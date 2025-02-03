@@ -1,0 +1,183 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|c:\\users\\bogdan.dragoi\\work\\3 programmi\\0_personal\\openn2\\openn2\\03_apimanager\\tiaportalopenness.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|solutionrelative:03_apimanager\\tiaportalopenness.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\01_constructor\\hardwareiodevices.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|solutionrelative:01_constructor\\hardwareiodevices.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|solutionrelative:mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|solutionrelative:mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\app.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|solutionrelative:app.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\01_constructor\\hardwareiocontrollers.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|solutionrelative:01_constructor\\hardwareiocontrollers.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\10_standardfunctions\\standardfunctions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|solutionrelative:10_standardfunctions\\standardfunctions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\01_constructor\\hardwaredevicetypesdatabase.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|solutionrelative:01_constructor\\hardwaredevicetypesdatabase.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{79008A31-F3E2-4CAC-A4EC-0D32652610D8}|Openn.csproj|solutionrelative:app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\obj\\Debug\\App.g.i.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:obj\\Debug\\App.g.i.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 1,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedHeight": 400,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{e506b91c-c606-466a-90a9-123d1d1e12b3}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "MainWindow.xaml",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\MainWindow.xaml",
+              "RelativeToolTip": "MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-02-03T21:23:36.701Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "TiaPortalOpenness.cs",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\03_ApiManager\\TiaPortalOpenness.cs",
+              "RelativeDocumentMoniker": "03_ApiManager\\TiaPortalOpenness.cs",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\03_ApiManager\\TiaPortalOpenness.cs",
+              "RelativeToolTip": "03_ApiManager\\TiaPortalOpenness.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAA/AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-03T21:23:38.602Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "MainWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\MainWindow.xaml.cs",
+              "RelativeDocumentMoniker": "MainWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\MainWindow.xaml.cs",
+              "RelativeToolTip": "MainWindow.xaml.cs",
+              "ViewState": "AQIAAMYAAAAAAAAAAAAgwNEAAAAJAAAA",
+              "Icon": "00000000-0000-0000-0000-000000000000.000000|iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADjSURBVDhPY0AGretv/t9x7tl/KJd0sOfii/\u002Bimfv\u002Bbzv7lGhDGBlid2Eo1pTkZNiSLsVQWVkJFWFgYGdnZygoKGAwNjZmhAphgt0XnsFd8P79\u002B/9Pnz6F47CwsP/R0dH/z549i2IhE5QGg1P3PzMsTtVgsFTiYvj27RtUFAF\u002B//7N0NfXx4BsCIoBIVoMDOaKnFg1wwDIkAkTJkB5oDBAAnFxcf/b29uhPNygsLCQYdWqVWC9KC748eMHlEU8QDGAHDBqABUMQEkHmZmZ/9\u002B\u002BfQvl4QbCwsIM06dPx50niAcMDADfJl5g9BqhpwAAAABJRU5ErkJggg==",
+              "WhenOpened": "2025-02-03T21:23:38.727Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "App.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\App.xaml.cs",
+              "RelativeDocumentMoniker": "App.xaml.cs",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\App.xaml.cs",
+              "RelativeToolTip": "App.xaml.cs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAABIAAAAJAAAA",
+              "Icon": "00000000-0000-0000-0000-000000000000.000000|iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADjSURBVDhPY0AGretv/t9x7tl/KJd0sOfii/\u002Bimfv\u002Bbzv7lGhDGBlid2Eo1pTkZNiSLsVQWVkJFWFgYGdnZygoKGAwNjZmhAphgt0XnsFd8P79\u002B/9Pnz6F47CwsP/R0dH/z549i2IhE5QGg1P3PzMsTtVgsFTiYvj27RtUFAF\u002B//7N0NfXx4BsCIoBIVoMDOaKnFg1wwDIkAkTJkB5oDBAAnFxcf/b29uhPNygsLCQYdWqVWC9KC748eMHlEU8QDGAHDBqABUMQEkHmZmZ/9\u002B\u002BfQvl4QbCwsIM06dPx50niAcMDADfJl5g9BqhpwAAAABJRU5ErkJggg==",
+              "WhenOpened": "2025-02-03T21:23:38.729Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "StandardFunctions.cs",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\10_StandardFunctions\\StandardFunctions.cs",
+              "RelativeDocumentMoniker": "10_StandardFunctions\\StandardFunctions.cs",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\10_StandardFunctions\\StandardFunctions.cs",
+              "RelativeToolTip": "10_StandardFunctions\\StandardFunctions.cs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAGwAAAAkAAAA",
+              "Icon": "00000000-0000-0000-0000-000000000000.000000|iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADtSURBVDhPYxgFCHDh4YX/sQtj/6u3qP9XblL\u002BHzk/8j9UiuHtx7f/VZpVwHxkNggwgohLjy79D18SzmAua86QZJbEwM/Bz3D91XWGCNMIRpAGo34jsGJkwMrMynCn9g5YP0PK0pT/3tO9/3/58gVuMjLA5wImEHH68WkGN3U3Bh4eHoiJJACwAb/\u002B/gI7CRuAeeH3398M8g3ycDayKxjC5oX9D54TjNX5IIDPC2Ann7x78n/E4ggGDw0PhgiDCLBrLj2/xJBhl0HQS3AFe67t\u002BT/lyBSGO2/uMHCxcTHYK9szdAd2kxwmIw8wMAAAESl0qwYO77cAAAAASUVORK5CYII=",
+              "WhenOpened": "2025-02-03T21:23:38.729Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "HardwareDeviceTypesDatabase.cs",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\01_Constructor\\HardwareDeviceTypesDatabase.cs",
+              "RelativeDocumentMoniker": "01_Constructor\\HardwareDeviceTypesDatabase.cs",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\01_Constructor\\HardwareDeviceTypesDatabase.cs",
+              "RelativeToolTip": "01_Constructor\\HardwareDeviceTypesDatabase.cs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAACkAAAAQAAAA",
+              "Icon": "00000000-0000-0000-0000-000000000000.000000|iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADtSURBVDhPYxgFCHDh4YX/sQtj/6u3qP9XblL\u002BHzk/8j9UiuHtx7f/VZpVwHxkNggwgohLjy79D18SzmAua86QZJbEwM/Bz3D91XWGCNMIRpAGo34jsGJkwMrMynCn9g5YP0PK0pT/3tO9/3/58gVuMjLA5wImEHH68WkGN3U3Bh4eHoiJJACwAb/\u002B/gI7CRuAeeH3398M8g3ycDayKxjC5oX9D54TjNX5IIDPC2Ann7x78n/E4ggGDw0PhgiDCLBrLj2/xJBhl0HQS3AFe67t\u002BT/lyBSGO2/uMHCxcTHYK9szdAd2kxwmIw8wMAAAESl0qwYO77cAAAAASUVORK5CYII=",
+              "WhenOpened": "2025-02-03T21:23:38.73Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "HardwareIoDevices.cs",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\01_Constructor\\HardwareIoDevices.cs",
+              "RelativeDocumentMoniker": "01_Constructor\\HardwareIoDevices.cs",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\01_Constructor\\HardwareIoDevices.cs",
+              "RelativeToolTip": "01_Constructor\\HardwareIoDevices.cs",
+              "ViewState": "AQIAADUAAAAAAAAAAAAIwGQAAAAzAAAA",
+              "Icon": "00000000-0000-0000-0000-000000000000.000000|iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADtSURBVDhPYxgFCHDh4YX/sQtj/6u3qP9XblL\u002BHzk/8j9UiuHtx7f/VZpVwHxkNggwgohLjy79D18SzmAua86QZJbEwM/Bz3D91XWGCNMIRpAGo34jsGJkwMrMynCn9g5YP0PK0pT/3tO9/3/58gVuMjLA5wImEHH68WkGN3U3Bh4eHoiJJACwAb/\u002B/gI7CRuAeeH3398M8g3ycDayKxjC5oX9D54TjNX5IIDPC2Ann7x78n/E4ggGDw0PhgiDCLBrLj2/xJBhl0HQS3AFe67t\u002BT/lyBSGO2/uMHCxcTHYK9szdAd2kxwmIw8wMAAAESl0qwYO77cAAAAASUVORK5CYII=",
+              "WhenOpened": "2025-02-03T21:23:38.731Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "HardwareIoControllers.cs",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\01_Constructor\\HardwareIoControllers.cs",
+              "RelativeDocumentMoniker": "01_Constructor\\HardwareIoControllers.cs",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\01_Constructor\\HardwareIoControllers.cs",
+              "RelativeToolTip": "01_Constructor\\HardwareIoControllers.cs",
+              "ViewState": "AQIAACwAAAAAAAAAAAAwwAoAAAAoAAAA",
+              "Icon": "00000000-0000-0000-0000-000000000000.000000|iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADtSURBVDhPYxgFCHDh4YX/sQtj/6u3qP9XblL\u002BHzk/8j9UiuHtx7f/VZpVwHxkNggwgohLjy79D18SzmAua86QZJbEwM/Bz3D91XWGCNMIRpAGo34jsGJkwMrMynCn9g5YP0PK0pT/3tO9/3/58gVuMjLA5wImEHH68WkGN3U3Bh4eHoiJJACwAb/\u002B/gI7CRuAeeH3398M8g3ycDayKxjC5oX9D54TjNX5IIDPC2Ann7x78n/E4ggGDw0PhgiDCLBrLj2/xJBhl0HQS3AFe67t\u002BT/lyBSGO2/uMHCxcTHYK9szdAd2kxwmIw8wMAAAESl0qwYO77cAAAAASUVORK5CYII=",
+              "WhenOpened": "2025-02-03T21:23:38.732Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "App.xaml",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\App.xaml",
+              "RelativeDocumentMoniker": "App.xaml",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\App.xaml",
+              "RelativeToolTip": "App.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-02-03T21:23:38.732Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "App.g.i.cs",
+              "DocumentMoniker": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\obj\\Debug\\App.g.i.cs",
+              "RelativeDocumentMoniker": "obj\\Debug\\App.g.i.cs",
+              "ToolTip": "C:\\Users\\bogdan.dragoi\\Work\\3 Programmi\\0_Personal\\Openn2\\Openn2\\obj\\Debug\\App.g.i.cs",
+              "RelativeToolTip": "obj\\Debug\\App.g.i.cs",
+              "ViewState": "AQIAACwAAAAAAAAAAAAQwDQAAAAMAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-03T21:23:38.746Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

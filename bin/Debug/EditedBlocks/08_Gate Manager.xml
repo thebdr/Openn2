@@ -1,0 +1,5517 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V17" />
+  <DocumentInfo>
+    <Created>2023-09-11T21:11:16.7675034Z</Created>
+    <ExportSetting>WithDefaults</ExportSetting>
+    <InstalledProducts>
+      <Product>
+        <DisplayName>Totally Integrated Automation Portal</DisplayName>
+        <DisplayVersion>V17 Update 6</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>TIA Portal Openness</DisplayName>
+        <DisplayVersion>V17 Update 6</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>TIA Portal Teamcenter Gateway</DisplayName>
+        <DisplayVersion>V17 Update 6</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>TIA Portal Version Control Interface</DisplayName>
+        <DisplayVersion>V17</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>Simotion SCOUT TIA</DisplayName>
+        <DisplayVersion>5.4.3.0</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>TIA Portal Test Suite Advanced</DisplayName>
+        <DisplayVersion>V17 Update 1</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>SIMOCODE ES</DisplayName>
+        <DisplayVersion>V17 Update 5</DisplayVersion>
+      </Product>
+      <Product>
+        <DisplayName>SINAMICS Startdrive Advanced</DisplayName>
+        <DisplayVersion>V17 SP1</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>SINAMICS Startdrive G130, G150, S120, S150, SINAMICS MV, S210</DisplayName>
+        <DisplayVersion>V17 SP1</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>SINAMICS Startdrive G110M, G120, G120C, G120D, G120P, G115D</DisplayName>
+        <DisplayVersion>V17 SP1</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>SIRIUS Safety ES</DisplayName>
+        <DisplayVersion>V17 Update 5</DisplayVersion>
+      </Product>
+      <Product>
+        <DisplayName>STEP 7 Professional</DisplayName>
+        <DisplayVersion>V17 Update 6</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>STEP 7 CFC</DisplayName>
+        <DisplayVersion>V17 Update 1</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>STEP 7 Safety</DisplayName>
+        <DisplayVersion>V17 Update 6</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>WinCC Advanced</DisplayName>
+        <DisplayVersion>V17 Update 6</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>SIMATIC Visualization Architect</DisplayName>
+        <DisplayVersion>V17 Update 5</DisplayVersion>
+      </OptionPackage>
+    </InstalledProducts>
+  </DocumentInfo>
+  <SW.Blocks.FC ID="0">
+    <AttributeList>
+      <AutoNumber>true</AutoNumber>
+      <HeaderAuthor />
+      <HeaderFamily />
+      <HeaderName />
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input" />
+  <Section Name="Output" />
+  <Section Name="InOut" />
+  <Section Name="Temp">
+    <Member Name="temp_EXAMPLE_OPEN" Datatype="Bool" />
+  </Section>
+  <Section Name="Constant" />
+  <Section Name="Return">
+    <Member Name="Ret_Val" Datatype="Void" Accessibility="Public" />
+  </Section>
+</Sections></Interface>
+      <IsIECCheckEnabled>false</IsIECCheckEnabled>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>08_Gate Manager</Name>
+      <Number>9</Number>
+      <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+      <UDABlockProperties />
+      <UDAEnableTagReadback>false</UDAEnableTagReadback>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+<!--Begin Template-->
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S1_SORTER_STOPPED_SC01" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S1_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0017-lv004-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B1 (DIAG  =SE01-B1)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B1 (SAFE CH1 =SE01-B1)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B1 (SAFE CH2 =SE01-B1)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SC01 SORTER =SC01 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S1_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SC01 OPEN DOOR REQUEST =SE01-B1 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SC01+LV004.EL001-Q32201 (SE01-B1)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B1 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B1 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B1 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B1" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S1 - SE01-B1 ([D002]  P1004 | =SC01+LV004.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="8" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S1_SORTER_STOPPED_SC01" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S1_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0017-lv004-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B2 (DIAG  =SE01-B2)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B2 (SAFE  CH1 =SE01-B2)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B2 (SAFE CH2 =SE01-B2)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SC01 SORTER =SC01 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S1_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SC01 OPEN DOOR REQUEST =SE01-B2 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SC01+LV004.EL001-Q32202 (SE01-B2)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B2 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B2 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B2 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B2" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="9" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="A" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="B" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="C" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S1 - SE01-B2 ([D003]  P1004 | =SC01+LV004.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="D" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S1_SORTER_STOPPED_SC01" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S1_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0005-lv008-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B3 (DIAG =SE01-B3)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B3 (SAFE CH1 =SE01-B3)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B3 (SAFE CH2 =SE01-B3)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SC01 SORTER =SC01 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S1_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SC01 OPEN DOOR REQUEST =SE01-B3 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SC01+LV008.EL001-Q32201 (SE01-B3)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B3" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="E" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="F" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="10" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="11" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S1 - SE01-B3 ([D012]  F1001 | =SC01+MA001.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="12" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S1_SORTER_STOPPED_SC01" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S1_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0005-lv008-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B4 (DIAG =SE01-B4)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B4 (SAFE CH1 =SE01-B4)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B4 (SAFE CH2 =SE01-B4)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SC01 SORTER =SC01 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S1_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SC01 OPEN DOOR REQUEST =SE01-B4 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SC01+LV008.EL001-Q32202 (SE01-B4)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B4 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B4 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B4 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B4" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="13" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="14" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="15" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="16" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S1 - SE01-B4 ([D013]  F1001 | =SC01+MA001.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="17" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S1_SORTER_STOPPED_SC01" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S2_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0018-lv004-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B5 (DIAG =SE01-B5)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B5 (SAFE CH1 =SE01-B5)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B5 (SAFE CH2 =SE01-B5)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SC02 SORTER =SC02 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S2_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SC02 OPEN DOOR REQUEST =SE01-B5 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SC02+LV004.EL001-Q32201 (SE01-B5)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B5 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B5 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B5 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B5" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="18" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="19" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="1A" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="1B" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S2 - SE01-B5 ([D004]  P1012 | =SC02+LV004.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="1C" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S2_SORTER_STOPPED_SC02" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S2_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0018-lv004-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B6 (DIAG =SE01-B6)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B6 (SAFE  CH1 =SE01-B6)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B6 (SAFE  CH2 =SE01-B6)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SC02 SORTER =SC02 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S2_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SC02 OPEN DOOR REQUEST =SE01-B6 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SC02+LV004.EL001-Q32202 (SE01-B6)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B6 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B6 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B6 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B6" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="1D" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="1E" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="1F" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="20" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S2 - SE01-B6 ([D005]  P1012 | =SC02+LV004.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="21" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S2_SORTER_STOPPED_SC02" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S2_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0006-lv008-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B7 (DIAG  =SE01-B7)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B7 (SAFE CH1 =SE01-B7)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B7 (SAFE CH2 =SE01-B7)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SC02 SORTER =SC02 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S2_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SC02 OPEN DOOR REQUEST =SE01-B7 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SC02+LV008.EL001-Q32201 (SE01-B7)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B7 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B7 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B7 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B7" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="22" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="23" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="24" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="25" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S2 - SE01-B7 ([D014]  F1002 | =SC02+MA001.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="26" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S2_SORTER_STOPPED_SC02" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S2_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0006-lv008-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B8 (DIAG  =SE01-B8)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B8 (SAFE CH1 =SE01-B8)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B8 (SAFE CH2 =SE01-B8)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SC02 SORTER =SC02 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S2_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SC02 OPEN DOOR REQUEST =SE01-B8 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SC02+LV008.EL001-Q32202 (SE01-B8)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B8 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B8 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B8 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B8" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="27" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="28" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="29" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="2A" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S2 - SE01-B8 ([D015]  F1002 | =SC02+MA001.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="2B" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S2_SORTER_STOPPED_SC02" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S3_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0083-lv001-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B9 (DIAG =SE01-B9)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B9 (SAFE CH1 =SE01-B9)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B9 (SAFE CH2 =SE01-B9)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SF03 SORTER =SF03 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S3_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SF03 OPEN DOOR REQUEST =SE01-B9 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SF03+LV001.EL001-Q32201 (SE01-B9)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B9 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B9 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B9 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B9" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="2C" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="2D" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="2E" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="2F" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S3 - SE01-B9 ([D024]  F1003 | =SF03+MA001.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="30" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S3_SORTER_STOPPED_SF03" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S3_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0083-lv001-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B10 (DIAG =SE01-B10)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B10 (SAFE CH1 =SE01-B10)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B10 (SAFE CH2 =SE01-B10)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SF03 SORTER =SF03 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S3_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SF03 OPEN DOOR REQUEST =SE01-B10 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SF03+LV001.EL001-Q32202 (SE01-B10)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B10 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B10 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B10 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B10" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="31" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="32" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="33" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="34" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S3 - SE01-B10 ([D025]  F1003 | =SF03+MA001.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="35" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S3_SORTER_STOPPED_SF03" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S4_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0084-lv001-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B11 (DIAG =SE01-B11)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B11 (SAFE CH1 =SE01-B11)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B11 (SAFE CH2 =SE01-B11)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SF04 SORTER =SF04 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S4_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SF04 OPEN DOOR REQUEST =SE01-B11 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SF04+LV001.EL001-Q32201 (SE01-B11)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B11 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B11 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B11 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B11" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="36" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="37" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="38" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="39" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S4 - SE01-B11 ([D026]  F1004 | =SF04+MA001.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="3A" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="S4_SORTER_STOPPED_SF04" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S4_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0084-lv001-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B12 (DIAG =SE01-B12)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B12 (SAFE CH1 =SE01-B12)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SE01-B12 (SAFE CH2 =SE01-B12)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="27">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="PNC_I_SF04 SORTER =SF04 RUNNING  []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="S4_SORTER_STOP" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="PNC_I_SF04 OPEN DOOR REQUEST =SE01-B12 []" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="SOLENOID CONTROL =SF04+LV001.EL001-Q32202 (SE01-B12)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B12 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B12 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SE01-B12 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="35" />
+    <Part Name="Coil" UId="36" />
+    <Call UId="37">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="38">
+          <Component Name="GATE_SE01-B12" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="44">
+      <Powerrail />
+      <NameCon UId="35" Name="in" />
+      <NameCon UId="37" Name="en" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="21" />
+      <NameCon UId="35" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <NameCon UId="35" Name="out" />
+      <NameCon UId="36" Name="in" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="23" />
+      <NameCon UId="37" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="24" />
+      <NameCon UId="37" Name="DIAG" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="25" />
+      <NameCon UId="37" Name="CH1" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="37" Name="CH2" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="27" />
+      <NameCon UId="37" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="55">
+      <IdentCon UId="30" />
+      <NameCon UId="37" Name="Open_Request" />
+    </Wire>
+    <Wire UId="56">
+      <OpenCon UId="39" />
+      <NameCon UId="37" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="57">
+      <OpenCon UId="40" />
+      <NameCon UId="37" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="58">
+      <OpenCon UId="41" />
+      <NameCon UId="37" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="59">
+      <OpenCon UId="42" />
+      <NameCon UId="37" Name="ACK" />
+    </Wire>
+    <Wire UId="60">
+      <NameCon UId="37" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="61">
+      <NameCon UId="37" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="62">
+      <NameCon UId="37" Name="EM_Cut_Delay" />
+      <OpenCon UId="43" />
+    </Wire>
+    <Wire UId="63">
+      <NameCon UId="37" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="64">
+      <NameCon UId="37" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="3B" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="3C" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Sorter Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="3D" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="3E" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>S4 - SE01-B12 ([D027]  F1004 | =SF04+MA001.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="3F" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0057-uc11-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC114.VS019-8AF3 (SAFE CH1 =SC00+UC114.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC114.VS019-8AF3 (SAFE CH2 =SC00+UC114.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC114.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC114.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC114.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC114.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="40" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="41" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="42" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="43" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L1 - SC00+UC114.VS019 ([D010]  S4001 | =SC00+UC11.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="44" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0053-uc12-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC124.VS019-8AF3 (SAFE CH1 =SC00+UC124.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC124.VS019-8AF3 (SAFE CH2 =SC00+UC124.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC124.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC124.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC124.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC124.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="45" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="46" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="47" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="48" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L2 - SC00+UC124.VS019 ([D009]  S4002 | =SC00+UC12.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="49" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0050-uc13-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC134.VS019-8AF3 (SAFE CH1 =SC00+UC134.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC134.VS019-8AF3 (SAFE CH2 =SC00+UC134.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC134.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC134.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC134.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC134.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4A" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="4B" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="4C" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="4D" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L3 - SC00+UC134.VS019 ([D008]  S4003 | =SC00+UC13.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="4E" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0025-uc14-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC144.VS019-8AF3 (SAFE CH1 =SC00+UC144.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC144.VS019-8AF3 (SAFE CH2 =SC00+UC144.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC144.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC144.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC144.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC144.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4F" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="50" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="51" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="52" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L4 - SC00+UC144.VS019 ([D007]  S4004 | =SC00+UC14.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="53" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0020-uc15-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC154.VS019-8AF3 (SAFE CH1 =SC00+UC154.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC154.VS019-8AF3 (SAFE CH2 =SC00+UC154.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC154.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC154.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC154.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC154.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="54" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="55" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="56" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="57" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L5 - SC00+UC154.VS019 ([D006]  S4005 | =SC00+UC15.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="58" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0015-uc16-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC164.VS019-8AF3 (SAFE CH1 =SC00+UC164.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC164.VS019-8AF3 (SAFE CH2 =SC00+UC164.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC164.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC164.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC164.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC164.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="59" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5A" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="5B" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="5C" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L6 - SC00+UC164.VS019 ([D001]  S4006 | =SC00+UC16.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="5D" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0028-uc17-el001-k30001_SN50" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC175.VS019-8AF3 (SAFE CH1 =SC00+UC175.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC175.VS019-8AF3 (SAFE CH2 =SC00+UC175.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC175.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC175.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC175.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC175.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="5E" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5F" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="60" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="61" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L7 - SC00+UC175.VS019 ([D011]  S4007 | =SC00+UC17.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="62" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0066-uc21-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC214.VS019-8AF3 (SAFE CH1 =SC00+UC214.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC214.VS019-8AF3 (SAFE CH2 =SC00+UC214.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC214.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC214.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC214.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC214.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="63" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="64" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="65" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="66" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L8 - SC00+UC214.VS019 ([D022]  S4008 | =SC00+UC21.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="67" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0061-uc22-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC224.VS019-8AF3 (SAFE CH1 =SC00+UC224.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC224.VS019-8AF3 (SAFE CH2 =SC00+UC224.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC224.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC224.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC224.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC224.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="68" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="69" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6A" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="6B" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L9 - SC00+UC224.VS019 ([D021]  S4009 | =SC00+UC22.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="6C" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0056-uc23-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC234.VS019-8AF3 (SAFE CH1 =SC00+UC234.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC234.VS019-8AF3 (SAFE CH2 =SC00+UC234.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC234.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC234.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC234.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC234.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="6D" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="6E" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6F" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="70" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L10 - SC00+UC234.VS019 ([D020]  S4010 | =SC00+UC23.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="71" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0051-uc24-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC244.VS019-8AF3 (SAFE CH1 =SC00+UC244.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC244.VS019-8AF3 (SAFE CH2 =SC00+UC244.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC244.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC244.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC244.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC244.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="72" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="73" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="74" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="75" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L11 - SC00+UC244.VS019 ([D019]  S4011 | =SC00+UC24.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="76" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0046-uc25-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC254.VS019-8AF3 (SAFE CH1 =SC00+UC254.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC254.VS019-8AF3 (SAFE CH2 =SC00+UC254.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC254.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC254.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC254.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC254.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="77" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="78" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="79" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7A" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L12 - SC00+UC254.VS019 ([D018]  S4012 | =SC00+UC25.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="7B" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0033-uc26-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC264.VS019-8AF3 (SAFE CH1 =SC00+UC264.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC264.VS019-8AF3 (SAFE CH2 =SC00+UC264.VS019)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC264.VS019-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC264.VS019-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC264.VS019-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC264.VS019" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="7C" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="7D" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="7E" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7F" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L13 - SC00+UC264.VS019 ([D016]  S4013 | =SC00+UC26.EL001/311)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="80" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0041-uc27-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC273.VS024-8AF3 (SAFE CH1 =SC00+UC273.VS024)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SC00+UC273.VS024-8AF3 (SAFE CH2 =SC00+UC273.VS024)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC273.VS024-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC273.VS024-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SC00+UC273.VS024-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SC00+UC273.VS024" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="81" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="82" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="83" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="84" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L14 - SC00+UC273.VS024 ([D017]  S4014 | =SC00+UC27.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="85" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="n0072-uf51-el001-k30001_SN51" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="22">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SF00+UF511.VS015-8AF3 (SAFE CH1 =SF00+UF511.VS015)" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="SAFETY DOOR OPEN =SF00+UF511.VS015-8AF3 (SAFE CH2 =SF00+UF511.VS015)" />
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="25">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LiteralConstant" UId="26">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SF00+UF511.VS015-8AF3 EM_CUT" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SF00+UF511.VS015-8AF3 OPEN" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="DOOR =SF00+UF511.VS015-8AF3 IN ALARM" />
+      </Symbol>
+    </Access>
+    <Call UId="30">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="31">
+          <Component Name="GATE_SF00+UF511.VS015" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="1oo1_evaluation" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="40">
+      <Powerrail />
+      <NameCon UId="30" Name="en" />
+    </Wire>
+    <Wire UId="41">
+      <IdentCon UId="21" />
+      <NameCon UId="30" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="30" Name="DIAG" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="23" />
+      <NameCon UId="30" Name="CH1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="24" />
+      <NameCon UId="30" Name="CH2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="25" />
+      <NameCon UId="30" Name="1oo1_evaluation" />
+    </Wire>
+    <Wire UId="46">
+      <OpenCon UId="32" />
+      <NameCon UId="30" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <OpenCon UId="33" />
+      <NameCon UId="30" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <OpenCon UId="34" />
+      <NameCon UId="30" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="35" />
+      <NameCon UId="30" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="26" />
+      <NameCon UId="30" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <OpenCon UId="36" />
+      <NameCon UId="30" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <OpenCon UId="37" />
+      <NameCon UId="30" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="30" Name="Solenoid" />
+      <OpenCon UId="38" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="30" Name="EM_Cut" />
+      <IdentCon UId="27" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="30" Name="EM_Cut_Delay" />
+      <OpenCon UId="39" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="30" Name="Diag_Open" />
+      <IdentCon UId="28" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="30" Name="Diag_Alarm" />
+      <IdentCon UId="29" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="86" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="87" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Conveyor Gate</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="88" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="89" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>L15 - SF00+UF511.VS015 ([D023]  S4029 | =SF00+UF51.EL001/310)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+<!--End Template-->
+      <MultilingualText ID="8A" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="8B" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.FC>
+</Document>

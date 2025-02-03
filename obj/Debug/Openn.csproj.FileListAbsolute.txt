@@ -1,0 +1,124 @@
+C:\Users\Production\source\repos\Openn\bin\Debug\Openn.exe.config
+C:\Users\Production\source\repos\Openn\bin\Debug\Openn.exe
+C:\Users\Production\source\repos\Openn\bin\Debug\Openn.pdb
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn.csproj.AssemblyReference.cache
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn.csproj.SuggestedBindingRedirects.cache
+C:\Users\Production\source\repos\Openn\obj\Debug\MainWindow.g.cs
+C:\Users\Production\source\repos\Openn\obj\Debug\App.g.cs
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn_MarkupCompile.cache
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn_MarkupCompile.lref
+C:\Users\Production\source\repos\Openn\obj\Debug\MainWindow.baml
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn.g.resources
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn.Properties.Resources.resources
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn.csproj.GenerateResource.cache
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn.csproj.CoreCompileInputs.cache
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn.exe
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn.pdb
+C:\Users\Production\source\repos\Openn\bin\Debug\Siemens.Engineering.dll
+C:\Users\Production\source\repos\Openn\bin\Debug\Siemens.Engineering.Hmi.dll
+C:\Users\Production\source\repos\Openn\bin\Debug\Siemens.Engineering.xml
+C:\Users\Production\source\repos\Openn\bin\Debug\Siemens.Engineering.Hmi.xml
+C:\Users\Production\source\repos\Openn\obj\Debug\Openn.csproj.CopyComplete
+C:\Users\antonio\source\repos\Openn\bin\Debug\Openn.exe.config
+C:\Users\antonio\source\repos\Openn\bin\Debug\Openn.exe
+C:\Users\antonio\source\repos\Openn\bin\Debug\Openn.pdb
+C:\Users\antonio\source\repos\Openn\bin\Debug\Siemens.Engineering.dll
+C:\Users\antonio\source\repos\Openn\bin\Debug\Siemens.Engineering.Hmi.dll
+C:\Users\antonio\source\repos\Openn\bin\Debug\Siemens.Engineering.xml
+C:\Users\antonio\source\repos\Openn\bin\Debug\Siemens.Engineering.Hmi.xml
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn.csproj.AssemblyReference.cache
+C:\Users\antonio\source\repos\Openn\obj\Debug\MainWindow.g.cs
+C:\Users\antonio\source\repos\Openn\obj\Debug\App.g.cs
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn_MarkupCompile.cache
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn_MarkupCompile.lref
+C:\Users\antonio\source\repos\Openn\obj\Debug\MainWindow.baml
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn.g.resources
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn.Properties.Resources.resources
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn.csproj.GenerateResource.cache
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn.csproj.CoreCompileInputs.cache
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn.csproj.CopyComplete
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn.exe
+C:\Users\antonio\source\repos\Openn\obj\Debug\Openn.pdb
+C:\Users\TIA\source\repos\Openn\bin\Debug\Openn.exe.config
+C:\Users\TIA\source\repos\Openn\bin\Debug\Openn.exe
+C:\Users\TIA\source\repos\Openn\bin\Debug\Openn.pdb
+C:\Users\TIA\source\repos\Openn\bin\Debug\Siemens.Engineering.dll
+C:\Users\TIA\source\repos\Openn\bin\Debug\Siemens.Engineering.Hmi.dll
+C:\Users\TIA\source\repos\Openn\bin\Debug\Siemens.Engineering.xml
+C:\Users\TIA\source\repos\Openn\bin\Debug\Siemens.Engineering.Hmi.xml
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn.csproj.AssemblyReference.cache
+C:\Users\TIA\source\repos\Openn\obj\Debug\MainWindow.g.cs
+C:\Users\TIA\source\repos\Openn\obj\Debug\App.g.cs
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn_MarkupCompile.cache
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn_MarkupCompile.lref
+C:\Users\TIA\source\repos\Openn\obj\Debug\MainWindow.baml
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn.g.resources
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn.Properties.Resources.resources
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn.csproj.GenerateResource.cache
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn.csproj.CoreCompileInputs.cache
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn.csproj.CopyComplete
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn.exe
+C:\Users\TIA\source\repos\Openn\obj\Debug\Openn.pdb
+C:\repos\Openn\obj\Debug\Openn.csproj.AssemblyReference.cache
+C:\repos\Openn\obj\Debug\MainWindow.g.cs
+C:\repos\Openn\obj\Debug\App.g.cs
+C:\repos\Openn\obj\Debug\Openn_MarkupCompile.cache
+C:\repos\Openn\obj\Debug\Openn_MarkupCompile.lref
+C:\repos\Openn\obj\Debug\Openn.exe
+C:\repos\Openn\obj\Debug\Openn.pdb
+C:\repos\Openn\bin\Debug\Openn.exe.config
+C:\repos\Openn\bin\Debug\Openn.exe
+C:\repos\Openn\bin\Debug\Openn.pdb
+C:\repos\Openn\bin\Debug\Siemens.Engineering.dll
+C:\repos\Openn\bin\Debug\Siemens.Engineering.Hmi.dll
+C:\repos\Openn\bin\Debug\Siemens.Engineering.xml
+C:\repos\Openn\bin\Debug\Siemens.Engineering.Hmi.xml
+C:\repos\Openn\obj\Debug\MainWindow.baml
+C:\repos\Openn\obj\Debug\Openn.g.resources
+C:\repos\Openn\obj\Debug\Openn.Properties.Resources.resources
+C:\repos\Openn\obj\Debug\Openn.csproj.GenerateResource.cache
+C:\repos\Openn\obj\Debug\Openn.csproj.CoreCompileInputs.cache
+C:\repos\Openn\obj\Debug\Openn.csproj.CopyComplete
+C:\repos\Openn2\bin\Debug\Siemens.Engineering.dll
+C:\repos\Openn2\bin\Debug\Siemens.Engineering.Hmi.dll
+C:\repos\Openn2\bin\Debug\Siemens.Engineering.xml
+C:\repos\Openn2\bin\Debug\Siemens.Engineering.Hmi.xml
+C:\repos\Openn2\obj\Debug\Openn.csproj.AssemblyReference.cache
+C:\repos\Openn2\obj\Debug\MainWindow.g.cs
+C:\repos\Openn2\obj\Debug\App.g.cs
+C:\repos\Openn2\obj\Debug\MainWindow.baml
+C:\repos\Openn2\obj\Debug\Openn.Properties.Resources.resources
+C:\repos\Openn2\obj\Debug\Openn.csproj.GenerateResource.cache
+C:\repos\Openn2\obj\Debug\Openn.csproj.CoreCompileInputs.cache
+C:\repos\Openn2\obj\Debug\Openn.csproj.CopyComplete
+C:\repos\Openn2\bin\Debug\Openn2.exe.config
+C:\repos\Openn2\bin\Debug\Openn2.exe
+C:\repos\Openn2\bin\Debug\Openn2.pdb
+C:\repos\Openn2\obj\Debug\Openn2_MarkupCompile.cache
+C:\repos\Openn2\obj\Debug\Openn2_MarkupCompile.lref
+C:\repos\Openn2\obj\Debug\Openn2.g.resources
+C:\repos\Openn2\obj\Debug\Openn2.exe
+C:\repos\Openn2\obj\Debug\Openn2.pdb
+C:\repos\Openn2\bin\Debug\FontAwesome.WPF.dll
+C:\repos\Openn2\bin\Debug\FontAwesome.WPF.xml
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\bin\Debug\Openn2.exe.config
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\bin\Debug\Openn2.exe
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\bin\Debug\Openn2.pdb
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\bin\Debug\FontAwesome.WPF.dll
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\bin\Debug\Siemens.Engineering.Hmi.dll
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\bin\Debug\FontAwesome.WPF.xml
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\bin\Debug\Siemens.Engineering.xml
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\bin\Debug\Siemens.Engineering.Hmi.xml
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn.csproj.AssemblyReference.cache
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\MainWindow.g.cs
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\App.g.cs
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn2_MarkupCompile.cache
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn2_MarkupCompile.lref
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\MainWindow.baml
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn2.g.resources
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn.Properties.Resources.resources
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn.csproj.GenerateResource.cache
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn.csproj.CoreCompileInputs.cache
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn.csproj.Up2Date
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn2.exe
+C:\Users\bogdan.dragoi\Work\3 Programmi\0_Personal\Openn2\Openn2\obj\Debug\Openn2.pdb

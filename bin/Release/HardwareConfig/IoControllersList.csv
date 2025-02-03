@@ -1,0 +1,3 @@
+# Station Name;Device Model Identifier;IP Address;Subnet Name;Custom Parameters; !!! "Plc" Type must be always first
+n0001-zp001-el001-k30001;6ES7517-3FP00-0AB0;192.168.50.1;Subnet50;
+n0001-zp001-el001-k30002;6GK7542-1AX00-0XE0;192.168.51.1;Subnet51;
