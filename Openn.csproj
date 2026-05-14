@@ -137,7 +137,15 @@
     </Resource>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="10_StandardFunctions\Logging\" />
     <Folder Include="12_LogViewer\" />
+    <Folder Include="Application\Services\" />
+    <Folder Include="CompositionRoot\" />
+    <Folder Include="Core\Interfaces\" />
+    <Folder Include="Core\Models\" />
+    <Folder Include="Infrastructures\Hardware\" />
+    <Folder Include="Infrastructures\Logging\" />
+    <Folder Include="Infrastructures\TiaPortal\" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.8">
