@@ -108,7 +108,6 @@ namespace Openn
             await RunBackend(async () =>
             {
                 tbAttachedProject.Text = await TiaWorker.Run(() => tia.AttachToProject(path));
-                await RefreshBlocksDropdown();
             });
         }
 
@@ -127,29 +126,22 @@ namespace Openn
             });
         }
 
-        private async void btnExportSource_Click(object sender, RoutedEventArgs e)
+        private void btnExportSource_Click(object sender, RoutedEventArgs e)
         {
-            if (cbSourceBlocksList.SelectedItem == null)
+            if (backendBusy)
             {
-                Log("Can't export: no block selected");
+                Log("Skipped: another operation is still running");
                 return;
             }
 
-            //entries look like "[Type] Name" - strip the type prefix
-            string[] blockInfo = cbSourceBlocksList.SelectedItem.ToString().Split(']');
-            if (blockInfo.Length < 2 || blockInfo[1].Length < 2)
+            //the window queues its reads/exports on the TiaWorker itself
+            var searchWindow = new BlockSearchWindow(
+                () => tia.GetAllBlocks(),
+                blockName => tia.ExportBlock(blockName))
             {
-                Log("Can't export: invalid block entry selected");
-                return;
-            }
-            string blockName = blockInfo[1].Substring(1);
-
-            await RunBackend(() => TiaWorker.Run(() => tia.ExportBlock(blockName)));
-        }
-
-        private async void btnRefreshBlocks_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => RefreshBlocksDropdown());
+                Owner = this,
+            };
+            searchWindow.ShowDialog();
         }
 
         private async void btnImportSource_Click(object sender, RoutedEventArgs e)
@@ -201,16 +193,6 @@ namespace Openn
         }
 
         #endregion Buttons & Controls
-
-        private async Task RefreshBlocksDropdown()
-        {
-            List<string> blocks = await TiaWorker.Run(() => tia.UpdateSourceBlocksList());
-
-            cbSourceBlocksList.Items.Clear();
-            foreach (string blockName in blocks)
-                cbSourceBlocksList.Items.Add(blockName);
-            cbSourceBlocksList.SelectedIndex = 0;
-        }
 
         private async Task RefreshOpenInstancesDropdown(bool quietWhenBusy)
         {

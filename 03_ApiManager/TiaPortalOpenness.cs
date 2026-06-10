@@ -168,53 +168,86 @@ namespace Openn._03_ApiManager
 
         public void ExportBlock(string blockName)
         {
+            if (project == null)
+            {
+                Log("Can't export: No Tia Project Attached");
+                return;
+            }
             PlcSoftware plcSoftware = GetPlcSoftware(project);
+            if (plcSoftware == null)
+            {
+                Log("Can't export: no Plc Software found in the project");
+                return;
+            }
 
-            PlcBlock plcBlock = plcSoftware.BlockGroup.Blocks.Find(blockName);
+            PlcBlock plcBlock = FindBlock(plcSoftware.BlockGroup, blockName);
+            if (plcBlock == null)
+            {
+                Log("ERROR Exporting Block \nBlock not found: " + blockName);
+                return;
+            }
+
             try
             {
-                plcBlock.Export(new FileInfo(appBaseDir + "\\ExportedBlocks\\" + plcBlock.Name + ".xml"), ExportOptions.WithDefaults);
+                var exportFile = new FileInfo(appBaseDir + "\\ExportedBlocks\\" + plcBlock.Name + ".xml");
+                exportFile.Directory.Create(); //no-op when it already exists
+                plcBlock.Export(exportFile, ExportOptions.WithDefaults);
+                Log("Exported software block: " + plcBlock.Name);
             }
             catch (Exception e)
             {
                 Log("ERROR Exporting Source Block \n" + e.Message);
-                return;
             }
-
-            if (!(plcBlock == null))
-                Log("Exported software block: " + plcBlock.Name);
         }
 
-        public List<string> UpdateSourceBlocksList()
+        /// <summary>
+        /// All program blocks of the attached project, including blocks inside
+        /// block groups (subfolders) at any depth.
+        /// </summary>
+        public IList<PlcBlockInfo> GetAllBlocks()
         {
-            List<string> Blocks = new List<string>();
-            //check if Tia Project is attached
-            if ((project == null))
+            var blocks = new List<PlcBlockInfo>();
+
+            if (project == null)
             {
-                Log("Can't refresh blocks: No Tia Project Attached");
-                return Blocks;
+                Log("Can't read blocks: No Tia Project Attached");
+                return blocks;
+            }
+            PlcSoftware plcSoftware = GetPlcSoftware(project);
+            if (plcSoftware == null)
+            {
+                Log("Can't read blocks: no Plc Software found in the project");
+                return blocks;
             }
 
-            //Get all blocks from the Plc Software            
-            string BlockType = "";
-            foreach (PlcBlock block in GetAllPlcSoftwareBlocks(project) ?? Enumerable.Empty<object>())
-            {
-                BlockType = block.GetType().Name.ToString();
-                Blocks.Add("[" + BlockType + "] " + block.Name);
-            }
-            Blocks.Sort();
+            CollectBlocks(plcSoftware.BlockGroup, "", blocks);
+            blocks.Sort((a, b) => string.Compare(a.DisplayText, b.DisplayText, StringComparison.OrdinalIgnoreCase));
 
-            if (Blocks.Count > 0)
+            Log("Software blocks list refreshed: found " + blocks.Count + " block(s)");
+            return blocks;
+        }
+
+        private void CollectBlocks(PlcBlockGroup group, string groupPath, List<PlcBlockInfo> blocks)
+        {
+            foreach (PlcBlock block in group.Blocks)
+                blocks.Add(new PlcBlockInfo(block.Name, block.GetType().Name, groupPath));
+
+            foreach (PlcBlockUserGroup subGroup in group.Groups)
+                CollectBlocks(subGroup, groupPath.Length == 0 ? subGroup.Name : groupPath + "/" + subGroup.Name, blocks);
+        }
+
+        /// <summary>Finds a block by name anywhere in the program blocks tree (names are unique per Plc).</summary>
+        private PlcBlock FindBlock(PlcBlockGroup group, string blockName)
+        {
+            PlcBlock block = group.Blocks.Find(blockName);
+            if (block != null) return block;
+
+            foreach (PlcBlockUserGroup subGroup in group.Groups)
             {
-                Log("Software Blocks List Refreshed: Found " + Blocks.Count + " blocks");
-                return Blocks;
+                block = FindBlock(subGroup, blockName);
+                if (block != null) return block;
             }
-            else
-            {
-                Log("Can't refresh blocks: No Software Blocks found");
-                var emptyList = new List<string>{"List Empty"};
-                return emptyList;
-            }
+            return null;
         }
 
         public void ImportPlcBlock(string fileName)
@@ -857,22 +890,6 @@ namespace Openn._03_ApiManager
                 break;
             }
             return plcSoftware;
-        }
-
-        private List<PlcBlock> GetAllPlcSoftwareBlocks(Project _project)
-        {
-            PlcSoftware plcSoftware = GetPlcSoftware(project);
-            if (plcSoftware == null)
-                return null;
-
-            List<PlcBlock> plcSoftwareBlocksList = new List<PlcBlock>();
-
-            foreach (PlcBlock plcBlock in plcSoftware.BlockGroup.Blocks ?? Enumerable.Empty<object>())
-            {
-                plcSoftwareBlocksList.Add(plcBlock);
-            }
-
-            return plcSoftwareBlocksList;
         }
 
         public struct TiaProcessInfo

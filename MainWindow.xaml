@@ -69,15 +69,11 @@
         <TextBox x:Name="tbAttachedProject" Grid.Row="0" Grid.Column="5" Grid.ColumnSpan="2" VerticalAlignment="Bottom" Height="20" Margin="5,2,2,5" FontSize="11" IsReadOnly ="True" Background="#E6E6E6"/>
         <Label Grid.Row="0" Grid.Column="5" Grid.ColumnSpan="2" Content="Attached Project:" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="2,1,5,2" FontSize="10"/>
         
-        <!-- Export Source from PLC Program Block /-->
+        <!-- Search & Export PLC Program Blocks (opens the regex search window) /-->
         <Button x:Name="btnExportSource" Click="btnExportSource_Click" Grid.Row="1" Grid.Column="0" Margin="2,2,2,2">
-            <AccessText Text="Export Source from Block" TextWrapping="Wrap" TextAlignment="Center"/>
+            <AccessText Text="Search / Export Blocks.." TextWrapping="Wrap" TextAlignment="Center"/>
         </Button>
-        <Button x:Name="btnRefreshBlocks" Click="btnRefreshBlocks_Click" Grid.Row="1" Grid.Column="2" Margin="2,2,4,2" HorizontalAlignment="Right" VerticalAlignment="Top" Width="80" Height="20">
-            <AccessText Text="Refresh Blocks" TextWrapping="Wrap" TextAlignment="Center" FontSize="10"/>
-        </Button>
-        <Label Grid.Row="1" Grid.Column="1" Content="Name of the Block:" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="2,1,5,2" FontSize="9"/>        
-        <ComboBox x:Name="cbSourceBlocksList" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" VerticalAlignment="Bottom" Height="20" Margin="5,2,2,5" FontSize="11" Background="White"></ComboBox>
+        <Label Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Content="Opens a search window over all program blocks (regex, includes subfolders)" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="2,1,5,2" FontSize="9"/>
 
         <!-- Import Source Code to PLC Block /-->
         <Button x:Name="btnImportSource" Click="btnImportSource_Click" Grid.Row="2" Grid.Column="0" Margin="2,2,2,2">

@@ -61,8 +61,11 @@ files, imports/exports PLC blocks.
    chosen version appears in the window title and the first log line.
 3. **Config load:** log shows
    `Hardware configuration loaded: 14 device types, 2 controller(s), 87 IO device(s), 336 module(s)`.
-4. **Project handling:** attach to a running TIA instance (dropdown) and by path;
-   Refresh Blocks; export and import a block.
+4. **Project handling:** attach to a running TIA instance (dropdown) and by path.
+   Open "Search / Export Blocks" — the list must include blocks inside block-group
+   subfolders (shown as `[Type] Folder/Name`), the search box filters as you type
+   (regex, case-insensitive), and exporting a block that lives in a subfolder must
+   work. Import a block.
 5. **Generate Hardware** on a fresh project: devices created, IPs and PN numbers set,
    and custom parameters land where the old hardcoded code put them — Murrelektronik FS
    Data module: `Failsafe_FDestinationAddress`/`FMonitoringtime`/`FParameterSignature…`
