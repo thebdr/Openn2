@@ -25,6 +25,10 @@ namespace Openn
         public MainWindow()
         {
             InitializeComponent();
+            AttachLogView(lbLogView);
+
+            Title += " - " + OpennessSetup.SelectedInstallation.DisplayName;
+            Log("Using " + OpennessSetup.SelectedInstallation.DisplayName + ": " + OpennessSetup.SelectedInstallation.EngineeringDllPath);
 
             //backgroundWorker1.DoWork += BackgroundWorker1_DoWork;
 
@@ -74,6 +78,12 @@ namespace Openn
             }
             else if (rbUseInstance.IsChecked == true)
             {
+                if (cbOpenTiaInstances.SelectedIndex < 0)
+                {
+                    Log("Can't attach: no open Tia Portal instance selected");
+                    ShowRunningIcon("stop");
+                    return;
+                }
                 path = processInfoList[cbOpenTiaInstances.SelectedIndex].ProjectPath;
             }
 
@@ -196,10 +206,17 @@ namespace Openn
 
         public void UpdateOpenInstancesDropdown()
         {
-            if (processInfoList.Equals(tia.GetOpenTiaInstances()))
+            try
+            {
+                processInfoList = tia.GetOpenTiaInstances();
+            }
+            catch (System.Exception e)
+            {
+                // typically: Siemens.Engineering.dll of the selected version could not be
+                // loaded, or the user is not a member of the "Siemens TIA Openness" group
+                Log("ERROR querying open Tia Portal instances \n" + e.Message);
                 return;
-
-            processInfoList = tia.GetOpenTiaInstances();
+            }
 
             cbOpenTiaInstances.Items.Clear();
             foreach (var processInfo in processInfoList)

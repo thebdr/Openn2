@@ -14,7 +14,6 @@ using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW;
 using System.Linq;
 using static Openn._10_StandardFunctions.LogsManager;
-using System.Drawing;
 using System.Threading.Tasks;
 
 namespace Openn._03_ApiManager
@@ -27,102 +26,71 @@ namespace Openn._03_ApiManager
 
         private TiaPortal portal = null;
         private Project project = null;
-        private Device device = null;
-        private DirectoryInfo path = null;
         private IoSystem ioSystem = null;
         private IList<Tuple<Device, DeviceItem>> ioControllers = null;
         private IList<Device> ioDevices = null;
         private Subnet subnet = null;
         private Dictionary<string, Tuple<Subnet, IoSystem>> ioSystems;
 
-        //temp vars
-        private List<DeviceItem> t_DeviceItems = new List<DeviceItem>();
-
-
         #endregion
 
         public async Task<string> AttachToProject(string _Path = "")
         {
-            bool bCreateNewProject = false;
+            bool bCreateNewProject = string.IsNullOrEmpty(_Path); //if no path is specified, create a new project
             string defaultProjectsFolder = appBaseDir + "\\TiaProjects\\";
             string projectName = "openness_project";
             string projectPath = defaultProjectsFolder + projectName;
 
-
-            if (_Path == "") //if no path is specified, create a new project
-            {
-                _Path = projectPath;
-                bCreateNewProject = true;
-            }
-            else if (_Path != "")
-            {
-                projectPath = _Path;
-                projectName = new DirectoryInfo(projectPath).Name.ToString();
-            }
-
             if (!bCreateNewProject)
             {
-                foreach (TiaPortalProcess tiaPortalProcess in TiaPortal.GetProcesses())
-                {
-                        try
-                        {
-                            if (tiaPortalProcess.ProjectPath.ToString().Contains(projectPath))
-                            {
-                                foreach (Project _project in TiaPortal.GetProcess(tiaPortalProcess.Id).Attach().Projects)
-                                {
-                                    project = _project;
-                                    Log("Attached to Existing Tia Project: " + project.Name);
-                                    goto ProjectExists;
-                                }
-                            }
-                                
-                        }
-                        catch (Exception e)
-                        {
-                            Log("ERROR \n" + e.Message);
-                            return "";
-                        }
-                }
-            }
-            //bCreateNewProject = true;
-            Log("Project is not open");
-        ProjectExists:
+                projectPath = _Path;
+                projectName = new DirectoryInfo(projectPath).Name;
 
-
-            if (bCreateNewProject)
-            {
-                projectName += "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
-
-                if (Directory.Exists(defaultProjectsFolder + projectName))
-                {
-                    try
-                    {
-                        Directory.Delete(defaultProjectsFolder + projectName, true);
-                        Log("TIA PROJECT DELETED: " + defaultProjectsFolder + projectName);
-                    }
-                    catch (Exception e)
-                    {
-                        Log("TIA PROJECT DELETE ERROR \n" + e.Message);
-                    }
-                }
-
-                portal = new TiaPortal(TiaPortalMode.WithUserInterface);
-                path = new DirectoryInfo(defaultProjectsFolder);
-                project = portal.Projects.Create(path, projectName);
-
-                Log("Attached to New Tia Project: " + project.Name);
+                project = TryAttachToOpenProject(projectPath);
+                if (project == null)
+                    Log("Project is not open");
             }
 
             try
             {
-                if (project == null) //open project in new tia window
+                if (bCreateNewProject)
                 {
-                    Log("ERROR Attaching Tia Project \n" + projectPath + " is not open");
+                    projectName += "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                    if (Directory.Exists(defaultProjectsFolder + projectName))
+                    {
+                        try
+                        {
+                            Directory.Delete(defaultProjectsFolder + projectName, true);
+                            Log("TIA PROJECT DELETED: " + defaultProjectsFolder + projectName);
+                        }
+                        catch (Exception e)
+                        {
+                            Log("TIA PROJECT DELETE ERROR \n" + e.Message);
+                        }
+                    }
+
                     portal = new TiaPortal(TiaPortalMode.WithUserInterface);
-                    var _project = new FileInfo(projectPath + "\\" + projectName + ".ap17");
-                    project = portal.Projects.Open(_project);
+                    project = portal.Projects.Create(new DirectoryInfo(defaultProjectsFolder), projectName);
+
+                    Log("Attached to New Tia Project: " + project.Name);
                 }
-                return project.Name.ToString();
+                else if (project == null) //not open in any running instance: open it in a new Tia Portal
+                {
+                    FileInfo projectFile = FindProjectFile(projectPath);
+                    if (projectFile == null)
+                    {
+                        Log("ERROR Attaching Tia Project \nNo TIA project file (*" +
+                            OpennessSetup.SelectedInstallation.ProjectFileExtension + ", *.ap..) found in: " + projectPath);
+                        return "";
+                    }
+
+                    portal = new TiaPortal(TiaPortalMode.WithUserInterface);
+                    project = portal.Projects.Open(projectFile);
+                    Log("Opened Tia Project: " + projectFile.Name);
+                }
+
+                return project.Name;
             }
             catch (Exception e)
             {
@@ -130,6 +98,58 @@ namespace Openn._03_ApiManager
                 return "";
             }
 
+        }
+
+        /// <summary>
+        /// Attaches to a running Tia Portal instance that has the given project open.
+        /// Returns null when no such instance exists.
+        /// </summary>
+        private Project TryAttachToOpenProject(string projectPath)
+        {
+            foreach (TiaPortalProcess tiaPortalProcess in TiaPortal.GetProcesses())
+            {
+                try
+                {
+                    if (tiaPortalProcess.ProjectPath == null) continue;
+                    if (!tiaPortalProcess.ProjectPath.ToString().Contains(projectPath)) continue;
+
+                    portal = TiaPortal.GetProcess(tiaPortalProcess.Id).Attach(); //keep the attached instance referenced
+                    foreach (Project openProject in portal.Projects)
+                    {
+                        Log("Attached to Existing Tia Project: " + openProject.Name);
+                        return openProject;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log("ERROR attaching to Tia Portal process [" + tiaPortalProcess.Id + "] \n" + e.Message);
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Finds the project file (*.ap18, *.ap19, ...) inside the project folder,
+        /// preferring the extension that matches the selected Tia Portal version.
+        /// </summary>
+        private FileInfo FindProjectFile(string projectDirectory)
+        {
+            var directory = new DirectoryInfo(projectDirectory);
+            if (!directory.Exists) return null;
+
+            var candidates = directory.GetFiles("*.ap*").Where(IsTiaProjectFile).ToList();
+            if (candidates.Count == 0) return null;
+
+            string preferredExtension = OpennessSetup.SelectedInstallation.ProjectFileExtension;
+            return candidates.FirstOrDefault(f => f.Extension.Equals(preferredExtension, StringComparison.OrdinalIgnoreCase))
+                   ?? candidates[0];
+        }
+
+        private static bool IsTiaProjectFile(FileInfo file)
+        {
+            string extension = file.Extension; //".ap18", ".ap15_1", ...
+            if (extension.Length <= 3 || !extension.StartsWith(".ap", StringComparison.OrdinalIgnoreCase)) return false;
+            return extension.Substring(3).All(c => char.IsDigit(c) || c == '_');
         }
 
         public string DetachProject()

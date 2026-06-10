@@ -29,6 +29,28 @@
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <!-- Openness requires the client to run with the same bitness as TIA Portal (64-bit) -->
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <!--
+    Compile-time reference to Siemens.Engineering.dll (supported range: V18 - V20).
+    The first existing location wins. Order: repo-local 'lib' override (for machines
+    without TIA Portal), then the oldest installed TIA Portal version (V18 first) for
+    maximum runtime compatibility. The version actually loaded at runtime is selected
+    by the user at startup and resolved in 03_ApiManager\OpennessSetup.cs - the dll is
+    never copied to the output folder (Private=False).
+  -->
+  <PropertyGroup>
+    <_SiemensRegDll18>$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\SOFTWARE\Siemens\Automation\Openness\18.0\PublicAPI\18.0', 'Siemens.Engineering', null, RegistryView.Registry64))</_SiemensRegDll18>
+    <_SiemensRegDll19>$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\SOFTWARE\Siemens\Automation\Openness\19.0\PublicAPI\19.0', 'Siemens.Engineering', null, RegistryView.Registry64))</_SiemensRegDll19>
+    <_SiemensRegDll20>$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\SOFTWARE\Siemens\Automation\Openness\20.0\PublicAPI\20.0', 'Siemens.Engineering', null, RegistryView.Registry64))</_SiemensRegDll20>
+    <SiemensEngineeringDll Condition="Exists('$(MSBuildProjectDirectory)\lib\Siemens.Engineering.dll')">$(MSBuildProjectDirectory)\lib\Siemens.Engineering.dll</SiemensEngineeringDll>
+    <SiemensEngineeringDll Condition="'$(SiemensEngineeringDll)' == '' And '$(_SiemensRegDll18)' != '' And Exists('$(_SiemensRegDll18)')">$(_SiemensRegDll18)</SiemensEngineeringDll>
+    <SiemensEngineeringDll Condition="'$(SiemensEngineeringDll)' == '' And '$(_SiemensRegDll19)' != '' And Exists('$(_SiemensRegDll19)')">$(_SiemensRegDll19)</SiemensEngineeringDll>
+    <SiemensEngineeringDll Condition="'$(SiemensEngineeringDll)' == '' And '$(_SiemensRegDll20)' != '' And Exists('$(_SiemensRegDll20)')">$(_SiemensRegDll20)</SiemensEngineeringDll>
+    <SiemensEngineeringDll Condition="'$(SiemensEngineeringDll)' == '' And Exists('C:\Program Files\Siemens\Automation\Portal V18\PublicAPI\V18\Siemens.Engineering.dll')">C:\Program Files\Siemens\Automation\Portal V18\PublicAPI\V18\Siemens.Engineering.dll</SiemensEngineeringDll>
+    <SiemensEngineeringDll Condition="'$(SiemensEngineeringDll)' == '' And Exists('C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.dll')">C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.dll</SiemensEngineeringDll>
+    <SiemensEngineeringDll Condition="'$(SiemensEngineeringDll)' == '' And Exists('C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20\Siemens.Engineering.dll')">C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20\Siemens.Engineering.dll</SiemensEngineeringDll>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -56,9 +78,10 @@
     <Reference Include="FontAwesome.WPF, Version=4.7.0.37774, Culture=neutral, PublicKeyToken=0758b07a11a4f466, processorArchitecture=MSIL">
       <HintPath>packages\FontAwesome.WPF.4.7.0.9\lib\net40\FontAwesome.WPF.dll</HintPath>
     </Reference>
-    <Reference Include="Siemens.Engineering, Version=16.0.0.0, Culture=neutral, PublicKeyToken=d29ec89bac048f84, processorArchitecture=MSIL">
+    <Reference Include="Siemens.Engineering">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\Program Files\Siemens\Automation\Portal V17\PublicAPI\V17\Siemens.Engineering.dll</HintPath>
+      <Private>False</Private>
+      <HintPath>$(SiemensEngineeringDll)</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -88,6 +111,8 @@
     </Page>
     <Compile Include="01_Constructor\HardwareIoControllers.cs" />
     <Compile Include="01_Constructor\HardwareIoDevices.cs" />
+    <Compile Include="03_ApiManager\OpennessSetup.cs" />
+    <Compile Include="03_ApiManager\OpennessVersionDialog.cs" />
     <Compile Include="03_ApiManager\TiaPortalOpenness.cs" />
     <Compile Include="10_StandardFunctions\StandardFunctions.cs" />
     <Compile Include="App.xaml.cs">
@@ -155,4 +180,7 @@
     <Resource Include="Roberto-64x64.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="EnsureSiemensEngineeringReference" BeforeTargets="ResolveAssemblyReferences" Condition="'$(SiemensEngineeringDll)' == ''">
+    <Error Text="Siemens.Engineering.dll (V18 - V20) was not found. Install TIA Portal V18-V20 including the Openness API, or copy a V18 Siemens.Engineering.dll into the repository 'lib' folder (see lib\README.md)." />
+  </Target>
 </Project>

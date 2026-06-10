@@ -1,5 +1,4 @@
-﻿using Siemens.Engineering.HW;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -55,11 +54,33 @@ namespace Openn._10_StandardFunctions
 
     public static class LogsManager
     {
-        private static System.Windows.Controls.ListView lvLogView = ((MainWindow)System.Windows.Application.Current.MainWindow).lbLogView;
+        private static System.Windows.Controls.ListView lvLogView;
+        private static readonly List<string> pendingMessages = new List<string>();
+
+        /// <summary>
+        /// Binds the log output to a ListView and flushes messages logged before
+        /// the window existed (e.g. during startup/version selection).
+        /// </summary>
+        public static void AttachLogView(System.Windows.Controls.ListView logView)
+        {
+            lvLogView = logView;
+            foreach (string message in pendingMessages)
+                Append(message);
+            pendingMessages.Clear();
+        }
+
         public static void Log(string Message)
         {
-            //lvLogView.Items.Insert(0, DateTime.Now.ToString("HH:mm:ss") + " " + Message);
-            lvLogView.Items.Add(DateTime.Now.ToString("HH:mm:ss") + " " + Message);
+            string line = DateTime.Now.ToString("HH:mm:ss") + " " + Message;
+            if (lvLogView == null)
+                pendingMessages.Add(line);
+            else
+                Append(line);
+        }
+
+        private static void Append(string line)
+        {
+            lvLogView.Items.Add(line);
             lvLogView.ScrollIntoView(lvLogView.Items[lvLogView.Items.Count - 1]);
             lvLogView.SelectedIndex = lvLogView.Items.Count - 1;
         }

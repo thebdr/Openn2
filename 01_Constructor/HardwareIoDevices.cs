@@ -1,12 +1,10 @@
-﻿using Siemens.Engineering.HW;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using static Openn._10_StandardFunctions.LogsManager;
 using Openn._10_StandardFunctions;
 using System.Runtime.Remoting.Messaging;
-using Siemens.Engineering.Library.Types;
 using Openn;
 
 namespace Openn._01_Constructor
