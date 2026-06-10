@@ -50,11 +50,10 @@ files, imports/exports PLC blocks.
 
 ## Verification checklist (on a machine with TIA V18–V20)
 
-1. **Build.** This is the first compile against a real `Siemens.Engineering.dll` —
-   Siemens-touching code was only syntax-checked on the dev machine (no TIA there).
-   Fix any minor API mismatches; most likely spots: `EngineeringAttributeAccessMode`
-   members and the `Channels` composition in the custom-parameter helpers of
-   `TiaPortalOpenness`.
+1. **Build.** Verified: compiles and runs against TIA Portal **V18** (tested
+   incrementally during development, 2026-06). Note the dev machine has no TIA Portal —
+   changes made there are only syntax-checked, so always rebuild and retest on a TIA
+   machine after pulling.
 2. **Startup:** version dialog lists all installed versions, newest preselected; the
    chosen version appears in the window title and the first log line.
 3. **Config load:** log shows
