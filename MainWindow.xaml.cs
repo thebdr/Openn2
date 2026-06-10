@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 
 using Openn._03_ApiManager;
@@ -9,18 +11,20 @@ using Openn._01_Constructor;
 using static Openn._10_StandardFunctions.LogsManager;
 using static Openn._10_StandardFunctions.StandardFunctions;
 using static Openn._03_ApiManager.TiaPortalOpenness;
-using System.Collections.ObjectModel;
-using System.Threading.Tasks;
-using System.ComponentModel;
-using System.Threading;
 
 namespace Openn
 {
     public partial class MainWindow : Window
     {
         public IList<TiaProcessInfo> processInfoList = new List<TiaProcessInfo>();
-        private BackgroundWorker backgroundWorker1 = new BackgroundWorker();
 
+        private readonly TiaPortalOpenness tia = new TiaPortalOpenness(); //instance of API Manager class
+
+        //all backend work (TIA Openness calls, csv loading) runs sequentially on the
+        //TiaWorker thread; the UI thread reads control values before queuing and
+        //updates controls after awaiting, so the window never freezes.
+        private bool backendBusy;
+        private int runningOperations;
 
         public MainWindow()
         {
@@ -30,19 +34,9 @@ namespace Openn
             Title += " - " + OpennessSetup.SelectedInstallation.DisplayName;
             Log("Using " + OpennessSetup.SelectedInstallation.DisplayName + ": " + OpennessSetup.SelectedInstallation.EngineeringDllPath);
 
-            //backgroundWorker1.DoWork += BackgroundWorker1_DoWork;
-
             InitializeGraphicComponents();
-            InitializeAdditionalStuff();
+            LoadHardwareConfiguration();
         }
-
-        public delegate void testDelegate();
-
-        private void BackgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
-        {
-            ShowRunningIcon("start");
-        }
-
 
         private void InitializeGraphicComponents()
         {
@@ -52,23 +46,50 @@ namespace Openn
             tbSourceBlockPath.Text = appBaseDir + "\\EditedBlocks";
             rbUseInstance.IsChecked = true;
             rbUseExistingIoControllers.IsChecked = true;
-            ShowRunningIcon("stop");
         }
 
-        private void InitializeAdditionalStuff()
+        private async void LoadHardwareConfiguration()
         {
-            ShowRunningIcon("start");
-            HardwareConfigLoader.LoadAll(tbHardwareCsvPath.Text);
-            ShowRunningIcon("stop");
+            string folder = tbHardwareCsvPath.Text;
+            await RunBackend(() => TiaWorker.Run(() => HardwareConfigLoader.LoadAll(folder)));
+            await RefreshOpenInstancesDropdown(quietWhenBusy: true);
         }
 
-        private TiaPortalOpenness tia = new TiaPortalOpenness(); //instance of API Manager class 
+        /// <summary>
+        /// Runs one backend operation while keeping the UI responsive: shows the
+        /// spinner, rejects overlapping operations (the worker queue is serial, so
+        /// a second click would otherwise just pile up), and logs uncaught errors.
+        /// </summary>
+        private async Task RunBackend(Func<Task> operation, bool quietWhenBusy = false)
+        {
+            if (backendBusy)
+            {
+                if (!quietWhenBusy)
+                    Log("Skipped: another operation is still running");
+                return;
+            }
+
+            backendBusy = true;
+            ShowRunningIcon("start");
+            try
+            {
+                await operation();
+            }
+            catch (Exception e)
+            {
+                Log("ERROR (background operation) \n" + e.Message);
+            }
+            finally
+            {
+                backendBusy = false;
+                ShowRunningIcon("stop");
+            }
+        }
 
         #region Buttons & Controls
 
         private async void btnAttachProject_Click(object sender, RoutedEventArgs e)
         {
-            ShowRunningIcon("start");
             string path = "Invalid Path";
             if (rbUsePath.IsChecked == true)
             {
@@ -79,15 +100,16 @@ namespace Openn
                 if (cbOpenTiaInstances.SelectedIndex < 0)
                 {
                     Log("Can't attach: no open Tia Portal instance selected");
-                    ShowRunningIcon("stop");
                     return;
                 }
                 path = processInfoList[cbOpenTiaInstances.SelectedIndex].ProjectPath;
             }
 
-            tbAttachedProject.Text = await tia.AttachToProject(path);
-            UpdateBlocksDropdown();
-            ShowRunningIcon("stop");
+            await RunBackend(async () =>
+            {
+                tbAttachedProject.Text = await TiaWorker.Run(() => tia.AttachToProject(path));
+                await RefreshBlocksDropdown();
+            });
         }
 
         private void btnBrowseProjects_Click(object sender, RoutedEventArgs e)
@@ -97,42 +119,43 @@ namespace Openn
                 tbProjectPath.Text = _path.FullName;
         }
 
-        private void btnDetachProject_Click(object sender, RoutedEventArgs e)
+        private async void btnDetachProject_Click(object sender, RoutedEventArgs e)
         {
-            tbAttachedProject.Text = tia.DetachProject();
+            await RunBackend(async () =>
+            {
+                tbAttachedProject.Text = await TiaWorker.Run(() => tia.DetachProject());
+            });
         }
 
-        private void btnExportSource_Click(object sender, RoutedEventArgs e)
+        private async void btnExportSource_Click(object sender, RoutedEventArgs e)
         {
-            backgroundWorker1.RunWorkerAsync();
+            if (cbSourceBlocksList.SelectedItem == null)
+            {
+                Log("Can't export: no block selected");
+                return;
+            }
 
-            //split Type & Name
-            string[] BlockInfo = new string[] { "", "" };
-            BlockInfo = cbSourceBlocksList.SelectedItem.ToString().Split(']');
-            BlockInfo[0] = BlockInfo[0].Remove(BlockInfo[0].Length - 1);
-            BlockInfo[1] = BlockInfo[1].Remove(0, 1);
+            //entries look like "[Type] Name" - strip the type prefix
+            string[] blockInfo = cbSourceBlocksList.SelectedItem.ToString().Split(']');
+            if (blockInfo.Length < 2 || blockInfo[1].Length < 2)
+            {
+                Log("Can't export: invalid block entry selected");
+                return;
+            }
+            string blockName = blockInfo[1].Substring(1);
 
-            tia.ExportBlock(BlockInfo[1]);
-
-            ShowRunningIcon("stop");
+            await RunBackend(() => TiaWorker.Run(() => tia.ExportBlock(blockName)));
         }
 
-        private void btnRefreshBlocks_Click(object sender, RoutedEventArgs e)
+        private async void btnRefreshBlocks_Click(object sender, RoutedEventArgs e)
         {
-            ShowRunningIcon("start");
-
-            UpdateBlocksDropdown();
-
-            ShowRunningIcon("stop");
+            await RunBackend(() => RefreshBlocksDropdown());
         }
 
-        private void btnImportSource_Click(object sender, RoutedEventArgs e)
+        private async void btnImportSource_Click(object sender, RoutedEventArgs e)
         {
-            ShowRunningIcon("start");
-
-            tia.ImportPlcBlock(tbSourceBlockPath.Text);
-
-            ShowRunningIcon("stop");
+            string fileName = tbSourceBlockPath.Text;
+            await RunBackend(() => TiaWorker.Run(() => tia.ImportPlcBlock(fileName)));
         }
 
         private void btnBrowseBlocks_Click(object sender, RoutedEventArgs e)
@@ -144,11 +167,7 @@ namespace Openn
 
         private void btnImportHardwareCsv_Click(object sender, RoutedEventArgs e)
         {
-            ShowRunningIcon("start");
-
-            HardwareConfigLoader.LoadAll(tbHardwareCsvPath.Text);
-
-            ShowRunningIcon("stop");
+            LoadHardwareConfiguration();
         }
 
         private void btnBrowseHwConfigCsv_Click(object sender, RoutedEventArgs e)
@@ -158,85 +177,76 @@ namespace Openn
                 tbHardwareCsvPath.Text = _path.FullName;
         }
 
-        private void btnGenerateHardware_Click(object sender, RoutedEventArgs e)
+        private async void btnGenerateHardware_Click(object sender, RoutedEventArgs e)
         {
-            ShowRunningIcon("start");
-
             if ((HardwareDeviceTypesDatabase.Identifier == null) || (HardwareDeviceTypesDatabase.Identifier.Count() < 1))
             {
                 Log("Can't generate hardware configuration: Hardware Configuration not loaded.");
                 return;
             }
-            tia.CreateDevices(rbCreateNewIoControllers.IsChecked);
-            
-            ShowRunningIcon("stop");
+
+            bool? createNewIoControllers = rbCreateNewIoControllers.IsChecked;
+            await RunBackend(() => TiaWorker.Run(() => tia.CreateDevices(createNewIoControllers)));
         }
 
-        private void btnClearLogs_Click(object sender, RoutedEventArgs e)
+        private async void btnClearLogs_Click(object sender, RoutedEventArgs e)
         {
-            ShowRunningIcon("start");
             lbLogView.Items.Clear();
-            UpdateOpenInstancesDropdown();
+            await RefreshOpenInstancesDropdown(quietWhenBusy: true);
         }
 
-        private void Window_Activated(object sender, System.EventArgs e)
+        private async void Window_Activated(object sender, System.EventArgs e)
         {
-            UpdateOpenInstancesDropdown();
+            await RefreshOpenInstancesDropdown(quietWhenBusy: true);
         }
 
         #endregion Buttons & Controls
 
-        private void UpdateBlocksDropdown()
+        private async Task RefreshBlocksDropdown()
         {
-            ShowRunningIcon("start");
+            List<string> blocks = await TiaWorker.Run(() => tia.UpdateSourceBlocksList());
 
             cbSourceBlocksList.Items.Clear();
-            foreach (string BlockName in tia.UpdateSourceBlocksList())
-            {
-                cbSourceBlocksList.Items.Add(BlockName);
-            }
+            foreach (string blockName in blocks)
+                cbSourceBlocksList.Items.Add(blockName);
             cbSourceBlocksList.SelectedIndex = 0;
-
-            ShowRunningIcon("stop");
         }
 
-        public void UpdateOpenInstancesDropdown()
+        private async Task RefreshOpenInstancesDropdown(bool quietWhenBusy)
         {
-            try
+            await RunBackend(async () =>
             {
-                processInfoList = tia.GetOpenTiaInstances();
-            }
-            catch (System.Exception e)
-            {
-                // typically: Siemens.Engineering.dll of the selected version could not be
-                // loaded, or the user is not a member of the "Siemens TIA Openness" group
-                Log("ERROR querying open Tia Portal instances \n" + e.Message);
-                return;
-            }
+                try
+                {
+                    processInfoList = await TiaWorker.Run(() => tia.GetOpenTiaInstances());
+                }
+                catch (Exception ex)
+                {
+                    // typically: Siemens.Engineering.dll of the selected version could not be
+                    // loaded, or the user is not a member of the "Siemens TIA Openness" group
+                    Log("ERROR querying open Tia Portal instances \n" + ex.Message);
+                    return;
+                }
 
-            cbOpenTiaInstances.Items.Clear();
-            foreach (var processInfo in processInfoList)
-            {
-                cbOpenTiaInstances.Items.Add("[" + processInfo.ProcessID + "] " + processInfo.ProjectName);
-            }
-            cbOpenTiaInstances.SelectedIndex = 0;
+                cbOpenTiaInstances.Items.Clear();
+                foreach (var processInfo in processInfoList)
+                {
+                    cbOpenTiaInstances.Items.Add("[" + processInfo.ProcessID + "] " + processInfo.ProjectName);
+                }
+                cbOpenTiaInstances.SelectedIndex = 0;
+            }, quietWhenBusy);
         }
 
         private void ShowRunningIcon(string Start_Stop)
         {
-            return;
-
             if (Start_Stop.Contains("start"))
-                this.Dispatcher.Invoke(()=> icoRunning.Visibility = Visibility.Visible);
-            else if (Start_Stop.Contains("stop"))
-                this.Dispatcher.Invoke(() => icoRunning.Visibility = Visibility.Visible);
+                runningOperations++;
             else
-                this.Dispatcher.Invoke(() => icoRunning.Visibility = Visibility.Visible);
+                runningOperations = Math.Max(0, runningOperations - 1);
 
+            icoRunning.Visibility = runningOperations > 0 ? Visibility.Visible : Visibility.Hidden;
         }
 
     }
 
 }
-
-       

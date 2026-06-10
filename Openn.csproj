@@ -116,6 +116,7 @@
     <Compile Include="03_ApiManager\OpennessSetup.cs" />
     <Compile Include="03_ApiManager\OpennessVersionDialog.cs" />
     <Compile Include="03_ApiManager\TiaPortalOpenness.cs" />
+    <Compile Include="03_ApiManager\TiaWorker.cs" />
     <Compile Include="10_StandardFunctions\CsvTable.cs" />
     <Compile Include="10_StandardFunctions\StandardFunctions.cs" />
     <Compile Include="App.xaml.cs">

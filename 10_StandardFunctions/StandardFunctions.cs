@@ -63,19 +63,38 @@ namespace Openn._10_StandardFunctions
         /// </summary>
         public static void AttachLogView(System.Windows.Controls.ListView logView)
         {
-            lvLogView = logView;
-            foreach (string message in pendingMessages)
-                Append(message);
-            pendingMessages.Clear();
+            lock (pendingMessages)
+            {
+                lvLogView = logView;
+                foreach (string message in pendingMessages)
+                    Append(message);
+                pendingMessages.Clear();
+            }
         }
 
+        /// <summary>
+        /// Thread-safe: messages logged from the backend worker thread are
+        /// marshalled to the UI dispatcher.
+        /// </summary>
         public static void Log(string Message)
         {
             string line = DateTime.Now.ToString("HH:mm:ss") + " " + Message;
-            if (lvLogView == null)
-                pendingMessages.Add(line);
-            else
+
+            System.Windows.Controls.ListView view;
+            lock (pendingMessages)
+            {
+                view = lvLogView;
+                if (view == null)
+                {
+                    pendingMessages.Add(line);
+                    return;
+                }
+            }
+
+            if (view.Dispatcher.CheckAccess())
                 Append(line);
+            else
+                view.Dispatcher.BeginInvoke((Action)(() => Append(line)));
         }
 
         private static void Append(string line)

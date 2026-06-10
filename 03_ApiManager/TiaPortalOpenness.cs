@@ -14,7 +14,6 @@ using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW;
 using System.Linq;
 using static Openn._10_StandardFunctions.LogsManager;
-using System.Threading.Tasks;
 
 namespace Openn._03_ApiManager
 {
@@ -34,7 +33,7 @@ namespace Openn._03_ApiManager
 
         #endregion
 
-        public async Task<string> AttachToProject(string _Path = "")
+        public string AttachToProject(string _Path = "")
         {
             bool bCreateNewProject = string.IsNullOrEmpty(_Path); //if no path is specified, create a new project
             string defaultProjectsFolder = appBaseDir + "\\TiaProjects\\";
