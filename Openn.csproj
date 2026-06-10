@@ -110,7 +110,6 @@
       <SubType>Designer</SubType>
     </Page>
     <Compile Include="01_Constructor\CustomParameterParser.cs" />
-    <Compile Include="01_Constructor\HardwareConfigConverter.cs" />
     <Compile Include="01_Constructor\HardwareConfigLoader.cs" />
     <Compile Include="01_Constructor\HardwareIoControllers.cs" />
     <Compile Include="01_Constructor\HardwareIoDevices.cs" />
@@ -169,9 +168,6 @@
     <None Include="HardwareConfig\Modules.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <!-- legacy format, kept for reference only - the loader converts such folders automatically -->
-    <None Include="HardwareConfig\IoControllersList.csv" />
-    <None Include="HardwareConfig\IoDevicesList.csv" />
   </ItemGroup>
   <!-- Hand-edited PLC block sources imported via "Import Block from Source" (default path: <exe folder>\EditedBlocks) -->
   <ItemGroup>

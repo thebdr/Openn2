@@ -12,10 +12,10 @@ namespace Openn._01_Constructor
     ///   DeviceTypesDatabase.csv - model database
     ///   Stations.csv            - one row per station (Role: Plc / PlcCardCm / IoDevice)
     ///   Modules.csv             - one row per plugged module, referencing its station
-    /// Legacy folders (IoControllersList.csv + wide IoDevicesList.csv) are converted
-    /// automatically on first load. The whole configuration is validated before the
-    /// lists are published: on any error nothing is loaded, so the generation code
-    /// never sees a half-valid configuration.
+    /// The whole configuration is validated before the lists are published: on any
+    /// error nothing is loaded, so the generation code never sees a half-valid
+    /// configuration. (Pre-format-2 folders are not supported - the old stable
+    /// application version handles those.)
     /// </summary>
     internal static class HardwareConfigLoader
     {
@@ -31,10 +31,6 @@ namespace Openn._01_Constructor
             HardwareIoDevices.DevicesList = new List<Tuple<HardwareIoDevices._Device, IList<HardwareIoDevices._Submodule>>>();
 
             HardwareDeviceTypesDatabase.Read(folder, errors);
-
-            string conversionNote;
-            if (HardwareConfigConverter.TryConvertLegacyFiles(folder, out conversionNote))
-                Log(conversionNote);
 
             CsvTable stations = CsvTable.Read(Path.Combine(folder, StationsFileName));
             CsvTable modules = CsvTable.Read(Path.Combine(folder, ModulesFileName));

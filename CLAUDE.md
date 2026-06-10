@@ -30,14 +30,17 @@ files, imports/exports PLC blocks.
 - **Hardware config** (`01_Constructor/`): csv "format 2" — `Stations.csv` +
   `Modules.csv` + `DeviceTypesDatabase.csv`; `;` delimited, `#` comments, `#!format=2`
   tag, parsed by `CsvTable`. `HardwareConfigLoader` validates the whole folder before
-  publishing anything (all-or-nothing, every error with file/line). Legacy folders
-  (`IoControllersList.csv` + wide `IoDevicesList.csv`) auto-convert on first load.
+  publishing anything (all-or-nothing, every error with file/line). **No legacy
+  support by design**: pre-format-2 folders (`IoControllersList.csv` + wide
+  `IoDevicesList.csv`) are handled by the old stable application version, not here —
+  do not re-add converters or fallbacks.
 - **Custom parameters** (`01_Constructor/CustomParameterParser.cs`): syntax
-  `[Item(i).][Ch(i).]Name=Value`, separated by `|` (legacy `,` accepted per cell), one
-  `(a-b)` range per entry, `IP[i]` placeholder = octet i of the station IP. Applied in
-  `TiaPortalOpenness` either via the explicit path or by discovering the owning object
-  through `GetAttributeInfos` (first writable match in the module tree); values are
-  converted to the attribute's actual type. No hardcoded attribute names — keep it that way.
+  `[Item(i).][Ch(i).]Name=Value`, separated by `|` (`,` is rejected with an error —
+  it collides with Excel's csv delimiter), one `(a-b)` range per entry, `IP[i]`
+  placeholder = octet i of the station IP. Applied in `TiaPortalOpenness` either via
+  the explicit path or by discovering the owning object through `GetAttributeInfos`
+  (first writable match in the module tree); values are converted to the attribute's
+  actual type. No hardcoded attribute names — keep it that way.
 
 ## Runtime requirements
 

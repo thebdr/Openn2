@@ -38,16 +38,14 @@ namespace Openn._01_Constructor
 
     /// <summary>
     /// Parser for the Custom Parameters csv cells.
-    /// Entries are separated by '|' (legacy ',' is accepted when a cell contains no '|').
+    /// Entries are separated by '|' (',' is rejected - it collides with Excel's csv delimiter).
     /// Entry grammar:  [Item(i).][Ch(i).]Name=Value
-    /// The legacy channel form "Name.Ch(i)=Value" is normalized to "Ch(i).Name=Value".
     /// One (from-to) range per entry expands to one entry per index, e.g. "Ch(0-7)".
     /// "IP[i]" inside the value is replaced with octet i (0..3) of the station IP.
     /// </summary>
     public static class CustomParameterParser
     {
         public const char Separator = '|';
-        public const char LegacySeparator = ',';
 
         /// <summary>
         /// Parses and merges the model-wide defaults with the per-row parameters;
@@ -73,8 +71,13 @@ namespace Openn._01_Constructor
             var parameters = new List<CustomParameter>();
             if (string.IsNullOrWhiteSpace(text)) return parameters;
 
-            char separator = text.IndexOf(Separator) >= 0 ? Separator : LegacySeparator;
-            foreach (string rawEntry in text.Split(separator))
+            if (text.IndexOf(',') >= 0)
+            {
+                errors.Add("invalid parameter list \"" + text + "\": ',' is not a valid separator - use '|'");
+                return parameters;
+            }
+
+            foreach (string rawEntry in text.Split(Separator))
             {
                 string entry = rawEntry.Trim();
                 if (entry.Length == 0) continue;
@@ -164,23 +167,15 @@ namespace Openn._01_Constructor
                 {
                     if (parameter.Name != null)
                     {
-                        //legacy form "Name.Ch(i)": exactly one channel step after the name
-                        if (!isChannel || parameter.Path.Count > 0)
-                        {
-                            errors.Add("invalid parameter \"" + entry + "\": path steps must come before the attribute name");
-                            return null;
-                        }
-                        parameter.Path.Add(new CustomParameterPathStep(true, index));
+                        errors.Add("invalid parameter \"" + entry + "\": path steps must come before the attribute name");
+                        return null;
                     }
-                    else
+                    if (parameter.Path.Any(s => s.IsChannel))
                     {
-                        if (parameter.Path.Any(s => s.IsChannel))
-                        {
-                            errors.Add("invalid parameter \"" + entry + "\": Ch(..) must be the last path step");
-                            return null;
-                        }
-                        parameter.Path.Add(new CustomParameterPathStep(isChannel, index));
+                        errors.Add("invalid parameter \"" + entry + "\": Ch(..) must be the last path step");
+                        return null;
                     }
+                    parameter.Path.Add(new CustomParameterPathStep(isChannel, index));
                 }
                 else
                 {
