@@ -165,6 +165,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+  <!-- Hand-edited PLC block sources imported via "Import Block from Source" (default path: <exe folder>\EditedBlocks) -->
+  <ItemGroup>
+    <None Include="EditedBlocks\*.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   <ItemGroup>
     <None Include="Resources\roberto_icon.ico" />
   </ItemGroup>
