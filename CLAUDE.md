@@ -23,6 +23,11 @@ files, imports/exports PLC blocks.
   startup (`App_Startup`) and an `AppDomain.AssemblyResolve` hook loads that version's
   assemblies. No Siemens type may be touched before the hook is registered; once loaded,
   the version is fixed until restart.
+- **TIA facade** (`03_ApiManager/TiaPortalOpenness*.cs`): one partial class split by
+  feature area — `TiaPortalOpenness.cs` (portal/project lifecycle),
+  `.Blocks.cs` (block listing/export/import), `.Hardware.cs` (hardware generation).
+  Custom-parameter writing is the separate stateless `CustomParameterApplier`.
+  Keep new TIA functionality in the matching file.
 - **Threading** (`03_ApiManager/TiaWorker.cs`): the Openness API is **not thread-safe**.
   ALL Siemens calls (and hardware-config loading) must go through `TiaWorker.Run(...)` —
   one dedicated worker thread with a serial queue. UI code awaits the returned Task via

@@ -113,8 +113,11 @@
     <Compile Include="01_Constructor\HardwareConfigLoader.cs" />
     <Compile Include="01_Constructor\HardwareIoControllers.cs" />
     <Compile Include="01_Constructor\HardwareIoDevices.cs" />
+    <Compile Include="03_ApiManager\CustomParameterApplier.cs" />
     <Compile Include="03_ApiManager\OpennessSetup.cs" />
     <Compile Include="03_ApiManager\PlcBlockInfo.cs" />
+    <Compile Include="03_ApiManager\TiaPortalOpenness.Blocks.cs" />
+    <Compile Include="03_ApiManager\TiaPortalOpenness.Hardware.cs" />
     <Compile Include="BlockSearchWindow.cs" />
     <Compile Include="03_ApiManager\OpennessVersionDialog.cs" />
     <Compile Include="03_ApiManager\TiaPortalOpenness.cs" />
