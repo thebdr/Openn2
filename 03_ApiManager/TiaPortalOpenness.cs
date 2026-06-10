@@ -244,6 +244,12 @@ namespace Openn._03_ApiManager
                 return;
             }
 
+            if (HwIoC.DevicesList == null || HwIoC.DevicesList.Count == 0)
+            {
+                Log("ERROR \n No I/O Controllers loaded - import a valid hardware configuration first.");
+                return;
+            }
+
             //check if first I/O Controller is of Plc Type
             if(!HwDb.Identifier[HwIoC.DevicesList[0].identifier].deviceType.Equals("Plc", StringComparison.OrdinalIgnoreCase))
             {
@@ -433,7 +439,12 @@ namespace Openn._03_ApiManager
                 }
                 else
                 {
-                    network.IoConnectors.Last().SetAttribute("PnDeviceNumber", Int32.Parse(d.Item1.IP.Split('.')[3]));
+                    //explicit PN Number from the configuration wins; default is the last IP octet
+                    int pnNumber;
+                    if (!int.TryParse(d.Item1.pnNumber, out pnNumber))
+                        pnNumber = Int32.Parse(d.Item1.IP.Split('.')[3]);
+
+                    network.IoConnectors.Last().SetAttribute("PnDeviceNumber", pnNumber);
                     network.Nodes.Last().SetAttribute("Address", d.Item1.IP);
                 }
 

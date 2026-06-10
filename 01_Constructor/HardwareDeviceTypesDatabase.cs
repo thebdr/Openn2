@@ -1,10 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using listbox = System.Windows.Controls.ListBox;
-using static Openn._10_StandardFunctions.LogsManager;
-using System.Runtime.Remoting.Messaging;
+using Openn._10_StandardFunctions;
 
 namespace Openn._01_Constructor
 {
@@ -29,48 +25,70 @@ namespace Openn._01_Constructor
             }
         }
 
+        public const string FileName = "DeviceTypesDatabase.csv";
+
+        /// <summary>Device types the generation code understands (canonical casing).</summary>
+        public static readonly string[] KnownDeviceTypes =
+            { "Plc", "PlcCard", "PlcCardCm", "IoDevice", "IoDeviceCard", "Hmi" };
+
         public static Dictionary<string, DeviceInfo> Identifier;
 
-        public static void ReadHardwareList(string folder)
+        /// <summary>
+        /// Reads the model database. Problems are appended to <paramref name="errors"/>
+        /// with file/line references instead of aborting on the first one.
+        /// </summary>
+        internal static void Read(string folder, IList<string> errors)
         {
             Identifier = new Dictionary<string, DeviceInfo>();
-            int nLineCounter = 0; 
-            
-            string filename = folder + "\\DeviceTypesDatabase.csv";
-            if (!File.Exists(filename)) //show error message if file does not exist
+
+            string filename = folder + "\\" + FileName;
+            CsvTable table = CsvTable.Read(filename);
+            foreach (string tableError in table.Errors)
+                errors.Add(tableError);
+
+            foreach (CsvRow row in table.Rows)
             {
-                Log("Csv File Read ERROR  \n file not found: " + filename);
-                return;
-            }
-
-            using (StreamReader reader = new StreamReader(filename))
-            {
-                try //read .csv file ('#' skips line)
+                if (row.Values.Length < 5)
                 {
-                    var entries = 0;                    
-                    while (!reader.EndOfStream)
-                    {
-                        var line = reader.ReadLine();
-                        nLineCounter++;
-                        if (line[0] == '#') continue;
-                        if (line[0] == '@') break;
-
-                        var values = line.Split(';');
-
-                        var info = new DeviceInfo(values[1], values[2], values[3], values[4], filename, nLineCounter);
-                        Identifier.Add(values[0], info);
-
-                        entries++;
-                    }
-                    Log("Csv File Read Ok: " + entries.ToString() + " entries have been read from " + filename);
+                    errors.Add(Describe(filename, row) + "expected 5 columns (Model Id;Type;Tia Identifier;Comment;Custom Parameters), found " + row.Values.Length);
+                    continue;
                 }
-                catch (Exception e)
+
+                string modelId = row.Get(0);
+                if (modelId.Length == 0)
                 {
-                    Log("Csv File Read ERROR \n" + e.Message);
+                    errors.Add(Describe(filename, row) + "Model Id (column 1) is empty");
+                    continue;
                 }
-            reader.Dispose();
+                if (Identifier.ContainsKey(modelId))
+                {
+                    errors.Add(Describe(filename, row) + "duplicate Model Id: " + modelId);
+                    continue;
+                }
+
+                string deviceType = CanonicalDeviceType(row.Get(1));
+                if (deviceType == null)
+                {
+                    errors.Add(Describe(filename, row) + "unknown device type \"" + row.Get(1) + "\" (expected: " + string.Join(", ", KnownDeviceTypes) + ")");
+                    continue;
+                }
+
+                Identifier.Add(modelId, new DeviceInfo(deviceType, row.Get(2), row.Get(3), row.Get(4), filename, row.LineNumber));
             }
         }
 
+        /// <summary>Returns the known type with canonical casing, or null when unknown.</summary>
+        private static string CanonicalDeviceType(string type)
+        {
+            foreach (string known in KnownDeviceTypes)
+            {
+                if (known.Equals(type, StringComparison.OrdinalIgnoreCase))
+                    return known;
+            }
+            return null;
+        }
+
+        private static string Describe(string filename, CsvRow row) =>
+            "File: " + filename + " Line: " + row.LineNumber + " - ";
     }
 }

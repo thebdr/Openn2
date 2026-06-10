@@ -1,13 +1,12 @@
-﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using static Openn._10_StandardFunctions.LogsManager;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Openn._01_Constructor
 {
+    /// <summary>
+    /// I/O controllers (Plc, PlcCardCm) of the hardware configuration.
+    /// Filled by HardwareConfigLoader from Stations.csv; the entry with the
+    /// "Plc" role is always first (TiaPortalOpenness relies on that).
+    /// </summary>
     internal class HardwareIoControllers
     {
         public struct _Controller
@@ -31,49 +30,6 @@ namespace Openn._01_Constructor
             }
         }
 
-        public static IList<_Controller> DevicesList;
-
-        public static void ReadDevicesList(string folder)
-        {
-            DevicesList = new List<_Controller>();
-            int nLineCounter = 0;
-
-            string filename = folder + "\\IoControllersList.csv";
-            if (!File.Exists(filename)) //show error message if file does not exist
-            {
-                Log("Csv File Read ERROR " + filename + "\n file not found: " + filename);
-                return;
-            }
-
-            using (StreamReader reader = new StreamReader(filename))
-            {
-                try //read .csv file ('#' skips line)
-                {
-                    var entries = 0;
-                    while (!reader.EndOfStream)
-                    {
-                        var line = reader.ReadLine();
-                        nLineCounter++;
-                        if (line[0] == '#') continue;
-                        if (line[0] == '@') break;
-
-                        var values = line.Split(';');
-
-                        var tmpController = new _Controller(values[0], values[1], values[2], values[3], values[4], filename, nLineCounter); //first 3 columns are the device params
-
-                        DevicesList.Add(tmpController);
-
-                        entries++;
-                    }
-                    Log("Csv File Read Ok: " + entries.ToString() + " entries have been read from " + filename);
-                }
-                catch (Exception e)
-                {
-                    Log("Csv File Read ERROR " + filename + "\n" + e.Message);
-                }
-                reader.Dispose();
-            }
-        }
-
+        public static IList<_Controller> DevicesList = new List<_Controller>();
     }
 }

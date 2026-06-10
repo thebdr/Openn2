@@ -109,11 +109,14 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Compile Include="01_Constructor\HardwareConfigConverter.cs" />
+    <Compile Include="01_Constructor\HardwareConfigLoader.cs" />
     <Compile Include="01_Constructor\HardwareIoControllers.cs" />
     <Compile Include="01_Constructor\HardwareIoDevices.cs" />
     <Compile Include="03_ApiManager\OpennessSetup.cs" />
     <Compile Include="03_ApiManager\OpennessVersionDialog.cs" />
     <Compile Include="03_ApiManager\TiaPortalOpenness.cs" />
+    <Compile Include="10_StandardFunctions\CsvTable.cs" />
     <Compile Include="10_StandardFunctions\StandardFunctions.cs" />
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
@@ -158,12 +161,15 @@
     <None Include="HardwareConfig\DeviceTypesDatabase.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="HardwareConfig\IoControllersList.csv">
+    <None Include="HardwareConfig\Stations.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="HardwareConfig\IoDevicesList.csv">
+    <None Include="HardwareConfig\Modules.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- legacy format, kept for reference only - the loader converts such folders automatically -->
+    <None Include="HardwareConfig\IoControllersList.csv" />
+    <None Include="HardwareConfig\IoDevicesList.csv" />
   </ItemGroup>
   <!-- Hand-edited PLC block sources imported via "Import Block from Source" (default path: <exe folder>\EditedBlocks) -->
   <ItemGroup>

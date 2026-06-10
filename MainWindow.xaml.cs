@@ -58,9 +58,7 @@ namespace Openn
         private void InitializeAdditionalStuff()
         {
             ShowRunningIcon("start");
-            HardwareDeviceTypesDatabase.ReadHardwareList(tbHardwareCsvPath.Text);
-            HardwareIoControllers.ReadDevicesList(tbHardwareCsvPath.Text);
-            HardwareIoDevices.ReadDevicesList(tbHardwareCsvPath.Text);
+            HardwareConfigLoader.LoadAll(tbHardwareCsvPath.Text);
             ShowRunningIcon("stop");
         }
 
@@ -148,9 +146,7 @@ namespace Openn
         {
             ShowRunningIcon("start");
 
-            HardwareDeviceTypesDatabase.ReadHardwareList(tbHardwareCsvPath.Text);
-            HardwareIoControllers.ReadDevicesList(tbHardwareCsvPath.Text);
-            HardwareIoDevices.ReadDevicesList(tbHardwareCsvPath.Text);
+            HardwareConfigLoader.LoadAll(tbHardwareCsvPath.Text);
 
             ShowRunningIcon("stop");
         }
