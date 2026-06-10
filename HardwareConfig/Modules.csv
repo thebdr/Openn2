@@ -1,5 +1,5 @@
 ﻿#!format=2
-# Station Name;Slot;Module Name;Model Id;I Addr;Q Addr;Custom Parameters  (Slot = plug order; first free position is used)
+# Station Name;Slot;Module Name;Model Id;I Addr;Q Addr;Custom Parameters  (Slot = plug order; parameters separated by |)
 n0005-zp001-el001-k40001;1;-K40002;6ES7131-6BH01-0BA0;0;0;
 n0005-zp001-el001-k40001;2;-K40003;6ES7131-6BH01-0BA0;2;2;
 n0005-zp001-el001-k40001;3;-K40004;6ES7131-6BH01-0BA0;4;4;

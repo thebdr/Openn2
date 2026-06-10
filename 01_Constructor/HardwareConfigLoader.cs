@@ -122,6 +122,9 @@ namespace Openn._01_Constructor
                 if (pnNumber.Length > 0 && (!int.TryParse(pnNumber, out pnValue) || pnValue < 1))
                     errors.Add(where + "PN Number must be a positive integer or empty, found \"" + pnNumber + "\"");
 
+                if (modelKnown)
+                    ValidateCustomParameters(dbInfo.customParameters, customParameters, ip, where, errors);
+
                 if (role.Equals("Plc", StringComparison.OrdinalIgnoreCase) || role.Equals("PlcCardCm", StringComparison.OrdinalIgnoreCase))
                 {
                     if (pnNumber.Length > 0)
@@ -175,7 +178,13 @@ namespace Openn._01_Constructor
         {
             var modulesByStation = new Dictionary<string, List<HardwareIoDevices._Submodule>>(StringComparer.OrdinalIgnoreCase);
             var slotsByStation = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
-            var deviceNames = new HashSet<string>(devices.Select(d => d.name), StringComparer.OrdinalIgnoreCase);
+
+            var deviceByName = new Dictionary<string, HardwareIoDevices._Device>(StringComparer.OrdinalIgnoreCase);
+            foreach (HardwareIoDevices._Device device in devices)
+            {
+                if (!deviceByName.ContainsKey(device.name))
+                    deviceByName.Add(device.name, device);
+            }
 
             foreach (CsvRow row in modules.Rows)
             {
@@ -190,7 +199,9 @@ namespace Openn._01_Constructor
                 string station = row.Get(0), slotText = row.Get(1), name = row.Get(2),
                        modelId = row.Get(3), iAddress = row.Get(4), qAddress = row.Get(5), customParameters = row.Get(6);
 
-                if (!deviceNames.Contains(station))
+                HardwareIoDevices._Device stationDevice;
+                bool stationKnown = deviceByName.TryGetValue(station, out stationDevice);
+                if (!stationKnown)
                     errors.Add(where + "Station Name \"" + station + "\" does not match any IoDevice station in " + StationsFileName);
 
                 if (name.Length == 0)
@@ -212,10 +223,14 @@ namespace Openn._01_Constructor
                 }
 
                 HardwareDeviceTypesDatabase.DeviceInfo dbInfo;
-                if (!HardwareDeviceTypesDatabase.Identifier.TryGetValue(modelId, out dbInfo))
+                bool modelKnown = HardwareDeviceTypesDatabase.Identifier.TryGetValue(modelId, out dbInfo);
+                if (!modelKnown)
                     errors.Add(where + "Model Id \"" + modelId + "\" not found in " + HardwareDeviceTypesDatabase.FileName);
                 else if (dbInfo.deviceType != "IoDeviceCard")
                     errors.Add(where + "model " + modelId + " is of type \"" + dbInfo.deviceType + "\" but modules must be \"IoDeviceCard\"");
+
+                if (modelKnown)
+                    ValidateCustomParameters(dbInfo.customParameters, customParameters, stationKnown ? stationDevice.IP : string.Empty, where, errors);
 
                 int address;
                 if (iAddress.Length > 0 && (!int.TryParse(iAddress, out address) || address < 0))
@@ -230,6 +245,18 @@ namespace Openn._01_Constructor
             }
 
             return modulesByStation;
+        }
+
+        /// <summary>
+        /// Parses the merged custom parameters only to surface syntax problems at
+        /// load time; the generation code re-parses them when applying.
+        /// </summary>
+        private static void ValidateCustomParameters(string globalParameters, string specificParameters, string ipAddress, string where, List<string> errors)
+        {
+            var parameterErrors = new List<string>();
+            CustomParameterParser.Parse(globalParameters, specificParameters, ipAddress, parameterErrors);
+            foreach (string parameterError in parameterErrors)
+                errors.Add(where + "custom parameter: " + parameterError);
         }
 
         private static string Describe(string filename, CsvRow row) =>

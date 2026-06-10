@@ -1,5 +1,5 @@
 ﻿#!format=2
-# Role;Station Name;Model Id;IP Address;PN Number;Subnet;Custom Parameters  (PN Number empty = last IP octet)
+# Role;Station Name;Model Id;IP Address;PN Number;Subnet;Custom Parameters  (PN Number empty = last IP octet; parameters separated by |)
 Plc;n0001-zp001-el001-k30001;6ES7517-3FP00-0AB0;192.168.50.1;;Subnet50;
 PlcCardCm;n0001-zp001-el001-k30002;6GK7542-1AX00-0XE0;192.168.51.1;;Subnet51;
 IoDevice;n0005-zp001-el001-k40001;6ES7155-6AU01-0BN0;192.168.50.5;;Subnet50;

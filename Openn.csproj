@@ -109,6 +109,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Compile Include="01_Constructor\CustomParameterParser.cs" />
     <Compile Include="01_Constructor\HardwareConfigConverter.cs" />
     <Compile Include="01_Constructor\HardwareConfigLoader.cs" />
     <Compile Include="01_Constructor\HardwareIoControllers.cs" />

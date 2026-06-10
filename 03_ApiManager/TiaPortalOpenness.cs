@@ -6,6 +6,7 @@ using Siemens.Engineering;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 
+using Openn._01_Constructor;
 using HwDb = Openn._01_Constructor.HardwareDeviceTypesDatabase;
 using HwIoC = Openn._01_Constructor.HardwareIoControllers;
 using HwIoD = Openn._01_Constructor.HardwareIoDevices;
@@ -477,7 +478,8 @@ namespace Openn._03_ApiManager
                     //write custom parameters & I/O addresses
                     DeviceItem T_submodule = FindDeviceItem(s.name, _device.DeviceItems);
 
-                    SetCustomParameters(T_submodule, HwDb.Identifier[s.identifier].customParameters, s.customParameters, _mainDeviceData.IP);
+                    ApplyCustomParameters(T_submodule, HwDb.Identifier[s.identifier].customParameters, s.customParameters, _mainDeviceData.IP,
+                        _mainDeviceData.name + " / " + s.name);
 
                     foreach (DeviceItem x in T_submodule.DeviceItems)
                     {
@@ -576,193 +578,179 @@ namespace Openn._03_ApiManager
             ioSystems.Add(c.subnetName, new Tuple<Subnet, IoSystem>(subnet, ioSystem));
         }
 
-        private struct DeviceCustomParam
+        /// <summary>
+        /// Applies the merged custom parameters (model defaults + row overrides) to a
+        /// plugged module. Parameters with an explicit path (Item(i).Ch(i).Name=Value)
+        /// are written exactly there; parameters without a path are written to the
+        /// first object in the module's tree that exposes a writable attribute of that
+        /// name, so new device families need no code changes.
+        /// </summary>
+        private void ApplyCustomParameters(DeviceItem module, string globalParameters, string specificParameters, string ipAddress, string context)
         {
-            public string Attribute;
-            public ulong Value;
-            public int ChannelId;
+            var parseErrors = new List<string>();
+            IList<CustomParameter> parameters = CustomParameterParser.Parse(globalParameters, specificParameters, ipAddress, parseErrors);
+            foreach (string parseError in parseErrors)
+                Log("Custom parameter error (" + context + "): " + parseError);
 
-            public DeviceCustomParam(string _Attribute, ulong _Value, int _ChannelId)
+            if (parameters.Count == 0)
+                return;
+
+            if (module == null)
             {
-                Attribute = _Attribute;
-                Value = _Value;
-                ChannelId = _ChannelId;
+                Log("Custom parameter error (" + context + "): module not found, " + parameters.Count + " parameter(s) skipped");
+                return;
+            }
+
+            foreach (CustomParameter parameter in parameters)
+            {
+                try
+                {
+                    ApplyCustomParameter(module, parameter, context);
+                }
+                catch (Exception e)
+                {
+                    Log("Custom parameter error (" + context + "): " + parameter + "\n" + e.Message);
+                }
             }
         }
 
-        private void SetCustomParameters(DeviceItem device, string customParamsGlobal, string customParamsSpecific, string IpAddress = "")
+        private void ApplyCustomParameter(DeviceItem module, CustomParameter parameter, string context)
         {
-            if (customParamsGlobal.Equals(string.Empty) && customParamsSpecific.Equals(string.Empty))
-                return; //skip if no params
-
-            IList<DeviceCustomParam> customParams = new List<DeviceCustomParam>();
-
-            string[] rawGlobalParams = customParamsGlobal.Split(',');
-            List<string> globalParams = DispatchCustomParameters(rawGlobalParams);
-
-            string[] rawSpecificParams = customParamsSpecific.Split(',');
-            List<string> specificParams = DispatchCustomParameters(rawSpecificParams);
-
-            //add global params not overrided to specificParams list
-            bool specifiParamExists;
-
-            foreach (string gParam in globalParams)
+            IEngineeringObject target;
+            if (parameter.Path.Count == 0)
             {
-                specifiParamExists = false;
-
-                foreach (string sParam in specificParams)
+                target = FindAttributeOwner(module, parameter.Name);
+                if (target == null)
                 {
-                    //check if a specific parameter exists, then override the global parameter
-                    if (sParam.Split('=')[0] == gParam.Split('=')[0])
-                    {
-                        specifiParamExists = true;
-                        break;
-                    }
+                    Log("Custom parameter error (" + context + "): no object of module " + module.Name +
+                        " has a writable attribute \"" + parameter.Name + "\"");
+                    return;
                 }
-
-                //add global param to list
-                if (!specifiParamExists)
+            }
+            else if (parameter.Path[0].IsChannel)
+            {
+                //channel without an explicit Item(..): find the sub item owning that channel
+                target = FindChannelOwner(module, parameter.Path[0].Index, parameter.Name);
+                if (target == null)
                 {
-                    specificParams.Add(gParam);
+                    Log("Custom parameter error (" + context + "): no channel " + parameter.Path[0].Index +
+                        " with a writable attribute \"" + parameter.Name + "\" found on module " + module.Name);
+                    return;
+                }
+            }
+            else
+            {
+                target = ResolvePath(module, parameter.Path);
+                if (target == null)
+                {
+                    Log("Custom parameter error (" + context + "): path of " + parameter + " does not exist on module " + module.Name);
+                    return;
                 }
             }
 
-            //process params and fill final list
-            foreach (string param in specificParams)
-            {
-                if (!param.Contains('='))
-                    continue; //skip if no equal sign
-
-                string[] splitParam = param.Split('=');
-                string _Attribute = splitParam[0];
-                int _ChannelId = 0;
-                ulong _Value = 0;
-
-                //check if param name contains dot (reference to subdevice/channel)
-                if (splitParam[0].Contains("."))
-                {
-                    string[] splitAttribute = splitParam[0].Split('.');
-                    _Attribute = splitAttribute[0];
-
-                    int.TryParse(splitAttribute[1].Split('(', ')')[1], out _ChannelId);
-                }
-
-                //check if param value is part of an IP Address
-                if (splitParam[1].Contains("IP["))
-                {
-                    string[] splitIp = IpAddress.Split('.');
-                    int ipField = int.TryParse(splitParam[1].Split('[', ']')[1], out int t) ? t: 3;
-
-                    ulong.TryParse(splitIp[ipField], out _Value);
-                }
-                else
-                {
-                    ulong.TryParse(splitParam[1], out _Value);
-                }
-                
-                DeviceCustomParam tmpCustomParam = new DeviceCustomParam(_Attribute, _Value, _ChannelId);
-                customParams.Add(tmpCustomParam);
-            }
-
-            foreach (DeviceCustomParam param in customParams)
-            {
-                switch (param.Attribute)
-                {
-                    //pass plugged FS_DATA Module
-                    case "Failsafe_FDestinationAddress":
-                    case "Failsafe_FMonitoringtime":
-                    case "Failsafe_FParameterSignatureIndividualParameters":
-                    {
-                        try
-                        {
-                            device.DeviceItems[0].SetAttribute(param.Attribute, param.Value);
-                        }
-                        catch (Exception e)
-                        {
-                            Log("SetCustomParameters Error, Attribute: " + param.Attribute + " Value: " + param.Value.ToString() + " Device: " + device.Name + "\n" +
-                                e.Message);
-                        }
-                            
-                        break;
-                    }
-
-                    //pass plugged Siemens F-DI Module
-                    case "PotentialGroup":
-                    {
-                        try
-                        {
-                            device.SetAttribute(param.Attribute, param.Value);
-                        }
-                        catch (Exception e)
-                        {
-                            Log("SetCustomParameters Error, Attribute: " + param.Attribute + " Value: " + param.Value.ToString() + " Device: " + device.Name + "\n" +
-                                e.Message);
-                        }
-
-                        break;
-                    }
-
-                    ////pass plugged Siemens F-DI Module
-                    case "Failsafe_SensorEvaluation":
-                    case "Failsafe_DiscrepancyTime":
-                    {
-                        try
-                        {
-                            device.DeviceItems[0].Channels[param.ChannelId].SetAttribute(param.Attribute, param.Value);
-                        }
-                        catch (Exception e)
-                        {
-                            Log("SetCustomParameters Error, Attribute: " + param.Attribute + " Value: " + param.Value.ToString() + " Device: " + device.Name + "\n" +
-                                e.Message);
-                        }
-                        break;
-                    }
-                    default:
-                        Log($"SetCustomParameters Error, Attribute: {param.Attribute} Value: {param.Value} Device: {device.Name} \n" +
-                            "has not been found in CustomParametersConfig.csv");
-
-                        break;
-                }
-
-            }
-
+            target.SetAttribute(parameter.Name, ConvertToAttributeType(target, parameter.Name, parameter.Value));
         }
 
-        private List<string> DispatchCustomParameters(string[] ParamList)
+        private IEngineeringObject ResolvePath(DeviceItem module, IList<CustomParameterPathStep> path)
         {
-            List<string> dispatchedParams = new List<string>();
-
-            for (int i = 0; i < ParamList.Length; i++)
+            IEngineeringObject current = module;
+            foreach (CustomParameterPathStep step in path)
             {
-                if (ParamList[i].Contains("("))
-                {
-                    string[] splitParam = ParamList[i].Split('(', ')');
-                    string ID = splitParam[1];
-
-                    if (ID.Contains("-"))
-                    {
-                        string[] splitID = ID.Split('-');
-                        int lowerBound = int.TryParse(splitID[0], out int n) ? n : 0;
-                        int upperBound = int.TryParse(splitID[1], out n) ? n : 0;
-
-                        for (int j = lowerBound; j <= upperBound; j++)
-                        {
-                            dispatchedParams.Add(splitParam[0] + "(" + j.ToString() + ")" + splitParam[2]);
-                        }
-                    }
-                    else
-                    {
-                        dispatchedParams.Add(ParamList[i]);
-                    }
-
-                }
-                else
-                {
-                    dispatchedParams.Add(ParamList[i]);
-                }
-
+                DeviceItem item = current as DeviceItem;
+                if (item == null) return null; //only DeviceItems have sub items/channels
+                current = step.IsChannel ? (IEngineeringObject)item.Channels[step.Index] : item.DeviceItems[step.Index];
             }
-            return dispatchedParams;
+            return current;
+        }
+
+        private IEngineeringObject FindAttributeOwner(DeviceItem module, string attributeName)
+        {
+            foreach (DeviceItem item in EnumerateModuleItems(module))
+            {
+                if (HasWritableAttribute(item, attributeName))
+                    return item;
+            }
+            return null;
+        }
+
+        private IEngineeringObject FindChannelOwner(DeviceItem module, int channelIndex, string attributeName)
+        {
+            foreach (DeviceItem item in EnumerateModuleItems(module))
+            {
+                IEngineeringObject channel = TryGetChannel(item, channelIndex);
+                if (channel != null && HasWritableAttribute(channel, attributeName))
+                    return channel;
+            }
+            return null;
+        }
+
+        /// <summary>The module itself and all its sub items, depth first.</summary>
+        private IEnumerable<DeviceItem> EnumerateModuleItems(DeviceItem root)
+        {
+            yield return root;
+            foreach (DeviceItem child in root.DeviceItems)
+            {
+                foreach (DeviceItem descendant in EnumerateModuleItems(child))
+                    yield return descendant;
+            }
+        }
+
+        private static IEngineeringObject TryGetChannel(DeviceItem item, int index)
+        {
+            try
+            {
+                var channels = item.Channels;
+                if (channels == null || index < 0 || index >= channels.Count) return null;
+                return channels[index];
+            }
+            catch
+            {
+                return null; //item exposes no channel composition
+            }
+        }
+
+        private static bool HasWritableAttribute(IEngineeringObject node, string attributeName)
+        {
+            foreach (var info in node.GetAttributeInfos())
+            {
+                if (info.Name == attributeName)
+                    return info.AccessMode != EngineeringAttributeAccessMode.Read;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Converts the value text to the type the attribute actually has (read from
+        /// its current value) - TIA attributes are typed and a ulong-only write would
+        /// fail for string/bool/enum/Int32 attributes.
+        /// </summary>
+        private static object ConvertToAttributeType(IEngineeringObject target, string attributeName, string valueText)
+        {
+            Type attributeType = null;
+            try
+            {
+                object currentValue = target.GetAttribute(attributeName);
+                attributeType = currentValue == null ? null : currentValue.GetType();
+            }
+            catch
+            {
+                //write-only or inaccessible attribute: use the fallback below
+            }
+
+            if (attributeType == null)
+            {
+                ulong numeric;
+                return ulong.TryParse(valueText, out numeric) ? (object)numeric : valueText;
+            }
+            if (attributeType == typeof(string)) return valueText;
+            if (attributeType.IsEnum) return Enum.Parse(attributeType, valueText, true);
+            if (attributeType == typeof(bool))
+            {
+                if (valueText == "1") return true;
+                if (valueText == "0") return false;
+                return bool.Parse(valueText);
+            }
+            return Convert.ChangeType(valueText, attributeType, System.Globalization.CultureInfo.InvariantCulture);
         }
 
 

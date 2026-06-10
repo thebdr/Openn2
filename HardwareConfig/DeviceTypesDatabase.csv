@@ -1,4 +1,4 @@
-# Identifier;Type (Plc, PlcCard, PlcCardCm, IoDevice, IoDeviceCard, Hmi);Order Number/FW Version;Comment;Custom Parameters
+# Identifier;Type (Plc, PlcCard, PlcCardCm, IoDevice, IoDeviceCard, Hmi);Order Number/FW Version;Comment;Custom Parameters (separated by |, syntax: [Item(i).][Ch(i).]Name=Value)
 6ES7517-3FP00-0AB0;Plc;OrderNumber:6ES7 517-3FP00-0AB0/V2.9;CPU 1517F-3 PN/DP;
 6ES7516-3FN02-0AB0;Plc;OrderNumber:6ES7 516-3FN02-0AB0/V2.8;CPU 1516F-3 PN/DP;
 6GK7542-1AX00-0XE0;PlcCardCm;OrderNumber:6GK7 542-1AX00-0XE0/V3.0;CM 1542-1;
@@ -10,6 +10,6 @@
 6ES7132-6BH01-0BA0;IoDeviceCard;OrderNumber:6ES7 132-6BH01-0BA0/V0.0;DQ 16x24VDC/0.5A ST;
 6ES7136-6DB00-0CA0;IoDeviceCard;OrderNumber:6ES7 136-6DB00-0CA0/V2.0;F-DQ 4x24VDC/2A PM HF;
 55556;IoDevice;GSD:GSDML-V2.31-MURRELEKTRONIK-MVK_MPNIO_F-20150903.XML/DAP/55556;MURRELEKTRONIK_55556;
-55556_DefaultCard;IoDeviceCard;GSD:GSDML-V2.31-MURRELEKTRONIK-MVK_MPNIO_F-20150903.XML/M/2;Murrelektronik FS Data Submodule;Failsafe_FDestinationAddress=IP[3],Failsafe_FMonitoringtime=450,Failsafe_FParameterSignatureIndividualParameters=2568997244
+55556_DefaultCard;IoDeviceCard;GSD:GSDML-V2.31-MURRELEKTRONIK-MVK_MPNIO_F-20150903.XML/M/2;Murrelektronik FS Data Submodule;Failsafe_FDestinationAddress=IP[3]|Failsafe_FMonitoringtime=450|Failsafe_FParameterSignatureIndividualParameters=2568997244
 55556_STATE_DATA;IoDeviceCard;GSD:GSDML-V2.31-MURRELEKTRONIK-MVK_MPNIO_F-20150903.XML/M/43;Murrelektronik State of FS Data Submodule;
 103040357;IoDevice;GSD:GSDML-V2.34-SCHMERSAL-SFB-PN-IRT-8M12-IOP-V2-20210827.XML/DAP/IDD_DAP1;SCHMERSAL_103040357;

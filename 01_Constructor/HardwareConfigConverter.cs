@@ -43,7 +43,7 @@ namespace Openn._01_Constructor
                 foreach (CsvRow row in table.Rows)
                 {
                     //legacy columns: Name;ModelId;IP;Subnet;CustomParameters
-                    stations.Add(new[] { LookupRole(row.Get(1)), row.Get(0), row.Get(1), row.Get(2), "", row.Get(3), row.Get(4) });
+                    stations.Add(new[] { LookupRole(row.Get(1)), row.Get(0), row.Get(1), row.Get(2), "", row.Get(3), NormalizeParameterSeparators(row.Get(4)) });
                 }
             }
 
@@ -54,7 +54,7 @@ namespace Openn._01_Constructor
                 {
                     //legacy head columns: Name;ModelId;IP;Subnet;CustomParameters
                     string stationName = row.Get(0);
-                    stations.Add(new[] { LookupRole(row.Get(1)), stationName, row.Get(1), row.Get(2), "", row.Get(3), row.Get(4) });
+                    stations.Add(new[] { LookupRole(row.Get(1)), stationName, row.Get(1), row.Get(2), "", row.Get(3), NormalizeParameterSeparators(row.Get(4)) });
 
                     int slot = 1;
                     for (int i = LegacyHeadColumns; i + LegacySubmoduleColumns - 1 < row.Values.Length; i += LegacySubmoduleColumns)
@@ -71,17 +71,17 @@ namespace Openn._01_Constructor
                             qAddress = split[1].Trim();
                         }
 
-                        modules.Add(new[] { stationName, slot.ToString(), row.Get(i), row.Get(i + 1), iAddress, qAddress, row.Get(i + 3) });
+                        modules.Add(new[] { stationName, slot.ToString(), row.Get(i), row.Get(i + 1), iAddress, qAddress, NormalizeParameterSeparators(row.Get(i + 3)) });
                         slot++;
                     }
                 }
             }
 
             WriteCsv(stationsFile,
-                "# Role;Station Name;Model Id;IP Address;PN Number;Subnet;Custom Parameters  (PN Number empty = last IP octet)",
+                "# Role;Station Name;Model Id;IP Address;PN Number;Subnet;Custom Parameters  (PN Number empty = last IP octet; parameters separated by |)",
                 stations);
             WriteCsv(modulesFile,
-                "# Station Name;Slot;Module Name;Model Id;I Addr;Q Addr;Custom Parameters  (Slot = plug order; first free position is used)",
+                "# Station Name;Slot;Module Name;Model Id;I Addr;Q Addr;Custom Parameters  (Slot = plug order; parameters separated by |)",
                 modules);
 
             note = "Converted legacy hardware csv files to " + HardwareConfigLoader.StationsFileName + " + " +
@@ -97,6 +97,12 @@ namespace Openn._01_Constructor
                 return info.deviceType;
             return string.Empty; //unknown model: validation reports it after conversion
         }
+
+        /// <summary>Legacy parameter lists were comma separated; format 2 uses '|'.</summary>
+        private static string NormalizeParameterSeparators(string parameters) =>
+            parameters.IndexOf(CustomParameterParser.Separator) >= 0
+                ? parameters
+                : parameters.Replace(CustomParameterParser.LegacySeparator, CustomParameterParser.Separator);
 
         private static char DetectDelimiter(string filePath)
         {
