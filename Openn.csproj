@@ -153,6 +153,18 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <!-- Hardware configuration data read by the app at runtime from <exe folder>\HardwareConfig -->
+  <ItemGroup>
+    <None Include="HardwareConfig\DeviceTypesDatabase.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="HardwareConfig\IoControllersList.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="HardwareConfig\IoDevicesList.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   <ItemGroup>
     <None Include="Resources\roberto_icon.ico" />
   </ItemGroup>

@@ -1,4 +1,0 @@
-# Station Name;Device Model Identifier;IP Address;Subnet Name;Submodule 1 Name;Submodule 1 Model;Submodule 1 Addresses (I&Q);Submodule 2 Name;Submodule 2 Model;Submodule 2 Addresses (I&Q);Submodule 3 Name;Submodule 3 Model;Submodule 3 Addresses (I&Q);…;;;;;
-n0093-ug7-el001-k30001;6ES7155-6AU01-0BN0;192.168.51.93;Subnet51;-K30001;6ES7155-6AU01-0BN0;100&;-K30002;6ES7131-6BH01-0BA0;200&;-K30003;6ES7131-6BH01-0BA0;300&;-K30004;6ES7136-6BA00-0CA0;400&;-K30005;6ES7136-6DB00-0CA0;500&
-n0006-zp001-el001-k25501;6ES7158-3AD10-0XA0;192.168.50.6;Subnet50;;;;;;;;;;;;;;;
-n0094-ug7-xn10;55556;192.168.51.94;Subnet50;FS_DATA;55556_FS_DATA;800;;;;;;;;;;;;

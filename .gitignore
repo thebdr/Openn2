@@ -1,2 +1,8 @@
 obj/
 bin/
+.vs/
+
+# Siemens-proprietary compile reference (see lib/README.md)
+lib/*.dll
+lib/*.xml
+lib/*.pdb
