@@ -44,13 +44,15 @@ namespace Openn._01_Constructor
         public string PnNumber = "";
         public string Subnet = "";
         public string CustomParameters = "";
+        /// <summary>Organizational path "folder/subfolder/..."; informational for now (generation ignores it).</summary>
+        public string Group = "";
         public List<ModuleModel> Modules = new List<ModuleModel>();
 
         public string DisplayText => "[" + Role + "] " + Name + (IpAddress.Length > 0 ? "  (" + IpAddress + ")" : "");
 
         /// <summary>Text the explorer's regex search runs against.</summary>
         public string SearchText =>
-            Role + " " + Name + " " + ModelId + " " + IpAddress + " " + PnNumber + " " + Subnet + " " + CustomParameters;
+            Role + " " + Name + " " + ModelId + " " + IpAddress + " " + PnNumber + " " + Subnet + " " + CustomParameters + " " + Group;
 
         /// <summary>Deep copy including all modules.</summary>
         public StationModel Clone()
@@ -64,6 +66,7 @@ namespace Openn._01_Constructor
                 PnNumber = PnNumber,
                 Subnet = Subnet,
                 CustomParameters = CustomParameters,
+                Group = Group,
             };
             foreach (ModuleModel module in Modules)
                 copy.Modules.Add(module.Clone());
@@ -71,12 +74,14 @@ namespace Openn._01_Constructor
         }
     }
 
-    /// <summary>One model database entry, for the editor's dropdowns and info line.</summary>
+    /// <summary>One model database entry, for the editor's dropdowns and info lines.</summary>
     public sealed class ModelInfo
     {
         public string Id = "";
         public string DeviceType = "";
         public string Comment = "";
+        /// <summary>Model-wide default custom parameters (merged with the row parameters at generation).</summary>
+        public string DefaultParameters = "";
     }
 
     /// <summary>
@@ -115,7 +120,7 @@ namespace Openn._01_Constructor
             {
                 string id = row.Get(0);
                 if (id.Length == 0 || document.Models.ContainsKey(id)) continue;
-                document.Models.Add(id, new ModelInfo { Id = id, DeviceType = row.Get(1), Comment = row.Get(3) });
+                document.Models.Add(id, new ModelInfo { Id = id, DeviceType = row.Get(1), Comment = row.Get(3), DefaultParameters = row.Get(4) });
             }
 
             CsvTable stations = CsvTable.Read(Path.Combine(folder, HardwareConfigLoader.StationsFileName));
@@ -131,6 +136,7 @@ namespace Openn._01_Constructor
                     PnNumber = row.Get(4),
                     Subnet = row.Get(5),
                     CustomParameters = row.Get(6),
+                    Group = row.Get(7),
                 });
             }
 
@@ -176,7 +182,7 @@ namespace Openn._01_Constructor
         {
             var stationsContent = new StringBuilder();
             stationsContent.AppendLine("#!format=" + HardwareConfigLoader.CurrentFormatVersion);
-            stationsContent.AppendLine("# Role;Station Name;Model Id;IP Address;PN Number;Subnet;Custom Parameters  (PN Number empty = last IP octet; parameters separated by |)");
+            stationsContent.AppendLine("# Role;Station Name;Model Id;IP Address;PN Number;Subnet;Custom Parameters;Group  (PN Number empty = last IP octet; parameters separated by |; Group = folder/subfolder/...)");
 
             var modulesContent = new StringBuilder();
             modulesContent.AppendLine("#!format=" + HardwareConfigLoader.CurrentFormatVersion);
@@ -184,7 +190,7 @@ namespace Openn._01_Constructor
 
             foreach (StationModel station in Stations)
             {
-                stationsContent.AppendLine(JoinCsv(station.Role, station.Name, station.ModelId, station.IpAddress, station.PnNumber, station.Subnet, station.CustomParameters));
+                stationsContent.AppendLine(JoinCsv(station.Role, station.Name, station.ModelId, station.IpAddress, station.PnNumber, station.Subnet, station.CustomParameters, station.Group));
                 foreach (ModuleModel module in station.Modules)
                     modulesContent.AppendLine(JoinCsv(station.Name, module.Slot, module.Name, module.ModelId, module.IAddress, module.QAddress, module.CustomParameters));
             }

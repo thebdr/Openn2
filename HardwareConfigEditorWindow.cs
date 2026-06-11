@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 using Openn._01_Constructor;
 using Openn._03_ApiManager;
@@ -19,16 +20,20 @@ namespace Openn
     /// Left: tree of stations and their modules, filtered as you type by a
     /// case-insensitive regex (a station matches by its own fields or stays
     /// visible with only its matching modules). Right: edit panel for the
-    /// selected object - changes apply to the in-memory document immediately.
-    /// Toolbar: add/duplicate/delete station and module (Del key works too).
+    /// selected object - changes apply to the in-memory document immediately,
+    /// and modified objects are highlighted bold blue until saved (a station
+    /// also turns blue while it contains modified modules).
+    ///
+    /// Selection: single click selects and edits; Ctrl+Click builds a
+    /// multi-selection (highlighted background) that Duplicate/Delete - via
+    /// the buttons, the right-click context menu or the Del key - operate on.
+    ///
     /// "Save + Reload" writes Stations.csv/Modules.csv back (format 2) and
     /// re-runs the validating HardwareConfigLoader on the worker thread, so
     /// the main window's configuration stays in sync and all validation
-    /// problems land in the main log.
-    ///
-    /// The editor deliberately tolerates invalid values (the document is not
-    /// validated while editing) - that is what makes it usable for FIXING a
-    /// configuration the loader rejected.
+    /// problems land in the main log. The editor deliberately tolerates
+    /// invalid values while editing - that is what makes it usable for
+    /// FIXING a configuration the loader rejected.
     /// </summary>
     public class HardwareConfigEditorWindow : Window
     {
@@ -44,8 +49,10 @@ namespace Openn
         private readonly GroupBox stationPanel;
         private readonly ComboBox stationRoleBox;
         private readonly TextBox stationNameBox;
+        private readonly TextBox stationGroupBox;
         private readonly ComboBox stationModelBox;
         private readonly TextBlock stationModelInfo;
+        private readonly TextBox stationModelDefaults;
         private readonly TextBox stationIpBox;
         private readonly TextBox stationPnBox;
         private readonly TextBox stationSubnetBox;
@@ -57,27 +64,37 @@ namespace Openn
         private readonly TextBox moduleNameBox;
         private readonly ComboBox moduleModelBox;
         private readonly TextBlock moduleModelInfo;
+        private readonly TextBox moduleModelDefaults;
         private readonly TextBox moduleIBox;
         private readonly TextBox moduleQBox;
         private readonly TextBox moduleParamsBox;
 
         private readonly HashSet<StationModel> expandedStations = new HashSet<StationModel>();
 
+        /// <summary>Objects changed since the last save; rendered bold blue.</summary>
+        private readonly HashSet<object> modifiedObjects = new HashSet<object>();
+
+        /// <summary>Ctrl+Click multi-selection (model objects); empty = use the tree's single selection.</summary>
+        private readonly HashSet<object> multiSelection = new HashSet<object>();
+
+        private static readonly Brush ModifiedBrush = Brushes.RoyalBlue;
+        private static readonly Brush MultiSelectBrush = new SolidColorBrush(Color.FromArgb(70, 0, 120, 215));
+
         public HardwareConfigEditorWindow(string configFolder)
         {
             document = HardwareConfigDocument.Load(configFolder);
 
             Title = "Openn2 - Hardware Configuration Editor - " + configFolder;
-            Width = 980;
-            Height = 640;
-            MinWidth = 700;
-            MinHeight = 400;
+            Width = 1020;
+            Height = 680;
+            MinWidth = 720;
+            MinHeight = 420;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
             //--- top: search ---
             var searchLabel = new TextBlock
             {
-                Text = "Search (regex, case-insensitive, matches role/name/model/IP/subnet/addresses/parameters):",
+                Text = "Search (regex, case-insensitive, matches role/name/group/model/IP/subnet/addresses/parameters). Ctrl+Click = multi-select.",
                 FontSize = 11,
                 Margin = new Thickness(0, 0, 0, 2),
             };
@@ -88,12 +105,17 @@ namespace Openn
             tree = new TreeView();
             tree.SelectedItemChanged += (s, e) => PopulateEditPanel();
             tree.KeyDown += (s, e) => { if (e.Key == Key.Delete) DeleteSelected(); };
+            tree.PreviewMouseLeftButtonDown += OnTreeLeftButtonDown;
+            tree.PreviewMouseRightButtonDown += OnTreeRightButtonDown;
+            tree.ContextMenu = BuildContextMenu();
 
             //--- right: edit panels ---
             stationRoleBox = new ComboBox { ItemsSource = new[] { "Plc", "PlcCardCm", "IoDevice" } };
             stationNameBox = new TextBox();
+            stationGroupBox = new TextBox { ToolTip = "Organizational path, e.g. line1/cell3/safety - informational for now" };
             stationModelBox = new ComboBox { IsEditable = true };
             stationModelInfo = new TextBlock { FontSize = 10, Foreground = SystemColors.GrayTextBrush, TextWrapping = TextWrapping.Wrap };
+            stationModelDefaults = MakeReadOnlyBox("Model-wide default parameters from DeviceTypesDatabase.csv; row parameters override them per target");
             stationIpBox = new TextBox();
             stationPnBox = new TextBox();
             stationSubnetBox = new TextBox();
@@ -106,8 +128,10 @@ namespace Openn
                 {
                     Tuple.Create("Role:", (FrameworkElement)stationRoleBox),
                     Tuple.Create("Name:", (FrameworkElement)stationNameBox),
+                    Tuple.Create("Group (folder/sub/..):", (FrameworkElement)stationGroupBox),
                     Tuple.Create("Model Id:", (FrameworkElement)stationModelBox),
                     Tuple.Create("", (FrameworkElement)stationModelInfo),
+                    Tuple.Create("Model defaults (read-only):", (FrameworkElement)stationModelDefaults),
                     Tuple.Create("IP Address:", (FrameworkElement)stationIpBox),
                     Tuple.Create("PN Number:", (FrameworkElement)stationPnBox),
                     Tuple.Create("Subnet:", (FrameworkElement)stationSubnetBox),
@@ -120,6 +144,7 @@ namespace Openn
             moduleNameBox = new TextBox();
             moduleModelBox = new ComboBox { IsEditable = true };
             moduleModelInfo = new TextBlock { FontSize = 10, Foreground = SystemColors.GrayTextBrush, TextWrapping = TextWrapping.Wrap };
+            moduleModelDefaults = MakeReadOnlyBox("Model-wide default parameters from DeviceTypesDatabase.csv; row parameters override them per target");
             moduleIBox = new TextBox();
             moduleQBox = new TextBox();
             moduleParamsBox = new TextBox { TextWrapping = TextWrapping.Wrap, AcceptsReturn = false, MinHeight = 40 };
@@ -133,6 +158,7 @@ namespace Openn
                     Tuple.Create("Name:", (FrameworkElement)moduleNameBox),
                     Tuple.Create("Model Id:", (FrameworkElement)moduleModelBox),
                     Tuple.Create("", (FrameworkElement)moduleModelInfo),
+                    Tuple.Create("Model defaults (read-only):", (FrameworkElement)moduleModelDefaults),
                     Tuple.Create("I Start Address:", (FrameworkElement)moduleIBox),
                     Tuple.Create("Q Start Address:", (FrameworkElement)moduleQBox),
                     Tuple.Create("Custom Parameters:", (FrameworkElement)moduleParamsBox),
@@ -198,6 +224,15 @@ namespace Openn
             RebuildTree();
             ShowLoadStatus();
         }
+
+        private static TextBox MakeReadOnlyBox(string toolTip) => new TextBox
+        {
+            IsReadOnly = true,
+            Background = SystemColors.ControlLightLightBrush,
+            Foreground = SystemColors.GrayTextBrush,
+            TextWrapping = TextWrapping.Wrap,
+            ToolTip = toolTip,
+        };
 
         #region Search / filter
 
@@ -269,19 +304,15 @@ namespace Openn
 
             foreach (SearchResult result in results)
             {
-                var stationItem = new TreeViewItem
-                {
-                    Header = result.Station.DisplayText + (result.Station.Modules.Count > 0 ? "   [" + result.Station.Modules.Count + " module(s)]" : ""),
-                    Tag = result.Station,
-                    IsExpanded = filtering || expandedStations.Contains(result.Station),
-                };
+                TreeViewItem stationItem = CreateItem(result.Station);
+                stationItem.IsExpanded = filtering || expandedStations.Contains(result.Station);
                 StationModel station = result.Station;
                 stationItem.Expanded += (s, e) => { if (e.Source == stationItem) expandedStations.Add(station); };
                 stationItem.Collapsed += (s, e) => { if (e.Source == stationItem) expandedStations.Remove(station); };
 
                 foreach (ModuleModel module in result.VisibleModules)
                 {
-                    var moduleItem = new TreeViewItem { Header = module.DisplayText, Tag = module };
+                    TreeViewItem moduleItem = CreateItem(module);
                     if (ReferenceEquals(module, previousSelection)) itemToSelect = moduleItem;
                     stationItem.Items.Add(moduleItem);
                 }
@@ -301,32 +332,154 @@ namespace Openn
             UpdateStatusCounts(results.Count);
         }
 
+        private TreeViewItem CreateItem(object model)
+        {
+            var item = new TreeViewItem { Tag = model, Header = new TextBlock() };
+            UpdateItemHeader(item);
+            return item;
+        }
+
+        /// <summary>
+        /// Renders text + state of one node: bold blue = modified since last save,
+        /// plain blue station = contains modified modules, highlighted = multi-selected.
+        /// </summary>
+        private void UpdateItemHeader(TreeViewItem item)
+        {
+            string text = "";
+            bool containsModified = false;
+            if (item.Tag is StationModel station)
+            {
+                text = station.DisplayText + (station.Modules.Count > 0 ? "   [" + station.Modules.Count + " module(s)]" : "");
+                containsModified = station.Modules.Any(m => modifiedObjects.Contains(m));
+            }
+            else if (item.Tag is ModuleModel module)
+            {
+                text = module.DisplayText;
+            }
+
+            bool isModified = modifiedObjects.Contains(item.Tag);
+            var header = (TextBlock)item.Header;
+            header.Text = text;
+            header.FontWeight = isModified ? FontWeights.Bold : FontWeights.Normal;
+            header.Foreground = (isModified || containsModified) ? ModifiedBrush : SystemColors.ControlTextBrush;
+            header.Background = multiSelection.Contains(item.Tag) ? MultiSelectBrush : Brushes.Transparent;
+        }
+
+        private void RestyleAllItems()
+        {
+            foreach (TreeViewItem stationItem in tree.Items)
+            {
+                UpdateItemHeader(stationItem);
+                foreach (TreeViewItem moduleItem in stationItem.Items)
+                    UpdateItemHeader(moduleItem);
+            }
+        }
+
+        /// <summary>Restyles the selected node and its parent (a module edit recolors the station too).</summary>
+        private void RefreshSelectedItemStyle()
+        {
+            var item = tree.SelectedItem as TreeViewItem;
+            if (item == null) return;
+            UpdateItemHeader(item);
+            if (ItemsControl.ItemsControlFromItemContainer(item) is TreeViewItem parent)
+                UpdateItemHeader(parent);
+        }
+
         private object SelectedObject()
         {
             var item = tree.SelectedItem as TreeViewItem;
             return item == null ? null : item.Tag;
         }
 
+        /// <summary>The multi-selection when active, otherwise the tree's single selection.</summary>
+        private IList<object> SelectedObjects()
+        {
+            if (multiSelection.Count > 0) return multiSelection.ToList();
+            object single = SelectedObject();
+            return single == null ? new List<object>() : new List<object> { single };
+        }
+
         private StationModel SelectedStation()
         {
             object selected = SelectedObject();
             if (selected is StationModel station) return station;
-            if (selected is ModuleModel module) return document.Stations.FirstOrDefault(s => s.Modules.Contains(module));
+            if (selected is ModuleModel module) return OwnerOf(module);
             return null;
         }
 
-        /// <summary>Refreshes the header of the selected node after a field edit.</summary>
-        private void RefreshSelectedHeader()
-        {
-            var item = tree.SelectedItem as TreeViewItem;
-            if (item == null) return;
-            if (item.Tag is StationModel station)
-                item.Header = station.DisplayText + (station.Modules.Count > 0 ? "   [" + station.Modules.Count + " module(s)]" : "");
-            else if (item.Tag is ModuleModel module)
-                item.Header = module.DisplayText;
-        }
+        private StationModel OwnerOf(ModuleModel module) =>
+            document.Stations.FirstOrDefault(s => s.Modules.Contains(module));
 
         #endregion Tree
+
+        #region Multi-selection and context menu
+
+        private static TreeViewItem ItemFromEventSource(object source)
+        {
+            var current = source as DependencyObject;
+            while (current != null && !(current is TreeViewItem))
+                current = VisualTreeHelper.GetParent(current);
+            return current as TreeViewItem;
+        }
+
+        private void OnTreeLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == 0)
+            {
+                //plain click: drop the multi-selection, normal tree selection proceeds
+                if (multiSelection.Count > 0)
+                {
+                    multiSelection.Clear();
+                    RestyleAllItems();
+                    UpdateStatusCounts(tree.Items.Count);
+                }
+                return;
+            }
+
+            TreeViewItem item = ItemFromEventSource(e.OriginalSource);
+            if (item == null) return;
+
+            if (!multiSelection.Remove(item.Tag))
+                multiSelection.Add(item.Tag);
+            UpdateItemHeader(item);
+            UpdateStatusCounts(tree.Items.Count);
+            e.Handled = true; //keep the native selection (and the edit panel) where it is
+        }
+
+        private void OnTreeRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            //right-click selects the item under the cursor unless it is part of the multi-selection
+            TreeViewItem item = ItemFromEventSource(e.OriginalSource);
+            if (item == null) return;
+            if (!multiSelection.Contains(item.Tag))
+            {
+                if (multiSelection.Count > 0)
+                {
+                    multiSelection.Clear();
+                    RestyleAllItems();
+                }
+                item.IsSelected = true;
+            }
+        }
+
+        private ContextMenu BuildContextMenu()
+        {
+            var menu = new ContextMenu();
+            MenuItem MakeItem(string caption, Action action)
+            {
+                var menuItem = new MenuItem { Header = caption };
+                menuItem.Click += (s, e) => action();
+                return menuItem;
+            }
+            menu.Items.Add(MakeItem("Add Station", AddStation));
+            menu.Items.Add(MakeItem("Add Module", AddModule));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(MakeItem("Duplicate", DuplicateSelected));
+            menu.Items.Add(MakeItem("Delete", DeleteSelected));
+            return menu;
+        }
+
+        #endregion Multi-selection and context menu
 
         #region Edit panels
 
@@ -334,7 +487,7 @@ namespace Openn
         private static Grid BuildFieldGrid(IList<Tuple<string, FrameworkElement>> fields)
         {
             var grid = new Grid { Margin = new Thickness(6) };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 130 });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 150 });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             for (int i = 0; i < fields.Count; i++)
@@ -362,13 +515,14 @@ namespace Openn
                 if (populatingFields) return;
                 if (!(SelectedObject() is StationModel station)) return;
                 change(station);
-                RefreshSelectedHeader();
-                MarkDirty();
+                MarkModified(station);
+                RefreshSelectedItemStyle();
             }
 
             stationRoleBox.SelectionChanged += (s, e) => Apply(st => st.Role = stationRoleBox.SelectedItem as string ?? st.Role);
             stationNameBox.TextChanged += (s, e) => Apply(st => st.Name = stationNameBox.Text);
-            WireEditableCombo(stationModelBox, () => Apply(st => { st.ModelId = stationModelBox.Text; ShowModelInfo(stationModelBox.Text, stationModelInfo); }));
+            stationGroupBox.TextChanged += (s, e) => Apply(st => st.Group = stationGroupBox.Text);
+            WireEditableCombo(stationModelBox, () => Apply(st => { st.ModelId = stationModelBox.Text; ShowModelDetails(stationModelBox.Text, stationModelInfo, stationModelDefaults); }));
             stationIpBox.TextChanged += (s, e) => Apply(st => st.IpAddress = stationIpBox.Text);
             stationPnBox.TextChanged += (s, e) => Apply(st => st.PnNumber = stationPnBox.Text);
             stationSubnetBox.TextChanged += (s, e) => Apply(st => st.Subnet = stationSubnetBox.Text);
@@ -382,13 +536,13 @@ namespace Openn
                 if (populatingFields) return;
                 if (!(SelectedObject() is ModuleModel module)) return;
                 change(module);
-                RefreshSelectedHeader();
-                MarkDirty();
+                MarkModified(module);
+                RefreshSelectedItemStyle();
             }
 
             moduleSlotBox.TextChanged += (s, e) => Apply(m => m.Slot = moduleSlotBox.Text);
             moduleNameBox.TextChanged += (s, e) => Apply(m => m.Name = moduleNameBox.Text);
-            WireEditableCombo(moduleModelBox, () => Apply(m => { m.ModelId = moduleModelBox.Text; ShowModelInfo(moduleModelBox.Text, moduleModelInfo); }));
+            WireEditableCombo(moduleModelBox, () => Apply(m => { m.ModelId = moduleModelBox.Text; ShowModelDetails(moduleModelBox.Text, moduleModelInfo, moduleModelDefaults); }));
             moduleIBox.TextChanged += (s, e) => Apply(m => m.IAddress = moduleIBox.Text);
             moduleQBox.TextChanged += (s, e) => Apply(m => m.QAddress = moduleQBox.Text);
             moduleParamsBox.TextChanged += (s, e) => Apply(m => m.CustomParameters = moduleParamsBox.Text);
@@ -414,12 +568,13 @@ namespace Openn
 
                     stationRoleBox.SelectedItem = new[] { "Plc", "PlcCardCm", "IoDevice" }.FirstOrDefault(r => r.Equals(station.Role, StringComparison.OrdinalIgnoreCase)) ?? station.Role;
                     stationNameBox.Text = station.Name;
+                    stationGroupBox.Text = station.Group;
                     stationModelBox.Text = station.ModelId;
                     stationIpBox.Text = station.IpAddress;
                     stationPnBox.Text = station.PnNumber;
                     stationSubnetBox.Text = station.Subnet;
                     stationParamsBox.Text = station.CustomParameters;
-                    ShowModelInfo(station.ModelId, stationModelInfo);
+                    ShowModelDetails(station.ModelId, stationModelInfo, stationModelDefaults);
                 }
                 else if (selected is ModuleModel module)
                 {
@@ -432,7 +587,7 @@ namespace Openn
                     moduleIBox.Text = module.IAddress;
                     moduleQBox.Text = module.QAddress;
                     moduleParamsBox.Text = module.CustomParameters;
-                    ShowModelInfo(module.ModelId, moduleModelInfo);
+                    ShowModelDetails(module.ModelId, moduleModelInfo, moduleModelDefaults);
                 }
                 else
                 {
@@ -446,12 +601,20 @@ namespace Openn
             }
         }
 
-        private void ShowModelInfo(string modelId, TextBlock target)
+        /// <summary>Info line (type - comment) and read-only model default parameters.</summary>
+        private void ShowModelDetails(string modelId, TextBlock infoLine, TextBox defaultsBox)
         {
             ModelInfo info;
-            target.Text = document.Models.TryGetValue(modelId ?? "", out info)
-                ? info.DeviceType + " - " + info.Comment
-                : "(model id not found in " + HardwareDeviceTypesDatabase.FileName + ")";
+            if (document.Models.TryGetValue(modelId ?? "", out info))
+            {
+                infoLine.Text = info.DeviceType + " - " + info.Comment;
+                defaultsBox.Text = info.DefaultParameters.Length > 0 ? info.DefaultParameters : "(none)";
+            }
+            else
+            {
+                infoLine.Text = "(model id not found in " + HardwareDeviceTypesDatabase.FileName + ")";
+                defaultsBox.Text = "";
+            }
         }
 
         #endregion Edit panels
@@ -466,7 +629,7 @@ namespace Openn
                 Name = HardwareConfigDocument.MakeUniqueName("new_station", document.Stations.Select(s => s.Name)),
             };
             document.Stations.Add(station);
-            MarkDirty();
+            MarkModified(station);
             RebuildTree(station);
         }
 
@@ -486,62 +649,84 @@ namespace Openn
             };
             station.Modules.Add(module);
             expandedStations.Add(station);
-            MarkDirty();
+            MarkModified(module);
             RebuildTree(module);
         }
 
         private void DuplicateSelected()
         {
-            object selected = SelectedObject();
-            if (selected is StationModel station)
+            IList<object> selected = SelectedObjects();
+            if (selected.Count == 0)
+            {
+                statusText.Text = "Select station(s) or module(s) to duplicate";
+                return;
+            }
+
+            var selectedStations = selected.OfType<StationModel>().ToList();
+            object lastCopy = null;
+
+            foreach (StationModel station in selectedStations)
             {
                 StationModel copy = station.Clone();
                 copy.Name = HardwareConfigDocument.MakeUniqueName(station.Name, document.Stations.Select(s => s.Name));
                 document.Stations.Insert(document.Stations.IndexOf(station) + 1, copy);
-                MarkDirty();
-                RebuildTree(copy);
+                MarkModified(copy);
+                lastCopy = copy;
             }
-            else if (selected is ModuleModel module)
+
+            //modules whose station is duplicated as a whole are already covered
+            foreach (ModuleModel module in selected.OfType<ModuleModel>())
             {
-                StationModel owner = SelectedStation();
-                if (owner == null) return;
+                StationModel owner = OwnerOf(module);
+                if (owner == null || selectedStations.Contains(owner)) continue;
+
                 ModuleModel copy = module.Clone();
                 copy.Slot = HardwareConfigDocument.NextFreeSlot(owner);
                 copy.Name = HardwareConfigDocument.MakeUniqueName(module.Name, owner.Modules.Select(m => m.Name));
                 owner.Modules.Insert(owner.Modules.IndexOf(module) + 1, copy);
-                MarkDirty();
-                RebuildTree(copy);
+                MarkModified(copy);
+                lastCopy = copy;
             }
-            else
-            {
-                statusText.Text = "Select a station or module to duplicate";
-            }
+
+            multiSelection.Clear();
+            RebuildTree(lastCopy);
         }
 
         private void DeleteSelected()
         {
-            object selected = SelectedObject();
-            if (selected is StationModel station)
-            {
-                string question = station.Modules.Count > 0
-                    ? "Delete station \"" + station.Name + "\" and its " + station.Modules.Count + " module(s)?"
-                    : "Delete station \"" + station.Name + "\"?";
-                if (MessageBox.Show(this, question, "Delete", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            IList<object> selected = SelectedObjects();
+            if (selected.Count == 0) return;
 
-                document.Stations.Remove(station);
-                MarkDirty();
-                RebuildTree();
-            }
-            else if (selected is ModuleModel module)
-            {
-                StationModel owner = SelectedStation();
-                if (owner == null) return;
-                if (MessageBox.Show(this, "Delete module \"" + module.Name + "\"?", "Delete", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            var stations = selected.OfType<StationModel>().ToList();
+            var modules = selected.OfType<ModuleModel>()
+                .Where(m => { StationModel owner = OwnerOf(m); return owner == null || !stations.Contains(owner); })
+                .ToList();
 
+            string question = stations.Count > 0 && modules.Count > 0
+                ? "Delete " + stations.Count + " station(s) and " + modules.Count + " module(s)?"
+                : stations.Count > 0
+                    ? "Delete " + stations.Count + " station(s)" + (stations.Sum(s => s.Modules.Count) > 0 ? " including their " + stations.Sum(s => s.Modules.Count) + " module(s)?" : "?")
+                    : "Delete " + modules.Count + " module(s)?";
+            if (MessageBox.Show(this, question, "Delete", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            foreach (ModuleModel module in modules)
+            {
+                StationModel owner = OwnerOf(module);
+                if (owner == null) continue;
                 owner.Modules.Remove(module);
-                MarkDirty();
-                RebuildTree(owner);
+                modifiedObjects.Remove(module);
+                MarkModified(owner); //composition changed
             }
+            foreach (StationModel station in stations)
+            {
+                document.Stations.Remove(station);
+                modifiedObjects.Remove(station);
+            }
+
+            dirty = true;
+            multiSelection.Clear();
+            RebuildTree();
         }
 
         private async Task SaveAsync()
@@ -557,6 +742,8 @@ namespace Openn
             }
 
             dirty = false;
+            modifiedObjects.Clear();
+            RestyleAllItems();
             statusText.Text = "Saved - validating...";
 
             //re-run the validating loader so the app state matches the files
@@ -576,6 +763,8 @@ namespace Openn
 
             document = HardwareConfigDocument.Load(document.Folder);
             dirty = false;
+            modifiedObjects.Clear();
+            multiSelection.Clear();
             expandedStations.Clear();
             RebuildTree();
             ShowLoadStatus();
@@ -593,8 +782,9 @@ namespace Openn
 
         #region Status
 
-        private void MarkDirty()
+        private void MarkModified(object model)
         {
+            modifiedObjects.Add(model);
             dirty = true;
             UpdateStatusCounts(tree.Items.Count);
         }
@@ -604,6 +794,8 @@ namespace Openn
             string text = document.Stations.Count + " station(s), " + document.ModuleCount + " module(s)";
             if (visibleStations != document.Stations.Count)
                 text += " - showing " + visibleStations;
+            if (multiSelection.Count > 0)
+                text += " - " + multiSelection.Count + " selected";
             if (dirty)
                 text += "  [modified - not saved]";
             statusText.Text = text;
