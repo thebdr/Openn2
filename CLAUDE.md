@@ -32,6 +32,11 @@ files, imports/exports PLC blocks.
   ALL Siemens calls (and hardware-config loading) must go through `TiaWorker.Run(...)` —
   one dedicated worker thread with a serial queue. UI code awaits the returned Task via
   `MainWindow.RunBackend`; never call `tia.*` directly on the UI thread.
+  Cancellation is **cooperative**: single Openness calls cannot be interrupted, so long
+  loops check `TiaWorker.CurrentCancellation` between calls (per station/module); the
+  "Cancel Operation" button trips the token. Never `Thread.Abort` the worker. Nothing
+  is ever auto-saved — a cancelled/aborted generation is rolled back by closing the
+  project in TIA without saving.
 - **Hardware config** (`01_Constructor/`): csv "format 2" — `Stations.csv` +
   `Modules.csv` + `DeviceTypesDatabase.csv`; `;` delimited, `#` comments, `#!format=2`
   tag, parsed by `CsvTable`. `HardwareConfigLoader` validates the whole folder before
@@ -85,6 +90,8 @@ files, imports/exports PLC blocks.
    Data module: `Failsafe_FDestinationAddress`/`FMonitoringtime`/`FParameterSignature…`
    on the module's first sub-item; F-DI cards: `Failsafe_DiscrepancyTime` per channel;
    `PotentialGroup` on the module itself. The UI must stay responsive (spinner over the
-   log area) during generation.
+   log area) during generation. "Cancel Operation" must stop the run between devices
+   with a "N of M created" log line; a plug error must pop the Retry/Abort/Ignore
+   dialog and honor each choice.
 6. **Negative test:** select V18 at startup, try attaching to a running V19 instance —
    expect an error in the log, not a crash.

@@ -110,6 +110,11 @@
         <!--Method Running Spinner -->
         
         
+        <!-- Cancels the running backend operation (visible only while one runs) /-->
+        <Button x:Name="btnCancelOperation" Click="btnCancelOperation_Click" Grid.Row="6" Grid.Column="5" Margin="2,2,4,2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="110" Height="25" FontWeight="SemiBold" Background="#FFFFD2D2" Visibility="Hidden">
+            <AccessText Text="Cancel Operation" TextWrapping="Wrap" TextAlignment="Center" FontSize="11" />
+        </Button>
+
         <!-- TextView for logs & messages /-->
         <Button x:Name="btnClearLogs" Click="btnClearLogs_Click" Grid.Row="6" Grid.Column="6" Margin="2,2,4,2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="80" Height="25" FontFamily="Courrier New" FontWeight="SemiBold" FontStyle="Italic"  Background="#FFADFFF9">
             <AccessText Text="Clear Logs" TextWrapping="Wrap" TextAlignment="Center" FontSize="13" />

@@ -17,6 +17,30 @@ namespace Openn._03_ApiManager
     {
         private static readonly BlockingCollection<Action> workQueue = new BlockingCollection<Action>();
 
+        /// <summary>Cancellation of the operation currently executing on the worker; null when idle.</summary>
+        private static volatile CancellationTokenSource currentOperationCancellation;
+
+        /// <summary>
+        /// Token of the running operation (None when idle). Openness calls themselves
+        /// cannot be interrupted, so long operations check this BETWEEN calls
+        /// (per station / per module) and stop cooperatively.
+        /// </summary>
+        public static CancellationToken CurrentCancellation
+        {
+            get
+            {
+                CancellationTokenSource source = currentOperationCancellation;
+                return source == null ? CancellationToken.None : source.Token;
+            }
+        }
+
+        /// <summary>Requests cancellation of the running operation (no-op when idle).</summary>
+        public static void CancelCurrentOperation()
+        {
+            CancellationTokenSource source = currentOperationCancellation;
+            if (source != null) source.Cancel();
+        }
+
         static TiaWorker()
         {
             var thread = new Thread(ProcessQueue)
@@ -36,8 +60,10 @@ namespace Openn._03_ApiManager
             var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
             workQueue.Add(() =>
             {
+                currentOperationCancellation = new CancellationTokenSource(); //fresh token per operation
                 try { completion.SetResult(work()); }
                 catch (Exception e) { completion.SetException(e); }
+                finally { currentOperationCancellation = null; }
             });
             return completion.Task;
         }

@@ -123,6 +123,12 @@ namespace Openn._03_ApiManager
         {
             foreach (TiaPortalProcess tiaPortalProcess in TiaPortal.GetProcesses())
             {
+                if (TiaWorker.CurrentCancellation.IsCancellationRequested)
+                {
+                    Log("Attach CANCELLED");
+                    return null;
+                }
+
                 try
                 {
                     if (tiaPortalProcess.ProjectPath == null) continue;

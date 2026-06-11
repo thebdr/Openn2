@@ -194,6 +194,13 @@ namespace Openn
             await RefreshOpenInstancesDropdown(quietWhenBusy: true);
         }
 
+        private void btnCancelOperation_Click(object sender, RoutedEventArgs e)
+        {
+            //cooperative: the operation stops at its next between-calls checkpoint
+            TiaWorker.CancelCurrentOperation();
+            Log("Cancel requested - the operation stops after the current TIA call completes");
+        }
+
         private async void Window_Activated(object sender, System.EventArgs e)
         {
             await RefreshOpenInstancesDropdown(quietWhenBusy: true);
@@ -233,7 +240,9 @@ namespace Openn
             else
                 runningOperations = Math.Max(0, runningOperations - 1);
 
-            icoRunning.Visibility = runningOperations > 0 ? Visibility.Visible : Visibility.Hidden;
+            Visibility visibility = runningOperations > 0 ? Visibility.Visible : Visibility.Hidden;
+            icoRunning.Visibility = visibility;
+            btnCancelOperation.Visibility = visibility;
         }
 
     }

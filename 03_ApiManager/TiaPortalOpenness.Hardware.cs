@@ -76,6 +76,9 @@ namespace Openn._03_ApiManager
 
             CreateIoDevices(HwIoD.DevicesList);
 
+            if (TiaWorker.CurrentCancellation.IsCancellationRequested)
+                return; //the loop that observed the cancel has already logged it
+
             foreach (var a in project.UngroupedDevicesGroup.Devices)
             {
                 SetAttribute(a.DeviceItems, "Author", "bdragoi");
@@ -99,6 +102,12 @@ namespace Openn._03_ApiManager
 
             foreach (var ioC in HwIoC.DevicesList)
             {
+                if (TiaWorker.CurrentCancellation.IsCancellationRequested)
+                {
+                    Log("Hardware generation CANCELLED while attaching IO controllers");
+                    return false;
+                }
+
                 //search for PLCs
                 if (HwDb.Identifier[ioC.identifier].deviceType.Equals("Plc", StringComparison.OrdinalIgnoreCase))
                 {
@@ -150,6 +159,12 @@ namespace Openn._03_ApiManager
 
             foreach (var c in HwIoC.DevicesList)
             {
+                if (TiaWorker.CurrentCancellation.IsCancellationRequested)
+                {
+                    Log("Hardware generation CANCELLED while creating IO controllers (project not saved - close it in TIA without saving to roll back)");
+                    return;
+                }
+
                 if (HwDb.Identifier[c.identifier].deviceType == "Plc") //create Plc
                 {
                     var device = project.Devices.CreateWithItem(HwDb.Identifier[c.identifier].identifier, c.name, c.name);
@@ -292,8 +307,18 @@ namespace Openn._03_ApiManager
         /// </summary>
         private void CreateIoDevices(IList<Tuple<HwIoD._Device, IList<HwIoD._Submodule>>> _devicesList)
         {
+            int createdCount = 0;
             foreach (var d in _devicesList)
             {
+                //cooperative cancel: single Openness calls cannot be interrupted, so we
+                //stop between devices; nothing is saved, TIA can roll back via close-without-save
+                if (TiaWorker.CurrentCancellation.IsCancellationRequested)
+                {
+                    Log("Hardware generation CANCELLED - " + createdCount + " of " + _devicesList.Count +
+                        " IO device(s) created (project not saved - close it in TIA without saving to roll back)");
+                    return;
+                }
+
                 var _device = project.UngroupedDevicesGroup.Devices.CreateWithItem(HwDb.Identifier[d.Item1.identifier].identifier, d.Item1.name, d.Item1.name);
 
                 SetAttribute(_device.DeviceItems, "Author", "bdragoi");
@@ -324,13 +349,15 @@ namespace Openn._03_ApiManager
                 PlugSubmodules(_device, d.Item1, d.Item2);
 
                 Log("IoDevice Creation Ok: IoDevice " + _device.Name + " (" + HwDb.Identifier[d.Item1.identifier].comment + " has been created");
+                createdCount++;
             }
         }
 
         /// <summary>
         /// Plugs each configured module into the first free slot of the device rack
         /// (the configured Slot only defines the order), then writes its custom
-        /// parameters and I/O start addresses.
+        /// parameters and I/O start addresses. A plug error pops a Retry / Abort /
+        /// Ignore decision to the user (the worker waits); Ignore skips the module.
         /// </summary>
         private void PlugSubmodules(Device _device, HwIoD._Device _mainDeviceData, IList<HwIoD._Submodule> _Submodules)
         {
@@ -339,19 +366,54 @@ namespace Openn._03_ApiManager
             int lastInsertedSlot = 0;
             foreach (var s in _Submodules)
             {
+                if (TiaWorker.CurrentCancellation.IsCancellationRequested)
+                {
+                    Log("Hardware generation CANCELLED while plugging modules of " + _device.Name);
+                    return;
+                }
                 if (s.name.Equals(string.Empty)) continue;
+
                 for (int i = lastInsertedSlot; i <= _device.DeviceItems.Count + _Submodules.Count; i++)
                 {
-                    try
+                    bool tryNextSlot = false;
+                    bool skipSubmodule = false;
+
+                    while (true) //repeated while the user chooses Retry
                     {
-                        if (!rail.CanPlugNew(HwDb.Identifier[s.identifier].identifier, s.name, i)) continue;
-                        lastInsertedSlot = i;
-                        rail.PlugNew(HwDb.Identifier[s.identifier].identifier, s.name, i);
+                        try
+                        {
+                            if (!rail.CanPlugNew(HwDb.Identifier[s.identifier].identifier, s.name, i))
+                            {
+                                tryNextSlot = true;
+                                break;
+                            }
+                            lastInsertedSlot = i;
+                            rail.PlugNew(HwDb.Identifier[s.identifier].identifier, s.name, i);
+                            break;
+                        }
+                        catch (Exception e)
+                        {
+                            var decision = AskPlugDecision(s.name, _device.Name, e.Message);
+                            if (decision == System.Windows.Forms.DialogResult.Retry)
+                            {
+                                Log("Retrying to plug submodule " + s.name + " to device " + _device.Name + " (slot " + i + ")");
+                                continue;
+                            }
+                            if (decision == System.Windows.Forms.DialogResult.Ignore)
+                            {
+                                Log("SKIPPED submodule " + s.name + " of device " + _device.Name + " after plug error - check I/O addresses and parameters! \n" + e.Message);
+                                skipSubmodule = true;
+                                break;
+                            }
+
+                            Log("Hardware generation ABORTED by the user after plug error at " + _device.Name + " / " + s.name + " \n" + e.Message);
+                            TiaWorker.CancelCurrentOperation(); //stops the outer loops at their next check
+                            return;
+                        }
                     }
-                    catch (Exception e)
-                    {
-                        Log("Error Plugging Submodule " + s.name + " to device " + _device.Name + "\n" + e.Message);
-                    }
+
+                    if (tryNextSlot) continue;
+                    if (skipSubmodule) break;
 
                     //write custom parameters & I/O addresses
                     DeviceItem T_submodule = FindDeviceItem(s.name, _device.DeviceItems);
@@ -363,6 +425,30 @@ namespace Openn._03_ApiManager
                     break;
                 }
             }
+        }
+
+        /// <summary>
+        /// Plug-error popup, shown on the UI thread while the worker waits:
+        /// Retry the plug call (e.g. after closing a blocking TIA dialog),
+        /// Abort the whole generation, or Ignore = skip this module (dangerous -
+        /// the following I/O addresses and parameters may no longer match).
+        /// </summary>
+        private static System.Windows.Forms.DialogResult AskPlugDecision(string moduleName, string deviceName, string errorMessage)
+        {
+            var application = System.Windows.Application.Current;
+            if (application == null) return System.Windows.Forms.DialogResult.Abort; //no UI: fail safe
+
+            return application.Dispatcher.Invoke(() =>
+                System.Windows.Forms.MessageBox.Show(
+                    "Error plugging submodule \"" + moduleName + "\" to device \"" + deviceName + "\":\n\n" +
+                    errorMessage + "\n\n" +
+                    "Retry  -  try the same plug call again (e.g. after closing a TIA dialog)\n" +
+                    "Abort  -  stop the whole hardware generation (project stays unsaved)\n" +
+                    "Ignore -  skip this module and continue - DANGEROUS: the following\n" +
+                    "          I/O addresses and custom parameters may no longer match",
+                    "Openn2 - Plug Module Error",
+                    System.Windows.Forms.MessageBoxButtons.AbortRetryIgnore,
+                    System.Windows.Forms.MessageBoxIcon.Warning));
         }
 
         /// <summary>
