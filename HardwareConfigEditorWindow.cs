@@ -24,9 +24,10 @@ namespace Openn
     /// and modified objects are highlighted bold blue until saved (a station
     /// also turns blue while it contains modified modules).
     ///
-    /// Selection: single click selects and edits; Ctrl+Click builds a
-    /// multi-selection (highlighted background) that Duplicate/Delete - via
-    /// the buttons, the right-click context menu or the Del key - operate on.
+    /// Selection: single click selects and edits; Ctrl+Click toggles items in a
+    /// multi-selection (highlighted background) and Shift+Click selects the range
+    /// from the last clicked item over the visible nodes. Duplicate/Delete - via
+    /// the buttons, the right-click context menu or the Del key - operate on it.
     ///
     /// "Save + Reload" writes Stations.csv/Modules.csv back (format 2) and
     /// re-runs the validating HardwareConfigLoader on the worker thread, so
@@ -74,8 +75,11 @@ namespace Openn
         /// <summary>Objects changed since the last save; rendered bold blue.</summary>
         private readonly HashSet<object> modifiedObjects = new HashSet<object>();
 
-        /// <summary>Ctrl+Click multi-selection (model objects); empty = use the tree's single selection.</summary>
+        /// <summary>Ctrl/Shift+Click multi-selection (model objects); empty = use the tree's single selection.</summary>
         private readonly HashSet<object> multiSelection = new HashSet<object>();
+
+        /// <summary>Range anchor for Shift+Click: the last plainly- or Ctrl-clicked object.</summary>
+        private object selectionAnchor;
 
         private static readonly Brush ModifiedBrush = Brushes.RoyalBlue;
         private static readonly Brush MultiSelectBrush = new SolidColorBrush(Color.FromArgb(70, 0, 120, 215));
@@ -94,7 +98,7 @@ namespace Openn
             //--- top: search ---
             var searchLabel = new TextBlock
             {
-                Text = "Search (regex, case-insensitive, matches role/name/group/model/IP/subnet/addresses/parameters). Ctrl+Click = multi-select.",
+                Text = "Search (regex, case-insensitive, matches role/name/group/model/IP/subnet/addresses/parameters). Ctrl+Click = toggle selection, Shift+Click = select range.",
                 FontSize = 11,
                 Margin = new Thickness(0, 0, 0, 2),
             };
@@ -424,26 +428,71 @@ namespace Openn
 
         private void OnTreeLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if ((Keyboard.Modifiers & ModifierKeys.Control) == 0)
+            TreeViewItem item = ItemFromEventSource(e.OriginalSource);
+            bool shiftHeld = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+            bool ctrlHeld = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+
+            if (shiftHeld && item != null)
             {
-                //plain click: drop the multi-selection, normal tree selection proceeds
-                if (multiSelection.Count > 0)
-                {
-                    multiSelection.Clear();
-                    RestyleAllItems();
-                    UpdateStatusCounts(tree.Items.Count);
-                }
+                //range from the anchor to the clicked item, over the visible nodes; the anchor stays
+                SelectRange(item);
+                e.Handled = true;
                 return;
             }
 
-            TreeViewItem item = ItemFromEventSource(e.OriginalSource);
-            if (item == null) return;
+            if (ctrlHeld)
+            {
+                if (item == null) return;
+                if (!multiSelection.Remove(item.Tag))
+                    multiSelection.Add(item.Tag);
+                selectionAnchor = item.Tag;
+                UpdateItemHeader(item);
+                UpdateStatusCounts(tree.Items.Count);
+                e.Handled = true; //keep the native selection (and the edit panel) where it is
+                return;
+            }
 
-            if (!multiSelection.Remove(item.Tag))
-                multiSelection.Add(item.Tag);
-            UpdateItemHeader(item);
+            //plain click: drop the multi-selection, normal tree selection proceeds
+            selectionAnchor = item == null ? null : item.Tag;
+            if (multiSelection.Count > 0)
+            {
+                multiSelection.Clear();
+                RestyleAllItems();
+                UpdateStatusCounts(tree.Items.Count);
+            }
+        }
+
+        /// <summary>Replaces the multi-selection with anchor..clicked over the items as displayed.</summary>
+        private void SelectRange(TreeViewItem clicked)
+        {
+            List<TreeViewItem> visible = VisibleItemsInDisplayOrder();
+            object anchor = selectionAnchor ?? SelectedObject();
+
+            int clickedIndex = visible.FindIndex(i => ReferenceEquals(i, clicked));
+            if (clickedIndex < 0) return;
+            int anchorIndex = visible.FindIndex(i => ReferenceEquals(i.Tag, anchor));
+            if (anchorIndex < 0) anchorIndex = clickedIndex;
+
+            multiSelection.Clear();
+            for (int i = Math.Min(anchorIndex, clickedIndex); i <= Math.Max(anchorIndex, clickedIndex); i++)
+                multiSelection.Add(visible[i].Tag);
+
+            RestyleAllItems();
             UpdateStatusCounts(tree.Items.Count);
-            e.Handled = true; //keep the native selection (and the edit panel) where it is
+        }
+
+        /// <summary>Tree nodes top to bottom as currently shown (modules only under expanded stations).</summary>
+        private List<TreeViewItem> VisibleItemsInDisplayOrder()
+        {
+            var items = new List<TreeViewItem>();
+            foreach (TreeViewItem stationItem in tree.Items)
+            {
+                items.Add(stationItem);
+                if (!stationItem.IsExpanded) continue;
+                foreach (TreeViewItem moduleItem in stationItem.Items)
+                    items.Add(moduleItem);
+            }
+            return items;
         }
 
         private void OnTreeRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -459,6 +508,7 @@ namespace Openn
                     RestyleAllItems();
                 }
                 item.IsSelected = true;
+                selectionAnchor = item.Tag;
             }
         }
 
