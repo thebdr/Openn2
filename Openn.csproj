@@ -110,6 +110,7 @@
       <SubType>Designer</SubType>
     </Page>
     <Compile Include="01_Constructor\CustomParameterParser.cs" />
+    <Compile Include="01_Constructor\HardwareConfigDocument.cs" />
     <Compile Include="01_Constructor\HardwareConfigLoader.cs" />
     <Compile Include="01_Constructor\HardwareIoControllers.cs" />
     <Compile Include="01_Constructor\HardwareIoDevices.cs" />
@@ -119,6 +120,7 @@
     <Compile Include="03_ApiManager\TiaPortalOpenness.Blocks.cs" />
     <Compile Include="03_ApiManager\TiaPortalOpenness.Hardware.cs" />
     <Compile Include="BlockSearchWindow.cs" />
+    <Compile Include="HardwareConfigEditorWindow.cs" />
     <Compile Include="03_ApiManager\OpennessVersionDialog.cs" />
     <Compile Include="03_ApiManager\TiaPortalOpenness.cs" />
     <Compile Include="03_ApiManager\TiaWorker.cs" />

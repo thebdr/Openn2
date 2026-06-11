@@ -39,6 +39,12 @@ files, imports/exports PLC blocks.
   support by design**: pre-format-2 folders (`IoControllersList.csv` + wide
   `IoDevicesList.csv`) are handled by the old stable application version, not here —
   do not re-add converters or fallbacks.
+- **Hardware config editor** (`HardwareConfigEditorWindow.cs` +
+  `01_Constructor/HardwareConfigDocument.cs`): tree explorer with regex search,
+  add/duplicate/delete/edit of stations and modules, saves back to format-2 csv and
+  re-runs the validating loader. The document layer deliberately tolerates invalid
+  rows (so broken configs can be fixed in the editor) — keep validation in the
+  loader, not in the editor.
 - **Custom parameters** (`01_Constructor/CustomParameterParser.cs`): syntax
   `[Item(i).][Ch(i).]Name=Value`, separated by `|` (`,` is rejected with an error —
   it collides with Excel's csv delimiter), one `(a-b)` range per entry, `IP[i]`

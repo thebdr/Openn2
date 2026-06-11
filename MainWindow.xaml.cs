@@ -169,6 +169,13 @@ namespace Openn
                 tbHardwareCsvPath.Text = _path.FullName;
         }
 
+        private void btnEditHardwareConfig_Click(object sender, RoutedEventArgs e)
+        {
+            //the editor saves + reloads through the TiaWorker itself
+            var editor = new HardwareConfigEditorWindow(tbHardwareCsvPath.Text) { Owner = this };
+            editor.ShowDialog();
+        }
+
         private async void btnGenerateHardware_Click(object sender, RoutedEventArgs e)
         {
             if ((HardwareDeviceTypesDatabase.Identifier == null) || (HardwareDeviceTypesDatabase.Identifier.Count() < 1))

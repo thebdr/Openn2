@@ -85,6 +85,11 @@
         <Label Grid.Row="2" Grid.Column="1" Content="Source File Path:" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="2,1,5,2" FontSize="9"/>
         <TextBox x:Name="tbSourceBlockPath" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" VerticalAlignment="Bottom" Height="20" Margin="5,2,2,5" FontSize="10"/>
 
+        <!-- Hardware Configuration explorer/editor (tree + regex search over the csv data) /-->
+        <Button x:Name="btnEditHardwareConfig" Click="btnEditHardwareConfig_Click" Grid.Row="2" Grid.Column="3" Margin="2,2,2,2">
+            <AccessText Text="Edit Hardware Config.." TextWrapping="Wrap" TextAlignment="Center"/>
+        </Button>
+
         <!-- Import Hardware Configuration from .CSV /-->
         <Button x:Name="btnImportHardwareCsv" Click="btnImportHardwareCsv_Click" Grid.Row="3" Grid.Column="0" Margin="2,2,2,2">
             <AccessText Text="Import Hardware Config from .Csv" TextWrapping="Wrap" TextAlignment="Center" />
