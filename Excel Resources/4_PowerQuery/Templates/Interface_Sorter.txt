@@ -1,0 +1,15 @@
+// Machine interface template: SORTER
+// Tokens in {braces} are replaced by OutInterface from INTERFACE_DATA and
+// generated values (ProjectCode, DeviceCount, SignalCount, AreaList).
+// One template file per machine type, referenced in MACHINE_TYPES.
+
+PROJECT     : {ProjectCode}
+MACHINE     : SORTER
+AREAS       : {AreaList}
+DEVICES     : {DeviceCount}
+SIGNALS     : {SignalCount}
+
+// project-specific tokens (INTERFACE_DATA rows):
+LINE_SPEED  : {LineSpeed}
+PLC_NAME    : {PlcName}
+HMI_STATION : {HmiStation}

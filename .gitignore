@@ -6,3 +6,9 @@ bin/
 lib/*.dll
 lib/*.xml
 lib/*.pdb
+
+# Excel workbooks are huge binaries - only the text pipeline (4_PowerQuery) is versioned
+Excel Resources/**/*.xlsm
+Excel Resources/**/*.xlsx
+Excel Resources/4_PowerQuery/Input/
+Excel Resources/4_PowerQuery/Output/
