@@ -41,6 +41,8 @@ let
         each fnIssue("V906", [Document], null, [RowKey],
             "Stale correction: RowKey no longer exists (document revision may already contain the fix)")),
 
-    Result = Table.Combine({EmptyIssues, Table.FromRecords(V301 & V302 & V303 & V906)})
+    AllFindings = V301 & V302 & V303 & V906,
+    Result = if List.IsEmpty(AllFindings) then EmptyIssues
+             else Table.Combine({EmptyIssues, Table.FromRecords(AllFindings)})
 in
     Result

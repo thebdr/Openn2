@@ -5,8 +5,14 @@
 let
     Devices = DbDevicesPaired,
 
+    // group by the physical device type: PairKey when the type is paired
+    // (E1/2 + E2/2 -> "E"), otherwise the TypeId - then strip characters that
+    // are illegal in a file name ("/" in E1/2, DI1/2, ... would break the export)
+    SafeName = (text) => Text.Combine(List.Transform(Text.ToList(Text.From(text ?? "")),
+        each if List.Contains({"/", "\", ":", "*", "?", """", "<", ">", "|"}, _) then "_" else _)),
+
     Built = Table.FromRecords(List.Transform(Table.ToRecords(Devices), each [
-        DbName = "DB_" & Text.From([TypeId]),
+        DbName = "DB_" & SafeName(if [PairKey] <> null and [PairKey] <> "" then [PairKey] else [TypeId]),
         Line = "   " & Text.Replace(Text.Replace(Text.From([TagName] ?? ""), ".", "_"), "+", "_") &
                " : Bool;   // " & Text.From([Description] ?? "")
     ])),

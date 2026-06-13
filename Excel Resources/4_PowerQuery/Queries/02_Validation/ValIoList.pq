@@ -43,7 +43,14 @@ let
         else List.Transform(Table.ToRecords(Table.SelectRows(S, each Text.Lower(Text.From([IsStruck] ?? "false")) = "true" and [Type] <> null)),
             each Issue("V107", _, "Struck-through (predisposition) row still has Type """ & Text.From([Type]) & """ - excluded from outputs")),
 
-    Result = Table.Combine({EmptyIssues,
-        Table.FromRecords(V101 & V102 & V103 & V104 & V105 & V106 & V107)})
+    // V108 diagnosis bit outside 0..63
+    DiagBitValue = (v) => try Number.From(Text.From(v)) otherwise -1,
+    V108 = List.Transform(Table.ToRecords(Table.SelectRows(S, each [DiagBit] <> null and
+            (DiagBitValue([DiagBit]) < 0 or DiagBitValue([DiagBit]) > 63))),
+        each Issue("V108", _, "Diagnosis Bit """ & Text.From([DiagBit]) & """ is outside 0..63")),
+
+    AllFindings = V101 & V102 & V103 & V104 & V105 & V106 & V107 & V108,
+    Result = if List.IsEmpty(AllFindings) then EmptyIssues
+             else Table.Combine({EmptyIssues, Table.FromRecords(AllFindings)})
 in
     Result

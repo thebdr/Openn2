@@ -21,6 +21,29 @@ outputs      Openn2 csv (format 2) · I/O tags · block instances · custom DBs
 
 Requires Excel with a current Power Query engine (Microsoft 365 / Excel 2021+).
 
+### Power Query firewall — why the queries are split the way they are
+
+Power Query's Formula Firewall forbids a single query from BOTH directly
+accessing a data source AND referencing other queries. So the pipeline obeys
+two rules and never needs "Ignore Privacy Levels":
+
+- **Leaf queries** touch exactly one source and nothing else: `Cfg`,
+  `SignalTypes`, `ColumnMap`, `Corrections`, `ValidationRules`, `MachineTypes`,
+  `InterfaceData` (each reads one workbook table); `RawIoList`, `RawCE`,
+  `RawDeviceTypes`, `RawInterfaceTemplate` (each opens one external file via a
+  native parameter).
+- **External-file paths are native parameters** (`pIoListStaged`, `pIoListSheet`,
+  `pCEStaged`, `pCESheet`, `pDeviceTypesCsv`, `pInterfaceTemplate`) — the firewall
+  treats parameters as constants, so a leaf may open a file named by a parameter.
+  The PrepareInputs macro pushes the real paths into these parameters (from PARAMS
+  / MACHINE_TYPES) before any refresh.
+- **Everything else is reference-only**: staging, validation, database and output
+  queries combine the leaves and call helper functions (which themselves only
+  reference leaves), never reading a workbook table or file directly.
+
+This is why config values are read through `fnParam` (which reads the `Cfg`
+leaf), not via `Excel.CurrentWorkbook` scattered in each query.
+
 ## One-time wiring (≈30 min)
 
 1. Create a macro workbook `SafetyDB.xlsm` in this folder.
@@ -110,6 +133,7 @@ Location, Device, Area`. When the customer renames a column, fix this table.
 V101 unknown type=Error · V102 duplicate identity=Error · V103 node/bit
 collision=Error · V104 device-tag pattern=Warning · V105 IP outside nets=Error
 · V106 diag data without type=Warning · V107 struck row with type=Warning ·
+V108 Diagnosis Bit outside 0..63=Error ·
 V201 malformed address=Error · V202 bad validation status=Error · V203 BYPASS
 without note=Error · V204 duplicate address in matrix=Error · V301 C&E device
 missing in I/O List=Error · V302 safety device missing in matrix=Warning ·

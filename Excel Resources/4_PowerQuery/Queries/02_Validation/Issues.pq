@@ -6,12 +6,8 @@
 let
     All = Table.Combine({ValIoList, ValCE, ValCross}),
 
-    Rules = Table.TransformColumnTypes(Excel.CurrentWorkbook(){[Name = "VALIDATION_RULES"]}[Content], {
-        {"RuleId", type text}, {"Description", type text},
-        {"Severity", type text}, {"Enabled", type logical}
-    }),
-
-    Joined = Table.NestedJoin(All, {"RuleId"}, Rules, {"RuleId"}, "Rule", JoinKind.LeftOuter),
+    // VALIDATION_RULES via its leaf (reference) so Issues touches no source directly
+    Joined = Table.NestedJoin(All, {"RuleId"}, ValidationRules, {"RuleId"}, "Rule", JoinKind.LeftOuter),
     Expanded = Table.ExpandTableColumn(Joined, "Rule", {"Description", "Severity", "Enabled"}),
 
     // unknown rule ids default to enabled Errors - misconfiguration must be loud

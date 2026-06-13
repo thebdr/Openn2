@@ -26,14 +26,29 @@ Public Sub ExportAll()
                "Fix the documents (or add CORRECTIONS rows) and refresh first.", vbExclamation
         Exit Sub
     End If
+    ExportAllSilent
+    MsgBox "Export complete -> " & Param("OutputFolder"), vbInformation
+End Sub
+
+'no message boxes - callable from automation/tests; raises when gated
+Public Sub ExportAllSilent()
+    Dim errorCount As Long
+    errorCount = CountIssueErrors()
+    If errorCount > 0 Then
+        Err.Raise vbObjectError + 517, , "Export blocked: " & errorCount & " Error finding(s) in ISSUES"
+    End If
 
     Dim exports As ListObject, r As ListRow
     Set exports = ThisWorkbook.Worksheets("PARAMS").ListObjects("EXPORTS")
     For Each r In exports.ListRows
         ExportOne CStr(r.Range.Cells(1, 1).Value), CStr(r.Range.Cells(1, 2).Value), CStr(r.Range.Cells(1, 3).Value)
     Next r
-    MsgBox "Export complete -> " & Param("OutputFolder"), vbInformation
 End Sub
+
+'for automation: how many Error findings currently gate the export
+Public Function ExportGateErrors() As Long
+    ExportGateErrors = CountIssueErrors()
+End Function
 
 Private Sub ExportOne(ByVal sourceTable As String, ByVal fileName As String, ByVal fileFormat As String)
     Dim t As ListObject
@@ -90,11 +105,21 @@ Private Sub WriteTextPerRow(ByVal t As ListObject)
     For r = 1 To t.DataBodyRange.Rows.Count
         Set lines = New Collection
         lines.Add CStr(t.DataBodyRange.Cells(r, contentCol).Value2 & "")
-        fileName = CStr(t.DataBodyRange.Cells(r, nameCol).Value2 & "")
+        fileName = SanitizeFileName(CStr(t.DataBodyRange.Cells(r, nameCol).Value2 & ""))
         If InStr(fileName, ".") = 0 Then fileName = fileName & ".db"
         WriteUtf8File JoinPath(JoinPath(Param("OutputFolder"), "Blocks"), fileName), lines
     Next r
 End Sub
+
+'Replaces characters that are illegal in a Windows file name with '_'.
+Private Function SanitizeFileName(ByVal name As String) As String
+    Dim bad As Variant, ch As Variant
+    bad = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+    For Each ch In bad
+        name = Replace(name, ch, "_")
+    Next ch
+    SanitizeFileName = name
+End Function
 
 Private Sub WriteUtf8File(ByVal fullPath As String, ByVal lines As Collection)
     EnsureFolder Left$(fullPath, InStrRev(fullPath, "\") - 1)

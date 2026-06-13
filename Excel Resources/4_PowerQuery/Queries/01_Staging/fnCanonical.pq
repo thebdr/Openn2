@@ -1,14 +1,14 @@
-// fnLoadStagedSheet — loads one sheet of a STAGED input file (produced by the
-// PrepareInputs macro, which snapshots the customer file and adds the IsStruck
-// column - Power Query cannot see strikethrough formatting itself).
-// Renames source headers to canonical names via COLUMN_MAP and keeps only
-// mapped columns + IsStruck.
-(filePathParam as text, sheetNameParam as text, headerRowParam as text, documentName as text) as table =>
+// fnCanonical — turns a raw staged sheet (from RawIoList / RawCE) into canonical
+// columns. REFERENCE-ONLY: it operates on an already-loaded table and references
+// the ColumnMap leaf; it never accesses a data source directly, so it is
+// firewall-safe even though its callers also reference file-based queries.
+//  - skips to the configured header row and promotes headers
+//  - renames the present source headers to canonical names via COLUMN_MAP
+//  - keeps mapped columns (+ IsStruck), trims text, normalizes empties to null
+//  - adds SourceRow (the original Excel row) for issue reporting
+(rawSheet as table, headerRow as number, documentName as text) as table =>
 let
-    HeaderRow = Number.From(fnParam(headerRowParam)),
-    Source = Excel.Workbook(File.Contents(fnParam(filePathParam)), null, true),
-    Sheet = Source{[Item = fnParam(sheetNameParam), Kind = "Sheet"]}[Data],
-    SkippedTop = Table.Skip(Sheet, HeaderRow - 1),
+    SkippedTop = Table.Skip(rawSheet, headerRow - 1),
     Promoted = Table.PromoteHeaders(SkippedTop, [PromoteAllScalars = true]),
 
     Map = Table.SelectRows(ColumnMap, each [Document] = documentName),
@@ -21,7 +21,6 @@ let
         (if Table.HasColumns(Renamed, "IsStruck") then {"IsStruck"} else {})),
     Selected = Table.SelectColumns(Renamed, KeepColumns, MissingField.UseNull),
 
-    // text hygiene: trim every text column, normalize empties to null
     TextColumns = List.Select(Table.ColumnNames(Selected), each _ <> "IsStruck"),
     Trimmed = Table.TransformColumns(Selected,
         List.Transform(TextColumns, (name) => {name,
@@ -29,7 +28,6 @@ let
                  else if Text.Trim(Text.From(_)) = "" then null
                  else Text.Trim(Text.From(_)), type any})),
 
-    // a source row index for error reporting (header row offset restored)
-    Indexed = Table.AddIndexColumn(Trimmed, "SourceRow", HeaderRow + 1, 1, Int64.Type)
+    Indexed = Table.AddIndexColumn(Trimmed, "SourceRow", headerRow + 1, 1, Int64.Type)
 in
     Indexed

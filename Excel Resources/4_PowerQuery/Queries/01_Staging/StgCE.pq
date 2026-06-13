@@ -5,7 +5,7 @@
 // FunctionalUnit, Location, Device, Area.
 // RowKey = BitAddress|Device (the address is the stable identity in the matrix).
 let
-    Loaded = fnLoadStagedSheet("CEStagedPath", "CESheetName", "CEHeaderRow", "CE"),
+    Loaded = fnCanonical(RawCE, Number.From(fnParam("CEHeaderRow")), "CE"),
 
     NonEmpty = Table.SelectRows(Loaded, each [BitAddress] <> null or [Device] <> null),
 

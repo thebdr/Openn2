@@ -12,3 +12,7 @@ Excel Resources/**/*.xlsm
 Excel Resources/**/*.xlsx
 Excel Resources/4_PowerQuery/Input/
 Excel Resources/4_PowerQuery/Output/
+Excel Resources/4_PowerQuery/TestInput/
+Excel Resources/4_PowerQuery/stage.log
+# tiny empty seed needed because SaveCopyAs is the only working save path
+!Excel Resources/4_PowerQuery/Templates/Seed.xlsm

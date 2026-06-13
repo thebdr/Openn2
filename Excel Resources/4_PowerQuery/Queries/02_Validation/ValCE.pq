@@ -27,7 +27,8 @@ let
     V204 = List.Transform(Table.ToRecords(DupGroups),
         each fnIssue("V204", "CE", null, Text.From([BitAddress]), "Address appears " & Text.From([N]) & " times in the matrix")),
 
-    Result = Table.Combine({EmptyIssues,
-        Table.FromRecords(V201 & V202 & V203 & V204)})
+    AllFindings = V201 & V202 & V203 & V204,
+    Result = if List.IsEmpty(AllFindings) then EmptyIssues
+             else Table.Combine({EmptyIssues, Table.FromRecords(AllFindings)})
 in
     Result

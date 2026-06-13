@@ -4,7 +4,7 @@
 // RowKey = FunctionalUnit|Location|Device|IdNode|Bit - the stable identity used
 // by CORRECTIONS and by the ISSUES report.
 let
-    Loaded = fnLoadStagedSheet("IoListStagedPath", "IoListSheetName", "IoListHeaderRow", "IoList"),
+    Loaded = fnCanonical(RawIoList, Number.From(fnParam("IoListHeaderRow")), "IoList"),
 
     // drop fully empty rows (no device, no module, no description)
     NonEmpty = Table.SelectRows(Loaded, each

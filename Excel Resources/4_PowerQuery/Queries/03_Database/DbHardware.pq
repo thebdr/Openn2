@@ -7,11 +7,8 @@ let
     // module rows: have a part number and a node id (the signal rows reference them)
     Hw = Table.SelectRows(StgIoList, each [PartNo] <> null and [IdNode] <> null),
 
-    // model database of Openn2 (semicolon csv, '#' comments)
-    DevTypesRaw = Csv.Document(File.Contents(fnParam("DeviceTypesCsvPath")), [Delimiter = ";", Encoding = 65001]),
-    DevTypes = Table.SelectRows(DevTypesRaw, each not Text.StartsWith(Text.From([Column1] ?? ""), "#")),
-    DevTypesNamed = Table.RenameColumns(DevTypes, {
-        {"Column1", "ModelId"}, {"Column2", "DeviceType"}, {"Column3", "TiaIdentifier"}, {"Column4", "Comment"}}),
+    // model database of Openn2 via the RawDeviceTypes leaf (reference, not direct read)
+    DevTypesNamed = RawDeviceTypes,
 
     // the model id convention: part number without spaces (e.g. 6ES7517-3FP00-0AB0)
     WithModelId = Table.AddColumn(Hw, "ModelId", each Text.Replace(Text.From([PartNo]), " ", ""), type text),
