@@ -71,7 +71,7 @@ def main():
         check("all columns present",
               [ws.cell(it.HEADER_ROW, c).value for c in range(1, len(it.COLUMNS) + 1)] == it.COLUMNS)
         addr_formula = str(ws.cell(it.DATA_START_ROW, 9).value)
-        check("PLC address formula references base cell", it.BASE_CELL in addr_formula and '"%"' in addr_formula)
+        check("PLC address formula uses absolute base ref", it.BASE_REF in addr_formula and '"%"' in addr_formula)
         scl_formula = str(ws.cell(it.DATA_START_ROW, 11).value)
         check("SCL mapping formula present", ':= "' in scl_formula and 'NOT ' in scl_formula)
         check("no leftover tokens", "{" not in ws["A1"].value and "{" not in str(ws[it.BASE_CELL].value))
