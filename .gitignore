@@ -16,6 +16,9 @@ Excel Resources/4_PowerQuery/TestInput/
 Excel Resources/4_PowerQuery/stage.log
 # tiny empty seed needed because SaveCopyAs is the only working save path
 !Excel Resources/4_PowerQuery/Templates/Seed.xlsm
+# Python bytecode
+__pycache__/
+*.pyc
 # Python DatabaseTool: generated outputs are disposable
 Excel Resources/DatabaseTool/Output/
 # but the hand-authored interface template IS versioned source

@@ -1,0 +1,22 @@
+type_id;description;category;pair_key;channel;in_diagnosis;is_pattern
+A;Alarm;Diag;;;yes;no
+W;Warning;Diag;;;yes;no
+PA;Fieldbus Alarm;Diag;;;yes;no
+PW;Fieldbus Warning;Diag;;;yes;no
+E1/2;Emergency Push Button;Safety;E;1;no;no
+E2/2;Emergency Push Button;Safety;E;2;no;no
+B1/2;Safety Breaker;Safety;B;1;no;no
+B2/2;Safety Breaker;Safety;B;2;no;no
+ENC1/2;Safety Encoder;Safety;ENC;1;no;no
+ENC2/2;Safety Encoder;Safety;ENC;2;no;no
+DI1/2;Door Closed Safety Input;Safety;DI;1;no;no
+DI2/2;Door Closed Safety Input;Safety;DI;2;no;no
+DD;Door Closed Diag Input;Diag;;;yes;no
+DR;Door Reset Input;Std;;;no;no
+DL;Door Lamp Output;Std;;;no;no
+DQ;Door Unlock Output;Std;;;no;no
+KI;Contactor Feedback Input;Safety;;;no;no
+KQ;Contactor Output;Safety;;;no;no
+RES;Emergency Reset;Safety;;;no;no
+FA#;Emergency Status Feedback Area #;Safety;;;no;yes
+IOC;Machine Interface (I/O Controller);Interface;;;no;no

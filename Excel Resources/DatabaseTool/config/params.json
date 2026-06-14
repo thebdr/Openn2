@@ -1,0 +1,20 @@
+{
+  "project_code": "8XXX",
+  "io_list": {
+    "path": "../3_Database/Source Data/8XXX_IOyyyy_R0.0_EmergencyIoListValidationTemplate.xlsx",
+    "sheet": "NET SAFETY 50",
+    "header_row": 1
+  },
+  "ce": {
+    "path": "../3_Database/Source Data/8XXX_Cause and Effect Matrix_R0.0_ValidationTemplate.xlsx",
+    "sheet": "CAUSE&EFFECT MATRIX",
+    "header_row": 4
+  },
+  "safety_nets": ["192.168.50", "192.168.51"],
+  "areas": ["AREA 1", "AREA 2", "AREA 3", "AREA 4"],
+  "strike_handling": "exclude",
+  "diag_bit_min": 0,
+  "diag_bit_max": 63,
+  "output_dir": "Output",
+  "interface_template": "Templates/TEMPLATE_INTERFACES_v0.0.xlsx"
+}
