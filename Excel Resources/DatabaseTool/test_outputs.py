@@ -16,12 +16,15 @@ def check(name, ok, detail=""):
 
 
 def row(script, fu, loc, dev, bit, d1="", d2="", index="", drawing="", sheet="", db_kind=""):
-    cat = "Interface" if script == "IOC" else ("Diag" if script in ("A", "W", "PA", "PW") else "Safety")
+    diag = script in ("A", "W", "PA", "PW", "DD")
+    cat = "Interface" if script == "IOC" else ("Diag" if diag else "Safety")
     return {
         "script_type": script, "functional_unit": fu, "location": loc, "device": dev,
         "bit": bit, "desc_l1": d1, "desc_l1b": d2, "index": index,
-        "drawing": drawing, "sheet": sheet,
-        "_type": {"description": f"Desc-{script}", "category": cat, "db_kind": db_kind},
+        "drawing": drawing, "sheet": sheet, "type_hw": "A" if diag else "P",
+        "diag_cabinet": "001", "diag_bit": "00", "id_node": "5",
+        "_type": {"description": f"Desc-{script}", "category": cat, "db_kind": db_kind,
+                  "in_diagnosis": diag},
     }
 
 
@@ -70,6 +73,17 @@ def main():
         with open(os.path.join(tmp, "DBs", "FDB_KQ.db"), encoding="utf-8") as f:
             body = f.read()
         check("DB source has DATA_BLOCK + member", "DATA_BLOCK" in body and tables["KQ"][0]["name"] in body)
+
+        # diagnosis List_IO: only in_diagnosis types (A), not safety (E1/2,KQ)
+        diag = outputs.build_diagnosis_list_io(rows)
+        check("diagnosis includes only in-diagnosis types", {d["DevType"] for d in diag} == {"A"})
+        check("diagnosis row has the 17 List_IO columns",
+              [c[0] for c in outputs.DIAG_COLUMNS][:3] == ["Diag Cabinet", "Diag Bit", "DevType"]
+              and diag[0]["Device"] == "-F09001")
+        # both A rows are in-diagnosis (incl. the address-less base-addr row)
+        n = outputs.write_diagnosis_list_io(diag, tmp)
+        check("diagnosis CSV written (address-less rows included)",
+              n == 2 and os.path.exists(os.path.join(tmp, "Diagnosis", "List_IO.csv")))
 
         print("ALL CHECKS PASS" if failures == 0 else f"{failures} CHECK(S) FAILED")
         raise SystemExit(0 if failures == 0 else 1)
