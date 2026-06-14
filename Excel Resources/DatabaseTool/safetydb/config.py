@@ -60,6 +60,8 @@ def load_signal_types() -> dict:
             "channel": r["channel"].strip(),
             "in_diagnosis": as_bool(r["in_diagnosis"]),
             "is_pattern": as_bool(r["is_pattern"]),
+            # db_kind: "" none | "db" standard DB | "safe_db" fail-safe (F) DB
+            "db_kind": (r.get("db_kind") or "").strip().lower(),
         }
     return types
 
