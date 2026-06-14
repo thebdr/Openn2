@@ -73,6 +73,7 @@ def find_interfaces(io_path: str, sheet: str, header_row: int) -> list[dict]:
             raise SystemExit(f"column '{required}' not found in sheet '{sheet}' header row {header_row}")
     script_c, index_c = cols["Script Type"], cols["Index"]
     bit_c = cols.get("Bit")
+    id_c = cols.get("ID")
     device_c = cols.get("Device")
     ip_c = cols.get("Profinet IP")
     last_col = ws.max_column
@@ -94,6 +95,7 @@ def find_interfaces(io_path: str, sheet: str, header_row: int) -> list[dict]:
             "machine_type": machine_type,
             "index": index,
             "base": str(ws.cell(row=r, column=bit_c).value or "").strip() if bit_c else "",
+            "base_node": str(ws.cell(row=r, column=id_c).value or "").strip() if id_c else "",
             "device": str(ws.cell(row=r, column=device_c).value or "").strip() if device_c else "",
             "ip": str(ws.cell(row=r, column=ip_c).value or "").strip() if ip_c else "",
             "source_row": r,
@@ -115,34 +117,45 @@ def _safe_name(text: str) -> str:
     return "".join("_" if ch in bad else ch for ch in text)[:31]
 
 
-def _plug(ws, base: str, index: str) -> None:
-    """Plugs the base address (Side-1 row) and index, and replaces <index> tokens."""
+def _to_int(text):
+    try:
+        return int(str(text).strip())
+    except (ValueError, TypeError):
+        return None
+
+
+def _side1_row(ws, side_c, value_c):
+    """Row of the Side-1 entry, or the first row with a value in value_c."""
+    if side_c:
+        for r in range(2, ws.max_row + 1):
+            if str(ws.cell(r, side_c).value).strip() in ("1", "1.0"):
+                return r
+    for r in range(2, ws.max_row + 1):
+        if ws.cell(r, value_c).value not in (None, ""):
+            return r
+    return None
+
+
+def _plug(ws, base: str, base_node: str, index: str) -> None:
+    """Plugs Base Address + Base Node into the Side-1 row, sets the Index column,
+    and replaces <index> tokens. (Side 2 is filled by hand and left untouched.)"""
     headers = _header_index(ws, 1)
     side_c = headers.get("Side")
     index_c = headers.get("Index")
     base_c = headers.get("Base Address")
+    node_c = headers.get("Base Node")
 
-    base_num = None
-    try:
-        base_num = int(str(base).strip())
-    except (ValueError, TypeError):
-        pass
+    base_num = _to_int(base)
+    node_num = _to_int(base_node)
 
-    # base address into the Side-1 row of the Base Address column
     if base_c and base_num is not None:
-        target_row = None
-        if side_c:
-            for r in range(2, ws.max_row + 1):
-                if str(ws.cell(r, side_c).value).strip() in ("1", "1.0"):
-                    target_row = r
-                    break
-        if target_row is None:  # no Side column: first non-empty Base Address cell
-            for r in range(2, ws.max_row + 1):
-                if ws.cell(r, base_c).value not in (None, ""):
-                    target_row = r
-                    break
-        if target_row:
-            ws.cell(target_row, base_c).value = base_num
+        r = _side1_row(ws, side_c, base_c)
+        if r:
+            ws.cell(r, base_c).value = base_num
+    if node_c and node_num is not None:
+        r = _side1_row(ws, side_c, node_c)
+        if r:
+            ws.cell(r, node_c).value = node_num
 
     # index into every populated Index-column cell
     if index_c and index:
@@ -184,7 +197,7 @@ def generate(io_path: str, sheet: str, header_row: int, out_dir: str, template_p
                 del wb[name]
         ws = wb[chosen]
         ws.title = _safe_name(itf["instance"])
-        _plug(ws, itf["base"], itf["index"])
+        _plug(ws, itf["base"], itf["base_node"], itf["index"])
         wb.save(target)
         wb.close()
 
