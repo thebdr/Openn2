@@ -1,22 +1,22 @@
-type_id,description,category,pair_key,channel,in_diagnosis,is_pattern,db_kind,db_name
-A,Alarm,Diag,,,yes,no,
-W,Warning,Diag,,,yes,no,
-PA,Fieldbus Alarm,Diag,,,yes,no,DB,PROFINET_ALARMS
-PW,Fieldbus Warning,Diag,,,yes,no,
-E1/2,Emergency Push Button,Safety,E,1,no,no,SAFE_DB,01_Pushbutton
+type_id,description,category,pair_key,channel,in_diagnosis,is_pattern,db_kind,db_names,add_to_name,tagtable_name
+A,Alarm,Diag,,,yes,no,,,,Alarms_Warnings
+W,Warning,Diag,,,yes,no,,,,Alarms_Warnings
+PA,Fieldbus Alarm,Diag,,,yes,no,DB,PROFINET_NODES_ALARM,"{profinet_ip}",
+PW,Fieldbus Warning,Diag,,,yes,no,DB,PROFINET_NODES_WARNING,"{profinet_ip}"
+E1/2,Emergency Push Button,Safety,E,1,no,no,SAFE_DB,01_Pushbutton,,EMERGENCY_PushButtons
 E2/2,Emergency Push Button,Safety,E,2,no,no,
-B1/2,Safety Breaker,Safety,B,1,no,no,SAFE_DB,01_Pushbutton
+B1/2,Safety Breaker,Safety,B,1,no,no,SAFE_DB,01_Pushbutton,,SAFETY_Breakers
 B2/2,Safety Breaker,Safety,B,2,no,no,
-ENC1/2,Safety Encoder,Safety,ENC,1,no,no,SAFE_DB,05_SPEED
-ENC2/2,Safety Encoder,Safety,ENC,2,no,no,SAFE_DB,05_SPEED
-DI1/2,Door Closed Safety Input,Safety,DI,1,no,no,SAFE_DB,05_DOORS
-DI2/2,Door Closed Safety Input,Safety,DI,2,no,no,
-DD,Door Closed Diag Input,Diag,,,yes,no,SAFE_DB,05_DOORS
-DR,Door Reset Input,Std,,,no,no,
-DL,Door Lamp Output,Std,,,no,no,
-DQ,Door Unlock Output,Std,,,no,no,
-KI,Contactor Feedback Input,Safety,,,no,no,SAFE_DB,07_FEEDBACK_ERROR
-KQ,Contactor Output,Safety,,,no,no,
-RES,Emergency Reset,Safety,,,no,no,
-FA#,Emergency Status Feedback Area #,Safety,,,no,yes,
-IOC,Machine Interface (I/O Controller),Interface,,,no,no,
+ENC1/2,Safety Encoder Sensor 1,Safety,ENC,1,no,no,SAFE_DB,04_SPEED,"Working - No Fault",SAFETY_Encoders
+ENC2/2,Safety Encoder Sensor 2,Safety,ENC,2,no,no,SAFE_DB,04_SPEED,"Working - No Fault"
+DI1/2,Door Closed Safety Input,Safety,DI,1,no,no,SAFE_DB,05_DOORS,,SAFETY_Doors
+DI2/2,Door Closed Safety Input,Safety,DI,2,no,no,,,,SAFETY_Doors
+DD,Door Closed Diag Input,Diag,,,yes,no,SAFE_DB,05_DOORS,"No Alarm",SAFETY_Doors
+DR,Door Reset Input,Std,,,no,no,,,,SAFETY_Doors
+DL,Door Lamp Output,Std,,,no,no,,,,SAFETY_Doors
+DQ,Door Unlock Output,Std,,,no,no,,,,SAFETY_Doors
+KI,Contactor Feedback Input,Safety,,,no,no,,,,SAFETY_Contactors
+KQ,Contactor Output,Safety,,,no,no,SAFE_DB,03_FDBACK|03_FDBACK_RAW,"Error",SAFETY_Contactors
+RES,Emergency Reset,Safety,,,no,no,,,,RESET
+FA#,Emergency Status Feedback Area #,Safety,,,no,yes,,,,SAFETY_Status
+IOC,Machine Interface (I/O Controller),Interface,,,no,no,,,,IOCouplers_Interfaces

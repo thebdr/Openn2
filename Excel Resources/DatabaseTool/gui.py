@@ -481,7 +481,7 @@ class App:
         self._ensure_staged()
         tables = outputs.build_io_tags(self._rows)
         n = outputs.write_io_tags(tables, self._out_dir())
-        self._log("OK", f"{n} tag(s) across {len(tables)} table(s)  ->  Output/IoTags")
+        self._log("OK", f"{n} tag(s) across {len(tables)} table(s)  ->  Output/IoTags/PLCTags.xlsx")
 
     def _phase_dbs(self):
         self._section("DATA BLOCKS")

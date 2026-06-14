@@ -102,23 +102,43 @@ def load_column_map(document: str) -> list[dict]:
 
 def load_signal_types() -> dict:
     """type_id (upper) -> {type_id, description, category, pair_key, channel,
-    in_diagnosis(bool), is_pattern(bool)}."""
+    in_diagnosis(bool), is_pattern(bool), db_kind, db_names(list), add_to_name,
+    tagtable_name}."""
     types = {}
     for r in _read_csv("signal_types.csv"):
-        tid = r["type_id"].strip()
+        tid = (r.get("type_id") or "").strip()
+        # db_names: '|'-separated; a type may feed several (identical) DBs.
+        # 'db_name' (legacy single) is still accepted as a fallback.
+        raw_names = (r.get("db_names") or r.get("db_name") or "").strip()
+        db_names = [n.strip() for n in raw_names.split("|") if n.strip()]
         types[tid.upper()] = {
             "type_id": tid,
-            "description": r["description"].strip(),
-            "category": r["category"].strip(),
-            "pair_key": r["pair_key"].strip(),
-            "channel": r["channel"].strip(),
-            "in_diagnosis": as_bool(r["in_diagnosis"]),
-            "is_pattern": as_bool(r["is_pattern"]),
+            "description": (r.get("description") or "").strip(),
+            "category": (r.get("category") or "").strip(),
+            "pair_key": (r.get("pair_key") or "").strip(),
+            "channel": (r.get("channel") or "").strip(),
+            "in_diagnosis": as_bool(r.get("in_diagnosis")),
+            "is_pattern": as_bool(r.get("is_pattern")),
             # db_kind: "" none | "db" standard DB | "safe_db" fail-safe (F) DB
             "db_kind": (r.get("db_kind") or "").strip().lower(),
-            # db_name: target DB name; types may share one (E1/2 + B1/2 -> 01_Pushbutton)
-            "db_name": (r.get("db_name") or "").strip(),
+            # db_names: target DBs; types may share one (E1/2 + B1/2 -> 01_Pushbutton)
+            "db_names": db_names,
+            # add_to_name: text appended to each DB member name; '{canonical}'
+            # tokens are replaced by that column's value from the source row.
+            "add_to_name": (r.get("add_to_name") or "").strip(),
+            # tagtable_name: PLC tag-table (Path) the type's I/O tags belong to.
+            "tagtable_name": (r.get("tagtable_name") or "").strip(),
         }
+    # A paired channel-2 type (e.g. E2/2) usually leaves tagtable_name blank; let it
+    # inherit the sibling's table (same pair_key) so both channels of one device land
+    # in the same PLC tag table. (An explicit tagtable_name always wins.)
+    by_pair = {}
+    for t in types.values():
+        if t["pair_key"] and t["tagtable_name"]:
+            by_pair.setdefault(t["pair_key"], t["tagtable_name"])
+    for t in types.values():
+        if not t["tagtable_name"] and t["pair_key"] in by_pair:
+            t["tagtable_name"] = by_pair[t["pair_key"]]
     return types
 
 

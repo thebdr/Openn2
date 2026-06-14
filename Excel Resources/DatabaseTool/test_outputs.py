@@ -3,6 +3,7 @@
 import os
 import shutil
 import tempfile
+from openpyxl import load_workbook
 from safetydb import outputs
 
 failures = 0
@@ -38,15 +39,16 @@ def main():
             row("IOC", "=S1", "+MC1.CC1", "-K66201", "10000", index="SORTER-01"),   # excluded (interface)
             row("A", "=S1", "+MS1.CC1", "-X1", "10000", "BASE", "ADDR"),            # excluded (no I/Q addr)
         ]
-        # E1/2 and KQ share one safe DB by db_name; A has none
+        # E1/2 + KQ share 01_Pushbutton (safe); KQ also feeds a second DB via '|'
+        # and carries an add_to_name suffix; A has no DB.
         signal_types = {
-            "E1/2": {"db_kind": "safe_db", "db_name": "01_Pushbutton"},
-            "A": {"db_kind": "", "db_name": ""},
-            "KQ": {"db_kind": "safe_db", "db_name": "01_Pushbutton"},
+            "E1/2": {"db_kind": "safe_db", "db_names": ["01_Pushbutton"], "add_to_name": ""},
+            "A":    {"db_kind": "",        "db_names": [],                 "add_to_name": ""},
+            "KQ":   {"db_kind": "safe_db", "db_names": ["01_Pushbutton", "01_Pushbutton_RAW"], "add_to_name": "Error"},
         }
 
         tables = outputs.build_io_tags(rows)
-        check("one table per type, interface + non-IO excluded",
+        check("one table per type (tagtable_name absent -> type id), interface + non-IO excluded",
               set(tables) == {"E1/2", "A", "KQ"}, str(sorted(tables)))
         check("counts (A has 1 taggable, not the base-addr row)",
               len(tables["A"]) == 1 and len(tables["E1/2"]) == 1 and len(tables["KQ"]) == 1)
@@ -56,27 +58,52 @@ def main():
               e["name"] == "Desc-E1/2 =S1+MS1.CC1-S67001", e["name"])
         check("comment format",
               e["comment"] == "[E1/2 0001] EMERGENCY CH1 [DWG1 670]", e["comment"])
+        check("logical address is %-prefixed", e["address"] == "%I20.0", e["address"])
 
         a = tables["A"][0]
         check("alarm tag name = descr1 p1+p2 (space) + FLD",
               a["name"] == "CIRCUIT BREAKER 400V =S1+MS1.CC1-F09001", a["name"])
 
         outputs.write_io_tags(tables, tmp)
-        check("one CSV file per type", os.path.exists(os.path.join(tmp, "IoTags", "E1_2.csv")))
-        with open(os.path.join(tmp, "IoTags", "A.csv"), encoding="utf-8-sig") as f:
-            head = f.readline().strip()
-        check("tag CSV header", head == "Name,Data Type,Logical Address,Comment", head)
+        xlsx = os.path.join(tmp, "IoTags", "PLCTags.xlsx")
+        check("single PLC Tags xlsx written", os.path.exists(xlsx))
+        wb = load_workbook(xlsx)
+        check("two sheets: PLC Tags + TagTable Properties",
+              wb.sheetnames == ["PLC Tags", "TagTable Properties"], str(wb.sheetnames))
+        ws = wb["PLC Tags"]
+        check("PLC Tags header matches TIA export",
+              [c.value for c in ws[1]] == outputs.TAG_COLUMNS)
+        rowvals = [[c.value for c in r] for r in ws.iter_rows(min_row=2)]
+        e_row = next((rv for rv in rowvals if rv[0] == "Desc-E1/2 =S1+MS1.CC1-S67001"), None)
+        check("tag row: Path + %-address + text 'True' flags",
+              e_row is not None and e_row[1] == "E1/2" and e_row[3] == "%I20.0" and e_row[5] == "True",
+              str(e_row))
+        paths = {r[0].value for r in wb["TagTable Properties"].iter_rows(min_row=2)}
+        check("TagTable Properties lists the distinct tables", paths == {"E1/2", "A", "KQ"}, str(paths))
 
         dbs = outputs.build_dbs(rows, signal_types)
-        check("DB grouped by db_name (E1/2 + KQ share one)", set(dbs) == {"01_Pushbutton"}, str(list(dbs)))
+        check("DBs by db_names incl. the '|' multi (-> two)",
+              set(dbs) == {"01_Pushbutton", "01_Pushbutton_RAW"}, str(sorted(dbs)))
         check("shared DB is fail-safe", dbs["01_Pushbutton"]["kind"] == "safe_db")
-        members = dbs["01_Pushbutton"]["members"]
-        check("shared DB combines both types' tags",
-              tables["E1/2"][0]["name"] in members and tables["KQ"][0]["name"] in members)
+        mnames = lambda d: [m["name"] for m in dbs[d]["members"]]
+        check("every DB opens with ALWAYS_FALSE + ALWAYS_TRUE",
+              mnames("01_Pushbutton")[:2] == ["ALWAYS_FALSE", "ALWAYS_TRUE"]
+              and mnames("01_Pushbutton_RAW")[:2] == ["ALWAYS_FALSE", "ALWAYS_TRUE"])
+        check("01_Pushbutton combines E1/2 + KQ members",
+              "Desc-E1/2 =S1+MS1.CC1-S67001" in mnames("01_Pushbutton")
+              and "Desc-KQ =S1+MS1.CC1-K1 Error" in mnames("01_Pushbutton"))
+        check("add_to_name suffix on KQ member, in both its DBs",
+              "Desc-KQ =S1+MS1.CC1-K1 Error" in mnames("01_Pushbutton_RAW"))
+        kq = next(m for m in dbs["01_Pushbutton"]["members"] if m["name"].startswith("Desc-KQ"))
+        check("DB member keeps the tag comment",
+              kq["comment"].startswith("[KQ 0003]") and "[DWG3 120]" in kq["comment"], kq["comment"])
         outputs.write_dbs(dbs, tmp)
         with open(os.path.join(tmp, "DBs", "01_Pushbutton.db"), encoding="utf-8") as f:
             body = f.read()
-        check("DB source has DATA_BLOCK + member", "DATA_BLOCK" in body and tables["KQ"][0]["name"] in body)
+        check("DB source: DATA_BLOCK + constant + //-commented member",
+              'DATA_BLOCK "01_Pushbutton"' in body
+              and '"ALWAYS_FALSE" : Bool;' in body
+              and '"Desc-KQ =S1+MS1.CC1-K1 Error" : Bool; //[KQ 0003]' in body)
 
         # diagnosis List_IO: only in_diagnosis types (A), not safety (E1/2,KQ)
         diag = outputs.build_diagnosis_list_io(rows)

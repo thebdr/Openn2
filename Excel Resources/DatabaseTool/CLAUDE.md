@@ -77,17 +77,29 @@ AC=Suggested Type, AD=Index, AE/AF=Diag Cabinet/Bit, **AG=Hardware Parameters**.
 21 types incl. `IOC` (interface) and pattern type `FA#` (matches FA1, FA2…).
 Per type: `category` (Safety/Diag/Std/Interface), `pair_key`+`channel` (paired
 channels E/B/ENC/DI = x1/2+x2/2), `in_diagnosis`, `db_kind` (`db`/`safe_db`),
-`db_name` (types may share a DB).
+`db_names` (**`|`-separated** — a type may feed several identical DBs; types may
+also share one), `add_to_name` (text appended to each **DB member** name; `{canonical}`
+tokens are replaced by that column's value from the source row, e.g. `{profinet_ip}`),
+`tagtable_name` (the PLC tag-table the type's I/O tags go to). A paired channel-2 type
+with a blank `tagtable_name` **inherits its sibling's** (same `pair_key`) so both
+channels land in one table; an explicit value always wins.
 
 ## Output rules (current)
 
-- **I/O tags** — one table per Script Type. Tag name = type description + FLD,
-  except PA/PW/A/W use Description language 1 (part1 + part2). Comment =
-  `[<ScriptType> <Index>] <descr> [<drawing> <sheet>]`. Only resolved
-  non-interface types with an I/Q bit address become tags.
-- **DBs** — grouped by `db_name` over **all rows** of flagged types (so PA, which
-  has no I/O address, still populates `PROFINET_ALARMS`); fail-safe if any
-  contributing type is `safe_db`; members keep the tag names.
+- **I/O tags** — a single TIA-style workbook `Output/IoTags/PLCTags.xlsx`: a
+  `PLC Tags` sheet (`Name, Path, Data Type, Logical Address, Comment, Hmi Visible/
+  Accessible/Writeable, Typeobject ID, Version ID`; **all values text**, Hmi flags
+  `"True"`, addresses **%-prefixed** `%I20.0`) + a `TagTable Properties` sheet of the
+  distinct tables. **`Path` = the type's `tagtable_name`** (types sharing one land
+  together). Tag name = type description + FLD, except PA/PW/A/W use Description
+  language 1 (p1 + p2). Comment = `[<ScriptType> <Index>] <descr> [<drawing> <sheet>]`.
+  Only resolved non-interface types with an I/Q bit become tags.
+- **DBs** — grouped by `db_names` over **all rows** of flagged types (so PA, no I/O
+  address, still gets its DB); fail-safe if any contributing type is `safe_db`. Every
+  DB opens with `ALWAYS_FALSE` + `ALWAYS_TRUE`. Each member is `"<tag name><add_to_name>"
+  : Bool; //<tag comment>` (the same comment string as the I/O tag). On re-run the
+  `DBs/` and `IoTags/` folders are swept of prior artifacts so only the current run
+  remains.
 - **Diagnosis** `List_IO` — in-diagnosis rows (A/W/PA/PW/DD) in the SWP_04
   17-column layout. (List_Logic / generated alarm PLC code come later.)
 - **Hardware** Stations/Modules (format 2), from the I/O List + the global

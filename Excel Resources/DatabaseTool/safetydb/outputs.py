@@ -1,15 +1,35 @@
-"""Outputs: I/O tag tables (one per Script Type) and the DBs some types need.
+"""Outputs: the PLC tag table (one TIA-style xlsx) and the DBs some types need.
 
 Tag name = <name part> + FLD, where FLD = FUNCTIONAL UNIT + LOCATION + DEVICE
 and <name part> is the signal type's description (signal_types.csv), except for
 PA/PW/A/W where it is "Description language 1 part 1 + part 2" (cols K + L).
-Comment   = [<Script Type> <Index>] <descL1 p1><descL1 p2> [<drawing> <sheet>]
-Each Script Type goes to its own tag table (file). Types whose db_kind is set
-also get a DB / safe DB whose members keep the same names as the tags.
+Comment   = [<Script Type> <Index>] <descL1 p1> <descL1 p2> [<drawing> <sheet>]
+
+I/O tags -> a single TIA "PLC Tags" workbook (Output/IoTags/PLCTags.xlsx); each tag's
+Path is its signal type's `tagtable_name` (types may share a table). Logical addresses
+are %-prefixed (%I20.0). DBs: a type with db_kind set feeds every name in its
+`db_names` (| separated); every DB always starts with ALWAYS_FALSE + ALWAYS_TRUE; each
+member carries the tag comment and its name gets the type's `add_to_name` appended
+(with {canonical} tokens resolved from the source row).
 """
 from __future__ import annotations
 import csv
+import glob
 import os
+import re
+
+import openpyxl
+
+
+def _clear(directory: str, *patterns: str) -> None:
+    """Remove previously-generated files (by glob) so a re-run leaves only the
+    current artifacts - DB/tag membership changes when the config changes."""
+    for pat in patterns:
+        for p in glob.glob(os.path.join(directory, pat)):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
 
 # types whose tag name uses the row description instead of the type description
 DESC_NAME_TYPES = {"PA", "PW", "A", "W"}
@@ -54,17 +74,39 @@ def tag_comment(row) -> str:
     return f"[{script} {index}] {_descr(row)} [{drawing} {sheet}]"
 
 
+_TOKEN = re.compile(r"\{([A-Za-z0-9_]+)\}")
+
+
+def _resolve_tokens(text: str, row) -> str:
+    """Replace {canonical} tokens with that column's value from the staged row."""
+    return _TOKEN.sub(lambda m: str(row.get(m.group(1), "") or ""), text or "")
+
+
+def _logical_address(bit) -> str:
+    """TIA logical address: %-prefixed (I20.0 -> %I20.0)."""
+    bit = str(bit or "").strip()
+    return ("%" + bit) if bit[:1].upper() in ("I", "Q") else bit
+
+
+def _tagtable(row) -> str:
+    """PLC tag-table (Path) for a row: its type's tagtable_name, else the type id."""
+    t = row.get("_type") or {}
+    return (t.get("tagtable_name") or "").strip() or str(row.get("script_type") or "").strip()
+
+
 def build_io_tags(io_rows: list) -> dict:
-    """Script Type -> list of tag dicts (name, data_type, address, comment, fld)."""
+    """tag-table name (Path) -> list of tag dicts (name, path, data_type, address,
+    comment, fld). Types sharing a tagtable_name land in the same table."""
     tables: dict[str, list] = {}
     for row in io_rows:
         if not _is_io_signal(row):
             continue
-        script = str(row.get("script_type") or "").strip()
-        tables.setdefault(script, []).append({
+        path = _tagtable(row)
+        tables.setdefault(path, []).append({
             "name": tag_name(row),
+            "path": path,
             "data_type": "Bool",
-            "address": str(row.get("bit") or "").strip(),
+            "address": _logical_address(row.get("bit")),
             "comment": tag_comment(row),
             "fld": fld(row),
             "source_row": row.get("_source_row"),
@@ -77,20 +119,33 @@ def _safe(name: str) -> str:
     return "".join("_" if ch in bad else ch for ch in name).strip()
 
 
+# TIA "PLC Tags" export columns - every value written as text, like a real export.
+TAG_COLUMNS = ["Name", "Path", "Data Type", "Logical Address", "Comment",
+               "Hmi Visible", "Hmi Accessible", "Hmi Writeable", "Typeobject ID", "Version ID"]
+
+
 def write_io_tags(tables: dict, out_dir: str) -> int:
-    """One comma-CSV per type: Name,Data Type,Logical Address,Comment. Comments are
-    free text and may contain commas, so rows are csv-quoted when needed."""
+    """Single TIA PLC-tags workbook Output/IoTags/PLCTags.xlsx: a 'PLC Tags' sheet
+    (one row per tag, Path = tag-table name) + a 'TagTable Properties' sheet listing
+    the distinct tables. Values are text, matching a real TIA export."""
     tag_dir = os.path.join(out_dir, "IoTags")
     os.makedirs(tag_dir, exist_ok=True)
+    _clear(tag_dir, "*.csv", "PLCTags.xlsx")  # drop legacy per-type CSVs + last run
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "PLC Tags"
+    ws.append(TAG_COLUMNS)
     total = 0
-    for script, tags in sorted(tables.items()):
-        path = os.path.join(tag_dir, _safe(script) + ".csv")
-        with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.writer(f, lineterminator="\n")
-            w.writerow(["Name", "Data Type", "Logical Address", "Comment"])
-            for t in tags:
-                w.writerow([t["name"], t["data_type"], t["address"], t["comment"]])
-        total += len(tags)
+    for path in sorted(tables):
+        for t in tables[path]:
+            ws.append([t["name"], path, t["data_type"], t["address"], t["comment"],
+                       "True", "True", "True", "", ""])
+            total += 1
+    props = wb.create_sheet("TagTable Properties")
+    props.append(["Path", "BelongsToUnit", "Accessibility"])
+    for path in sorted(tables):
+        props.append([path, "", ""])
+    wb.save(os.path.join(tag_dir, "PLCTags.xlsx"))
     return total
 
 
@@ -148,30 +203,55 @@ def write_diagnosis_list_io(rows: list, out_dir: str) -> int:
     return len(rows)
 
 
+# every DB always opens with these two constant booleans
+DB_CONSTANTS = ["ALWAYS_FALSE", "ALWAYS_TRUE"]
+
+
+def _db_member_name(row, rec) -> str:
+    """Tag name with the type's add_to_name appended ({canonical} tokens resolved)."""
+    base = tag_name(row)
+    add = _resolve_tokens(rec.get("add_to_name", ""), row).strip()
+    return f"{base} {add}".strip() if add else base
+
+
 def build_dbs(io_rows: list, signal_types: dict) -> dict:
-    """Groups members into DBs by the type's db_name (types may share a DB,
-    e.g. E1/2 + B1/2 -> 01_Pushbutton). Members are ALL rows of a flagged type,
-    not just I/O-addressed tags - so address-less PA fieldbus alarms still get
-    their DB. Member name = the tag name; DB is fail-safe if any contributing
-    type is safe_db. Returns db_name -> {kind, members}."""
+    """Groups members into DBs by the type's db_names (| separated -> several
+    identical DBs; types may also share a name, e.g. E1/2 + B1/2 -> 01_Pushbutton).
+    Members are ALL rows of a flagged type (so address-less PA alarms still get a
+    DB). Every DB opens with ALWAYS_FALSE + ALWAYS_TRUE; each member keeps the tag
+    comment and gets the type's add_to_name suffix. A DB is fail-safe if any
+    contributing type is safe_db. Returns name -> {kind, members:[{name, comment}]}."""
     dbs: dict[str, dict] = {}
+
+    def ensure(name: str, kind: str) -> dict:
+        if name not in dbs:
+            dbs[name] = {"kind": kind, "members": [{"name": c, "comment": ""} for c in DB_CONSTANTS]}
+        return dbs[name]
+
     for row in io_rows:
         t = row.get("_type")
         if not t or t["category"] == "Interface":
             continue
         script = str(row.get("script_type") or "").strip()
         rec = signal_types.get(script.upper())
-        kind = rec["db_kind"] if rec else ""
+        if not rec:
+            continue
+        kind = rec.get("db_kind", "")
         if kind not in ("db", "safe_db"):
             continue
-        member = tag_name(row)
-        if not member:
+        names = rec.get("db_names") or []
+        if isinstance(names, str):  # tolerate a raw '|' string
+            names = [n.strip() for n in names.split("|") if n.strip()]
+        if not names:
+            names = [_safe(script)]
+        member = {"name": _db_member_name(row, rec), "comment": tag_comment(row)}
+        if not member["name"]:
             continue
-        name = (rec.get("db_name") or "").strip() or _safe(script)
-        g = dbs.setdefault(name, {"kind": kind, "members": []})
-        if kind == "safe_db":
-            g["kind"] = "safe_db"  # safety wins for a shared DB
-        g["members"].append(member)
+        for name in names:
+            g = ensure(name, kind)
+            if kind == "safe_db":
+                g["kind"] = "safe_db"  # safety wins for a shared DB
+            g["members"].append(member)
     return dbs
 
 
@@ -180,12 +260,14 @@ def write_dbs(dbs: dict, out_dir: str) -> int:
         return 0
     db_dir = os.path.join(out_dir, "DBs")
     os.makedirs(db_dir, exist_ok=True)
+    _clear(db_dir, "*.db")  # remove DBs from a previous (differently-named) run
     for dbname, db in dbs.items():
         safety = ' { S7_Optimized_Access := "TRUE" }' if db["kind"] == "safe_db" else ""
         lines = [f'DATA_BLOCK "{dbname}"{safety}', "VERSION : 0.1", "   STRUCT"]
         for m in db["members"]:
-            lines.append(f'      "{m}" : Bool;')
+            comment = f' //{m["comment"]}' if m.get("comment") else ""
+            lines.append(f'      "{m["name"]}" : Bool;{comment}')
         lines += ["   END_STRUCT;", "BEGIN", "END_DATA_BLOCK"]
-        with open(os.path.join(db_dir, dbname + ".db"), "w", encoding="utf-8") as f:
+        with open(os.path.join(db_dir, _safe(dbname) + ".db"), "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
     return len(dbs)

@@ -91,7 +91,7 @@ def main(argv=None) -> int:
     _section("I/O TAGS")
     tables = outputs.build_io_tags(rows)
     n_tags = outputs.write_io_tags(tables, out_dir)
-    print(f"  {n_tags} tag(s) across {len(tables)} table(s) -> {os.path.join(out_dir, 'IoTags')}")
+    print(f"  {n_tags} tag(s) across {len(tables)} table(s) -> {os.path.join(out_dir, 'IoTags', 'PLCTags.xlsx')}")
 
     # ---- data blocks ---------------------------------------------------
     _section("DATA BLOCKS")
