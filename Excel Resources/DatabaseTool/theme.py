@@ -8,10 +8,11 @@ TAB_FONT = ("Consolas", 16)                    # notebook tab labels
 TABLE_FONT = ("Consolas", 12, "normal")        # tksheet cells
 TABLE_HEADER_FONT = ("Consolas", 12, "bold")   # tksheet headers/index
 
-# Zebra striping for the table viewer (same colours in both modes, by request):
-# even rows steelblue + white text, odd rows light blue.
-ZEBRA_A = {"bg": "#4682b4", "fg": "#ffffff"}    # steelblue / white
-ZEBRA_B = {"bg": "#dbeafe", "fg": "#10243a"}    # light blue / dark text
+# Table viewer colours (same in both modes, by request): a steel-blue header with
+# white text, then zebra body rows - odd rows light blue, even rows light grey.
+HEADER = {"bg": "#4682b4", "fg": "#ffffff"}     # steel blue / white (column header)
+ZEBRA_ODD = {"bg": "#cfe2f3", "fg": "#10243a"}  # light blue
+ZEBRA_EVEN = {"bg": "#ededed", "fg": "#1c1c1c"}  # light grey
 
 LIGHT = {
     "name": "light",

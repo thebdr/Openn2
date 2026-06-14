@@ -111,15 +111,14 @@ class FileEditor(ttk.Frame):
 
         bar = ttk.Frame(self, padding=(4, 4))
         bar.pack(side="top", fill="x")
-        self._path_var = tk.StringVar(value="(no file open)")
-        ttk.Label(bar, textvariable=self._path_var, anchor="w").pack(side="left", fill="x", expand=True)
 
-        # right-hand controls (packed right-to-left)
+        # Right-hand controls are packed FIRST so a long path label can never push
+        # them off-screen (Tk pack gives earlier widgets their space first).
         self._reload_btn = ttk.Button(bar, text="Reload", command=self.reload, state="disabled")
         self._reload_btn.pack(side="right", padx=2)
         self._save_btn = ttk.Button(bar, text="Save", command=self.save, state="disabled")
         self._save_btn.pack(side="right", padx=2)
-        self._columns_btn = ttk.Button(bar, text="Columns…", command=self._open_columns_filter, state="disabled")
+        self._columns_btn = ttk.Button(bar, text="Filter columns", command=self._open_columns_filter, state="disabled")
         self._columns_btn.pack(side="right", padx=(8, 2))
         # xlsx-only controls (packed/forgotten in _show_xlsx_controls):
         self._show_values = tk.BooleanVar(value=False)
@@ -129,6 +128,10 @@ class FileEditor(ttk.Frame):
         self._sheet_combo = ttk.Combobox(bar, textvariable=self._sheet_var, width=22, state="readonly")
         self._sheet_combo.bind("<<ComboboxSelected>>", lambda e: self._load_sheet())
 
+        # width=1 so the label never dictates the bar width; it fills the leftover space.
+        self._path_var = tk.StringVar(value="(no file open)")
+        ttk.Label(bar, textvariable=self._path_var, anchor="w", width=1).pack(side="left", fill="x", expand=True)
+
         self._body = ttk.Frame(self)
         self._body.pack(side="top", fill="both", expand=True)
 
@@ -137,7 +140,7 @@ class FileEditor(ttk.Frame):
         if not path or not os.path.isfile(path):
             return
         self.path = path
-        self._path_var.set(path)
+        self._path_var.set(self._shorten(path))
         self._visible_cols = None  # reset the column filter for the new file
         ext = os.path.splitext(path)[1].lower()
         if ext in (".xlsx", ".xlsm"):
@@ -185,6 +188,10 @@ class FileEditor(ttk.Frame):
         self._status(f"saved {os.path.basename(self.path)}")
 
     # ---- internals ---- #
+    @staticmethod
+    def _shorten(path: str, maxlen: int = 90) -> str:
+        return path if len(path) <= maxlen else "…" + path[-(maxlen - 1):]
+
     def _status(self, msg):
         self._on_status(msg)
 
@@ -230,17 +237,24 @@ class FileEditor(ttk.Frame):
             self._show_text("\n".join("\t".join(str(c) for c in r) for r in data))
 
     def _apply_zebra(self):
-        """Steelblue + white text on even rows, light blue on odd rows."""
+        """Steel-blue header (white text); light-grey even rows, light-blue odd rows."""
         if not self._grid:
             return
+        try:
+            self._grid.set_options(header_bg=theme.HEADER["bg"], header_fg=theme.HEADER["fg"],
+                                   header_selected_columns_bg=theme.HEADER["bg"],
+                                   header_selected_columns_fg=theme.HEADER["fg"], redraw=False)
+        except Exception:  # noqa: BLE001
+            pass
         n = len(self._grid.get_sheet_data())
         even = list(range(0, n, 2))
         odd = list(range(1, n, 2))
         try:
             if even:
-                self._grid.highlight_rows(even, bg=theme.ZEBRA_A["bg"], fg=theme.ZEBRA_A["fg"], redraw=False)
+                self._grid.highlight_rows(even, bg=theme.ZEBRA_EVEN["bg"], fg=theme.ZEBRA_EVEN["fg"], redraw=False)
             if odd:
-                self._grid.highlight_rows(odd, bg=theme.ZEBRA_B["bg"], fg=theme.ZEBRA_B["fg"], redraw=True)
+                self._grid.highlight_rows(odd, bg=theme.ZEBRA_ODD["bg"], fg=theme.ZEBRA_ODD["fg"], redraw=False)
+            self._grid.redraw()
         except Exception:  # noqa: BLE001
             pass
 

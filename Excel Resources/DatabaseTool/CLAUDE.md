@@ -59,8 +59,9 @@ don't reach back for Power Query or VBA.
 - `editor.py` — the GUI's **Files** tab: a file tree (config + `HardwareConfig` +
   `Output`) beside a `FileEditor`. `.csv` and `.xlsx`/`.xlsm` open in a **tksheet**
   spreadsheet grid (Consolas font; in-cell edit, multi-select, copy/paste, undo,
-  right-click insert/delete row & column; **zebra rows** steelblue/light-blue; a
-  **Columns…** show/hide filter). CSVs read with delimiter sniffing, saved
+  right-click insert/delete row & column; steel-blue header + **zebra rows**
+  light-blue odd / light-grey even; a **Filter columns** show/hide popup). CSVs
+  read with delimiter sniffing, saved
   comma-delimited; xlsx edits round-trip via openpyxl (per sheet) and show formula
   strings, with a **Show values** checkbox that reloads cached values read-only.
   Other files (`.db`/`.json`/…) open in a text editor. Follows the GUI's dark mode.
