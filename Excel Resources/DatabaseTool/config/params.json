@@ -13,6 +13,7 @@
     "area_header_row": 3,
     "area_data_row": 4
   },
+  "device_types_db": "../../HardwareConfig/DeviceTypesDatabase.csv",
   "safety_nets": ["192.168.50", "192.168.51"],
   "areas": ["AREA 1", "AREA 2", "AREA 3", "AREA 4"],
   "strike_handling": "exclude",

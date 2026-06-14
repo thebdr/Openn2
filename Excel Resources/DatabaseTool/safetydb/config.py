@@ -28,7 +28,33 @@ def load_params(path: str | None = None) -> dict:
     for key in ("io_list", "ce"):
         if key in params and not os.path.isabs(params[key]["path"]):
             params[key] = dict(params[key], path=os.path.normpath(os.path.join(_HERE, params[key]["path"])))
+    if "device_types_db" in params and not os.path.isabs(params["device_types_db"]):
+        params["device_types_db"] = os.path.normpath(os.path.join(_HERE, params["device_types_db"]))
     return params
+
+
+def load_device_types_db(params: dict) -> dict:
+    """Global DeviceTypesDatabase (manually maintained): Model Id (upper) ->
+    {model_id, dev_type, order, comment, params}. '#'-comment lines skipped."""
+    path = params["device_types_db"]
+    db = {}
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if not line or line.lstrip().startswith("#"):
+                continue
+            cells = line.split(";")
+            model = cells[0].strip()
+            if not model:
+                continue
+            db[model.upper()] = {
+                "model_id": model,
+                "dev_type": cells[1].strip() if len(cells) > 1 else "",
+                "order": cells[2].strip() if len(cells) > 2 else "",
+                "comment": cells[3].strip() if len(cells) > 3 else "",
+                "params": cells[4].strip() if len(cells) > 4 else "",
+            }
+    return db
 
 
 def load_column_map(document: str) -> list[dict]:
