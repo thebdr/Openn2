@@ -27,6 +27,14 @@ def as_bool(value) -> bool:
     return str(value).strip().lower() in _TRUE
 
 
+def as_sheet_list(value) -> list:
+    """params io_list 'sheet' may be a single name or a list -> list of names."""
+    if isinstance(value, (list, tuple)):
+        return [str(s).strip() for s in value if str(s).strip()]
+    s = str(value or "").strip()
+    return [s] if s else []
+
+
 def load_params(path: str | None = None) -> dict:
     path = path or os.path.join(CONFIG_DIR, "params.json")
     with open(path, encoding="utf-8") as f:

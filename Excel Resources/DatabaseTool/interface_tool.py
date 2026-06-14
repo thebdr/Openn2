@@ -63,43 +63,58 @@ def _row_struck(ws, row_index: int, last_col: int) -> bool:
     return False
 
 
-def find_interfaces(io_path: str, sheet: str, header_row: int) -> list[dict]:
-    """One record per IOC row: instance, machine_type, index, base, device, ip, source_row."""
-    wb = load_workbook(io_path, data_only=True)  # not read_only: need font.strike
-    ws = wb[sheet]
-    cols = _header_index(ws, header_row)
-    for required in ("Script Type", "Index"):
-        if required not in cols:
-            raise SystemExit(f"column '{required}' not found in sheet '{sheet}' header row {header_row}")
-    script_c, index_c = cols["Script Type"], cols["Index"]
-    bit_c = cols.get("Bit")
-    id_c = cols.get("ID")
-    device_c = cols.get("Device")
-    ip_c = cols.get("Profinet IP")
-    last_col = ws.max_column
+def _as_sheets(sheet) -> list:
+    """`sheet` may be a single name or a list of names -> list of names."""
+    if isinstance(sheet, (list, tuple)):
+        return [str(s).strip() for s in sheet if str(s).strip()]
+    s = str(sheet or "").strip()
+    return [s] if s else []
 
+
+def find_interfaces(io_path: str, sheet, header_row: int) -> list[dict]:
+    """One record per IOC row across the given sheet(s): instance, machine_type,
+    index, base, base_node, device, ip, source_row, source_sheet."""
+    wb = load_workbook(io_path, data_only=True)  # not read_only: need font.strike
     interfaces = []
-    for r in range(header_row + 1, ws.max_row + 1):
-        script = ws.cell(row=r, column=script_c).value
-        if script is None or str(script).strip().upper() != TRIGGER_TYPE:
+    for sh in _as_sheets(sheet):
+        if sh not in wb.sheetnames:
+            print(f"  WARNING: sheet '{sh}' not found in {io_path} - skipped")
             continue
-        if _row_struck(ws, r, last_col):
+        ws = wb[sh]
+        cols = _header_index(ws, header_row)
+        missing = [c for c in ("Script Type", "Index") if c not in cols]
+        if missing:
+            print(f"  WARNING: sheet '{sh}' missing column(s) {missing} - skipped")
             continue
-        instance = str(ws.cell(row=r, column=index_c).value or "").strip()
-        if not instance:
-            print(f"  WARNING: IOC row {r} has no Index - skipped")
-            continue
-        machine_type, index = parse_instance(instance)
-        interfaces.append({
-            "instance": instance,
-            "machine_type": machine_type,
-            "index": index,
-            "base": str(ws.cell(row=r, column=bit_c).value or "").strip() if bit_c else "",
-            "base_node": str(ws.cell(row=r, column=id_c).value or "").strip() if id_c else "",
-            "device": str(ws.cell(row=r, column=device_c).value or "").strip() if device_c else "",
-            "ip": str(ws.cell(row=r, column=ip_c).value or "").strip() if ip_c else "",
-            "source_row": r,
-        })
+        script_c, index_c = cols["Script Type"], cols["Index"]
+        bit_c = cols.get("Bit")
+        id_c = cols.get("ID")
+        device_c = cols.get("Device")
+        ip_c = cols.get("Profinet IP")
+        last_col = ws.max_column
+
+        for r in range(header_row + 1, ws.max_row + 1):
+            script = ws.cell(row=r, column=script_c).value
+            if script is None or str(script).strip().upper() != TRIGGER_TYPE:
+                continue
+            if _row_struck(ws, r, last_col):
+                continue
+            instance = str(ws.cell(row=r, column=index_c).value or "").strip()
+            if not instance:
+                print(f"  WARNING: IOC row {r} ({sh}) has no Index - skipped")
+                continue
+            machine_type, index = parse_instance(instance)
+            interfaces.append({
+                "instance": instance,
+                "machine_type": machine_type,
+                "index": index,
+                "base": str(ws.cell(row=r, column=bit_c).value or "").strip() if bit_c else "",
+                "base_node": str(ws.cell(row=r, column=id_c).value or "").strip() if id_c else "",
+                "device": str(ws.cell(row=r, column=device_c).value or "").strip() if device_c else "",
+                "ip": str(ws.cell(row=r, column=ip_c).value or "").strip() if ip_c else "",
+                "source_row": r,
+                "source_sheet": sh,
+            })
     wb.close()
     return interfaces
 

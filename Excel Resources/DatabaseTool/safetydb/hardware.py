@@ -203,7 +203,9 @@ def extract(io_rows: list, dtd: dict):
             model = _model_id(row.get("part_no"))
             rec = by_id.get(model.upper())
             if rec is None:  # device not in DTD -> can't generate; log and skip
-                where = f"row {row.get('_source_row')} {row.get('profinet_name') or row.get('device') or ''}".strip()
+                sheet = row.get("_source_sheet")
+                loc = f"[{sheet}] row {row.get('_source_row')}" if sheet else f"row {row.get('_source_row')}"
+                where = f"{loc} {row.get('profinet_name') or row.get('device') or ''}".strip()
                 if _looks_like_switch(row):
                     messages.append(("WARNING", f"{where}: switch model '{model}' not in DeviceTypesDatabase - skipped"))
                 else:

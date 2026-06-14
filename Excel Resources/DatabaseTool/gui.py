@@ -51,7 +51,7 @@ LEVEL_STYLE = {
 PARAM_SPEC = [
     ("project_code",          "Project code",            "text"),
     ("io_list.path",          "I/O List file",           "file"),
-    ("io_list.sheet",         "I/O List sheet",          "text"),
+    ("io_list.sheet",         "I/O List sheet(s)",       "list"),
     ("io_list.header_row",    "I/O List header row",     "int"),
     ("ce.path",               "Cause&Effect file",       "file"),
     ("ce.matrix_sheet",       "C&E matrix sheet",        "text"),
@@ -501,11 +501,14 @@ class App:
             self._rows, self._warns = staging.load_io_list(self._params, self._types)
 
     def _staging_link(self, warning: str):
-        m = re.search(r"column ([A-Z]+)", warning)
-        if not m:
+        cm = re.search(r"column ([A-Z]+)", warning)
+        if not cm:
             return None
         io = self._params["io_list"]
-        return {"path": io["path"], "sheet": io["sheet"], "cell": f"{m.group(1)}{io['header_row']}"}
+        sm = re.search(r"IoList\[([^\]]+)\]", warning)  # the sheet the warning is about
+        sheets = config.as_sheet_list(io.get("sheet"))
+        sheet = sm.group(1) if sm else (sheets[0] if sheets else "")
+        return {"path": io["path"], "sheet": sheet, "cell": f"{cm.group(1)}{io['header_row']}"}
 
     def _phase_staging(self):
         self._section("STAGING  (reading the I/O List)")
@@ -567,9 +570,18 @@ class App:
         nmod = hardware.write_modules(modules, self._out_dir())
         self._log("OK", f"{nst} station(s), {nmod} module(s)  ->  Output/Hardware")
         io = self._params["io_list"]
+        sheets = config.as_sheet_list(io.get("sheet"))
+        default_sheet = sheets[0] if sheets else ""
         for level, text in messages:
-            m = re.match(r"row (\d+)", text)
-            link = {"path": io["path"], "sheet": io["sheet"], "cell": f"A{m.group(1)}"} if m else None
+            sm = re.search(r"\[([^\]]+)\] row (\d+)", text)   # "[sheet] row N ..."
+            rm = re.search(r"row (\d+)", text)
+            if sm:
+                sheet, n = sm.group(1), sm.group(2)
+            elif rm:
+                sheet, n = default_sheet, rm.group(1)
+            else:
+                sheet = n = None
+            link = {"path": io["path"], "sheet": sheet, "cell": f"A{n}"} if n else None
             self._log(level, text, link)
 
     def _phase_interfaces(self):

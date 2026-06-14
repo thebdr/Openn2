@@ -42,23 +42,16 @@ def _skip_reason_present(value) -> bool:
     return s not in ("", "0", "0.0")
 
 
-def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], list[str]]:
-    spec = params["io_list"]
-    header_row = spec["header_row"]
-    colmap = config.load_column_map("IoList")
-    warnings: list[str] = []
+def _hkey(s):
+    # collapse internal whitespace: source headers wrap with embedded newlines,
+    # e.g. "Functional \nunit"
+    return " ".join(_norm(s).split()).lower()
 
-    wb = load_workbook(spec["path"], data_only=True)
-    if spec["sheet"] not in wb.sheetnames:
-        raise SystemExit(f"sheet '{spec['sheet']}' not in {spec['path']} (have {wb.sheetnames})")
-    ws = wb[spec["sheet"]]
-    last_col = ws.max_column
 
-    # build position->canonical, verifying headers (collapse internal whitespace:
-    # source headers wrap with embedded newlines, e.g. "Functional \nunit")
-    def _hkey(s):
-        return " ".join(_norm(s).split()).lower()
-
+def _load_sheet(ws, sheet, header_row, colmap, strike_exclude, signal_types):
+    """Read one sheet -> (rows, [summary, *header-warnings]). Each row carries its
+    source sheet + row so the GUI can jump back to the right cell."""
+    header_warnings = []
     fields = []  # (col_index, canonical)
     for m in colmap:
         ci = column_index_from_string(m["column"])
@@ -66,34 +59,59 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
         # prefix match: real headers carry verbose suffixes, e.g.
         # "Description language 1 (1° part) (permanent part)"; binding is positional
         if not _hkey(actual).startswith(_hkey(m["expected_header"])):
-            msg = (f"IoList column {m['column']}: header '{actual}' != expected "
+            msg = (f"IoList[{sheet}] column {m['column']}: header '{actual}' != expected "
                    f"'{m['expected_header']}' (mapping to {m['canonical']})")
             if m["required"]:
                 raise SystemExit("ERROR " + msg)
-            warnings.append(msg)
+            header_warnings.append(msg)
         fields.append((ci, m["canonical"]))
 
+    last_col = ws.max_column
     rows: list[StagedRow] = []
-    excluded_struck = excluded_skip = 0
-    strike_exclude = str(params.get("strike_handling", "exclude")).lower() == "exclude"
-
+    struck = skip = 0
     for r in range(header_row + 1, ws.max_row + 1):
-        # an entirely empty row ends/skip
         if all(ws.cell(row=r, column=ci).value in (None, "") for ci, _ in fields):
-            continue
+            continue  # entirely empty row
         row = StagedRow((canon, _norm(ws.cell(row=r, column=ci).value)) for ci, canon in fields)
         row["_source_row"] = r
-
+        row["_source_sheet"] = sheet
         if _skip_reason_present(row.get("skip_reason")):
-            excluded_skip += 1
+            skip += 1
             continue
         if strike_exclude and _is_struck(ws, r, last_col):
-            excluded_struck += 1
+            struck += 1
             continue
-
         row["_type"] = config.resolve_type(signal_types, row.get("script_type"))
         rows.append(row)
 
+    summary = f"IoList[{sheet}]: {len(rows)} rows kept, {struck} struck, {skip} skip-reason"
+    return rows, [summary] + header_warnings
+
+
+def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], list[str]]:
+    """Read the I/O List. `io_list.sheet` may be a single name or a list of names;
+    rows from every sheet are concatenated (each tagged with its source sheet)."""
+    spec = params["io_list"]
+    header_row = spec["header_row"]
+    colmap = config.load_column_map("IoList")
+    sheets = config.as_sheet_list(spec.get("sheet"))
+    if not sheets:
+        raise SystemExit(f"no I/O List sheet configured ({spec['path']})")
+    strike_exclude = str(params.get("strike_handling", "exclude")).lower() == "exclude"
+
+    wb = load_workbook(spec["path"], data_only=True)
+    missing = [s for s in sheets if s not in wb.sheetnames]
+    if missing:
+        names = wb.sheetnames
+        wb.close()
+        raise SystemExit(f"sheet(s) {missing} not in {spec['path']} (have {names})")
+
+    rows: list[StagedRow] = []
+    warnings: list[str] = []
+    for sheet in sheets:
+        sheet_rows, sheet_warnings = _load_sheet(
+            wb[sheet], sheet, header_row, colmap, strike_exclude, signal_types)
+        rows.extend(sheet_rows)
+        warnings.extend(sheet_warnings)
     wb.close()
-    warnings.insert(0, f"IoList: {len(rows)} rows kept, {excluded_struck} struck, {excluded_skip} skip-reason")
     return rows, warnings

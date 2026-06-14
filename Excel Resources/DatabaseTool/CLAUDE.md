@@ -67,7 +67,10 @@ run the wrong one).
 ## Source documents & real I/O List layout
 
 Real docs live in `../3_Database/Source Data/` (paths in `params.json`). The I/O
-List sheet `NET SAFETY 50`, header row 1. Columns that matter (by letter):
+List sheet `NET SAFETY 50`, header row 1. **`io_list.sheet` may be a single name or a
+list** — staging reads every listed sheet and concatenates the rows (each tagged with
+its `_source_sheet`/`_source_row` so the GUI links jump to the right cell); the
+interface generator scans them all too. Columns that matter (by letter):
 F=ID (node), G=Bit (**full address** like `I0.0`, or the interface base byte),
 O/P/Q=Functional unit/Location/Device, R=Type (hardware), AA=Skip Reason,
 **AB=Script Type** (the signal type — incl. `PLC`/`PlcCardCm`/`IOC`),
