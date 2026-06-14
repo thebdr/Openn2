@@ -60,7 +60,9 @@ don't reach back for Power Query or VBA.
   `Output`) beside a `FileEditor`. `.csv` and `.xlsx`/`.xlsm` open in a **tksheet**
   spreadsheet grid (Consolas font; in-cell edit, multi-select, copy/paste, undo,
   right-click insert/delete row & column; steel-blue header + **zebra rows**
-  light-blue odd / light-grey even; a **Filter columns** show/hide popup). CSVs
+  light-blue odd / light-grey even; a **Filter columns** show/hide popup and a
+  **Filter rows** popup — a regex per column, cascading AND, header row pinned,
+  view-only via tksheet display_rows so edits/indices survive). CSVs
   read with delimiter sniffing, saved
   comma-delimited; xlsx edits round-trip via openpyxl (per sheet) and show formula
   strings, with a **Show values** checkbox that reloads cached values read-only.

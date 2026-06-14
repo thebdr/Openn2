@@ -17,6 +17,7 @@ tksheet is a hard dependency here; if it is missing the grid degrades to text.
 from __future__ import annotations
 import csv
 import os
+import re
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
@@ -107,7 +108,9 @@ class FileEditor(ttk.Frame):
         self._grid = None
         self._text = None
         self._pal = theme.LIGHT
-        self._visible_cols = None  # None = all columns shown
+        self._visible_cols = None       # None = all columns shown
+        self._row_filters: dict = {}    # column index -> regex pattern (AND-combined)
+        self._row_filter_cs = tk.BooleanVar(value=False)  # case-sensitive regex?
 
         bar = ttk.Frame(self, padding=(4, 4))
         bar.pack(side="top", fill="x")
@@ -119,7 +122,9 @@ class FileEditor(ttk.Frame):
         self._save_btn = ttk.Button(bar, text="Save", command=self.save, state="disabled")
         self._save_btn.pack(side="right", padx=2)
         self._columns_btn = ttk.Button(bar, text="Filter columns", command=self._open_columns_filter, state="disabled")
-        self._columns_btn.pack(side="right", padx=(8, 2))
+        self._columns_btn.pack(side="right", padx=2)
+        self._rows_btn = ttk.Button(bar, text="Filter rows", command=self._open_row_filter, state="disabled")
+        self._rows_btn.pack(side="right", padx=(8, 2))
         # xlsx-only controls (packed/forgotten in _show_xlsx_controls):
         self._show_values = tk.BooleanVar(value=False)
         self._values_chk = ttk.Checkbutton(bar, text="Show values", variable=self._show_values,
@@ -141,7 +146,8 @@ class FileEditor(ttk.Frame):
             return
         self.path = path
         self._path_var.set(self._shorten(path))
-        self._visible_cols = None  # reset the column filter for the new file
+        self._visible_cols = None  # reset column + row filters for the new file
+        self._row_filters = {}
         ext = os.path.splitext(path)[1].lower()
         if ext in (".xlsx", ".xlsm"):
             self.mode = "xlsx"
@@ -208,6 +214,7 @@ class FileEditor(ttk.Frame):
         self.sheet_name = self._sheet_var.get()
         values = self._show_values.get()
         self._visible_cols = None
+        self._row_filters = {}
         self._show_grid(_read_xlsx_grid(self.path, self.sheet_name, data_only=values))
         # showing computed values would clobber the formulas on save -> read-only
         self._save_btn.configure(state="disabled" if values else "normal")
@@ -232,8 +239,10 @@ class FileEditor(ttk.Frame):
             self._grid.pack(fill="both", expand=True)
             self._apply_zebra()
             self._columns_btn.configure(state="normal")
+            self._rows_btn.configure(state="normal")
         else:  # graceful fallback when tksheet is unavailable
             self._columns_btn.configure(state="disabled")
+            self._rows_btn.configure(state="disabled")
             self._show_text("\n".join("\t".join(str(c) for c in r) for r in data))
 
     def _apply_zebra(self):
@@ -299,9 +308,91 @@ class FileEditor(ttk.Frame):
         ttk.Button(btns, text="All", command=lambda: [v.set(True) for v in vars_]).pack(side="left")
         ttk.Button(btns, text="None", command=lambda: [v.set(False) for v in vars_]).pack(side="left", padx=4)
 
+    def _open_row_filter(self):
+        """Per-column regex row filter (cascading: rows must match ALL patterns)."""
+        if not self._grid:
+            return
+        data = self._grid.get_sheet_data()
+        ncols = max((len(r) for r in data), default=0)
+        if not ncols:
+            return
+        letters = _col_letters(ncols)
+        headers = data[0] if data else []
+
+        top = tk.Toplevel(self)
+        top.title("Filter rows (regex per column)")
+        top.transient(self.winfo_toplevel())
+        ttk.Label(top, padding=(8, 6), justify="left",
+                  text="Type a regex for one or more columns. Rows matching ALL patterns are shown\n"
+                       "(cascading AND). Row 1 (header) stays visible. Empty = no filter on that column."
+                  ).pack(side="top", fill="x")
+        frm = ttk.Frame(top, padding=8)
+        frm.pack(fill="both", expand=True)
+        entries, per_col = {}, 17
+        for i in range(ncols):
+            head = str(headers[i]).strip() if i < len(headers) else ""
+            label = f"{letters[i]}  {head[:22]}" if head else letters[i]
+            block, row = (i // per_col) * 2, i % per_col
+            ttk.Label(frm, text=label).grid(row=row, column=block, sticky="w", padx=(6, 2), pady=1)
+            var = tk.StringVar(value=self._row_filters.get(i, ""))
+            ttk.Entry(frm, textvariable=var, width=20).grid(row=row, column=block + 1, sticky="w", padx=(0, 12), pady=1)
+            entries[i] = var
+
+        btns = ttk.Frame(top, padding=(8, 0, 8, 8))
+        btns.pack(fill="x")
+        ttk.Checkbutton(btns, text="Case sensitive", variable=self._row_filter_cs).pack(side="left")
+
+        def apply():
+            pats = {i: v.get() for i, v in entries.items() if v.get().strip()}
+            flags = 0 if self._row_filter_cs.get() else re.IGNORECASE
+            bad = []
+            for i, p in pats.items():
+                try:
+                    re.compile(p, flags)
+                except re.error as exc:
+                    bad.append(f"{letters[i]}: {exc}")
+            if bad:
+                messagebox.showerror("Invalid regex", "\n".join(bad))
+                return
+            self._row_filters = pats
+            self._apply_row_filter()
+            top.destroy()
+
+        def clear():
+            self._row_filters = {}
+            self._apply_row_filter()
+            top.destroy()
+
+        ttk.Button(btns, text="Apply", command=apply).pack(side="right")
+        ttk.Button(btns, text="Clear", command=clear).pack(side="right", padx=4)
+
+    def _apply_row_filter(self):
+        """Show only rows matching every active per-column regex (row 1 pinned)."""
+        if not self._grid:
+            return
+        try:
+            data = self._grid.get_sheet_data()
+            if not self._row_filters:
+                # pass the explicit full range - all_rows_displayed=True alone doesn't reset
+                self._grid.display_rows(rows=list(range(len(data))), all_rows_displayed=True, redraw=True)
+                self._status("row filter cleared")
+                return
+            flags = 0 if self._row_filter_cs.get() else re.IGNORECASE
+            compiled = {c: re.compile(p, flags) for c, p in self._row_filters.items()}
+            shown = [0] if data else []   # keep the header row visible
+            for ri in range(1, len(data)):
+                row = data[ri]
+                if all(c < len(row) and rx.search(str(row[c])) for c, rx in compiled.items()):
+                    shown.append(ri)
+            self._grid.display_rows(shown, all_rows_displayed=False, redraw=True)
+            self._status(f"row filter: {len(shown) - 1} of {max(len(data) - 1, 0)} rows match")
+        except Exception as e:  # noqa: BLE001
+            self._status(f"row filter error: {e}")
+
     def _show_text(self, content: str):
         self._clear_body()
         self._columns_btn.configure(state="disabled")
+        self._rows_btn.configure(state="disabled")
         self._text = tk.Text(self._body, wrap="none", font=("Consolas", 11), undo=True,
                              background=self._pal["field"], foreground=self._pal["fg"],
                              insertbackground=self._pal["fg"])
