@@ -40,16 +40,27 @@ don't reach back for Power Query or VBA.
   (I/O tags, DBs, diagnosis, hardware, interfaces). Resolves all paths relative to
   itself, so it runs from any cwd. `--strict` fails on validation FAILs; it exits 1
   on a hardware ERROR (device not in the DeviceTypesDatabase), 2 on a missing doc.
+- `gui.py` — Tkinter operator window (the interactive twin of `run.py`): toolbar
+  with **Run All** + one button per phase, a colour-coded **Log** viewer, and a
+  **Configuration** tab that edits `params.json` and opens the config CSVs. The
+  pipeline runs on a worker thread (queue → `root.after` drain) so the UI stays
+  responsive, mirroring Openn2's `TiaWorker`. **Clickable links**: a validation
+  `Sheet!Cell` or a hardware `row N` log line carries an `[open …]` link that opens
+  the source workbook in Excel **at that cell** via `tools/excel_goto.ps1` (Windows
+  PowerShell COM; reuses a running Excel, else `os.startfile` fallback). It calls the
+  `safetydb` modules directly (not `run.py`) so it can attach those cell links.
+- `tools/excel_goto.ps1` — Excel "go to cell" helper used by `gui.py` (committed).
 - `interface_tool.py` — standalone IOC interface-table generator (see below); also
-  invoked by `run.py`.
+  invoked by `run.py` and `gui.py`.
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL
   and exits non-zero on failure. Run them after any change.
 - `Output/`, `Templates/*.xlsx` (except the committed interface template),
   `__pycache__/` are gitignored.
 
-Run everything: `python run.py [--strict]`. Run one check: `python test_staging.py` etc.
-Always invoke the copy under `C:\Source\Repos\Openn2\...` explicitly (a sibling clone
-exists; a relative path can run the wrong one).
+GUI: `python gui.py` (or `pythonw gui.py` for no console). Headless: `python run.py
+[--strict]`. Run one check: `python test_staging.py` etc. Always invoke the copy under
+`C:\Source\Repos\Openn2\...` explicitly (a sibling clone exists; a relative path can
+run the wrong one).
 
 ## Source documents & real I/O List layout
 
