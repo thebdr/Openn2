@@ -16,6 +16,7 @@ Run:  python gui.py        (shows a console - handy the first time)
 Always launch THIS copy under C:\\Source\\Repos\\Openn2\\... (a sibling clone exists).
 """
 from __future__ import annotations
+import importlib
 import json
 import os
 import queue
@@ -35,6 +36,7 @@ import interface_tool
 import editor
 import theme
 import block_templates
+import block_builders
 import softwareblocks
 import verify
 
@@ -383,12 +385,14 @@ class App:
 
     def _work_softwareblocks(self):
         self._section("SOFTWARE BLOCKS  (block_builders -> SoftwareBlocksBuilder CSV)")
+        self._reload_builders()
         for stem, (path, n) in softwareblocks.generate().items():
             self._log("OK", f"{n} instance(s)  ->  {os.path.basename(path)}")
         self._stat("SoftwareBlocks CSV generated")
 
     def _work_coverage(self):
         self._section("COVERAGE  (every signal lands somewhere)")
+        self._reload_builders()
         s = verify.generate()
         self._log("OK" if s["orphans"] == 0 else "WARNING",
                   f"{s['covered']}/{s['total']} covered, {s['orphans']} orphan(s), "
@@ -397,13 +401,21 @@ class App:
         self._stat("coverage report written")
 
     def _work_scan_templates(self):
-        self._section("BLOCK TEMPLATES  (scan !!key$$ -> config/block_templates.json)")
+        self._section("BLOCK TEMPLATES  (scan !!key$$ -> json -> sync block_builders.py)")
         s = block_templates.build_templates_json()
         self._log("OK", f"+{s['added_templates']} template(s), +{s['added_keys']} new key(s), "
                          f"{s['kept_keys']} kept binding(s)  ->  config/block_templates.json")
         for m in s["missing"]:
             self._log("INFO", f"  key no longer in template (kept): {m}")
-        self._stat("block_templates.json updated")
+        b = block_templates.sync_builders()
+        self._log("OK", f"block_builders.py: {b['kept']} kept ($keep), {b['replaced']} re-stubbed "
+                         f"($replace), {b['added']} added")
+        importlib.reload(block_builders)  # pick up the regenerated builders
+        self._stat("templates scanned + builders synced")
+
+    def _reload_builders(self):
+        """Re-import block_builders.py so the latest edits are used by the runs."""
+        importlib.reload(block_builders)
 
     def _work_export_central(self):
         self._section("CENTRAL DATABASE  (staged rows -> Output/CentralDatabase.csv)")

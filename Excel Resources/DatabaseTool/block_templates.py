@@ -24,6 +24,7 @@ Usage:
 """
 from __future__ import annotations
 import argparse
+import ast
 import csv as _csv
 import json
 import os
@@ -38,6 +39,7 @@ from safetydb import config
 
 TEMPLATES_DIR = os.path.join(_HERE, "Templates", "Tia Portal Software Blocks")
 TEMPLATES_JSON = os.path.join(config.CONFIG_DIR, "block_templates.json")
+BUILDERS_PY = os.path.join(_HERE, "block_builders.py")
 # !!key$$  - key is one or more chars that are not '$' or a line break (so a
 # placeholder can't accidentally span lines or swallow a following '$').
 KEY_RE = re.compile(r"!!([^$\r\n]+?)\$\$")
@@ -97,6 +99,85 @@ def build_templates_json(templates_dir: str = TEMPLATES_DIR, json_path: str = TE
     return {"added_templates": added_t, "added_keys": added_k, "kept_keys": kept_k, "missing": missing}
 
 
+# --- block_builders.py scaffolder -------------------------------------------
+_STUB = ('# $replace\n'
+         'def {name}(db: list) -> list:\n'
+         '    """{stem}.xml - TODO: gather instances.\n'
+         '    keys: {keys}\n'
+         '    """\n'
+         '    return []')
+
+
+def _builder_func_name(stem: str) -> str:
+    """Template stem -> builder function name, e.g. ...--03_Zone Cumulative -> build_03_zone_cumulative."""
+    part = stem.rsplit("--", 1)[-1]
+    return "build_" + (re.sub(r"[^a-z0-9]+", "_", part.lower()).strip("_") or "template")
+
+
+def sync_builders(builders_path: str = BUILDERS_PY, json_path: str = TEMPLATES_JSON) -> dict:
+    """Regenerate block_builders.py from block_templates.json, honoring the per-builder
+    markers: a function above which sits `# $replace` (or that doesn't exist yet) is
+    re-stubbed with that template's current keys; `# $keep` (or no marker) is preserved
+    verbatim. The header (docstring/helpers) and trailing content are kept; the BUILDERS
+    dict is regenerated. Returns {kept, replaced, added}."""
+    with open(json_path, encoding="utf-8") as f:
+        templates = json.load(f)
+    src = open(builders_path, encoding="utf-8").read()
+    lines = src.splitlines()
+    tree = ast.parse(src)
+
+    # existing build_* functions: name -> {marker, block, start(1-based)}
+    builders, first_line = {}, None
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("build_"):
+            j, marker, mstart = node.lineno - 2, None, node.lineno
+            while j >= 0 and lines[j].strip() == "":
+                j -= 1
+            if j >= 0:
+                m = re.match(r"#\s*\$\s*(keep|replace)\b", lines[j].strip())
+                if m:
+                    marker, mstart = m.group(1), j + 1
+            builders[node.name] = {"marker": marker, "block": "\n".join(lines[mstart - 1:node.end_lineno])}
+            first_line = mstart if first_line is None else min(first_line, mstart)
+
+    # existing stem -> funcname (from the BUILDERS dict) + the dict's extent
+    existing_map, assign = {}, None
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "BUILDERS" for t in node.targets):
+            assign = node
+            if isinstance(node.value, ast.Dict):
+                for k, v in zip(node.value.keys, node.value.values):
+                    if isinstance(k, ast.Constant) and isinstance(v, ast.Name):
+                        existing_map[k.value] = v.id
+
+    header_end = (first_line - 1) if first_line else (assign.lineno - 1 if assign else len(lines))
+    header = "\n".join(lines[:header_end]).rstrip()
+    trailing = "\n".join(lines[assign.end_lineno:]).strip() if assign else ""
+
+    blocks, new_map, kept = [], {}, 0
+    replaced = added = 0
+    for stem, keys in templates.items():
+        fname = existing_map.get(stem) or _builder_func_name(stem)
+        new_map[stem] = fname
+        ex = builders.get(fname)
+        if ex and ex["marker"] != "replace":           # $keep or no marker -> preserve
+            blocks.append(ex["block"]); kept += 1
+        else:                                           # $replace or new -> (re)stub
+            blocks.append(_STUB.format(name=fname, stem=stem, keys=", ".join(keys.keys())))
+            replaced += int(bool(ex)); added += int(not ex)
+
+    dict_src = ["# template file stem -> builder", "BUILDERS = {"]
+    dict_src += [f"    {stem!r}: {new_map[stem]}," for stem in templates]
+    dict_src.append("}")
+
+    out = header + "\n\n\n" + "\n\n\n".join(blocks) + "\n\n\n" + "\n".join(dict_src) + "\n"
+    if trailing:
+        out += "\n" + trailing + "\n"
+    with open(builders_path, "w", encoding="utf-8") as f:
+        f.write(out)
+    return {"kept": kept, "replaced": replaced, "added": added}
+
+
 def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> str:
     """Write the staged I/O List rows to a CSV (canonical columns + a few resolved
     fields) for inspection. Returns the path written."""
@@ -135,6 +216,9 @@ def main():
         for m in s["missing"]:
             print(f"  (note) key no longer in template, binding kept: {m}")
         print(f"  -> {TEMPLATES_JSON}")
+        b = sync_builders()
+        print(f"block_builders.py: {b['kept']} kept ($keep), {b['replaced']} re-stubbed "
+              f"($replace), {b['added']} added  -> {BUILDERS_PY}")
     elif args.cmd == "staged":
         print(f"staged database -> {dump_staged(args.out)}")
 

@@ -74,9 +74,13 @@ don't reach back for Power Query or VBA.
   invoked by `run.py` and `gui.py`.
 - `block_templates.py` — **tooling, not pipeline** (see "Software-block templates").
   `keys` scans the block templates for `!!key$$` placeholders → `config/block_templates.json`
-  (merge-preserving); `staged` exports the CentralDatabase to `Output/CentralDatabase.csv`.
-  Both are also wired into the GUI Configuration tab's Block templates panel.
+  (merge-preserving) **and `sync_builders` regenerates `block_builders.py`** from it; `staged`
+  exports the CentralDatabase to `Output/CentralDatabase.csv`. Wired into the GUI panel.
 - `block_builders.py` — **you edit**: one `build_*(db)` per template returning instances.
+  Each builder carries a `# $keep` or `# $replace` marker: `sync_builders` re-stubs the
+  `# $replace` ones with that template's current keys (in the docstring) and adds new
+  templates, but preserves `# $keep` functions verbatim. The GUI reloads this module
+  before each SoftwareBlocks/Coverage run so live edits are picked up.
   `softwareblocks.py` — the engine that writes the SoftwareBlocksBuilder CSV(s) to
   `Output/SoftwareBlocks/` (see "Software-block templates").
 - `verify.py` — **coverage check + report**: per CentralDatabase row, which outputs it
