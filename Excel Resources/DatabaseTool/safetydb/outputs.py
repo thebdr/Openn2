@@ -91,6 +91,59 @@ def write_io_tags(tables: dict, out_dir: str) -> int:
     return total
 
 
+def _descr2(row) -> str:
+    """Description language 2 part 1 + part 2 (cols M + N), joined with a space."""
+    p1 = str(row.get("desc_l2") or "").strip()
+    p2 = str(row.get("desc_l2b") or "").strip()
+    return " ".join(p for p in (p1, p2) if p)
+
+
+# Diagnosis List_IO layout (mirrors the SWP_04 ">List_IO" sheet); each column is
+# (header, value-from-staged-row).
+DIAG_COLUMNS = [
+    ("Diag Cabinet", lambda r: r.get("diag_cabinet", "")),
+    ("Diag Bit", lambda r: r.get("diag_bit", "")),
+    ("DevType", lambda r: r.get("script_type", "")),
+    ("Index", lambda r: r.get("index", "")),
+    ("Type", lambda r: r.get("type_hw", "")),
+    ("Address", lambda r: r.get("bit", "")),
+    ("ID", lambda r: r.get("id_node", "")),
+    ("Desc L1", _descr),
+    ("Desc L2", _descr2),
+    ("Functional unit", lambda r: r.get("functional_unit", "")),
+    ("Location", lambda r: r.get("location", "")),
+    ("Device", lambda r: r.get("device", "")),
+    ("Drawing name", lambda r: r.get("drawing", "")),
+    ("Sheet", lambda r: r.get("sheet", "")),
+    ("IP", lambda r: r.get("profinet_ip", "")),
+    ("PnName", lambda r: r.get("profinet_name", "")),
+    ("TsRef", lambda r: r.get("ts_ref", "")),
+]
+
+
+def build_diagnosis_list_io(io_rows: list) -> list:
+    """The diagnosis-relevant rows (types flagged in_diagnosis) in the List_IO
+    column order. Includes rows without a bit address (e.g. PA fieldbus alarms)."""
+    out = []
+    for r in io_rows:
+        t = r.get("_type")
+        if not t or not t.get("in_diagnosis"):
+            continue
+        out.append({name: fn(r) for name, fn in DIAG_COLUMNS})
+    return out
+
+
+def write_diagnosis_list_io(rows: list, out_dir: str) -> int:
+    diag_dir = os.path.join(out_dir, "Diagnosis")
+    os.makedirs(diag_dir, exist_ok=True)
+    headers = [c[0] for c in DIAG_COLUMNS]
+    with open(os.path.join(diag_dir, "List_IO.csv"), "w", encoding="utf-8-sig", newline="") as f:
+        f.write(";".join(headers) + "\n")
+        for r in rows:
+            f.write(";".join(str(r[h]) for h in headers) + "\n")
+    return len(rows)
+
+
 def build_dbs(tables: dict, signal_types: dict) -> dict:
     """For Script Types whose db_kind is set, a DB whose members reuse the tag
     names. Returns dbname -> {kind, members}."""
