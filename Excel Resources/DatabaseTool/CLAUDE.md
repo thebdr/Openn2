@@ -42,8 +42,10 @@ don't reach back for Power Query or VBA.
   on a hardware ERROR (device not in the DeviceTypesDatabase), 2 on a missing doc.
 - `gui.py` — Tkinter operator window "**Pipeline2**" (the interactive twin of
   `run.py`): toolbar with **Run All** + one button per phase, a colour-coded **Log**
-  viewer, and a **Configuration** tab that edits `params.json` and opens the config
-  CSVs. The pipeline runs on a worker thread (queue → `root.after` drain) so the UI
+  viewer, and a **Configuration** tab that edits `params.json`, opens the config CSVs,
+  and has a **Block templates** panel (scan → `block_templates.json`, edit it, export
+  the Central Database CSV — see "Software-block templates"). The pipeline runs on a
+  worker thread (queue → `root.after` drain) so the UI
   stays responsive, mirroring Openn2's `TiaWorker`. **Clickable links**: a validation
   `Sheet!Cell` or a hardware `row N` log line carries an `[open …]` link that opens the
   source workbook in Excel **at that cell and brings Excel to the front**, via
@@ -72,7 +74,8 @@ don't reach back for Power Query or VBA.
   invoked by `run.py` and `gui.py`.
 - `block_templates.py` — **tooling, not pipeline** (see "Software-block templates").
   `keys` scans the block templates for `!!key$$` placeholders → `config/block_templates.json`
-  (merge-preserving); `staged` exports the staged DB to `Output/staged.csv` for inspection.
+  (merge-preserving); `staged` exports the staged DB to `Output/CentralDatabase.csv` for
+  inspection. Both are also wired into the GUI Configuration tab's Block templates panel.
 - `requirements.txt` — `openpyxl` (core); `tksheet` + `pywin32` (GUI). pywin32 is
   optional (Excel cell-jump falls back to `os.startfile` without it).
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL
@@ -167,8 +170,9 @@ bindings are kept, only new ones are added (default binding `""`); keys dropped 
 template are kept and just noted. A binding is one of: a **canonical column name**
 (`"device"` → that row's value), a **literal list** (`["a","b"]`), or a **query** over the
 staged DB (object; the query schema + the actual template-filling generation are still
-to build). To author bindings, inspect the data with `python block_templates.py staged`,
-which writes `Output/staged.csv` (canonical columns + `matrix_areas` +
+to build). To author bindings, inspect the data with `python block_templates.py staged`
+(or the GUI Configuration tab's Block templates panel),
+which writes `Output/CentralDatabase.csv` (canonical columns + `matrix_areas` +
 `_source_sheet`/`_source_row`/`type_id_resolved`/`type_category`); open it in the
 Pipeline2 **Files** tab and use the regex **Filter rows** to prototype queries. CSV was
 chosen for inspection because it opens in that editor; if real SQL is wanted later, an

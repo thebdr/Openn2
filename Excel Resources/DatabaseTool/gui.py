@@ -34,6 +34,7 @@ from safetydb import config, staging, validation, outputs, hardware
 import interface_tool
 import editor
 import theme
+import block_templates
 
 APP_NAME = "Pipeline2"
 ICON_BASE = os.path.join(_HERE, "assets", APP_NAME)  # + .ico / .png
@@ -252,6 +253,7 @@ class App:
     def _build_notebook(self):
         nb = ttk.Notebook(self.root)
         nb.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 4))
+        self._nb = nb
 
         # --- Log tab ---
         log_tab = ttk.Frame(nb)
@@ -272,6 +274,7 @@ class App:
         # --- Files tab (config + outputs editor) ---
         files_tab = ttk.Frame(nb)
         nb.add(files_tab, text="Files")
+        self._files_tab = files_tab
         self._build_files_tab(files_tab)
 
     def _build_files_tab(self, parent):
@@ -323,6 +326,59 @@ class App:
                    command=lambda: self._open_path(os.path.join(config.CONFIG_DIR, "column_map.csv"))).pack(side="left", padx=2)
         ttk.Button(btns, text="Open DeviceTypesDatabase.csv",
                    command=self._open_dtd).pack(side="left", padx=2)
+
+        # --- Block templates (tooling) ---
+        blk = ttk.LabelFrame(parent, text="Block templates", padding=8)
+        blk.grid(row=len(PARAM_SPEC) + 2, column=0, columnspan=3, sticky="we", pady=(14, 0))
+        ttk.Label(blk, justify="left", wraplength=640,
+                  text="Scan the TIA Software Block templates for !!key$$ placeholders into "
+                       "block_templates.json, bind each key, and export the staged Central "
+                       "Database (CSV) to inspect / author bindings.").grid(
+            row=0, column=0, columnspan=4, sticky="w", pady=(0, 6))
+        b_scan = ttk.Button(blk, text="Scan templates → block_templates.json",
+                            command=lambda: self._start(self._work_scan_templates))
+        b_scan.grid(row=1, column=0, sticky="w", padx=(0, 6), pady=2)
+        ttk.Button(blk, text="Edit block_templates.json",
+                   command=lambda: self._open_in_files(os.path.join(config.CONFIG_DIR, "block_templates.json"))
+                   ).grid(row=1, column=1, sticky="w", padx=6, pady=2)
+        b_central = ttk.Button(blk, text="Export Central Database (CSV)",
+                               command=lambda: self._start(self._work_export_central))
+        b_central.grid(row=1, column=2, sticky="w", padx=6, pady=2)
+        ttk.Button(blk, text="Open Central Database",
+                   command=self._open_central).grid(row=1, column=3, sticky="w", padx=6, pady=2)
+        self._run_buttons.extend([b_scan, b_central])  # greyed while any run is in flight
+
+    def _open_in_files(self, path: str):
+        """Open a file in the Files tab editor (switch to it); else open externally."""
+        files = getattr(self, "_files", None)
+        if files is not None and os.path.exists(path):
+            self._nb.select(self._files_tab)
+            files.editor.open(path)
+        else:
+            self._open_path(path)
+
+    def _open_central(self):
+        path = os.path.join(self._out_dir(), "CentralDatabase.csv")
+        if os.path.exists(path):
+            self._open_in_files(path)
+        else:
+            self.status.set("CentralDatabase.csv not found - run 'Export Central Database' first")
+
+    def _work_scan_templates(self):
+        self._section("BLOCK TEMPLATES  (scan !!key$$ -> config/block_templates.json)")
+        s = block_templates.build_templates_json()
+        self._log("OK", f"+{s['added_templates']} template(s), +{s['added_keys']} new key(s), "
+                         f"{s['kept_keys']} kept binding(s)  ->  config/block_templates.json")
+        for m in s["missing"]:
+            self._log("INFO", f"  key no longer in template (kept): {m}")
+        self._stat("block_templates.json updated")
+
+    def _work_export_central(self):
+        self._section("CENTRAL DATABASE  (staged rows -> Output/CentralDatabase.csv)")
+        self._stat("exporting Central Database ...")
+        path = block_templates.dump_staged()
+        self._log("OK", f"{os.path.basename(path)} written  ->  {path}")
+        self._stat("CentralDatabase.csv exported")
 
     def _build_statusbar(self):
         bar = ttk.Frame(self.root, padding=(8, 4))

@@ -15,7 +15,7 @@ The TIA Portal Software Block templates under
               * a literal list           -> ["a", "b", "c"]
               * a query over the staged DB (object; schema TBD when generation lands)
 
-  staged  - exports the staged database to a CSV you can inspect (open it in the
+  staged  - exports the staged database to Output/CentralDatabase.csv (open it in the
             Pipeline2 Files tab and use the regex row filter to prototype queries).
 
 Usage:
@@ -106,7 +106,7 @@ def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> 
     rows, _warnings = staging.load_io_list(params, types)  # adds matrix_areas (in staging now)
     cols = [m["canonical"] for m in config.load_column_map("IoList")]
     extra = ["matrix_areas", "_source_sheet", "_source_row", "type_id_resolved", "type_category"]
-    csv_path = csv_path or os.path.join(_abs(params.get("output_dir", "Output")), "staged.csv")
+    csv_path = csv_path or os.path.join(_abs(params.get("output_dir", "Output")), "CentralDatabase.csv")
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
         w = _csv.writer(f, lineterminator="\n")
@@ -124,7 +124,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("keys", help="scan templates -> config/block_templates.json (merge)")
     sp = sub.add_parser("staged", help="export the staged database to CSV for inspection")
-    sp.add_argument("--out", default=None, help="output CSV path (default Output/staged.csv)")
+    sp.add_argument("--out", default=None, help="output CSV path (default Output/CentralDatabase.csv)")
     args = ap.parse_args()
 
     if args.cmd == "keys":
