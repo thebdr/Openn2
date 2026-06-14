@@ -20,5 +20,6 @@
   "diag_bit_min": 0,
   "diag_bit_max": 63,
   "output_dir": "Output",
+  "csv_delimiter": ",",
   "interface_template": "Templates/TEMPLATE_INTERFACES_v0.0.xlsx"
 }

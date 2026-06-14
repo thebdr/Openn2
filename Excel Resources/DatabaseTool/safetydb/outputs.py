@@ -8,6 +8,7 @@ Each Script Type goes to its own tag table (file). Types whose db_kind is set
 also get a DB / safe DB whose members keep the same names as the tags.
 """
 from __future__ import annotations
+import csv
 import os
 
 # types whose tag name uses the row description instead of the type description
@@ -77,16 +78,18 @@ def _safe(name: str) -> str:
 
 
 def write_io_tags(tables: dict, out_dir: str) -> int:
-    """One ';'-CSV per type: Name;Data Type;Logical Address;Comment."""
+    """One comma-CSV per type: Name,Data Type,Logical Address,Comment. Comments are
+    free text and may contain commas, so rows are csv-quoted when needed."""
     tag_dir = os.path.join(out_dir, "IoTags")
     os.makedirs(tag_dir, exist_ok=True)
     total = 0
     for script, tags in sorted(tables.items()):
         path = os.path.join(tag_dir, _safe(script) + ".csv")
         with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            f.write("Name;Data Type;Logical Address;Comment\n")
+            w = csv.writer(f, lineterminator="\n")
+            w.writerow(["Name", "Data Type", "Logical Address", "Comment"])
             for t in tags:
-                f.write(f"{t['name']};{t['data_type']};{t['address']};{t['comment']}\n")
+                w.writerow([t["name"], t["data_type"], t["address"], t["comment"]])
         total += len(tags)
     return total
 
@@ -138,9 +141,10 @@ def write_diagnosis_list_io(rows: list, out_dir: str) -> int:
     os.makedirs(diag_dir, exist_ok=True)
     headers = [c[0] for c in DIAG_COLUMNS]
     with open(os.path.join(diag_dir, "List_IO.csv"), "w", encoding="utf-8-sig", newline="") as f:
-        f.write(";".join(headers) + "\n")
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow(headers)
         for r in rows:
-            f.write(";".join(str(r[h]) for h in headers) + "\n")
+            w.writerow([str(r[h]) for h in headers])
     return len(rows)
 
 

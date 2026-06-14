@@ -21,6 +21,8 @@ Deduced rules (golden: HardwareConfig/{Stations,Modules}.csv):
 Override order honored throughout: I/O List (col AG) params are written last.
 """
 from __future__ import annotations
+import csv
+import io
 import os
 import re
 
@@ -107,11 +109,18 @@ def _expand_by_type(card_signals, signal_types_by_type, card_start_byte) -> str:
     return _merge_params(*parts)
 
 
+def _looks_like_switch(row) -> bool:
+    text = (str(row.get("description_module") or "") + " " + str(row.get("desc_l1") or "")).upper()
+    return "SWITCH" in text
+
+
 def extract(io_rows: list, dtd: dict):
-    """Single pass over the I/O List -> (stations, modules)."""
+    """Single pass over the I/O List -> (stations, modules, messages).
+    messages: (level, text) - heads with no DTD model are ERROR, except switches
+    (WARNING). Switches are not generatable stations and are skipped either way."""
     by_id = dtd["by_id"]
     default_cards = dtd["default_cards"]
-    stations, modules = [], []
+    stations, modules, messages = [], [], []
     cur = None  # {role, row, model, rec, head_tag, signals[]}
 
     def finalize():
@@ -125,9 +134,11 @@ def extract(io_rows: list, dtd: dict):
         i_base = min(sig_i) if sig_i else None
         q_base = min(sig_q) if sig_q else None
 
+        # DTD col-5 (Parameters) is applied by Openn2 itself - NOT written here.
+        # Station params: the resolved I/O-address template + I/O List col-AG (last).
         io_addr = _resolve_addr_template(rec["io_addr_params"], i_base, q_base)
         head_ag = str(row.get("hardware_params") or "")
-        station_params = _merge_params(rec["params"], io_addr, head_ag)
+        station_params = _merge_params(io_addr, head_ag)
 
         stations.append({
             "Role": cur["role"], "Station Name": str(row.get("profinet_name") or "").strip(),
@@ -152,7 +163,6 @@ def extract(io_rows: list, dtd: dict):
             cards[slot].append(s)
 
         plug = 0
-        prev_model = None
         for slot in order:
             sigs = cards[slot]
             cmodel = _model_id(sigs[0].get("part_no"))
@@ -160,8 +170,9 @@ def extract(io_rows: list, dtd: dict):
             bytes_ = [parse_address(s.get("bit"))[1] for s in sigs if parse_address(s.get("bit"))]
             start = min(bytes_) if bytes_ else ""
             plug += 1
-            pg = "PotentialGroup=1" if cmodel != prev_model else ""
-            prev_model = cmodel
+            # PotentialGroup: the first card always starts a group; for slots 2+ it
+            # comes from the I/O List (col AG) - the designer decides per module.
+            pg = "PotentialGroup=1" if plug == 1 else ""
             by_type = _expand_by_type(sigs, crec["params_by_type"] if crec else {}, start if start != "" else 0)
             card_ag = _merge_params(*[str(s.get("hardware_params") or "") for s in sigs])
             params = _merge_params(pg, by_type, card_ag)
@@ -173,15 +184,15 @@ def extract(io_rows: list, dtd: dict):
                 "Comment": crec["comment"] if crec else "",
             })
 
-        # default cards (<PARENT>:SUFFIX) for this device model
+        # default cards (<PARENT>:SUFFIX) for this device model. Their DTD col-5
+        # params are applied by Openn2 itself, so the row carries no params here.
         for card_id in default_cards.get(model.upper(), []):
             crec = by_id[card_id.upper()]
             plug += 1
             modules.append({
                 "Station Name": cur["row"].get("profinet_name", "").strip(),
                 "Slot": plug, "Module Name": crec["model_id"], "Model Id": crec["model_id"],
-                "I Addr": "", "Q Addr": "",
-                "Custom Parameters": _merge_params(crec["params"]),
+                "I Addr": "", "Q Addr": "", "Custom Parameters": "",
                 "Comment": crec["comment"],
             })
 
@@ -191,7 +202,12 @@ def extract(io_rows: list, dtd: dict):
             finalize()
             model = _model_id(row.get("part_no"))
             rec = by_id.get(model.upper())
-            if rec is None:  # device not in DTD (e.g. managed switch) -> skip
+            if rec is None:  # device not in DTD -> can't generate; log and skip
+                where = f"row {row.get('_source_row')} {row.get('profinet_name') or row.get('device') or ''}".strip()
+                if _looks_like_switch(row):
+                    messages.append(("WARNING", f"{where}: switch model '{model}' not in DeviceTypesDatabase - skipped"))
+                else:
+                    messages.append(("ERROR", f"{where}: device model '{model}' not in DeviceTypesDatabase - skipped"))
                 cur = None
                 continue
             cur = {"role": role, "row": row, "model": model, "rec": rec,
@@ -199,14 +215,20 @@ def extract(io_rows: list, dtd: dict):
         elif cur is not None:
             cur["signals"].append(row)
     finalize()
-    return stations, modules
+    return stations, modules, messages
 
 
 def _format2(rows: list, keys: list) -> str:
-    out = ["#!format=2", "# " + ";".join(keys)]
+    """Comma-delimited format-2 text: '#!format=2' tag, a '# header' comment, then
+    one csv-quoted row per dict (fields with ',' or '"' are quoted, as Openn2's
+    CsvTable expects). Params inside a field use '|', so they never need quoting."""
+    buf = io.StringIO()
+    buf.write("#!format=2\n")
+    buf.write("# " + ",".join(keys) + "\n")
+    writer = csv.writer(buf, lineterminator="\n")  # default delimiter ',', QUOTE_MINIMAL
     for r in rows:
-        out.append(";".join(str(r.get(k, "")) for k in keys))
-    return "\n".join(out) + "\n"
+        writer.writerow([str(r.get(k, "")) for k in keys])
+    return buf.getvalue()
 
 
 def write_stations(stations: list, out_dir: str) -> int:

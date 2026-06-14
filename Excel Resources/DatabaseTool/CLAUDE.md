@@ -105,14 +105,17 @@ Identifier, Type, Order Number/FW, Comment, Parameters (`|`), Parameters by
 Signal Type, I/O Addresses Parameter. The loader sniffs `,` vs `;`. Not generated
 by this tool — read only.
 
-## Delimiters (IN FLUX — confirm before relying)
+## Delimiters
 
-Config + DTD CSVs are comma-delimited (loaders sniff `,`/`;`, so `;` still works).
-The user has stated "all CSV comma-delimited going forward." The **format-2
-output** (`Stations.csv`/`Modules.csv`) currently still emits `;` (matches the
-golden `HardwareConfig` files and Openn2's C# `CsvTable`, which splits on `;`).
-Switching the output to comma needs Openn2's `CsvTable` delimiter updated too —
-do not change it unilaterally; it's an open decision (`params.json csv_delimiter`).
+**Comma everywhere.** All CSVs this tool reads and writes are comma-delimited:
+config (`signal_types.csv`, `column_map.csv`), the global `DeviceTypesDatabase`,
+and the format-2 outputs (`Stations.csv`/`Modules.csv`, plus the I/O-tag and
+diagnosis CSVs). Writers use Python's `csv` module (`QUOTE_MINIMAL`): a field is
+`"`-quoted only when it contains a comma or `"`. Custom parameters use `|`
+internally, so they never need quoting. Openn2's C# `CsvTable` was switched to the
+same comma default and quoting, and its `#!format=N` parser tolerates Excel's
+delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so older
+`;` files keep loading, but write comma. (`params.json csv_delimiter` = `,`.)
 
 ## Conventions & gotchas
 
@@ -127,5 +130,4 @@ do not change it unilaterally; it's an open decision (`params.json csv_delimiter
 ## Still to build
 
 `run.py` — one CLI: documents → staging → validation report → all outputs
-(I/O tags, DBs, diagnosis, interfaces, hardware). Wire it once the output
-delimiter is settled.
+(I/O tags, DBs, diagnosis, interfaces, hardware).

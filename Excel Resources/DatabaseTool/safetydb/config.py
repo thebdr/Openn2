@@ -10,10 +10,17 @@ CONFIG_DIR = os.path.join(_HERE, "config")
 _TRUE = {"yes", "true", "1", "y"}
 
 
+def _sniff_delim(text: str) -> str:
+    """',' unless the first non-empty line clearly uses ';' more (transition-safe)."""
+    first = next((ln for ln in text.splitlines() if ln.strip()), "")
+    return ";" if first.count(";") > first.count(",") else ","
+
+
 def _read_csv(name: str) -> list[dict]:
     path = os.path.join(CONFIG_DIR, name)
     with open(path, newline="", encoding="utf-8-sig") as f:
-        return list(csv.DictReader(f, delimiter=";"))
+        text = f.read()
+    return list(csv.DictReader(text.splitlines(), delimiter=_sniff_delim(text)))
 
 
 def as_bool(value) -> bool:

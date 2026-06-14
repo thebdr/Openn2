@@ -38,8 +38,11 @@ files, imports/exports PLC blocks.
   is ever auto-saved — a cancelled/aborted generation is rolled back by closing the
   project in TIA without saving.
 - **Hardware config** (`01_Constructor/`): csv "format 2" — `Stations.csv` +
-  `Modules.csv` + `DeviceTypesDatabase.csv`; `;` delimited, `#` comments, `#!format=2`
-  tag, parsed by `CsvTable`. `HardwareConfigLoader` validates the whole folder before
+  `Modules.csv` + `DeviceTypesDatabase.csv`; `,` delimited (`CsvTable` default; fields
+  with a comma or `"` are `"`-quoted, and custom parameters use `|` internally so they
+  never need quoting), `#` comments, `#!format=2` tag (a delimiter-padded directive line
+  like `#!format=2,,,,` from Excel is tolerated), parsed by `CsvTable`.
+  `HardwareConfigLoader` validates the whole folder before
   publishing anything (all-or-nothing, every error with file/line). **No legacy
   support by design**: pre-format-2 folders (`IoControllersList.csv` + wide
   `IoDevicesList.csv`) are handled by the old stable application version, not here —

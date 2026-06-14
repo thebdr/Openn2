@@ -1,22 +1,22 @@
-type_id;description;category;pair_key;channel;in_diagnosis;is_pattern;db_kind;db_name
-A;Alarm;Diag;;;yes;no;
-W;Warning;Diag;;;yes;no;
-PA;Fieldbus Alarm;Diag;;;yes;no;DB;PROFINET_ALARMS
-PW;Fieldbus Warning;Diag;;;yes;no;
-E1/2;Emergency Push Button;Safety;E;1;no;no;SAFE_DB;01_Pushbutton
-E2/2;Emergency Push Button;Safety;E;2;no;no;
-B1/2;Safety Breaker;Safety;B;1;no;no;SAFE_DB;01_Pushbutton
-B2/2;Safety Breaker;Safety;B;2;no;no;
-ENC1/2;Safety Encoder;Safety;ENC;1;no;no;SAFE_DB;05_SPEED
-ENC2/2;Safety Encoder;Safety;ENC;2;no;no;SAFE_DB;05_SPEED
-DI1/2;Door Closed Safety Input;Safety;DI;1;no;no;SAFE_DB;05_DOORS
-DI2/2;Door Closed Safety Input;Safety;DI;2;no;no;
-DD;Door Closed Diag Input;Diag;;;yes;no;SAFE_DB;05_DOORS
-DR;Door Reset Input;Std;;;no;no;
-DL;Door Lamp Output;Std;;;no;no;
-DQ;Door Unlock Output;Std;;;no;no;
-KI;Contactor Feedback Input;Safety;;;no;no;SAFE_DB;07_FEEDBACK_ERROR
-KQ;Contactor Output;Safety;;;no;no;
-RES;Emergency Reset;Safety;;;no;no;
-FA#;Emergency Status Feedback Area #;Safety;;;no;yes;
-IOC;Machine Interface (I/O Controller);Interface;;;no;no;
+type_id,description,category,pair_key,channel,in_diagnosis,is_pattern,db_kind,db_name
+A,Alarm,Diag,,,yes,no,
+W,Warning,Diag,,,yes,no,
+PA,Fieldbus Alarm,Diag,,,yes,no,DB,PROFINET_ALARMS
+PW,Fieldbus Warning,Diag,,,yes,no,
+E1/2,Emergency Push Button,Safety,E,1,no,no,SAFE_DB,01_Pushbutton
+E2/2,Emergency Push Button,Safety,E,2,no,no,
+B1/2,Safety Breaker,Safety,B,1,no,no,SAFE_DB,01_Pushbutton
+B2/2,Safety Breaker,Safety,B,2,no,no,
+ENC1/2,Safety Encoder,Safety,ENC,1,no,no,SAFE_DB,05_SPEED
+ENC2/2,Safety Encoder,Safety,ENC,2,no,no,SAFE_DB,05_SPEED
+DI1/2,Door Closed Safety Input,Safety,DI,1,no,no,SAFE_DB,05_DOORS
+DI2/2,Door Closed Safety Input,Safety,DI,2,no,no,
+DD,Door Closed Diag Input,Diag,,,yes,no,SAFE_DB,05_DOORS
+DR,Door Reset Input,Std,,,no,no,
+DL,Door Lamp Output,Std,,,no,no,
+DQ,Door Unlock Output,Std,,,no,no,
+KI,Contactor Feedback Input,Safety,,,no,no,SAFE_DB,07_FEEDBACK_ERROR
+KQ,Contactor Output,Safety,,,no,no,
+RES,Emergency Reset,Safety,,,no,no,
+FA#,Emergency Status Feedback Area #,Safety,,,no,yes,
+IOC,Machine Interface (I/O Controller),Interface,,,no,no,

@@ -73,7 +73,7 @@ namespace Openn._01_Constructor
         }
 
         /// <summary>
-        /// Stations.csv columns: Role;Station Name;Model Id;IP Address;PN Number;Subnet;Custom Parameters
+        /// Stations.csv columns: Role,Station Name,Model Id,IP Address,PN Number,Subnet,Custom Parameters
         /// </summary>
         private static void ParseStations(CsvTable stations, List<string> errors,
             List<HardwareIoControllers._Controller> controllers, List<HardwareIoDevices._Device> devices)
@@ -87,7 +87,7 @@ namespace Openn._01_Constructor
 
                 if (row.Values.Length < 6)
                 {
-                    errors.Add(where + "expected at least 6 columns (Role;Station Name;Model Id;IP Address;PN Number;Subnet;Custom Parameters), found " + row.Values.Length);
+                    errors.Add(where + "expected at least 6 columns (Role,Station Name,Model Id,IP Address,PN Number,Subnet,Custom Parameters), found " + row.Values.Length);
                     continue;
                 }
 
@@ -167,7 +167,7 @@ namespace Openn._01_Constructor
         }
 
         /// <summary>
-        /// Modules.csv columns: Station Name;Slot;Module Name;Model Id;I Addr;Q Addr;Custom Parameters
+        /// Modules.csv columns: Station Name,Slot,Module Name,Model Id,I Addr,Q Addr,Custom Parameters
         /// </summary>
         private static Dictionary<string, List<HardwareIoDevices._Submodule>> ParseModules(
             CsvTable modules, List<HardwareIoDevices._Device> devices, List<string> errors)
@@ -188,7 +188,7 @@ namespace Openn._01_Constructor
 
                 if (row.Values.Length < 6)
                 {
-                    errors.Add(where + "expected at least 6 columns (Station Name;Slot;Module Name;Model Id;I Addr;Q Addr;Custom Parameters), found " + row.Values.Length);
+                    errors.Add(where + "expected at least 6 columns (Station Name,Slot,Module Name,Model Id,I Addr,Q Addr,Custom Parameters), found " + row.Values.Length);
                     continue;
                 }
 

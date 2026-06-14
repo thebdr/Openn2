@@ -50,7 +50,7 @@ namespace Openn._01_Constructor
             {
                 if (row.Values.Length < 5)
                 {
-                    errors.Add(Describe(filename, row) + "expected 5 columns (Model Id;Type;Tia Identifier;Comment;Custom Parameters), found " + row.Values.Length);
+                    errors.Add(Describe(filename, row) + "expected 5 columns (Model Id,Type,Tia Identifier,Comment,Custom Parameters), found " + row.Values.Length);
                     continue;
                 }
 

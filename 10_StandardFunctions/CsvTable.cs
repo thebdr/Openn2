@@ -23,7 +23,7 @@ namespace Openn._10_StandardFunctions
 
     /// <summary>
     /// Shared reader for the HardwareConfig csv files.
-    /// Conventions: UTF-8 (BOM tolerated); ';' delimiter unless specified;
+    /// Conventions: UTF-8 (BOM tolerated); ',' delimiter unless specified;
     /// '#!format=N' declares the file format version (defaults to 1);
     /// '#' starts a comment line; a line starting with '@' stops reading;
     /// blank lines are skipped; fields may be quoted with '"' ("" escapes a quote).
@@ -35,7 +35,7 @@ namespace Openn._10_StandardFunctions
         public IList<CsvRow> Rows { get; } = new List<CsvRow>();
         public IList<string> Errors { get; } = new List<string>();
 
-        public static CsvTable Read(string filePath, char delimiter = ';')
+        public static CsvTable Read(string filePath, char delimiter = ',')
         {
             var table = new CsvTable { FilePath = filePath };
 
@@ -56,7 +56,11 @@ namespace Openn._10_StandardFunctions
 
                     if (line.StartsWith("#!", StringComparison.Ordinal))
                     {
-                        string[] directive = line.Substring(2).Split('=');
+                        // Tolerate a delimiter-padded directive line (Excel rewrites
+                        // "#!format=2" as "#!format=2,,,,," when it saves the file):
+                        // take the first delimited field, then split it on '='.
+                        string directiveText = line.Substring(2).Split(delimiter)[0];
+                        string[] directive = directiveText.Split('=');
                         if (directive.Length == 2 &&
                             directive[0].Trim().Equals("format", StringComparison.OrdinalIgnoreCase) &&
                             int.TryParse(directive[1].Trim(), out int version))

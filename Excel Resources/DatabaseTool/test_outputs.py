@@ -65,7 +65,7 @@ def main():
         check("one CSV file per type", os.path.exists(os.path.join(tmp, "IoTags", "E1_2.csv")))
         with open(os.path.join(tmp, "IoTags", "A.csv"), encoding="utf-8-sig") as f:
             head = f.readline().strip()
-        check("tag CSV header", head == "Name;Data Type;Logical Address;Comment", head)
+        check("tag CSV header", head == "Name,Data Type,Logical Address,Comment", head)
 
         dbs = outputs.build_dbs(rows, signal_types)
         check("DB grouped by db_name (E1/2 + KQ share one)", set(dbs) == {"01_Pushbutton"}, str(list(dbs)))

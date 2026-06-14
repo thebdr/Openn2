@@ -182,11 +182,11 @@ namespace Openn._01_Constructor
         {
             var stationsContent = new StringBuilder();
             stationsContent.AppendLine("#!format=" + HardwareConfigLoader.CurrentFormatVersion);
-            stationsContent.AppendLine("# Role;Station Name;Model Id;IP Address;PN Number;Subnet;Custom Parameters;Group  (PN Number empty = last IP octet; parameters separated by |; Group = folder/subfolder/...)");
+            stationsContent.AppendLine("# Role,Station Name,Model Id,IP Address,PN Number,Subnet,Custom Parameters,Group  (PN Number empty = last IP octet; parameters separated by |; Group = folder/subfolder/...)");
 
             var modulesContent = new StringBuilder();
             modulesContent.AppendLine("#!format=" + HardwareConfigLoader.CurrentFormatVersion);
-            modulesContent.AppendLine("# Station Name;Slot;Module Name;Model Id;I Addr;Q Addr;Custom Parameters  (Slot = plug order; parameters separated by |)");
+            modulesContent.AppendLine("# Station Name,Slot,Module Name,Model Id,I Addr,Q Addr,Custom Parameters  (Slot = plug order; parameters separated by |)");
 
             foreach (StationModel station in Stations)
             {
@@ -224,12 +224,12 @@ namespace Openn._01_Constructor
             return (highest + 1).ToString();
         }
 
-        private static string JoinCsv(params string[] fields) => string.Join(";", fields.Select(Escape));
+        private static string JoinCsv(params string[] fields) => string.Join(",", fields.Select(Escape));
 
         private static string Escape(string field)
         {
             field = field ?? "";
-            return field.IndexOfAny(new[] { ';', '"' }) >= 0
+            return field.IndexOfAny(new[] { ',', '"' }) >= 0
                 ? "\"" + field.Replace("\"", "\"\"") + "\""
                 : field;
         }
