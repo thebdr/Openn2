@@ -52,8 +52,17 @@ don't reach back for Power Query or VBA.
   it falls back to `os.startfile`. It calls the `safetydb` modules directly (not
   `run.py`) so it can attach those cell links. Window icon: `assets/Pipeline2.ico|png`.
 - `assets/` — app icon for `gui.py` (see `assets/README.md`).
+- `editor.py` — the GUI's **Files** tab: a file tree (config + `HardwareConfig` +
+  `Output`) beside a `FileEditor`. `.csv` and `.xlsx`/`.xlsm` open in a **tksheet**
+  spreadsheet grid (in-cell edit, multi-select, copy/paste, undo, right-click
+  insert/delete row & column); CSVs are read with delimiter sniffing and saved
+  comma-delimited; xlsx edits round-trip via openpyxl (per sheet). Other files
+  (`.db`/`.json`/`.txt`/…) open in a plain text editor. Reusable + meant to grow
+  workflow-specific tooling. The tree refreshes after each pipeline run.
 - `interface_tool.py` — standalone IOC interface-table generator (see below); also
   invoked by `run.py` and `gui.py`.
+- `requirements.txt` — `openpyxl` (core); `tksheet` + `pywin32` (GUI). pywin32 is
+  optional (Excel cell-jump falls back to `os.startfile` without it).
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL
   and exits non-zero on failure. Run them after any change.
 - `Output/`, `Templates/*.xlsx` (except the committed interface template),

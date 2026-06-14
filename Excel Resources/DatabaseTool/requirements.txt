@@ -1,0 +1,9 @@
+# DatabaseTool dependencies.  Install:  pip install -r requirements.txt
+
+# Core pipeline (run.py + safetydb/): read/write the Excel and CSV artifacts.
+openpyxl
+
+# GUI (gui.py + editor.py):
+tksheet        # spreadsheet grid in the Files editor tab
+pywin32        # click-a-log-link -> jump to that Excel cell (optional; without it
+               # the GUI falls back to just opening the workbook via os.startfile)

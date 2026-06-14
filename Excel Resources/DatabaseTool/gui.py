@@ -32,6 +32,7 @@ if _HERE not in sys.path:
 
 from safetydb import config, staging, validation, outputs, hardware
 import interface_tool
+import editor
 
 APP_NAME = "Pipeline2"
 ICON_BASE = os.path.join(_HERE, "assets", APP_NAME)  # + .ico / .png
@@ -259,6 +260,24 @@ class App:
         nb.add(cfg_tab, text="Configuration")
         self._build_config_tab(cfg_tab)
 
+        # --- Files tab (config + outputs editor) ---
+        files_tab = ttk.Frame(nb)
+        nb.add(files_tab, text="Files")
+        self._build_files_tab(files_tab)
+
+    def _build_files_tab(self, parent):
+        """Spreadsheet/CSV/text editor over the config and output files."""
+        roots = [("config", config.CONFIG_DIR)]
+        try:
+            dtd = config.load_params().get("device_types_db")
+            if dtd and os.path.isdir(os.path.dirname(dtd)):
+                roots.append(("HardwareConfig", os.path.dirname(dtd)))
+        except Exception:  # noqa: BLE001
+            pass
+        roots.append(("Output", self._out_dir()))
+        self._files = editor.FileBrowser(parent, roots, on_status=self.status.set)
+        self._files.pack(fill="both", expand=True)
+
     def _build_config_tab(self, parent):
         ttk.Label(parent, text="config/params.json", font=("Segoe UI", 10, "bold")).grid(
             row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
@@ -428,6 +447,9 @@ class App:
         else:
             self.progress.stop()
             self.status.set("Ready")
+            files = getattr(self, "_files", None)
+            if files is not None:
+                files.refresh()  # surface freshly-generated outputs
 
     def _drain(self):
         try:
