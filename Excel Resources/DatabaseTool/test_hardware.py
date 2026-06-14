@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
-"""Synthetic test for hardware Stations/Modules extraction. Run: python test_hardware.py"""
-import os
-import shutil
-import tempfile
-from safetydb import hardware
+"""Synthetic test for hardware extract() (Stations + Modules). Run: python test_hardware.py"""
+from safetydb import config, hardware
 
 failures = 0
 
@@ -15,62 +12,79 @@ def check(name, ok, detail=""):
         failures += 1
 
 
-def row(script="", type_hw="", pn="", slot="", bit="", fu="=S1", loc="+M1", dev="-D1",
-        ip="", pname="", idn=""):
-    return {"script_type": script, "type_hw": type_hw, "part_no": pn, "slot": slot,
-            "bit": bit, "functional_unit": fu, "location": loc, "device": dev,
-            "profinet_ip": ip, "profinet_name": pname, "id_node": idn, "_source_row": 0}
+def row(script="", type_hw="", pn="", slot="", bit="", fu="=S1", pname="", idn="", ag=""):
+    return {"script_type": script, "type_hw": type_hw, "part_no": pn, "slot": slot, "bit": bit,
+            "functional_unit": fu, "profinet_name": pname, "id_node": idn, "hardware_params": ag,
+            "_source_row": 0}
+
+
+def rec(ident, params="", by_type="", io_addr="", comment="C", parent=None):
+    return {"model_id": ident, "dev_type": "", "order": "", "comment": comment, "params": params,
+            "params_by_type": config.parse_params_by_type(by_type), "io_addr_params": io_addr, "parent": parent}
 
 
 def main():
-    tmp = tempfile.mkdtemp(prefix="hwtest_")
-    try:
-        dtd = {
-            "6ES7155-6AU01-0BN0": {"params": ""},
-            "6ES7131-6BH01-0BA0": {"params": ""},
-            "6ES7136-6BA01-0CA0": {"params": "Ch(0-7).Failsafe_DiscrepancyTime=100"},
-        }
-        rows = [
-            row(script="PLC", pn="6ES7517-3FP00-0AB0", ip="192.168.50.1", pname="n0001-plc", idn="1"),
-            row(script="PlcCardCm", pn="6GK7 542-1AX00-0XE0", ip="192.168.51.1", pname="n0001-cm", idn="1"),
-            # IoDevice head (Type R first letter P)
-            row(type_hw="PA", pn="6ES7155-6AU01-0BN0", ip="192.168.50.5", pname="n0005-im", idn="5"),
-            # card 1: two DI signals -> I start byte 0
-            row(type_hw="A", pn="6ES7131-6BH01-0BA0", slot="-K10", bit="I0.0"),
-            row(type_hw="A", pn="6ES7131-6BH01-0BA0", slot="-K10", bit="I0.1"),
-            # card 2: F-DI with DTD params -> I start byte 4
-            row(type_hw="A", pn="6ES7136-6BA01-0CA0", slot="-K11", bit="I4.0"),
-            # card 3: a DQ output -> Q start byte 2
-            row(type_hw="A", pn="6ES7131-6BH01-0BA0", slot="-K12", bit="Q2.0"),
-        ]
+    by_id = {
+        "6ES7518-4FP00-0AB0": rec("6ES7518-4FP00-0AB0", comment="CPU"),
+        "6ES7155-6AU01-0BN0": rec("6ES7155-6AU01-0BN0", comment="IM155"),
+        "6ES7131-6BH01-0BA0": rec("6ES7131-6BH01-0BA0", comment="DI"),
+        "6ES7136-6BA00-0CA0": rec("6ES7136-6BA00-0CA0", comment="F-DI",
+                                  by_type="<B1/2>Ch(#).Failsafe_DiscrepancyTime=450 | Ch(#).Failsafe_SensorEvaluation=0<B1/2>"),
+        "55556": rec("55556", comment="MVK"),
+        "<55556>:DEFAULTCARD": rec("<55556>:DefaultCard", params="Failsafe_FDestinationAddress=IP[3]",
+                                   comment="MVK card", parent="55556"),
+        "LU1": rec("LU1", io_addr="Item(0).Addr(0).StartAddress = %I% | Item(1).Addr(0).StartAddress = %I%+10",
+                   comment="LUMBERG"),
+    }
+    default_cards = {"55556": ["<55556>:DefaultCard"]}
+    dtd = {"by_id": by_id, "default_cards": default_cards}
 
-        st = hardware.extract_stations(rows, dtd)
-        check("3 station heads (Plc, PlcCardCm, IoDevice)",
-              [s["Role"] for s in st] == ["Plc", "PlcCardCm", "IoDevice"], str([s["Role"] for s in st]))
-        check("Model Id strips spaces (PlcCardCm)", st[1]["Model Id"] == "6GK7542-1AX00-0XE0")
-        check("station fields (name/IP/PN/subnet/group)",
-              st[2]["Station Name"] == "n0005-im" and st[2]["IP Address"] == "192.168.50.5"
-              and st[2]["PN Number"] == "5" and st[2]["Subnet"] == "Subnet50" and st[2]["Group"] == "=S1")
+    rows = [
+        row(script="PLC", pn="6ES7518-4FP00-0AB0", pname="n01-plc"),
+        row(type_hw="PW", pn="6GK5208", pname="n10-sw"),                       # not in DTD -> skipped
+        row(type_hw="PA", pn="6ES7155-6AU01-0BN0", slot="-K65001", pname="n05-im"),  # IoDevice head (tag -K65001)
+        row(type_hw="A", pn="6ES7131-6BH01-0BA0", slot="-K10", bit="I0.0"),    # card -K10 DI
+        row(type_hw="A", pn="6ES7131-6BH01-0BA0", slot="-K10", bit="I0.1"),
+        row(type_hw="A", pn="6ES7131-6BH01-0BA0", slot="-K11", bit="I4.0"),    # card -K11 DI (model same -> no PG)
+        row(script="B1/2", pn="6ES7136-6BA00-0CA0", slot="-K12", bit="I20.1"), # card -K12 F-DI, B1/2 at ch1
+        # Murrelektronik with a default card and a LUMBERG with auto-plugged card
+        row(type_hw="PA", pn="55556", slot="-XN1", pname="n13-mvk"),
+        row(type_hw="PA", pn="LU1", slot="-XNS1", pname="n31-lum", ag=""),
+        row(bit="I920.0", slot="-XNS1"),   # LUMBERG signal on its own tag -> auto-plugged, skipped
+        row(bit="I921.7", slot="-XNS1"),
+    ]
 
-        mod = hardware.extract_modules(rows, dtd)
-        check("3 cards grouped by Slot", [m["Module Name"] for m in mod] == ["-K10", "-K11", "-K12"],
-              str([m["Module Name"] for m in mod]))
-        check("plug order sequential", [m["Slot"] for m in mod] == [1, 2, 3])
-        check("I start byte = lowest input byte of the card", mod[0]["I Addr"] == 0 and mod[1]["I Addr"] == 4)
-        check("Q start byte for output card", mod[2]["Q Addr"] == 2 and mod[2]["I Addr"] == "")
-        check("card gets DTD model default params", mod[1]["Custom Parameters"] == "Ch(0-7).Failsafe_DiscrepancyTime=100")
-        check("cards belong to the IoDevice station", all(m["Station Name"] == "n0005-im" for m in mod))
+    st, mod = hardware.extract(rows, dtd)
 
-        hardware.write_stations(st, tmp)
-        hardware.write_modules(mod, tmp)
-        with open(os.path.join(tmp, "Hardware", "Stations.csv"), encoding="utf-8-sig") as f:
-            head = f.readline().strip()
-        check("Stations.csv format-2 header", head == "#!format=2")
+    names = [s["Station Name"] for s in st]
+    check("switch (not in DTD) excluded", "n10-sw" not in names, str(names))
+    check("PN empty + Group suffix", st[0]["PN Number"] == "" and st[0]["Group"] == "=S1_IODevices")
+    lum = next(s for s in st if s["Station Name"] == "n31-lum")
+    check("LUMBERG %I% resolved (920, +10=930)",
+          lum["Custom Parameters"] == "Item(0).Addr(0).StartAddress = 920 | Item(1).Addr(0).StartAddress = 930",
+          lum["Custom Parameters"])
 
-        print("ALL CHECKS PASS" if failures == 0 else f"{failures} CHECK(S) FAILED")
-        raise SystemExit(0 if failures == 0 else 1)
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    im = [m for m in mod if m["Station Name"] == "n05-im"]
+    check("cards grouped (-K10,-K11,-K12), auto/own-tag excluded",
+          [m["Module Name"] for m in im] == ["-K10", "-K11", "-K12"], str([m["Module Name"] for m in im]))
+    check("I Addr = Q Addr = start byte", im[0]["I Addr"] == 0 and im[0]["Q Addr"] == 0 and im[1]["I Addr"] == 4)
+    check("PotentialGroup on first + on model change, not on same model",
+          im[0]["Custom Parameters"] == "PotentialGroup=1" and im[1]["Custom Parameters"] == ""
+          and im[2]["Custom Parameters"].startswith("PotentialGroup=1"))
+    check("by-type expanded Ch(#)->Ch(channel) for B1/2 at ch1",
+          "Ch(1).Failsafe_DiscrepancyTime=450" in im[2]["Custom Parameters"], im[2]["Custom Parameters"])
+    check("module comment from DTD", im[0]["Comment"] == "DI")
+
+    mvk = [m for m in mod if m["Station Name"] == "n13-mvk"]
+    check("default card <55556>:DefaultCard emitted as a module",
+          len(mvk) == 1 and mvk[0]["Model Id"] == "<55556>:DefaultCard"
+          and "Failsafe_FDestinationAddress=IP[3]" in mvk[0]["Custom Parameters"], str(mvk))
+
+    lummod = [m for m in mod if m["Station Name"] == "n31-lum"]
+    check("LUMBERG auto-plugged card -> no module row", lummod == [], str(lummod))
+
+    print("ALL CHECKS PASS" if failures == 0 else f"{failures} CHECK(S) FAILED")
+    raise SystemExit(0 if failures == 0 else 1)
 
 
 if __name__ == "__main__":

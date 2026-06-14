@@ -1,21 +1,24 @@
 """Hardware: extract format-2 Stations.csv + Modules.csv from the I/O List.
 
-Roles (per HW for openness v2):
-  Script Type (AB) = PLC        -> Plc            (head)
-  Script Type (AB) = PlcCardCm  -> PlcCardCm      (head, plugged in the Plc rack)
-  Type (R) first letter = P     -> IoDevice       (head, e.g. PN/PN coupler, IM155)
-Rows that are not heads are the device's signals; they are grouped into cards by
-Slot (col E, the card device tag, e.g. -K65010). Card model = Part No (col C).
+Deduced rules (golden: HardwareConfig/{Stations,Modules}.csv):
+ Roles  - Script Type PLC/PlcCardCm = heads; Type (R) first letter P = IoDevice.
+ Filter - a head is emitted only if its model is in the DeviceTypesDatabase
+          (so unlisted devices, e.g. managed switches, are skipped).
+ Station- Name=Profinet name, Model Id=Part No (no spaces), PN empty (->last IP
+          octet), Subnet from IP, Group=<FunctionalUnit>_IODevices.
+          Custom Parameters = device DTD params + DTD "I/O Addresses Parameter"
+          (%I%/%Q% = device start byte, +N arithmetic), then I/O List col AG
+          (Hardware Parameters) overrides.
+ Modules- signal rows grouped into cards by Slot (col E); a group whose Slot
+          equals the device's own tag is the auto-plugged card and is skipped.
+          I Addr = Q Addr = card start byte. Comment = DTD comment.
+          Custom Parameters = PotentialGroup=1 when the card model changes from
+          the previous card, + per-signal "Parameters by Signal Type" blocks
+          (Ch(#) -> Ch(channel)), then col-AG overrides.
+ Default cards - DTD entries '<PARENT>:SUFFIX' are emitted as extra Modules rows
+          for every station of PARENT (with the default card's DTD params).
 
-Stations columns: Role; Station Name (Profinet name W); Model Id (Part No, no
-spaces); IP (V); PN Number (ID, F); Subnet (from IP); Custom Parameters (device
-model defaults from the DeviceTypesDatabase); Group (Functional unit O).
-Modules columns: Station Name; Slot (plug order); Module Name (card tag E);
-Model Id; I Addr; Q Addr (start bytes); Custom Parameters (card model defaults).
-
-Custom-parameter generation logic (PotentialGroup on the first card, default
-cards, per-channel overrides) is layered on top later; this builds the
-structure + model-default params.
+Override order honored throughout: I/O List (col AG) params are written last.
 """
 from __future__ import annotations
 import os
@@ -23,6 +26,7 @@ import re
 
 HEAD_PLC = "PLC"
 HEAD_CM = "PLCCARDCM"
+_ADDR = re.compile(r"\s*([IQ])\s*(\d+)\.(\d+)", re.IGNORECASE)
 
 
 def _model_id(part_no) -> str:
@@ -30,125 +34,194 @@ def _model_id(part_no) -> str:
 
 
 def _subnet(ip: str) -> str:
-    parts = str(ip or "").split(".")
-    return f"Subnet{parts[2]}" if len(parts) == 4 else ""
+    p = str(ip or "").split(".")
+    return f"Subnet{p[2]}" if len(p) == 4 else ""
 
 
 def _role(row) -> str | None:
-    script = str(row.get("script_type") or "").strip().upper()
-    if script == HEAD_PLC:
+    s = str(row.get("script_type") or "").strip().upper()
+    if s == HEAD_PLC:
         return "Plc"
-    if script == HEAD_CM:
+    if s == HEAD_CM:
         return "PlcCardCm"
     if str(row.get("type_hw") or "").strip()[:1].upper() == "P":
         return "IoDevice"
     return None
 
 
-_ADDR = re.compile(r"\s*([IQ])\s*(\d+)\.(\d+)", re.IGNORECASE)
-
-
 def parse_address(value):
-    """'I0.0' -> ('I', 0, 0); 'Q12.3' -> ('Q', 12, 3); else None."""
     m = _ADDR.match(str(value or ""))
-    if not m:
-        return None
-    return m.group(1).upper(), int(m.group(2)), int(m.group(3))
+    return (m.group(1).upper(), int(m.group(2)), int(m.group(3))) if m else None
 
 
-def extract_stations(io_rows: list, dtd: dict) -> list:
-    stations = []
+def _merge_params(*blobs) -> str:
+    """Merge '|'-separated 'key=value' params; later blobs override by key
+    (key = text before '='). Order preserved by first appearance."""
+    order, values = [], {}
+    for blob in blobs:
+        for part in str(blob or "").split("|"):
+            part = part.strip()
+            if not part or "=" not in part:
+                if part:  # a valueless token like a bare flag - keep once
+                    if part not in values:
+                        order.append(part)
+                        values[part] = None
+                continue
+            key = part.split("=", 1)[0].strip()
+            if key not in values:
+                order.append(key)
+            values[key] = part
+    return " | ".join(values[k] if values[k] is not None else k for k in order)
+
+
+def _resolve_addr_template(template: str, i_base, q_base) -> str:
+    """Replace %I%/%Q% (with optional +N) by the device start bytes."""
+    def repl(m):
+        sym, plus = m.group(1).upper(), m.group(2)
+        base = i_base if sym == "I" else q_base
+        if base is None:
+            return m.group(0)
+        return str(base + (int(plus) if plus else 0))
+    return re.sub(r"%([IQ])%\s*(?:\+\s*(\d+))?", repl, template or "")
+
+
+def _channel(addr, card_start_byte) -> int:
+    """Channel index of a signal on its card: (byte - start) * 8 + bit."""
+    _, byte, bit = addr
+    return (byte - card_start_byte) * 8 + bit
+
+
+def _expand_by_type(card_signals, signal_types_by_type, card_start_byte) -> str:
+    """Per-signal 'Parameters by Signal Type' blocks, Ch(#) -> Ch(channel)."""
+    parts = []
+    for sig in card_signals:
+        addr = parse_address(sig.get("bit"))
+        if not addr:
+            continue
+        st = str(sig.get("script_type") or "").strip().upper()
+        block = signal_types_by_type.get(st)
+        if not block:
+            continue
+        ch = _channel(addr, card_start_byte)
+        parts.append(block.replace("#", str(ch)))
+    return _merge_params(*parts)
+
+
+def extract(io_rows: list, dtd: dict):
+    """Single pass over the I/O List -> (stations, modules)."""
+    by_id = dtd["by_id"]
+    default_cards = dtd["default_cards"]
+    stations, modules = [], []
+    cur = None  # {role, row, model, rec, head_tag, signals[]}
+
+    def finalize():
+        if cur is None:
+            return
+        row, model, rec = cur["row"], cur["model"], cur["rec"]
+        sig_i = [parse_address(s.get("bit"))[1] for s in cur["signals"]
+                 if parse_address(s.get("bit")) and parse_address(s.get("bit"))[0] == "I"]
+        sig_q = [parse_address(s.get("bit"))[1] for s in cur["signals"]
+                 if parse_address(s.get("bit")) and parse_address(s.get("bit"))[0] == "Q"]
+        i_base = min(sig_i) if sig_i else None
+        q_base = min(sig_q) if sig_q else None
+
+        io_addr = _resolve_addr_template(rec["io_addr_params"], i_base, q_base)
+        head_ag = str(row.get("hardware_params") or "")
+        station_params = _merge_params(rec["params"], io_addr, head_ag)
+
+        stations.append({
+            "Role": cur["role"], "Station Name": str(row.get("profinet_name") or "").strip(),
+            "Model Id": model, "IP Address": str(row.get("profinet_ip") or "").strip(),
+            "PN Number": "", "Subnet": _subnet(row.get("profinet_ip")),
+            "Custom Parameters": station_params,
+            "Group": str(row.get("functional_unit") or "").strip() + "_IODevices",
+        })
+
+        if cur["role"] != "IoDevice":
+            return
+
+        # group signals into cards by Slot (col E), in order
+        cards, order = {}, []
+        for s in cur["signals"]:
+            slot = str(s.get("slot") or "").strip()
+            if not slot or slot == cur["head_tag"]:  # auto-plugged card: device's own tag
+                continue
+            if slot not in cards:
+                cards[slot] = []
+                order.append(slot)
+            cards[slot].append(s)
+
+        plug = 0
+        prev_model = None
+        for slot in order:
+            sigs = cards[slot]
+            cmodel = _model_id(sigs[0].get("part_no"))
+            crec = by_id.get(cmodel.upper())
+            bytes_ = [parse_address(s.get("bit"))[1] for s in sigs if parse_address(s.get("bit"))]
+            start = min(bytes_) if bytes_ else ""
+            plug += 1
+            pg = "PotentialGroup=1" if cmodel != prev_model else ""
+            prev_model = cmodel
+            by_type = _expand_by_type(sigs, crec["params_by_type"] if crec else {}, start if start != "" else 0)
+            card_ag = _merge_params(*[str(s.get("hardware_params") or "") for s in sigs])
+            params = _merge_params(pg, by_type, card_ag)
+            modules.append({
+                "Station Name": cur["row"].get("profinet_name", "").strip(),
+                "Slot": plug, "Module Name": slot, "Model Id": cmodel,
+                "I Addr": start, "Q Addr": start,
+                "Custom Parameters": params,
+                "Comment": crec["comment"] if crec else "",
+            })
+
+        # default cards (<PARENT>:SUFFIX) for this device model
+        for card_id in default_cards.get(model.upper(), []):
+            crec = by_id[card_id.upper()]
+            plug += 1
+            modules.append({
+                "Station Name": cur["row"].get("profinet_name", "").strip(),
+                "Slot": plug, "Module Name": crec["model_id"], "Model Id": crec["model_id"],
+                "I Addr": "", "Q Addr": "",
+                "Custom Parameters": _merge_params(crec["params"]),
+                "Comment": crec["comment"],
+            })
+
     for row in io_rows:
         role = _role(row)
-        if role is None:
-            continue
-        model = _model_id(row.get("part_no"))
-        dev = dtd.get(model.upper())
-        stations.append({
-            "Role": role,
-            "Station Name": str(row.get("profinet_name") or "").strip(),
-            "Model Id": model,
-            "IP Address": str(row.get("profinet_ip") or "").strip(),
-            "PN Number": str(row.get("id_node") or "").strip(),
-            "Subnet": _subnet(row.get("profinet_ip")),
-            "Custom Parameters": dev["params"] if dev else "",
-            "Group": str(row.get("functional_unit") or "").strip(),
-            "_source_row": row.get("_source_row"),
-        })
-    return stations
+        if role is not None:
+            finalize()
+            model = _model_id(row.get("part_no"))
+            rec = by_id.get(model.upper())
+            if rec is None:  # device not in DTD (e.g. managed switch) -> skip
+                cur = None
+                continue
+            cur = {"role": role, "row": row, "model": model, "rec": rec,
+                   "head_tag": str(row.get("slot") or "").strip(), "signals": []}
+        elif cur is not None:
+            cur["signals"].append(row)
+    finalize()
+    return stations, modules
 
 
-def extract_modules(io_rows: list, dtd: dict) -> list:
-    """Walk rows in order; under each IoDevice head, group signal rows into cards
-    by Slot (E). I/Q Addr = the card's lowest input/output start byte."""
-    modules = []
-    current_station = None
-    plug_order = 0
-    card = None  # accumulator for the current Slot group
-
-    def flush(c):
-        if not c:
-            return
-        i_bytes = [b for (t, b) in c["addrs"] if t == "I"]
-        q_bytes = [b for (t, b) in c["addrs"] if t == "Q"]
-        dev = dtd.get(c["model"].upper())
-        modules.append({
-            "Station Name": c["station"],
-            "Slot": c["slot_order"],
-            "Module Name": c["name"],
-            "Model Id": c["model"],
-            "I Addr": min(i_bytes) if i_bytes else "",
-            "Q Addr": min(q_bytes) if q_bytes else "",
-            "Custom Parameters": dev["params"] if dev else "",
-        })
-
-    for row in io_rows:
-        if _role(row) is not None:  # a head row: start a new station context
-            flush(card)
-            card = None
-            current_station = str(row.get("profinet_name") or "").strip()
-            plug_order = 0
-            continue
-        if current_station is None:
-            continue
-        slot_tag = str(row.get("slot") or "").strip()  # card device tag (col E)
-        if not slot_tag:
-            continue
-        if card is None or card["name"] != slot_tag:
-            flush(card)
-            plug_order += 1
-            card = {"station": current_station, "name": slot_tag,
-                    "model": _model_id(row.get("part_no")), "slot_order": plug_order,
-                    "addrs": []}
-        addr = parse_address(row.get("bit"))
-        if addr:
-            card["addrs"].append((addr[0], addr[1]))
-    flush(card)
-    return modules
-
-
-def _format2(headers: list, comment: str, rows: list, key_order: list) -> str:
-    out = ["#!format=2", "# " + comment]
+def _format2(rows: list, keys: list) -> str:
+    out = ["#!format=2", "# " + ";".join(keys)]
     for r in rows:
-        out.append(";".join(str(r.get(k, "")) for k in key_order))
+        out.append(";".join(str(r.get(k, "")) for k in keys))
     return "\n".join(out) + "\n"
 
 
 def write_stations(stations: list, out_dir: str) -> int:
-    hw_dir = os.path.join(out_dir, "Hardware")
-    os.makedirs(hw_dir, exist_ok=True)
+    hw = os.path.join(out_dir, "Hardware")
+    os.makedirs(hw, exist_ok=True)
     keys = ["Role", "Station Name", "Model Id", "IP Address", "PN Number", "Subnet", "Custom Parameters", "Group"]
-    text = _format2(keys, ";".join(keys), stations, keys)
-    with open(os.path.join(hw_dir, "Stations.csv"), "w", encoding="utf-8-sig", newline="") as f:
-        f.write(text)
+    with open(os.path.join(hw, "Stations.csv"), "w", encoding="utf-8-sig", newline="") as f:
+        f.write(_format2(stations, keys))
     return len(stations)
 
 
 def write_modules(modules: list, out_dir: str) -> int:
-    hw_dir = os.path.join(out_dir, "Hardware")
-    os.makedirs(hw_dir, exist_ok=True)
-    keys = ["Station Name", "Slot", "Module Name", "Model Id", "I Addr", "Q Addr", "Custom Parameters"]
-    text = _format2(keys, ";".join(keys), modules, keys)
-    with open(os.path.join(hw_dir, "Modules.csv"), "w", encoding="utf-8-sig", newline="") as f:
-        f.write(text)
+    hw = os.path.join(out_dir, "Hardware")
+    os.makedirs(hw, exist_ok=True)
+    keys = ["Station Name", "Slot", "Module Name", "Model Id", "I Addr", "Q Addr", "Custom Parameters", "Comment"]
+    with open(os.path.join(hw, "Modules.csv"), "w", encoding="utf-8-sig", newline="") as f:
+        f.write(_format2(modules, keys))
     return len(modules)

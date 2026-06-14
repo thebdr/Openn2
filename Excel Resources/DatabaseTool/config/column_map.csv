@@ -31,6 +31,7 @@ IoList;AC;suggested_type;Suggested Type;no
 IoList;AD;index;Index;no
 IoList;AE;diag_cabinet;Diag Cabinet;no
 IoList;AF;diag_bit;Diag Bit;no
+IoList;AG;hardware_params;Hardware Parameters;no
 CE;F;address;BIT (ADDRESS);yes
 CE;J;functional_unit;FUNCTIONAL UNIT;yes
 CE;K;location;LOCATION;yes

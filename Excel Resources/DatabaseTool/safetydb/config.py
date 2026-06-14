@@ -33,28 +33,49 @@ def load_params(path: str | None = None) -> dict:
     return params
 
 
+def parse_params_by_type(blob: str) -> dict:
+    """'<B1/2>p=1 | q=0<B1/2><DI1/2>r=0<DI1/2>' -> {'B1/2': 'p=1 | q=0', 'DI1/2': 'r=0'}."""
+    import re
+    out = {}
+    for st, block in re.findall(r"<([^>]+)>(.*?)<\1>", blob or ""):
+        out[st.strip().upper()] = block.strip()
+    return out
+
+
 def load_device_types_db(params: dict) -> dict:
-    """Global DeviceTypesDatabase (manually maintained): Model Id (upper) ->
-    {model_id, dev_type, order, comment, params}. '#'-comment lines skipped."""
+    """Global DeviceTypesDatabase (';'-delimited, manually maintained). Returns
+    {by_id: {ID_upper -> rec}, default_cards: {parent_upper -> [card_id,...]}}.
+    rec = {model_id, dev_type, order, comment, params, params_by_type(dict),
+    io_addr_params, parent}. A card whose Identifier is '<PARENT>:SUFFIX' is a
+    default card of PARENT (emitted as a Modules row per station of PARENT)."""
+    import re
     path = params["device_types_db"]
-    db = {}
-    with open(path, newline="", encoding="utf-8-sig") as f:
-        for line in f:
-            line = line.rstrip("\n")
-            if not line or line.lstrip().startswith("#"):
-                continue
-            cells = line.split(";")
-            model = cells[0].strip()
-            if not model:
-                continue
-            db[model.upper()] = {
-                "model_id": model,
-                "dev_type": cells[1].strip() if len(cells) > 1 else "",
-                "order": cells[2].strip() if len(cells) > 2 else "",
-                "comment": cells[3].strip() if len(cells) > 3 else "",
-                "params": cells[4].strip() if len(cells) > 4 else "",
-            }
-    return db
+    by_id, default_cards = {}, {}
+    with open(path, encoding="utf-8-sig") as f:
+        text = f.read()
+    # sniff delimiter from the first non-comment line (',' or ';')
+    first = next((ln for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("#")), "")
+    delim = ";" if first.count(";") > first.count(",") else ","
+    for c in csv.reader(text.splitlines(), delimiter=delim):
+        if not c or not c[0].strip() or c[0].lstrip().startswith("#"):
+            continue
+        ident = c[0].strip()
+        rec = {
+            "model_id": ident,
+            "dev_type": c[1].strip() if len(c) > 1 else "",
+            "order": c[2].strip() if len(c) > 2 else "",
+            "comment": c[3].strip() if len(c) > 3 else "",
+            "params": c[4].strip() if len(c) > 4 else "",
+            "params_by_type": parse_params_by_type(c[5] if len(c) > 5 else ""),
+            "io_addr_params": c[6].strip() if len(c) > 6 else "",
+            "parent": None,
+        }
+        m = re.match(r"^<(.+?)>:(.+)$", ident)
+        if m:
+            rec["parent"] = m.group(1).strip()
+            default_cards.setdefault(m.group(1).strip().upper(), []).append(ident)
+        by_id[ident.upper()] = rec
+    return {"by_id": by_id, "default_cards": default_cards}
 
 
 def load_column_map(document: str) -> list[dict]:
