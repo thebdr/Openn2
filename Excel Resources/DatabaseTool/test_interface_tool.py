@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Self-contained test for interface_tool: builds synthetic I/O Lists, runs the
-generator, and checks naming, columns, formulas, strikethrough exclusion,
-multiple instances and preserve-on-rerun. Run: python test_interface_tool.py
+"""Self-contained test for interface_tool: builds a synthetic I/O List and a
+multi-sheet interface template (one type sheet + <GENERIC>), runs the generator,
+and checks instance parsing, sheet selection + GENERIC fallback, base/index
+plugging, <index> token replacement, strikethrough exclusion and
+preserve-on-rerun. Run: python test_interface_tool.py
 """
 import os
 import shutil
@@ -22,7 +24,6 @@ def check(name, ok):
 
 
 def make_io_list(path, rows, struck_rows=()):
-    """rows: list of dict with keys device, ip, bit, script, index. Header row 1."""
     wb = Workbook()
     ws = wb.active
     ws.title = "NET SAFETY 50"
@@ -41,43 +42,63 @@ def make_io_list(path, rows, struck_rows=()):
     wb.save(path)
 
 
+def make_template(path):
+    """Two sheets (SORTER + <GENERIC>) with the real plug columns/tokens."""
+    wb = Workbook()
+    for name in ("SORTER", "<GENERIC>"):
+        ws = wb.create_sheet(name)
+        for c, h in enumerate(["Category", "Signal Name", "Side", "Index", "Base Address"], 1):
+            ws.cell(1, c, h)
+        if name == "SORTER":
+            ws.append(["WATCHDOG", "PNC_Q_Sorter<index> HB", 1, "01", 10000])  # Side 1 (our PLC)
+            ws.append(["STATE", "PNC_I_Sorter<index> ST", 2, "01", 0])          # Side 2
+    del wb["Sheet"]
+    wb.save(path)
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="iftest_")
     try:
         io_path = os.path.join(tmp, "io.xlsx")
         out = os.path.join(tmp, "out")
         tpl = os.path.join(tmp, "tpl.xlsx")
+        make_template(tpl)
+
+        # parse_instance unit checks
+        check("parse SORTER-01", it.parse_instance("SORTER-01") == ("SORTER", "01"))
+        check("parse PALLETIZER-12", it.parse_instance("PALLETIZER-12") == ("PALLETIZER", "12"))
 
         make_io_list(io_path, [
-            {"device": "-K66201", "ip": "192.168.50.6", "bit": "10000", "script": "IOC", "index": "SORTER-01"},
-            {"device": "-S31001", "ip": "", "bit": "I0.0", "script": "E1/2", "index": "0001"},  # not IOC
-            {"device": "-K66202", "ip": "192.168.50.7", "bit": "20000", "script": "IOC", "index": "SORTER-02"},
-            {"device": "-K66203", "ip": "192.168.50.8", "bit": "30000", "script": "IOC", "index": "PALLETIZER-01"},
+            {"device": "-K66201", "ip": "192.168.50.6", "bit": "88888", "script": "IOC", "index": "SORTER-01"},
+            {"device": "-S31001", "ip": "", "bit": "I0.0", "script": "E1/2", "index": "0001"},   # not IOC
+            {"device": "-K66203", "ip": "192.168.50.8", "bit": "30000", "script": "IOC", "index": "PALLETIZER-03"},
             {"device": "-K69999", "ip": "192.168.50.9", "bit": "40000", "script": "IOC", "index": "GHOST-99"},  # struck
-        ], struck_rows={4})
+        ], struck_rows={3})
 
         n = it.generate(io_path, "NET SAFETY 50", 1, out, tpl)
-        check("creates one file per non-struck IOC row", n == 3)
-
+        check("creates one file per non-struck IOC row", n == 2)
         files = sorted(os.listdir(out))
-        check("instance names preserved (dash kept)",
-              files == ["IF_PALLETIZER-01.xlsx", "IF_SORTER-01.xlsx", "IF_SORTER-02.xlsx"])
-        check("struck IOC row excluded", "IF_GHOST-99.xlsx" not in files)
+        check("instance file names", files == ["IF_PALLETIZER-03.xlsx", "IF_SORTER-01.xlsx"])
+        check("struck IOC excluded", "IF_GHOST-99.xlsx" not in files)
 
+        # SORTER-01 uses the SORTER sheet, base + index plugged, token replaced
         wb = load_workbook(os.path.join(out, "IF_SORTER-01.xlsx"))
+        check("single sheet named for instance", wb.sheetnames == ["SORTER-01"])
         ws = wb.active
-        check("title tokens filled (instance + source)", "SORTER-01" in ws["A1"].value and "-K66201" in ws["A1"].value)
-        check("base address substituted as number", ws[it.BASE_CELL].value == 10000)
-        check("all columns present",
-              [ws.cell(it.HEADER_ROW, c).value for c in range(1, len(it.COLUMNS) + 1)] == it.COLUMNS)
-        addr_formula = str(ws.cell(it.DATA_START_ROW, 9).value)
-        check("PLC address formula uses absolute base ref", it.BASE_REF in addr_formula and '"%"' in addr_formula)
-        scl_formula = str(ws.cell(it.DATA_START_ROW, 11).value)
-        check("SCL mapping formula present", ':= "' in scl_formula and 'NOT ' in scl_formula)
-        check("no leftover tokens", "{" not in ws["A1"].value and "{" not in str(ws[it.BASE_CELL].value))
+        check("base plugged into Side-1 row (distinct value)", ws["E2"].value == 88888)
+        check("Side-2 base untouched", ws["E3"].value == 0)
+        check("Index column set", ws["D2"].value == "01" and ws["D3"].value == "01")
+        check("<index> token replaced in signal names",
+              ws["B2"].value == "PNC_Q_Sorter01 HB" and "<index>" not in ws["B3"].value)
         wb.close()
 
-        # preserve-on-rerun: mark a file, regenerate, ensure it is untouched
+        # PALLETIZER-03 falls back to <GENERIC> (no PALLETIZER sheet)
+        wb = load_workbook(os.path.join(out, "IF_PALLETIZER-03.xlsx"))
+        check("unknown type uses GENERIC structure (no SORTER signals)",
+              wb.active["A2"].value is None)  # GENERIC had no data rows
+        wb.close()
+
+        # preserve-on-rerun
         marker = os.path.join(out, "IF_SORTER-01.xlsx")
         wb = load_workbook(marker)
         wb.active["A20"] = "HAND ADDED"
