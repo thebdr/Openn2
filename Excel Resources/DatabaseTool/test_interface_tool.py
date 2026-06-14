@@ -22,20 +22,21 @@ def check(name, ok):
 
 
 def make_io_list(path, rows, struck_rows=()):
-    """rows: list of dict with keys device, ip, script, index. Header row 1."""
+    """rows: list of dict with keys device, ip, bit, script, index. Header row 1."""
     wb = Workbook()
     ws = wb.active
     ws.title = "NET SAFETY 50"
-    headers = ["Device", "Profinet IP", "Script Type", "Index"]
+    headers = ["Device", "Profinet IP", "Bit", "Script Type", "Index"]
     for c, h in enumerate(headers, 1):
         ws.cell(1, c, h)
     for i, row in enumerate(rows, start=2):
         ws.cell(i, 1, row["device"])
         ws.cell(i, 2, row["ip"])
-        ws.cell(i, 3, row["script"])
-        ws.cell(i, 4, row["index"])
+        ws.cell(i, 3, row.get("bit", ""))
+        ws.cell(i, 4, row["script"])
+        ws.cell(i, 5, row["index"])
         if (i - 2) in struck_rows:
-            for c in range(1, 5):
+            for c in range(1, 6):
                 ws.cell(i, c).font = Font(strike=True)
     wb.save(path)
 
@@ -48,11 +49,11 @@ def main():
         tpl = os.path.join(tmp, "tpl.xlsx")
 
         make_io_list(io_path, [
-            {"device": "-K66201", "ip": "192.168.50.6", "script": "IOC", "index": "SORTER-01"},
-            {"device": "-S31001", "ip": "", "script": "E1/2", "index": "0001"},      # not IOC
-            {"device": "-K66202", "ip": "192.168.50.7", "script": "IOC", "index": "SORTER-02"},
-            {"device": "-K66203", "ip": "192.168.50.8", "script": "IOC", "index": "PALLETIZER-01"},
-            {"device": "-K69999", "ip": "192.168.50.9", "script": "IOC", "index": "GHOST-99"},  # struck
+            {"device": "-K66201", "ip": "192.168.50.6", "bit": "10000", "script": "IOC", "index": "SORTER-01"},
+            {"device": "-S31001", "ip": "", "bit": "I0.0", "script": "E1/2", "index": "0001"},  # not IOC
+            {"device": "-K66202", "ip": "192.168.50.7", "bit": "20000", "script": "IOC", "index": "SORTER-02"},
+            {"device": "-K66203", "ip": "192.168.50.8", "bit": "30000", "script": "IOC", "index": "PALLETIZER-01"},
+            {"device": "-K69999", "ip": "192.168.50.9", "bit": "40000", "script": "IOC", "index": "GHOST-99"},  # struck
         ], struck_rows={4})
 
         n = it.generate(io_path, "NET SAFETY 50", 1, out, tpl)
@@ -65,12 +66,15 @@ def main():
 
         wb = load_workbook(os.path.join(out, "IF_SORTER-01.xlsx"))
         ws = wb.active
-        check("title has instance + source", "SORTER-01" in ws["A1"].value and "-K66201" in ws["A1"].value)
-        check("six columns present",
-              [ws.cell(2, c).value for c in range(1, 7)] == it.COLUMNS)
-        check("TIA tag formula present", str(ws["E3"].value).startswith("=IF($C3"))
-        check("SCL mapping formula present",
-              ':= "' in str(ws["F3"].value) and 'NOT ' in str(ws["F3"].value))
+        check("title tokens filled (instance + source)", "SORTER-01" in ws["A1"].value and "-K66201" in ws["A1"].value)
+        check("base address substituted as number", ws[it.BASE_CELL].value == 10000)
+        check("all columns present",
+              [ws.cell(it.HEADER_ROW, c).value for c in range(1, len(it.COLUMNS) + 1)] == it.COLUMNS)
+        addr_formula = str(ws.cell(it.DATA_START_ROW, 9).value)
+        check("PLC address formula references base cell", it.BASE_CELL in addr_formula and '"%"' in addr_formula)
+        scl_formula = str(ws.cell(it.DATA_START_ROW, 11).value)
+        check("SCL mapping formula present", ':= "' in scl_formula and 'NOT ' in scl_formula)
+        check("no leftover tokens", "{" not in ws["A1"].value and "{" not in str(ws[it.BASE_CELL].value))
         wb.close()
 
         # preserve-on-rerun: mark a file, regenerate, ensure it is untouched
