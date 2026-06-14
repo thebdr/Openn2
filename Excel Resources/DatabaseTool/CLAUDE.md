@@ -173,11 +173,12 @@ which writes `Output/staged.csv` (canonical columns + `matrix_areas` +
 Pipeline2 **Files** tab and use the regex **Filter rows** to prototype queries. CSV was
 chosen for inspection because it opens in that editor; if real SQL is wanted later, an
 SQLite export is the alternative. **`matrix_areas`** (`'|'`-joined, e.g. `AREA 1|AREA 2`)
-is a C&E enrichment (`safetydb/matrix.py`, not core staging): for an **input**
-(I-address) it's the area columns marked `X` on that signal's CAUSE&EFFECT MATRIX row
-(EFFECT block from column `S`; the area = the column header); for an **output**
-(Q-address) it's the AREA n sheet(s) listing that Q address (col C). Matched by the
-signal's own I/Q address.
+is added in **staging** (`safetydb/matrix.py`, from the C&E workbook; `''` if the C&E
+doc is absent): for an **input** (I-address) it's the area columns marked `X` on that
+signal's CAUSE&EFFECT MATRIX row (EFFECT block from column `S`; the area = the column
+header); for an **output** (Q-address) it's the AREA n sheet(s) listing that Q address
+(col C). Matched by the signal's own I/Q address, then **paired channels of one device
+(same pair_key + FU+Loc+Dev) share the union** so e.g. `E2/2` inherits `E1/2`'s areas.
 
 ## DeviceTypesDatabase (global, manually maintained)
 

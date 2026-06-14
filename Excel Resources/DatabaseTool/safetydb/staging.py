@@ -15,6 +15,7 @@ from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string
 
 from . import config
+from . import matrix
 
 
 class StagedRow(dict):
@@ -114,4 +115,7 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
         rows.extend(sheet_rows)
         warnings.extend(sheet_warnings)
     wb.close()
+    # enrich each row with its safety AREAs from the C&E workbook (best-effort:
+    # '' when the C&E doc is absent). Paired channels share their device's areas.
+    matrix.annotate_areas(params, rows)
     return rows, warnings

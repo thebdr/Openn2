@@ -100,11 +100,10 @@ def build_templates_json(templates_dir: str = TEMPLATES_DIR, json_path: str = TE
 def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> str:
     """Write the staged I/O List rows to a CSV (canonical columns + a few resolved
     fields) for inspection. Returns the path written."""
-    from safetydb import staging, matrix  # local imports so `keys` needs neither doc
+    from safetydb import staging  # local import so `keys` doesn't need the I/O List
     params = config.load_params(params_path)
     types = config.load_signal_types()
-    rows, _warnings = staging.load_io_list(params, types)
-    matrix.annotate_areas(params, rows)  # adds row['matrix_areas'] from the C&E matrix
+    rows, _warnings = staging.load_io_list(params, types)  # adds matrix_areas (in staging now)
     cols = [m["canonical"] for m in config.load_column_map("IoList")]
     extra = ["matrix_areas", "_source_sheet", "_source_row", "type_id_resolved", "type_category"]
     csv_path = csv_path or os.path.join(_abs(params.get("output_dir", "Output")), "staged.csv")

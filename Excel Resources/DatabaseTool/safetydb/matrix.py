@@ -1,8 +1,8 @@
 """matrix.py - annotate staged rows with the safety AREAs they belong to.
 
-Derived from the Cause & Effect workbook, NOT from the I/O List, so it is an
-enrichment (used by the staged-DB export and, later, block generation) rather than
-part of core staging.
+Derived from the Cause & Effect workbook (not the I/O List). `staging.load_io_list`
+calls `annotate_areas`, so every staged row carries `matrix_areas` as part of the
+pipeline; best-effort - '' when the C&E document is absent.
 
   * input signal  (I-address): its row in the CAUSE&EFFECT MATRIX carries an "X"
     under the EFFECT/area columns (column S onward; the area name is that column's
@@ -82,16 +82,40 @@ def area_lookup(params: dict) -> tuple[dict, dict]:
 
 def annotate_areas(params: dict, rows: list) -> list:
     """Set row['matrix_areas'] ('|'-joined area names) on every staged row, by its
-    I/Q address. Rows without an I/Q bit get ''. Returns the same list."""
+    I/Q address. Paired channels of one device (same pair_key + FUNCTIONAL UNIT +
+    LOCATION + DEVICE) share the union of their areas, so channel-2 inherits the
+    area its channel-1 sibling is marked in (the matrix lists the device once).
+    Rows without an I/Q bit get ''. Returns the same list."""
     inputs, outputs = area_lookup(params)
+    found = {}  # id(row) -> [areas]
     for row in rows:
         bit = _norm(row.get("bit"))
         head = bit[:1]
         if head == "I":
-            areas = inputs.get(bit, [])
+            found[id(row)] = list(inputs.get(bit, []))
         elif head == "Q":
-            areas = outputs.get(bit, [])
+            found[id(row)] = list(outputs.get(bit, []))
         else:
-            areas = []
-        row["matrix_areas"] = "|".join(areas)
+            found[id(row)] = []
+
+    # pair inheritance: union areas across each paired device's channels
+    groups: dict = {}
+    for row in rows:
+        pk = ((row.get("_type") or {}).get("pair_key") or "").strip().upper()
+        if not pk:
+            continue
+        key = (pk, _norm(row.get("functional_unit")), _norm(row.get("location")), _norm(row.get("device")))
+        groups.setdefault(key, []).append(row)
+    for members in groups.values():
+        union = []
+        for m in members:
+            for a in found[id(m)]:
+                if a not in union:
+                    union.append(a)
+        if union:
+            for m in members:
+                found[id(m)] = union
+
+    for row in rows:
+        row["matrix_areas"] = "|".join(found[id(row)])
     return rows
