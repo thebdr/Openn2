@@ -35,6 +35,8 @@ import interface_tool
 import editor
 import theme
 import block_templates
+import softwareblocks
+import verify
 
 APP_NAME = "Pipeline2"
 ICON_BASE = os.path.join(_HERE, "assets", APP_NAME)  # + .ico / .png
@@ -346,7 +348,15 @@ class App:
         b_central.grid(row=1, column=2, sticky="w", padx=6, pady=2)
         ttk.Button(blk, text="Open Central Database",
                    command=self._open_central).grid(row=1, column=3, sticky="w", padx=6, pady=2)
-        self._run_buttons.extend([b_scan, b_central])  # greyed while any run is in flight
+        b_blocks = ttk.Button(blk, text="Generate SoftwareBlocks CSV",
+                              command=lambda: self._start(self._work_softwareblocks))
+        b_blocks.grid(row=2, column=0, sticky="w", padx=(0, 6), pady=2)
+        b_cov = ttk.Button(blk, text="Coverage report",
+                           command=lambda: self._start(self._work_coverage))
+        b_cov.grid(row=2, column=1, sticky="w", padx=6, pady=2)
+        ttk.Button(blk, text="Open coverage report",
+                   command=self._open_coverage).grid(row=2, column=2, sticky="w", padx=6, pady=2)
+        self._run_buttons.extend([b_scan, b_central, b_blocks, b_cov])  # greyed while a run is in flight
 
     def _open_in_files(self, path: str):
         """Open a file in the Files tab editor (switch to it); else open externally."""
@@ -363,6 +373,28 @@ class App:
             self._open_in_files(path)
         else:
             self.status.set("CentralDatabase.csv not found - run 'Export Central Database' first")
+
+    def _open_coverage(self):
+        path = os.path.join(self._out_dir(), "Report", "coverage.csv")
+        if os.path.exists(path):
+            self._open_in_files(path)
+        else:
+            self.status.set("coverage.csv not found - run 'Coverage report' first")
+
+    def _work_softwareblocks(self):
+        self._section("SOFTWARE BLOCKS  (block_builders -> SoftwareBlocksBuilder CSV)")
+        for stem, (path, n) in softwareblocks.generate().items():
+            self._log("OK", f"{n} instance(s)  ->  {os.path.basename(path)}")
+        self._stat("SoftwareBlocks CSV generated")
+
+    def _work_coverage(self):
+        self._section("COVERAGE  (every signal lands somewhere)")
+        s = verify.generate()
+        self._log("OK" if s["orphans"] == 0 else "WARNING",
+                  f"{s['covered']}/{s['total']} covered, {s['orphans']} orphan(s), "
+                  f"{s['unplaced']} unplaced member(s), {s['untyped']} untyped/spare")
+        self._log("INFO", "  -> Output/Report/coverage.csv + coverage.txt")
+        self._stat("coverage report written")
 
     def _work_scan_templates(self):
         self._section("BLOCK TEMPLATES  (scan !!key$$ -> config/block_templates.json)")

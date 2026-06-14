@@ -79,6 +79,13 @@ don't reach back for Power Query or VBA.
 - `block_builders.py` — **you edit**: one `build_*(db)` per template returning instances.
   `softwareblocks.py` — the engine that writes the SoftwareBlocksBuilder CSV(s) to
   `Output/SoftwareBlocks/` (see "Software-block templates").
+- `verify.py` — **coverage check + report**: per CentralDatabase row, which outputs it
+  lands in (io_tag/db/diagnosis/interface/hardware/block); flags **ORPHAN** (a *typed*
+  row in no output) and **UNPLACED MEMBER** (a DB member not in any block ITERATOR — the
+  worklist for finishing the builders). Untyped/spare rows aren't flagged. Writes
+  `Output/Report/coverage.csv` (per-row matrix, Files-tab filterable) + `coverage.txt`.
+  Wired into `run.py` (a COVERAGE section, lazy/guarded) and the GUI Block-templates
+  panel (Generate SoftwareBlocks CSV · Coverage report · Open coverage report).
 - `requirements.txt` — `openpyxl` (core); `tksheet` + `pywin32` (GUI). pywin32 is
   optional (Excel cell-jump falls back to `os.startfile` without it).
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL
@@ -238,8 +245,9 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
   format (their SWP_04 workbook). `List_IO` is done; this is the remaining diagnosis
   output, to be wired into `outputs.py` + `run.py` once the format is known.
 - **Software-block generation** — the SoftwareBlocksBuilder-CSV engine
-  (`softwareblocks.py`) is done; remaining: the user fills the `build_05_*`/`build_06_*`
-  bodies in `block_builders.py`, resolve the `!!key$$` delimiter question (also `!!key!!`/
-  `$$key!!`?), confirm the `$` template-path prefix the builder tool expects, and the
-  final step that fills the template XML from the CSV (the XML-filling, then Openn2
+  (`softwareblocks.py`) + coverage check (`verify.py`) are done; remaining: the user
+  fills the `build_05_*`/`build_06_*` bodies in `block_builders.py` (the coverage
+  report's UNPLACED-member list is the worklist), resolve the `!!key$$` delimiter
+  question (also `!!key!!`/`$$key!!`?), confirm the `$` template-path prefix the builder
+  tool expects, and the final step that fills the template XML from the CSV (then Openn2
   `ImportPlcBlock`).

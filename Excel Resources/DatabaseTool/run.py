@@ -130,6 +130,20 @@ def main(argv=None) -> int:
     else:
         print(f"  interface template not found ({tpl}) - skipped")
 
+    # ---- coverage ------------------------------------------------------
+    _section("COVERAGE  (every signal lands somewhere)")
+    cov = {"covered": 0, "total": len(rows), "orphans": 0, "unplaced": 0, "untyped": 0}
+    try:
+        import verify  # lazy: a half-written block_builders.py must not break the run
+        records, findings, counts = verify.compute_coverage(rows)
+        report_dir = os.path.join(out_dir, "Report")
+        verify.write_csv(records, report_dir)
+        _txt, cov = verify.write_txt(records, findings, counts, report_dir)
+        print(f"  {cov['covered']}/{cov['total']} covered, {cov['orphans']} orphan(s), "
+              f"{cov['unplaced']} unplaced member(s), {cov['untyped']} untyped/spare  ->  {report_dir}")
+    except Exception as e:  # noqa: BLE001
+        print(f"  coverage skipped: {e}")
+
     # ---- summary -------------------------------------------------------
     _section("SUMMARY")
     print(f"  rows staged    : {len(rows)}")
@@ -138,6 +152,8 @@ def main(argv=None) -> int:
     print(f"  diagnosis rows : {n_diag}")
     print(f"  hardware       : {n_st} station(s), {n_mod} module(s), {hw_errors} error(s)")
     print(f"  interfaces     : {n_if} created")
+    print(f"  coverage       : {cov['covered']}/{cov['total']} covered, {cov['orphans']} orphan(s), "
+          f"{cov['unplaced']} unplaced")
 
     rc = 0
     if hw_errors:
