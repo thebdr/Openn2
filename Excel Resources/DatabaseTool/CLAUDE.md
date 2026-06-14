@@ -36,13 +36,20 @@ don't reach back for Power Query or VBA.
   - `outputs.py` — I/O tags, DBs, diagnosis List_IO.
   - `hardware.py` — `extract`: format-2 Stations + Modules.
 - `config/` — versioned config: `column_map.csv`, `signal_types.csv`, `params.json`.
-- `interface_tool.py` — standalone IOC interface-table generator (see below).
+- `run.py` — the pipeline CLI: documents → staging → validation → every output
+  (I/O tags, DBs, diagnosis, hardware, interfaces). Resolves all paths relative to
+  itself, so it runs from any cwd. `--strict` fails on validation FAILs; it exits 1
+  on a hardware ERROR (device not in the DeviceTypesDatabase), 2 on a missing doc.
+- `interface_tool.py` — standalone IOC interface-table generator (see below); also
+  invoked by `run.py`.
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL
   and exits non-zero on failure. Run them after any change.
 - `Output/`, `Templates/*.xlsx` (except the committed interface template),
   `__pycache__/` are gitignored.
 
-Run a check: `python test_staging.py` etc. Validate live: `python run_validation.py`.
+Run everything: `python run.py [--strict]`. Run one check: `python test_staging.py` etc.
+Always invoke the copy under `C:\Source\Repos\Openn2\...` explicitly (a sibling clone
+exists; a relative path can run the wrong one).
 
 ## Source documents & real I/O List layout
 
@@ -129,5 +136,6 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
 
 ## Still to build
 
-`run.py` — one CLI: documents → staging → validation report → all outputs
-(I/O tags, DBs, diagnosis, interfaces, hardware).
+Diagnosis **List_Logic** + the generated alarm PLC code — the user will supply the
+format (their SWP_04 workbook). `List_IO` is done; this is the remaining diagnosis
+output, to be wired into `outputs.py` + `run.py` once the format is known.
