@@ -74,8 +74,11 @@ don't reach back for Power Query or VBA.
   invoked by `run.py` and `gui.py`.
 - `block_templates.py` — **tooling, not pipeline** (see "Software-block templates").
   `keys` scans the block templates for `!!key$$` placeholders → `config/block_templates.json`
-  (merge-preserving); `staged` exports the staged DB to `Output/CentralDatabase.csv` for
-  inspection. Both are also wired into the GUI Configuration tab's Block templates panel.
+  (merge-preserving); `staged` exports the CentralDatabase to `Output/CentralDatabase.csv`.
+  Both are also wired into the GUI Configuration tab's Block templates panel.
+- `block_builders.py` — **you edit**: one `build_*(db)` per template returning instances.
+  `softwareblocks.py` — the engine that writes the SoftwareBlocksBuilder CSV(s) to
+  `Output/SoftwareBlocks/` (see "Software-block templates").
 - `requirements.txt` — `openpyxl` (core); `tksheet` + `pywin32` (GUI). pywin32 is
   optional (Excel cell-jump falls back to `os.startfile` without it).
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL
@@ -165,18 +168,34 @@ and carry placeholders `!!key$$` (e.g. `!!NetworkComment$$`, `!!Error_memberOf:0
 placeholder is its own slot (so `tagName:Contactor1…` ≠ `tagName:Contactor2…`).
 
 `python block_templates.py keys` scans them into `config/block_templates.json` =
-`{ template-file-stem : { key : <binding> } }`. It **merges**: existing template/key
-bindings are kept, only new ones are added (default binding `""`); keys dropped from a
-template are kept and just noted. A binding is one of: a **canonical column name**
-(`"device"` → that row's value), a **literal list** (`["a","b"]`), or a **query** over the
-staged DB (object; the query schema + the actual template-filling generation are still
-to build). To author bindings, inspect the data with `python block_templates.py staged`
-(or the GUI Configuration tab's Block templates panel),
-which writes `Output/CentralDatabase.csv` (canonical columns + `matrix_areas` +
-`_source_sheet`/`_source_row`/`type_id_resolved`/`type_category`); open it in the
-Pipeline2 **Files** tab and use the regex **Filter rows** to prototype queries. CSV was
-chosen for inspection because it opens in that editor; if real SQL is wanted later, an
-SQLite export is the alternative. **`matrix_areas`** (`'|'`-joined, e.g. `AREA 1|AREA 2`)
+`{ template-file-stem : { key : "" } }` (merge-only: keeps existing, adds new, keeps +
+notes dropped). This is just the **key inventory** per template — it drives the `%`
+header column order of the output CSV. **Generation is imperative Python, not a DSL**
+(decided with the user): `block_builders.py` has one `build_*(db)` function per template
+that **you edit** to gather the data, and `softwareblocks.py` is the engine.
+
+- `block_builders.py` — each builder gets `db` (the CentralDatabase: staged row dicts
+  with `matrix_areas` + `name_in_db`) and returns a list of **instances**, one per `@`
+  row. An instance is `{ "<!!key$$>": value }`: a `str` is one cell; a `list[str]` is
+  the horizontal **ITERATOR** (one per instance); `"_pad"` overrides the pad element
+  (default `block_builders.PAD = "ALWAYS_TRUE"`). Row multiplication is just your loops.
+- `softwareblocks.py` — loads `db`, calls each builder, and writes
+  `Output/SoftwareBlocks/<stem>.csv` in the SoftwareBlocksBuilder format: markers `$`
+  (template dir), `#`, `%` (`TemplateType,#Templates Capacity,#Templates Index,#Elements
+  Needed`, then `!!key$$` cols), `@` (one instance). `#Elements Needed` = real iterator
+  length; **TemplateType** = the Index of the smallest **Capacity ≥** that length from
+  the template's sidecar CSV (`<stem>.csv`, a Capacity→Index table that rides along in
+  cols C/D); the ITERATOR is padded to that capacity with the pad element.
+- The target/example is `SoftwareBlocksBuilder/test - Copy.csv`; the filled XML blocks
+  are ultimately imported by Openn2's `TiaPortalOpenness.Blocks.cs::ImportPlcBlock`.
+- **Open:** the `!!key$$` delimiter may also be `!!key!!` / `$$key!!` in the templates
+  (under user review); `block_templates.py keys` currently extracts `!!…$$` only.
+
+To author the builders, inspect `Output/CentralDatabase.csv` (`python block_templates.py
+staged`, or the GUI Configuration tab's Block templates panel) — canonical columns +
+`matrix_areas` + `name_in_db` (the `.db` member name) + `_source_sheet`/`_source_row`/
+`type_id_resolved`/`type_category`; open it in the Pipeline2 **Files** tab and use the
+regex **Filter rows** to explore. **`matrix_areas`** (`'|'`-joined, e.g. `AREA 1|AREA 2`)
 is added in **staging** (`safetydb/matrix.py`, from the C&E workbook; `''` if the C&E
 doc is absent): for an **input** (I-address) it's the area columns marked `X` on that
 signal's CAUSE&EFFECT MATRIX row (EFFECT block from column `S`; the area = the column
@@ -218,7 +237,9 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
 - Diagnosis **List_Logic** + the generated alarm PLC code — the user will supply the
   format (their SWP_04 workbook). `List_IO` is done; this is the remaining diagnosis
   output, to be wired into `outputs.py` + `run.py` once the format is known.
-- **Software-block generation** — resolve the `config/block_templates.json` bindings
-  (canonical column / literal list / query) against the staged DB and fill the
-  `!!key$$` placeholders in the template XML to emit per-instance blocks. The binding
-  schema (esp. the query form) and the iterator semantics (`ITERATOR_STRINGS`) are TBD.
+- **Software-block generation** — the SoftwareBlocksBuilder-CSV engine
+  (`softwareblocks.py`) is done; remaining: the user fills the `build_05_*`/`build_06_*`
+  bodies in `block_builders.py`, resolve the `!!key$$` delimiter question (also `!!key!!`/
+  `$$key!!`?), confirm the `$` template-path prefix the builder tool expects, and the
+  final step that fills the template XML from the CSV (the XML-filling, then Openn2
+  `ImportPlcBlock`).

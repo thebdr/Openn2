@@ -105,7 +105,7 @@ def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> 
     types = config.load_signal_types()
     rows, _warnings = staging.load_io_list(params, types)  # adds matrix_areas (in staging now)
     cols = [m["canonical"] for m in config.load_column_map("IoList")]
-    extra = ["matrix_areas", "_source_sheet", "_source_row", "type_id_resolved", "type_category"]
+    extra = ["matrix_areas", "name_in_db", "_source_sheet", "_source_row", "type_id_resolved", "type_category"]
     csv_path = csv_path or os.path.join(_abs(params.get("output_dir", "Output")), "CentralDatabase.csv")
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
@@ -114,8 +114,9 @@ def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> 
         for r in rows:
             t = r.get("_type") or {}
             w.writerow([r.get(c, "") for c in cols]
-                       + [r.get("matrix_areas", ""), r.get("_source_sheet", ""),
-                          r.get("_source_row", ""), t.get("type_id", ""), t.get("category", "")])
+                       + [r.get("matrix_areas", ""), r.get("name_in_db", ""),
+                          r.get("_source_sheet", ""), r.get("_source_row", ""),
+                          t.get("type_id", ""), t.get("category", "")])
     return csv_path
 
 

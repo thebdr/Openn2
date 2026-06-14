@@ -214,6 +214,16 @@ def _db_member_name(row, rec) -> str:
     return f"{base} {add}".strip() if add else base
 
 
+def member_name(row) -> str:
+    """The name this row gets as a member of its DB in the generated .db files, or
+    '' if its signal type is not DB-backed. (Same value build_dbs writes - used to
+    enrich the CentralDatabase with `name_in_db`.)"""
+    t = row.get("_type") or {}
+    if t.get("db_kind") not in ("db", "safe_db"):
+        return ""
+    return _db_member_name(row, t)
+
+
 def build_dbs(io_rows: list, signal_types: dict) -> dict:
     """Groups members into DBs by the type's db_names (| separated -> several
     identical DBs; types may also share a name, e.g. E1/2 + B1/2 -> 01_Pushbutton).

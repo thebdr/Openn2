@@ -16,6 +16,7 @@ from openpyxl.utils import column_index_from_string
 
 from . import config
 from . import matrix
+from . import outputs  # leaf module; provides the DB member name for name_in_db
 
 
 class StagedRow(dict):
@@ -118,4 +119,7 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
     # enrich each row with its safety AREAs from the C&E workbook (best-effort:
     # '' when the C&E doc is absent). Paired channels share their device's areas.
     matrix.annotate_areas(params, rows)
+    # name_in_db = the name this row gets as a DB member in the generated .db files
+    for row in rows:
+        row["name_in_db"] = outputs.member_name(row)
     return rows, warnings
