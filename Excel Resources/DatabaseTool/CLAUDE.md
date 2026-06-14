@@ -40,16 +40,18 @@ don't reach back for Power Query or VBA.
   (I/O tags, DBs, diagnosis, hardware, interfaces). Resolves all paths relative to
   itself, so it runs from any cwd. `--strict` fails on validation FAILs; it exits 1
   on a hardware ERROR (device not in the DeviceTypesDatabase), 2 on a missing doc.
-- `gui.py` — Tkinter operator window (the interactive twin of `run.py`): toolbar
-  with **Run All** + one button per phase, a colour-coded **Log** viewer, and a
-  **Configuration** tab that edits `params.json` and opens the config CSVs. The
-  pipeline runs on a worker thread (queue → `root.after` drain) so the UI stays
-  responsive, mirroring Openn2's `TiaWorker`. **Clickable links**: a validation
-  `Sheet!Cell` or a hardware `row N` log line carries an `[open …]` link that opens
-  the source workbook in Excel **at that cell** via `tools/excel_goto.ps1` (Windows
-  PowerShell COM; reuses a running Excel, else `os.startfile` fallback). It calls the
-  `safetydb` modules directly (not `run.py`) so it can attach those cell links.
-- `tools/excel_goto.ps1` — Excel "go to cell" helper used by `gui.py` (committed).
+- `gui.py` — Tkinter operator window "**Pipeline2**" (the interactive twin of
+  `run.py`): toolbar with **Run All** + one button per phase, a colour-coded **Log**
+  viewer, and a **Configuration** tab that edits `params.json` and opens the config
+  CSVs. The pipeline runs on a worker thread (queue → `root.after` drain) so the UI
+  stays responsive, mirroring Openn2's `TiaWorker`. **Clickable links**: a validation
+  `Sheet!Cell` or a hardware `row N` log line carries an `[open …]` link that opens the
+  source workbook in Excel **at that cell and brings Excel to the front**, via
+  **pywin32 COM** (`win32com` reuses a running Excel; `win32gui` AttachThreadInput
+  forces focus). COM is initialised on the click worker thread; if pywin32 is missing
+  it falls back to `os.startfile`. It calls the `safetydb` modules directly (not
+  `run.py`) so it can attach those cell links. Window icon: `assets/Pipeline2.ico|png`.
+- `assets/` — app icon for `gui.py` (see `assets/README.md`).
 - `interface_tool.py` — standalone IOC interface-table generator (see below); also
   invoked by `run.py` and `gui.py`.
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL

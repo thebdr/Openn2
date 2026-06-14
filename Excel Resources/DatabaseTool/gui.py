@@ -20,8 +20,6 @@ import json
 import os
 import queue
 import re
-import shutil
-import subprocess
 import sys
 import threading
 import traceback
@@ -35,7 +33,8 @@ if _HERE not in sys.path:
 from safetydb import config, staging, validation, outputs, hardware
 import interface_tool
 
-EXCEL_GOTO_PS1 = os.path.join(_HERE, "tools", "excel_goto.ps1")
+APP_NAME = "Pipeline2"
+ICON_BASE = os.path.join(_HERE, "assets", APP_NAME)  # + .ico / .png
 
 # Log level -> Text-tag style. SECTION is a header; OK is a success line.
 LEVEL_STYLE = {
@@ -77,33 +76,81 @@ PHASES = ["Staging", "Validation", "I/O Tags", "DBs", "Diagnosis", "Hardware", "
 # --------------------------------------------------------------------------- #
 # Excel navigation                                                            #
 # --------------------------------------------------------------------------- #
+def _bring_to_front(hwnd: int) -> None:
+    """Force a window to the foreground, working around Windows' focus lock by
+    briefly attaching to the current foreground thread's input."""
+    import win32api
+    import win32con
+    import win32gui
+    import win32process
+    if not hwnd:
+        return
+    if win32gui.IsIconic(hwnd):
+        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+    fg = win32gui.GetForegroundWindow()
+    cur = win32api.GetCurrentThreadId()
+    other = win32process.GetWindowThreadProcessId(fg)[0] if fg else 0
+    attached = bool(other) and other != cur
+    if attached:
+        win32process.AttachThreadInput(other, cur, True)
+    try:
+        win32gui.BringWindowToTop(hwnd)
+        win32gui.SetForegroundWindow(hwnd)
+    finally:
+        if attached:
+            win32process.AttachThreadInput(other, cur, False)
+
+
 def excel_goto(path: str, sheet: str, cell: str) -> tuple[bool, str]:
-    """Open `path` in Excel and select `sheet!cell`. Returns (jumped?, message).
-    Prefers the PowerShell COM helper (reuses a running Excel, exact cell); falls
-    back to just opening the workbook so the user can Ctrl+G to the cell."""
+    """Open `path` in Excel, select `sheet!cell`, and bring Excel to the front.
+    Reuses a running Excel instance (pywin32 COM); falls back to just opening the
+    workbook if pywin32 is missing. Runs on a worker thread, so COM is initialised
+    here and torn down at the end."""
     if not path or not os.path.exists(path):
         return False, f"workbook not found: {path}"
-    pwsh = shutil.which("powershell.exe")
-    if pwsh and os.path.exists(EXCEL_GOTO_PS1):
-        try:
-            r = subprocess.run(
-                [pwsh, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", EXCEL_GOTO_PS1,
-                 "-Path", path, "-Sheet", sheet, "-Cell", cell],
-                capture_output=True, text=True, timeout=90)
-            if r.returncode == 0:
-                return True, f"Excel -> {sheet}!{cell}"
-            detail = (r.stderr or r.stdout or "").strip().replace("\n", " ")
-            # fall through to startfile, but report why COM failed
-            note = f" (COM error: {detail[:120]})" if detail else ""
-        except Exception as e:  # noqa: BLE001 - report any launch failure
-            note = f" (COM launch failed: {e})"
-    else:
-        note = "" if pwsh else " (powershell.exe not found)"
     try:
-        os.startfile(path)  # type: ignore[attr-defined]
-        return False, f"opened workbook - press Ctrl+G and go to {sheet}!{cell}{note}"
+        import pythoncom
+        import win32com.client as win32
+    except ImportError:
+        try:
+            os.startfile(path)  # type: ignore[attr-defined]
+            return False, f"opened workbook - press Ctrl+G -> {sheet}!{cell} (install pywin32 for the cell jump)"
+        except Exception as e:  # noqa: BLE001
+            return False, f"could not open {path}: {e}"
+
+    pythoncom.CoInitialize()
+    try:
+        try:
+            xl = win32.GetActiveObject("Excel.Application")
+        except Exception:  # noqa: BLE001 - no running instance, start one
+            xl = win32.Dispatch("Excel.Application")
+        xl.Visible = True
+        full = os.path.abspath(path)
+        wb = None
+        for b in xl.Workbooks:
+            try:
+                if os.path.normcase(b.FullName) == os.path.normcase(full):
+                    wb = b
+                    break
+            except Exception:  # noqa: BLE001
+                pass
+        if wb is None:
+            wb = xl.Workbooks.Open(full)
+        ws = wb.Worksheets(sheet)
+        ws.Activate()
+        xl.Goto(ws.Range(cell), True)   # scroll so the cell is top-left
+        try:
+            _bring_to_front(int(xl.Hwnd))
+        except Exception:  # noqa: BLE001 - focus is best-effort
+            try:
+                xl.ActiveWindow.Activate()
+            except Exception:  # noqa: BLE001
+                pass
+        return True, f"Excel -> {sheet}!{cell}"
     except Exception as e:  # noqa: BLE001
-        return False, f"could not open {path}: {e}"
+        return False, f"Excel COM error: {e}"
+    finally:
+        pythoncom.CoUninitialize()
 
 
 # --------------------------------------------------------------------------- #
@@ -140,8 +187,9 @@ def _params_file() -> str:
 class App:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("SafetyDB - pipeline")
+        self.root.title(APP_NAME)
         self.root.geometry("1040x700")
+        self._set_icon()
         self.q: queue.Queue = queue.Queue()
         self.busy = False
         self._links: dict[str, dict] = {}
@@ -155,10 +203,21 @@ class App:
         self._build_statusbar()
 
         self.root.after(60, self._drain)
-        self._log("INFO", f"DatabaseTool GUI ready. Output -> {self._out_dir()}", None)
+        self._log("INFO", f"{APP_NAME} ready. Output -> {self._out_dir()}", None)
         self._log("INFO", "Click a phase, or 'Run All'. Click an [open ...] link to jump to that Excel cell.", None)
 
     # ---- widget construction ------------------------------------------- #
+    def _set_icon(self):
+        """Window/taskbar icon from assets/Pipeline2.ico (preferred) or .png."""
+        try:
+            if os.path.exists(ICON_BASE + ".ico"):
+                self.root.iconbitmap(ICON_BASE + ".ico")
+            elif os.path.exists(ICON_BASE + ".png"):
+                self._icon = tk.PhotoImage(file=ICON_BASE + ".png")  # keep a ref
+                self.root.iconphoto(True, self._icon)
+        except Exception:  # noqa: BLE001 - icon is cosmetic
+            pass
+
     def _build_toolbar(self):
         bar = ttk.Frame(self.root, padding=(8, 6))
         bar.pack(side="top", fill="x")
