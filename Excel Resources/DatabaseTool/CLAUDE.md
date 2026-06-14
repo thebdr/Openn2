@@ -70,6 +70,9 @@ don't reach back for Power Query or VBA.
   Reusable + meant to grow workflow-specific tooling. Tree refreshes after each run.
 - `interface_tool.py` — standalone IOC interface-table generator (see below); also
   invoked by `run.py` and `gui.py`.
+- `block_templates.py` — **tooling, not pipeline** (see "Software-block templates").
+  `keys` scans the block templates for `!!key$$` placeholders → `config/block_templates.json`
+  (merge-preserving); `staged` exports the staged DB to `Output/staged.csv` for inspection.
 - `requirements.txt` — `openpyxl` (core); `tksheet` + `pywin32` (GUI). pywin32 is
   optional (Excel cell-jump falls back to `os.startfile` without it).
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL
@@ -151,6 +154,25 @@ channels land in one table; an explicit value always wins.
   Base Node (ID/col F) into the Side-1 cells and the index into `<index>` tokens.
   Existing files preserved on re-run.
 
+## Software-block templates (tooling, not the pipeline)
+
+TIA Portal Software Block exports live in `Templates/Tia Portal Software Blocks/*.xml`
+and carry placeholders `!!key$$` (e.g. `!!NetworkComment$$`, `!!Error_memberOf:03_FDBACK$$`,
+`!!tagName:Contactor1_QBadInput$$`). The **whole inner string is the key** — each distinct
+placeholder is its own slot (so `tagName:Contactor1…` ≠ `tagName:Contactor2…`).
+
+`python block_templates.py keys` scans them into `config/block_templates.json` =
+`{ template-file-stem : { key : <binding> } }`. It **merges**: existing template/key
+bindings are kept, only new ones are added (default binding `""`); keys dropped from a
+template are kept and just noted. A binding is one of: a **canonical column name**
+(`"device"` → that row's value), a **literal list** (`["a","b"]`), or a **query** over the
+staged DB (object; the query schema + the actual template-filling generation are still
+to build). To author bindings, inspect the data with `python block_templates.py staged`,
+which writes `Output/staged.csv` (canonical columns + `_source_sheet`/`_source_row`/
+`type_id_resolved`/`type_category`); open it in the Pipeline2 **Files** tab and use the
+regex **Filter rows** to prototype queries. CSV was chosen for inspection because it
+opens in that editor; if real SQL is wanted later, an SQLite export is the alternative.
+
 ## DeviceTypesDatabase (global, manually maintained)
 
 At `../../HardwareConfig/DeviceTypesDatabase.csv`. **Comma-delimited**, 7 columns:
@@ -182,6 +204,10 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
 
 ## Still to build
 
-Diagnosis **List_Logic** + the generated alarm PLC code — the user will supply the
-format (their SWP_04 workbook). `List_IO` is done; this is the remaining diagnosis
-output, to be wired into `outputs.py` + `run.py` once the format is known.
+- Diagnosis **List_Logic** + the generated alarm PLC code — the user will supply the
+  format (their SWP_04 workbook). `List_IO` is done; this is the remaining diagnosis
+  output, to be wired into `outputs.py` + `run.py` once the format is known.
+- **Software-block generation** — resolve the `config/block_templates.json` bindings
+  (canonical column / literal list / query) against the staged DB and fill the
+  `!!key$$` placeholders in the template XML to emit per-instance blocks. The binding
+  schema (esp. the query form) and the iterator semantics (`ITERATOR_STRINGS`) are TBD.

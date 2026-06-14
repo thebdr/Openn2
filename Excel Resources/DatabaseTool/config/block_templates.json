@@ -1,0 +1,23 @@
+{
+  "TEMPLATE--v1.0--03_Zone Cumulative": {
+    "nameOfDB": "",
+    "ITERATOR_STRINGS": "",
+    "memberOf:02_COM": "",
+    "NetworkComment": ""
+  },
+  "TEMPLATE--v1.0--06_Feedback Error": {
+    "Error_memberOf:03_FDBACK": "",
+    "ITERATOR_STRINGS": "",
+    "NetworkComment": ""
+  },
+  "TEMPLATE--v1.1--05_Output Feedback": {
+    "OnCondition1_memberOf:05_EM_STATE": "",
+    "tagName:Contactor1_QBadInput": "",
+    "Reset1_memberOf:05_EM_STATE": "",
+    "Error_memberOf:03_FDBACK": "",
+    "NetworkComment": "",
+    "tagName:Contactor2_QBadInput": "",
+    "OnCondition2_memberOf:05_EM_STATE": "",
+    "Reset2_memberOf:05_EM_STATE": ""
+  }
+}
