@@ -16,3 +16,6 @@ Excel Resources/4_PowerQuery/TestInput/
 Excel Resources/4_PowerQuery/stage.log
 # tiny empty seed needed because SaveCopyAs is the only working save path
 !Excel Resources/4_PowerQuery/Templates/Seed.xlsm
+# Python DatabaseTool: generated outputs and auto-built template (build_template() is the source of truth)
+Excel Resources/DatabaseTool/Output/
+Excel Resources/DatabaseTool/Templates/
