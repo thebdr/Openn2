@@ -31,3 +31,10 @@ IoList;AC;suggested_type;Suggested Type;no
 IoList;AD;index;Index;no
 IoList;AE;diag_cabinet;Diag Cabinet;no
 IoList;AF;diag_bit;Diag Bit;no
+CE;F;address;BIT (ADDRESS);yes
+CE;J;functional_unit;FUNCTIONAL UNIT;yes
+CE;K;location;LOCATION;yes
+CE;L;device;DEVICE;yes
+CE;M;concat_id;CONCATENATE ID;no
+AREA;A;concat_id;SIGLA CONTATTORE;no
+AREA;C;address;DIGITAL OUTPUT;no
