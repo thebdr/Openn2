@@ -1,0 +1,331 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V18" />
+  <DocumentInfo>
+    <Created>2026-06-14T16:12:11.9430968Z</Created>
+    <ExportSetting>WithDefaults</ExportSetting>
+    <InstalledProducts>
+      <Product>
+        <DisplayName>Totally Integrated Automation Portal</DisplayName>
+        <DisplayVersion>V18 Update 5</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>TIA Portal Openness</DisplayName>
+        <DisplayVersion>V18 Update 5</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>TIA Portal Version Control Interface</DisplayName>
+        <DisplayVersion>V18</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>SINAMICS Startdrive Advanced</DisplayName>
+        <DisplayVersion>V18 SP2 Update 1</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>SINAMICS Startdrive G110M, G120, G120C, G120D, G120P, G115D</DisplayName>
+        <DisplayVersion>V18 SP2 Update 1</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>SINAMICS Startdrive G130, G150, S120, S150, SINAMICS MV, S210, G220, S200</DisplayName>
+        <DisplayVersion>V18 SP2 Update 1</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>STEP 7 Professional</DisplayName>
+        <DisplayVersion>V18 Update 5</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>STEP 7 Safety</DisplayName>
+        <DisplayVersion>V18</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>WinCC Advanced / Unified PC</DisplayName>
+        <DisplayVersion>V18 Update 5</DisplayVersion>
+      </Product>
+    </InstalledProducts>
+  </DocumentInfo>
+  <SW.Blocks.FC ID="0">
+    <AttributeList>
+      <AutoNumber>true</AutoNumber>
+      <HeaderAuthor />
+      <HeaderFamily />
+      <HeaderName />
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input" />
+  <Section Name="Output" />
+  <Section Name="InOut" />
+  <Section Name="Temp" />
+  <Section Name="Constant" />
+  <Section Name="Return">
+    <Member Name="Ret_Val" Datatype="Void" Accessibility="Public" />
+  </Section>
+</Sections></Interface>
+      <IsIECCheckEnabled>false</IsIECCheckEnabled>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>TEMPLATE--v1.0--06_Feedback Error</Name>
+      <Namespace />
+      <Number>7</Number>
+      <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+      <UDABlockProperties />
+      <UDAEnableTagReadback>false</UDAEnableTagReadback>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>v1.0 First Emission</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="!!Error_memberOf:03_FDBACK$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="03_FDBACK_RAW" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="03_FDBACK_RAW" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="03_FDBACK_RAW" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="03_FDBACK_RAW" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="03_FDBACK_RAW" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="03_FDBACK_RAW" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="03_FDBACK_RAW" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="03_FDBACK_RAW" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="03_FDBACK" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="03_FDBACK" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="03_FDBACK" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="03_FDBACK" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="03_FDBACK" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="35">
+      <Symbol>
+        <Component Name="03_FDBACK" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="36">
+      <Symbol>
+        <Component Name="03_FDBACK" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="37">
+      <Symbol>
+        <Component Name="03_FDBACK" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Call UId="38">
+      <CallInfo Name="03_FDBACK error" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="39">
+          <Component Name="$$instanceOf:03_FDBACK error!!" />
+        </Instance>
+        <Parameter Name="Commissioning_bypass" Section="Input" Type="Bool" />
+        <Parameter Name="FDBACK ERROR 1" Section="Input" Type="Bool" />
+        <Parameter Name="FDBACK ERROR 2" Section="Input" Type="Bool" />
+        <Parameter Name="FDBACK ERROR 3" Section="Input" Type="Bool" />
+        <Parameter Name="FDBACK ERROR 4" Section="Input" Type="Bool" />
+        <Parameter Name="FDBACK ERROR 5" Section="Input" Type="Bool" />
+        <Parameter Name="FDBACK ERROR 6" Section="Input" Type="Bool" />
+        <Parameter Name="FDBACK ERROR 7" Section="Input" Type="Bool" />
+        <Parameter Name="FDBACK ERROR 8" Section="Input" Type="Bool" />
+        <Parameter Name="Cumulative FDBACK" Section="Output" Type="Bool" />
+        <Parameter Name="ERROR 1" Section="Output" Type="Bool" />
+        <Parameter Name="ERROR 2" Section="Output" Type="Bool" />
+        <Parameter Name="ERROR 3" Section="Output" Type="Bool" />
+        <Parameter Name="ERROR 4" Section="Output" Type="Bool" />
+        <Parameter Name="ERROR 5" Section="Output" Type="Bool" />
+        <Parameter Name="ERROR 6" Section="Output" Type="Bool" />
+        <Parameter Name="ERROR 7" Section="Output" Type="Bool" />
+        <Parameter Name="ERROR 8" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="41">
+      <Powerrail />
+      <NameCon UId="38" Name="en" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="21" />
+      <NameCon UId="38" Name="Commissioning_bypass" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="22" />
+      <NameCon UId="38" Name="FDBACK ERROR 1" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="23" />
+      <NameCon UId="38" Name="FDBACK ERROR 2" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="24" />
+      <NameCon UId="38" Name="FDBACK ERROR 3" />
+    </Wire>
+    <Wire UId="46">
+      <IdentCon UId="25" />
+      <NameCon UId="38" Name="FDBACK ERROR 4" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="26" />
+      <NameCon UId="38" Name="FDBACK ERROR 5" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="27" />
+      <NameCon UId="38" Name="FDBACK ERROR 6" />
+    </Wire>
+    <Wire UId="49">
+      <IdentCon UId="28" />
+      <NameCon UId="38" Name="FDBACK ERROR 7" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="29" />
+      <NameCon UId="38" Name="FDBACK ERROR 8" />
+    </Wire>
+    <Wire UId="51">
+      <NameCon UId="38" Name="Cumulative FDBACK" />
+      <OpenCon UId="40" />
+    </Wire>
+    <Wire UId="52">
+      <NameCon UId="38" Name="ERROR 1" />
+      <IdentCon UId="30" />
+    </Wire>
+    <Wire UId="53">
+      <NameCon UId="38" Name="ERROR 2" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="38" Name="ERROR 3" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="38" Name="ERROR 4" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="38" Name="ERROR 5" />
+      <IdentCon UId="34" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="38" Name="ERROR 6" />
+      <IdentCon UId="35" />
+    </Wire>
+    <Wire UId="58">
+      <NameCon UId="38" Name="ERROR 7" />
+      <IdentCon UId="36" />
+    </Wire>
+    <Wire UId="59">
+      <NameCon UId="38" Name="ERROR 8" />
+      <IdentCon UId="37" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>!!NetworkComment$$</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="8" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="9" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>group / bypass contactor feedback errors by I/O Node</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.FC>
+</Document>
