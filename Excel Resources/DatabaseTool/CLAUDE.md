@@ -168,10 +168,16 @@ template are kept and just noted. A binding is one of: a **canonical column name
 (`"device"` → that row's value), a **literal list** (`["a","b"]`), or a **query** over the
 staged DB (object; the query schema + the actual template-filling generation are still
 to build). To author bindings, inspect the data with `python block_templates.py staged`,
-which writes `Output/staged.csv` (canonical columns + `_source_sheet`/`_source_row`/
-`type_id_resolved`/`type_category`); open it in the Pipeline2 **Files** tab and use the
-regex **Filter rows** to prototype queries. CSV was chosen for inspection because it
-opens in that editor; if real SQL is wanted later, an SQLite export is the alternative.
+which writes `Output/staged.csv` (canonical columns + `matrix_areas` +
+`_source_sheet`/`_source_row`/`type_id_resolved`/`type_category`); open it in the
+Pipeline2 **Files** tab and use the regex **Filter rows** to prototype queries. CSV was
+chosen for inspection because it opens in that editor; if real SQL is wanted later, an
+SQLite export is the alternative. **`matrix_areas`** (`'|'`-joined, e.g. `AREA 1|AREA 2`)
+is a C&E enrichment (`safetydb/matrix.py`, not core staging): for an **input**
+(I-address) it's the area columns marked `X` on that signal's CAUSE&EFFECT MATRIX row
+(EFFECT block from column `S`; the area = the column header); for an **output**
+(Q-address) it's the AREA n sheet(s) listing that Q address (col C). Matched by the
+signal's own I/Q address.
 
 ## DeviceTypesDatabase (global, manually maintained)
 

@@ -100,12 +100,13 @@ def build_templates_json(templates_dir: str = TEMPLATES_DIR, json_path: str = TE
 def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> str:
     """Write the staged I/O List rows to a CSV (canonical columns + a few resolved
     fields) for inspection. Returns the path written."""
-    from safetydb import staging  # local import so `keys` doesn't need the I/O List
+    from safetydb import staging, matrix  # local imports so `keys` needs neither doc
     params = config.load_params(params_path)
     types = config.load_signal_types()
     rows, _warnings = staging.load_io_list(params, types)
+    matrix.annotate_areas(params, rows)  # adds row['matrix_areas'] from the C&E matrix
     cols = [m["canonical"] for m in config.load_column_map("IoList")]
-    extra = ["_source_sheet", "_source_row", "type_id_resolved", "type_category"]
+    extra = ["matrix_areas", "_source_sheet", "_source_row", "type_id_resolved", "type_category"]
     csv_path = csv_path or os.path.join(_abs(params.get("output_dir", "Output")), "staged.csv")
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
@@ -114,8 +115,8 @@ def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> 
         for r in rows:
             t = r.get("_type") or {}
             w.writerow([r.get(c, "") for c in cols]
-                       + [r.get("_source_sheet", ""), r.get("_source_row", ""),
-                          t.get("type_id", ""), t.get("category", "")])
+                       + [r.get("matrix_areas", ""), r.get("_source_sheet", ""),
+                          r.get("_source_row", ""), t.get("type_id", ""), t.get("category", "")])
     return csv_path
 
 
