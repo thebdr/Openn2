@@ -33,20 +33,12 @@ if _HERE not in sys.path:
 from safetydb import config, staging, validation, outputs, hardware
 import interface_tool
 import editor
+import theme
 
 APP_NAME = "Pipeline2"
 ICON_BASE = os.path.join(_HERE, "assets", APP_NAME)  # + .ico / .png
 
-# Log level -> Text-tag style. SECTION is a header; OK is a success line.
-LEVEL_STYLE = {
-    "ERROR":   {"foreground": "#c0282d", "font": ("Consolas", 10, "bold")},
-    "FAIL":    {"foreground": "#c0282d", "font": ("Consolas", 10, "bold")},
-    "WARNING": {"foreground": "#b35c00"},
-    "PASS":    {"foreground": "#1a7f37"},
-    "OK":      {"foreground": "#1a7f37", "font": ("Consolas", 10, "bold")},
-    "INFO":    {"foreground": "#444444"},
-    "SECTION": {"foreground": "#003a8c", "font": ("Consolas", 11, "bold")},
-}
+LOG_LEVELS = {"ERROR", "FAIL", "WARNING", "PASS", "OK", "INFO", "SECTION"}
 
 # Configuration tab: (dotted params.json key, label, kind). kind: text|int|file|dir|list
 PARAM_SPEC = [
@@ -198,14 +190,31 @@ class App:
         self._rows = None          # cached staged rows (invalidated on config save)
         self._run_buttons: list[ttk.Button] = []
         self.status = tk.StringVar(value="Ready")
+        self._style = ttk.Style(self.root)
+        self._dark = tk.BooleanVar(value=False)
 
         self._build_toolbar()
         self._build_notebook()
         self._build_statusbar()
+        self._apply_theme()        # colours, tab font, log tags (light by default)
 
         self.root.after(60, self._drain)
         self._log("INFO", f"{APP_NAME} ready. Output -> {self._out_dir()}", None)
         self._log("INFO", "Click a phase, or 'Run All'. Click an [open ...] link to jump to that Excel cell.", None)
+
+    def _apply_theme(self):
+        """Apply the current (light/dark) palette to ttk, the log, and the editor."""
+        dark = self._dark.get()
+        pal = theme.palette(dark)
+        theme.apply_ttk(self._style, pal)
+        self.log.configure(background=pal["log_bg"], foreground=pal["log_fg"],
+                           insertbackground=pal["log_fg"])
+        for level, cfg in theme.log_tags(dark).items():
+            self.log.tag_configure(level, **cfg)
+        self.log.tag_configure("link", foreground=pal["accent"], underline=True)
+        files = getattr(self, "_files", None)
+        if files is not None:
+            files.apply_theme(pal)
 
     # ---- widget construction ------------------------------------------- #
     def _set_icon(self):
@@ -237,6 +246,9 @@ class App:
         ttk.Button(bar, text="Open Output", command=self._open_output).pack(side="left", padx=2)
         ttk.Button(bar, text="Clear Log", command=self._clear_log).pack(side="left", padx=2)
 
+        ttk.Checkbutton(bar, text="Dark mode", variable=self._dark,
+                        command=self._apply_theme).pack(side="right")
+
     def _build_notebook(self):
         nb = ttk.Notebook(self.root)
         nb.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 4))
@@ -244,16 +256,13 @@ class App:
         # --- Log tab ---
         log_tab = ttk.Frame(nb)
         nb.add(log_tab, text="Log")
-        self.log = tk.Text(log_tab, wrap="word", font=("Consolas", 10),
-                           background="#fbfbfb", foreground="#1c1c1c", undo=False)
+        self.log = tk.Text(log_tab, wrap="word", font=("Consolas", 10), undo=False)
         ys = ttk.Scrollbar(log_tab, orient="vertical", command=self.log.yview)
         self.log.configure(yscrollcommand=ys.set)
         ys.pack(side="right", fill="y")
         self.log.pack(side="left", fill="both", expand=True)
-        for level, style in LEVEL_STYLE.items():
-            self.log.tag_configure(level, **style)
-        self.log.tag_configure("link", foreground="#0b5fff", underline=True)
         self.log.bind("<Key>", self._readonly_keys)  # read-only but keep copy/select
+        # colours + tags are set in _apply_theme
 
         # --- Configuration tab ---
         cfg_tab = ttk.Frame(nb, padding=10)
@@ -407,7 +416,7 @@ class App:
         return "break"
 
     def _insert_log(self, level: str, text: str, link):
-        tag = level if level in LEVEL_STYLE else "INFO"
+        tag = level if level in LOG_LEVELS else "INFO"
         if level == "SECTION":
             self.log.insert("end", "\n" + text + "\n", ("SECTION",))
         else:
@@ -646,11 +655,7 @@ class App:
 
 def main():
     root = tk.Tk()
-    try:
-        ttk.Style().theme_use("vista")  # native-ish on Windows; ignore if unavailable
-    except tk.TclError:
-        pass
-    App(root)
+    App(root)  # App applies the theme (clam-based, light by default)
     root.mainloop()
 
 

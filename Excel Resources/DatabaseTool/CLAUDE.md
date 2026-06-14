@@ -50,15 +50,21 @@ don't reach back for Power Query or VBA.
   **pywin32 COM** (`win32com` reuses a running Excel; `win32gui` AttachThreadInput
   forces focus). COM is initialised on the click worker thread; if pywin32 is missing
   it falls back to `os.startfile`. It calls the `safetydb` modules directly (not
-  `run.py`) so it can attach those cell links. Window icon: `assets/Pipeline2.ico|png`.
+  `run.py`) so it can attach those cell links. **Dark-mode** toggle (toolbar) and
+  Consolas-16 notebook tabs; all theming lives in `theme.py` (light/dark palettes,
+  ttk 'clam' recolour, log tag colours). Window icon: `assets/Pipeline2.ico|png`.
+- `theme.py` — light/dark palettes + `apply_ttk` (tab font, widget colours), log tag
+  colours, the table font, and the zebra stripe colours. Shared by gui + editor.
 - `assets/` — app icon for `gui.py` (see `assets/README.md`).
 - `editor.py` — the GUI's **Files** tab: a file tree (config + `HardwareConfig` +
   `Output`) beside a `FileEditor`. `.csv` and `.xlsx`/`.xlsm` open in a **tksheet**
-  spreadsheet grid (in-cell edit, multi-select, copy/paste, undo, right-click
-  insert/delete row & column); CSVs are read with delimiter sniffing and saved
-  comma-delimited; xlsx edits round-trip via openpyxl (per sheet). Other files
-  (`.db`/`.json`/`.txt`/…) open in a plain text editor. Reusable + meant to grow
-  workflow-specific tooling. The tree refreshes after each pipeline run.
+  spreadsheet grid (Consolas font; in-cell edit, multi-select, copy/paste, undo,
+  right-click insert/delete row & column; **zebra rows** steelblue/light-blue; a
+  **Columns…** show/hide filter). CSVs read with delimiter sniffing, saved
+  comma-delimited; xlsx edits round-trip via openpyxl (per sheet) and show formula
+  strings, with a **Show values** checkbox that reloads cached values read-only.
+  Other files (`.db`/`.json`/…) open in a text editor. Follows the GUI's dark mode.
+  Reusable + meant to grow workflow-specific tooling. Tree refreshes after each run.
 - `interface_tool.py` — standalone IOC interface-table generator (see below); also
   invoked by `run.py` and `gui.py`.
 - `requirements.txt` — `openpyxl` (core); `tksheet` + `pywin32` (GUI). pywin32 is
