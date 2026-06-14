@@ -38,10 +38,11 @@ def main():
             row("IOC", "=S1", "+MC1.CC1", "-K66201", "10000", index="SORTER-01"),   # excluded (interface)
             row("A", "=S1", "+MS1.CC1", "-X1", "10000", "BASE", "ADDR"),            # excluded (no I/Q addr)
         ]
-        # mark KQ type as needing a safe DB
+        # E1/2 and KQ share one safe DB by db_name; A has none
         signal_types = {
-            "E1/2": {"db_kind": ""}, "A": {"db_kind": ""},
-            "KQ": {"db_kind": "safe_db"},
+            "E1/2": {"db_kind": "safe_db", "db_name": "01_Pushbutton"},
+            "A": {"db_kind": "", "db_name": ""},
+            "KQ": {"db_kind": "safe_db", "db_name": "01_Pushbutton"},
         }
 
         tables = outputs.build_io_tags(rows)
@@ -66,11 +67,14 @@ def main():
             head = f.readline().strip()
         check("tag CSV header", head == "Name;Data Type;Logical Address;Comment", head)
 
-        dbs = outputs.build_dbs(tables, signal_types)
-        check("safe DB built for KQ only", set(dbs) == {"FDB_KQ"}, str(list(dbs)))
-        check("DB member keeps tag name", dbs["FDB_KQ"]["members"] == [tables["KQ"][0]["name"]])
+        dbs = outputs.build_dbs(rows, signal_types)
+        check("DB grouped by db_name (E1/2 + KQ share one)", set(dbs) == {"01_Pushbutton"}, str(list(dbs)))
+        check("shared DB is fail-safe", dbs["01_Pushbutton"]["kind"] == "safe_db")
+        members = dbs["01_Pushbutton"]["members"]
+        check("shared DB combines both types' tags",
+              tables["E1/2"][0]["name"] in members and tables["KQ"][0]["name"] in members)
         outputs.write_dbs(dbs, tmp)
-        with open(os.path.join(tmp, "DBs", "FDB_KQ.db"), encoding="utf-8") as f:
+        with open(os.path.join(tmp, "DBs", "01_Pushbutton.db"), encoding="utf-8") as f:
             body = f.read()
         check("DB source has DATA_BLOCK + member", "DATA_BLOCK" in body and tables["KQ"][0]["name"] in body)
 

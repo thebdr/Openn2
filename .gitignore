@@ -24,3 +24,6 @@ Excel Resources/DatabaseTool/Output/
 # but the hand-authored interface template IS versioned source
 !Excel Resources/DatabaseTool/Templates/
 !Excel Resources/DatabaseTool/Templates/*.xlsx
+
+# Editor
+.vscode/

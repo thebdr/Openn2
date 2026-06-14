@@ -62,6 +62,8 @@ def load_signal_types() -> dict:
             "is_pattern": as_bool(r["is_pattern"]),
             # db_kind: "" none | "db" standard DB | "safe_db" fail-safe (F) DB
             "db_kind": (r.get("db_kind") or "").strip().lower(),
+            # db_name: target DB name; types may share one (E1/2 + B1/2 -> 01_Pushbutton)
+            "db_name": (r.get("db_name") or "").strip(),
         }
     return types
 

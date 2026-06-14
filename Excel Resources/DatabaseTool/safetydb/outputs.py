@@ -144,20 +144,30 @@ def write_diagnosis_list_io(rows: list, out_dir: str) -> int:
     return len(rows)
 
 
-def build_dbs(tables: dict, signal_types: dict) -> dict:
-    """For Script Types whose db_kind is set, a DB whose members reuse the tag
-    names. Returns dbname -> {kind, members}."""
+def build_dbs(io_rows: list, signal_types: dict) -> dict:
+    """Groups members into DBs by the type's db_name (types may share a DB,
+    e.g. E1/2 + B1/2 -> 01_Pushbutton). Members are ALL rows of a flagged type,
+    not just I/O-addressed tags - so address-less PA fieldbus alarms still get
+    their DB. Member name = the tag name; DB is fail-safe if any contributing
+    type is safe_db. Returns db_name -> {kind, members}."""
     dbs: dict[str, dict] = {}
-    for script, tags in tables.items():
+    for row in io_rows:
+        t = row.get("_type")
+        if not t or t["category"] == "Interface":
+            continue
+        script = str(row.get("script_type") or "").strip()
         rec = signal_types.get(script.upper())
         kind = rec["db_kind"] if rec else ""
         if kind not in ("db", "safe_db"):
             continue
-        prefix = "FDB" if kind == "safe_db" else "DB"
-        dbs[f"{prefix}_{_safe(script)}"] = {
-            "kind": kind,
-            "members": [t["name"] for t in tags],
-        }
+        member = tag_name(row)
+        if not member:
+            continue
+        name = (rec.get("db_name") or "").strip() or _safe(script)
+        g = dbs.setdefault(name, {"kind": kind, "members": []})
+        if kind == "safe_db":
+            g["kind"] = "safe_db"  # safety wins for a shared DB
+        g["members"].append(member)
     return dbs
 
 
