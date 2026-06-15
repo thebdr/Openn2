@@ -167,12 +167,15 @@ def rows_of(db: list, prefix: str) -> list:
 # one builder per template — EDIT THESE                                       #
 # --------------------------------------------------------------------------- #
 
-# $replace
+# $keep
 def build_00_only_for_commissioning(db: list) -> list:
-    """TEMPLATE--v1.0--00_Only for Commissioning.xml - TODO: gather instances.
-    keys: Bypass_memberOf:00_Commissioning
-    """
-    return []
+    """TEMPLATE--v1.0--00_Only for Commissioning.xml  (one @row; the commissioning-bypass
+    member of every I/O node as the horizontal ITERATOR). No sidecar -> no padding.
+    keys: Bypass_memberOf:00_Commissioning"""
+    bypasses = [f"{n['profinet_name']}_{n['subnet_name']}" for n in nodes(db)]
+    if not bypasses:
+        return []
+    return [{"Bypass_memberOf:00_Commissioning": bypasses}]
 
 
 # $keep
