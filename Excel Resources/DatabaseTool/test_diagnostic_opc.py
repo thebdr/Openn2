@@ -60,7 +60,7 @@ def main():
     a1 = re.search(r'"S1\.CABINET001\.ALARM1"\(.*?\);', scl, re.S).group(0)   # the FB call, not the DiagnosticTags ref
     check("alarm IN = tag, ML invert(FALSE), FL = node PROFINET_ALARMS",
           'IN_00 := "ALARM ONE =S1+MS1.CC1-F1"' in a1 and "ML_00 := FALSE" in a1
-          and 'FL_00 := "PROFINET_ALARMS"."n0005-x_Subnet50"' in a1)
+          and 'FL_00 := "PROFINET_NODES_ALARM"."n0005-x_Subnet50"' in a1)
     check("PA(node) IN = DB-qualified, ML mirror(TRUE), FL = false (no self-filter)",
           'IN_01 := "PROFINET_NODES_ALARM"."FIELD BUS FAILURE"' in a1
           and "ML_01 := TRUE" in a1
