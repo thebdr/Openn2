@@ -33,10 +33,13 @@ def row(script, cab, bit, type_hw, dev="-X", tag="", nid="", nc="", pn="", subne
 
 
 def main():
+    alarm0 = row("A", "001", "00", "A", dev="-F1", tag="ALARM ONE =S1+MS1.CC1-F1", nc="1")    # invert -> ML FALSE
+    alarm0["bit"] = "I1.0"                                                                    # address -> resolves to pa_node
+    pa_node = row("PA", "001", "01", "PA", pn="n0005-x", subnet="Subnet50", dlogic="mirror",
+                  nid="FIELD BUS FAILURE", dbnames=["PROFINET_NODES_ALARM"])                  # mirror, DB-qual IN, node-level -> FL false
+    pa_node["I_startByte"], pa_node["I_endByte"] = 0, 20                                      # the node covering alarm0
     db = [
-        row("A", "001", "00", "A", dev="-F1", tag="ALARM ONE =S1+MS1.CC1-F1", nc="1"),       # invert -> ML FALSE
-        row("PA", "001", "01", "PA", pn="n0005-x", subnet="Subnet50", dlogic="mirror",
-            nid="FIELD BUS FAILURE", dbnames=["PROFINET_NODES_ALARM"]),                       # mirror -> ML TRUE, DB-qual IN, FL
+        alarm0, pa_node,
         row("W", "001", "00", "W", dev="-W1", tag="WARN ONE", nc=""),                         # NoTristate warning
         row("A", "012", "00", "A", dev="-F12", tag="ALARM TWELVE", nc="1"),                   # tristate cabinet
         # encoder pair at PC1 -> List_Logic rule fires for cabinet 009
@@ -55,12 +58,13 @@ def main():
 
     import re
     a1 = re.search(r'"S1\.CABINET001\.ALARM1"\(.*?\);', scl, re.S).group(0)   # the FB call, not the DiagnosticTags ref
-    check("alarm IN = tag, ML invert(FALSE)",
-          'IN_00 := "ALARM ONE =S1+MS1.CC1-F1"' in a1 and "ML_00 := FALSE" in a1)
-    check("PA IN = DB-qualified, ML mirror(TRUE), FL = PROFINET_ALARMS node",
+    check("alarm IN = tag, ML invert(FALSE), FL = node PROFINET_ALARMS",
+          'IN_00 := "ALARM ONE =S1+MS1.CC1-F1"' in a1 and "ML_00 := FALSE" in a1
+          and 'FL_00 := "PROFINET_ALARMS"."n0005-x_Subnet50"' in a1)
+    check("PA(node) IN = DB-qualified, ML mirror(TRUE), FL = false (no self-filter)",
           'IN_01 := "PROFINET_NODES_ALARM"."FIELD BUS FAILURE"' in a1
           and "ML_01 := TRUE" in a1
-          and 'FL_01 := "PROFINET_ALARMS"."n0005-x_Subnet50"' in a1)
+          and "FL_01 := false" in a1)
     check("NoTristate alarm DWord = ALARM1", "Tristate_DW" not in a1)
     check("CabState instance = S1.CABINET001.STATE", '"S1.CABINET001.STATE"(' in scl)
     w1 = re.search(r'"S1\.CABINET001\.WARNING1"\(.*?\);', scl, re.S)
@@ -76,7 +80,7 @@ def main():
 
     check("List_Logic rule fired for the encoder pair (cabinet 009)",
           len(logic_entries) == 1 and logic_entries[0]["cabinet"] == 9
-          and logic_entries[0]["in"] == '"04_SPEED"."Safety Encoder =S1+PC1.CC1-X81001 Working - No Fault"')
+          and logic_entries[0]["in"] == '"04_SPEED"."Safety Encoder Failure =S1+PC1.CC1-X81001"')
 
     check("SCL is one FUNCTION", scl.count("FUNCTION") >= 1 and "END_FUNCTION" in scl)
 

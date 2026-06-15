@@ -120,16 +120,19 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
     # '' when the C&E doc is absent). Paired channels share their device's areas.
     matrix.annotate_areas(params, rows)
     for row in rows:
-        # name_in_db = the name this row gets as a DB member in the generated .db files
+        # name_in_db = the DB member name (the type's db_element template); '' when the
+        # type isn't DB-backed
         row["name_in_db"] = outputs.member_name(row)
-        # I/O tag identity: name_in_tagtable = the PLC tag name (no DB add_to_name suffix),
-        # tagtable = the tag-table (Path) it lands in; both '' when not a taggable I/O point
-        if outputs._is_io_signal(row):
+        # name_in_tagtable = the PLC I/O tag name (the type's tag_name template), tagtable =
+        # the tag-table (Path); both '' when not a taggable I/O point or the type is untagged
+        if outputs._is_io_signal(row) and outputs.tag_name(row):
             row["name_in_tagtable"] = outputs.tag_name(row)
             row["tagtable"] = outputs._tagtable(row)
         else:
             row["name_in_tagtable"] = ""
             row["tagtable"] = ""
+        # diag_desc = the diagnosis alarm/warning description (the type's diag_desc template)
+        row["diag_desc"] = outputs.diag_desc(row)
         # datablocks = the DB(s) this row is a member of ('|'-joined), '' when not DB-backed
         t = row.get("_type") or {}
         row["datablocks"] = ("|".join(t.get("db_names") or [])

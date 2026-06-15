@@ -187,7 +187,7 @@ def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> 
     rows, _warnings = staging.load_io_list(params, types)  # adds matrix_areas (in staging now)
     cols = [m["canonical"] for m in config.load_column_map("IoList")]
     extra = ["matrix_areas", "IsSorterArea", "name_in_db", "name_in_tagtable",
-             "tagtable", "datablocks", "subnet_name",
+             "tagtable", "datablocks", "diag_desc", "subnet_name",
              "I_startByte", "I_endByte", "Q_startByte", "Q_endByte",
              "_source_sheet", "_source_row", "type_id_resolved", "type_category"]
     csv_path = csv_path or os.path.join(_abs(params.get("output_dir", "Output")), "CentralDatabase.csv")
@@ -200,7 +200,8 @@ def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> 
             w.writerow([r.get(c, "") for c in cols]
                        + [r.get("matrix_areas", ""), r.get("IsSorterArea", ""),
                           r.get("name_in_db", ""), r.get("name_in_tagtable", ""),
-                          r.get("tagtable", ""), r.get("datablocks", ""), r.get("subnet_name", ""),
+                          r.get("tagtable", ""), r.get("datablocks", ""), r.get("diag_desc", ""),
+                          r.get("subnet_name", ""),
                           r.get("I_startByte", ""), r.get("I_endByte", ""),
                           r.get("Q_startByte", ""), r.get("Q_endByte", ""),
                           r.get("_source_sheet", ""), r.get("_source_row", ""),

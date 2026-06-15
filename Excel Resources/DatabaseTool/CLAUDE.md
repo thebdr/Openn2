@@ -136,15 +136,21 @@ AC=Suggested Type, AD=Index, AE/AF=Diag Cabinet/Bit, **AG=Hardware Parameters**.
 
 ## Signal types (`config/signal_types.csv`)
 
-21 types incl. `IOC` (interface) and pattern type `FA#` (matches FA1, FA2…).
-Per type: `category` (Safety/Diag/Std/Interface), `pair_key`+`channel` (paired
-channels E/B/ENC/DI = x1/2+x2/2), `in_diagnosis`, `db_kind` (`db`/`safe_db`),
-`db_names` (**`|`-separated** — a type may feed several identical DBs; types may
-also share one), `add_to_name` (text appended to each **DB member** name; `{canonical}`
-tokens are replaced by that column's value from the source row, e.g. `{profinet_ip}`),
-`tagtable_name` (the PLC tag-table the type's I/O tags go to). A paired channel-2 type
-with a blank `tagtable_name` **inherits its sibling's** (same `pair_key`) so both
-channels land in one table; an explicit value always wins.
+One row per type (incl. `IOC` interface + pattern type `FA#`). **Names and comments are
+per-type `{canonical}`-interpolation TEMPLATES** resolved per row (`outputs._interp`):
+- `tag_name` — the I/O tag name (`''` ⇒ the type isn't tagged on its own, e.g. a
+  channel-2 type that shares its sibling's device tag);
+- `db_element` — the **DB member** name (the full name, not a suffix);
+- `io_comment` — the tag + DB-member comment;
+- `diag_desc` — the diagnosis alarm/warning description (enriched onto the row as
+  `diag_desc`, surfaced in the CentralDatabase + List_IO/List_Logic).
+
+Other columns: `type_id_desc`, `category` (Safety/Diag/Std/Interface), `pair_key`+`channel`
+(paired channels E/B/ENC/DI = x1/2+x2/2), `is_pattern`, `tagtable_name` (PLC tag-table Path;
+a channel-2 type with a blank one **inherits its sibling's** by `pair_key`), `db_kind`
+(`db`/`safe_db`), `db_names` (**`|`-separated** — several identical DBs / types may share
+one), `in_diag`, `diag_logic` (`mirror`→ML TRUE / `invert`→ML FALSE / blank→from
+`normal_condition`).
 
 ## Output rules (current)
 
@@ -153,13 +159,13 @@ channels land in one table; an explicit value always wins.
   Accessible/Writeable, Typeobject ID, Version ID`; **all values text**, Hmi flags
   `"True"`, addresses **%-prefixed** `%I20.0`) + a `TagTable Properties` sheet of the
   distinct tables. **`Path` = the type's `tagtable_name`** (types sharing one land
-  together). Tag name = type description + FLD, except PA/PW/A/W use Description
-  language 1 (p1 + p2). Comment = `[<ScriptType> <Index>] <descr> [<drawing> <sheet>]`.
-  Only resolved non-interface types with an I/Q bit become tags.
+  together). **Tag name + comment come from the type's `tag_name` / `io_comment`
+  templates.** Only resolved non-interface types with an I/Q bit **and a non-empty
+  `tag_name`** become tags (so channel-2 types with blank `tag_name` are skipped).
 - **DBs** — grouped by `db_names` over **all rows** of flagged types (so PA, no I/O
   address, still gets its DB); fail-safe if any contributing type is `safe_db`. Every
-  DB opens with `ALWAYS_FALSE` + `ALWAYS_TRUE`. Each member is `"<tag name><add_to_name>"
-  : Bool; //<tag comment>` (the same comment string as the I/O tag). On re-run the
+  DB opens with `ALWAYS_FALSE` + `ALWAYS_TRUE`. Each member is `"<db_element>"
+  : Bool; //<io_comment>`. On re-run the
   `DBs/` and `IoTags/` folders are swept of prior artifacts so only the current run
   remains.
 - **Diagnosis** (`diagnostic_opc.py`) — writes `Output/Diagnosis/`: `List_IO.csv`
@@ -254,13 +260,13 @@ builder's own instance keys, first-seen order, falling back to a template scan �
 To author the builders, inspect `Output/CentralDatabase.csv` (`python block_templates.py
 staged`, or the GUI Configuration tab's Block templates panel) — canonical columns +
 `matrix_areas` + `IsSorterArea` + the three identity columns below + `subnet_name` +
-per-node `I_/Q_ start/end byte` + `_source_sheet`/`_source_row`/`type_id_resolved`/
-`type_category`; open it in the Pipeline2 **Files** tab and use the regex **Filter rows**
-to explore. A row's three identities (each `''` when N/A) — pick the one a `!!key$$`
-expects: **`name_in_db`** = the `.db` member name (with the type's `add_to_name` suffix,
-e.g. `… Working - No Fault`) — use for `…_memberOf:<DB>` keys; **`name_in_tagtable`** =
-the PLC I/O tag name (NO suffix) — use for `tagName:` keys; **`tagtable`** = the tag-table
-(Path) that tag lands in; **`datablocks`** = the DB(s) the member belongs to (`'|'`-joined). **`matrix_areas`** (`'|'`-joined, e.g. `AREA 1|AREA 2`)
+per-node `I_/Q_ start/end byte` + `diag_desc` + `_source_sheet`/`_source_row`/
+`type_id_resolved`/`type_category`; open it in the Pipeline2 **Files** tab and use the
+regex **Filter rows** to explore. A row's three identities (each `''` when N/A) — pick the
+one a `!!key$$` expects: **`name_in_db`** = the `.db` member name (the type's `db_element`
+template) — use for `…_memberOf:<DB>` keys; **`name_in_tagtable`** = the PLC I/O tag name
+(the `tag_name` template) — use for `tagName:` keys; **`tagtable`** = the tag-table (Path)
+that tag lands in; **`datablocks`** = the DB(s) the member belongs to (`'|'`-joined). **`matrix_areas`** (`'|'`-joined, e.g. `AREA 1|AREA 2`)
 is added in **staging** (`safetydb/matrix.py`, from the C&E workbook; `''` if the C&E
 doc is absent): for an **input** (I-address) it's the area columns marked `X` on that
 signal's CAUSE&EFFECT MATRIX row (EFFECT block from column `S`; the area = the column

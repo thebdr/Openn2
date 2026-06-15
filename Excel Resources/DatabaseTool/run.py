@@ -150,7 +150,7 @@ def main(argv=None) -> int:
     print(f"  rows staged    : {len(rows)}")
     print(f"  validation     : {failed} fail(s)")
     print(f"  I/O tags / DBs : {n_tags} / {n_dbs}")
-    print(f"  diagnosis rows : {n_diag}")
+    print(f"  diagnosis      : {d['io']} List_IO + {d['logic']} List_Logic + OPC SCL")
     print(f"  hardware       : {n_st} station(s), {n_mod} module(s), {hw_errors} error(s)")
     print(f"  interfaces     : {n_if} created")
     print(f"  coverage       : {cov['covered']}/{cov['total']} covered, {cov['orphans']} orphan(s), "

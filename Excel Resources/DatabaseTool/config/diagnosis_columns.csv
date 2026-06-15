@@ -8,6 +8,7 @@ Address,{bit}
 ID,{id_node}
 Desc L1,{desc_l1} {desc_l1b}
 Desc L2,{desc_l2} {desc_l2b}
+Diag Desc,{diag_desc}
 Functional unit,{functional_unit}
 Location,{location}
 Device,{device}

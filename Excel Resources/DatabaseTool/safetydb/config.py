@@ -124,36 +124,42 @@ def load_diagnosis_columns() -> list[tuple]:
 
 
 def load_signal_types() -> dict:
-    """type_id (upper) -> {type_id, description, category, pair_key, channel,
-    in_diagnosis(bool), is_pattern(bool), db_kind, db_names(list), add_to_name,
-    tagtable_name}."""
+    """type_id (upper) -> type record. Names/comments are `{canonical}`-interpolation
+    TEMPLATES resolved per row (see outputs._interp): `tag_name` (I/O tag), `db_element`
+    (DB member), `io_comment` (tag/member comment), `diag_desc` (diagnosis description).
+    Also: type_id_desc, category, pair_key, channel, is_pattern, db_kind, db_names(list),
+    in_diagnosis(bool), diagnosis_logic, tagtable_name."""
     types = {}
     for r in _read_csv("signal_types.csv"):
         tid = (r.get("type_id") or "").strip()
-        # db_names: '|'-separated; a type may feed several (identical) DBs.
-        # 'db_name' (legacy single) is still accepted as a fallback.
-        raw_names = (r.get("db_names") or r.get("db_name") or "").strip()
+        raw_names = (r.get("db_names") or "").strip()
         db_names = [n.strip() for n in raw_names.split("|") if n.strip()]
         types[tid.upper()] = {
             "type_id": tid,
-            "description": (r.get("description") or "").strip(),
+            "type_id_desc": (r.get("type_id_desc") or "").strip(),
             "category": (r.get("category") or "").strip(),
             "pair_key": (r.get("pair_key") or "").strip(),
             "channel": (r.get("channel") or "").strip(),
-            "in_diagnosis": as_bool(r.get("in_diagnosis")),
             "is_pattern": as_bool(r.get("is_pattern")),
+            # tagtable_name: PLC tag-table (Path) the type's I/O tags belong to.
+            "tagtable_name": (r.get("tagtable_name") or "").strip(),
+            # tag_name: I/O tag-name template ('' -> the type is not tagged on its own,
+            # e.g. a channel-2 type that shares its sibling's device tag).
+            "tag_name": (r.get("tag_name") or "").strip(),
             # db_kind: "" none | "db" standard DB | "safe_db" fail-safe (F) DB
             "db_kind": (r.get("db_kind") or "").strip().lower(),
             # db_names: target DBs; types may share one (E1/2 + B1/2 -> 01_Pushbutton)
             "db_names": db_names,
-            # add_to_name: text appended to each DB member name; '{canonical}'
-            # tokens are replaced by that column's value from the source row.
-            "add_to_name": (r.get("add_to_name") or "").strip(),
-            # tagtable_name: PLC tag-table (Path) the type's I/O tags belong to.
-            "tagtable_name": (r.get("tagtable_name") or "").strip(),
+            # db_element: DB-member-name template (the full member name, not a suffix).
+            "db_element": (r.get("db_element") or "").strip(),
+            "in_diagnosis": as_bool(r.get("in_diag")),
             # diagnosis_logic: mirror -> ML TRUE, invert -> ML FALSE, blank -> from
             # the row's normal_condition (see outputs.ml_value).
-            "diagnosis_logic": (r.get("diagnosis_logic") or "").strip().lower(),
+            "diagnosis_logic": (r.get("diag_logic") or "").strip().lower(),
+            # diag_desc: diagnosis alarm/warning description template.
+            "diag_desc": (r.get("diag_desc") or "").strip(),
+            # io_comment: I/O tag + DB-member comment template.
+            "io_comment": (r.get("io_comment") or "").strip(),
         }
     # A paired channel-2 type (e.g. E2/2) usually leaves tagtable_name blank; let it
     # inherit the sibling's table (same pair_key) so both channels of one device land

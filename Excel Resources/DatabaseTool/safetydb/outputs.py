@@ -1,16 +1,15 @@
 """Outputs: the PLC tag table (one TIA-style xlsx) and the DBs some types need.
 
-Tag name = <name part> + FLD, where FLD = FUNCTIONAL UNIT + LOCATION + DEVICE
-and <name part> is the signal type's description (signal_types.csv), except for
-PA/PW/A/W where it is "Description language 1 part 1 + part 2" (cols K + L).
-Comment   = [<Script Type> <Index>] <descL1 p1> <descL1 p2> [<drawing> <sheet>]
+Names + comments come from per-type `{canonical}`-interpolation TEMPLATES in
+signal_types.csv (resolved per row by `_interp`): `tag_name` (the I/O tag name; '' = the
+type isn't tagged on its own, e.g. a channel-2 type), `db_element` (the DB member name),
+`io_comment` (the tag + member comment), `diag_desc` (the diagnosis description).
 
 I/O tags -> a single TIA "PLC Tags" workbook (Output/IoTags/PLCTags.xlsx); each tag's
 Path is its signal type's `tagtable_name` (types may share a table). Logical addresses
 are %-prefixed (%I20.0). DBs: a type with db_kind set feeds every name in its
 `db_names` (| separated); every DB always starts with ALWAYS_FALSE + ALWAYS_TRUE; each
-member carries the tag comment and its name gets the type's `add_to_name` appended
-(with {canonical} tokens resolved from the source row).
+member name = the `db_element` template, carrying the `io_comment`.
 """
 from __future__ import annotations
 import csv
@@ -33,11 +32,6 @@ def _clear(directory: str, *patterns: str) -> None:
             except OSError:
                 pass
 
-# types whose tag name uses the row description instead of the type description
-DESC_NAME_TYPES = {"PA", "PW", "A", "W"}
-NAME_SEP = " "  # between the name part and the FLD  (see README / confirm)
-
-
 def fld(row) -> str:
     """The FUNCTIONAL UNIT + LOCATION + DEVICE concatenation, as written."""
     return (str(row.get("functional_unit") or "").strip()
@@ -45,11 +39,22 @@ def fld(row) -> str:
             + str(row.get("device") or "").strip())
 
 
-def _descr(row) -> str:
-    """Description language 1 part 1 + part 2 (cols K + L), joined with a space."""
-    p1 = str(row.get("desc_l1") or "").strip()
-    p2 = str(row.get("desc_l1b") or "").strip()
-    return " ".join(p for p in (p1, p2) if p)
+_TOKEN = re.compile(r"\{([A-Za-z0-9_]+)\}")
+
+
+def _resolve_tokens(text: str, row) -> str:
+    """Replace {canonical} tokens with that column's value from the staged row."""
+    return _TOKEN.sub(lambda m: str(row.get(m.group(1), "") or ""), text or "")
+
+
+def _interp(template: str, row) -> str:
+    """Resolve a signal-type `{canonical}` template against the row; trim the outer
+    whitespace (templates carry intentional inner spacing)."""
+    return _resolve_tokens(template, row).strip()
+
+
+def _tpl(row, key: str) -> str:
+    return (row.get("_type") or {}).get(key, "")
 
 
 def _is_io_signal(row) -> bool:
@@ -62,26 +67,19 @@ def _is_io_signal(row) -> bool:
 
 
 def tag_name(row) -> str:
-    t = row["_type"]
-    script = str(row.get("script_type") or "").strip().upper()
-    name_part = _descr(row).strip() if script in DESC_NAME_TYPES else t["description"]
-    return f"{name_part}{NAME_SEP}{fld(row)}".strip()
+    """The PLC I/O tag name from the type's `tag_name` template ('' when the type isn't
+    tagged on its own, e.g. a channel-2 type sharing its sibling's device tag)."""
+    return _interp(_tpl(row, "tag_name"), row)
 
 
 def tag_comment(row) -> str:
-    script = str(row.get("script_type") or "").strip()
-    index = str(row.get("index") or "").strip()
-    drawing = str(row.get("drawing") or "").strip()
-    sheet = str(row.get("sheet") or "").strip()
-    return f"[{script} {index}] {_descr(row)} [{drawing} {sheet}]"
+    """The I/O tag + DB-member comment from the type's `io_comment` template."""
+    return _interp(_tpl(row, "io_comment"), row)
 
 
-_TOKEN = re.compile(r"\{([A-Za-z0-9_]+)\}")
-
-
-def _resolve_tokens(text: str, row) -> str:
-    """Replace {canonical} tokens with that column's value from the staged row."""
-    return _TOKEN.sub(lambda m: str(row.get(m.group(1), "") or ""), text or "")
+def diag_desc(row) -> str:
+    """The diagnosis alarm/warning description from the type's `diag_desc` template."""
+    return _interp(_tpl(row, "diag_desc"), row)
 
 
 def _logical_address(bit) -> str:
@@ -103,9 +101,12 @@ def build_io_tags(io_rows: list) -> dict:
     for row in io_rows:
         if not _is_io_signal(row):
             continue
+        name = tag_name(row)
+        if not name:                       # untagged type (empty tag_name, e.g. channel-2)
+            continue
         path = _tagtable(row)
         tables.setdefault(path, []).append({
-            "name": tag_name(row),
+            "name": name,
             "path": path,
             "data_type": "Bool",
             "address": _logical_address(row.get("bit")),
@@ -149,13 +150,6 @@ def write_io_tags(tables: dict, out_dir: str) -> int:
         props.append([path, "", ""])
     wb.save(os.path.join(tag_dir, "PLCTags.xlsx"))
     return total
-
-
-def _descr2(row) -> str:
-    """Description language 2 part 1 + part 2 (cols M + N), joined with a space."""
-    p1 = str(row.get("desc_l2") or "").strip()
-    p2 = str(row.get("desc_l2b") or "").strip()
-    return " ".join(p for p in (p1, p2) if p)
 
 
 # The >List_IO / >List_Logic column layout is config-driven (config/diagnosis_columns.csv);
@@ -225,29 +219,22 @@ def write_diagnosis_list_io(rows: list, out_dir: str, filename: str = "List_IO.c
 DB_CONSTANTS = ["ALWAYS_FALSE", "ALWAYS_TRUE"]
 
 
-def _db_member_name(row, rec) -> str:
-    """Tag name with the type's add_to_name appended ({canonical} tokens resolved)."""
-    base = tag_name(row)
-    add = _resolve_tokens(rec.get("add_to_name", ""), row).strip()
-    return f"{base} {add}".strip() if add else base
-
-
 def member_name(row) -> str:
-    """The name this row gets as a member of its DB in the generated .db files, or
-    '' if its signal type is not DB-backed. (Same value build_dbs writes - used to
-    enrich the CentralDatabase with `name_in_db`.)"""
+    """The name this row gets as a member of its DB in the generated .db files (the type's
+    `db_element` template, interpolated), or '' if its type is not DB-backed. Same value
+    build_dbs writes - used to enrich the CentralDatabase with `name_in_db`."""
     t = row.get("_type") or {}
     if t.get("db_kind") not in ("db", "safe_db"):
         return ""
-    return _db_member_name(row, t)
+    return _interp(t.get("db_element", ""), row)
 
 
 def build_dbs(io_rows: list, signal_types: dict) -> dict:
     """Groups members into DBs by the type's db_names (| separated -> several
     identical DBs; types may also share a name, e.g. E1/2 + B1/2 -> 01_Pushbutton).
     Members are ALL rows of a flagged type (so address-less PA alarms still get a
-    DB). Every DB opens with ALWAYS_FALSE + ALWAYS_TRUE; each member keeps the tag
-    comment and gets the type's add_to_name suffix. A DB is fail-safe if any
+    DB). Every DB opens with ALWAYS_FALSE + ALWAYS_TRUE; each member name is the type's
+    `db_element` template and carries the `io_comment`. A DB is fail-safe if any
     contributing type is safe_db. Returns name -> {kind, members:[{name, comment}]}."""
     dbs: dict[str, dict] = {}
 
@@ -272,7 +259,7 @@ def build_dbs(io_rows: list, signal_types: dict) -> dict:
             names = [n.strip() for n in names.split("|") if n.strip()]
         if not names:
             names = [_safe(script)]
-        member = {"name": _db_member_name(row, rec), "comment": tag_comment(row)}
+        member = {"name": member_name(row), "comment": tag_comment(row)}
         if not member["name"]:
             continue
         for name in names:

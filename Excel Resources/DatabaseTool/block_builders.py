@@ -353,7 +353,7 @@ def build_07_speed_control(db: list) -> list:
         enc2 = _first(encoders_of(db, num, "ENC2/2"))
         member1 = enc1["name_in_db"] if enc1 else ""    # DB member (with 'Working - No Fault')
         member2 = enc2["name_in_db"] if enc2 else ""
-        broken = re.sub(r"\s*Sensor\s*[12]\b", "", member1).strip()   # drop 'Sensor N' -> common name
+        broken = f"Safety Encoder Failure {_fld(enc1)}" if enc1 else ""   # the common encoder-failure member (matches diagnosis_logic_rules)
         out.append({
             "tagName:EncoderSensor1":                      enc1["name_in_tagtable"] if enc1 else "",
             "tagName:EncoderSensor2":                      enc2["name_in_tagtable"] if enc2 else "",
