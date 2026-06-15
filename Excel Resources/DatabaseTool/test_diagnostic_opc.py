@@ -42,14 +42,17 @@ def main():
         alarm0, pa_node,
         row("W", "001", "00", "W", dev="-W1", tag="WARN ONE", nc=""),                         # NoTristate warning
         row("A", "012", "00", "A", dev="-F12", tag="ALARM TWELVE", nc="1"),                   # tristate cabinet
-        # encoder pair at PC1 -> List_Logic rule fires for cabinet 009
-        row("ENC1/2", "", "", "F", dev="-X81001", loc="+PC1.CC1", dlogic="invert", in_diag=False),
-        row("ENC2/2", "", "", "F", dev="-X81001", loc="+PC1.CC1", dlogic="invert", in_diag=False),
+        # encoder pair physically at PC1 (cabinet 009) but ASSIGNED to cabinet 014 (their
+        # diag_cabinet); they occupy bits 00/01 there, so the rule-generated "Safety Encoder
+        # Failure" must land in 014 at the next free bit (02) - NOT in PC1's 009.
+        row("ENC1/2", "014", "00", "A", dev="-X81001", loc="+PC1.CC1", tag="ENC ONE HEALTHY", dlogic="invert"),
+        row("ENC2/2", "014", "01", "A", dev="-X81001", loc="+PC1.CC1", tag="ENC TWO HEALTHY", dlogic="invert"),
     ]
     blocks = {
         1:  {"index": "001", "fld": "=S1+MS1.CC1", "template_type": "1"},   # AutoReset/NoTristate
         9:  {"index": "009", "fld": "=S1+PC1.CC1", "template_type": "1"},
         12: {"index": "012", "fld": "=S1+Field", "template_type": "2"},     # AutoReset/Tristate
+        14: {"index": "014", "fld": "=S1+SafetyEncoders", "template_type": "2"},
     }
 
     logic_rows, logic_entries = diagnosis_rules.build_list_logic(db, blocks)
@@ -78,8 +81,9 @@ def main():
 
     check("unused channels removed (no IN_05 in cabinet 001 ALARM1)", "IN_05" not in a1)
 
-    check("List_Logic rule fired for the encoder pair (cabinet 009)",
-          len(logic_entries) == 1 and logic_entries[0]["cabinet"] == 9
+    check("List_Logic rule lands in the encoders' cabinet (014) at next free bit (02)",
+          len(logic_entries) == 1 and logic_entries[0]["cabinet"] == 14
+          and logic_entries[0]["bit"] == 2
           and logic_entries[0]["in"] == '"04_SPEED"."Safety Encoder Failure =S1+PC1.CC1-X81001"')
 
     check("SCL is one FUNCTION", scl.count("FUNCTION") >= 1 and "END_FUNCTION" in scl)

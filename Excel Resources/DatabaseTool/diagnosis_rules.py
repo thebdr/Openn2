@@ -67,15 +67,17 @@ def build_list_logic(db: list, blocks: dict) -> tuple[list, list]:
 
     logic_rows, entries = [], []
     for rule in rules:
-        # group matched rows by cabinet (FLD -> DiagnosticBlocks; fallback the row's diag_cabinet)
+        # group matched rows by cabinet (the row's own diag_cabinet - the cabinet the signal
+        # is assigned to; fallback FLD -> DiagnosticBlocks for rows with no diag_cabinet)
         by_cab = {}
         for r in db:
             if r.get("script_type") not in rule["required_types"]:
                 continue
-            fld = f"{r.get('functional_unit', '')}{r.get('location', '')}"
-            cab = fld_to_cab.get(fld)
-            if cab is None and str(r.get("diag_cabinet", "")).strip().isdigit():
-                cab = int(r.get("diag_cabinet"))
+            dc = str(r.get("diag_cabinet", "")).strip()
+            if dc.lstrip("-").isdigit():
+                cab = int(dc)
+            else:
+                cab = fld_to_cab.get(f"{r.get('functional_unit', '')}{r.get('location', '')}")
             if cab is not None:
                 by_cab.setdefault(cab, {}).setdefault(r["script_type"], []).append(r)
 
