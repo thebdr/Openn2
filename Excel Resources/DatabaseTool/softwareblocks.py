@@ -20,7 +20,6 @@ C/D for reference). Not part of the pipeline.
 from __future__ import annotations
 import argparse
 import csv
-import json
 import os
 import sys
 
@@ -30,9 +29,9 @@ if _HERE not in sys.path:
 
 from safetydb import config, staging
 import block_builders
+import block_templates
 
 TEMPLATES_DIR = os.path.join(_HERE, "Templates", "Tia Portal Software Blocks")
-TEMPLATES_JSON = os.path.join(config.CONFIG_DIR, "block_templates.json")
 META_COLS = ["TemplateType", "#Templates Capacity", "#Templates Index", "#Elements Needed"]
 TEMPLATE_PATH_PREFIX = r"\XML Templates"   # how the $ directive references the template
 
@@ -64,16 +63,19 @@ def _pick(table: list, n: int):
     return table[-1]
 
 
-def _template_keys(stem: str) -> list:
-    with open(TEMPLATES_JSON, encoding="utf-8") as f:
-        return list(json.load(f).get(stem, {}).keys())
-
-
 def build_template_csv(stem: str, builder, db: list) -> list:
     """Return the CSV grid (list of rows) for one template."""
     table = _load_capacity(stem)
     instances = builder(db)
-    keys = _template_keys(stem)
+    # column keys = the union of the builders' instance keys (first-seen order); if the
+    # builder produced nothing, fall back to scanning the template (no json needed).
+    keys = []
+    for inst in instances:
+        for k in inst:
+            if k != "_pad" and k not in keys:
+                keys.append(k)
+    if not keys:
+        keys = block_templates.scan_template_keys().get(stem, [])
 
     # the iterator key = the one that carries a list value
     iter_key = next((k for inst in instances for k, v in inst.items() if isinstance(v, list)), None)
