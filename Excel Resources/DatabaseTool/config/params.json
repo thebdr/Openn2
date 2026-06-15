@@ -16,9 +16,10 @@
   "device_types_db": "../../HardwareConfig/DeviceTypesDatabase.csv",
   "safety_nets": ["192.168.50", "192.168.51"],
   "areas": ["AREA 1", "AREA 2", "AREA 3", "AREA 4"],
+  "sorter_areas": ["AREA 1"],
   "strike_handling": "exclude",
   "diag_bit_min": 0,
-  "diag_bit_max": 63,
+  "diag_bit_max": 62,
   "output_dir": "Output",
   "csv_delimiter": ",",
   "interface_template": "Templates/TEMPLATE_INTERFACES_v0.0.xlsx"

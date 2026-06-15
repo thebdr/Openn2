@@ -48,19 +48,10 @@ def load_params(path: str | None = None) -> dict:
     return params
 
 
-def load_project_config(path: str | None = None) -> dict:
-    """Manually-maintained project config (config/config.json), {} if absent."""
-    path = path or os.path.join(CONFIG_DIR, "config.json")
-    if not os.path.exists(path):
-        return {}
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def sorter_areas(project: dict | None = None) -> set:
-    """Set of area names flagged IsSorterArea=true in the project config."""
-    project = project if project is not None else load_project_config()
-    return {a for a, v in (project.get("areas") or {}).items() if (v or {}).get("IsSorterArea")}
+def sorter_areas(params: dict | None = None) -> set:
+    """Areas flagged as sorter-style, from params.json 'sorter_areas' (a list of AREA names)."""
+    params = params if params is not None else load_params()
+    return set(as_sheet_list(params.get("sorter_areas")))
 
 
 def parse_params_by_type(blob: str) -> dict:

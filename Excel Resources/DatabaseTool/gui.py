@@ -67,6 +67,7 @@ PARAM_SPEC = [
     ("diag_bit_max",          "Diag bit max",            "int"),
     ("safety_nets",           "Safety nets (comma sep)", "list"),
     ("areas",                 "Areas (comma sep)",       "list"),
+    ("sorter_areas",          "Sorter areas (comma sep)","list"),
 ]
 
 PHASES = ["Staging", "Validation", "I/O Tags", "DBs", "Diagnosis", "Hardware", "Interfaces"]
