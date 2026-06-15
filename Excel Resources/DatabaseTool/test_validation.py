@@ -80,6 +80,41 @@ def main():
     check("AREA 1 C4 checked with cell address -> FAIL", e is not None and e.level == "FAIL")
     check("log includes passes and fails", any(x.level == "PASS" for x in log) and any(x.level == "FAIL" for x in log))
 
+    # --- diagnosis bit map checks ---------------------------------------
+    def drow(cab, bit, thw, dev, srow, in_diag=True):
+        return {"diag_cabinet": cab, "diag_bit": bit, "type_hw": thw,
+                "functional_unit": "=S1", "location": "+PC1.CC1", "device": dev,
+                "_source_sheet": "NET SAFETY 50", "_source_row": srow,
+                "_type": {"in_diagnosis": in_diag}}
+
+    diag_rows = [
+        drow("014", "00", "A", "-F1", 11),                 # unique alarm -> PASS
+        drow("014", "01", "A", "-F2", 12),                 # collides with -F3 below
+        drow("014", "01", "A", "-F3", 13),                 # duplicate alarm slot 014.01
+        drow("014", "01", "AW", "-W1", 14),                # same cab/bit but WARNING family -> ok
+        drow("", "05", "A", "-F5", 15),                    # missing Diag Cabinet
+        drow("014", "", "A", "-F6", 16),                   # missing Diag Bit
+        drow("", "", "A", "-X9", 17, in_diag=False),       # not in-diagnosis -> ignored
+    ]
+    dlog = []
+    validation.check_diagnosis_bits({"io_list": {"path": "io.xlsx"}}, diag_rows, dlog)
+    for e in dlog:
+        print("   " + e.format())
+    fails = [e for e in dlog if e.level == "FAIL"]
+    dups = [e for e in fails if "duplicate" in e.message]
+    miss = [e for e in fails if "missing" in e.message]
+    check("duplicate alarm slot 014.01 flagged on BOTH rows", len(dups) == 2
+          and all("ALARM" in e.address for e in dups))
+    check("warning at same cab/bit is a separate slot -> PASS",
+          any(e.level == "PASS" and "WARNING" in e.address for e in dlog))
+    check("missing Diag Cabinet -> FAIL", any("Diag Cabinet" in e.message for e in miss))
+    check("missing Diag Bit -> FAIL", any("Diag Bit" in e.message for e in miss))
+    check("non in-diagnosis row ignored", all("-X9" not in (e.key or "") for e in dlog))
+    check("diagnosis entries link to the I/O List path",
+          all(e.path == "io.xlsx" for e in dlog if e.level in ("PASS", "FAIL")))
+    check("diagnosis entry locations point at AE/AF cells",
+          all(("!AE" in e.location or "!AF" in e.location) for e in fails + [e for e in dlog if e.level == "PASS"]))
+
     print("ALL CHECKS PASS" if failures == 0 else f"{failures} CHECK(S) FAILED")
     raise SystemExit(0 if failures == 0 else 1)
 

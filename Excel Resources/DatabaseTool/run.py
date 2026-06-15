@@ -75,17 +75,15 @@ def main(argv=None) -> int:
         print(f"  - {w}")
 
     # ---- validation ----------------------------------------------------
-    _section("VALIDATION  (C&E / AREA vs I/O List)")
-    failed = 0
-    if os.path.exists(params["ce"]["path"]):
-        log = validation.validate(params, rows)
-        passed, failed = validation.write_log(log, out_dir)
-        print(f"  {passed} passed, {failed} failed  ->  {os.path.join(out_dir, 'validation_log.txt')}")
-        for e in log:
-            if e.level == "FAIL":
-                print(f"  FAIL {e.location}: {e.message}")
-    else:
-        print(f"  C&E document not found ({params['ce']['path']}) - skipped")
+    _section("VALIDATION  (C&E / AREA + diagnosis bit map vs I/O List)")
+    if not os.path.exists(params["ce"]["path"]):
+        print(f"  C&E document not found ({params['ce']['path']}) - C&E/AREA checks skipped")
+    log = validation.validate(params, rows)
+    passed, failed = validation.write_log(log, out_dir)
+    print(f"  {passed} passed, {failed} failed  ->  {os.path.join(out_dir, 'validation_log.txt')}")
+    for e in log:
+        if e.level == "FAIL":
+            print(f"  FAIL {e.location}: {e.message}")
 
     # ---- I/O tags ------------------------------------------------------
     _section("I/O TAGS")

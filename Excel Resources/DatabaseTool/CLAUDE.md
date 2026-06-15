@@ -33,7 +33,12 @@ don't reach back for Power Query or VBA.
     (header verified by prefix; the doc has duplicate "Description language"
     headers and newline-wrapped headers, so a name map is unsafe). Excludes
     struck rows and rows with a Skip Reason. Resolves each row's signal type.
-  - `validation.py` — `validate`: C&E matrix + `AREA n` sheets vs the I/O List.
+  - `validation.py` — `validate`: C&E matrix + `AREA n` sheets vs the I/O List, plus
+    `check_diagnosis_bits` (always runs, I/O List only): every in-diagnosis signal must
+    carry a numeric Diag Cabinet (AE) + Diag Bit (AF), and (cabinet, bit) must be unique
+    within its alarm/warning family (col R 'Type' ending 'W' = warning) - missing/invalid
+    or colliding slots are FAILs. Each `LogEntry` carries the source `path` (I/O List vs
+    C&E doc) so the GUI links the right workbook/cell.
   - `outputs.py` — I/O tags, DBs, diagnosis List_IO (config-driven columns + `plc_binding`/
     `ml_value`).
   - `hardware.py` — `extract`: format-2 Stations + Modules.

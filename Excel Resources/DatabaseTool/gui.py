@@ -668,13 +668,12 @@ class App:
             self._log("WARNING" if is_warn else "INFO", w, self._staging_link(w) if is_warn else None)
 
     def _phase_validation(self):
-        self._section("VALIDATION  (C&E / AREA vs I/O List)")
+        self._section("VALIDATION  (C&E / AREA + diagnosis bit map vs I/O List)")
         self._ensure_staged()
         ce = self._params["ce"]
         if not os.path.exists(ce["path"]):
-            self._log("WARNING", f"C&E document not found - skipped: {ce['path']}")
-            return
-        self._stat("validating C&E / AREA ...")
+            self._log("WARNING", f"C&E document not found - C&E/AREA checks skipped: {ce['path']}")
+        self._stat("validating ...")
         log = validation.validate(self._params, self._rows)
         passed, failed = validation.write_log(log, self._out_dir())
         self._log("OK" if failed == 0 else "WARNING",
@@ -683,7 +682,7 @@ class App:
             link = None
             if "!" in e.location:
                 sheet, cell = e.location.split("!", 1)
-                link = {"path": ce["path"], "sheet": sheet, "cell": cell}
+                link = {"path": e.path or ce["path"], "sheet": sheet, "cell": cell}
             if e.level == "FAIL":
                 self._log("FAIL", f"{e.location}: {e.message}", link)
 

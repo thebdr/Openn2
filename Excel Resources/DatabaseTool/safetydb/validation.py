@@ -1,4 +1,5 @@
-"""Validation: cross-check the C&E matrix and AREA sheets against the I/O List.
+"""Validation: cross-check the C&E matrix and AREA sheets against the I/O List, and
+sanity-check the diagnosis bit map of the in-diagnosis signals.
 
 Match key = FUNCTIONAL UNIT + LOCATION + DEVICE; address = the Bit/address cell.
   I/O List : functional_unit (O) + location (P) + device (Q), address = bit (G)
@@ -6,7 +7,15 @@ Match key = FUNCTIONAL UNIT + LOCATION + DEVICE; address = the Bit/address cell.
   AREA n   : column A (already concatenated),        address = column C
 Every C&E / AREA reference must exist in the I/O List with a matching address.
 Only the CAUSE&EFFECT MATRIX and AREA n sheets are checked - all other sheets
-are ignored. Every check is logged (pass AND fail) with its cell addresses.
+are ignored.
+
+Diagnosis bit map (I/O List, columns Diag Cabinet AE / Diag Bit AF): every signal
+flagged in-diagnosis must carry a numeric Diag Cabinet + Diag Bit (else it cannot be
+placed in the OPC diagnosis DWords), and no two may share the same cabinet/bit within
+the same alarm/warning family (they would overwrite one another in the packed DWord).
+
+Every check is logged (pass AND fail) with its cell address; the offending workbook is
+carried on the entry (`path`) so the GUI can link the I/O List vs the C&E document.
 """
 from __future__ import annotations
 import os
@@ -17,14 +26,15 @@ from . import config
 
 
 class LogEntry:
-    __slots__ = ("level", "location", "key", "address", "message")
+    __slots__ = ("level", "location", "key", "address", "message", "path")
 
-    def __init__(self, level, location, key, address, message):
+    def __init__(self, level, location, key, address, message, path=None):
         self.level = level          # PASS / FAIL / INFO
         self.location = location    # "Sheet!Cell"
         self.key = key
         self.address = address
         self.message = message
+        self.path = path            # workbook the location refers to (None -> the C&E doc)
 
     def format(self) -> str:
         head = f"[{self.level:4}] {self.location}"
@@ -132,12 +142,80 @@ def check_area_sheets(params: dict, io_index: dict, log: list) -> None:
     wb.close()
 
 
+def _is_warning(row) -> bool:
+    """Alarm vs warning family (I/O List col R 'Type' ending in 'W' = warning)."""
+    return str(row.get("type_hw", "")).strip().upper().endswith("W")
+
+
+def _diag_loc(row, col: str) -> str:
+    """'Sheet!<col><row>' back into the I/O List for a staged row (just the sheet when the
+    source row wasn't recorded)."""
+    sheet = row.get("_source_sheet") or "I/O List"
+    r = row.get("_source_row")
+    return f"{sheet}!{col}{r}" if r else sheet
+
+
+def _dev_label(row) -> str:
+    fld = f"{row.get('functional_unit', '')}{row.get('location', '')}{row.get('device', '')}"
+    return fld or "(no device)"
+
+
+def check_diagnosis_bits(params: dict, io_rows: list, log: list) -> None:
+    """Validate the diagnosis bit map of the in-diagnosis signals: each must carry a numeric
+    Diag Cabinet + Diag Bit, and (cabinet, bit) must be unique within its alarm/warning
+    family. Missing/invalid -> FAIL; collision -> FAIL on every colliding row; otherwise PASS.
+    Entries link back to the I/O List (Diag Cabinet col AE / Diag Bit col AF)."""
+    try:
+        cols = {m["canonical"]: m["column"] for m in config.load_column_map("IoList")}
+    except Exception:  # noqa: BLE001 - fall back to the documented positions
+        cols = {}
+    cab_col, bit_col = cols.get("diag_cabinet", "AE"), cols.get("diag_bit", "AF")
+    io_path = (params.get("io_list") or {}).get("path", "")
+
+    diag_rows = [r for r in io_rows if (r.get("_type") or {}).get("in_diagnosis")]
+    by_slot: dict[tuple, list] = {}
+    for r in diag_rows:
+        cab = str(r.get("diag_cabinet", "")).strip()
+        bit = str(r.get("diag_bit", "")).strip()
+        cab_ok, bit_ok = cab.lstrip("-").isdigit(), bit.lstrip("-").isdigit()
+        if not cab_ok or not bit_ok:
+            missing = ([f"Diag Cabinet ('{cab}')"] if not cab_ok else []) + \
+                      ([f"Diag Bit ('{bit}')"] if not bit_ok else [])
+            loc = _diag_loc(r, cab_col if not cab_ok else bit_col)
+            log.append(LogEntry("FAIL", loc, _dev_label(r), f"{cab}.{bit}",
+                                f"in-diagnosis signal missing/invalid {', '.join(missing)}", io_path))
+            continue
+        fam = "WARNING" if _is_warning(r) else "ALARM"
+        by_slot.setdefault((int(cab), int(bit), fam), []).append(r)
+
+    for (cab, bit, fam), members in sorted(by_slot.items()):
+        slot = f"{cab:03d}.{bit:02d} {fam}"
+        if len(members) == 1:
+            r = members[0]
+            log.append(LogEntry("PASS", _diag_loc(r, cab_col), _dev_label(r), slot,
+                                "diagnosis slot unique", io_path))
+        else:
+            for r in members:
+                others = ", ".join(_diag_loc(m, bit_col) for m in members if m is not r)
+                log.append(LogEntry("FAIL", _diag_loc(r, bit_col), _dev_label(r), slot,
+                                    f"duplicate diagnosis slot {slot} - also at {others}", io_path))
+
+    if diag_rows:
+        log.append(LogEntry("INFO", "Diagnosis", "", "", f"{len(diag_rows)} in-diagnosis signal(s) checked"))
+
+
 def validate(params: dict, io_rows: list) -> list:
     io_index = build_io_index(io_rows)
     log: list[LogEntry] = []
     log.append(LogEntry("INFO", "I/O List", "", "", f"{len(io_index)} distinct device key(s) indexed"))
-    check_ce_matrix(params, io_index, log)
-    check_area_sheets(params, io_index, log)
+    check_diagnosis_bits(params, io_rows, log)                  # I/O List only - always runs
+    ce_path = (params.get("ce") or {}).get("path", "")
+    if ce_path and os.path.exists(ce_path):
+        check_ce_matrix(params, io_index, log)
+        check_area_sheets(params, io_index, log)
+    else:
+        log.append(LogEntry("INFO", "C&E", "", "",
+                            f"C&E document not found ({ce_path}) - C&E/AREA checks skipped"))
     return log
 
 
