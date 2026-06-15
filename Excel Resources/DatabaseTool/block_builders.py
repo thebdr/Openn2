@@ -151,6 +151,18 @@ def _first(seq):
     return seq[0] if seq else None
 
 
+def _fld(r) -> str:
+    """FUNCTIONAL UNIT + LOCATION + DEVICE, as written (matches outputs.fld)."""
+    return (str(r.get("functional_unit") or "").strip()
+            + str(r.get("location") or "").strip()
+            + str(r.get("device") or "").strip())
+
+
+def rows_of(db: list, prefix: str) -> list:
+    """Rows whose script_type starts with `prefix` (e.g. 'KQ' matches KQ, KQ1/2, KQ2/2)."""
+    return [r for r in db if str(r.get("script_type", "")).upper().startswith(prefix.upper())]
+
+
 # --------------------------------------------------------------------------- #
 # one builder per template — EDIT THESE                                       #
 # --------------------------------------------------------------------------- #
@@ -216,16 +228,61 @@ def build_04_estop(db: list) -> list:
     return []
 
 
-# $replace
+# $keep
 def build_05_output_feedback(db: list) -> list:
-    """TEMPLATE--v1.1--05_Output Feedback.xml - TODO: gather instances.
+    """TEMPLATE--v1.1--05_Output Feedback.xml  (one @row per KQ unit).
+
+    Families (fixed numbered slots, not one ITERATOR):
+      ContactorOutput  <- the unit's KQ channel(s); Contactor{n}_Output = KQ name_in_tagtable
+      FeedbackInput    <- KI rows of the same device(s); Contactor{n}_FeedbackInput = KI name_in_tagtable
+      OnCondition      <- one per matrix_area of the KQ; value 'AREA {nn} Q_Delayed' (+ Reset 'AREA {nn} RESET')
+    Contactor{n}_QBadInput = 'QBAD_' + that output's name_in_tagtable.
+    Error_memberOf:03_FDBACK_RAW = the KQ's name_in_db (it's a member of 03_FDBACK_RAW).
+    instanceOf:FDBACK = 'FDBACK_' + the KQ's FLD (+ '_<device>' per extra KQ channel of the unit).
+
+    NOTE: TemplateType is NOT set here - it comes from the 3-family capacity sidecar
+    (OnCondition / FeedbackInput / ContactorOutput), which needs its #Templates Index
+    column finished + a multi-family engine pass. Slots are filled; sizing is pending.
     keys: OnCondition1_memberOf:05_EM_STATE, tagName:Contactor1_FeedbackInput, tagName:Contactor1_QBadInput,
     Reset1_memberOf:05_EM_STATE, tagName:Contactor1_Output, Error_memberOf:03_FDBACK_RAW, instanceOf:FDBACK,
     NetworkComment, tagName:Contactor2_FeedbackInput, tagName:Contactor3_FeedbackInput,
     tagName:Contactor4_FeedbackInput, tagName:Contactor2_QBadInput, tagName:Contactor2_Output,
     OnCondition2_memberOf:05_EM_STATE, Reset2_memberOf:05_EM_STATE
     """
-    return []
+    out = []
+    # group KQ rows into units by device (channels KQ1/2+KQ2/2 of one device -> one unit)
+    units = {}
+    for kq in rows_of(db, "KQ"):
+        units.setdefault(kq.get("device", ""), []).append(kq)
+
+    for dev, kqs in units.items():
+        kq0 = kqs[0]
+        inst_name = "FDBACK_" + _fld(kq0)
+        for extra in kqs[1:]:                       # extra KQ channels of the unit
+            inst_name += "_" + str(extra.get("device", ""))
+        inst = {
+            "instanceOf:FDBACK":            inst_name,
+            "NetworkComment":               inst_name,                 # TODO: confirm comment format
+            "Error_memberOf:03_FDBACK_RAW": kq0.get("name_in_db", ""),
+        }
+        # ContactorOutput + its QBadInput, one slot per KQ channel
+        for n, kq in enumerate(kqs, start=1):
+            tag = kq.get("name_in_tagtable", "")
+            inst[f"tagName:Contactor{n}_Output"] = tag
+            inst[f"tagName:Contactor{n}_QBadInput"] = f"QBAD_{tag}" if tag else ""
+        # FeedbackInput, one slot per KI of the unit's device(s)
+        devices = {kq.get("device", "") for kq in kqs}
+        kis = [r for r in rows_of(db, "KI") if r.get("device", "") in devices]
+        for n, ki in enumerate(kis, start=1):
+            inst[f"tagName:Contactor{n}_FeedbackInput"] = ki.get("name_in_tagtable", "")
+        # OnCondition + Reset, one slot per area the KQ belongs to
+        areas = [a for a in str(kq0.get("matrix_areas", "")).split("|") if a]
+        for i, area in enumerate(areas, start=1):
+            nn = f"{int(area_index(area)):02d}" if area_index(area) else area
+            inst[f"OnCondition{i}_memberOf:05_EM_STATE"] = f"AREA {nn} Q_Delayed"
+            inst[f"Reset{i}_memberOf:05_EM_STATE"] = f"AREA {nn} RESET"
+        out.append(inst)
+    return out
 
 
 # $keep

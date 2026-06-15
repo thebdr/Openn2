@@ -265,9 +265,16 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
   output, to be wired into `outputs.py` + `run.py` once the format is known.
 - **Software-block generation** — the SoftwareBlocksBuilder-CSV engine
   (`softwareblocks.py`), the shell workbook + keep/fill/override directives
-  (`blockshells.py`), and the coverage check (`verify.py`) are done. `02/03/06/07` builders
-  are written; remaining: finish `build_00/04/05/08` bodies in `block_builders.py` (the
-  coverage report's UNPLACED-member list is the worklist), resolve the `07` encoder→index
-  link + `SorterRunningIOC` source, confirm the `$` template-path prefix the builder tool
-  expects, and the final step that fills the template XML from the CSV (then Openn2
-  `ImportPlcBlock`).
+  (`blockshells.py`), and the coverage check (`verify.py`) are done. `02/03/05/06/07`
+  builders are written; remaining: finish `build_00/04/08` bodies in `block_builders.py`
+  (the coverage report's UNPLACED-member list is the worklist), confirm the `$`
+  template-path prefix the builder tool expects, and the final step that fills the
+  template XML from the CSV (then Openn2 `ImportPlcBlock`).
+- **`05` multi-family TemplateType** — `05`'s slots are filled, but its TemplateType is
+  *not* set: `05` has three element families (`OnCondition` / `FeedbackInput` /
+  `ContactorOutput`), each with its own capacity (the `Kx` type denominator, e.g.
+  `KQ1/2` → ContactorOutput cap 2; OnCondition cap = `matrix_areas` count). Its sidecar
+  CSV has **3 capacity columns**, which the current single-capacity `_load_capacity`/
+  `_pick` can't read, and the sidecar's `#Templates Index` column is unfinished. To wire
+  it: finish that Index column, then teach the engine a multi-family mode (count the
+  filled numbered slots per family → match the triple to the sidecar Index).
