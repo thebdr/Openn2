@@ -27,7 +27,8 @@ don't reach back for Power Query or VBA.
 
 - `safetydb/` — the package:
   - `config.py` — loads `config/*.csv` + `params.json`; `load_signal_types`,
-    `load_device_types_db`, `resolve_type` (pattern-aware), `parse_params_by_type`.
+    `load_device_types_db`, `resolve_type` (pattern-aware), `parse_params_by_type`,
+    `sorter_areas` (the `params.json` `"sorter_areas"` list → which AREAs are sorter-style).
   - `staging.py` — `load_io_list`: reads the I/O List by **column position**
     (header verified by prefix; the doc has duplicate "Description language"
     headers and newline-wrapped headers, so a name map is unsafe). Excludes
@@ -189,28 +190,35 @@ and carry placeholders `!!key$$` (e.g. `!!NetworkComment$$`, `!!Error_memberOf:0
 placeholder is its own slot (so `tagName:Contactor1…` ≠ `tagName:Contactor2…`).
 
 `python block_templates.py keys` scans them into `config/block_templates.json` =
-`{ template-file-stem : { key : "" } }` (merge-only: keeps existing, adds new, keeps +
-notes dropped). This is just the **key inventory** per template — it drives the `%`
-header column order of the output CSV. **Generation is imperative Python, not a DSL**
-(decided with the user): `block_builders.py` has one `build_*(db)` function per template
-that **you edit** to gather the data, and `softwareblocks.py` is the engine.
+`{ template-file-stem : { key : "" } }` (merge-only) — the **key inventory** that
+`sync_builders` uses to (re)stub `block_builders.py`. **Generation is imperative Python,
+not a DSL**: `block_builders.py` has one `build_*(db)` per template that **you edit**, and
+`softwareblocks.py` is the engine. (The output CSV's `%` header keys come from each
+builder's own instance keys, first-seen order, falling back to a template scan — not the json.)
 
 - `block_builders.py` — each builder gets `db` (the CentralDatabase: staged row dicts
   with `matrix_areas` + `name_in_db`) and returns a list of **instances**, one per `@`
   row. An instance is `{ "<!!key$$>": value }`: a `str` is one cell; a `list[str]` is
   the horizontal **ITERATOR** (one per instance); `"_pad"` overrides the pad element
-  (default `block_builders.PAD = "ALWAYS_TRUE"`). Row multiplication is just your loops.
-- `softwareblocks.py` — loads `db`, calls each builder, and writes
-  `Output/SoftwareBlocks/<stem>.csv` in the SoftwareBlocksBuilder format: markers `$`
-  (template dir), `#`, `%` (`TemplateType,#Templates Capacity,#Templates Index,#Elements
-  Needed`, then `!!key$$` cols), `@` (one instance). `#Elements Needed` = real iterator
-  length; **TemplateType** = the Index of the smallest **Capacity ≥** that length from
-  the template's sidecar CSV (`<stem>.csv`, a Capacity→Index table that rides along in
-  cols C/D); the ITERATOR is padded to that capacity with the pad element.
-- The target/example is `SoftwareBlocksBuilder/test - Copy.csv`; the filled XML blocks
-  are ultimately imported by Openn2's `TiaPortalOpenness.Blocks.cs::ImportPlcBlock`.
-- **Open:** the `!!key$$` delimiter may also be `!!key!!` / `$$key!!` in the templates
-  (under user review); `block_templates.py keys` currently extracts `!!…$$` only.
+  (default `block_builders.PAD = "AlwaysTRUE"`). Row multiplication is just your loops.
+  **All 8 builders (`00/02/03/04/05/06/07/08`) are written and generate.**
+- `softwareblocks.py` — the engine: loads `db`, calls each builder, writes
+  `Output/SoftwareBlocks/<stem>.csv` in the SoftwareBlocksBuilder format — markers `$`
+  (template dir), `#`, `%` (meta columns + `!!key$$` cols), `@` (one instance) — and picks
+  **TemplateType** per @row by one of **three sizing models** (from the sidecar `<stem>.csv`,
+  which rides along in the meta columns):
+  - *single-capacity* (`02/03/06`): sidecar `#Templates Capacity,#Templates Index`; the
+    instance's one list-valued key is the ITERATOR, padded to the smallest Capacity ≥ its
+    length (`_pick`); `#Elements Needed` = that length.
+  - *multi-family* (`05`): sidecar with **>1** `#Templates Capacity <family>` column; fixed
+    numbered slots (no ITERATOR). The instance adds `"_sizes" = {family: count}`;
+    `_build_multi`/`_pick_multi` pick the smallest variant whose every family capacity ≥ that count.
+  - *purpose / builder-set* (`08`): the instance sets `"_template_type"` = the Index per @row
+    directly (08: 1 per sorter, 2 per door DQ; sidecar `#Templates Purpose`).
+  `_pad`/`_sizes`/`_template_type` are control keys, never emitted as columns.
+- The target/example is `SoftwareBlocksBuilder/test - Copy.csv`. **Pipeline2 deliberately
+  STOPS at the CSV**; Openn2 fills the template XML from it and imports it
+  (`TiaPortalOpenness.Blocks.cs::ImportPlcBlock`). A future shared library may unify the two.
 
 To author the builders, inspect `Output/CentralDatabase.csv` (`python block_templates.py
 staged`, or the GUI Configuration tab's Block templates panel) — canonical columns +
@@ -258,28 +266,14 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
 - Working repo is this clone, `C:\Source\Repos\Openn2` (git remote
   thebdr/Openn2.git, branch upgrade_refactor_1). Commit here.
 
-## Still to build
+## Status & still to build
 
-- Diagnosis **List_Logic** + the generated alarm PLC code — the user will supply the
-  format (their SWP_04 workbook). `List_IO` is done; this is the remaining diagnosis
-  output, to be wired into `outputs.py` + `run.py` once the format is known.
-- **Software-block generation** — the SoftwareBlocksBuilder-CSV engine
-  (`softwareblocks.py`), the shell workbook + keep/fill/override directives
-  (`blockshells.py`), and the coverage check (`verify.py`) are done. **All 8 builders
-  (`00/02/03/04/05/06/07/08`) are written** and generate on the real data; coverage shows
-  0 orphans (the only unplaced members are PA/PW fieldbus-failure / profinet-switch members
-  that belong to no software block). **Pipeline2 deliberately STOPS at the `<stem>.csv`** —
-  filling the template XML from the CSV (then `ImportPlcBlock`) is **Openn2's** job (a future
-  shared library may unify the two). Minor open: confirm the `$` template-path prefix the
-  builder tool expects.
-- **Three template sizing models** (how the engine picks `TemplateType`):
-  - *single-capacity* (`02/03/06`): sidecar `#Templates Capacity,#Templates Index`; the
-    builder's one list-valued key is the ITERATOR; `_pick` = smallest capacity ≥ its length.
-  - *multi-family* (`05`): sidecar with **>1** `#Templates Capacity <family>` column; fixed
-    numbered slots (no ITERATOR). The builder returns scalar keys + `"_sizes"` =
-    `{family: count}`; `_build_multi`/`_pick_multi` picks the smallest variant whose every
-    family capacity ≥ that family's count.
-  - *purpose / builder-set* (`08`): the builder returns a control key **`"_template_type"`**
-    = the Index per `@` row (08: 1 per sorter, 2 per door DQ — the `#Templates Purpose`
-    sidecar). The engine just uses it. (`_pad`/`_sizes`/`_template_type` are control keys,
-    never emitted as columns.)
+Pipeline (staging → validation → outputs), the GUI, the coverage report, and the full
+software-block path (all 8 builders → `Output/SoftwareBlocks/*.csv`; coverage = 0 orphans)
+are done; the `test_*.py` suite is green. Remaining:
+
+- Diagnosis **List_Logic** + the generated alarm PLC code — awaiting the user's SWP_04
+  format. `List_IO` is done; wire the rest into `outputs.py` + `run.py` when known.
+- Minor: confirm the `$` template-path prefix the SoftwareBlocksBuilder tool expects.
+- Out of scope here: filling the template XML from the CSV is **Openn2's** job (Pipeline2
+  stops at the CSV).
