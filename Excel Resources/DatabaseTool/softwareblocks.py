@@ -107,7 +107,7 @@ def _instance_keys(instances: list, stem: str) -> list:
     keys = []
     for inst in instances:
         for k in inst:
-            if k not in ("_pad", "_sizes") and k not in keys:
+            if k not in ("_pad", "_sizes", "_template_type") and k not in keys:
                 keys.append(k)
     return keys or block_templates.scan_template_keys().get(stem, [])
 
@@ -170,6 +170,7 @@ def build_template_csv(stem: str, builder, db: list) -> list:
         items = list(inst.get(iter_key, [])) if iter_key else []
         n = len(items)
         cap, idx = _pick(table, n)
+        idx = inst.get("_template_type", idx)   # a builder may set TemplateType directly (e.g. 08 per purpose)
         pad = inst.get("_pad", block_builders.PAD)
         padded = items + [pad] * max(0, cap - n) if isinstance(cap, int) else items
         scal = [str(inst.get(k, "")) for k in scalar_keys]

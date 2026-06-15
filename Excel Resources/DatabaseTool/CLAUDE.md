@@ -265,17 +265,21 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
   output, to be wired into `outputs.py` + `run.py` once the format is known.
 - **Software-block generation** — the SoftwareBlocksBuilder-CSV engine
   (`softwareblocks.py`), the shell workbook + keep/fill/override directives
-  (`blockshells.py`), and the coverage check (`verify.py`) are done. `02/03/05/06/07`
-  builders are written; remaining: finish `build_00/04/08` bodies in `block_builders.py`
-  (the coverage report's UNPLACED-member list is the worklist), confirm the `$`
-  template-path prefix the builder tool expects, and the final step that fills the
-  template XML from the CSV (then Openn2 `ImportPlcBlock`).
-- **Multi-family templates (e.g. `05`)** — a template whose sidecar has **>1**
-  `#Templates Capacity <family>` column (05: `OnCondition`/`FeedbackInput`/`ContactorOutput`)
-  uses fixed numbered slots, not one ITERATOR. The builder returns scalar slot keys plus a
-  control key **`"_sizes"`** = `{family: count}`; the engine (`_load_capacity_multi` +
-  `_pick_multi` → `_build_multi`) picks **TemplateType** = the Index of the smallest sidecar
-  variant whose every family capacity ≥ that family's count (tie-break: smaller Index). The
-  `@` row carries `TemplateType` + `#Elements Needed` (the per-family counts `o|f|c`); the
-  sidecar (caps + Index) rides alongside, same convention as single-capacity. `08` is a
-  *purpose*-based sidecar (`#Templates Purpose`), a separate model still to do.
+  (`blockshells.py`), and the coverage check (`verify.py`) are done. **All 8 builders
+  (`00/02/03/04/05/06/07/08`) are written** and generate on the real data. Remaining:
+  confirm the `$` template-path prefix the builder tool expects, and the final step that
+  fills the template XML from the CSV (then Openn2 `ImportPlcBlock`). Loose ends: `05`'s
+  `NetworkComment` defaulted to the instance name; `08`'s `doorIsClosedInfo` is empty
+  because `DI2/2` carries no `name_in_db` (a `signal_types.csv` config matter); `08`'s
+  sorter-@row `instanceOf`/`NetworkComment`/`Bypass` are reasonable defaults.
+- **Three template sizing models** (how the engine picks `TemplateType`):
+  - *single-capacity* (`02/03/06`): sidecar `#Templates Capacity,#Templates Index`; the
+    builder's one list-valued key is the ITERATOR; `_pick` = smallest capacity ≥ its length.
+  - *multi-family* (`05`): sidecar with **>1** `#Templates Capacity <family>` column; fixed
+    numbered slots (no ITERATOR). The builder returns scalar keys + `"_sizes"` =
+    `{family: count}`; `_build_multi`/`_pick_multi` picks the smallest variant whose every
+    family capacity ≥ that family's count.
+  - *purpose / builder-set* (`08`): the builder returns a control key **`"_template_type"`**
+    = the Index per `@` row (08: 1 per sorter, 2 per door DQ — the `#Templates Purpose`
+    sidecar). The engine just uses it. (`_pad`/`_sizes`/`_template_type` are control keys,
+    never emitted as columns.)

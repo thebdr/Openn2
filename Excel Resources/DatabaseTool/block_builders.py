@@ -367,9 +367,26 @@ def build_07_speed_control(db: list) -> list:
     return out
 
 
-# $replace
+# $keep
 def build_08_gate_manager(db: list) -> list:
-    """TEMPLATE--v1.0--08_Gate Manager.xml - TODO: gather instances.
+    """TEMPLATE--v1.0--08_Gate Manager.xml  (purpose sidecar: 1 per Sorter = TemplateType 1,
+    1 per Door DQ = TemplateType 2; the builder sets _template_type per @row).
+
+    Sorter @row (TT 1, one per IOC SORTER-nn):
+      tagName:SorterRunningIOC = 'PNC_I_Sorter{nn} SORTER RUNNING'         (from 07)
+      areaSorterStopped_memberOf:SPEED_STATE_REC = 'SORTER_{nn}_STOPPED'    (from 07)
+      areaSorterNotRunning_memberOf:05_EM_STATE  = 'SORTER_{nn}_NOT_RUNNING'
+    Door @row (TT 2, one per DQ; DI1/2 DI2/2 DD DR DL matched by the DQ's Index):
+      tagName Door* = name_in_tagtable of DI1/2(Ch1) DI2/2(Ch2) DD(DiagInput) DR(OpenRequest)
+                      DQ(SolenoidUnlock) DL(ResetLamp)
+      doorIsClosedSafe/Info/doorAlarm_memberOf:07_DOOR = name_in_db of DI1/2 / DI2/2 / DD
+      choice:IsSorterDoor / choice:DoorResetNecessary = 'Always TRUE' if a same-Index DR
+                      exists, else 'Always FALSE'
+      instanceOf:02_Safety_Door = 'DOOR_' + DQ fld; Bypass = the DQ node's bypass
+    Bypass_memberOf:00_Commissioning = {profinet_name}_{subnet_name} of the @row's node.
+
+    ASSUMPTION (confirm): the sorter @row's instanceOf/NetworkComment/Bypass; note DI2/2 has
+    no name_in_db in this project so doorIsClosedInfo comes out empty.
     keys: areaSorterStopped_memberOf:SPEED_STATE_REC, areaSorterNotRunning_memberOf:05_EM_STATE,
     Bypass_memberOf:00_Commissioning, tagName:DoorClosedDiagInput, tagName:DoorClosedCh1,
     tagName:DoorClosedCh2, tagName:SorterRunningIOC, tagName:DoorOpenRequest, choice:IsSorterDoor,
@@ -377,7 +394,56 @@ def build_08_gate_manager(db: list) -> list:
     doorIsClosedInfo_memberOf:07_DOOR, doorAlarm_memberOf:07_DOOR, tagName:DoorResetLamp,
     instanceOf:02_Safety_Door, NetworkComment
     """
-    return []
+    def tag(r):
+        return r["name_in_tagtable"] if r else ""
+
+    def member(r):
+        return r["name_in_db"] if r else ""
+
+    out = []
+    # template 01 - one @row per sorter
+    for ioc, num in sorters(db):
+        nn = f"{num:02d}"
+        out.append({
+            "_template_type":                              1,
+            "instanceOf:02_Safety_Door":                   f"SDOOR_SORTER_{nn}",          # ASSUMPTION
+            "NetworkComment":                              f"SORTER {nn} GATE MANAGER",   # ASSUMPTION
+            "tagName:SorterRunningIOC":                    f"PNC_I_Sorter{nn} SORTER RUNNING",
+            "areaSorterStopped_memberOf:SPEED_STATE_REC":  f"SORTER_{nn}_STOPPED",
+            "areaSorterNotRunning_memberOf:05_EM_STATE":   f"SORTER_{nn}_NOT_RUNNING",
+            "Bypass_memberOf:00_Commissioning":            f"{ioc['profinet_name']}_{ioc['subnet_name']}",  # ASSUMPTION
+        })
+
+    # template 02 - one @row per Door DQ (DI1/2 DI2/2 DD DR DL matched by the DQ's Index)
+    for dq in rows_of(db, "DQ"):
+        idx = dq.get("index", "")
+        di1 = _first(rows_by_index(db, idx, "DI1/2"))
+        di2 = _first(rows_by_index(db, idx, "DI2/2"))
+        dd = _first(rows_by_index(db, idx, "DD"))
+        dr = _first(rows_by_index(db, idx, "DR"))
+        dl = _first(rows_by_index(db, idx, "DL"))
+        has_dr = "Always TRUE" if dr else "Always FALSE"
+        node = node_of(db, dq)
+        bypass = f"{node['profinet_name']}_{node['subnet_name']}" if node else ""
+        inst = f"DOOR_{_fld(dq)}"
+        out.append({
+            "_template_type":                    2,
+            "instanceOf:02_Safety_Door":         inst,
+            "NetworkComment":                    inst,
+            "Bypass_memberOf:00_Commissioning":  bypass,
+            "tagName:DoorClosedCh1":             tag(di1),
+            "tagName:DoorClosedCh2":             tag(di2),
+            "tagName:DoorClosedDiagInput":       tag(dd),
+            "tagName:DoorOpenRequest":           tag(dr),
+            "tagName:DoorSolenoidUnlock":        tag(dq),
+            "tagName:DoorResetLamp":             tag(dl),
+            "doorIsClosedSafe_memberOf:07_DOOR": member(di1),
+            "doorIsClosedInfo_memberOf:07_DOOR": member(di2),
+            "doorAlarm_memberOf:07_DOOR":        member(dd),
+            "choice:IsSorterDoor":               has_dr,
+            "choice:DoorResetNecessary":         has_dr,
+        })
+    return out
 
 
 # template file stem -> builder
