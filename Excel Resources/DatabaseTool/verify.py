@@ -8,7 +8,8 @@ For every CentralDatabase row, mark which outputs it lands in and report the gap
   diagnosis   its type is in_diagnosis
   interface   its type's category is Interface (IOC)
   hardware    hardware._role is not None (Plc / PlcCardCm / IoDevice head)
-  block       its name_in_db is placed in some block ITERATOR (block_builders)
+  block       its name_in_db is emitted by some builder - an ITERATOR element or a
+              scalar `…_memberOf:` slot (block_builders)
 
   ORPHAN          - a row in NONE of the above              (WARNING)
   UNPLACED MEMBER - a DB member not referenced by any block (WARNING; a worklist
@@ -40,15 +41,23 @@ def _abs(path: str) -> str:
     return path if os.path.isabs(path) else os.path.normpath(os.path.join(_HERE, path))
 
 
+_CONTROL_KEYS = ("_pad", "_sizes", "_template_type")
+
+
 def _block_placed(db: list) -> set:
-    """name_in_db strings placed into any block ITERATOR (list-valued instance cells)."""
+    """Every string a builder emits - ITERATOR lists AND scalar slots (e.g. the
+    `…_memberOf:` keys of 04/05/08) - so a member placed in a fixed slot still counts."""
     placed = set()
     for builder in block_builders.BUILDERS.values():
         try:
             for inst in builder(db):
-                for v in inst.values():
+                for k, v in inst.items():
+                    if k in _CONTROL_KEYS:
+                        continue
                     if isinstance(v, list):
                         placed.update(str(x) for x in v)
+                    elif v:
+                        placed.add(str(v))
         except Exception:  # noqa: BLE001 - a half-written builder must not break the report
             pass
     return placed
