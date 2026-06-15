@@ -1,0 +1,9 @@
+{
+  "_comment": "Manually maintained project config. areas.<AREA n>.IsSorterArea flags sorter areas (used by staging -> the IsSorterArea row column, and the block builders). Add more per-area flags here as needed.",
+  "areas": {
+    "AREA 1": { "IsSorterArea": false },
+    "AREA 2": { "IsSorterArea": false },
+    "AREA 3": { "IsSorterArea": false },
+    "AREA 4": { "IsSorterArea": false }
+  }
+}

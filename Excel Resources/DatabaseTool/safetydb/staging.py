@@ -126,6 +126,11 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
         octets = str(row.get("profinet_ip", "")).split(".")
         row["subnet_name"] = f"Subnet{octets[2]}" if len(octets) == 4 and octets[2] else ""
     _add_node_address_ranges(rows)
+    # IsSorterArea: the row is in an area flagged IsSorterArea in config/config.json
+    sorter = config.sorter_areas()
+    for row in rows:
+        areas = {a for a in str(row.get("matrix_areas", "")).split("|") if a}
+        row["IsSorterArea"] = "yes" if (areas & sorter) else ""
     return rows, warnings
 
 

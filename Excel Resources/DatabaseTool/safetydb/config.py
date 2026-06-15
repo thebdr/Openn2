@@ -48,6 +48,21 @@ def load_params(path: str | None = None) -> dict:
     return params
 
 
+def load_project_config(path: str | None = None) -> dict:
+    """Manually-maintained project config (config/config.json), {} if absent."""
+    path = path or os.path.join(CONFIG_DIR, "config.json")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def sorter_areas(project: dict | None = None) -> set:
+    """Set of area names flagged IsSorterArea=true in the project config."""
+    project = project if project is not None else load_project_config()
+    return {a for a, v in (project.get("areas") or {}).items() if (v or {}).get("IsSorterArea")}
+
+
 def parse_params_by_type(blob: str) -> dict:
     """'<B1/2>p=1 | q=0<B1/2><DI1/2>r=0<DI1/2>' -> {'B1/2': 'p=1 | q=0', 'DI1/2': 'r=0'}."""
     import re
