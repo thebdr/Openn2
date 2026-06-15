@@ -383,10 +383,9 @@ def build_08_gate_manager(db: list) -> list:
       choice:IsSorterDoor / choice:DoorResetNecessary = 'Always TRUE' if a same-Index DR
                       exists, else 'Always FALSE'
       instanceOf:02_Safety_Door = 'DOOR_' + DQ fld; Bypass = the DQ node's bypass
+    Sorter @row: instanceOf = 'SFDOOR_' + FLD of the sorter's DI1/2 (linked by index);
+      Bypass = the node that DI1/2 is wired to.
     Bypass_memberOf:00_Commissioning = {profinet_name}_{subnet_name} of the @row's node.
-
-    ASSUMPTION (confirm): the sorter @row's instanceOf/NetworkComment/Bypass; note DI2/2 has
-    no name_in_db in this project so doorIsClosedInfo comes out empty.
     keys: areaSorterStopped_memberOf:SPEED_STATE_REC, areaSorterNotRunning_memberOf:05_EM_STATE,
     Bypass_memberOf:00_Commissioning, tagName:DoorClosedDiagInput, tagName:DoorClosedCh1,
     tagName:DoorClosedCh2, tagName:SorterRunningIOC, tagName:DoorOpenRequest, choice:IsSorterDoor,
@@ -404,14 +403,18 @@ def build_08_gate_manager(db: list) -> list:
     # template 01 - one @row per sorter
     for ioc, num in sorters(db):
         nn = f"{num:02d}"
+        # the sorter's safety door = the DI1/2 linked by index (fall back to the first);
+        # instanceOf + Bypass come from it (FLD + the node it's wired to)
+        di1 = _first([r for r in rows_of(db, "DI1/2") if _num_index(r) == num]) or _first(rows_of(db, "DI1/2"))
+        node = node_of(db, di1) if di1 else None
         out.append({
             "_template_type":                              1,
-            "instanceOf:02_Safety_Door":                   f"SDOOR_SORTER_{nn}",          # ASSUMPTION
-            "NetworkComment":                              f"SORTER {nn} GATE MANAGER",   # ASSUMPTION
+            "instanceOf:02_Safety_Door":                   f"SFDOOR_{_fld(di1)}" if di1 else f"SFDOOR_SORTER_{nn}",
+            "NetworkComment":                              f"SORTER {nn} GATE MANAGER",
             "tagName:SorterRunningIOC":                    f"PNC_I_Sorter{nn} SORTER RUNNING",
             "areaSorterStopped_memberOf:SPEED_STATE_REC":  f"SORTER_{nn}_STOPPED",
             "areaSorterNotRunning_memberOf:05_EM_STATE":   f"SORTER_{nn}_NOT_RUNNING",
-            "Bypass_memberOf:00_Commissioning":            f"{ioc['profinet_name']}_{ioc['subnet_name']}",  # ASSUMPTION
+            "Bypass_memberOf:00_Commissioning":            f"{node['profinet_name']}_{node['subnet_name']}" if node else "",
         })
 
     # template 02 - one @row per Door DQ (DI1/2 DI2/2 DD DR DL matched by the DQ's Index)
