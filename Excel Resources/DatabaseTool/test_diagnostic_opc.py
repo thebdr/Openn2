@@ -37,7 +37,7 @@ def main():
     alarm0["bit"] = "I1.0"                                                                    # address -> resolves to pa_node
     pa_node = row("PA", "001", "01", "PA", pn="n0005-x", subnet="Subnet50", dlogic="mirror",
                   nid="FIELD BUS FAILURE", dbnames=["PROFINET_NODES_ALARM"])                  # mirror, DB-qual IN, node-level -> FL false
-    pa_node["I_startByte"], pa_node["I_endByte"] = 0, 20                                      # the node covering alarm0
+    pa_node["I_startByte"], pa_node["I_endByte"], pa_node["profinet_ip"] = 0, 20, "192.168.50.5"   # node covering alarm0
     db = [
         alarm0, pa_node,
         row("W", "001", "00", "W", dev="-W1", tag="WARN ONE", nc=""),                         # NoTristate warning
@@ -60,7 +60,7 @@ def main():
     a1 = re.search(r'"S1\.CABINET001\.ALARM1"\(.*?\);', scl, re.S).group(0)   # the FB call, not the DiagnosticTags ref
     check("alarm IN = tag, ML invert(FALSE), FL = node PROFINET_ALARMS",
           'IN_00 := "ALARM ONE =S1+MS1.CC1-F1"' in a1 and "ML_00 := FALSE" in a1
-          and 'FL_00 := "PROFINET_NODES_ALARM"."n0005-x_Subnet50"' in a1)
+          and 'FL_00 := "PROFINET_NODES_ALARM"."n0005-x 192.168.50.5"' in a1)
     check("PA(node) IN = DB-qualified, ML mirror(TRUE), FL = false (no self-filter)",
           'IN_01 := "PROFINET_NODES_ALARM"."FIELD BUS FAILURE"' in a1
           and "ML_01 := TRUE" in a1

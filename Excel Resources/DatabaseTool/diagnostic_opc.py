@@ -42,16 +42,18 @@ def _is_warning(row) -> bool:
 
 
 def fl_value(db: list, row) -> str:
-    """FL_xx mute term: "PROFINET_NODES_ALARM"."<node profinet_name>_<subnet>" of the row's
-    node (the node whose I/Q range contains the signal's address); the literal `false`
-    (never mute) when no node resolves. A **node-level alarm itself** (PA/PW - it carries
-    its own `profinet_name`) must NOT filter on itself, else it would mute the very alarm
-    reporting the node down -> `false`."""
+    """FL_xx mute term: the row's node's alarm bit in PROFINET_NODES_ALARM -
+    "PROFINET_NODES_ALARM"."<profinet_name> <profinet_ip>" (the PA `db_element` shape, so it
+    matches the member that actually lives in that DB). The node is the one whose I/Q range
+    contains the signal's address; `false` (never mute) when no node resolves. A node-level
+    alarm itself (PA/PW - it carries its own `profinet_name`) must NOT filter on itself ->
+    `false`."""
     if row.get("profinet_name"):                       # PA/PW: the node-down alarm itself
         return "false"
     node = block_builders.node_of(db, row)
     if node and node.get("profinet_name"):
-        return f'"PROFINET_NODES_ALARM"."{node["profinet_name"]}_{node.get("subnet_name", "")}"'
+        member = f'{node["profinet_name"]} {node.get("profinet_ip", "")}'.strip()
+        return f'"PROFINET_NODES_ALARM"."{member}"'
     return "false"
 
 
