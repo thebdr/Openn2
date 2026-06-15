@@ -219,16 +219,47 @@ def build_03_zone_cumulative(db: list) -> list:
     return instances
 
 
-# $replace
+# $keep
 def build_04_estop(db: list) -> list:
-    """TEMPLATE--v1.0--04_ESTOP.xml - TODO: gather instances.
+    """TEMPLATE--v1.0--04_ESTOP.xml  (one @row per AREA).
+
+      areaPB/areaFDB_memberOf:02_COM     = A{n}_PB / A{n}_FDB  (the members 03 creates)
+      SafetyBreaker1/2_memberOf:01_PushButton = the area's B1/2 name_in_db (slots 1, 2)
+      ITERATOR_STRINGS                   = the area's DI1/2 door name_in_db
+      areaEncoderBroken_memberOf:SPEED_STATE_REC = 'SORTER{nn}_ENCODER_BROKEN' (nn=area_index;
+                                           encoders aren't in the C&E, so default to area_index)
+      the 05_EM_STATE members            = 'AREA {nn} <suffix>' (Q / Q_Delayed / RESET /
+                                           SAFETY_BREAKERS_COM / SAFETY_DOORS_COM / POWER_CUT)
+      instanceOf:ESTOP1 = 'ESTOP_{area}'; NetworkComment = '{area} ESTOP'
     keys: areaPB_memberOf:02_COM, areaFDB_memberOf:02_COM, Reset1_memberOf:05_EM_STATE,
     areaQ_memberOf:05_EM_STATE, areaQDelayed_memberOf:05_EM_STATE, SafetyBreaker1_memberOf:01_PushButton,
     SafetyBreaker2_memberOf:01_PushButton, areaSafetyBreakersCom_memberOf:05_EM_STATE, ITERATOR_STRINGS,
     areaSafetyDoorsCom_memberOf:05_EM_STATE, areaEncoderBroken_memberOf:SPEED_STATE_REC,
     areaPowerCut_memberOf:05_EM_STATE, instanceOf:ESTOP1, NetworkComment
     """
-    return []
+    out = []
+    for area in unique_areas(db):
+        idx = area_index(area)
+        nn = f"{int(idx):02d}" if idx else area
+        breakers = names_in_db(db, script_type="B1/2", area=area)     # safety breakers in the area
+        doors = names_in_db(db, script_type="DI1/2", area=area)       # door safety inputs (ITERATOR)
+        out.append({
+            "instanceOf:ESTOP1":                          f"ESTOP_{area}",
+            "NetworkComment":                             f"{area} ESTOP",
+            "areaPB_memberOf:02_COM":                     f"A{idx}_PB",
+            "areaFDB_memberOf:02_COM":                    f"A{idx}_FDB",
+            "areaQ_memberOf:05_EM_STATE":                 f"AREA {nn} Q",
+            "areaQDelayed_memberOf:05_EM_STATE":          f"AREA {nn} Q_Delayed",
+            "Reset1_memberOf:05_EM_STATE":                f"AREA {nn} RESET",
+            "areaSafetyBreakersCom_memberOf:05_EM_STATE": f"AREA {nn} SAFETY_BREAKERS_COM",
+            "areaSafetyDoorsCom_memberOf:05_EM_STATE":    f"AREA {nn} SAFETY_DOORS_COM",
+            "areaPowerCut_memberOf:05_EM_STATE":          f"AREA {nn} POWER_CUT",
+            "areaEncoderBroken_memberOf:SPEED_STATE_REC": f"SORTER{nn}_ENCODER_BROKEN",
+            "SafetyBreaker1_memberOf:01_PushButton":      breakers[0] if len(breakers) > 0 else "",
+            "SafetyBreaker2_memberOf:01_PushButton":      breakers[1] if len(breakers) > 1 else "",
+            "ITERATOR_STRINGS":                           doors,
+        })
+    return out
 
 
 # $keep
