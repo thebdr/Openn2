@@ -281,6 +281,9 @@ def build_05_output_feedback(db: list) -> list:
             nn = f"{int(area_index(area)):02d}" if area_index(area) else area
             inst[f"OnCondition{i}_memberOf:05_EM_STATE"] = f"AREA {nn} Q_Delayed"
             inst[f"Reset{i}_memberOf:05_EM_STATE"] = f"AREA {nn} RESET"
+        # per-family counts -> the engine picks TemplateType from the 3-family sidecar
+        inst["_sizes"] = {"OnCondition": len(areas), "FeedbackInput": len(kis),
+                          "ContactorOutput": len(kqs)}
         out.append(inst)
     return out
 

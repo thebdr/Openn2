@@ -270,11 +270,12 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
   (the coverage report's UNPLACED-member list is the worklist), confirm the `$`
   template-path prefix the builder tool expects, and the final step that fills the
   template XML from the CSV (then Openn2 `ImportPlcBlock`).
-- **`05` multi-family TemplateType** — `05`'s slots are filled, but its TemplateType is
-  *not* set: `05` has three element families (`OnCondition` / `FeedbackInput` /
-  `ContactorOutput`), each with its own capacity (the `Kx` type denominator, e.g.
-  `KQ1/2` → ContactorOutput cap 2; OnCondition cap = `matrix_areas` count). Its sidecar
-  CSV has **3 capacity columns**, which the current single-capacity `_load_capacity`/
-  `_pick` can't read, and the sidecar's `#Templates Index` column is unfinished. To wire
-  it: finish that Index column, then teach the engine a multi-family mode (count the
-  filled numbered slots per family → match the triple to the sidecar Index).
+- **Multi-family templates (e.g. `05`)** — a template whose sidecar has **>1**
+  `#Templates Capacity <family>` column (05: `OnCondition`/`FeedbackInput`/`ContactorOutput`)
+  uses fixed numbered slots, not one ITERATOR. The builder returns scalar slot keys plus a
+  control key **`"_sizes"`** = `{family: count}`; the engine (`_load_capacity_multi` +
+  `_pick_multi` → `_build_multi`) picks **TemplateType** = the Index of the smallest sidecar
+  variant whose every family capacity ≥ that family's count (tie-break: smaller Index). The
+  `@` row carries `TemplateType` + `#Elements Needed` (the per-family counts `o|f|c`); the
+  sidecar (caps + Index) rides alongside, same convention as single-capacity. `08` is a
+  *purpose*-based sidecar (`#Templates Purpose`), a separate model still to do.
