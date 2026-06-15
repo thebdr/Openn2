@@ -54,7 +54,7 @@ def main():
         row(bit="I921.7", slot="-XNS1"),
     ]
 
-    st, mod = hardware.extract(rows, dtd)
+    st, mod, _messages = hardware.extract(rows, dtd)
 
     names = [s["Station Name"] for s in st]
     check("switch (not in DTD) excluded", "n10-sw" not in names, str(names))
