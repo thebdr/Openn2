@@ -162,8 +162,11 @@ def build_template_csv(stem: str, builder, db: list) -> list:
 
     # the iterator key = the one that carries a list value
     iter_key = next((k for inst in instances for k, v in inst.items() if isinstance(v, list)), None)
-    scalar_keys = [k for k in keys if k != iter_key]
-    ordered_keys = scalar_keys + ([iter_key] if iter_key else [])
+    # the ITERATOR column is always the LAST !!key$$; key it by the list value when there are
+    # instances, else by name (so the shell, built from empty instances, still puts it last)
+    last_key = iter_key or ("ITERATOR_STRINGS" if "ITERATOR_STRINGS" in keys else None)
+    scalar_keys = [k for k in keys if k != last_key]
+    ordered_keys = scalar_keys + ([last_key] if last_key else [])
 
     data_rows = []  # (template_type, n_elements, [scalar cells], [iterator cells])
     for inst in instances:
@@ -205,7 +208,7 @@ def generate(out_dir: str | None = None, params_path: str | None = None,
     db, _warnings = staging.load_io_list(params, types)   # CentralDatabase (has all builder columns)
     out_dir = out_dir or os.path.join(_abs(params.get("output_dir", "Output")), "SoftwareBlocks")
     os.makedirs(out_dir, exist_ok=True)
-    shell = shell_path or blockshells.SHELL_PATH
+    shell = shell_path or blockshells.shell_path(params)
     mode_of = blockshells.modes(shell)   # {stem -> keep|fill|override}
 
     written = {}

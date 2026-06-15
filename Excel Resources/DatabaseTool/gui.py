@@ -364,7 +364,7 @@ class App:
                               command=lambda: self._start(self._work_shells))
         b_shells.grid(row=3, column=0, sticky="w", padx=(0, 6), pady=2)
         ttk.Button(blk, text="Open shell workbook",
-                   command=lambda: self._open_path(blockshells.SHELL_PATH)).grid(row=3, column=1, sticky="w", padx=6, pady=2)
+                   command=lambda: self._open_path(blockshells.shell_path())).grid(row=3, column=1, sticky="w", padx=6, pady=2)
         self._run_buttons.extend([b_scan, b_central, b_blocks, b_cov, b_shells])  # greyed while a run is in flight
 
     def _open_in_files(self, path: str):

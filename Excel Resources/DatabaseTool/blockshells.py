@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """blockshells.py - the per-template shell spreadsheet + the keep/fill/override directives.
 
-`SoftwareBlocks.xlsm` holds one **shell sheet per template**: the SoftwareBlocksBuilder
-format laid out in cells - a `$ template=...` row, a `$ <mode>` directive row, the `%`
-header (`TemplateType,#Templates Capacity,#Templates Index,#Elements Needed,!!key$$...`),
-and the Capacity table - with no `@` data. The directive (cell B2) is one of:
+`SoftwareBlocks.xlsm` (generated in the **output folder**) holds one **shell sheet per
+template**: the SoftwareBlocksBuilder format laid out in cells - a `$ template=...` row, a
+`$ <mode>` directive row, the `%` header (`TemplateType,#Templates Capacity,#Templates
+Index,#Elements Needed,!!key$$...`), and the Capacity table - with no `@` data. The
+directive (cell B2) is one of:
 
   keep      - the Python builder generates the CSV; the sheet is ignored (a reference).
   fill      - the Python builder generates the CSV AND writes its @ rows into the sheet
@@ -22,8 +23,19 @@ import re
 import openpyxl
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-SHELL_PATH = os.path.join(_HERE, "SoftwareBlocks.xlsm")
 MODES = ("keep", "fill", "override")
+
+
+def _output_dir(params: dict | None = None) -> str:
+    from safetydb import config  # lazy: avoid an import cycle
+    params = params if params is not None else config.load_params()
+    d = params.get("output_dir", "Output")
+    return d if os.path.isabs(d) else os.path.normpath(os.path.join(_HERE, d))
+
+
+def shell_path(params: dict | None = None) -> str:
+    """The shell workbook path, in the output folder (`Output/SoftwareBlocks.xlsm`)."""
+    return os.path.join(_output_dir(params), "SoftwareBlocks.xlsm")
 
 
 def _sheet_name(stem: str) -> str:
@@ -58,12 +70,14 @@ def _shell_rows(stem: str, db: list, mode: str = "keep") -> list:
     return [grid[0], ["$", mode]] + grid[1:]
 
 
-def generate_shells(db: list, shell_path: str = SHELL_PATH) -> dict:
+def generate_shells(db: list, path: str | None = None) -> dict:
     """Create/refresh the shell workbook, one sheet per BUILDERS template. Additive:
     existing sheets are left untouched. Returns {created, kept, path}."""
     import block_builders
-    if os.path.exists(shell_path):
-        wb = openpyxl.load_workbook(shell_path, keep_vba=True)
+    path = path or shell_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.exists(path):
+        wb = openpyxl.load_workbook(path, keep_vba=True)
     else:
         wb = openpyxl.Workbook()
     blank = wb["Sheet"] if (wb.sheetnames == ["Sheet"] and wb["Sheet"].max_row == 1) else None
@@ -80,15 +94,16 @@ def generate_shells(db: list, shell_path: str = SHELL_PATH) -> dict:
 
     if blank is not None and created:
         wb.remove(blank)
-    wb.save(shell_path)
-    return {"created": created, "kept": kept, "path": shell_path}
+    wb.save(path)
+    return {"created": created, "kept": kept, "path": path}
 
 
-def modes(shell_path: str = SHELL_PATH) -> dict:
+def modes(path: str | None = None) -> dict:
     """{template stem -> mode} read from each sheet's directive (default 'keep')."""
-    if not os.path.exists(shell_path):
+    path = path or shell_path()
+    if not os.path.exists(path):
         return {}
-    wb = openpyxl.load_workbook(shell_path)
+    wb = openpyxl.load_workbook(path)
     out = {}
     for name in wb.sheetnames:
         ws = wb[name]
@@ -100,9 +115,12 @@ def modes(shell_path: str = SHELL_PATH) -> dict:
     return out
 
 
-def override_grid(stem: str, shell_path: str = SHELL_PATH) -> list:
+def override_grid(stem: str, path: str | None = None) -> list:
     """The CSV grid read from the template's sheet (the $ mode row dropped)."""
-    wb = openpyxl.load_workbook(shell_path)
+    path = path or shell_path()
+    if not os.path.exists(path):
+        return []
+    wb = openpyxl.load_workbook(path)
     ws = _find_sheet(wb, stem)
     grid = []
     if ws is not None:
@@ -115,12 +133,13 @@ def override_grid(stem: str, shell_path: str = SHELL_PATH) -> list:
     return grid
 
 
-def write_fill(stem: str, grid: list, shell_path: str = SHELL_PATH) -> None:
+def write_fill(stem: str, grid: list, path: str | None = None) -> None:
     """Write a freshly-built grid (the @ rows) into the template's sheet, keeping its
     current mode directive."""
-    if not os.path.exists(shell_path):
+    path = path or shell_path()
+    if not os.path.exists(path):
         return
-    wb = openpyxl.load_workbook(shell_path, keep_vba=True)
+    wb = openpyxl.load_workbook(path, keep_vba=True)
     ws = _find_sheet(wb, stem)
     if ws is None:
         wb.close()
@@ -129,7 +148,7 @@ def write_fill(stem: str, grid: list, shell_path: str = SHELL_PATH) -> None:
     ws.delete_rows(1, ws.max_row)
     for row in ([grid[0], ["$", mode]] + grid[1:]):
         ws.append(row)
-    wb.save(shell_path)
+    wb.save(path)
 
 
 def main():
@@ -138,8 +157,8 @@ def main():
     if _HERE not in _sys.path:
         _sys.path.insert(0, _HERE)
     from safetydb import config, staging
-    ap = argparse.ArgumentParser(description="Generate the per-template shell workbook (SoftwareBlocks.xlsm).")
-    ap.add_argument("--out", default=SHELL_PATH)
+    ap = argparse.ArgumentParser(description="Generate the per-template shell workbook (Output/SoftwareBlocks.xlsm).")
+    ap.add_argument("--out", default=None)
     args = ap.parse_args()
     db, _w = staging.load_io_list(config.load_params(), config.load_signal_types())
     r = generate_shells(db, args.out)

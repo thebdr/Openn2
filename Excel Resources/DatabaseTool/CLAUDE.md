@@ -85,9 +85,10 @@ don't reach back for Power Query or VBA.
   `softwareblocks.py` — the engine that writes the SoftwareBlocksBuilder CSV(s) to
   `Output/SoftwareBlocks/` (see "Software-block templates"), honoring each template's
   shell directive (keep/fill/override).
-- `blockshells.py` — the per-template **shell workbook** `SoftwareBlocks.xlsm` (one sheet
-  per template: `$ template=…`, a `$ <mode>` directive in B2, the `%` header with the
-  template's keys, and the Capacity table — no `@` data). `generate_shells` is additive
+- `blockshells.py` — the per-template **shell workbook** `Output/SoftwareBlocks.xlsm` (in
+  the output folder; one sheet per template: `$ template=…`, a `$ <mode>` directive in B2,
+  the `%` header with the template's keys, and the Capacity table — no `@` data; path via
+  `blockshells.shell_path(params)`). `generate_shells` is additive
   (existing sheets/your overrides are kept). The mode in B2 drives generation:
   **keep** = the Python builder makes the CSV, sheet ignored; **fill** = builder makes the
   CSV *and* writes its `@` rows back into the sheet (to inspect/tweak); **override** =
@@ -216,6 +217,8 @@ builder's own instance keys, first-seen order, falling back to a template scan �
   - *purpose / builder-set* (`08`): the instance sets `"_template_type"` = the Index per @row
     directly (08: 1 per sorter, 2 per door DQ; sidecar `#Templates Purpose`).
   `_pad`/`_sizes`/`_template_type` are control keys, never emitted as columns.
+  `!!ITERATOR_STRINGS$$` is always the **last** `%` column (keyed by the list value when
+  there are instances, by name for the empty-instance shell).
 - The target/example is `SoftwareBlocksBuilder/test - Copy.csv`. **Pipeline2 deliberately
   STOPS at the CSV**; Openn2 fills the template XML from it and imports it
   (`TiaPortalOpenness.Blocks.cs::ImportPlcBlock`). A future shared library may unify the two.
