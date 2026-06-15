@@ -119,7 +119,43 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
     # enrich each row with its safety AREAs from the C&E workbook (best-effort:
     # '' when the C&E doc is absent). Paired channels share their device's areas.
     matrix.annotate_areas(params, rows)
-    # name_in_db = the name this row gets as a DB member in the generated .db files
     for row in rows:
+        # name_in_db = the name this row gets as a DB member in the generated .db files
         row["name_in_db"] = outputs.member_name(row)
+        # subnet_name = "Subnet" + 3rd octet of the node IP (e.g. 192.168.50.x -> Subnet50)
+        octets = str(row.get("profinet_ip", "")).split(".")
+        row["subnet_name"] = f"Subnet{octets[2]}" if len(octets) == 4 and octets[2] else ""
+    _add_node_address_ranges(rows)
     return rows, warnings
+
+
+def _addr_byte(bit):
+    """('I'|'Q', byte) from an address cell like 'I20.0'/'Q130.1', else None."""
+    b = str(bit or "").strip().upper()
+    if b[:1] in ("I", "Q") and "." in b:
+        try:
+            return b[0], int(b[1:b.index(".")])
+        except ValueError:
+            return None
+    return None
+
+
+def _add_node_address_ranges(rows) -> None:
+    """On each node row (one carrying a profinet_name) set I_/Q_ start/end byte from the
+    addresses used at that node's location; '' on the others. A signal's node is then
+    the node whose matching I/Q range contains the signal's address byte."""
+    by_loc_I, by_loc_Q = {}, {}
+    for r in rows:
+        ab = _addr_byte(r.get("bit"))
+        if ab:
+            (by_loc_I if ab[0] == "I" else by_loc_Q).setdefault(r.get("location", ""), []).append(ab[1])
+    for r in rows:
+        if r.get("profinet_name"):
+            ib = by_loc_I.get(r.get("location", ""), [])
+            qb = by_loc_Q.get(r.get("location", ""), [])
+            r["I_startByte"] = min(ib) if ib else ""
+            r["I_endByte"] = max(ib) if ib else ""
+            r["Q_startByte"] = min(qb) if qb else ""
+            r["Q_endByte"] = max(qb) if qb else ""
+        else:
+            r["I_startByte"] = r["I_endByte"] = r["Q_startByte"] = r["Q_endByte"] = ""
