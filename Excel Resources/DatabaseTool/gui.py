@@ -38,6 +38,7 @@ import theme
 import block_templates
 import block_builders
 import softwareblocks
+import blockshells
 import verify
 
 APP_NAME = "Pipeline2"
@@ -358,7 +359,12 @@ class App:
         b_cov.grid(row=2, column=1, sticky="w", padx=6, pady=2)
         ttk.Button(blk, text="Open coverage report",
                    command=self._open_coverage).grid(row=2, column=2, sticky="w", padx=6, pady=2)
-        self._run_buttons.extend([b_scan, b_central, b_blocks, b_cov])  # greyed while a run is in flight
+        b_shells = ttk.Button(blk, text="Generate block shells (.xlsm)",
+                              command=lambda: self._start(self._work_shells))
+        b_shells.grid(row=3, column=0, sticky="w", padx=(0, 6), pady=2)
+        ttk.Button(blk, text="Open shell workbook",
+                   command=lambda: self._open_path(blockshells.SHELL_PATH)).grid(row=3, column=1, sticky="w", padx=6, pady=2)
+        self._run_buttons.extend([b_scan, b_central, b_blocks, b_cov, b_shells])  # greyed while a run is in flight
 
     def _open_in_files(self, path: str):
         """Open a file in the Files tab editor (switch to it); else open externally."""
@@ -383,11 +389,22 @@ class App:
         else:
             self.status.set("coverage.csv not found - run 'Coverage report' first")
 
-    def _work_softwareblocks(self):
-        self._section("SOFTWARE BLOCKS  (block_builders -> SoftwareBlocksBuilder CSV)")
+    def _work_shells(self):
+        self._section("BLOCK SHELLS  (per-template shell sheets -> SoftwareBlocks.xlsm)")
         self._reload_builders()
-        for stem, (path, n) in softwareblocks.generate().items():
-            self._log("OK", f"{n} instance(s)  ->  {os.path.basename(path)}")
+        params = config.load_params()
+        types = config.load_signal_types()
+        db, _w = staging.load_io_list(params, types)
+        r = blockshells.generate_shells(db)
+        self._log("OK", f"+{r['created']} shell(s) created, {r['kept']} kept  ->  {os.path.basename(r['path'])}")
+        self._log("INFO", "  set each sheet's directive (B2) to keep / fill / override")
+        self._stat("block shells generated")
+
+    def _work_softwareblocks(self):
+        self._section("SOFTWARE BLOCKS  (block_builders / shell -> SoftwareBlocksBuilder CSV)")
+        self._reload_builders()
+        for stem, (path, n, mode) in softwareblocks.generate().items():
+            self._log("OK", f"{n} instance(s)  [{mode}]  ->  {os.path.basename(path)}")
         self._stat("SoftwareBlocks CSV generated")
 
     def _work_coverage(self):

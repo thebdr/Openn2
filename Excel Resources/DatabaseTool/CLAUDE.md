@@ -82,14 +82,24 @@ don't reach back for Power Query or VBA.
   templates, but preserves `# $keep` functions verbatim. The GUI reloads this module
   before each SoftwareBlocks/Coverage run so live edits are picked up.
   `softwareblocks.py` — the engine that writes the SoftwareBlocksBuilder CSV(s) to
-  `Output/SoftwareBlocks/` (see "Software-block templates").
+  `Output/SoftwareBlocks/` (see "Software-block templates"), honoring each template's
+  shell directive (keep/fill/override).
+- `blockshells.py` — the per-template **shell workbook** `SoftwareBlocks.xlsm` (one sheet
+  per template: `$ template=…`, a `$ <mode>` directive in B2, the `%` header with the
+  template's keys, and the Capacity table — no `@` data). `generate_shells` is additive
+  (existing sheets/your overrides are kept). The mode in B2 drives generation:
+  **keep** = the Python builder makes the CSV, sheet ignored; **fill** = builder makes the
+  CSV *and* writes its `@` rows back into the sheet (to inspect/tweak); **override** =
+  generation reads the `@` rows *from* the sheet (hand-filled) instead of running the
+  builder. The `.xlsm` is regenerable + user-edited, so it is **not committed**.
 - `verify.py` — **coverage check + report**: per CentralDatabase row, which outputs it
   lands in (io_tag/db/diagnosis/interface/hardware/block); flags **ORPHAN** (a *typed*
   row in no output) and **UNPLACED MEMBER** (a DB member not in any block ITERATOR — the
   worklist for finishing the builders). Untyped/spare rows aren't flagged. Writes
   `Output/Report/coverage.csv` (per-row matrix, Files-tab filterable) + `coverage.txt`.
   Wired into `run.py` (a COVERAGE section, lazy/guarded) and the GUI Block-templates
-  panel (Generate SoftwareBlocks CSV · Coverage report · Open coverage report).
+  panel (Generate SoftwareBlocks CSV · Coverage report · Open coverage report ·
+  Generate block shells · Open shell workbook).
 - `requirements.txt` — `openpyxl` (core); `tksheet` + `pywin32` (GUI). pywin32 is
   optional (Excel cell-jump falls back to `os.startfile` without it).
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL
@@ -249,9 +259,10 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
   format (their SWP_04 workbook). `List_IO` is done; this is the remaining diagnosis
   output, to be wired into `outputs.py` + `run.py` once the format is known.
 - **Software-block generation** — the SoftwareBlocksBuilder-CSV engine
-  (`softwareblocks.py`) + coverage check (`verify.py`) are done; remaining: the user
-  fills the `build_05_*`/`build_06_*` bodies in `block_builders.py` (the coverage
-  report's UNPLACED-member list is the worklist), resolve the `!!key$$` delimiter
-  question (also `!!key!!`/`$$key!!`?), confirm the `$` template-path prefix the builder
-  tool expects, and the final step that fills the template XML from the CSV (then Openn2
+  (`softwareblocks.py`), the shell workbook + keep/fill/override directives
+  (`blockshells.py`), and the coverage check (`verify.py`) are done. `02/03/06/07` builders
+  are written; remaining: finish `build_00/04/05/08` bodies in `block_builders.py` (the
+  coverage report's UNPLACED-member list is the worklist), resolve the `07` encoder→index
+  link + `SorterRunningIOC` source, confirm the `$` template-path prefix the builder tool
+  expects, and the final step that fills the template XML from the CSV (then Openn2
   `ImportPlcBlock`).

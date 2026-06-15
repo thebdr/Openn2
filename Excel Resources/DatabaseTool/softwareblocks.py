@@ -113,20 +113,31 @@ def build_template_csv(stem: str, builder, db: list) -> list:
     return [r + [""] * (width - len(r)) for r in grid], len(data_rows)
 
 
-def generate(out_dir: str | None = None, params_path: str | None = None) -> dict:
+def generate(out_dir: str | None = None, params_path: str | None = None,
+             shell_path: str | None = None) -> dict:
+    import blockshells  # lazy: avoid an import cycle
     params = config.load_params(params_path)
     types = config.load_signal_types()
-    db, _warnings = staging.load_io_list(params, types)   # CentralDatabase (has matrix_areas + name_in_db)
+    db, _warnings = staging.load_io_list(params, types)   # CentralDatabase (has all builder columns)
     out_dir = out_dir or os.path.join(_abs(params.get("output_dir", "Output")), "SoftwareBlocks")
     os.makedirs(out_dir, exist_ok=True)
+    shell = shell_path or blockshells.SHELL_PATH
+    mode_of = blockshells.modes(shell)   # {stem -> keep|fill|override}
 
     written = {}
     for stem, builder in block_builders.BUILDERS.items():
-        grid, n = build_template_csv(stem, builder, db)
+        mode = mode_of.get(stem, "keep")
+        if mode == "override":                       # take the @ rows straight from the sheet
+            grid = blockshells.override_grid(stem, shell)
+            n = sum(1 for r in grid if r and r[0] == "@")
+        else:
+            grid, n = build_template_csv(stem, builder, db)
+            if mode == "fill":                       # build, then mirror the @ rows into the sheet
+                blockshells.write_fill(stem, grid, shell)
         path = os.path.join(out_dir, stem + ".csv")
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
             csv.writer(f, lineterminator="\n").writerows(grid)
-        written[stem] = (path, n)
+        written[stem] = (path, n, mode)
     return written
 
 
@@ -134,8 +145,8 @@ def main():
     ap = argparse.ArgumentParser(description="Generate SoftwareBlocksBuilder CSVs from block_builders.py")
     ap.add_argument("--out", default=None, help="output dir (default Output/SoftwareBlocks)")
     args = ap.parse_args()
-    for stem, (path, n) in generate(args.out).items():
-        print(f"{n:3} instance(s)  ->  {path}")
+    for stem, (path, n, mode) in generate(args.out).items():
+        print(f"{n:3} instance(s)  [{mode}]  ->  {path}")
 
 
 if __name__ == "__main__":
