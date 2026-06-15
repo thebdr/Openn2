@@ -266,12 +266,12 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
 - **Software-block generation** — the SoftwareBlocksBuilder-CSV engine
   (`softwareblocks.py`), the shell workbook + keep/fill/override directives
   (`blockshells.py`), and the coverage check (`verify.py`) are done. **All 8 builders
-  (`00/02/03/04/05/06/07/08`) are written** and generate on the real data. Remaining:
-  confirm the `$` template-path prefix the builder tool expects, and the final step that
-  fills the template XML from the CSV (then Openn2 `ImportPlcBlock`). Loose ends: `05`'s
-  `NetworkComment` defaulted to the instance name; `08`'s `doorIsClosedInfo` is empty
-  because `DI2/2` carries no `name_in_db` (a `signal_types.csv` config matter); `08`'s
-  sorter-@row `instanceOf`/`NetworkComment`/`Bypass` are reasonable defaults.
+  (`00/02/03/04/05/06/07/08`) are written** and generate on the real data; coverage shows
+  0 orphans (the only unplaced members are PA/PW fieldbus-failure / profinet-switch members
+  that belong to no software block). **Pipeline2 deliberately STOPS at the `<stem>.csv`** —
+  filling the template XML from the CSV (then `ImportPlcBlock`) is **Openn2's** job (a future
+  shared library may unify the two). Minor open: confirm the `$` template-path prefix the
+  builder tool expects.
 - **Three template sizing models** (how the engine picks `TemplateType`):
   - *single-capacity* (`02/03/06`): sidecar `#Templates Capacity,#Templates Index`; the
     builder's one list-valued key is the ITERATOR; `_pick` = smallest capacity ≥ its length.
