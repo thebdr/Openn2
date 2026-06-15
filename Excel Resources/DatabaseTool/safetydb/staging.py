@@ -176,3 +176,41 @@ def _add_node_address_ranges(rows) -> None:
             r["Q_endByte"] = max(qb) if qb else ""
         else:
             r["I_startByte"] = r["I_endByte"] = r["Q_startByte"] = r["Q_endByte"] = ""
+
+
+def load_diagnostic_blocks(params: dict) -> dict:
+    """Read the I/O List 'DiagnosticBlocks' sheet -> {cabinet_id:int -> {index, fld,
+    template_type}}, keyed by ID_SWP. `index` = the 3-digit cabinet string ('000','001'…);
+    `fld` = FullName (the cabinet's Functional unit+Location); `template_type` = the
+    per-cabinet variant (e.g. '01'-'04'), '' when that column is absent/blank. Columns are
+    found by header name; {} if the sheet (or ID_SWP column) is missing."""
+    wb = load_workbook(params["io_list"]["path"], data_only=True)
+    sheet = next((s for s in wb.sheetnames if s.strip().lower() == "diagnosticblocks"), None)
+    if sheet is None:
+        wb.close()
+        return {}
+    grid = list(wb[sheet].iter_rows(values_only=True))
+    wb.close()
+    if not grid:
+        return {}
+    header = [_hkey(c) for c in grid[0]]
+
+    def col(name):
+        key = _hkey(name)
+        return next((i for i, h in enumerate(header) if h == key), None)
+
+    c_id, c_fld, c_tt = col("ID_SWP"), col("FullName"), col("TemplateType")
+    if c_id is None:
+        return {}
+    out = {}
+    for r in grid[1:]:
+        raw = _norm(r[c_id]) if c_id < len(r) else ""
+        if not raw or not raw.lstrip("-").isdigit():
+            continue
+        cid = int(raw)
+        out[cid] = {
+            "index": f"{cid:03d}",
+            "fld": _norm(r[c_fld]) if c_fld is not None and c_fld < len(r) else "",
+            "template_type": _norm(r[c_tt]) if c_tt is not None and c_tt < len(r) else "",
+        }
+    return out

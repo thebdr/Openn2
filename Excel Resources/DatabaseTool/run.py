@@ -103,10 +103,11 @@ def main(argv=None) -> int:
         print(f"  - {name}  ({kind}, {len(db['members'])} member(s))")
 
     # ---- diagnosis -----------------------------------------------------
-    _section("DIAGNOSIS  (List_IO)")
-    diag = outputs.build_diagnosis_list_io(rows)
-    n_diag = outputs.write_diagnosis_list_io(diag, out_dir)
-    print(f"  {n_diag} row(s) -> {os.path.join(out_dir, 'Diagnosis', 'List_IO.csv')}")
+    _section("DIAGNOSIS  (List_IO + List_Logic + OPC SCL)")
+    import diagnostic_opc
+    d = diagnostic_opc.generate_for(rows, params, out_dir)
+    print(f"  {d['io']} List_IO + {d['logic']} List_Logic row(s) -> Diagnosis/")
+    print(f"  SCL -> {os.path.relpath(d['scl'], out_dir)}")
 
     # ---- hardware ------------------------------------------------------
     _section("HARDWARE  (Stations / Modules, format 2)")

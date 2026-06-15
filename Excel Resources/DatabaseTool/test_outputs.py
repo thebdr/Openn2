@@ -108,9 +108,8 @@ def main():
         # diagnosis List_IO: only in_diagnosis types (A), not safety (E1/2,KQ)
         diag = outputs.build_diagnosis_list_io(rows)
         check("diagnosis includes only in-diagnosis types", {d["DevType"] for d in diag} == {"A"})
-        check("diagnosis row has the 17 List_IO columns",
-              [c[0] for c in outputs.DIAG_COLUMNS][:3] == ["Diag Cabinet", "Diag Bit", "DevType"]
-              and diag[0]["Device"] == "-F09001")
+        check("diagnosis row uses the config columns + PLC_Binding",
+              diag[0]["Device"] == "-F09001" and "PLC_Binding" in diag[0])
         # both A rows are in-diagnosis (incl. the address-less base-addr row)
         n = outputs.write_diagnosis_list_io(diag, tmp)
         check("diagnosis CSV written (address-less rows included)",

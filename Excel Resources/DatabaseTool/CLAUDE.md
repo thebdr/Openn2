@@ -34,9 +34,13 @@ don't reach back for Power Query or VBA.
     headers and newline-wrapped headers, so a name map is unsafe). Excludes
     struck rows and rows with a Skip Reason. Resolves each row's signal type.
   - `validation.py` — `validate`: C&E matrix + `AREA n` sheets vs the I/O List.
-  - `outputs.py` — I/O tags, DBs, diagnosis List_IO.
+  - `outputs.py` — I/O tags, DBs, diagnosis List_IO (config-driven columns + `plc_binding`/
+    `ml_value`).
   - `hardware.py` — `extract`: format-2 Stations + Modules.
-- `config/` — versioned config: `column_map.csv`, `signal_types.csv`, `params.json`.
+  - `staging.load_diagnostic_blocks` — the I/O List `DiagnosticBlocks` sheet
+    (`{cabinet_id: {index, fld, template_type}}`).
+- `config/` — versioned config: `column_map.csv`, `signal_types.csv`, `params.json`,
+  `diagnosis_columns.csv` (>List_IO/>List_Logic columns), `diagnosis_logic_rules.csv`.
 - `run.py` — the pipeline CLI: documents → staging → validation → every output
   (I/O tags, DBs, diagnosis, hardware, interfaces). Resolves all paths relative to
   itself, so it runs from any cwd. `--strict` fails on validation FAILs; it exits 1
@@ -94,6 +98,9 @@ don't reach back for Power Query or VBA.
   CSV *and* writes its `@` rows back into the sheet (to inspect/tweak); **override** =
   generation reads the `@` rows *from* the sheet (hand-filled) instead of running the
   builder. The `.xlsm` is regenerable + user-edited, so it is **not committed**.
+- `diagnostic_opc.py` + `diagnosis_rules.py` — the diagnosis SCL generator + the
+  rule-generated `>List_Logic` (see "Diagnosis" under Output rules). Wired into the
+  pipeline DIAGNOSIS phase (`generate_for(db, params, out_dir)` reuses the staged rows).
 - `verify.py` — **coverage check + report**: per CentralDatabase row, which outputs it
   lands in (io_tag/db/diagnosis/interface/hardware/block); flags **ORPHAN** (a *typed*
   row in no output) and **UNPLACED MEMBER** (a DB member not in any block ITERATOR — the
@@ -155,8 +162,29 @@ channels land in one table; an explicit value always wins.
   : Bool; //<tag comment>` (the same comment string as the I/O tag). On re-run the
   `DBs/` and `IoTags/` folders are swept of prior artifacts so only the current run
   remains.
-- **Diagnosis** `List_IO` — in-diagnosis rows (A/W/PA/PW/DD) in the SWP_04
-  17-column layout. (List_Logic / generated alarm PLC code come later.)
+- **Diagnosis** (`diagnostic_opc.py`) — writes `Output/Diagnosis/`: `List_IO.csv`
+  (in-diagnosis rows A/W/PA/PW/DD), `List_Logic.csv` (rule-generated), and
+  **`Diagnostic_for_OPC.scl`** (the OPC alarm/warning bindings — fills the
+  `06_Diagnostic for OPC.scl` template directly; Pipeline2 owns this text fill).
+  - The `>List_IO`/`>List_Logic` **columns are config-driven** (`config/diagnosis_columns.csv`:
+    `header,expression` where `expression` interpolates `{CentralDatabase column}` tokens);
+    the one hardcoded column is **`PLC_Binding`** (sentinel `$PLC_Binding$` →
+    `outputs.plc_binding`: `"<leftmost db_name>"."<name_in_db>"` → `"<name_in_tagtable>"` → `bit`).
+  - **`config/diagnosis_logic_rules.csv`** (`name,required_types,dev_type,db_name,member`):
+    when all `required_types` (`|`-sep `script_type`s) are present in a cabinet (matched
+    rows' FLD → `DiagnosticBlocks`), `diagnosis_rules.build_list_logic` emits a `>List_Logic`
+    entry at the **next free bit** of that cabinet's alarm/warning family, IN binding
+    `"<db_name>"."<member>"` (`member` interpolates `{columns}`).
+  - **SCL fill**: one FUNCTION, one REGION per cabinet (cabinet→FLD+`TemplateType` from the
+    I/O List **`DiagnosticBlocks`** sheet via `staging.load_diagnostic_blocks`). Per cabinet:
+    a CabState call + one `BoolToUDInt` call per packed DWord. FB instance = the DWord it
+    backs (`S1.CABINET<idx>.ALARM1`; CabState = `…STATE`). Channels: `IN_xx`=`PLC_Binding`,
+    `ML_xx`=`outputs.ml_value` (type `diagnosis_logic` mirror→TRUE/invert→FALSE, blank→from
+    `normal_condition`), `FL_xx`=`"PROFINET_ALARMS"."<node profinet_name>_<subnet>"`; only
+    assigned channels are emitted. Alarm vs warning = `type_hw` ends `W`; `diag_bit` 0-31→
+    DWord1, 32-63→DWord2, channel=`bit%32`. The cabinet **`TemplateType`** (1-4) picks the
+    `#Template` variant; **Tristate** (2/4) pairs each alarm DWord with its warning DWord
+    (`Tristate_DW =>`, the "was-active" state) instead of carrying real warnings.
 - **Hardware** Stations/Modules (format 2), from the I/O List + the global
   `DeviceTypesDatabase`:
   - roles: Script Type `PLC`/`PlcCardCm` = heads, Type R first letter `P` = IoDevice;
@@ -271,12 +299,13 @@ delimiter padding (`#!format=2,,,,`). The loaders still **sniff** `,`/`;` so old
 
 ## Status & still to build
 
-Pipeline (staging → validation → outputs), the GUI, the coverage report, and the full
-software-block path (all 8 builders → `Output/SoftwareBlocks/*.csv`; coverage = 0 orphans)
-are done; the `test_*.py` suite is green. Remaining:
+Pipeline (staging → validation → outputs), the GUI, the coverage report, the full
+software-block path (all 8 builders → `Output/SoftwareBlocks/*.csv`; coverage = 0 orphans),
+and the diagnosis path (`List_IO` + rule-generated `List_Logic` + the OPC `.scl`) are done;
+the `test_*.py` suite is green. Remaining:
 
-- Diagnosis **List_Logic** + the generated alarm PLC code — awaiting the user's SWP_04
-  format. `List_IO` is done; wire the rest into `outputs.py` + `run.py` when known.
+- Diagnosis **List_Logic rules** are seeded with the encoder example; add more rules to
+  `config/diagnosis_logic_rules.csv` as the project needs them.
 - Minor: confirm the `$` template-path prefix the SoftwareBlocksBuilder tool expects.
 - Out of scope here: filling the template XML from the CSV is **Openn2's** job (Pipeline2
   stops at the CSV).

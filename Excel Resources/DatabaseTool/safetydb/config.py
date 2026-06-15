@@ -114,6 +114,15 @@ def load_column_map(document: str) -> list[dict]:
     return rows
 
 
+def load_diagnosis_columns() -> list[tuple]:
+    """The >List_IO / >List_Logic column layout: [(header, expression)] from
+    config/diagnosis_columns.csv. `expression` interpolates CentralDatabase columns with
+    `{canonical}` tokens (literals allowed); the sentinel `$PLC_Binding$` is computed by
+    outputs.plc_binding (the only hardcoded column)."""
+    return [(r["header"].strip(), (r.get("expression") or "").strip())
+            for r in _read_csv("diagnosis_columns.csv") if (r.get("header") or "").strip()]
+
+
 def load_signal_types() -> dict:
     """type_id (upper) -> {type_id, description, category, pair_key, channel,
     in_diagnosis(bool), is_pattern(bool), db_kind, db_names(list), add_to_name,
@@ -142,6 +151,9 @@ def load_signal_types() -> dict:
             "add_to_name": (r.get("add_to_name") or "").strip(),
             # tagtable_name: PLC tag-table (Path) the type's I/O tags belong to.
             "tagtable_name": (r.get("tagtable_name") or "").strip(),
+            # diagnosis_logic: mirror -> ML TRUE, invert -> ML FALSE, blank -> from
+            # the row's normal_condition (see outputs.ml_value).
+            "diagnosis_logic": (r.get("diagnosis_logic") or "").strip().lower(),
         }
     # A paired channel-2 type (e.g. E2/2) usually leaves tagtable_name blank; let it
     # inherit the sibling's table (same pair_key) so both channels of one device land

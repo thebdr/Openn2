@@ -705,11 +705,12 @@ class App:
             self._log("INFO", f"  {name}  ({kind}, {len(db['members'])} member(s))")
 
     def _phase_diagnosis(self):
-        self._section("DIAGNOSIS  (List_IO)")
+        self._section("DIAGNOSIS  (List_IO + List_Logic + OPC SCL)")
         self._ensure_staged()
-        diag = outputs.build_diagnosis_list_io(self._rows)
-        n = outputs.write_diagnosis_list_io(diag, self._out_dir())
-        self._log("OK", f"{n} row(s)  ->  Output/Diagnosis/List_IO.csv")
+        import diagnostic_opc
+        d = diagnostic_opc.generate_for(self._rows, config.load_params(), self._out_dir())
+        self._log("OK", f"{d['io']} List_IO + {d['logic']} List_Logic row(s)  ->  Output/Diagnosis/")
+        self._log("OK", f"SCL  ->  Output/Diagnosis/{os.path.basename(d['scl'])}")
 
     def _phase_hardware(self):
         self._section("HARDWARE  (Stations / Modules, format 2)")

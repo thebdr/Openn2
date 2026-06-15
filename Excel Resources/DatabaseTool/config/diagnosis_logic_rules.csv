@@ -1,0 +1,2 @@
+name,required_types,dev_type,db_name,member
+Safety Encoder Failure,ENC1/2|ENC2/2,A,04_SPEED,Safety Encoder {functional_unit}{location}{device} Working - No Fault

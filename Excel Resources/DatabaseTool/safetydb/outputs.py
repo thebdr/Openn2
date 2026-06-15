@@ -20,6 +20,8 @@ import re
 
 import openpyxl
 
+from . import config
+
 
 def _clear(directory: str, *patterns: str) -> None:
     """Remove previously-generated files (by glob) so a re-run leaves only the
@@ -156,50 +158,66 @@ def _descr2(row) -> str:
     return " ".join(p for p in (p1, p2) if p)
 
 
-# Diagnosis List_IO layout (mirrors the SWP_04 ">List_IO" sheet); each column is
-# (header, value-from-staged-row).
-DIAG_COLUMNS = [
-    ("Diag Cabinet", lambda r: r.get("diag_cabinet", "")),
-    ("Diag Bit", lambda r: r.get("diag_bit", "")),
-    ("DevType", lambda r: r.get("script_type", "")),
-    ("Index", lambda r: r.get("index", "")),
-    ("Type", lambda r: r.get("type_hw", "")),
-    ("Address", lambda r: r.get("bit", "")),
-    ("ID", lambda r: r.get("id_node", "")),
-    ("Desc L1", _descr),
-    ("Desc L2", _descr2),
-    ("Functional unit", lambda r: r.get("functional_unit", "")),
-    ("Location", lambda r: r.get("location", "")),
-    ("Device", lambda r: r.get("device", "")),
-    ("Drawing name", lambda r: r.get("drawing", "")),
-    ("Sheet", lambda r: r.get("sheet", "")),
-    ("IP", lambda r: r.get("profinet_ip", "")),
-    ("PnName", lambda r: r.get("profinet_name", "")),
-    ("TsRef", lambda r: r.get("ts_ref", "")),
-]
+# The >List_IO / >List_Logic column layout is config-driven (config/diagnosis_columns.csv);
+# each column is (header, interpolation expression over the CentralDatabase row). The one
+# hardcoded column is PLC_Binding (the IN_xx reference), via this sentinel:
+PLC_BINDING_SENTINEL = "$PLC_Binding$"
+
+
+def plc_binding(row) -> str:
+    """The IN_xx PLC reference for a diagnosis row: '"<leftmost db_name>"."<name_in_db>"'
+    when DB-backed, else '"<name_in_tagtable>"', else the bit address."""
+    nid = (row.get("name_in_db") or "").strip()
+    if nid:
+        dbs = (row.get("_type") or {}).get("db_names") or []
+        return f'"{dbs[0]}"."{nid}"' if dbs else f'"{nid}"'
+    tag = (row.get("name_in_tagtable") or "").strip()
+    if tag:
+        return f'"{tag}"'
+    return (row.get("bit") or "").strip()
+
+
+def ml_value(row) -> str:
+    """ML_xx (Mirror Logic): the type's diagnosis_logic mirror->TRUE / invert->FALSE;
+    blank -> from normal_condition (set -> FALSE/invert, empty -> TRUE/mirror)."""
+    logic = ((row.get("_type") or {}).get("diagnosis_logic") or "").strip().lower()
+    if logic == "mirror":
+        return "TRUE"
+    if logic == "invert":
+        return "FALSE"
+    nc = str(row.get("normal_condition") or "").strip().lower()
+    return "FALSE" if nc and nc not in ("0", "0.0", "false", "no") else "TRUE"
+
+
+def _diag_cell(expr: str, row) -> str:
+    if expr.strip() == PLC_BINDING_SENTINEL:
+        return plc_binding(row)
+    return _resolve_tokens(expr, row).strip()
 
 
 def build_diagnosis_list_io(io_rows: list) -> list:
-    """The diagnosis-relevant rows (types flagged in_diagnosis) in the List_IO
-    column order. Includes rows without a bit address (e.g. PA fieldbus alarms)."""
+    """The diagnosis-relevant rows (types flagged in_diagnosis) as dicts keyed by the
+    config/diagnosis_columns.csv headers (each cell interpolated from the CentralDatabase
+    row; the `$PLC_Binding$` column via plc_binding). Address-less rows (e.g. PA) included."""
+    cols = config.load_diagnosis_columns()
     out = []
     for r in io_rows:
         t = r.get("_type")
         if not t or not t.get("in_diagnosis"):
             continue
-        out.append({name: fn(r) for name, fn in DIAG_COLUMNS})
+        out.append({h: _diag_cell(expr, r) for h, expr in cols})
     return out
 
 
-def write_diagnosis_list_io(rows: list, out_dir: str) -> int:
+def write_diagnosis_list_io(rows: list, out_dir: str, filename: str = "List_IO.csv") -> int:
     diag_dir = os.path.join(out_dir, "Diagnosis")
     os.makedirs(diag_dir, exist_ok=True)
-    headers = [c[0] for c in DIAG_COLUMNS]
-    with open(os.path.join(diag_dir, "List_IO.csv"), "w", encoding="utf-8-sig", newline="") as f:
+    headers = [h for h, _ in config.load_diagnosis_columns()]
+    with open(os.path.join(diag_dir, filename), "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f, lineterminator="\n")
         w.writerow(headers)
         for r in rows:
-            w.writerow([str(r[h]) for h in headers])
+            w.writerow([str(r.get(h, "")) for h in headers])
     return len(rows)
 
 
