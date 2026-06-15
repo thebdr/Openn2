@@ -2,7 +2,7 @@ document,column,canonical,expected_header,required
 IoList,A,description_module,Description Module,no
 IoList,B,manufacturer,Manufacturer,no
 IoList,C,part_no,Part No.,yes
-IoList,D,cod_fives,Cod. Fives,no
+IoList,D,cod_fives,Cod.,no
 IoList,E,slot,Slot,no
 IoList,F,id_node,ID,yes
 IoList,G,bit,Bit,no
