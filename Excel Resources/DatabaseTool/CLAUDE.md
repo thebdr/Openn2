@@ -214,9 +214,14 @@ that **you edit** to gather the data, and `softwareblocks.py` is the engine.
 
 To author the builders, inspect `Output/CentralDatabase.csv` (`python block_templates.py
 staged`, or the GUI Configuration tab's Block templates panel) — canonical columns +
-`matrix_areas` + `name_in_db` (the `.db` member name) + `_source_sheet`/`_source_row`/
-`type_id_resolved`/`type_category`; open it in the Pipeline2 **Files** tab and use the
-regex **Filter rows** to explore. **`matrix_areas`** (`'|'`-joined, e.g. `AREA 1|AREA 2`)
+`matrix_areas` + `IsSorterArea` + the three identity columns below + `subnet_name` +
+per-node `I_/Q_ start/end byte` + `_source_sheet`/`_source_row`/`type_id_resolved`/
+`type_category`; open it in the Pipeline2 **Files** tab and use the regex **Filter rows**
+to explore. A row's three identities (each `''` when N/A) — pick the one a `!!key$$`
+expects: **`name_in_db`** = the `.db` member name (with the type's `add_to_name` suffix,
+e.g. `… Working - No Fault`) — use for `…_memberOf:<DB>` keys; **`name_in_tagtable`** =
+the PLC I/O tag name (NO suffix) — use for `tagName:` keys; **`tagtable`** = the tag-table
+(Path) that tag lands in; **`datablocks`** = the DB(s) the member belongs to (`'|'`-joined). **`matrix_areas`** (`'|'`-joined, e.g. `AREA 1|AREA 2`)
 is added in **staging** (`safetydb/matrix.py`, from the C&E workbook; `''` if the C&E
 doc is absent): for an **input** (I-address) it's the area columns marked `X` on that
 signal's CAUSE&EFFECT MATRIX row (EFFECT block from column `S`; the area = the column

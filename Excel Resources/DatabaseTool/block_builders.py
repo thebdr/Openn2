@@ -134,6 +134,19 @@ def rows_by_index(db: list, index_value, script_type=None) -> list:
             and (script_type is None or r.get("script_type") == script_type)]
 
 
+def _num_index(r):
+    """Numeric element Index, e.g. '0001' -> 1; None when not numeric (e.g. 'SORTER-01')."""
+    s = str(r.get("index", "")).strip()
+    return int(s) if s.isdigit() else None
+
+
+def encoders_of(db: list, sorter_num: int, channel: str) -> list:
+    """ENC rows of `channel` ('ENC1/2'/'ENC2/2') belonging to sorter `sorter_num` - the
+    encoders carry a numeric Index ('0001') equal to the sorter's number (SORTER-01)."""
+    return [r for r in db
+            if r.get("script_type") == channel and _num_index(r) == sorter_num]
+
+
 def _first(seq):
     return seq[0] if seq else None
 
@@ -241,22 +254,21 @@ def build_07_speed_control(db: list) -> list:
     EncoderSensor2Faulty_memberOf:04_SPEED, EncoderBroken_memberOf:04_SPEED, NetworkComment"""
     out = []
     for ioc, num in sorters(db):
-        x = num                                   # sorter number (1, 2, ...); adjust format if needed
-        idx = ioc.get("index", "")                # e.g. SORTER-01
-        enc1 = _first(rows_by_index(db, idx, "ENC1/2"))   # TODO: confirm the encoders carry this Index
-        enc2 = _first(rows_by_index(db, idx, "ENC2/2"))
-        s1 = enc1["name_in_db"] if enc1 else ""
-        s2 = enc2["name_in_db"] if enc2 else ""
-        broken = re.sub(r"\s*Sensor\s*[12]\b", "", s1).strip()   # drop 'Sensor N' -> encoder common name
+        nn = f"{num:02d}"                                # zero-padded sorter number (01, 02, ...)
+        enc1 = _first(encoders_of(db, num, "ENC1/2"))   # encoders linked by numeric Index == num
+        enc2 = _first(encoders_of(db, num, "ENC2/2"))
+        member1 = enc1["name_in_db"] if enc1 else ""    # DB member (with 'Working - No Fault')
+        member2 = enc2["name_in_db"] if enc2 else ""
+        broken = re.sub(r"\s*Sensor\s*[12]\b", "", member1).strip()   # drop 'Sensor N' -> common name
         out.append({
-            "tagName:EncoderSensor1":                      s1,
-            "tagName:EncoderSensor2":                      s2,
-            "tagName:SorterRunningIOC":                    ioc.get("name_in_db", ""),  # TODO: the sorter-running signal
-            "EncoderSensor1Faulty_memberOf:04_SPEED":      s1,
-            "EncoderSensor2Faulty_memberOf:04_SPEED":      s2,
+            "tagName:EncoderSensor1":                      enc1["name_in_tagtable"] if enc1 else "",
+            "tagName:EncoderSensor2":                      enc2["name_in_tagtable"] if enc2 else "",
+            "tagName:SorterRunningIOC":                    f"PNC_I_Sorter{nn} SORTER RUNNING",
+            "EncoderSensor1Faulty_memberOf:04_SPEED":      member1,
+            "EncoderSensor2Faulty_memberOf:04_SPEED":      member2,
             "EncoderBroken_memberOf:04_SPEED":             broken,
-            "areaSorterStopped_memberOf:SPEED_STATE_REC":  f"SORTER_{x}_STOPPED",
-            "NetworkComment":                              f"SORTER {x} SPEED CONTROL",
+            "areaSorterStopped_memberOf:SPEED_STATE_REC":  f"SORTER_{nn}_STOPPED",
+            "NetworkComment":                              f"SORTER {nn} SPEED CONTROL",
         })
     return out
 

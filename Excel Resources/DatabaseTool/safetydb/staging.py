@@ -122,6 +122,18 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
     for row in rows:
         # name_in_db = the name this row gets as a DB member in the generated .db files
         row["name_in_db"] = outputs.member_name(row)
+        # I/O tag identity: name_in_tagtable = the PLC tag name (no DB add_to_name suffix),
+        # tagtable = the tag-table (Path) it lands in; both '' when not a taggable I/O point
+        if outputs._is_io_signal(row):
+            row["name_in_tagtable"] = outputs.tag_name(row)
+            row["tagtable"] = outputs._tagtable(row)
+        else:
+            row["name_in_tagtable"] = ""
+            row["tagtable"] = ""
+        # datablocks = the DB(s) this row is a member of ('|'-joined), '' when not DB-backed
+        t = row.get("_type") or {}
+        row["datablocks"] = ("|".join(t.get("db_names") or [])
+                             if t.get("db_kind") in ("db", "safe_db") and row["name_in_db"] else "")
         # subnet_name = "Subnet" + 3rd octet of the node IP (e.g. 192.168.50.x -> Subnet50)
         octets = str(row.get("profinet_ip", "")).split(".")
         row["subnet_name"] = f"Subnet{octets[2]}" if len(octets) == 4 and octets[2] else ""
