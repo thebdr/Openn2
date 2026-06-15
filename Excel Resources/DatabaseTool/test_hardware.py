@@ -46,7 +46,8 @@ def main():
         row(type_hw="A", pn="6ES7131-6BH01-0BA0", slot="-K10", bit="I0.0"),    # card -K10 DI
         row(type_hw="A", pn="6ES7131-6BH01-0BA0", slot="-K10", bit="I0.1"),
         row(type_hw="A", pn="6ES7131-6BH01-0BA0", slot="-K11", bit="I4.0"),    # card -K11 DI (model same -> no PG)
-        row(script="B1/2", pn="6ES7136-6BA00-0CA0", slot="-K12", bit="I20.1"), # card -K12 F-DI, B1/2 at ch1
+        row(script="B1/2", pn="6ES7136-6BA00-0CA0", slot="-K12", bit="I20.1",  # card -K12 F-DI, B1/2 at ch1
+            ag="PotentialGroup=1"),                                            #   slot 2+ PG comes from col AG
         # Murrelektronik with a default card and a LUMBERG with auto-plugged card
         row(type_hw="PA", pn="55556", slot="-XN1", pname="n13-mvk"),
         row(type_hw="PA", pn="LU1", slot="-XNS1", pname="n31-lum", ag=""),
@@ -68,17 +69,19 @@ def main():
     check("cards grouped (-K10,-K11,-K12), auto/own-tag excluded",
           [m["Module Name"] for m in im] == ["-K10", "-K11", "-K12"], str([m["Module Name"] for m in im]))
     check("I Addr = Q Addr = start byte", im[0]["I Addr"] == 0 and im[0]["Q Addr"] == 0 and im[1]["I Addr"] == 4)
-    check("PotentialGroup on first + on model change, not on same model",
-          im[0]["Custom Parameters"] == "PotentialGroup=1" and im[1]["Custom Parameters"] == ""
-          and im[2]["Custom Parameters"].startswith("PotentialGroup=1"))
+    check("PotentialGroup=1 on the first card only; slots 2+ come from col AG",
+          im[0]["Custom Parameters"] == "PotentialGroup=1"      # first card auto-starts a group
+          and im[1]["Custom Parameters"] == ""                  # slot 2, no col AG -> none
+          and "PotentialGroup=1" in im[2]["Custom Parameters"], # slot 3 PG supplied via col AG
+          im[1]["Custom Parameters"] + " | " + im[2]["Custom Parameters"])
     check("by-type expanded Ch(#)->Ch(channel) for B1/2 at ch1",
           "Ch(1).Failsafe_DiscrepancyTime=450" in im[2]["Custom Parameters"], im[2]["Custom Parameters"])
     check("module comment from DTD", im[0]["Comment"] == "DI")
 
     mvk = [m for m in mod if m["Station Name"] == "n13-mvk"]
-    check("default card <55556>:DefaultCard emitted as a module",
+    check("default card <55556>:DefaultCard emitted as a module (DTD col-5 params applied by Openn2, not here)",
           len(mvk) == 1 and mvk[0]["Model Id"] == "<55556>:DefaultCard"
-          and "Failsafe_FDestinationAddress=IP[3]" in mvk[0]["Custom Parameters"], str(mvk))
+          and mvk[0]["Custom Parameters"] == "", str(mvk))
 
     lummod = [m for m in mod if m["Station Name"] == "n31-lum"]
     check("LUMBERG auto-plugged card -> no module row", lummod == [], str(lummod))
