@@ -45,8 +45,12 @@ don't reach back for Power Query or VBA.
     FAIL when its description names a safety concept (params `ce_mandatory_words`) else WARN.
     A **partial** match (only the FLD or only the address differs) is logged at the same
     severity, printing both sides. Fuzzy word match uses params `ce_fuzzy_chars` (Levenshtein
-    tolerance; `0` disables). Each `LogEntry` carries the source `path` (I/O List vs C&E doc)
-    so the GUI links the right workbook/cell; `write_log` returns `(passed, failed, warned)`.
+    tolerance; `0` disables). Untyped rows whose description matches `ce_excluded_words`
+    (params) are skipped - but a `ce_mandatory_words` match wins, and typed rows are never
+    excluded (signal-type rules prevail); `ce_full_check` (params, default `false`) ignores
+    the exclusion list for a complete sweep. Each `LogEntry` carries the source `path` (I/O
+    List vs C&E doc) so the GUI links the right workbook/cell; `write_log` returns
+    `(passed, failed, warned)`.
   - `outputs.py` — I/O tags, DBs, diagnosis List_IO (config-driven columns + `plc_binding`/
     `ml_value`).
   - `hardware.py` — `extract`: format-2 Stations + Modules.

@@ -22,6 +22,8 @@
   "diag_bit_max": 62,
   "ce_fuzzy_chars": 2,
   "ce_mandatory_words": ["emergency", "safety", "relay", "contactor", "enable"],
+  "ce_excluded_words": ["circuit breaker", "power supply", "profinet switch", "coupler", "door"],
+  "ce_full_check": false,
   "output_dir": "Output",
   "csv_delimiter": ",",
   "interface_template": "Templates/TEMPLATE_INTERFACES_v0.0.xlsx"

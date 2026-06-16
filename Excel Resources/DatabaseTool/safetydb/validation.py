@@ -23,6 +23,9 @@ ERROR when its description names a safety concept (the params.json `ce_mandatory
 default emergency/safety/relay/contactor/enable) else a WARNING. A partial match - only the
 FLD or only the address differs - is logged at the same severity, printing both sides.
 Fuzzy word matching uses params.json `ce_fuzzy_chars` (Levenshtein tolerance; 0 disables).
+Untyped rows whose description matches `ce_excluded_words` (params.json) are skipped - but a
+`ce_mandatory_words` match wins, and typed rows are never excluded (signal-type rules
+prevail); `ce_full_check` (params.json, default false) ignores the exclusion list.
 
 Every check is logged (pass AND fail) with its cell address; the offending workbook is
 carried on the entry (`path`) so the GUI can link the I/O List vs the C&E document.
@@ -238,10 +241,10 @@ def _row_text(row) -> str:
                     ("desc_l1", "desc_l1b", "desc_l2", "desc_l2b", "mnemonic"))
 
 
-def _names_safety_concept(text: str, words, fuzzy: int) -> bool:
-    """True if any `words` entry appears in `text` - as a substring, or (when fuzzy > 0) as a
-    whole token within Levenshtein distance `fuzzy` ('tolerance up to N chars'). fuzzy == 0
-    keeps only the exact substring match."""
+def _matches_words(text: str, words, fuzzy: int) -> bool:
+    """True if any `words` entry appears in `text` - as a substring (handles multi-word
+    phrases like 'circuit breaker'), or (when fuzzy > 0) as a whole token within Levenshtein
+    distance `fuzzy` ('tolerance up to N chars'). fuzzy == 0 keeps only the substring match."""
     low = text.lower()
     words = [w.lower() for w in words if w]
     if any(w in low for w in words):
@@ -318,7 +321,12 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
     are checked when they carry a device designation (FLD) - or, device-less, a non-empty
     desc_l1/desc_l1b - plus an address, an absent one being a FAIL when its description names
     a safety concept else a WARN. A partial match (only the FLD or only the address differs)
-    is logged at the same severity, printing both sides. Links to the functional-unit cell."""
+    is logged at the same severity, printing both sides. Links to the functional-unit cell.
+
+    Untyped rows whose description matches `ce_excluded_words` (params) are skipped entirely -
+    BUT a `ce_mandatory_words` match wins (still checked), and typed rows are never excluded
+    (signal-type rules prevail). `ce_full_check` (params, default false) ignores the exclusion
+    list for a complete sweep."""
     spec = params.get("ce") or {}
     if not spec.get("path") or not os.path.exists(spec["path"]):
         return
@@ -326,13 +334,14 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
     io_path = (params.get("io_list") or {}).get("path", "")
     words = params.get("ce_mandatory_words") or list(CE_MANDATORY_WORDS)
     fuzzy = int(params.get("ce_fuzzy_chars", 2) or 0)
+    excluded = [] if params.get("ce_full_check") else (params.get("ce_excluded_words") or [])
     try:
         cols = {m["canonical"]: m["column"] for m in config.load_column_map("IoList")}
     except Exception:  # noqa: BLE001
         cols = {}
     fu_col = cols.get("functional_unit", "O")
 
-    checked = 0
+    checked = skipped = 0
     for r in io_rows:
         key = _key(r.get("functional_unit"), r.get("location"), r.get("device"))
         addr = _addr(r.get("bit"))
@@ -356,16 +365,23 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
             has_desc = bool(_norm(r.get("desc_l1")) or _norm(r.get("desc_l1b")))
             if not key or not addr or not (_norm(r.get("device")) or has_desc):
                 continue
+            text = _row_text(r)
+            safety = _matches_words(text, words, fuzzy)
+            if not safety and excluded and _matches_words(text, excluded, fuzzy):
+                skipped += 1                       # excluded category, and not a safety concept
+                continue
             checked += 1
             status, detail = _ce_match(key, addr, by_key, by_addr)
             if status == "full":
                 continue                           # present -> fine (no noise)
-            safety = _names_safety_concept(_row_text(r), words, fuzzy)
             reason = "description names a safety concept" if safety else "no safety keyword in description"
             log.append(LogEntry("FAIL" if safety else "WARN", _io_loc(r, fu_col), key, addr,
                                 f"untyped signal {detail} ({reason})", io_path))
     if checked:
         log.append(LogEntry("INFO", "C&E (reverse)", "", "", f"{checked} I/O signal(s) checked vs C&E"))
+    if skipped:
+        log.append(LogEntry("INFO", "C&E (reverse)", "", "",
+                            f"{skipped} untyped row(s) skipped by ce_excluded_words"))
 
 
 def validate(params: dict, io_rows: list) -> list:

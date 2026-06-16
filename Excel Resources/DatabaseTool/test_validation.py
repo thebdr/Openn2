@@ -170,11 +170,46 @@ def main():
 
     # --- fuzzy / word-list parameters -----------------------------------
     W = ["emergency", "safety", "relay", "contactor", "enable"]
-    check("fuzzy=0 keeps exact substring ('SAFETY DOOR')", validation._names_safety_concept("SAFETY DOOR", W, 0))
-    check("fuzzy=0 drops near-miss ('SAFTY DOOR')", not validation._names_safety_concept("SAFTY DOOR", W, 0))
-    check("fuzzy=2 catches near-miss ('SAFTY DOOR')", validation._names_safety_concept("SAFTY DOOR", W, 2))
-    check("custom word list is honored", validation._names_safety_concept("VALVE OPEN", ["valve"], 0)
-          and not validation._names_safety_concept("VALVE OPEN", W, 2))
+    check("fuzzy=0 keeps exact substring ('SAFETY DOOR')", validation._matches_words("SAFETY DOOR", W, 0))
+    check("fuzzy=0 drops near-miss ('SAFTY DOOR')", not validation._matches_words("SAFTY DOOR", W, 0))
+    check("fuzzy=2 catches near-miss ('SAFTY DOOR')", validation._matches_words("SAFTY DOOR", W, 2))
+    check("multi-word phrase matches as substring ('circuit breaker')",
+          validation._matches_words("400V CIRCUIT BREAKER TRIP", ["circuit breaker"], 0))
+    check("custom word list is honored", validation._matches_words("VALVE OPEN", ["valve"], 0)
+          and not validation._matches_words("VALVE OPEN", W, 2))
+
+    # --- ce_excluded_words + ce_full_check ------------------------------
+    excl = ["circuit breaker", "power supply", "profinet switch", "coupler", "door"]
+    ex_rows = [
+        trow("=S1", "+CB1", "-F50001", "I40.0", desc="CIRCUIT BREAKER TRIP 400V", srow=50),  # excluded -> skip
+        trow("=S1", "+DR1", "-B5", "I41.0", desc="SAFETY DOOR OPEN", srow=51),    # excluded 'door' but 'safety' wins -> FAIL
+        trow("=S1", "+DR2", "-B6", "I42.0", mand="yes", desc="MAIN DOOR CLOSED", srow=52),  # typed -> rules prevail -> FAIL
+        trow("=S1", "+PS1", "-T1", "I43.0", desc="POWER SUPPLY UNIT FAULT", srow=53),  # excluded -> skip
+        trow("=S1", "+GN1", "-M1", "I44.0", desc="TANK LEVEL HIGH", srow=54),    # not excluded, no safety -> WARN
+    ]
+    xlog = []
+    validation.check_ce_mandatory(dict(params, ce_excluded_words=excl), ex_rows, xlog)
+    for e in xlog:
+        print("   " + e.format())
+
+    def xrow(srow):
+        return next((e for e in xlog if e.location.endswith(f"!O{srow}")), None)
+
+    check("untyped excluded word (circuit breaker) -> skipped", xrow(50) is None)
+    check("excluded 'door' but mandatory 'safety' wins -> FAIL", xrow(51) and xrow(51).level == "FAIL")
+    check("typed row never excluded (signal-type rules prevail) -> FAIL", xrow(52) and xrow(52).level == "FAIL")
+    check("untyped excluded word (power supply) -> skipped", xrow(53) is None)
+    check("non-excluded untyped, no safety -> WARN", xrow(54) and xrow(54).level == "WARN")
+    check("an INFO records how many rows were excluded",
+          any(e.level == "INFO" and "skipped by ce_excluded_words" in e.message for e in xlog))
+
+    flog = []
+    validation.check_ce_mandatory(
+        dict(params, ce_excluded_words=excl, ce_full_check=True),
+        [trow("=S1", "+CB9", "-F9", "I49.0", desc="CIRCUIT BREAKER TRIP", srow=60)], flog)
+    frow = next((e for e in flog if e.location.endswith("!O60")), None)
+    check("ce_full_check ignores exclusions (circuit breaker now checked) -> WARN",
+          frow and frow.level == "WARN")
 
     print("ALL CHECKS PASS" if failures == 0 else f"{failures} CHECK(S) FAILED")
     raise SystemExit(0 if failures == 0 else 1)
