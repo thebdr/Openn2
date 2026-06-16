@@ -27,8 +27,14 @@ Untyped rows whose description matches `ce_excluded_words` (params.json) are ski
 `ce_mandatory_words` match wins, and typed rows are never excluded (signal-type rules
 prevail); `ce_full_check` (params.json, default false) ignores the exclusion list.
 
-Every check is logged (pass AND fail) with its cell address; the offending workbook is
-carried on the entry (`path`) so the GUI can link the I/O List vs the C&E document.
+The log is split into three clearly separated phases (`validate`):
+  1. C&E in IOList             - the forward check (check_ce_matrix + check_area_sheets);
+  2. IOList in C&E             - the reverse check (check_ce_mandatory);
+  3. Diagnosis Coherence Check - the diagnosis bit map (check_diagnosis_bits).
+Every check is logged (pass AND fail); each entry carries an info block
+`bit | desc_l1 desc_l1b | FLD | drawing | script_type-index` (from the I/O row, or a C&E
+pseudo-row for unmatched forward references) and the offending workbook (`path`) so the GUI
+can link the I/O List vs the C&E document.
 """
 from __future__ import annotations
 import os
@@ -42,20 +48,29 @@ CE_MANDATORY_WORDS = ("emergency", "safety", "relay", "contactor", "enable")
 
 
 class LogEntry:
-    __slots__ = ("level", "location", "key", "address", "message", "path")
+    __slots__ = ("level", "location", "key", "address", "message", "path", "row")
 
-    def __init__(self, level, location, key, address, message, path=None):
-        self.level = level          # PASS / FAIL / WARN / INFO
+    def __init__(self, level, location, key, address, message, path=None, row=None):
+        self.level = level          # PASS / FAIL / WARN / INFO / PHASE
         self.location = location    # "Sheet!Cell"
         self.key = key
         self.address = address
         self.message = message
         self.path = path            # workbook the location refers to (None -> the C&E doc)
+        self.row = row or {}        # the I/O (or C&E ref) row, for the per-entry info block
+
+    def info(self) -> str:
+        """The shared per-entry identifier: bit | desc_l1 desc_l1b | FLD | drawing | st-index."""
+        return _row_info(self.row)
 
     def format(self) -> str:
+        if self.level == "PHASE":   # a phase banner separating the validation log
+            bar = "=" * 78
+            return f"\n{bar}\n{self.message}\n{bar}"
         head = f"[{self.level:4}] {self.location}"
-        body = f"key='{self.key}' addr='{self.address}'"
-        return f"{head}  {body}  {self.message}".rstrip()
+        info = self.info()
+        parts = [head] + ([info] if info else []) + ([self.message] if self.message else [])
+        return "  ".join(parts).rstrip()
 
 
 def _norm(value) -> str:
@@ -73,6 +88,28 @@ def _addr(value) -> str:
     return _norm(value).replace(" ", "").upper()
 
 
+def _row_info(row) -> str:
+    """Per-entry identifier block (every log line carries it): `bit | desc_l1 desc_l1b | FLD |
+    drawing | script_type-index`. '' when the row has nothing identifying (e.g. summary/INFO
+    lines). FLD = functional_unit+location+device; works for an I/O row or a C&E ref pseudo-row."""
+    if not row:
+        return ""
+    bit = _norm(row.get("bit"))
+    desc = " ".join(p for p in (_norm(row.get("desc_l1")), _norm(row.get("desc_l1b"))) if p)
+    fld = "".join(_norm(row.get(c)) for c in ("functional_unit", "location", "device"))
+    drawing = _norm(row.get("drawing"))
+    st, idx = _norm(row.get("script_type")), _norm(row.get("index"))
+    sti = f"{st}-{idx}" if (st or idx) else ""
+    if not any((bit, desc, fld, drawing, sti)):
+        return ""
+    return f"{bit} | {desc} | {fld} | {drawing} | {sti}"
+
+
+def _banner(log: list, title: str) -> None:
+    """Append a phase banner that visually separates the validation log into its phases."""
+    log.append(LogEntry("PHASE", "", "", "", title))
+
+
 def build_io_index(io_rows: list) -> dict:
     """key -> set of addresses found in the I/O List (only rows with a key)."""
     index: dict[str, set] = {}
@@ -84,25 +121,26 @@ def build_io_index(io_rows: list) -> dict:
     return index
 
 
-def _check_reference(sheet, row, key_cells, key, addr_cell, address, io_index, log):
-    """One C&E/AREA reference vs the I/O List; appends a PASS or FAIL entry."""
+def _check_reference(sheet, key_cells, key, addr_cell, address, io_index, info_row, log):
+    """One C&E/AREA reference vs the I/O List; appends a PASS or FAIL entry. `info_row` (the
+    matched I/O row, else a C&E pseudo-row) drives the per-entry info block."""
     location = f"{sheet}!{addr_cell}"
     keyloc = f"(key {key_cells})"
     if not key:
-        log.append(LogEntry("FAIL", location, key, address, f"empty device key {keyloc}"))
+        log.append(LogEntry("FAIL", location, key, address, f"empty device key {keyloc}", row=info_row))
         return
     addrs = io_index.get(key)
     if addrs is None:
         log.append(LogEntry("FAIL", location, key, address,
-                            f"device {keyloc} not found in I/O List"))
+                            f"device {keyloc} not found in I/O List", row=info_row))
     elif address not in addrs:
         log.append(LogEntry("FAIL", location, key, address,
-                            f"device found {keyloc} but address mismatch; I/O List has {sorted(addrs)}"))
+                            f"device found {keyloc} but address mismatch; I/O List has {sorted(addrs)}", row=info_row))
     else:
-        log.append(LogEntry("PASS", location, key, address, f"matches I/O List {keyloc}"))
+        log.append(LogEntry("PASS", location, key, address, f"matches I/O List {keyloc}", row=info_row))
 
 
-def check_ce_matrix(params: dict, io_index: dict, log: list) -> None:
+def check_ce_matrix(params: dict, io_index: dict, io_by_key: dict, log: list) -> None:
     spec = params["ce"]
     cols = {m["canonical"]: m["column"] for m in config.load_column_map("CE")}
     wb = load_workbook(spec["path"], data_only=True, read_only=True)
@@ -127,13 +165,15 @@ def check_ce_matrix(params: dict, io_index: dict, log: list) -> None:
             continue  # empty row
         key = _key(fu, loc, dev)
         key_cells = f"{cols['functional_unit']}{r}:{cols['device']}{r}"
-        _check_reference(sheet, r, key_cells, key, f"{cols['address']}{r}", address, io_index, log)
+        ref_row = {"functional_unit": _norm(fu), "location": _norm(loc), "device": _norm(dev), "bit": address}
+        info_row = io_by_key.get(key) or ref_row     # prefer the matched I/O row (desc/drawing/type)
+        _check_reference(sheet, key_cells, key, f"{cols['address']}{r}", address, io_index, info_row, log)
         checked += 1
     wb.close()
     log.append(LogEntry("INFO", sheet, "", "", f"{checked} reference(s) checked"))
 
 
-def check_area_sheets(params: dict, io_index: dict, log: list) -> None:
+def check_area_sheets(params: dict, io_index: dict, io_by_key: dict, log: list) -> None:
     spec = params["ce"]
     cols = {m["canonical"]: m["column"] for m in config.load_column_map("AREA")}
     wb = load_workbook(spec["path"], data_only=True, read_only=True)
@@ -151,8 +191,10 @@ def check_area_sheets(params: dict, io_index: dict, log: list) -> None:
             if not _norm(raw_key) and not address:
                 continue
             key = _key(raw_key)
-            _check_reference(sheet, r, f"{cols['concat_id']}{r}", key,
-                             f"{cols['address']}{r}", address, io_index, log)
+            ref_row = {"functional_unit": _norm(raw_key), "location": "", "device": "", "bit": address}
+            info_row = io_by_key.get(key) or ref_row
+            _check_reference(sheet, f"{cols['concat_id']}{r}", key,
+                             f"{cols['address']}{r}", address, io_index, info_row, log)
             checked += 1
         log.append(LogEntry("INFO", sheet, "", "", f"{checked} reference(s) checked"))
     wb.close()
@@ -199,7 +241,7 @@ def check_diagnosis_bits(params: dict, io_rows: list, log: list) -> None:
                       ([f"Diag Bit ('{bit}')"] if not bit_ok else [])
             loc = _io_loc(r, cab_col if not cab_ok else bit_col)
             log.append(LogEntry("FAIL", loc, _dev_label(r), f"{cab}.{bit}",
-                                f"in-diagnosis signal missing/invalid {', '.join(missing)}", io_path))
+                                f"in-diagnosis signal missing/invalid {', '.join(missing)}", io_path, row=r))
             continue
         fam = "WARNING" if _is_warning(r) else "ALARM"
         by_slot.setdefault((int(cab), int(bit), fam), []).append(r)
@@ -209,12 +251,12 @@ def check_diagnosis_bits(params: dict, io_rows: list, log: list) -> None:
         if len(members) == 1:
             r = members[0]
             log.append(LogEntry("PASS", _io_loc(r, cab_col), _dev_label(r), slot,
-                                "diagnosis slot unique", io_path))
+                                "diagnosis slot unique", io_path, row=r))
         else:
             for r in members:
                 others = ", ".join(_io_loc(m, bit_col) for m in members if m is not r)
                 log.append(LogEntry("FAIL", _io_loc(r, bit_col), _dev_label(r), slot,
-                                    f"duplicate diagnosis slot {slot} - also at {others}", io_path))
+                                    f"duplicate diagnosis slot {slot} - also at {others}", io_path, row=r))
 
     if diag_rows:
         log.append(LogEntry("INFO", "Diagnosis", "", "", f"{len(diag_rows)} in-diagnosis signal(s) checked"))
@@ -354,10 +396,10 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
             status, detail = _ce_match(key, addr, by_key, by_addr)
             if status == "full":
                 log.append(LogEntry("PASS", _io_loc(r, fu_col), key, addr,
-                                    f"present in C&E (ce_mandatory={mand})", io_path))
+                                    f"present in C&E (ce_mandatory={mand})", io_path, row=r))
             else:
                 log.append(LogEntry("FAIL" if mand == "yes" else "WARN", _io_loc(r, fu_col),
-                                    key, addr, f"ce_mandatory={mand} but {detail}", io_path))
+                                    key, addr, f"ce_mandatory={mand} but {detail}", io_path, row=r))
         else:                                      # untyped / unknown
             # check a real device (FLD), or - device-less - a row that still carries a
             # description (desc_l1/desc_l1b); a bare spare channel (no device, no desc) is
@@ -376,7 +418,7 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
                 continue                           # present -> fine (no noise)
             reason = "description names a safety concept" if safety else "no safety keyword in description"
             log.append(LogEntry("FAIL" if safety else "WARN", _io_loc(r, fu_col), key, addr,
-                                f"untyped signal {detail} ({reason})", io_path))
+                                f"untyped signal {detail} ({reason})", io_path, row=r))
     if checked:
         log.append(LogEntry("INFO", "C&E (reverse)", "", "", f"{checked} I/O signal(s) checked vs C&E"))
     if skipped:
@@ -385,18 +427,36 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
 
 
 def validate(params: dict, io_rows: list) -> list:
+    """The validation log, divided into three clearly separated phases:
+      1. C&E in IOList            - every C&E / AREA reference exists in the I/O List
+      2. IOList in C&E            - every mandatory I/O signal appears in the C&E (reverse)
+      3. Diagnosis Coherence Check - the in-diagnosis cabinet/bit map is complete + unique."""
     io_index = build_io_index(io_rows)
-    log: list[LogEntry] = []
-    log.append(LogEntry("INFO", "I/O List", "", "", f"{len(io_index)} distinct device key(s) indexed"))
-    check_diagnosis_bits(params, io_rows, log)                  # I/O List only - always runs
+    io_by_key: dict[str, dict] = {}                 # key -> a representative I/O row (for info)
+    for r in io_rows:
+        k = _key(r.get("functional_unit"), r.get("location"), r.get("device"))
+        if k:
+            io_by_key.setdefault(k, r)
     ce_path = (params.get("ce") or {}).get("path", "")
-    if ce_path and os.path.exists(ce_path):
-        check_ce_matrix(params, io_index, log)
-        check_area_sheets(params, io_index, log)
-        check_ce_mandatory(params, io_rows, log)               # reverse: I/O List -> C&E
+    ce_ok = bool(ce_path and os.path.exists(ce_path))
+    log: list[LogEntry] = []
+
+    _banner(log, "PHASE 1 - C&E in IOList  (every C&E / AREA reference exists in the I/O List)")
+    log.append(LogEntry("INFO", "I/O List", "", "", f"{len(io_index)} distinct device key(s) indexed"))
+    if ce_ok:
+        check_ce_matrix(params, io_index, io_by_key, log)
+        check_area_sheets(params, io_index, io_by_key, log)
     else:
-        log.append(LogEntry("INFO", "C&E", "", "",
-                            f"C&E document not found ({ce_path}) - C&E/AREA checks skipped"))
+        log.append(LogEntry("INFO", "C&E", "", "", f"C&E document not found ({ce_path}) - skipped"))
+
+    _banner(log, "PHASE 2 - IOList in C&E  (every mandatory I/O signal appears in the C&E)")
+    if ce_ok:
+        check_ce_mandatory(params, io_rows, log)
+    else:
+        log.append(LogEntry("INFO", "C&E", "", "", f"C&E document not found ({ce_path}) - skipped"))
+
+    _banner(log, "PHASE 3 - Diagnosis Coherence Check  (in-diagnosis cabinet/bit map)")
+    check_diagnosis_bits(params, io_rows, log)
     return log
 
 

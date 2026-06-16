@@ -57,7 +57,8 @@ def main():
     make_ce(ce_path)
 
     io_rows = [
-        {"functional_unit": "=S1", "location": "+MS1.CC1", "device": "-S67001", "bit": "I20.0"},
+        {"functional_unit": "=S1", "location": "+MS1.CC1", "device": "-S67001", "bit": "I20.0",
+         "desc_l1": "MAIN ESTOP", "drawing": "DWG-100", "script_type": "E1/2", "index": "0001"},
         {"functional_unit": "=S1", "location": "+MS1.CC1", "device": "-S67002", "bit": "I20.2"},
     ]
     params = {"io_list": {"path": "io.xlsx"},
@@ -80,6 +81,19 @@ def main():
     e = find("AREA 1!C4")
     check("AREA 1 C4 checked with cell address -> FAIL", e is not None and e.level == "FAIL")
     check("log includes passes and fails", any(x.level == "PASS" for x in log) and any(x.level == "FAIL" for x in log))
+
+    # --- 3 clearly separated phases + the per-entry info block ----------
+    phases = [e for e in log if e.level == "PHASE"]
+    check("log is split into 3 phases", len(phases) == 3)
+    check("phase 1 = C&E in IOList, 2 = IOList in C&E, 3 = Diagnosis Coherence Check",
+          len(phases) == 3 and "C&E in IOList" in phases[0].message
+          and "IOList in C&E" in phases[1].message
+          and "Diagnosis Coherence Check" in phases[2].message)
+    e5 = find("CAUSE&EFFECT MATRIX!F5")
+    check("entry info block = bit | desc_l1 desc_l1b | FLD | drawing | script_type-index",
+          all(s in e5.info() for s in ("I20.0", "MAIN ESTOP", "=S1+MS1.CC1-S67001", "DWG-100", "E1/2-0001"))
+          and e5.info().count("|") == 4, e5.info())
+    check("format() of a FAIL carries the info block", "|" in find("CAUSE&EFFECT MATRIX!F6").format())
 
     # --- diagnosis bit map checks ---------------------------------------
     def drow(cab, bit, thw, dev, srow, in_diag=True):

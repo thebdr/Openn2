@@ -82,8 +82,10 @@ def main(argv=None) -> int:
     passed, failed, warned = validation.write_log(log, out_dir)
     print(f"  {passed} passed, {failed} failed, {warned} warning(s)  ->  {os.path.join(out_dir, 'validation_log.txt')}")
     for e in log:
-        if e.level in ("FAIL", "WARN"):
-            print(f"  {e.level:4} {e.location}: {e.message}")
+        if e.level == "PHASE":
+            print(f"\n  {e.message}")
+        elif e.level in ("FAIL", "WARN"):
+            print("  " + e.format())
 
     # ---- I/O tags ------------------------------------------------------
     _section("I/O TAGS")

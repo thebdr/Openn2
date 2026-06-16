@@ -33,8 +33,13 @@ don't reach back for Power Query or VBA.
     (header verified by prefix; the doc has duplicate "Description language"
     headers and newline-wrapped headers, so a name map is unsafe). Excludes
     struck rows and rows with a Skip Reason. Resolves each row's signal type.
-  - `validation.py` — `validate`: C&E matrix + `AREA n` sheets vs the I/O List, plus
-    `check_diagnosis_bits` (always runs, I/O List only): every in-diagnosis signal must
+  - `validation.py` — `validate`: the log is split into **3 clearly separated phases** (each
+    led by a `PHASE` banner): **1. C&E in IOList** (forward: `check_ce_matrix` + `check_area_sheets`),
+    **2. IOList in C&E** (reverse: `check_ce_mandatory`), **3. Diagnosis Coherence Check**
+    (`check_diagnosis_bits`). Every entry carries an **info block**
+    `bit | desc_l1 desc_l1b | FLD | drawing | script_type-index` (`LogEntry.info()`; from the
+    I/O row, or a C&E pseudo-row for unmatched forward refs). Phase 1 = C&E matrix + `AREA n`
+    sheets vs the I/O List. Phase 3 = `check_diagnosis_bits` (I/O List only): every in-diagnosis signal must
     carry a numeric Diag Cabinet (AE) + Diag Bit (AF), and (cabinet, bit) must be unique
     within its alarm/warning family (col R 'Type' ending 'W' = warning) - missing/invalid
     or colliding slots are FAILs. Plus `check_ce_mandatory` (reverse C&E, runs when the C&E

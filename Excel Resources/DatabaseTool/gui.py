@@ -679,14 +679,18 @@ class App:
         self._log("OK" if failed == 0 else "WARNING",
                   f"{passed} passed, {failed} failed, {warned} warning(s)  ->  Output/validation_log.txt")
         for e in log:
+            if e.level == "PHASE":
+                self._log("SECTION", e.message)
+                continue
+            if e.level not in ("FAIL", "WARN"):
+                continue
             link = None
             if "!" in e.location:
                 sheet, cell = e.location.split("!", 1)
                 link = {"path": e.path or ce["path"], "sheet": sheet, "cell": cell}
-            if e.level == "FAIL":
-                self._log("FAIL", f"{e.location}: {e.message}", link)
-            elif e.level == "WARN":
-                self._log("WARNING", f"{e.location}: {e.message}", link)
+            info = e.info()
+            text = f"{e.location}  {info}: {e.message}" if info else f"{e.location}: {e.message}"
+            self._log("FAIL" if e.level == "FAIL" else "WARNING", text, link)
 
     def _phase_iotags(self):
         self._section("I/O TAGS")
