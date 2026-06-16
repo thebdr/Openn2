@@ -86,7 +86,7 @@ def main(argv=None) -> int:
     for e in log:
         if e.level == "PHASE":
             print(f"\n  {e.message}")
-        elif e.level in ("FAIL", "WARN"):
+        elif e.level in ("FAIL", "WARN") or e.location == "params.json":   # params always shown
             print("  " + e.format())
         elif full_print and e.level in ("PASS", "SKIP", "INFO"):
             print("  " + e.format())

@@ -82,6 +82,12 @@ def main():
     check("AREA 1 C4 checked with cell address -> FAIL", e is not None and e.level == "FAIL")
     check("log includes passes and fails", any(x.level == "PASS" for x in log) and any(x.level == "FAIL" for x in log))
 
+    # --- params.json logged at the start --------------------------------
+    pj = next((e for e in log if e.location == "params.json"), None)
+    check("params.json logged on validation start (before phase 1)",
+          pj is not None and pj.level == "INFO" and '"io_list"' in pj.message
+          and log.index(pj) < next(i for i, e in enumerate(log) if e.level == "PHASE"))
+
     # --- 3 clearly separated phases + the per-entry info block ----------
     phases = [e for e in log if e.level == "PHASE"]
     check("log is split into 3 phases", len(phases) == 3)

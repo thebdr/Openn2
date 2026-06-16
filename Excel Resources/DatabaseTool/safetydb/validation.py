@@ -42,6 +42,7 @@ pseudo-row for unmatched forward references) and the offending workbook (`path`)
 can link the I/O List vs the C&E document.
 """
 from __future__ import annotations
+import json
 import os
 import re
 from openpyxl import load_workbook
@@ -458,7 +459,8 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
 
 
 def validate(params: dict, io_rows: list) -> list:
-    """The validation log, divided into three clearly separated phases:
+    """The validation log: the effective params.json is logged first (config audit), then
+    three clearly separated phases:
       1. C&E in IOList            - every C&E / AREA reference exists in the I/O List
       2. IOList in C&E            - every mandatory I/O signal appears in the C&E (reverse)
       3. Diagnosis Coherence Check - the in-diagnosis cabinet/bit map is complete + unique."""
@@ -471,6 +473,11 @@ def validate(params: dict, io_rows: list) -> list:
     ce_path = (params.get("ce") or {}).get("path", "")
     ce_ok = bool(ce_path and os.path.exists(ce_path))
     log: list[LogEntry] = []
+
+    # log the effective params.json at the start, so the validation log records the config
+    # (paths, ce_* knobs) that produced it
+    log.append(LogEntry("INFO", "params.json", "", "",
+                        json.dumps(params, indent=2, default=str)))
 
     _banner(log, "PHASE 1 - C&E in IOList  (every C&E / AREA reference exists in the I/O List)")
     log.append(LogEntry("INFO", "I/O List", "", "", f"{len(io_index)} distinct device key(s) indexed"))
@@ -513,12 +520,12 @@ def _html_escape(s: str) -> str:
 
 def _html_line(e) -> str:
     """One HTML log line: a phase -> a <h2> header; every other entry a colour-coded <div>
-    (CSS class = the level). `white-space:pre-wrap` keeps the monospace column layout."""
+    (CSS class = the level), reusing the exact `format()` text (so .txt and .html match).
+    `white-space:pre-wrap` keeps the monospace column layout."""
     if e.level == "PHASE":
         return f'<h2 class="phase">{_html_escape(e.message)}</h2>'
-    parts = [f"[{e.level}]", e.location] + ([e.info()] if e.info() else []) + ([e.message] if e.message else [])
     cls = e.level if e.level in ("FAIL", "WARN", "PASS", "SKIP", "INFO") else "INFO"
-    return f'<div class="entry {cls}">{_html_escape("  ".join(p for p in parts if p))}</div>'
+    return f'<div class="entry {cls}">{_html_escape(e.format())}</div>'
 
 
 def write_log(log: list, out_dir: str) -> tuple[int, int, int]:

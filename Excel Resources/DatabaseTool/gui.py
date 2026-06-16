@@ -697,6 +697,8 @@ class App:
                 continue
             if e.level in ("FAIL", "WARN"):
                 gui_level = "FAIL" if e.level == "FAIL" else "WARNING"
+            elif e.location == "params.json":          # the start-of-run params are always shown
+                gui_level = "INFO"
             elif full_print and e.level in grey:
                 gui_level = grey[e.level]
             else:

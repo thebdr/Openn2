@@ -33,7 +33,8 @@ don't reach back for Power Query or VBA.
     (header verified by prefix; the doc has duplicate "Description language"
     headers and newline-wrapped headers, so a name map is unsafe). Excludes
     struck rows and rows with a Skip Reason. Resolves each row's signal type.
-  - `validation.py` — `validate`: the log is split into **3 clearly separated phases** (each
+  - `validation.py` — `validate`: logs the effective **params.json** first (config audit,
+    always shown), then the log is split into **3 clearly separated phases** (each
     led by a `PHASE` banner): **1. C&E in IOList** (forward: `check_ce_matrix` + `check_area_sheets`),
     **2. IOList in C&E** (reverse: `check_ce_mandatory`), **3. Diagnosis Coherence Check**
     (`check_diagnosis_bits`). Every entry carries an **info block**
