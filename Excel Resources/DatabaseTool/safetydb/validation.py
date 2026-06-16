@@ -494,7 +494,7 @@ def validate(params: dict, io_rows: list) -> list:
 # Per-level colour for the markdown render (mirrors the GUI log viewer: red/orange,
 # everything informational grey).
 _MD_COLOR = {"FAIL": "#c0282d", "WARN": "#b35c00",
-             "PASS": "#777777", "SKIP": "#777777", "INFO": "#777777"}
+             "PASS": "#D7FFAF", "SKIP": "#777777", "INFO": "#FFE697"}
 
 
 def _md_escape(s: str) -> str:

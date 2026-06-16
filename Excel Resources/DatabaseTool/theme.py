@@ -45,20 +45,20 @@ def log_tags(dark: bool) -> dict:
             "ERROR": {"foreground": "#ff6b6b", "font": ("Consolas", 10, "bold")},
             "FAIL": {"foreground": "#ff6b6b", "font": ("Consolas", 10, "bold")},
             "WARNING": {"foreground": "#e0a458"},
-            "PASS": {"foreground": "#a8a8a8"},
+            "PASS": {"foreground": "#D7FFAF"},
             "SKIP": {"foreground": "#a8a8a8"},
             "OK": {"foreground": "#3fb950", "font": ("Consolas", 10, "bold")},
-            "INFO": {"foreground": "#a8a8a8"},
+            "INFO": {"foreground": "#FFE697"},
             "SECTION": {"foreground": "#4ea1ff", "font": ("Consolas", 11, "bold")},
         }
     return {
         "ERROR": {"foreground": "#c0282d", "font": ("Consolas", 10, "bold")},
         "FAIL": {"foreground": "#c0282d", "font": ("Consolas", 10, "bold")},
         "WARNING": {"foreground": "#b35c00"},
-        "PASS": {"foreground": "#777777"},
+        "PASS": {"foreground": "#D7FFAF"},
         "SKIP": {"foreground": "#777777"},
         "OK": {"foreground": "#1a7f37", "font": ("Consolas", 10, "bold")},
-        "INFO": {"foreground": "#555555"},
+        "INFO": {"foreground": "#FFE697"},
         "SECTION": {"foreground": "#003a8c", "font": ("Consolas", 11, "bold")},
     }
 
