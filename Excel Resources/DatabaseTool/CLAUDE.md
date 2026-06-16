@@ -265,8 +265,10 @@ builder's own instance keys, first-seen order, falling back to a template scan �
 To author the builders, inspect `Output/CentralDatabase.csv` (`python block_templates.py
 staged`, or the GUI Configuration tab's Block templates panel) — canonical columns +
 `matrix_areas` + `IsSorterArea` + the three identity columns below + `subnet_name` +
-per-node `I_/Q_ start/end byte` + `diag_desc` + `_source_sheet`/`_source_row`/
-`type_id_resolved`/`type_category`; open it in the Pipeline2 **Files** tab and use the
+per-node `I_/Q_ start/end byte` + `diag_desc` + `diag_block_name`/`diag_block_template`
+(the FullName + TemplateType of the cabinet the signal is assigned to, from the
+`DiagnosticBlocks` sheet cols E/F, looked up by `diag_cabinet`) +
+`_source_sheet`/`_source_row`/`type_id_resolved`/`type_category`; open it in the Pipeline2 **Files** tab and use the
 regex **Filter rows** to explore. A row's three identities (each `''` when N/A) — pick the
 one a `!!key$$` expects: **`name_in_db`** = the `.db` member name (the type's `db_element`
 template) — use for `…_memberOf:<DB>` keys; **`name_in_tagtable`** = the PLC I/O tag name

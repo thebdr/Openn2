@@ -119,6 +119,9 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
     # enrich each row with its safety AREAs from the C&E workbook (best-effort:
     # '' when the C&E doc is absent). Paired channels share their device's areas.
     matrix.annotate_areas(params, rows)
+    # diagnosis-cabinet blocks (DiagnosticBlocks sheet), keyed by cabinet id, for the per-row
+    # diag_block_name (FullName, col E) / diag_block_template (TemplateType, col F)
+    diag_blocks = load_diagnostic_blocks(params)
     for row in rows:
         # name_in_db = the DB member name (the type's db_element template); '' when the
         # type isn't DB-backed
@@ -133,6 +136,12 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
             row["tagtable"] = ""
         # diag_desc = the diagnosis alarm/warning description (the type's diag_desc template)
         row["diag_desc"] = outputs.diag_desc(row)
+        # diag_block_name / diag_block_template = the FullName + TemplateType of the cabinet
+        # this signal is assigned to (DiagnosticBlocks cols E/F), looked up by Diag Cabinet
+        dc = str(row.get("diag_cabinet", "")).strip()
+        blk = diag_blocks.get(int(dc)) if dc.lstrip("-").isdigit() else None
+        row["diag_block_name"] = blk["fld"] if blk else ""
+        row["diag_block_template"] = blk["template_type"] if blk else ""
         # datablocks = the DB(s) this row is a member of ('|'-joined), '' when not DB-backed
         t = row.get("_type") or {}
         row["datablocks"] = ("|".join(t.get("db_names") or [])

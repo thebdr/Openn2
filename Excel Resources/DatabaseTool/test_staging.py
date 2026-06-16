@@ -51,6 +51,14 @@ def main():
     pairs = {r["_type"]["pair_key"] for r in typed if r["_type"]["pair_key"]}
     check("channel-pair types found", {"E", "B", "ENC", "DI"} & pairs == {"E", "B", "ENC", "DI"}, str(sorted(pairs)))
 
+    # diag_block_name/diag_block_template enriched from the DiagnosticBlocks sheet (cols E/F),
+    # looked up by Diag Cabinet - the encoders are assigned to the SafetyEncoders cabinet
+    enc = [r for r in rows if r.get("script_type") in ("ENC1/2", "ENC2/2")]
+    check("encoder rows carry their diagnosis-block name + template",
+          bool(enc) and all(r.get("diag_block_name") == "=S1+SafetyEncoders"
+                            and r.get("diag_block_template") == "2" for r in enc),
+          enc and f"{enc[0].get('diag_block_name')!r}/{enc[0].get('diag_block_template')!r}")
+
     print("ALL CHECKS PASS" if failures == 0 else f"{failures} CHECK(S) FAILED")
     raise SystemExit(0 if failures == 0 else 1)
 
