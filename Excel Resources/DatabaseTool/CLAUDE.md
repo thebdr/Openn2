@@ -144,6 +144,11 @@ don't reach back for Power Query or VBA.
   optional (Excel cell-jump falls back to `os.startfile` without it).
 - `test_*.py` — plain-`python` test scripts (no pytest); each prints PASS/FAIL
   and exits non-zero on failure. Run them after any change.
+- `make_demo_inputs.py` — generates `demo/8XXX_IOList_DEMO.xlsx` + `demo/8XXX_CE_DEMO.xlsx`
+  (same structure as the real inputs) whose rows trigger **every** validation case across the
+  3 phases; run it to (re)build the files + print/HTML the validation log (demonstration).
+  `test_demo_validation.py` builds them in a temp dir and asserts each case fires (regression).
+  The `.xlsx` are gitignored (regenerate on demand); the generator + test are the source.
 - `Output/`, `Templates/*.xlsx` (except the committed interface template),
   `__pycache__/` are gitignored.
 
