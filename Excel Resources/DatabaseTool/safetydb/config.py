@@ -160,6 +160,10 @@ def load_signal_types() -> dict:
             "diag_desc": (r.get("diag_desc") or "").strip(),
             # io_comment: I/O tag + DB-member comment template.
             "io_comment": (r.get("io_comment") or "").strip(),
+            # ce_mandatory: reverse-C&E rule (validation.check_ce_mandatory). 'yes' -> the
+            # device must appear in the C&E (else ERROR); 'warn' -> same but WARNING;
+            # 'no'/'' -> not required (the row is ignored by that check).
+            "ce_mandatory": (r.get("ce_mandatory") or "").strip().lower(),
         }
     # A paired channel-2 type (e.g. E2/2) usually leaves tagtable_name blank; let it
     # inherit the sibling's table (same pair_key) so both channels of one device land

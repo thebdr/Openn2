@@ -14,22 +14,32 @@ flagged in-diagnosis must carry a numeric Diag Cabinet + Diag Bit (else it canno
 placed in the OPC diagnosis DWords), and no two may share the same cabinet/bit within
 the same alarm/warning family (they would overwrite one another in the packed DWord).
 
+Reverse C&E (I/O List -> C&E): every I/O signal that *should* be in the C&E must appear
+there. A typed row uses its signal type's `ce_mandatory` (yes -> ERROR if absent, warn ->
+WARNING, no -> ignored); an untyped/unknown row is checked only when it carries a device
+designation (FLD = FU+LOC+DEV, not a bare cabinet) and an address, and an absent one is an
+ERROR when its description names a safety concept (emergency/safety/relay/contactor/enable,
+fuzzy <= 2 chars) else a WARNING.
+
 Every check is logged (pass AND fail) with its cell address; the offending workbook is
 carried on the entry (`path`) so the GUI can link the I/O List vs the C&E document.
 """
 from __future__ import annotations
 import os
+import re
 from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string, get_column_letter
 
 from . import config
+
+CE_MANDATORY_WORDS = ("emergency", "safety", "relay", "contactor", "enable")
 
 
 class LogEntry:
     __slots__ = ("level", "location", "key", "address", "message", "path")
 
     def __init__(self, level, location, key, address, message, path=None):
-        self.level = level          # PASS / FAIL / INFO
+        self.level = level          # PASS / FAIL / WARN / INFO
         self.location = location    # "Sheet!Cell"
         self.key = key
         self.address = address
@@ -147,7 +157,7 @@ def _is_warning(row) -> bool:
     return str(row.get("type_hw", "")).strip().upper().endswith("W")
 
 
-def _diag_loc(row, col: str) -> str:
+def _io_loc(row, col: str) -> str:
     """'Sheet!<col><row>' back into the I/O List for a staged row (just the sheet when the
     source row wasn't recorded)."""
     sheet = row.get("_source_sheet") or "I/O List"
@@ -181,7 +191,7 @@ def check_diagnosis_bits(params: dict, io_rows: list, log: list) -> None:
         if not cab_ok or not bit_ok:
             missing = ([f"Diag Cabinet ('{cab}')"] if not cab_ok else []) + \
                       ([f"Diag Bit ('{bit}')"] if not bit_ok else [])
-            loc = _diag_loc(r, cab_col if not cab_ok else bit_col)
+            loc = _io_loc(r, cab_col if not cab_ok else bit_col)
             log.append(LogEntry("FAIL", loc, _dev_label(r), f"{cab}.{bit}",
                                 f"in-diagnosis signal missing/invalid {', '.join(missing)}", io_path))
             continue
@@ -192,16 +202,128 @@ def check_diagnosis_bits(params: dict, io_rows: list, log: list) -> None:
         slot = f"{cab:03d}.{bit:02d} {fam}"
         if len(members) == 1:
             r = members[0]
-            log.append(LogEntry("PASS", _diag_loc(r, cab_col), _dev_label(r), slot,
+            log.append(LogEntry("PASS", _io_loc(r, cab_col), _dev_label(r), slot,
                                 "diagnosis slot unique", io_path))
         else:
             for r in members:
-                others = ", ".join(_diag_loc(m, bit_col) for m in members if m is not r)
-                log.append(LogEntry("FAIL", _diag_loc(r, bit_col), _dev_label(r), slot,
+                others = ", ".join(_io_loc(m, bit_col) for m in members if m is not r)
+                log.append(LogEntry("FAIL", _io_loc(r, bit_col), _dev_label(r), slot,
                                     f"duplicate diagnosis slot {slot} - also at {others}", io_path))
 
     if diag_rows:
         log.append(LogEntry("INFO", "Diagnosis", "", "", f"{len(diag_rows)} in-diagnosis signal(s) checked"))
+
+
+# --- reverse C&E: I/O List signals that must appear in the C&E -------------- #
+def _levenshtein(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if not a or not b:
+        return len(a) or len(b)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _row_text(row) -> str:
+    """The row's human description (where words like EMERGENCY / SAFETY / RELAY appear)."""
+    return " ".join(str(row.get(c, "")) for c in
+                    ("desc_l1", "desc_l1b", "desc_l2", "desc_l2b", "mnemonic"))
+
+
+def _names_safety_concept(text: str) -> bool:
+    """True if any CE_MANDATORY_WORDS appears in `text` - as a substring, or as a token within
+    edit distance 2 ('match with tolerance up to 2 chars')."""
+    low = text.lower()
+    if any(w in low for w in CE_MANDATORY_WORDS):
+        return True
+    return any(_levenshtein(tok, w) <= 2
+               for tok in re.findall(r"[a-z]+", low) for w in CE_MANDATORY_WORDS)
+
+
+def build_ce_index(params: dict) -> set:
+    """Set of device keys (FU+LOC+DEV) referenced anywhere in the C&E document - the
+    CAUSE&EFFECT MATRIX rows and every AREA n sheet (the union, so a signal present in
+    either counts as 'in the C&E')."""
+    spec = params["ce"]
+    keys: set = set()
+    wb = load_workbook(spec["path"], data_only=True, read_only=True)
+    mcols = {m["canonical"]: m["column"] for m in config.load_column_map("CE")}
+    sheet = spec["matrix_sheet"]
+    if sheet in wb.sheetnames:
+        ws = wb[sheet]
+        fu_c = column_index_from_string(mcols["functional_unit"])
+        loc_c = column_index_from_string(mcols["location"])
+        dev_c = column_index_from_string(mcols["device"])
+        for r in range(spec["matrix_data_row"], ws.max_row + 1):
+            k = _key(ws.cell(r, fu_c).value, ws.cell(r, loc_c).value, ws.cell(r, dev_c).value)
+            if k:
+                keys.add(k)
+    acols = {m["canonical"]: m["column"] for m in config.load_column_map("AREA")}
+    key_c = column_index_from_string(acols["concat_id"])
+    for s in wb.sheetnames:
+        if s.strip().upper().startswith("AREA") and any(ch.isdigit() for ch in s):
+            ws = wb[s]
+            for r in range(spec["area_data_row"], ws.max_row + 1):
+                k = _key(ws.cell(r, key_c).value)
+                if k:
+                    keys.add(k)
+    wb.close()
+    return keys
+
+
+def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
+    """Reverse C&E: every I/O signal that must be in the C&E has to appear there. Typed rows
+    use their type's `ce_mandatory` (yes -> FAIL when absent, warn -> WARN, no/'' -> skip);
+    untyped/unknown rows are checked only when they carry a device designation (FLD) and an
+    address, and an absent one is a FAIL when its description names a safety concept (else
+    WARN). Entries link back to the I/O List functional-unit cell (col O)."""
+    spec = params.get("ce") or {}
+    if not spec.get("path") or not os.path.exists(spec["path"]):
+        return
+    ce_keys = build_ce_index(params)
+    io_path = (params.get("io_list") or {}).get("path", "")
+    try:
+        cols = {m["canonical"]: m["column"] for m in config.load_column_map("IoList")}
+    except Exception:  # noqa: BLE001
+        cols = {}
+    fu_col = cols.get("functional_unit", "O")
+
+    checked = 0
+    for r in io_rows:
+        key = _key(r.get("functional_unit"), r.get("location"), r.get("device"))
+        addr = _addr(r.get("bit"))
+        typ = r.get("_type")
+        if typ:                                    # known signal type -> ce_mandatory governs
+            mand = str(typ.get("ce_mandatory", "")).strip().lower()
+            if mand not in ("yes", "warn") or not key:
+                continue
+            checked += 1
+            if key in ce_keys:
+                log.append(LogEntry("PASS", _io_loc(r, fu_col), key, addr,
+                                    f"present in C&E (ce_mandatory={mand})", io_path))
+            else:
+                log.append(LogEntry("FAIL" if mand == "yes" else "WARN", _io_loc(r, fu_col),
+                                    key, addr, f"ce_mandatory={mand} but device not found in C&E", io_path))
+        else:                                      # untyped / unknown -> only a real device
+            # "FLD not empty" = a device designation is present (FU+LOC alone, e.g. a spare
+            # PLC channel with just an address, is not a device and is ignored).
+            if not _norm(r.get("device")) or not key or not addr:
+                continue
+            checked += 1
+            if key in ce_keys:
+                continue                           # present -> fine (no noise)
+            safety = _names_safety_concept(_row_text(r))
+            log.append(LogEntry("FAIL" if safety else "WARN", _io_loc(r, fu_col), key, addr,
+                                "untyped signal not found in C&E - "
+                                + ("description names a safety concept" if safety
+                                   else "no safety keyword in description"), io_path))
+    if checked:
+        log.append(LogEntry("INFO", "C&E (reverse)", "", "", f"{checked} I/O signal(s) checked vs C&E"))
 
 
 def validate(params: dict, io_rows: list) -> list:
@@ -213,19 +335,21 @@ def validate(params: dict, io_rows: list) -> list:
     if ce_path and os.path.exists(ce_path):
         check_ce_matrix(params, io_index, log)
         check_area_sheets(params, io_index, log)
+        check_ce_mandatory(params, io_rows, log)               # reverse: I/O List -> C&E
     else:
         log.append(LogEntry("INFO", "C&E", "", "",
                             f"C&E document not found ({ce_path}) - C&E/AREA checks skipped"))
     return log
 
 
-def write_log(log: list, out_dir: str) -> tuple[int, int]:
+def write_log(log: list, out_dir: str) -> tuple[int, int, int]:
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, "validation_log.txt")
     passed = sum(1 for e in log if e.level == "PASS")
     failed = sum(1 for e in log if e.level == "FAIL")
+    warned = sum(1 for e in log if e.level == "WARN")
     with open(path, "w", encoding="utf-8") as f:
         for e in log:
             f.write(e.format() + "\n")
-        f.write(f"\nSUMMARY: {passed} passed, {failed} failed\n")
-    return passed, failed
+        f.write(f"\nSUMMARY: {passed} passed, {failed} failed, {warned} warning(s)\n")
+    return passed, failed, warned

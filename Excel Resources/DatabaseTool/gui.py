@@ -675,9 +675,9 @@ class App:
             self._log("WARNING", f"C&E document not found - C&E/AREA checks skipped: {ce['path']}")
         self._stat("validating ...")
         log = validation.validate(self._params, self._rows)
-        passed, failed = validation.write_log(log, self._out_dir())
+        passed, failed, warned = validation.write_log(log, self._out_dir())
         self._log("OK" if failed == 0 else "WARNING",
-                  f"{passed} passed, {failed} failed  ->  Output/validation_log.txt")
+                  f"{passed} passed, {failed} failed, {warned} warning(s)  ->  Output/validation_log.txt")
         for e in log:
             link = None
             if "!" in e.location:
@@ -685,6 +685,8 @@ class App:
                 link = {"path": e.path or ce["path"], "sheet": sheet, "cell": cell}
             if e.level == "FAIL":
                 self._log("FAIL", f"{e.location}: {e.message}", link)
+            elif e.level == "WARN":
+                self._log("WARNING", f"{e.location}: {e.message}", link)
 
     def _phase_iotags(self):
         self._section("I/O TAGS")

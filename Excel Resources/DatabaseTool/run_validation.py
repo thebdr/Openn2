@@ -22,8 +22,8 @@ def main():
     print("=" * 90)
 
     out_dir = os.path.join(os.path.dirname(__file__), params.get("output_dir", "Output"))
-    passed, failed = validation.write_log(log, out_dir)
-    print(f"SUMMARY: {passed} passed, {failed} failed   ->  {os.path.join(out_dir, 'validation_log.txt')}")
+    passed, failed, warned = validation.write_log(log, out_dir)
+    print(f"SUMMARY: {passed} passed, {failed} failed, {warned} warning(s)   ->  {os.path.join(out_dir, 'validation_log.txt')}")
 
 
 if __name__ == "__main__":

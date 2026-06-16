@@ -79,11 +79,11 @@ def main(argv=None) -> int:
     if not os.path.exists(params["ce"]["path"]):
         print(f"  C&E document not found ({params['ce']['path']}) - C&E/AREA checks skipped")
     log = validation.validate(params, rows)
-    passed, failed = validation.write_log(log, out_dir)
-    print(f"  {passed} passed, {failed} failed  ->  {os.path.join(out_dir, 'validation_log.txt')}")
+    passed, failed, warned = validation.write_log(log, out_dir)
+    print(f"  {passed} passed, {failed} failed, {warned} warning(s)  ->  {os.path.join(out_dir, 'validation_log.txt')}")
     for e in log:
-        if e.level == "FAIL":
-            print(f"  FAIL {e.location}: {e.message}")
+        if e.level in ("FAIL", "WARN"):
+            print(f"  {e.level:4} {e.location}: {e.message}")
 
     # ---- I/O tags ------------------------------------------------------
     _section("I/O TAGS")
@@ -146,7 +146,7 @@ def main(argv=None) -> int:
     # ---- summary -------------------------------------------------------
     _section("SUMMARY")
     print(f"  rows staged    : {len(rows)}")
-    print(f"  validation     : {failed} fail(s)")
+    print(f"  validation     : {failed} fail(s), {warned} warning(s)")
     print(f"  I/O tags / DBs : {n_tags} / {n_dbs}")
     print(f"  diagnosis      : {d['io']} List_IO + {d['logic']} List_Logic + OPC SCL")
     print(f"  hardware       : {n_st} station(s), {n_mod} module(s), {hw_errors} error(s)")

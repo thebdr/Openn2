@@ -1,33 +1,33 @@
-﻿type_id,type_id_desc,category,pair_key,channel,is_pattern,tagtable_name,tag_name,db_kind,db_names,db_element,in_diag,diag_logic,diag_desc,io_comment
-A,Alarm,Diag,,,no,Alarms_Warnings,{desc_l1} {desc_l1b} [ {functional_unit}{location}{device} ],,,,yes,,{desc_l1} {desc_l1b},[ {script_type} {index}  {drawing} ]
-W,Warning,Diag,,,no,Alarms_Warnings,{desc_l1} {desc_l1b} [ {functional_unit}{location}{device} ],,,,yes,,{desc_l1} {desc_l1b},[ {script_type} {index}  {drawing} ]
-PA,Fieldbus Alarm,Diag,,,no,,,DB,PROFINET_NODES_ALARM,{profinet_name} {profinet_ip},yes,mirror,FIELDBUS NODE FAILURE {profinet_name} {profinet_ip} ,[ {script_type} {index}  {drawing} ]
-PW,Fieldbus Warning,Diag,,,no,,,DB,PROFINET_NODES_WARNING,{profinet_name} {profinet_ip},yes,mirror,FIELDBUS NODE FAILURE {profinet_name} {profinet_ip} ,[ {script_type} {index}  {drawing} ]
-E1/2,Emergency Push Button,Safety,E,1,no,EMERGENCY_PushButtons,Emergency Push Button [ {functional_unit}{location}{device} ],SAFE_DB,01_Pushbutton,Emergency Push Button [ {functional_unit}{location}{device} ],yes,invert,EMERGENCY PUSH-BUTTON PRESSED [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ]
-E2/2,Emergency Push Button,Safety,E,2,no,,,,,,no,,,[ {script_type} {index}  {drawing} ]
-B1/2,Safety Breaker,Safety,B,1,no,SAFETY_Breakers,Safety Breaker [ {functional_unit}{location}{device} ],SAFE_DB,01_Pushbutton,Safety Breaker [ {functional_unit}{location}{device} ],yes,invert,THE SAFETY BREAKER IS OPEN [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ]
-B2/2,Safety Breaker,Safety,B,2,no,,,,,,no,,,[ {script_type} {index}  {drawing} ]
-ENC1/2,Safety Encoder Sensor 1,Safety,ENC,1,no,SAFETY_Encoders,Safety Encoder {index} Sensor 1 [ {functional_unit}{location}{device} ],SAFE_DB,04_SPEED,Safety Encoder {index} Sensor 1 Healthy [ {functional_unit}{location}{device} ],yes,invert,SAFETY ENCODER PHOTOCELL 1 FAILURE [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ]
-ENC2/2,Safety Encoder Sensor 2,Safety,ENC,2,no,SAFETY_Encoders,Safety Encoder {index} Sensor 2 [ {functional_unit}{location}{device} ],SAFE_DB,04_SPEED,Safety Encoder {index} Sensor 2 Healthy [ {functional_unit}{location}{device} ],yes,invert,SAFETY ENCODER PHOTOCELL 2 FAILURE [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ]
-DI1/2,Door Closed Safety Input 1,Safety,DI,1,no,SAFETY_Doors,Door Closed Safety Input 1 [ {functional_unit}{location}{device} ],SAFE_DB,05_DOORS,Door Closed SAFE_STATE [ {functional_unit}{location}{device} ],yes,invert,SAFETY DOOR OPEN [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ]
-DI2/2,Door Closed Safety Input 2,Safety,DI,2,no,SAFETY_Doors,Door Closed Safety Input 2 [ {functional_unit}{location}{device} ],SAFE_DB,05_DOORS,Door Closed DIAGNOSIS [ {functional_unit}{location}{device} ],no,,,[ {script_type} {index}  {drawing} ]
-DD,Door Closed Diag Input,Diag,,,no,SAFETY_Doors,Door Closed Diagnosis Input [ {functional_unit}{location}{device} ],SAFE_DB,05_DOORS,Door Alarm [ {functional_unit}{location}{device} ],yes,invert,SAFETY DOOR ALARM - NOT PROPERLY CLOSED [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ]
-DR,Door Reset Input,Std,,,no,SAFETY_Doors,Door Reset Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-DL,Door Lamp Output,Std,,,no,SAFETY_Doors,Door Lamp Output [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-DQ,Door Unlock Output,Std,,,no,SAFETY_Doors,Door Unlock Output [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI1/2,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI2/2,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI1/3,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI2/3,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI3/3,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI1/4,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI2/4,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI3/4,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KI4/4,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-KQ,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {functional_unit}{location}{device} ],SAFE_DB,03_FDBACK|03_FDBACK_RAW,Contactor Feedback Error [ {functional_unit}{location}{device} ],yes,invert,FEEDBACK OF SAFETY RELAY FAULT {desc_l1b},[ {script_type} {index}  {drawing} ]
-KQ1/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {functional_unit}{location}{device} ],SAFE_DB,03_FDBACK|03_FDBACK_RAW,Contactor Feedback Error [ {functional_unit}{location}{device} ],yes,invert,FEEDBACK OF SAFETY RELAY FAULT {desc_l1b},[ {script_type} {index}  {drawing} ]
-KQ2/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-RES,Emergency Reset,Safety,,,no,RESET,Emergency Reset Command [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-FA#,Emergency Status Feedback Area #,Safety,,,yes,SAFETY_Status,Emergency Status Feedback Area # [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ]
-IOC,Machine Interface (I/O Controller),Interface,,,no,IOCouplers_Interfaces,,,,,no,,,[ {script_type} {index}  {drawing} ]
+﻿type_id,type_id_desc,category,pair_key,channel,is_pattern,tagtable_name,tag_name,db_kind,db_names,db_element,in_diag,diag_logic,diag_desc,io_comment,ce_mandatory
+A,Alarm,Diag,,,no,Alarms_Warnings,{desc_l1} {desc_l1b} [ {functional_unit}{location}{device} ],,,,yes,,{desc_l1} {desc_l1b},[ {script_type} {index}  {drawing} ],no
+W,Warning,Diag,,,no,Alarms_Warnings,{desc_l1} {desc_l1b} [ {functional_unit}{location}{device} ],,,,yes,,{desc_l1} {desc_l1b},[ {script_type} {index}  {drawing} ],no
+PA,Fieldbus Alarm,Diag,,,no,,,DB,PROFINET_NODES_ALARM,{profinet_name} {profinet_ip},yes,mirror,FIELDBUS NODE FAILURE {profinet_name} {profinet_ip} ,[ {script_type} {index}  {drawing} ],no
+PW,Fieldbus Warning,Diag,,,no,,,DB,PROFINET_NODES_WARNING,{profinet_name} {profinet_ip},yes,mirror,FIELDBUS NODE FAILURE {profinet_name} {profinet_ip} ,[ {script_type} {index}  {drawing} ],no
+E1/2,Emergency Push Button,Safety,E,1,no,EMERGENCY_PushButtons,Emergency Push Button [ {functional_unit}{location}{device} ],SAFE_DB,01_Pushbutton,Emergency Push Button [ {functional_unit}{location}{device} ],yes,invert,EMERGENCY PUSH-BUTTON PRESSED [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ],yes
+E2/2,Emergency Push Button,Safety,E,2,no,,,,,,no,,,[ {script_type} {index}  {drawing} ],no
+B1/2,Safety Breaker,Safety,B,1,no,SAFETY_Breakers,Safety Breaker [ {functional_unit}{location}{device} ],SAFE_DB,01_Pushbutton,Safety Breaker [ {functional_unit}{location}{device} ],yes,invert,THE SAFETY BREAKER IS OPEN [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ],yes
+B2/2,Safety Breaker,Safety,B,2,no,,,,,,no,,,[ {script_type} {index}  {drawing} ],no
+ENC1/2,Safety Encoder Sensor 1,Safety,ENC,1,no,SAFETY_Encoders,Safety Encoder {index} Sensor 1 [ {functional_unit}{location}{device} ],SAFE_DB,04_SPEED,Safety Encoder {index} Sensor 1 Healthy [ {functional_unit}{location}{device} ],yes,invert,SAFETY ENCODER PHOTOCELL 1 FAILURE [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ],warn
+ENC2/2,Safety Encoder Sensor 2,Safety,ENC,2,no,SAFETY_Encoders,Safety Encoder {index} Sensor 2 [ {functional_unit}{location}{device} ],SAFE_DB,04_SPEED,Safety Encoder {index} Sensor 2 Healthy [ {functional_unit}{location}{device} ],yes,invert,SAFETY ENCODER PHOTOCELL 2 FAILURE [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ],warn
+DI1/2,Door Closed Safety Input 1,Safety,DI,1,no,SAFETY_Doors,Door Closed Safety Input 1 [ {functional_unit}{location}{device} ],SAFE_DB,05_DOORS,Door Closed SAFE_STATE [ {functional_unit}{location}{device} ],yes,invert,SAFETY DOOR OPEN [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ],yes
+DI2/2,Door Closed Safety Input 2,Safety,DI,2,no,SAFETY_Doors,Door Closed Safety Input 2 [ {functional_unit}{location}{device} ],SAFE_DB,05_DOORS,Door Closed DIAGNOSIS [ {functional_unit}{location}{device} ],no,,,[ {script_type} {index}  {drawing} ],no
+DD,Door Closed Diag Input,Diag,,,no,SAFETY_Doors,Door Closed Diagnosis Input [ {functional_unit}{location}{device} ],SAFE_DB,05_DOORS,Door Alarm [ {functional_unit}{location}{device} ],yes,invert,SAFETY DOOR ALARM - NOT PROPERLY CLOSED [ {functional_unit}{location}{device} ],[ {script_type} {index}  {drawing} ],no
+DR,Door Reset Input,Std,,,no,SAFETY_Doors,Door Reset Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+DL,Door Lamp Output,Std,,,no,SAFETY_Doors,Door Lamp Output [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+DQ,Door Unlock Output,Std,,,no,SAFETY_Doors,Door Unlock Output [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI1/2,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI2/2,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI1/3,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI2/3,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI3/3,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI1/4,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI2/4,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI3/4,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KI4/4,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+KQ,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {functional_unit}{location}{device} ],SAFE_DB,03_FDBACK|03_FDBACK_RAW,Contactor Feedback Error [ {functional_unit}{location}{device} ],yes,invert,FEEDBACK OF SAFETY RELAY FAULT {desc_l1b},[ {script_type} {index}  {drawing} ],yes
+KQ1/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {functional_unit}{location}{device} ],SAFE_DB,03_FDBACK|03_FDBACK_RAW,Contactor Feedback Error [ {functional_unit}{location}{device} ],yes,invert,FEEDBACK OF SAFETY RELAY FAULT {desc_l1b},[ {script_type} {index}  {drawing} ],yes
+KQ2/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],yes
+RES,Emergency Reset,Safety,,,no,RESET,Emergency Reset Command [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],warn
+FA#,Emergency Status Feedback Area #,Safety,,,yes,SAFETY_Status,Emergency Status Feedback Area # [ {functional_unit}{location}{device} ],,,,no,,,[ {script_type} {index}  {drawing} ],no
+IOC,Machine Interface (I/O Controller),Interface,,,no,IOCouplers_Interfaces,,,,,no,,,[ {script_type} {index}  {drawing} ],no

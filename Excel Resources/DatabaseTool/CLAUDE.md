@@ -37,8 +37,13 @@ don't reach back for Power Query or VBA.
     `check_diagnosis_bits` (always runs, I/O List only): every in-diagnosis signal must
     carry a numeric Diag Cabinet (AE) + Diag Bit (AF), and (cabinet, bit) must be unique
     within its alarm/warning family (col R 'Type' ending 'W' = warning) - missing/invalid
-    or colliding slots are FAILs. Each `LogEntry` carries the source `path` (I/O List vs
-    C&E doc) so the GUI links the right workbook/cell.
+    or colliding slots are FAILs. Plus `check_ce_mandatory` (reverse C&E, runs when the C&E
+    doc exists): an I/O signal that must be in the C&E but isn't is flagged - a typed row by
+    its type's `ce_mandatory` (`yes`->FAIL, `warn`->WARN, `no`/blank->skip); an untyped/
+    unknown row only when it carries a device designation (FLD) + an address, FAIL when its
+    description names a safety concept (emergency/safety/relay/contactor/enable, fuzzy <= 2)
+    else WARN. Each `LogEntry` carries the source `path` (I/O List vs C&E doc) so the GUI
+    links the right workbook/cell; `write_log` returns `(passed, failed, warned)`.
   - `outputs.py` — I/O tags, DBs, diagnosis List_IO (config-driven columns + `plc_binding`/
     `ml_value`).
   - `hardware.py` — `extract`: format-2 Stations + Modules.
@@ -155,7 +160,8 @@ Other columns: `type_id_desc`, `category` (Safety/Diag/Std/Interface), `pair_key
 a channel-2 type with a blank one **inherits its sibling's** by `pair_key`), `db_kind`
 (`db`/`safe_db`), `db_names` (**`|`-separated** — several identical DBs / types may share
 one), `in_diag`, `diag_logic` (`mirror`→ML TRUE / `invert`→ML FALSE / blank→from
-`normal_condition`).
+`normal_condition`), `ce_mandatory` (reverse-C&E rule, `validation.check_ce_mandatory`:
+`yes`→must be in the C&E else **ERROR**, `warn`→else **WARNING**, `no`/blank→not required).
 
 ## Output rules (current)
 
