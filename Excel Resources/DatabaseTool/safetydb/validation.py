@@ -491,10 +491,16 @@ def validate(params: dict, io_rows: list) -> list:
     return log
 
 
-# Per-level colour for the markdown render (mirrors the GUI log viewer: red/orange,
-# everything informational grey).
-_MD_COLOR = {"FAIL": "#c0282d", "WARN": "#b35c00",
-             "PASS": "#D7FFAF", "SKIP": "#777777", "INFO": "#FFE697"}
+# Per-level markdown style = (font colour, emphasis wrapper). Only font colour + bold/italic
+# are used (no monospace/font-family); the .md is usually read on a light page, so the colours
+# are the readable ones - the GUI log viewer keeps its own dark/light palette.
+_MD_STYLE = {
+    "FAIL": ("#c0282d", "**"),   # bold red
+    "WARN": ("#b35c00", "**"),   # bold orange
+    "PASS": ("#1a7f37", ""),     # green
+    "SKIP": ("#777777", "*"),    # italic grey
+    "INFO": ("#8a6d00", "*"),    # italic amber
+}
 
 
 def _md_escape(s: str) -> str:
@@ -507,15 +513,18 @@ def _md_escape(s: str) -> str:
 
 
 def _md_line(e) -> str:
-    """One markdown line mirroring the log-viewer layout: phases become headers, every other
-    entry a colour-coded monospace span (so a markdown viewer keeps the same coloured layout).
-    The ` &nbsp; ` separators are added AFTER escaping the parts, so they stay literal entities."""
+    """One markdown line: phases become headers; every other entry a colour span with optional
+    bold/italic (font colour + emphasis only - no monospace). The ` &nbsp; ` separators are
+    added AFTER escaping the parts, so they stay literal entities; the emphasis markers wrap
+    the already-escaped text (whose own * _ ` are neutralised, so they can't interfere)."""
     if e.level == "PHASE":
         return f"\n## {e.message}\n"
+    color, emph = _MD_STYLE.get(e.level, ("#777777", ""))
     parts = [f"[{e.level}]", e.location] + ([e.info()] if e.info() else []) + ([e.message] if e.message else [])
     text = " &nbsp; ".join(_md_escape(p) for p in parts if p)
-    color = _MD_COLOR.get(e.level, "#777777")
-    return f'<span style="color:{color};font-family:Consolas,monospace">{text}</span><br>'
+    if emph:
+        text = f"{emph}{text}{emph}"
+    return f'<span style="color:{color}">{text}</span><br>'
 
 
 def write_log(log: list, out_dir: str) -> tuple[int, int, int]:

@@ -55,10 +55,10 @@ def log_tags(dark: bool) -> dict:
         "ERROR": {"foreground": "#c0282d", "font": ("Consolas", 10, "bold")},
         "FAIL": {"foreground": "#c0282d", "font": ("Consolas", 10, "bold")},
         "WARNING": {"foreground": "#b35c00"},
-        "PASS": {"foreground": "#D7FFAF"},
+        "PASS": {"foreground": "#1a7f37"},
         "SKIP": {"foreground": "#777777"},
         "OK": {"foreground": "#1a7f37", "font": ("Consolas", 10, "bold")},
-        "INFO": {"foreground": "#FFE697"},
+        "INFO": {"foreground": "#8a6d00"},
         "SECTION": {"foreground": "#003a8c", "font": ("Consolas", 11, "bold")},
     }
 

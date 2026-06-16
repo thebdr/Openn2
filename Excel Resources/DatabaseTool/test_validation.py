@@ -251,8 +251,8 @@ def main():
     out = tempfile.mkdtemp(prefix="vallog_")
     validation.write_log(log, out)
     md = open(os.path.join(out, "validation_log.md"), encoding="utf-8").read()
-    check("validation_log.md = phase headers + colour spans (FAIL red)",
-          "## PHASE 1" in md and "color:#c0282d" in md and "<span" in md)
+    check("validation_log.md = phase headers + colour spans (FAIL red, bold) + no monospace",
+          "## PHASE 1" in md and "color:#c0282d" in md and "**[FAIL]" in md and "font-family" not in md)
     check("validation_log.md escapes & (CAUSE&EFFECT) but keeps the &nbsp; separators literal",
           "CAUSE&amp;EFFECT" in md and "&nbsp;" in md and "&amp;nbsp;" not in md)
     txt = open(os.path.join(out, "validation_log.txt"), encoding="utf-8").read()
