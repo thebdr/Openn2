@@ -15,11 +15,14 @@ placed in the OPC diagnosis DWords), and no two may share the same cabinet/bit w
 the same alarm/warning family (they would overwrite one another in the packed DWord).
 
 Reverse C&E (I/O List -> C&E): every I/O signal that *should* be in the C&E must appear
-there. A typed row uses its signal type's `ce_mandatory` (yes -> ERROR if absent, warn ->
-WARNING, no -> ignored); an untyped/unknown row is checked only when it carries a device
-designation (FLD = FU+LOC+DEV, not a bare cabinet) and an address, and an absent one is an
-ERROR when its description names a safety concept (emergency/safety/relay/contactor/enable,
-fuzzy <= 2 chars) else a WARNING.
+there, matched by BOTH its device key (FLD) and its address. A typed row uses its signal
+type's `ce_mandatory` (yes -> ERROR if not fully present, warn -> WARNING, no -> ignored);
+an untyped/unknown row is checked when it carries a device designation (FLD = FU+LOC+DEV) -
+or, device-less, a non-empty desc_l1/desc_l1b - plus an address, an absent one being an
+ERROR when its description names a safety concept (the params.json `ce_mandatory_words`,
+default emergency/safety/relay/contactor/enable) else a WARNING. A partial match - only the
+FLD or only the address differs - is logged at the same severity, printing both sides.
+Fuzzy word matching uses params.json `ce_fuzzy_chars` (Levenshtein tolerance; 0 disables).
 
 Every check is logged (pass AND fail) with its cell address; the offending workbook is
 carried on the entry (`path`) so the GUI can link the I/O List vs the C&E document.
@@ -235,22 +238,36 @@ def _row_text(row) -> str:
                     ("desc_l1", "desc_l1b", "desc_l2", "desc_l2b", "mnemonic"))
 
 
-def _names_safety_concept(text: str) -> bool:
-    """True if any CE_MANDATORY_WORDS appears in `text` - as a substring, or as a token within
-    edit distance 2 ('match with tolerance up to 2 chars')."""
+def _names_safety_concept(text: str, words, fuzzy: int) -> bool:
+    """True if any `words` entry appears in `text` - as a substring, or (when fuzzy > 0) as a
+    whole token within Levenshtein distance `fuzzy` ('tolerance up to N chars'). fuzzy == 0
+    keeps only the exact substring match."""
     low = text.lower()
-    if any(w in low for w in CE_MANDATORY_WORDS):
+    words = [w.lower() for w in words if w]
+    if any(w in low for w in words):
         return True
-    return any(_levenshtein(tok, w) <= 2
-               for tok in re.findall(r"[a-z]+", low) for w in CE_MANDATORY_WORDS)
+    if fuzzy and fuzzy > 0:
+        toks = re.findall(r"[a-z]+", low)
+        return any(_levenshtein(tok, w) <= fuzzy for tok in toks for w in words)
+    return False
 
 
-def build_ce_index(params: dict) -> set:
-    """Set of device keys (FU+LOC+DEV) referenced anywhere in the C&E document - the
-    CAUSE&EFFECT MATRIX rows and every AREA n sheet (the union, so a signal present in
-    either counts as 'in the C&E')."""
+def build_ce_index(params: dict) -> tuple[dict, dict]:
+    """Two indexes over the C&E document (CAUSE&EFFECT MATRIX rows + every AREA n sheet):
+    by_key  = device key (FU+LOC+DEV) -> set of addresses referenced for it (a '' member
+              means the C&E listed the device with no address),
+    by_addr = address -> set of device keys referenced at it.
+    A signal is fully 'in the C&E' when both its key and its address line up here."""
     spec = params["ce"]
-    keys: set = set()
+    by_key: dict[str, set] = {}
+    by_addr: dict[str, set] = {}
+
+    def add(key, addr):
+        if key:
+            by_key.setdefault(key, set()).add(addr)
+            if addr:
+                by_addr.setdefault(addr, set()).add(key)
+
     wb = load_workbook(spec["path"], data_only=True, read_only=True)
     mcols = {m["canonical"]: m["column"] for m in config.load_column_map("CE")}
     sheet = spec["matrix_sheet"]
@@ -259,34 +276,56 @@ def build_ce_index(params: dict) -> set:
         fu_c = column_index_from_string(mcols["functional_unit"])
         loc_c = column_index_from_string(mcols["location"])
         dev_c = column_index_from_string(mcols["device"])
+        addr_c = column_index_from_string(mcols["address"])
         for r in range(spec["matrix_data_row"], ws.max_row + 1):
-            k = _key(ws.cell(r, fu_c).value, ws.cell(r, loc_c).value, ws.cell(r, dev_c).value)
-            if k:
-                keys.add(k)
+            add(_key(ws.cell(r, fu_c).value, ws.cell(r, loc_c).value, ws.cell(r, dev_c).value),
+                _addr(ws.cell(r, addr_c).value))
     acols = {m["canonical"]: m["column"] for m in config.load_column_map("AREA")}
     key_c = column_index_from_string(acols["concat_id"])
+    addr_c = column_index_from_string(acols["address"])
     for s in wb.sheetnames:
         if s.strip().upper().startswith("AREA") and any(ch.isdigit() for ch in s):
             ws = wb[s]
             for r in range(spec["area_data_row"], ws.max_row + 1):
-                k = _key(ws.cell(r, key_c).value)
-                if k:
-                    keys.add(k)
+                add(_key(ws.cell(r, key_c).value), _addr(ws.cell(r, addr_c).value))
     wb.close()
-    return keys
+    return by_key, by_addr
+
+
+def _ce_match(key: str, addr: str, by_key: dict, by_addr: dict) -> tuple[str, str]:
+    """Match an I/O (key, addr) against the C&E indexes. Returns (status, detail):
+    'full'     - the device and (when it has one) its address both line up;
+    'fld_only' - the device is in the C&E but at (a) different address(es);
+    'addr_only'- the address is in the C&E but under a different device;
+    'missing'  - neither is in the C&E.
+    `detail` names what differs, printing BOTH sides (I/O vs C&E)."""
+    ce_addrs = by_key.get(key)
+    if ce_addrs is not None and (not addr or addr in ce_addrs or not (ce_addrs - {""})):
+        return "full", ""
+    if ce_addrs is not None:
+        ce = sorted(ce_addrs - {""}) or ["(no address)"]
+        return "fld_only", f"found in C&E with a different address: I/O '{addr}' vs C&E {ce}"
+    if addr and addr in by_addr:
+        return "addr_only", (f"address in C&E under a different device: "
+                             f"I/O '{key}' vs C&E {sorted(by_addr[addr])}")
+    return "missing", "not found in C&E"
 
 
 def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
-    """Reverse C&E: every I/O signal that must be in the C&E has to appear there. Typed rows
-    use their type's `ce_mandatory` (yes -> FAIL when absent, warn -> WARN, no/'' -> skip);
-    untyped/unknown rows are checked only when they carry a device designation (FLD) and an
-    address, and an absent one is a FAIL when its description names a safety concept (else
-    WARN). Entries link back to the I/O List functional-unit cell (col O)."""
+    """Reverse C&E: every I/O signal that must be in the C&E has to appear there, matched by
+    BOTH its device key (FLD) and its address. Typed rows use their type's `ce_mandatory`
+    (yes -> FAIL when not fully present, warn -> WARN, no/'' -> skip); untyped/unknown rows
+    are checked when they carry a device designation (FLD) - or, device-less, a non-empty
+    desc_l1/desc_l1b - plus an address, an absent one being a FAIL when its description names
+    a safety concept else a WARN. A partial match (only the FLD or only the address differs)
+    is logged at the same severity, printing both sides. Links to the functional-unit cell."""
     spec = params.get("ce") or {}
     if not spec.get("path") or not os.path.exists(spec["path"]):
         return
-    ce_keys = build_ce_index(params)
+    by_key, by_addr = build_ce_index(params)
     io_path = (params.get("io_list") or {}).get("path", "")
+    words = params.get("ce_mandatory_words") or list(CE_MANDATORY_WORDS)
+    fuzzy = int(params.get("ce_fuzzy_chars", 2) or 0)
     try:
         cols = {m["canonical"]: m["column"] for m in config.load_column_map("IoList")}
     except Exception:  # noqa: BLE001
@@ -303,25 +342,28 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
             if mand not in ("yes", "warn") or not key:
                 continue
             checked += 1
-            if key in ce_keys:
+            status, detail = _ce_match(key, addr, by_key, by_addr)
+            if status == "full":
                 log.append(LogEntry("PASS", _io_loc(r, fu_col), key, addr,
                                     f"present in C&E (ce_mandatory={mand})", io_path))
             else:
                 log.append(LogEntry("FAIL" if mand == "yes" else "WARN", _io_loc(r, fu_col),
-                                    key, addr, f"ce_mandatory={mand} but device not found in C&E", io_path))
-        else:                                      # untyped / unknown -> only a real device
-            # "FLD not empty" = a device designation is present (FU+LOC alone, e.g. a spare
-            # PLC channel with just an address, is not a device and is ignored).
-            if not _norm(r.get("device")) or not key or not addr:
+                                    key, addr, f"ce_mandatory={mand} but {detail}", io_path))
+        else:                                      # untyped / unknown
+            # check a real device (FLD), or - device-less - a row that still carries a
+            # description (desc_l1/desc_l1b); a bare spare channel (no device, no desc) is
+            # ignored. An address is always required.
+            has_desc = bool(_norm(r.get("desc_l1")) or _norm(r.get("desc_l1b")))
+            if not key or not addr or not (_norm(r.get("device")) or has_desc):
                 continue
             checked += 1
-            if key in ce_keys:
+            status, detail = _ce_match(key, addr, by_key, by_addr)
+            if status == "full":
                 continue                           # present -> fine (no noise)
-            safety = _names_safety_concept(_row_text(r))
+            safety = _names_safety_concept(_row_text(r), words, fuzzy)
+            reason = "description names a safety concept" if safety else "no safety keyword in description"
             log.append(LogEntry("FAIL" if safety else "WARN", _io_loc(r, fu_col), key, addr,
-                                "untyped signal not found in C&E - "
-                                + ("description names a safety concept" if safety
-                                   else "no safety keyword in description"), io_path))
+                                f"untyped signal {detail} ({reason})", io_path))
     if checked:
         log.append(LogEntry("INFO", "C&E (reverse)", "", "", f"{checked} I/O signal(s) checked vs C&E"))
 

@@ -189,7 +189,7 @@ def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> 
     extra = ["matrix_areas", "IsSorterArea", "name_in_db", "name_in_tagtable",
              "tagtable", "datablocks", "diag_desc", "diag_block_name", "diag_block_template",
              "subnet_name", "I_startByte", "I_endByte", "Q_startByte", "Q_endByte",
-             "_source_sheet", "_source_row", "type_id_resolved", "type_category"]
+             "source_cell", "_source_sheet", "_source_row", "type_id_resolved", "type_category"]
     csv_path = csv_path or os.path.join(_abs(params.get("output_dir", "Output")), "CentralDatabase.csv")
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
@@ -205,6 +205,7 @@ def dump_staged(csv_path: str | None = None, params_path: str | None = None) -> 
                           r.get("subnet_name", ""),
                           r.get("I_startByte", ""), r.get("I_endByte", ""),
                           r.get("Q_startByte", ""), r.get("Q_endByte", ""),
+                          r.get("source_cell", ""),
                           r.get("_source_sheet", ""), r.get("_source_row", ""),
                           t.get("type_id", ""), t.get("category", "")])
     return csv_path

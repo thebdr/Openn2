@@ -117,24 +117,28 @@ def main():
           all(("!AE" in e.location or "!AF" in e.location) for e in fails + [e for e in dlog if e.level == "PASS"]))
 
     # --- reverse C&E: I/O List signals that must appear in the C&E ------
-    # ce keys present in make_ce: =S1+MS1.CC1-S67001, =S1+SG1-B1, =S1+PC1.CC1-K65060
-    def trow(fu, loc, dev, bit, mand=None, desc="", srow=30):
+    # ce (key @ addr) in make_ce: =S1+MS1.CC1-S67001 @ I20.0 & I20.9, =S1+SG1-B1 @ I120.0,
+    #                             =S1+PC1.CC1-K65060 @ Q130.0
+    def trow(fu, loc, dev, bit, mand=None, desc="", desc_b="", srow=30):
         r = {"functional_unit": fu, "location": loc, "device": dev, "bit": bit,
-             "desc_l1": desc, "_source_sheet": "NET SAFETY 50", "_source_row": srow}
+             "desc_l1": desc, "desc_l1b": desc_b, "_source_sheet": "NET SAFETY 50", "_source_row": srow}
         r["_type"] = {"ce_mandatory": mand} if mand is not None else None
         return r
 
     ce_rows = [
-        trow("=S1", "+MS1.CC1", "-S67001", "I20.0", mand="yes", srow=30),   # present -> PASS
+        trow("=S1", "+MS1.CC1", "-S67001", "I20.0", mand="yes", srow=30),   # full match -> PASS
         trow("=S1", "+XX1", "-S99001", "I21.0", mand="yes", srow=31),       # absent, yes -> FAIL
         trow("=S1", "+XX2", "-S99002", "I22.0", mand="warn", srow=32),      # absent, warn -> WARN
         trow("=S1", "+XX3", "-S99003", "I23.0", mand="no", srow=33),        # absent, no -> skipped
         trow("=S1", "+EM1", "-S88001", "I24.0", desc="EMERGENCY STOP PB", srow=34),  # untyped + safety -> FAIL
         trow("=S1", "+CV1", "-M70001", "Q24.0", desc="CONVEYOR MOTOR RUN", srow=35),  # untyped, no kw -> WARN
-        trow("=S1", "+SG1", "-B1", "I26.0", desc="WHATEVER", srow=36),      # untyped but present -> no entry
+        trow("=S1", "+SG1", "-B1", "I120.0", desc="WHATEVER", srow=36),     # full match -> no entry
         trow("=S1", "+ZZ1", "-X1", "", desc="EMERGENCY", srow=37),          # untyped, no address -> skipped
         trow("=S1", "+SF1", "-K90001", "I28.0", desc="SAFTY RELAY MODULE", srow=38),  # untyped, fuzzy 'safty' -> FAIL
-        trow("=S1", "+MS1.CC1", "", "I9.0", desc="", srow=39),              # untyped, no device (spare) -> skipped
+        trow("=S1", "+MS1.CC1", "", "I9.0", desc="", srow=39),              # untyped, no device + no desc -> skipped
+        trow("=S1", "+MS1.CC1", "-S67001", "I20.5", mand="yes", srow=40),   # FLD found, addr differs -> FAIL
+        trow("=S1", "+SG9", "-B9", "I120.0", desc="PLAIN", srow=41),        # addr found, FLD differs -> WARN
+        trow("=S1", "+MS1.CC1", "", "I30.0", desc="", desc_b="SOME SIGNAL", srow=42),  # device-less but desc_l1b -> WARN
     ]
     clog = []
     validation.check_ce_mandatory(params, ce_rows, clog)
@@ -144,18 +148,33 @@ def main():
     def crow(srow):
         return next((e for e in clog if e.location.endswith(f"!O{srow}")), None)
 
-    check("ce_mandatory=yes present -> PASS", crow(30) and crow(30).level == "PASS")
+    check("ce_mandatory=yes full match -> PASS", crow(30) and crow(30).level == "PASS")
     check("ce_mandatory=yes absent -> FAIL", crow(31) and crow(31).level == "FAIL")
     check("ce_mandatory=warn absent -> WARN", crow(32) and crow(32).level == "WARN")
     check("ce_mandatory=no absent -> not checked", crow(33) is None)
     check("untyped + safety word (EMERGENCY) absent -> FAIL", crow(34) and crow(34).level == "FAIL")
     check("untyped, no safety word absent -> WARN", crow(35) and crow(35).level == "WARN")
-    check("untyped but present in C&E -> no entry", crow(36) is None)
+    check("untyped full match in C&E -> no entry", crow(36) is None)
     check("untyped without an address -> not checked", crow(37) is None)
     check("untyped + fuzzy 'safty' (<=2 of safety) -> FAIL", crow(38) and crow(38).level == "FAIL")
-    check("untyped without a device (spare channel) -> not checked", crow(39) is None)
+    check("untyped without a device and no desc (spare) -> not checked", crow(39) is None)
+    check("FLD found but address differs -> FAIL (same severity), prints both sides",
+          crow(40) and crow(40).level == "FAIL" and "I20.5" in crow(40).message
+          and "I20.0" in crow(40).message and "different address" in crow(40).message)
+    check("address found but FLD differs -> WARN, prints both sides",
+          crow(41) and crow(41).level == "WARN" and "=S1+SG9-B9" in crow(41).message
+          and "=S1+SG1-B1" in crow(41).message and "different device" in crow(41).message)
+    check("device-less row with desc_l1b text IS checked -> WARN", crow(42) and crow(42).level == "WARN")
     check("reverse-C&E entries link to the I/O List path",
           all(e.path == params["io_list"]["path"] for e in clog if e.level in ("PASS", "FAIL", "WARN")))
+
+    # --- fuzzy / word-list parameters -----------------------------------
+    W = ["emergency", "safety", "relay", "contactor", "enable"]
+    check("fuzzy=0 keeps exact substring ('SAFETY DOOR')", validation._names_safety_concept("SAFETY DOOR", W, 0))
+    check("fuzzy=0 drops near-miss ('SAFTY DOOR')", not validation._names_safety_concept("SAFTY DOOR", W, 0))
+    check("fuzzy=2 catches near-miss ('SAFTY DOOR')", validation._names_safety_concept("SAFTY DOOR", W, 2))
+    check("custom word list is honored", validation._names_safety_concept("VALVE OPEN", ["valve"], 0)
+          and not validation._names_safety_concept("VALVE OPEN", W, 2))
 
     print("ALL CHECKS PASS" if failures == 0 else f"{failures} CHECK(S) FAILED")
     raise SystemExit(0 if failures == 0 else 1)

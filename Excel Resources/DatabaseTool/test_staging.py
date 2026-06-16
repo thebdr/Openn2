@@ -59,6 +59,13 @@ def main():
                             and r.get("diag_block_template") == "2" for r in enc),
           enc and f"{enc[0].get('diag_block_name')!r}/{enc[0].get('diag_block_template')!r}")
 
+    # source_cell = 'Sheet!<FU col><row>' link back into the I/O List
+    r0 = rows[0]
+    check("rows carry a source_cell link (Sheet!<FU col><row>)",
+          bool(r0.get("source_cell")) and "!" in r0["source_cell"]
+          and r0["source_cell"].endswith(str(r0.get("_source_row"))),
+          r0.get("source_cell"))
+
     print("ALL CHECKS PASS" if failures == 0 else f"{failures} CHECK(S) FAILED")
     raise SystemExit(0 if failures == 0 else 1)
 

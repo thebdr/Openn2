@@ -38,12 +38,15 @@ don't reach back for Power Query or VBA.
     carry a numeric Diag Cabinet (AE) + Diag Bit (AF), and (cabinet, bit) must be unique
     within its alarm/warning family (col R 'Type' ending 'W' = warning) - missing/invalid
     or colliding slots are FAILs. Plus `check_ce_mandatory` (reverse C&E, runs when the C&E
-    doc exists): an I/O signal that must be in the C&E but isn't is flagged - a typed row by
-    its type's `ce_mandatory` (`yes`->FAIL, `warn`->WARN, `no`/blank->skip); an untyped/
-    unknown row only when it carries a device designation (FLD) + an address, FAIL when its
-    description names a safety concept (emergency/safety/relay/contactor/enable, fuzzy <= 2)
-    else WARN. Each `LogEntry` carries the source `path` (I/O List vs C&E doc) so the GUI
-    links the right workbook/cell; `write_log` returns `(passed, failed, warned)`.
+    doc exists): an I/O signal that must be in the C&E but isn't is flagged, matched by BOTH
+    device key (FLD) and address - a typed row by its type's `ce_mandatory` (`yes`->FAIL,
+    `warn`->WARN, `no`/blank->skip); an untyped/unknown row when it carries a device
+    designation (FLD) - or, device-less, a non-empty `desc_l1`/`desc_l1b` - plus an address,
+    FAIL when its description names a safety concept (params `ce_mandatory_words`) else WARN.
+    A **partial** match (only the FLD or only the address differs) is logged at the same
+    severity, printing both sides. Fuzzy word match uses params `ce_fuzzy_chars` (Levenshtein
+    tolerance; `0` disables). Each `LogEntry` carries the source `path` (I/O List vs C&E doc)
+    so the GUI links the right workbook/cell; `write_log` returns `(passed, failed, warned)`.
   - `outputs.py` — I/O tags, DBs, diagnosis List_IO (config-driven columns + `plc_binding`/
     `ml_value`).
   - `hardware.py` — `extract`: format-2 Stations + Modules.
@@ -273,7 +276,8 @@ staged`, or the GUI Configuration tab's Block templates panel) — canonical col
 `matrix_areas` + `IsSorterArea` + the three identity columns below + `subnet_name` +
 per-node `I_/Q_ start/end byte` + `diag_desc` + `diag_block_name`/`diag_block_template`
 (the FullName + TemplateType of the cabinet the signal is assigned to, from the
-`DiagnosticBlocks` sheet cols E/F, looked up by `diag_cabinet`) +
+`DiagnosticBlocks` sheet cols E/F, looked up by `diag_cabinet`) + `source_cell` (where the
+row lives in the I/O List, `Sheet!<FU col><row>`, for a link straight back to source) +
 `_source_sheet`/`_source_row`/`type_id_resolved`/`type_category`; open it in the Pipeline2 **Files** tab and use the
 regex **Filter rows** to explore. A row's three identities (each `''` when N/A) — pick the
 one a `!!key$$` expects: **`name_in_db`** = the `.db` member name (the type's `db_element`

@@ -122,7 +122,13 @@ def load_io_list(params: dict, signal_types: dict) -> tuple[list[StagedRow], lis
     # diagnosis-cabinet blocks (DiagnosticBlocks sheet), keyed by cabinet id, for the per-row
     # diag_block_name (FullName, col E) / diag_block_template (TemplateType, col F)
     diag_blocks = load_diagnostic_blocks(params)
+    # functional-unit column letter (for the per-row source_cell link back into the I/O List)
+    fu_col = next((m["column"] for m in colmap if m["canonical"] == "functional_unit"), "O")
     for row in rows:
+        # source_cell = where this row lives in the I/O List ('Sheet!<FU col><row>'), so the
+        # CentralDatabase row links straight back to the source (validation uses the same shape)
+        if not row.get("source_cell") and row.get("_source_row"):
+            row["source_cell"] = f"{row.get('_source_sheet', '')}!{fu_col}{row['_source_row']}"
         # name_in_db = the DB member name (the type's db_element template); '' when the
         # type isn't DB-backed
         row["name_in_db"] = outputs.member_name(row)

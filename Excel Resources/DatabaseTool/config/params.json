@@ -20,6 +20,8 @@
   "strike_handling": "exclude",
   "diag_bit_min": 0,
   "diag_bit_max": 62,
+  "ce_fuzzy_chars": 2,
+  "ce_mandatory_words": ["emergency", "safety", "relay", "contactor", "enable"],
   "output_dir": "Output",
   "csv_delimiter": ",",
   "interface_template": "Templates/TEMPLATE_INTERFACES_v0.0.xlsx"
