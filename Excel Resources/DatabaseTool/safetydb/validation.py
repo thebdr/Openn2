@@ -25,7 +25,12 @@ FLD or only the address differs - is logged at the same severity, printing both 
 Fuzzy word matching uses params.json `ce_fuzzy_chars` (Levenshtein tolerance; 0 disables).
 Untyped rows whose description matches `ce_excluded_words` (params.json) are skipped - but a
 `ce_mandatory_words` match wins, and typed rows are never excluded (signal-type rules
-prevail); `ce_full_check` (params.json, default false) ignores the exclusion list.
+prevail); `ce_full_check` (params.json, default false) ignores that list. `ce_always_excluded_words`
+(substring only, NO fuzzy) ALWAYS skips a row (typed or untyped), overriding everything
+(e.g. 'ch2' to drop channel-2 rows). Every PASS/SKIP is logged; `ce_full_print` (params.json)
+controls whether the live display (GUI/console) shows the passing/skipped rows (greyed) - the
+`validation_log.txt` and the colour-coded `validation_log.md` (same viewer layout) always hold
+the full record.
 
 The log is split into three clearly separated phases (`validate`):
   1. C&E in IOList             - the forward check (check_ce_matrix + check_area_sheets);
@@ -283,18 +288,26 @@ def _row_text(row) -> str:
                     ("desc_l1", "desc_l1b", "desc_l2", "desc_l2b", "mnemonic"))
 
 
-def _matches_words(text: str, words, fuzzy: int) -> bool:
-    """True if any `words` entry appears in `text` - as a substring (handles multi-word
+def _first_match(text: str, words, fuzzy: int):
+    """The first `words` entry that appears in `text` - as a substring (handles multi-word
     phrases like 'circuit breaker'), or (when fuzzy > 0) as a whole token within Levenshtein
-    distance `fuzzy` ('tolerance up to N chars'). fuzzy == 0 keeps only the substring match."""
+    distance `fuzzy` ('tolerance up to N chars'). fuzzy == 0 keeps only the substring match.
+    Returns the matched word (for the log reason) or None."""
     low = text.lower()
-    words = [w.lower() for w in words if w]
-    if any(w in low for w in words):
-        return True
+    cand = [w.lower() for w in words if w]
+    for w in cand:
+        if w in low:
+            return w
     if fuzzy and fuzzy > 0:
-        toks = re.findall(r"[a-z]+", low)
-        return any(_levenshtein(tok, w) <= fuzzy for tok in toks for w in words)
-    return False
+        for tok in re.findall(r"[a-z]+", low):
+            for w in cand:
+                if _levenshtein(tok, w) <= fuzzy:
+                    return w
+    return None
+
+
+def _matches_words(text: str, words, fuzzy: int) -> bool:
+    return _first_match(text, words, fuzzy) is not None
 
 
 def build_ce_index(params: dict) -> tuple[dict, dict]:
@@ -367,8 +380,12 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
 
     Untyped rows whose description matches `ce_excluded_words` (params) are skipped entirely -
     BUT a `ce_mandatory_words` match wins (still checked), and typed rows are never excluded
-    (signal-type rules prevail). `ce_full_check` (params, default false) ignores the exclusion
-    list for a complete sweep."""
+    (signal-type rules prevail). `ce_full_check` (params, default false) ignores that list.
+    `ce_always_excluded_words` (params, substring only - NO fuzzy) ALWAYS skips a row (typed
+    or untyped), taking precedence over everything (not overridden by a mandatory match, not
+    bypassed by ce_full_check) - e.g. 'ch2' to drop paired channel-2 rows. Every PASS/SKIP is
+    written to the log (the .txt/.md hold the full record, with reasons); `ce_full_print`
+    (params) controls only whether the live display (GUI/console) shows them (greyed)."""
     spec = params.get("ce") or {}
     if not spec.get("path") or not os.path.exists(spec["path"]):
         return
@@ -377,16 +394,29 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
     words = params.get("ce_mandatory_words") or list(CE_MANDATORY_WORDS)
     fuzzy = int(params.get("ce_fuzzy_chars", 2) or 0)
     excluded = [] if params.get("ce_full_check") else (params.get("ce_excluded_words") or [])
+    always = params.get("ce_always_excluded_words") or []       # substring only, no fuzzy, wins all
     try:
         cols = {m["canonical"]: m["column"] for m in config.load_column_map("IoList")}
     except Exception:  # noqa: BLE001
         cols = {}
     fu_col = cols.get("functional_unit", "O")
 
+    # every PASS/SKIP is logged (the file + .md are the full record); the live display
+    # filters them out unless params.json ce_full_print is set.
+    def skip(r, key, addr, why):
+        nonlocal skipped
+        skipped += 1
+        log.append(LogEntry("SKIP", _io_loc(r, fu_col), key, addr, f"skipped - {why}", io_path, row=r))
+
     checked = skipped = 0
     for r in io_rows:
         key = _key(r.get("functional_unit"), r.get("location"), r.get("device"))
         addr = _addr(r.get("bit"))
+        text = _row_text(r)
+        aw = _first_match(text, always, 0)         # ALWAYS excluded (substring, no fuzzy) - wins all
+        if aw:
+            skip(r, key, addr, f"matches ce_always_excluded_words '{aw}'")
+            continue
         typ = r.get("_type")
         if typ:                                    # known signal type -> ce_mandatory governs
             mand = str(typ.get("ce_mandatory", "")).strip().lower()
@@ -407,23 +437,24 @@ def check_ce_mandatory(params: dict, io_rows: list, log: list) -> None:
             has_desc = bool(_norm(r.get("desc_l1")) or _norm(r.get("desc_l1b")))
             if not key or not addr or not (_norm(r.get("device")) or has_desc):
                 continue
-            text = _row_text(r)
             safety = _matches_words(text, words, fuzzy)
-            if not safety and excluded and _matches_words(text, excluded, fuzzy):
-                skipped += 1                       # excluded category, and not a safety concept
+            ew = _first_match(text, excluded, fuzzy) if (not safety and excluded) else None
+            if ew:
+                skip(r, key, addr, f"matches ce_excluded_words '{ew}'")
                 continue
             checked += 1
             status, detail = _ce_match(key, addr, by_key, by_addr)
             if status == "full":
-                continue                           # present -> fine (no noise)
+                log.append(LogEntry("PASS", _io_loc(r, fu_col), key, addr,
+                                    "present in C&E (untyped full match)", io_path, row=r))
+                continue
             reason = "description names a safety concept" if safety else "no safety keyword in description"
             log.append(LogEntry("FAIL" if safety else "WARN", _io_loc(r, fu_col), key, addr,
                                 f"untyped signal {detail} ({reason})", io_path, row=r))
     if checked:
-        log.append(LogEntry("INFO", "C&E (reverse)", "", "", f"{checked} I/O signal(s) checked vs C&E"))
+        log.append(LogEntry("INFO", "IOList in C&E", "", "", f"{checked} I/O signal(s) checked vs C&E"))
     if skipped:
-        log.append(LogEntry("INFO", "C&E (reverse)", "", "",
-                            f"{skipped} untyped row(s) skipped by ce_excluded_words"))
+        log.append(LogEntry("INFO", "IOList in C&E", "", "", f"{skipped} row(s) skipped (excluded words)"))
 
 
 def validate(params: dict, io_rows: list) -> list:
@@ -460,14 +491,48 @@ def validate(params: dict, io_rows: list) -> list:
     return log
 
 
+# Per-level colour for the markdown render (mirrors the GUI log viewer: red/orange,
+# everything informational grey).
+_MD_COLOR = {"FAIL": "#c0282d", "WARN": "#b35c00",
+             "PASS": "#777777", "SKIP": "#777777", "INFO": "#777777"}
+
+
+def _md_escape(s: str) -> str:
+    """Make `s` render literally inside an inline markdown <span>: HTML-escape & < > (& first,
+    so the entities below aren't double-escaped) and neutralise markdown-active * _ ` (as
+    numeric entities, which still display as the original char - e.g. underscores in drawing
+    names like 8FVX_Q0001 won't trigger emphasis)."""
+    s = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return s.replace("*", "&#42;").replace("_", "&#95;").replace("`", "&#96;")
+
+
+def _md_line(e) -> str:
+    """One markdown line mirroring the log-viewer layout: phases become headers, every other
+    entry a colour-coded monospace span (so a markdown viewer keeps the same coloured layout).
+    The ` &nbsp; ` separators are added AFTER escaping the parts, so they stay literal entities."""
+    if e.level == "PHASE":
+        return f"\n## {e.message}\n"
+    parts = [f"[{e.level}]", e.location] + ([e.info()] if e.info() else []) + ([e.message] if e.message else [])
+    text = " &nbsp; ".join(_md_escape(p) for p in parts if p)
+    color = _MD_COLOR.get(e.level, "#777777")
+    return f'<span style="color:{color};font-family:Consolas,monospace">{text}</span><br>'
+
+
 def write_log(log: list, out_dir: str) -> tuple[int, int, int]:
     os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, "validation_log.txt")
     passed = sum(1 for e in log if e.level == "PASS")
     failed = sum(1 for e in log if e.level == "FAIL")
     warned = sum(1 for e in log if e.level == "WARN")
-    with open(path, "w", encoding="utf-8") as f:
+    skipped = sum(1 for e in log if e.level == "SKIP")
+    summary = f"{passed} passed, {failed} failed, {warned} warning(s), {skipped} skipped"
+    with open(os.path.join(out_dir, "validation_log.txt"), "w", encoding="utf-8") as f:
         for e in log:
             f.write(e.format() + "\n")
-        f.write(f"\nSUMMARY: {passed} passed, {failed} failed, {warned} warning(s)\n")
+        f.write(f"\nSUMMARY: {summary}\n")
+    # a markdown twin that keeps the coloured log-viewer layout (phases as headers, severity
+    # colours per line) for viewers that render markdown + inline HTML colour.
+    with open(os.path.join(out_dir, "validation_log.md"), "w", encoding="utf-8") as f:
+        f.write(f"# Validation log\n\n**{summary}**\n")
+        for e in log:
+            f.write(_md_line(e) + "\n")
     return passed, failed, warned

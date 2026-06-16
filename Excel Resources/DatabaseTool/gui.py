@@ -44,7 +44,7 @@ import verify
 APP_NAME = "Pipeline2"
 ICON_BASE = os.path.join(_HERE, "assets", APP_NAME)  # + .ico / .png
 
-LOG_LEVELS = {"ERROR", "FAIL", "WARNING", "PASS", "OK", "INFO", "SECTION"}
+LOG_LEVELS = {"ERROR", "FAIL", "WARNING", "PASS", "SKIP", "OK", "INFO", "SECTION"}
 
 # Configuration tab: (dotted params.json key, label, kind). kind: text|int|file|dir|list
 PARAM_SPEC = [
@@ -199,6 +199,7 @@ class App:
         self.status = tk.StringVar(value="Ready")
         self._style = ttk.Style(self.root)
         self._dark = tk.BooleanVar(value=False)
+        self._large_font = tk.BooleanVar(value=False)   # log viewer font 10 -> 13
 
         self._build_toolbar()
         self._build_notebook()
@@ -214,9 +215,14 @@ class App:
         dark = self._dark.get()
         pal = theme.palette(dark)
         theme.apply_ttk(self._style, pal)
+        base = 13 if self._large_font.get() else 10        # log-viewer font size (toolbar toggle)
         self.log.configure(background=pal["log_bg"], foreground=pal["log_fg"],
-                           insertbackground=pal["log_fg"])
+                           insertbackground=pal["log_fg"], font=("Consolas", base))
         for level, cfg in theme.log_tags(dark).items():
+            cfg = dict(cfg)
+            if "font" in cfg:                              # keep each tag's relative size + style
+                fam, sz, *style = cfg["font"]
+                cfg["font"] = (fam, base + (sz - 10), *style)
             self.log.tag_configure(level, **cfg)
         self.log.tag_configure("link", foreground=pal["accent"], underline=True)
         files = getattr(self, "_files", None)
@@ -255,6 +261,8 @@ class App:
 
         ttk.Checkbutton(bar, text="Dark mode", variable=self._dark,
                         command=self._apply_theme).pack(side="right")
+        ttk.Checkbutton(bar, text="Large font", variable=self._large_font,
+                        command=self._apply_theme).pack(side="right", padx=(0, 12))
 
     def _build_notebook(self):
         nb = ttk.Notebook(self.root)
@@ -539,7 +547,8 @@ class App:
             self.log.insert("end", "\n" + text + "\n", ("SECTION",))
         else:
             self.log.insert("end", f"[{level}] ", (tag,))
-            self.log.insert("end", text, (tag,) if level in ("ERROR", "FAIL", "OK", "WARNING") else ())
+            self.log.insert("end", text,
+                            (tag,) if level in ("ERROR", "FAIL", "OK", "WARNING", "PASS", "SKIP", "INFO") else ())
             if link:
                 self.log.insert("end", "   ")
                 lt = f"lnk{self._lnk}"
@@ -676,21 +685,29 @@ class App:
         self._stat("validating ...")
         log = validation.validate(self._params, self._rows)
         passed, failed, warned = validation.write_log(log, self._out_dir())
+        skipped = sum(1 for e in log if e.level == "SKIP")
+        full_print = bool(self._params.get("ce_full_print"))
         self._log("OK" if failed == 0 else "WARNING",
-                  f"{passed} passed, {failed} failed, {warned} warning(s)  ->  Output/validation_log.txt")
+                  f"{passed} passed, {failed} failed, {warned} warning(s), {skipped} skipped  ->  Output/validation_log.txt")
+        # FAIL/WARN always; with ce_full_print also the passed/skipped/info rows (greyed)
+        grey = {"PASS": "PASS", "SKIP": "SKIP", "INFO": "INFO"}
         for e in log:
             if e.level == "PHASE":
                 self._log("SECTION", e.message)
                 continue
-            if e.level not in ("FAIL", "WARN"):
+            if e.level in ("FAIL", "WARN"):
+                gui_level = "FAIL" if e.level == "FAIL" else "WARNING"
+            elif full_print and e.level in grey:
+                gui_level = grey[e.level]
+            else:
                 continue
             link = None
             if "!" in e.location:
                 sheet, cell = e.location.split("!", 1)
                 link = {"path": e.path or ce["path"], "sheet": sheet, "cell": cell}
             info = e.info()
-            text = f"{e.location}  {info}: {e.message}" if info else f"{e.location}: {e.message}"
-            self._log("FAIL" if e.level == "FAIL" else "WARNING", text, link)
+            text = f"{e.location}  {info}: {e.message}" if info else (f"{e.location}: {e.message}" if e.location else e.message)
+            self._log(gui_level, text, link)
 
     def _phase_iotags(self):
         self._section("I/O TAGS")

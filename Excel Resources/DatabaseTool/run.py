@@ -80,11 +80,15 @@ def main(argv=None) -> int:
         print(f"  C&E document not found ({params['ce']['path']}) - C&E/AREA checks skipped")
     log = validation.validate(params, rows)
     passed, failed, warned = validation.write_log(log, out_dir)
-    print(f"  {passed} passed, {failed} failed, {warned} warning(s)  ->  {os.path.join(out_dir, 'validation_log.txt')}")
+    skipped = sum(1 for e in log if e.level == "SKIP")
+    full_print = bool(params.get("ce_full_print"))
+    print(f"  {passed} passed, {failed} failed, {warned} warning(s), {skipped} skipped  ->  {os.path.join(out_dir, 'validation_log.txt')}")
     for e in log:
         if e.level == "PHASE":
             print(f"\n  {e.message}")
         elif e.level in ("FAIL", "WARN"):
+            print("  " + e.format())
+        elif full_print and e.level in ("PASS", "SKIP", "INFO"):
             print("  " + e.format())
 
     # ---- I/O tags ------------------------------------------------------

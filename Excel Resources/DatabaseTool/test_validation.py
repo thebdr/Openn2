@@ -168,7 +168,7 @@ def main():
     check("ce_mandatory=no absent -> not checked", crow(33) is None)
     check("untyped + safety word (EMERGENCY) absent -> FAIL", crow(34) and crow(34).level == "FAIL")
     check("untyped, no safety word absent -> WARN", crow(35) and crow(35).level == "WARN")
-    check("untyped full match in C&E -> no entry", crow(36) is None)
+    check("untyped full match in C&E -> PASS (always logged)", crow(36) and crow(36).level == "PASS")
     check("untyped without an address -> not checked", crow(37) is None)
     check("untyped + fuzzy 'safty' (<=2 of safety) -> FAIL", crow(38) and crow(38).level == "FAIL")
     check("untyped without a device and no desc (spare) -> not checked", crow(39) is None)
@@ -209,13 +209,15 @@ def main():
     def xrow(srow):
         return next((e for e in xlog if e.location.endswith(f"!O{srow}")), None)
 
-    check("untyped excluded word (circuit breaker) -> skipped", xrow(50) is None)
+    check("untyped excluded word (circuit breaker) -> SKIP", xrow(50) and xrow(50).level == "SKIP")
     check("excluded 'door' but mandatory 'safety' wins -> FAIL", xrow(51) and xrow(51).level == "FAIL")
     check("typed row never excluded (signal-type rules prevail) -> FAIL", xrow(52) and xrow(52).level == "FAIL")
-    check("untyped excluded word (power supply) -> skipped", xrow(53) is None)
+    check("untyped excluded word (power supply) -> SKIP", xrow(53) and xrow(53).level == "SKIP")
     check("non-excluded untyped, no safety -> WARN", xrow(54) and xrow(54).level == "WARN")
+    check("SKIP entry names the matched excluded word",
+          xrow(50) and "circuit breaker" in xrow(50).message)
     check("an INFO records how many rows were excluded",
-          any(e.level == "INFO" and "skipped by ce_excluded_words" in e.message for e in xlog))
+          any(e.level == "INFO" and "skipped" in e.message for e in xlog))
 
     flog = []
     validation.check_ce_mandatory(
@@ -224,6 +226,37 @@ def main():
     frow = next((e for e in flog if e.location.endswith("!O60")), None)
     check("ce_full_check ignores exclusions (circuit breaker now checked) -> WARN",
           frow and frow.level == "WARN")
+
+    # --- ce_always_excluded_words (substring only, no fuzzy, wins all) ---
+    aw_rows = [
+        trow("=S1", "+A1", "-X1", "I60.0", desc="SOMETHING CH2", srow=70),                # untyped + ch2 -> SKIP
+        trow("=S1", "+A2", "-X2", "I61.0", mand="yes", desc="SAFETY RELAY CH2", srow=71), # typed yes + ch2 -> SKIP (wins all)
+        trow("=S1", "+A3", "-X3", "I62.0", desc="CHANNEL TWO", srow=72),                  # no 'ch2' substring -> WARN
+    ]
+    awlog = []
+    validation.check_ce_mandatory(
+        dict(params, ce_always_excluded_words=["ch2"], ce_full_check=True), aw_rows, awlog)
+
+    def awrow(srow):
+        return next((e for e in awlog if e.location.endswith(f"!O{srow}")), None)
+
+    check("ce_always_excluded 'ch2' skips an untyped row -> SKIP", awrow(70) and awrow(70).level == "SKIP")
+    check("ce_always_excluded wins over signal-type + mandatory (typed yes ch2) -> SKIP",
+          awrow(71) and awrow(71).level == "SKIP")
+    check("ce_always_excluded is substring-only/no-fuzzy ('channel two' != ch2) -> WARN",
+          awrow(72) and awrow(72).level == "WARN")
+    check("ce_full_check does NOT bypass ce_always_excluded_words", awrow(70) and awrow(70).level == "SKIP")
+
+    # --- markdown export (validation_log.md), colour-coded, same layout -
+    out = tempfile.mkdtemp(prefix="vallog_")
+    validation.write_log(log, out)
+    md = open(os.path.join(out, "validation_log.md"), encoding="utf-8").read()
+    check("validation_log.md = phase headers + colour spans (FAIL red)",
+          "## PHASE 1" in md and "color:#c0282d" in md and "<span" in md)
+    check("validation_log.md escapes & (CAUSE&EFFECT) but keeps the &nbsp; separators literal",
+          "CAUSE&amp;EFFECT" in md and "&nbsp;" in md and "&amp;nbsp;" not in md)
+    txt = open(os.path.join(out, "validation_log.txt"), encoding="utf-8").read()
+    check("validation_log.txt SUMMARY includes the skipped count", "skipped" in txt.splitlines()[-1])
 
     print("ALL CHECKS PASS" if failures == 0 else f"{failures} CHECK(S) FAILED")
     raise SystemExit(0 if failures == 0 else 1)

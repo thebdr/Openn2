@@ -53,9 +53,16 @@ don't reach back for Power Query or VBA.
     tolerance; `0` disables). Untyped rows whose description matches `ce_excluded_words`
     (params) are skipped - but a `ce_mandatory_words` match wins, and typed rows are never
     excluded (signal-type rules prevail); `ce_full_check` (params, default `false`) ignores
-    the exclusion list for a complete sweep. Each `LogEntry` carries the source `path` (I/O
-    List vs C&E doc) so the GUI links the right workbook/cell; `write_log` returns
-    `(passed, failed, warned)`.
+    the exclusion list for a complete sweep. `ce_always_excluded_words` (params, **substring
+    only - no fuzzy**) ALWAYS skips a row (typed or untyped), overriding everything incl.
+    `ce_full_check` and a mandatory match - e.g. `"ch2"` to drop the channel-2 paired rows.
+    Every PASS/SKIP is logged (with its reason); `ce_full_print` (params) controls only
+    whether the **live display** (GUI/console) shows the passing/skipped rows (greyed).
+    Each `LogEntry` carries the source `path` (I/O List vs C&E doc) so the GUI links the right
+    workbook/cell; `write_log` returns `(passed, failed, warned)` and writes BOTH a plain
+    `validation_log.txt` and a colour-coded `validation_log.md` (phases as headers + severity
+    colours, mirroring the log-viewer layout). The GUI log viewer has a **Large font** toggle
+    (10↔13) and a **Clear Log** button.
   - `outputs.py` — I/O tags, DBs, diagnosis List_IO (config-driven columns + `plc_binding`/
     `ml_value`).
   - `hardware.py` — `extract`: format-2 Stations + Modules.
