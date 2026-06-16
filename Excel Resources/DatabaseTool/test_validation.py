@@ -247,14 +247,17 @@ def main():
           awrow(72) and awrow(72).level == "WARN")
     check("ce_full_check does NOT bypass ce_always_excluded_words", awrow(70) and awrow(70).level == "SKIP")
 
-    # --- markdown export (validation_log.md), colour-coded, same layout -
+    # --- HTML export (validation_log.html), colour-coded, same layout --
     out = tempfile.mkdtemp(prefix="vallog_")
     validation.write_log(log, out)
-    md = open(os.path.join(out, "validation_log.md"), encoding="utf-8").read()
-    check("validation_log.md = phase headers + colour spans (FAIL red, bold) + no monospace",
-          "## PHASE 1" in md and "color:#c0282d" in md and "**[FAIL]" in md and "font-family" not in md)
-    check("validation_log.md escapes & (CAUSE&EFFECT) but keeps the &nbsp; separators literal",
-          "CAUSE&amp;EFFECT" in md and "&nbsp;" in md and "&amp;nbsp;" not in md)
+    html = open(os.path.join(out, "validation_log.html"), encoding="utf-8").read()
+    check("validation_log.html = dark page, phase <h2>, coloured entry <div>s, FAIL CSS",
+          "<!DOCTYPE html" in html and '<h2 class="phase">' in html
+          and 'class="entry FAIL"' in html and "#ff6b6b" in html)
+    check("validation_log.html escapes & (CAUSE&EFFECT); no leftover <span> markup",
+          "CAUSE&amp;EFFECT" in html and "<span" not in html)
+    check("the superseded validation_log.md is removed",
+          not os.path.exists(os.path.join(out, "validation_log.md")))
     txt = open(os.path.join(out, "validation_log.txt"), encoding="utf-8").read()
     check("validation_log.txt SUMMARY includes the skipped count", "skipped" in txt.splitlines()[-1])
 

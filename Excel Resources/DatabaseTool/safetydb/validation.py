@@ -29,8 +29,8 @@ prevail); `ce_full_check` (params.json, default false) ignores that list. `ce_al
 (substring only, NO fuzzy) ALWAYS skips a row (typed or untyped), overriding everything
 (e.g. 'ch2' to drop channel-2 rows). Every PASS/SKIP is logged; `ce_full_print` (params.json)
 controls whether the live display (GUI/console) shows the passing/skipped rows (greyed) - the
-`validation_log.txt` and the colour-coded `validation_log.md` (same viewer layout) always hold
-the full record.
+`validation_log.txt` and the colour-coded `validation_log.html` (a dark page mirroring the log
+viewer, renders in any browser) always hold the full record.
 
 The log is split into three clearly separated phases (`validate`):
   1. C&E in IOList             - the forward check (check_ce_matrix + check_area_sheets);
@@ -491,40 +491,34 @@ def validate(params: dict, io_rows: list) -> list:
     return log
 
 
-# Per-level markdown style = (font colour, emphasis wrapper). Only font colour + bold/italic
-# are used (no monospace/font-family); the .md is usually read on a light page, so the colours
-# are the readable ones - the GUI log viewer keeps its own dark/light palette.
-_MD_STYLE = {
-    "FAIL": ("#c0282d", "**"),   # bold red
-    "WARN": ("#b35c00", "**"),   # bold orange
-    "PASS": ("#1a7f37", ""),     # green
-    "SKIP": ("#777777", "*"),    # italic grey
-    "INFO": ("#8a6d00", "*"),    # italic amber
-}
+# A dark log page (so the pastel PASS/INFO read well, mirroring the dark GUI log viewer):
+# font colour per level, FAIL/WARN bold, SKIP/INFO italic.
+_HTML_CSS = """
+  body{background:#1e1e1e;color:#d4d4d4;font:13px/1.55 Consolas,'Courier New',monospace;padding:18px;}
+  h1{color:#e6e6e6;font-size:18px;margin:0 0 4px;}
+  .summary{color:#e6e6e6;font-weight:bold;margin:0 0 10px;}
+  h2.phase{color:#4ea1ff;font-size:15px;border-top:1px solid #3c3c3c;padding-top:14px;margin:22px 0 8px;}
+  .entry{white-space:pre-wrap;margin:1px 0;}
+  .FAIL{color:#ff6b6b;font-weight:bold;}
+  .WARN{color:#e0a458;font-weight:bold;}
+  .PASS{color:#D7FFAF;}
+  .SKIP{color:#a8a8a8;font-style:italic;}
+  .INFO{color:#FFE697;font-style:italic;}
+"""
 
 
-def _md_escape(s: str) -> str:
-    """Make `s` render literally inside an inline markdown <span>: HTML-escape & < > (& first,
-    so the entities below aren't double-escaped) and neutralise markdown-active * _ ` (as
-    numeric entities, which still display as the original char - e.g. underscores in drawing
-    names like 8FVX_Q0001 won't trigger emphasis)."""
-    s = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    return s.replace("*", "&#42;").replace("_", "&#95;").replace("`", "&#96;")
+def _html_escape(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _md_line(e) -> str:
-    """One markdown line: phases become headers; every other entry a colour span with optional
-    bold/italic (font colour + emphasis only - no monospace). The ` &nbsp; ` separators are
-    added AFTER escaping the parts, so they stay literal entities; the emphasis markers wrap
-    the already-escaped text (whose own * _ ` are neutralised, so they can't interfere)."""
+def _html_line(e) -> str:
+    """One HTML log line: a phase -> a <h2> header; every other entry a colour-coded <div>
+    (CSS class = the level). `white-space:pre-wrap` keeps the monospace column layout."""
     if e.level == "PHASE":
-        return f"\n## {e.message}\n"
-    color, emph = _MD_STYLE.get(e.level, ("#777777", ""))
+        return f'<h2 class="phase">{_html_escape(e.message)}</h2>'
     parts = [f"[{e.level}]", e.location] + ([e.info()] if e.info() else []) + ([e.message] if e.message else [])
-    text = " &nbsp; ".join(_md_escape(p) for p in parts if p)
-    if emph:
-        text = f"{emph}{text}{emph}"
-    return f'<span style="color:{color}">{text}</span><br>'
+    cls = e.level if e.level in ("FAIL", "WARN", "PASS", "SKIP", "INFO") else "INFO"
+    return f'<div class="entry {cls}">{_html_escape("  ".join(p for p in parts if p))}</div>'
 
 
 def write_log(log: list, out_dir: str) -> tuple[int, int, int]:
@@ -538,10 +532,20 @@ def write_log(log: list, out_dir: str) -> tuple[int, int, int]:
         for e in log:
             f.write(e.format() + "\n")
         f.write(f"\nSUMMARY: {summary}\n")
-    # a markdown twin that keeps the coloured log-viewer layout (phases as headers, severity
-    # colours per line) for viewers that render markdown + inline HTML colour.
-    with open(os.path.join(out_dir, "validation_log.md"), "w", encoding="utf-8") as f:
-        f.write(f"# Validation log\n\n**{summary}**\n")
-        for e in log:
-            f.write(_md_line(e) + "\n")
+    # an HTML twin that keeps the coloured log-viewer layout (dark page, phases as headers,
+    # severity colours per line) - renders in any browser.
+    html = ["<!DOCTYPE html>",
+            "<html><head><meta charset='utf-8'><title>Validation log</title>",
+            "<style>", _HTML_CSS, "</style></head><body>",
+            "<h1>Validation log</h1>", f'<p class="summary">{_html_escape(summary)}</p>']
+    html += [_html_line(e) for e in log]
+    html.append("</body></html>")
+    with open(os.path.join(out_dir, "validation_log.html"), "w", encoding="utf-8") as f:
+        f.write("\n".join(html) + "\n")
+    md_path = os.path.join(out_dir, "validation_log.md")        # remove the superseded markdown twin
+    if os.path.exists(md_path):
+        try:
+            os.remove(md_path)
+        except OSError:
+            pass
     return passed, failed, warned

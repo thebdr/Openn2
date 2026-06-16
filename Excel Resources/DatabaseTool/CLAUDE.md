@@ -60,9 +60,10 @@ don't reach back for Power Query or VBA.
     whether the **live display** (GUI/console) shows the passing/skipped rows (greyed).
     Each `LogEntry` carries the source `path` (I/O List vs C&E doc) so the GUI links the right
     workbook/cell; `write_log` returns `(passed, failed, warned)` and writes BOTH a plain
-    `validation_log.txt` and a colour-coded `validation_log.md` (phases as headers + severity
-    colours, mirroring the log-viewer layout). The GUI log viewer has a **Large font** toggle
-    (10↔13) and a **Clear Log** button.
+    `validation_log.txt` and a colour-coded `validation_log.html` (a self-contained **dark**
+    page - phases as `<h2>`, each entry a `<div class="LEVEL">`; FAIL/WARN bold, SKIP/INFO
+    italic - renders in any browser). The GUI log viewer has a **Large font** toggle (10↔13)
+    and a **Clear Log** button.
   - `outputs.py` — I/O tags, DBs, diagnosis List_IO (config-driven columns + `plc_binding`/
     `ml_value`).
   - `hardware.py` — `extract`: format-2 Stations + Modules.
