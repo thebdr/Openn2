@@ -132,9 +132,8 @@ class ActionsMixin:
 
     # ---- worker-thread pipeline ---------------------------------------- #
     def _out_dir(self) -> str:
-        # an open project writes into <project>/Output; the bundled default keeps params.output_dir
-        if os.path.abspath(self._project_path) != os.path.abspath(config.PARAMS_FILE):
-            return os.path.join(project.project_dir(self._project_path), project.OUTPUT_DIR)
+        # config.load_params resolves a project's `output_dir: Output` to <project>/Output; the bundled
+        # default (config_project) leaves it unset, so output_root falls back to Shared/OutputTree.
         try:
             return config.output_root(getattr(self, "_params", None) or config.load_params(self._project_path))
         except Exception:  # noqa: BLE001

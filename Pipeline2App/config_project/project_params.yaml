@@ -43,8 +43,9 @@ diag_bit_max: 62
 
 
 # --- output ----------------------------------------------------------------- #
-# artifacts are written to the sibling Shared/OutputTree/ by default; set an ABSOLUTE
-# output_dir only to redirect a self-contained project elsewhere.
+# This built-in default config writes artifacts to the sibling Shared/OutputTree/. A *project*
+# (any project.yaml the GUI creates outside config_project/) carries output_dir: "Output" and so
+# writes into <project>/Output. Set an ABSOLUTE output_dir here only to redirect elsewhere.
 # output_dir: ""
 csv_delimiter: ","
 copy_inputs_on_save: false

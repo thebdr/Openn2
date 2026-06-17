@@ -303,7 +303,9 @@ class App:
 
     # ---- project manager actions ---- #
     def _new(self):
-        folder = filedialog.askdirectory(title=i18n.tr("menu_new", self._lang))
+        base = config.PROJECTS_DIR
+        os.makedirs(base, exist_ok=True)
+        folder = gui_common.ask_project_name(self.root, base, self._lang)
         if not folder:
             return
         self._project_path = project.new_project(folder)
@@ -332,7 +334,10 @@ class App:
         self.status.set(i18n.tr("project_saved", self._lang, name=project.project_name(self._project_path)))
 
     def _save_as(self):
-        folder = filedialog.askdirectory(title=i18n.tr("menu_save_as", self._lang))
+        base = config.PROJECTS_DIR
+        os.makedirs(base, exist_ok=True)
+        folder = gui_common.ask_project_name(self.root, base, self._lang,
+                                             title=i18n.tr("menu_save_as", self._lang))
         if not folder:
             return
         try:
@@ -384,7 +389,10 @@ class App:
             messagebox.showerror(i18n.tr("btn_open_config", self._lang), str(e))
 
     def _open_output(self):
-        out = config.OUTPUT_ROOT
+        try:
+            out = config.output_root(config.load_params(self._project_path))
+        except Exception:  # noqa: BLE001
+            out = config.OUTPUT_ROOT
         os.makedirs(out, exist_ok=True)
         try:
             os.startfile(out)  # type: ignore[attr-defined]

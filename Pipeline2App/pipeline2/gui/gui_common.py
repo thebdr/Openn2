@@ -7,8 +7,9 @@
   with a leading cell link and an optional trailing other-workbook link).
 """
 from __future__ import annotations
+import os
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 from pipeline2.core import i18n, validation
 
@@ -101,6 +102,69 @@ def ask_archive(parent, default_name: str, lang: str = "en") -> dict | None:
     def cancel():
         dlg.destroy()
 
+    ttk.Button(btns, text=i18n.tr("btn_ok", lang), command=ok).pack(side="right")
+    ttk.Button(btns, text=i18n.tr("btn_cancel", lang), command=cancel).pack(side="right", padx=(0, 6))
+    frm.columnconfigure(1, weight=1)
+    entry.focus_set()
+    entry.select_range(0, "end")
+    dlg.bind("<Return>", lambda e: ok())
+    dlg.bind("<Escape>", lambda e: cancel())
+    dlg.grab_set()
+    parent.wait_window(dlg)
+    return result["value"]
+
+
+# --------------------------------------------------------------------------- #
+# new-project name prompt (New / Save As)                                     #
+# --------------------------------------------------------------------------- #
+_ILLEGAL_NAME_CHARS = set('<>:"/\\|?*')
+
+
+def ask_project_name(parent, base: str, lang: str = "en", default: str = "",
+                     title: str | None = None) -> str | None:
+    """Modal: a project-name textbox with a live '<base>/<name>' preview. Validates (non-empty, no path
+    separators / illegal chars, not already existing under `base`). Returns the absolute <base>/<name>
+    on OK, or None if cancelled. Pure UI + validation - it does NOT create the folder (the caller does)."""
+    dlg = tk.Toplevel(parent)
+    dlg.title(title or i18n.tr("project_name_title", lang))
+    dlg.transient(parent)
+    dlg.resizable(False, False)
+    result = {"value": None}
+
+    frm = ttk.Frame(dlg, padding=12)
+    frm.pack(fill="both", expand=True)
+    ttk.Label(frm, text=i18n.tr("project_name_base", lang, base=base)).grid(
+        row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+    ttk.Label(frm, text=i18n.tr("project_name_label", lang)).grid(row=1, column=0, sticky="w", pady=(0, 4))
+    name_var = tk.StringVar(value=default)
+    entry = ttk.Entry(frm, textvariable=name_var, width=40)
+    entry.grid(row=1, column=1, sticky="we", padx=(8, 0), pady=(0, 4))
+    preview = ttk.Label(frm, text="", foreground="grey")
+    preview.grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 10))
+
+    def _refresh(*_):
+        name = name_var.get().strip()
+        preview.config(text=i18n.tr("project_name_preview", lang, path=os.path.join(base, name)) if name else "")
+    name_var.trace_add("write", _refresh)
+    _refresh()
+
+    def ok():
+        name = name_var.get().strip()
+        if not name or os.path.basename(name) != name or (_ILLEGAL_NAME_CHARS & set(name)):
+            messagebox.showerror(dlg.title(), i18n.tr("invalid_name", lang), parent=dlg)
+            return
+        path = os.path.join(base, name)
+        if os.path.exists(path):
+            messagebox.showerror(dlg.title(), i18n.tr("project_exists", lang, name=name, base=base), parent=dlg)
+            return
+        result["value"] = path
+        dlg.destroy()
+
+    def cancel():
+        dlg.destroy()
+
+    btns = ttk.Frame(frm)
+    btns.grid(row=3, column=0, columnspan=2, sticky="e")
     ttk.Button(btns, text=i18n.tr("btn_ok", lang), command=ok).pack(side="right")
     ttk.Button(btns, text=i18n.tr("btn_cancel", lang), command=cancel).pack(side="right", padx=(0, 6))
     frm.columnconfigure(1, weight=1)

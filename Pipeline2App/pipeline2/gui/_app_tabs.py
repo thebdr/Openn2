@@ -209,7 +209,9 @@ class TabsMixin:
 
     # ---- project manager actions --------------------------------------- #
     def _proj_new(self):
-        folder = filedialog.askdirectory(title=i18n.tr("menu_new", self._lang))
+        base = config.PROJECTS_DIR
+        os.makedirs(base, exist_ok=True)
+        folder = gui_common.ask_project_name(self.root, base, self._lang)
         if not folder:
             return
         self._project_path = project.new_project(folder)
@@ -228,7 +230,10 @@ class TabsMixin:
         self._after_project_change()
 
     def _proj_save_as(self):
-        folder = filedialog.askdirectory(title=i18n.tr("menu_save_as", self._lang))
+        base = config.PROJECTS_DIR
+        os.makedirs(base, exist_ok=True)
+        folder = gui_common.ask_project_name(self.root, base, self._lang,
+                                             title=i18n.tr("menu_save_as", self._lang))
         if not folder:
             return
         try:

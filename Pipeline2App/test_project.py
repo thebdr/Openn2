@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Tests for project.py (the folder-based project manager).
 
-new/open/save round-trip, copy-inputs-on-save (xlsx copied into Inputs/ + paths rewritten,
-resolved back by config.load_params), and archive (with/without a date/time suffix).
+new/open/save round-trip, copy-inputs-on-save (xlsx copied into Input/ + paths rewritten,
+resolved back by config.load_params), per-project output_dir, and archive (date/time suffix).
 
 Run: python test_project.py
 """
@@ -43,8 +43,8 @@ def main():
     folder = os.path.join(tmp, "MyProject")
     ppath = project.new_project(folder)
     check("new_project creates project.yaml", os.path.exists(ppath))
-    check("new_project creates Inputs/ + Output/",
-          os.path.isdir(os.path.join(folder, "Inputs")) and os.path.isdir(os.path.join(folder, "Output")))
+    check("new_project creates Input/ + Output/",
+          os.path.isdir(os.path.join(folder, "Input")) and os.path.isdir(os.path.join(folder, "Output")))
     doc = project.load_doc(ppath)
     check("default doc blanks io_list/ce paths",
           doc["io_list"]["path"] == "" and doc["ce"]["path"] == "")
@@ -52,6 +52,14 @@ def main():
     # project knobs are PRESENT + well-typed rather than coupling to the template's language.
     check("default doc has project knobs",
           isinstance(doc.get("copy_inputs_on_save"), bool) and doc.get("language") in ("en", "it"))
+    check("default doc sets output_dir=Output", doc.get("output_dir") == "Output")
+    # a project's params resolves output_dir to an absolute <project>/Output; the built-in default
+    # config_project/project_params.yaml leaves it unset -> Shared/OutputTree.
+    check("load_params resolves a project's output_dir to <project>/Output",
+          os.path.normpath(config.load_params(ppath).get("output_dir", "")) ==
+          os.path.normpath(os.path.join(folder, "Output")))
+    check("built-in default has no output_dir (stays Shared/OutputTree)",
+          not config.load_params(config.PARAMS_FILE).get("output_dir"))
 
     # --- open project ---
     check("open_project resolves the folder", project.open_project(folder) == ppath)
@@ -74,23 +82,23 @@ def main():
     reopened = project.load_doc(ppath)
     check("save round-trips a scalar edit", reopened.get("project_code") == "TEST123")
     check("no-copy leaves absolute input paths", reopened["io_list"]["path"] == src_io)
-    check("no-copy did NOT create Inputs copies",
-          not os.path.exists(os.path.join(folder, "Inputs", "io.xlsx")))
+    check("no-copy did NOT create Input copies",
+          not os.path.exists(os.path.join(folder, "Input", "io.xlsx")))
 
     # --- save WITH copy-inputs ---
     project.save_project(doc, ppath, copy_inputs=True)
     saved = project.load_doc(ppath)
-    check("copy-inputs copies the I/O List into Inputs/",
-          os.path.exists(os.path.join(folder, "Inputs", "io.xlsx")))
-    check("copy-inputs copies the C&E into Inputs/",
-          os.path.exists(os.path.join(folder, "Inputs", "ce.xlsx")))
-    check("copy-inputs rewrites paths to Inputs/<name>",
-          saved["io_list"]["path"] == "Inputs/io.xlsx" and saved["ce"]["path"] == "Inputs/ce.xlsx")
+    check("copy-inputs copies the I/O List into Input/",
+          os.path.exists(os.path.join(folder, "Input", "io.xlsx")))
+    check("copy-inputs copies the C&E into Input/",
+          os.path.exists(os.path.join(folder, "Input", "ce.xlsx")))
+    check("copy-inputs rewrites paths to Input/<name>",
+          saved["io_list"]["path"] == "Input/io.xlsx" and saved["ce"]["path"] == "Input/ce.xlsx")
     # config.load_params resolves the relative paths against the project folder
     params = config.load_params(ppath)
     check("config.load_params resolves project-relative inputs",
           os.path.isfile(params["io_list"]["path"]) and
-          os.path.normpath(params["io_list"]["path"]) == os.path.normpath(os.path.join(folder, "Inputs", "io.xlsx")))
+          os.path.normpath(params["io_list"]["path"]) == os.path.normpath(os.path.join(folder, "Input", "io.xlsx")))
 
     # --- save_as ---
     folder2 = os.path.join(tmp, "Copy2")
@@ -104,7 +112,7 @@ def main():
         names = zf.namelist()
     check("archive contains project.yaml under the project root",
           any(n.replace("\\", "/") == "MyProject/project.yaml" for n in names))
-    check("archive contains the copied input", any("Inputs/io.xlsx" in n.replace("\\", "/") for n in names))
+    check("archive contains the copied input", any("Input/io.xlsx" in n.replace("\\", "/") for n in names))
 
     # --- archive (with datetime) ---
     from datetime import datetime

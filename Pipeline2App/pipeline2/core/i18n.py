@@ -218,6 +218,16 @@ STRINGS: dict[str, dict[str, str]] = {
     "btn_ok": {"en": "OK", "it": "OK"},
     "btn_cancel": {"en": "Cancel", "it": "Annulla"},
 
+    # --- GUI: new-project name modal --------------------------------------- #
+    "project_name_title": {"en": "New project", "it": "Nuovo progetto"},
+    "project_name_label": {"en": "Project name", "it": "Nome progetto"},
+    "project_name_base": {"en": "Created in: {base}", "it": "Creato in: {base}"},
+    "project_name_preview": {"en": "Project folder: {path}", "it": "Cartella progetto: {path}"},
+    "project_exists": {"en": "A folder named '{name}' already exists in {base}.",
+                       "it": "Esiste già una cartella '{name}' in {base}."},
+    "invalid_name": {"en": "Invalid project name (no slashes or special characters).",
+                     "it": "Nome progetto non valido (niente barre o caratteri speciali)."},
+
     # --- GUI: project status ----------------------------------------------- #
     "project_opened": {"en": "Project opened: {name}", "it": "Progetto aperto: {name}"},
     "project_saved": {"en": "Project saved: {name}", "it": "Progetto salvato: {name}"},

@@ -4,8 +4,8 @@ A *project* is a self-contained folder:
 
     <project>/
         project.yaml        the run parameters (same schema as config_project/project_params.yaml)
-        Inputs/             optional local copies of the I/O List + C&E workbooks
-        Output/             where the validation logs / artifacts are written
+        Input/              optional local copies of the I/O List + C&E workbooks
+        Output/             where the validation logs / artifacts are written (the OUTPUT_PATHS tree)
 
 `config_project/project_params.yaml` stays the built-in default project. Relative `io_list`/`ce` paths in a
 project.yaml resolve against the project folder (see config.load_params), so a project with
@@ -23,7 +23,7 @@ import zipfile
 from pipeline2.core import config
 
 PROJECT_FILE = "project.yaml"
-INPUTS_DIR = "Inputs"
+INPUTS_DIR = "Input"
 OUTPUT_DIR = "Output"
 _INPUT_KEYS = ("io_list", "ce")           # params keys whose .path is a workbook to copy
 
@@ -86,6 +86,7 @@ def default_doc():
             doc[key]["path"] = ""
     doc.setdefault("copy_inputs_on_save", False)
     doc.setdefault("language", "en")
+    doc.setdefault("output_dir", "Output")     # a project writes into <project>/Output (relative -> portable)
     return doc
 
 
@@ -106,8 +107,8 @@ def open_project(folder_or_yaml: str) -> str:
 
 
 def _copy_inputs(doc, folder: str) -> None:
-    """Copy each input workbook into <folder>/Inputs/ and repoint its param to the relative
-    'Inputs/<name>'. Missing/blank/already-local paths are left untouched."""
+    """Copy each input workbook into <folder>/Input/ and repoint its param to the relative
+    'Input/<name>'. Missing/blank/already-local paths are left untouched."""
     inputs = os.path.join(folder, INPUTS_DIR)
     os.makedirs(inputs, exist_ok=True)
     for key in _INPUT_KEYS:
@@ -128,7 +129,7 @@ def _copy_inputs(doc, folder: str) -> None:
 
 def save_project(doc, project_path: str, copy_inputs: bool = False) -> str:
     """Write `doc` to project_path. With copy_inputs, first copy the I/O List + C&E into
-    Inputs/ and rewrite their paths to be project-relative. Returns the project path."""
+    Input/ and rewrite their paths to be project-relative. Returns the project path."""
     folder = project_dir(project_path)
     _ensure_layout(folder)
     if copy_inputs:

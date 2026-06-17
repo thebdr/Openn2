@@ -37,6 +37,9 @@ PARAMS_FILE = os.path.join(CONFIG_PROJECT, "project_params.yaml")
 BLOCK_TEMPLATES_JSON = os.path.join(CONFIG_PROJECT, "block_templates.json")
 CONFIG_DIR = CONFIG_PROJECT                # alias: "open the config folder" = the project config
 
+# Where the GUI's New / Save As create a project (a self-contained <PROJECTS_DIR>/<name> directory):
+PROJECTS_DIR = os.environ.get("PIPELINE2_PROJECTS") or os.path.join(os.path.expanduser("~"), "Pipeline2 Projects")
+
 # Shared-data defaults (used when project_params.yaml omits / can't resolve them):
 DEVICE_TYPES_DB_DEFAULT = os.path.join(SHARED, "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
 INTERFACE_TEMPLATE_DEFAULT = os.path.join(TEMPLATES_DIR, "MachineInterfaces", "TEMPLATE_INTERFACES_v0.0.xlsx")
@@ -58,7 +61,8 @@ OUTPUT_PATHS = {
 
 def output_root(params: dict | None = None) -> str:
     """Root of the generated-artifact tree. Default = OUTPUT_ROOT (Shared/OutputTree); an absolute
-    `params['output_dir']` overrides it (e.g. a self-contained project folder)."""
+    `params['output_dir']` overrides it. A project's project.yaml carries `output_dir: Output`, which
+    load_params resolves to an absolute <project>/Output - so an open project writes into itself."""
     d = (params or {}).get("output_dir")
     return d if (d and os.path.isabs(d)) else OUTPUT_ROOT
 
@@ -148,6 +152,14 @@ def load_params(path: str | None = None) -> dict:
     for key in ("io_list", "ce"):
         if key in params and params[key].get("path") and not os.path.isabs(params[key]["path"]):
             params[key] = dict(params[key], path=_resolve_doc(base, params[key]["path"]))
+    # a project's own params file (anything other than the built-in PARAMS_FILE) routes its outputs into
+    # the project: default a missing/blank output_dir to "Output", then resolve a relative one to absolute
+    # (relative keeps the project portable - zip + move stays valid). The built-in default leaves it unset
+    # -> output_root() falls back to Shared/OutputTree.
+    if os.path.abspath(path) != os.path.abspath(PARAMS_FILE) and not str(params.get("output_dir") or "").strip():
+        params["output_dir"] = "Output"
+    if params.get("output_dir") and not os.path.isabs(params["output_dir"]):
+        params["output_dir"] = _resolve_doc(base, params["output_dir"])
     # shared-data docs: an absolute path wins; a relative one resolves against the project (else the
     # Shared default); an absent key falls back to the Shared default.
     for key, dflt in (("device_types_db", DEVICE_TYPES_DB_DEFAULT),
