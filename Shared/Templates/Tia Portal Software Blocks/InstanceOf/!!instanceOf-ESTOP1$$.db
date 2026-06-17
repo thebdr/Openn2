@@ -1,0 +1,15 @@
+﻿DATA_BLOCK "!!instanceOf-ESTOP1$$"
+{InstructionName := 'ESTOP1';
+ LibVersion := '1.6';
+ S7_Optimized_Access := 'TRUE' }
+AUTHOR : Safety
+FAMILY : F_FUNC
+NAME : F_ESTOP1
+VERSION : 1.1
+NON_RETAIN
+ESTOP1
+
+BEGIN
+
+END_DATA_BLOCK
+

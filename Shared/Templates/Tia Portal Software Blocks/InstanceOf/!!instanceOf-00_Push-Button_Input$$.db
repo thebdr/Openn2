@@ -1,0 +1,10 @@
+﻿DATA_BLOCK "!!instanceOf-00_Push-Button_Input$$"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"00_Push-Button_Input"
+
+BEGIN
+
+END_DATA_BLOCK
+

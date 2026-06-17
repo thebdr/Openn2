@@ -1,0 +1,103 @@
+﻿id,phase,type,treatment,location,message
+e99f3bcdf9,0A,Empty permanent part,,NET SAFETY 50!K23,Empty permanent part
+c0e48c3f54,0A,T.S. ref is missing,,NET SAFETY 50!U108,T.S. ref is missing
+4232578c03,0A,T.S. ref is missing,,NET SAFETY 50!U109,T.S. ref is missing
+3d19ee4ae9,0A,T.S. ref is missing,,NET SAFETY 50!U116,T.S. ref is missing
+faed89a167,0A,T.S. ref is missing,,NET SAFETY 50!U117,T.S. ref is missing
+7933a900f6,0A,T.S. ref is missing,,NET SAFETY 50!U124,T.S. ref is missing
+c1d9c72674,0A,T.S. ref is missing,,NET SAFETY 50!U125,T.S. ref is missing
+82e72ee10e,0A,T.S. ref is missing,,NET SAFETY 50!U23,T.S. ref is missing
+c34db658e4,0A,T.S. ref is missing,,NET SAFETY 50!U44,T.S. ref is missing
+8ec3dc7762,0A,T.S. ref is missing,,NET SAFETY 50!U52,T.S. ref is missing
+cbe89ca181,0A,T.S. ref is missing,,NET SAFETY 50!U60,T.S. ref is missing
+d629dac85c,0A,T.S. ref is missing,,NET SAFETY 50!U68,T.S. ref is missing
+82261ffcdc,0A,T.S. ref is missing,,NET SAFETY 50!U76,T.S. ref is missing
+a7988d7392,0A,T.S. ref is missing,,NET SAFETY 50!U84,T.S. ref is missing
+e4349751c6,0A,T.S. ref is missing,,NET SAFETY 50!U92,T.S. ref is missing
+37e8a982f6,1,Declared in the I/O List at a different address.,,AREA 2!C10,Declared in the I/O List at a different address.
+c4545372ee,1,Declared in the I/O List at a different address.,,AREA 2!C13,Declared in the I/O List at a different address.
+0416184cf3,1,Declared in the I/O List at a different address.,,AREA 2!C14,Declared in the I/O List at a different address.
+d1dc5d6751,1,Declared in the I/O List at a different address.,,AREA 2!C5,Declared in the I/O List at a different address.
+6223dd0fc5,1,Declared in the I/O List at a different address.,,AREA 2!C6,Declared in the I/O List at a different address.
+1ff15c5002,1,Declared in the I/O List at a different address.,,AREA 2!C9,Declared in the I/O List at a different address.
+7136afe03d,1,Device not declared in the I/O List.,,AREA 1!C5,Device not declared in the I/O List.
+42505404eb,1,Device not declared in the I/O List.,,AREA 2!C34,Device not declared in the I/O List.
+d12b1e43fa,1,Device not declared in the I/O List.,,AREA 2!C45,Device not declared in the I/O List.
+71e6e1c7a3,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F102,Device not declared in the I/O List.
+522d8b5a13,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F104,Device not declared in the I/O List.
+8c4fd00d69,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F105,Device not declared in the I/O List.
+73e57c4685,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F106,Device not declared in the I/O List.
+1138b55c00,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F110,Device not declared in the I/O List.
+cb629b76ba,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F111,Device not declared in the I/O List.
+1e9d9abe28,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F112,Device not declared in the I/O List.
+8716831aa3,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F113,Device not declared in the I/O List.
+b0ab3aef25,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F115,Device not declared in the I/O List.
+8f22c2f585,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F116,Device not declared in the I/O List.
+231dfd6b2e,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F117,Device not declared in the I/O List.
+8062387551,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F118,Device not declared in the I/O List.
+1b1b9ee8a3,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F119,Device not declared in the I/O List.
+9e932b24b2,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F120,Device not declared in the I/O List.
+f876ab06c2,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F121,Device not declared in the I/O List.
+e622a47eb5,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F122,Device not declared in the I/O List.
+df432b46e3,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F123,Device not declared in the I/O List.
+0cf0e6a071,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F124,Device not declared in the I/O List.
+38794e878c,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F125,Device not declared in the I/O List.
+aa8afe9f9f,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F126,Device not declared in the I/O List.
+20a84249bd,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F127,Device not declared in the I/O List.
+9cb5421f3d,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F128,Device not declared in the I/O List.
+bfb943e34b,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F129,Device not declared in the I/O List.
+8afad8efb5,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F130,Device not declared in the I/O List.
+128596f487,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F131,Device not declared in the I/O List.
+9d17601232,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F132,Device not declared in the I/O List.
+84bc739478,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F133,Device not declared in the I/O List.
+f5ede27a6a,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F134,Device not declared in the I/O List.
+75437daf31,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F135,Device not declared in the I/O List.
+a11f177ba2,1,Device not declared in the I/O List.,,CAUSE&EFFECT MATRIX!F136,Device not declared in the I/O List.
+b07e10851a,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O194,Address present in the Cause&Effect matrix under a different device.
+f20158e225,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O202,Address present in the Cause&Effect matrix under a different device.
+7fcde06567,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O204,Address present in the Cause&Effect matrix under a different device.
+5de24a7896,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O211,Address present in the Cause&Effect matrix under a different device.
+eadc056476,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O310,Address present in the Cause&Effect matrix under a different device.
+ce9c30c5da,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O389,Address present in the Cause&Effect matrix under a different device.
+648256be1d,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O391,Address present in the Cause&Effect matrix under a different device.
+821c57a34b,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O417,Address present in the Cause&Effect matrix under a different device.
+db33ca8009,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O470,Address present in the Cause&Effect matrix under a different device.
+8e0f41a21d,2,Mandatory signal absent from the Cause&Effect matrix.,,NET SAFETY 50!O442,Mandatory signal absent from the Cause&Effect matrix.
+14edbc3ad1,2,Mandatory signal absent from the Cause&Effect matrix.,,NET SAFETY 50!O444,Mandatory signal absent from the Cause&Effect matrix.
+8faea2081e,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE210,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+bc09550049,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE211,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+2808a82776,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE264,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+b8a7fbb910,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE318,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+a37e5c5937,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE339,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+a94154d4aa,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE340,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+14d65be4d9,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE341,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+a4cc4e767f,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE342,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+7e92cc8ba8,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE405,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+5787f75896,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE406,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+aa1fe08156,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE407,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+4b2fc9e47a,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE408,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+53a83d9a1b,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE409,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+70697e042a,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE410,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+24f2625ebc,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE411,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+1f002fcdd6,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE412,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+309f0b3cd7,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE417,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+37bdd84299,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE419,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+89cab60fc4,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE458,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+6ed5bead59,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE459,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+f848575ebf,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE460,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+965f7321bb,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE461,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+6a16243651,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE462,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+402d758dc3,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE463,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+c6bb7bffb9,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE464,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+0e7654b979,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE465,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+b751651ba8,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE470,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+2fd97aa414,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE472,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+2319313a1e,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE519,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+69084dec8c,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE521,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+fa2c1f1dc4,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE522,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+95f2e8d480,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE564,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+99ad0c87dc,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE566,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+f9d13cb60a,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE567,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+ec56d090ea,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE609,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+b72421e909,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE611,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+bf254f37e8,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE612,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"

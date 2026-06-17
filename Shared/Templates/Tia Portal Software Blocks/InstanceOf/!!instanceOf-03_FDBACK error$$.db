@@ -1,0 +1,10 @@
+﻿DATA_BLOCK "!!instanceOf-03_FDBACK error$$"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"03_FDBACK error"
+
+BEGIN
+
+END_DATA_BLOCK
+

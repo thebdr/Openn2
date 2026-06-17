@@ -1,0 +1,10 @@
+﻿DATA_BLOCK "!!instanceOf-02_Safety_Door$$"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"02_Safety_Door"
+
+BEGIN
+
+END_DATA_BLOCK
+

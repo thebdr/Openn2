@@ -1,0 +1,23 @@
+# Compiled
+Openn2App/obj/
+Openn2App/bin/
+
+# Editor
+.vscode/
+*/.vscode/
+.vs/
+*/.vs/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Generated / regenerable output (not version-controlled)
+Pipeline2App/Output/
+Shared/OutputTree/
+
+# NuGet restore output
+Open2App/packages/
+
+# Large reference doc (not needed for builds)
+Open2App/lib/HW Parameter description/

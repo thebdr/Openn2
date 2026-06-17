@@ -1,0 +1,29 @@
+# PyInstaller version resource for IOListChecker.exe (embeds real product metadata, which
+# helps reduce AV/SmartScreen "unknown unsigned binary" heuristics). Referenced by gui_designer.spec.
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 0, 0, 0),
+    prodvers=(1, 0, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0),
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable('040904B0', [
+        StringStruct('CompanyName', 'Fives'),
+        StringStruct('FileDescription', 'I/O List Checker - validates I/O Lists vs the Cause & Effect matrix'),
+        StringStruct('FileVersion', '1.0.0.0'),
+        StringStruct('InternalName', 'IOListChecker'),
+        StringStruct('LegalCopyright', 'Fives'),
+        StringStruct('OriginalFilename', 'IOListChecker.exe'),
+        StringStruct('ProductName', 'I/O List Checker'),
+        StringStruct('ProductVersion', '1.0.0.0'),
+      ]),
+    ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])]),
+  ],
+)

@@ -1,0 +1,27 @@
+position,name
+1,Description Module
+2,Manufacturer
+3,Part No.
+4,Cod. Fives
+5,Slot
+6,ID
+7,Bit
+8,Normal condition
+9,Connector
+10,Pin No.
+11,Description language 1 (1° part) (permanent part)
+12,Description language 1 (2° part) (variable part)
+13,Description language 2 (1° part) (permanent part)
+14,Description language 2 (2° part) (variable part)
+15,Functional unit
+16,Location
+17,Device
+18,Type
+19,Drawing name
+20,Sheet
+21,T.S. ref.
+22,Profinet IP
+23,Profinet name
+24,Mnemonic
+25,Alarm filter
+26,Tag filter

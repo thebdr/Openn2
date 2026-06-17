@@ -1,0 +1,15 @@
+﻿DATA_BLOCK "!!instanceOf-FDBACK$$"
+{InstructionName := 'FDBACK';
+ LibVersion := '1.5';
+ S7_Optimized_Access := 'TRUE' }
+AUTHOR : Safety
+FAMILY : F_FUNC
+NAME : F_FDBACK
+VERSION : 1.1
+NON_RETAIN
+FDBACK
+
+BEGIN
+
+END_DATA_BLOCK
+

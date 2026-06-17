@@ -1,0 +1,51 @@
+# Parameters
+
+project_code: "8XXX"
+
+# --- input documents -------------------------------------------------------- #
+
+io_list: # The I/O List workbook ::: validation checks format and cross-checks it against the Cause & Effect matrix
+  path: "C:\\Users\\bogdan.dragoi\\OneDrive - FIVES\\Work\\0 Commesse\\Xx_Minor\\FVX_Mondial Realy Lyon\\0 Documenti Elettrici\\8FVX_IOList\\8FVX_IO0100_R0.1_Emergency.xlsx"
+  sheet: [NET SAFETY 50]        # a single sheet name, or a list of names or a regular expression
+  header_row: 1
+
+# Parameters
+strike_handling: "error"        # how struck-through I/O List rows (even partiallly) are treated
+ce_mandatory_words: ["emergency", "safety", "relay", "contactor", "enable"] # A row's description naming a safety concept must appear in the C&E.
+ce_excluded_words: ["circuit breaker", "power supply", "profinet switch", "coupler", "door"] # rows containing these words are skipped, unless 'ce_full_check'
+ce_always_excluded_words: ["ch2"]   # always skipped, even under ce_full_check
+ce_fuzzy_chars: 2               # Levenshtein tolerance for word matching (0 disables)
+ce_full_check: true             # ignore ce_excluded_words (check every row)
+ce_full_print: true             # log every PASS/SKIP, not just FAIL/WARN
+safety_nets: [192.168.50, 192.168.51]             # PROFINET safety subnet /24 prefixes
+
+ce: # The Cause & Effect Matrix workbook ::: validation cross-checks this against the I/O List
+  path: "C:\\Users\\bogdan.dragoi\\OneDrive - FIVES\\Work\\0 Commesse\\Xx_Minor\\FVX_Mondial Realy Lyon\\0 Documenti Elettrici\\File matrix\\8FVX_Cause and Effect Matrix(V5)_R03.xlsx"
+  matrix_sheet: "CAUSE&EFFECT MATRIX"
+  matrix_header_row: 2
+  matrix_data_row: 5
+  area_header_row: 3
+  area_data_row: 4
+
+# Parameters
+areas: [AREA 1, AREA 2, AREA 3, AREA 4]           # C&E Areas List or Regular Expression
+sorter_areas: [AREA 1]                            # List of Sorter Areas
+
+# Other Documents (optional overrides; default to the sibling Shared/ tree when omitted)
+# device_types_db: "../../Shared/HardwareConfigBuilderData/DeviceTypesDatabase.csv"
+# interface_template: "../../Shared/Templates/MachineInterfaces/TEMPLATE_INTERFACES_v0.0.xlsx"
+
+
+
+# --- diagnosis -------------------------------------------------------------- #
+diag_bit_min: 0                 # valid diagnosis bit range (inclusive)
+diag_bit_max: 62
+
+
+# --- output ----------------------------------------------------------------- #
+# artifacts are written to the sibling Shared/OutputTree/ by default; set an ABSOLUTE
+# output_dir only to redirect a self-contained project elsewhere.
+# output_dir: ""
+csv_delimiter: ","
+copy_inputs_on_save: false
+language: en

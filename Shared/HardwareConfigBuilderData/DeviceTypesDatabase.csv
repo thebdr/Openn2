@@ -1,0 +1,18 @@
+# Identifier,Type (Plc| PlcCard| PlcCardCm| IoDevice| IoDeviceCard| Hmi),Order Number/FW Version,Comment,Parameters (sep= | ),Parameters by Signal Type <ST>P1=0 | P2=0<ST>,I/O Addresses Parameter (Default is Device.Address, managed by Openn2)
+6ES7518-4FP00-0AB0,Plc,OrderNumber:6ES7518-4FP00-0AB0/V3.0,CPU 1518F-4PN/DP,,,
+6ES7517-3FP00-0AB0,Plc,OrderNumber:6ES7 517-3FP00-0AB0/V2.9,CPU 1517F-3 PN/DP,,,
+6ES7516-3FN02-0AB0,Plc,OrderNumber:6ES7 516-3FN02-0AB0/V2.8,CPU 1516F-3 PN/DP,,,
+6GK7542-1AX00-0XE0,PlcCardCm,OrderNumber:6GK7 542-1AX00-0XE0/V3.0,CM 1542-1,,,
+6ES7158-3AD10-0XA0,IoDevice,OrderNumber:6ES7 158-3AD10-0XA0/V4.2,PN/PN Coupler,,,
+6ES7155-6AU01-0BN0,IoDevice,OrderNumber:6ES7 155-6AU01-0BN0/V4.2,IM 155-6 PN ST,,,
+6ES7131-6BH01-0BA0,IoDeviceCard,OrderNumber:6ES7 131-6BH01-0BA0/V0.0,DI 16x24VDC ST,,,
+6ES7136-6BA00-0CA0,IoDeviceCard,OrderNumber:6ES7 136-6BA00-0CA0/V1.0,F-DI 8x24VDC HF,Ch(0-7).Failsafe_DiscrepancyTime=100,<B1/2>Ch(#).Failsafe_DiscrepancyTime=450<B1/2><DI1/2>Ch(#).Failsafe_SensorEvaluation=0<DI1/2><RES>Ch(2).Failsafe_SensorEvaluation=0<RES>,
+6ES7136-6BA01-0CA0,IoDeviceCard,OrderNumber:6ES7 136-6BA00-0CA0/V1.0,F-DI 8x24VDC HF (v2),Ch(0-7).Failsafe_DiscrepancyTime=100,<B1/2>Ch(#).Failsafe_DiscrepancyTime=450<B1/2><DI1/2>Ch(#).Failsafe_SensorEvaluation=0<DI1/2><RES>Ch(2).Failsafe_SensorEvaluation=0<RES>,
+6ES7132-6BH01-0BA0,IoDeviceCard,OrderNumber:6ES7 132-6BH01-0BA0/V0.0,DQ 16x24VDC/0.5A ST,,,
+6ES7136-6DB00-0CA0,IoDeviceCard,OrderNumber:6ES7 136-6DB00-0CA0/V2.0,F-DQ 4x24VDC/2A PM HF,,,
+55556,IoDevice,GSD:GSDML-V2.31-MURRELEKTRONIK-MVK_MPNIO_F-20150903.XML/DAP/55556,MURRELEKTRONIK_55556,,,
+<55556>:DefaultCard,IoDeviceCard,GSD:GSDML-V2.31-MURRELEKTRONIK-MVK_MPNIO_F-20150903.XML/M/2,Murrelektronik FS Data Submodule,Failsafe_FDestinationAddress=IP[3]|Failsafe_FMonitoringtime=450|Failsafe_FParameterSignatureIndividualParameters=2568997244,,
+<55556>:STATE_DATA,IoDeviceCard,GSD:GSDML-V2.31-MURRELEKTRONIK-MVK_MPNIO_F-20150903.XML/M/43,Murrelektronik State of FS Data Submodule,,,
+103040357,IoDevice,GSD:GSDML-V2.34-SCHMERSAL-SFB-PN-IRT-8M12-IOP-V2-20210827.XML/DAP/IDD_DAP1,SCHMERSAL_103040357,,,
+LU935023006,IoDevice,GSD:GSDML-V2.44-BELDENDEUTSCHLAND-LION-SAFETY-20240314.XML/DAP/IDD_W60_M12PWR_FS_16FDI_M12IO_SP,LUMBERG 935023006 16/8-F-DI,Item(1).Item(3).Item(0).Failsafe_FDestinationAddress = IP[3] | Item(1).Item(3).Item(0).Failsafe_FParameterSignatureIndividualParameters = 4147663383 | Item(1).Item(3).Item(0).PrmData(1)=CD 03 FF 00 ,,Item(1).Item(3).Item(0).Addr(0-1).StartAddress = %I% | Item(1).Item(2).Item(0).Addr(0).StartAddress = %I%+10
+LU935023006_AutoPluggedCard,IoDeviceCard,GSD:GSDML-V2.44-BELDENDEUTSCHLAND-LION-SAFETY-20240314.XML/M/IDM_16FDI_FS_MODULE,LUMBERG X1-X8: 16/8-F-DI_1 (Plugged by Default on Slot 2),,,

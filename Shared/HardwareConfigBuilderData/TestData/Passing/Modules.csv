@@ -1,0 +1,6 @@
+#!format=2,,,,,,,
+# Station Name,Slot (plug order),Module Name,Model Id,I Addr,Q Addr,Custom Parameters (separator= | )  syntax: [Item(i).][Ch(i).]Name=Value,Comment
+n0005-ms1-cc1-k65001,1,-K65010,6ES7131-6BH01-0BA0,0,0,PotentialGroup=1,DI 16x24VDC ST
+n0005-ms1-cc1-k65001,2,-K65012,6ES7131-6BH01-0BA0,4,4,,DI 16x24VDC ST
+n0005-ms1-cc1-k65001,3,-K65030,6ES7132-6BH01-0BA0,0,0,PotentialGroup=1,DQ 16x24VDC/0.5A ST
+n0005-ms1-cc1-k65001,4,-K65050,6ES7136-6BA00-0CA0,20,20,PotentialGroup=1|Ch(1).Failsafe_DiscrepancyTime=450|Ch(2).Failsafe_SensorEvaluation=0,F-DI 8x24VDC HF

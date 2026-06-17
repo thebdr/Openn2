@@ -1,0 +1,6 @@
+#!format=2,,,,,,,,
+# Role,Station Name,Model Id,IP Address,PN Number (empty:last IP Octet),Subnet,Custom Parameters (separator= | ), Group = folder/subfolder/...,
+Plc,n0001-mc1-cc1-k65501,6ES7518-4FP00-0AB0,192.168.50.1,,Subnet50,,=S1_IODevices,
+IoDevice,n0006-mc1-cc1-k66201,6ES7158-3AD10-0XA0,192.168.50.6,,Subnet50,,=S1_IODevices,
+IoDevice,n0005-ms1-cc1-k65001,6ES7155-6AU01-0BN0,192.168.50.5,,Subnet50,,=S1_IODevices,
+IoDevice,n0031-sm72-xns1,LU935023006,192.168.50.31,,Subnet50,Item(1).Item(3).Item(0).Addr(0-1).StartAddress = 920 | Item(1).Item(2).Item(0).Addr(0).StartAddress = 930,=S1_IODevices,

@@ -1,0 +1,10 @@
+﻿DATA_BLOCK "!!instanceOf-01_Speed_Control_SLS$$"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"01_Speed_Control_SLS"
+
+BEGIN
+
+END_DATA_BLOCK
+

@@ -1,0 +1,491 @@
+#!/usr/bin/env python3
+"""block_builders.py — YOU edit this. One function per Software Block template.
+
+Each builder receives `db` (the CentralDatabase: a list of staged row dicts — canonical
+columns + matrix_areas + IsSorterArea + name_in_db + subnet_name + the per-node I/Q
+byte-range columns) and returns a list of INSTANCES, one per @row in the generated CSV.
+
+An instance is a dict { "<!!key$$ name>": value }:
+  * value = str          -> one cell (a scalar placeholder)
+  * value = list[str]    -> the horizontal ITERATOR (one such key per instance; the
+                            writer pads it to capacity and computes TemplateType)
+  * optional "_pad": str -> override the pad element for this instance (default PAD)
+
+Markers above each builder: `# $keep` preserve, `# $replace` re-stub on scan.
+"""
+from __future__ import annotations
+import csv
+import os
+import re
+
+from pipeline2.core import config
+
+PAD = "Always TRUE"   # default ITERATOR padding element (override per-instance via "_pad")
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_TEMPLATES = config.BLOCK_TEMPLATES_DIR   # Shared/Templates/Tia Portal Software Blocks
+
+
+# --------------------------------------------------------------------------- #
+# helpers you may use (or ignore and write your own)                          #
+# --------------------------------------------------------------------------- #
+def unique_areas(db: list) -> list:
+    """Distinct AREA n across the CentralDatabase (matrix_areas is '|'-joined)."""
+    areas = set()
+    for r in db:
+        for a in str(r.get("matrix_areas", "")).split("|"):
+            if a.strip():
+                areas.add(a.strip())
+    return sorted(areas)
+
+
+def area_index(area: str) -> str:
+    """'AREA 1' -> '1' (trailing digits)."""
+    m = re.search(r"(\d+)\s*$", str(area))
+    return m.group(1) if m else ""
+
+
+def names_in_db(db: list, *, script_type=None, area=None) -> list:
+    """name_in_db of rows matching the given filters (each filter optional)."""
+    out = []
+    for r in db:
+        if script_type is not None and r.get("script_type") != script_type:
+            continue
+        if area is not None and area not in str(r.get("matrix_areas", "")).split("|"):
+            continue
+        if r.get("name_in_db"):
+            out.append(r["name_in_db"])
+    return out
+
+
+def template_capacity(stem: str) -> int:
+    """Largest #Templates Capacity from the template's sidecar CSV (the chunk size)."""
+    caps = []
+    p = os.path.join(_TEMPLATES, stem + ".csv")
+    if os.path.exists(p):
+        with open(p, encoding="utf-8-sig") as f:
+            for row in csv.reader(f):
+                if len(row) >= 2 and str(row[0]).strip().isdigit():
+                    caps.append(int(row[0]))
+    return max(caps) if caps else 0
+
+
+def chunked(seq, n) -> list:
+    """Split into chunks of <= n (n<=0 -> a single chunk)."""
+    seq = list(seq)
+    if n and n > 0:
+        return [seq[i:i + n] for i in range(0, len(seq), n)] or [[]]
+    return [seq] if seq else []
+
+
+def _addr_byte(bit):
+    b = str(bit or "").strip().upper()
+    if b[:1] in ("I", "Q") and "." in b:
+        try:
+            return b[0], int(b[1:b.index(".")])
+        except ValueError:
+            return None
+    return None
+
+
+def nodes(db: list) -> list:
+    """The I/O node rows (those carrying a profinet_name)."""
+    return [r for r in db if r.get("profinet_name")]
+
+
+def node_of(db: list, row) -> dict | None:
+    """The node whose I/Q byte range contains this signal's address (else None)."""
+    ab = _addr_byte(row.get("bit"))
+    if not ab:
+        return None
+    kind, byte = ab
+    sk, ek = f"{kind}_startByte", f"{kind}_endByte"
+    for n in nodes(db):
+        s, e = n.get(sk, ""), n.get(ek, "")
+        if s != "" and int(s) <= byte <= int(e):
+            return n
+    return None
+
+
+def group_by_node(db: list, script_type: str) -> list:
+    """[(node_row, [name_in_db of that script_type on the node])], grouped by node."""
+    groups = {}
+    for r in db:
+        if r.get("script_type") == script_type and r.get("name_in_db"):
+            n = node_of(db, r)
+            if n is not None:
+                groups.setdefault(id(n), (n, []))[1].append(r["name_in_db"])
+    return list(groups.values())
+
+
+def sorters(db: list) -> list:
+    """[(ioc_row, index:int)] for IOC rows whose Index is SORTER-nn."""
+    out = []
+    for r in db:
+        if str(r.get("script_type", "")).upper() == "IOC":
+            m = re.match(r"^\s*SORTER-?(\d+)\s*$", str(r.get("index", "")), re.I)
+            if m:
+                out.append((r, int(m.group(1))))
+    return out
+
+
+def rows_by_index(db: list, index_value, script_type=None) -> list:
+    """Rows whose Index column equals index_value (optionally of a script_type)."""
+    return [r for r in db
+            if str(r.get("index", "")) == str(index_value)
+            and (script_type is None or r.get("script_type") == script_type)]
+
+
+def _num_index(r):
+    """Numeric element Index, e.g. '0001' -> 1; None when not numeric (e.g. 'SORTER-01')."""
+    s = str(r.get("index", "")).strip()
+    return int(s) if s.isdigit() else None
+
+
+def encoders_of(db: list, sorter_num: int, channel: str) -> list:
+    """ENC rows of `channel` ('ENC1/2'/'ENC2/2') belonging to sorter `sorter_num` - the
+    encoders carry a numeric Index ('0001') equal to the sorter's number (SORTER-01)."""
+    return [r for r in db
+            if r.get("script_type") == channel and _num_index(r) == sorter_num]
+
+
+def _first(seq):
+    return seq[0] if seq else None
+
+
+def _fld(r) -> str:
+    """FUNCTIONAL UNIT + LOCATION + DEVICE, as written (matches outputs.fld)."""
+    return (str(r.get("functional_unit") or "").strip()
+            + str(r.get("location") or "").strip()
+            + str(r.get("device") or "").strip())
+
+
+def rows_of(db: list, prefix: str) -> list:
+    """Rows whose script_type starts with `prefix` (e.g. 'KQ' matches KQ, KQ1/2, KQ2/2)."""
+    return [r for r in db if str(r.get("script_type", "")).upper().startswith(prefix.upper())]
+
+
+def estop_template_type(door_count: int, stem: str = "TEMPLATE--v1.0--04_ESTOP") -> int:
+    """ESTOP TemplateType from the doors sidecar (#Templates Capacity Doors / #Templates
+    Index): the smallest SORTER row whose door capacity >= door_count; an area with no
+    doors -> the <GENERIC>:<ResetRequired> row (index 6). Largest SORTER tier if none fits."""
+    if door_count <= 0:
+        return 6
+    table = []
+    p = os.path.join(_TEMPLATES, stem + ".csv")
+    if os.path.exists(p):
+        with open(p, encoding="utf-8-sig", newline="") as f:
+            rows = list(csv.reader(f))
+        if rows:
+            header = [c.strip() for c in rows[0]]
+            dc = next((i for i, h in enumerate(header) if h.startswith("#Templates Capacity Doors")), None)
+            ix = next((i for i, h in enumerate(header) if h.startswith("#Templates Index")), None)
+            if dc is not None and ix is not None:
+                for r in rows[1:]:
+                    if (dc < len(r) and str(r[dc]).strip().isdigit()
+                            and ix < len(r) and str(r[ix]).strip().isdigit()):
+                        table.append((int(r[dc]), int(r[ix])))
+    table.sort()
+    for cap, idx in table:
+        if cap >= door_count:
+            return idx
+    return table[-1][1] if table else 6
+
+
+# --------------------------------------------------------------------------- #
+# one builder per template — EDIT THESE                                       #
+# --------------------------------------------------------------------------- #
+
+
+# $keep
+def build_03_zone_cumulative(db: list) -> list:
+    """TEMPLATE--v1.0--03_Zone Cumulative.xml
+    keys: NetworkComment, nameOfDB, memberOf:02_COM, ITERATOR_STRINGS
+
+    EXAMPLE gathering (adjust to your real rules): for each AREA, one @row per
+    memberOf — pushbuttons (E1/2) and feedback (KQ); the ITERATOR is the name_in_db
+    of the matching rows in that area."""
+
+    instances = []
+    for area in unique_areas(db):
+        nn = f"{int(area_index(area)):02d}" if area_index(area) else area_index(area)
+        for suffix, stype in (("PB", "E1/2"), ("FDB", "KQ")):
+            instances.append({
+                "NetworkComment":      f"{area} - SYSTEM",
+                "nameOfDB":            "02_COM",
+                "02_COM.{db_element}": f"AREA {nn} {suffix}",   # member created in 02_COM (AREA 01 PB / FDB)
+                "ITERATOR_STRINGS":    names_in_db(db, script_type=stype, area=area),
+            })
+    return instances
+
+
+# $keep
+def build_04_estop(db: list) -> list:
+    """TEMPLATE--v1.0--04_ESTOP.xml  (one @row per AREA).
+
+      areaPB/areaFDB_memberOf:02_COM     = A{n}_PB / A{n}_FDB  (the members 03 creates)
+      SafetyBreaker1/2_memberOf:01_PushButton = the area's B1/2 name_in_db (slots 1, 2)
+      ITERATOR_STRINGS                   = the area's DI1/2 door name_in_db
+      areaEncoderBroken_memberOf:SPEED_STATE_REC = 'SORTER{nn}_ENCODER_BROKEN' (nn=area_index;
+                                           encoders aren't in the C&E, so default to area_index)
+      the 05_EM_STATE members            = 'AREA {nn} <suffix>' (Q / Q_Delayed / RESET /
+                                           SAFETY_BREAKERS_COM / SAFETY_DOORS_COM / POWER_CUT)
+      instanceOf-ESTOP1 = 'ESTOP_{area}'; NetworkComment = '{area} ESTOP'
+    keys: areaPB_memberOf:02_COM, areaFDB_memberOf:02_COM, Reset1_memberOf:05_EM_STATE,
+    areaQ_memberOf:05_EM_STATE, areaQDelayed_memberOf:05_EM_STATE, SafetyBreaker1_memberOf:01_PushButton,
+    SafetyBreaker2_memberOf:01_PushButton, areaSafetyBreakersCom_memberOf:05_EM_STATE, ITERATOR_STRINGS,
+    areaSafetyDoorsCom_memberOf:05_EM_STATE, areaEncoderBroken_memberOf:SPEED_STATE_REC,
+    areaPowerCut_memberOf:05_EM_STATE, instanceOf-ESTOP1, NetworkComment
+    """
+    out = []
+    for area in unique_areas(db):
+        idx = area_index(area)
+        nn = f"{int(idx):02d}" if idx else area
+        breakers = names_in_db(db, script_type="B1/2", area=area)     # safety breakers in the area
+        doors = names_in_db(db, script_type="DI1/2", area=area)       # door safety inputs (ITERATOR)
+        out.append({
+            "instanceOf-ESTOP1":                              f"ESTOP_{area}",
+            "NetworkComment":                                 f"{area} ESTOP",
+            "02_COM.{matrix_area} PB":                        f"AREA {nn} PB",
+            "02_COM.{matrix_area} FDB":                       f"AREA {nn} FDB",
+            "05_EM_STATE.{matrix_area}_Q":                    f"AREA {nn} Q",
+            "05_EM_STATE.{matrix_area}_Q_DELAYED":            f"AREA {nn} Q_Delayed",
+            "05_EM_STATE.{matrix_areas}_RESET":               f"AREA {nn} RESET",
+            "05_EM_STATE.{matrix_area}_SAFETY_BREAKERS_COM":  f"AREA {nn} SAFETY_BREAKERS_COM",
+            "05_EM_STATE.{matrix_area}_SAFETY_DOORS_COM":     f"AREA {nn} SAFETY_DOORS_COM",
+            "05_EM_STATE.{matrix_area}_SORTER_POWER_CUT":     f"AREA {nn} POWER_CUT",
+            "SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY": f"SORTER{nn}_ENCODER_BROKEN",
+            "01_PushButton.SafetyBreaker1":                   breakers[0] if len(breakers) > 0 else "Always TRUE",
+            "01_PushButton.SafetyBreaker2":                   breakers[1] if len(breakers) > 1 else "Always TRUE",
+            "ITERATOR_STRINGS":                               doors,
+            "_template_type":                                 estop_template_type(len(doors)),
+        })
+    return out
+
+
+# $keep
+def build_06_feedback_error(db: list) -> list:
+    """TEMPLATE--v1.0--06_Feedback Error.xml  (one @row per I/O node carrying KQ feedback).
+    keys: Bypass_memberOf:00_Commissioning, instanceOf-03_FDBACK error, NetworkComment, ITERATOR_STRINGS"""
+    cap = template_capacity("TEMPLATE--v1.0--06_Feedback Error")
+    out = []
+    for node, members in group_by_node(db, "KQ"):
+        for i, chunk in enumerate(chunked(members, cap), start=1):
+            inst = f"FDBK_ERR_{node['profinet_name']}_{i}"
+            out.append({
+                "instanceOf-03_FDBACK error":    inst,
+                "NetworkComment":                f"{inst} {node['profinet_ip']}",
+                "00_Commissioning.{db_element}": f"{node['profinet_name']}_{node['subnet_name']}",
+                "ITERATOR_STRINGS":              chunk,
+                "_pad":                          "Always FALSE",
+            })
+    return out
+
+
+# $keep
+def build_07_speed_control(db: list) -> list:
+    """TEMPLATE--v1.0--07_Speed Control.xml  (one @row per sorter; encoders linked by Index).
+    keys: tagName:EncoderSensor1, tagName:EncoderSensor2, tagName:SorterRunningIOC,
+    areaSorterStopped_memberOf:SPEED_STATE_REC, EncoderSensor1Faulty_memberOf:04_SPEED,
+    EncoderSensor2Faulty_memberOf:04_SPEED, EncoderBroken_memberOf:04_SPEED, NetworkComment"""
+    out = []
+    for ioc, num in sorters(db):
+        nn = f"{num:02d}"                                # zero-padded sorter number (01, 02, ...)
+        enc1 = _first(encoders_of(db, num, "ENC1/2"))   # encoders linked by numeric Index == num
+        enc2 = _first(encoders_of(db, num, "ENC2/2"))
+        member1 = enc1["name_in_db"] if enc1 else ""    # DB member (with 'Working - No Fault')
+        member2 = enc2["name_in_db"] if enc2 else ""
+        broken = f"Safety Encoder Failure {_fld(enc1)}" if enc1 else ""   # the common encoder-failure member (matches diagnosis_logic_rules)
+        out.append({
+            "instanceOf-01_Speed_Control_SLS":             f"SLS_SORTER_{nn}",
+            "tagName:EncoderSensor1":                      enc1["name_in_tagtable"] if enc1 else "",
+            "tagName:EncoderSensor2":                      enc2["name_in_tagtable"] if enc2 else "",
+            "tagName:SorterRunningIOC":                    f"PNC_I_Sorter{nn} SORTER RUNNING",
+            "04_SPEED.{db_element:ENC1/2}":                member1,
+            "04_SPEED.{db_element:ENC2/2}":                member2,
+            "04_SPEED.{db_element:ENC}":                   broken,
+            "SPEED_STATE_REC.SORTER_{index}_STOPPED":      f"SORTER_{nn}_STOPPED",
+            "NetworkComment":                              f"SORTER {nn} SPEED CONTROL",
+        })
+    return out
+
+
+# $keep
+def build_08_gate_manager(db: list) -> list:
+    """TEMPLATE--v1.0--08_Gate Manager.xml  (purpose sidecar: 1 per Sorter = TemplateType 1,
+    1 per Door DQ = TemplateType 2; the builder sets _template_type per @row).
+
+    Sorter @row (TT 1, one per IOC SORTER-nn):
+      tagName:SorterRunningIOC = 'PNC_I_Sorter{nn} SORTER RUNNING'         (from 07)
+      areaSorterStopped_memberOf:SPEED_STATE_REC = 'SORTER_{nn}_STOPPED'    (from 07)
+      areaSorterNotRunning_memberOf:05_EM_STATE  = 'SORTER_{nn}_NOT_RUNNING'
+    Door @row (TT 2, one per DQ; DI1/2 DI2/2 DD DR DL matched by the DQ's Index):
+      tagName Door* = name_in_tagtable of DI1/2(Ch1) DI2/2(Ch2) DD(DiagInput) DR(OpenRequest)
+                      DQ(SolenoidUnlock) DL(ResetLamp)
+      doorIsClosedSafe/Info/doorAlarm_memberOf:07_DOOR = name_in_db of DI1/2 / DI2/2 / DD
+      choice:IsSorterDoor / choice:DoorResetNecessary = 'Always TRUE' if a same-Index DR
+                      exists, else 'Always FALSE'
+      instanceOf-02_Safety_Door = 'DOOR_' + DQ fld; Bypass = the DQ node's bypass
+    Sorter @row: instanceOf = 'SFDOOR_' + FLD of the sorter's DI1/2 (linked by index);
+      Bypass = the node that DI1/2 is wired to.
+    Bypass_memberOf:00_Commissioning = {profinet_name}_{subnet_name} of the @row's node.
+    keys: areaSorterStopped_memberOf:SPEED_STATE_REC, areaSorterNotRunning_memberOf:05_EM_STATE,
+    Bypass_memberOf:00_Commissioning, tagName:DoorClosedDiagInput, tagName:DoorClosedCh1,
+    tagName:DoorClosedCh2, tagName:SorterRunningIOC, tagName:DoorOpenRequest, choice:IsSorterDoor,
+    choice:DoorResetNecessary, tagName:DoorSolenoidUnlock, doorIsClosedSafe_memberOf:07_DOOR,
+    doorIsClosedInfo_memberOf:07_DOOR, doorAlarm_memberOf:07_DOOR, tagName:DoorResetLamp,
+    instanceOf-02_Safety_Door, NetworkComment
+    """
+    def tag(r):
+        return r["name_in_tagtable"] if r else ""
+
+    def member(r):
+        return r["name_in_db"] if r else ""
+
+    out = []
+    # template 01 - one @row per sorter (the speed-control row; no door instance / bypass)
+    for ioc, num in sorters(db):
+        nn = f"{num:02d}"
+        out.append({
+            "_template_type":                               1,
+            "instanceOf-02_Safety_Door":                    "",
+            "NetworkComment":                               f"SORTER {nn} SPEED CONTROL",
+            "tagName:SorterRunningIOC":                     f"PNC_I_Sorter{nn} SORTER RUNNING",
+            "SPEED_STATE_REC.SORTER_{index}_STOPPED":       f"SORTER_{nn}_STOPPED",
+            "05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING": f"SORTER_{nn}_NOT_RUNNING",
+            "00_Commissioning.{db_element}":                "",
+        })
+
+    # template 02 - one @row per Door DQ (DI1/2 DI2/2 DD DR DL matched by the DQ's Index)
+    for dq in rows_of(db, "DQ"):
+        idx = dq.get("index", "")
+        di1 = _first(rows_by_index(db, idx, "DI1/2"))
+        di2 = _first(rows_by_index(db, idx, "DI2/2"))
+        dd = _first(rows_by_index(db, idx, "DD"))
+        dr = _first(rows_by_index(db, idx, "DR"))
+        dl = _first(rows_by_index(db, idx, "DL"))
+        has_dr = "Always TRUE" if dr else "Always FALSE"
+        node = node_of(db, dq)
+        bypass = f"{node['profinet_name']}_{node['subnet_name']}" if node else ""
+        inst = f"SFDOOR_{_fld(di1)}" if di1 else f"SFDOOR_{_fld(dq)}"
+        out.append({
+            "_template_type":                2,
+            "instanceOf-02_Safety_Door":     inst,
+            "NetworkComment":                inst,
+            "00_Commissioning.{db_element}": bypass,
+            "tagName:DoorClosedCh1":         tag(di1),
+            "tagName:DoorClosedCh2":         tag(di2),
+            "tagName:DoorClosedDiagInput":   tag(dd),
+            "tagName:DoorOpenRequest":       tag(dr),
+            "tagName:DoorSolenoidUnlock":    tag(dq),
+            "tagName:DoorResetLamp":         tag(dl),
+            "07_DOOR.{db_element:DI1/2}":    member(di1),
+            "07_DOOR.{db_element:DI2/2}":    member(di2),
+            "07_DOOR.{db_element:DD}":       member(dd),
+            "choice:IsSorterDoor":           has_dr,
+            "choice:DoorResetNecessary":     has_dr,
+        })
+    return out
+
+
+# $keep
+def build_00_only_for_commissioning(db: list) -> list:
+    """TEMPLATE--v1.1--00_Only for Commissioning.xml  (one @row; the commissioning-bypass
+    member of every I/O node as the ITERATOR; no sidecar -> rendered one element per row).
+    keys: 00_Commissioning.{db_element}"""
+    bypasses = [f"{n['profinet_name']}_{n['subnet_name']}" for n in nodes(db)]
+    if not bypasses:
+        return []
+    return [{"00_Commissioning.{db_element}": bypasses}]
+
+
+# $keep
+def build_02_em_push_button(db: list) -> list:
+    """TEMPLATE--v1.1--02_EM Push Button.xml  (one @row per I/O node carrying E1/2 inputs,
+    chunked so the ITERATOR never exceeds the template capacity).
+    keys: 00_Commissioning.{db_element}, instanceOf-00_Push-Button_Input, NetworkComment, ITERATOR_STRINGS"""
+    cap = template_capacity("TEMPLATE--v1.1--02_EM Push Button")
+    out = []
+    for node, members in group_by_node(db, "E1/2"):                 # node <- address-range match
+        for i, chunk in enumerate(chunked(members, cap), start=1):  # split if > capacity
+            inst = f"EMPB_{node['profinet_name']}_{i}"               # unique instance name
+            out.append({
+                "instanceOf-00_Push-Button_Input":  inst,
+                "NetworkComment":                   f"{inst} {node['profinet_ip']}",
+                "00_Commissioning.{db_element}":    f"{node['profinet_name']}_{node['subnet_name']}",
+                "ITERATOR_STRINGS":                 chunk,           # name_in_db of the E1/2's
+            })
+    return out
+
+
+# $keep
+def build_05_output_feedback(db: list) -> list:
+    """TEMPLATE--v1.1--05_Output Feedback.xml  (one @row per KQ unit).
+
+    Families (fixed numbered slots, not one ITERATOR):
+      ContactorOutput  <- the unit's KQ channel(s); Contactor{n}_Output = KQ name_in_tagtable
+      FeedbackInput    <- KI rows of the same device(s); Contactor{n}_FeedbackInput = KI name_in_tagtable
+      OnCondition      <- one per matrix_area of the KQ; value 'AREA {nn} Q_Delayed' (+ Reset 'AREA {nn} RESET')
+    Contactor{n}_QBadInput = 'QBAD_' + that output's name_in_tagtable.
+    Error_memberOf:03_FDBACK_RAW = the KQ's name_in_db (it's a member of 03_FDBACK_RAW).
+    instanceOf-FDBACK = 'FDBACK_' + the KQ's FLD (+ '_<device>' per extra KQ channel of the unit).
+
+    NOTE: TemplateType is NOT set here - it comes from the 3-family capacity sidecar
+    (OnCondition / FeedbackInput / ContactorOutput), which needs its #Templates Index
+    column finished + a multi-family engine pass. Slots are filled; sizing is pending.
+    keys: OnCondition1_memberOf:05_EM_STATE, tagName:Contactor1_FeedbackInput, tagName:Contactor1_QBadInput,
+    Reset1_memberOf:05_EM_STATE, tagName:Contactor1_Output, Error_memberOf:03_FDBACK_RAW, instanceOf-FDBACK,
+    NetworkComment, tagName:Contactor2_FeedbackInput, tagName:Contactor3_FeedbackInput,
+    tagName:Contactor4_FeedbackInput, tagName:Contactor2_QBadInput, tagName:Contactor2_Output,
+    OnCondition2_memberOf:05_EM_STATE, Reset2_memberOf:05_EM_STATE
+    """
+    out = []
+    # group KQ rows into units by device (channels KQ1/2+KQ2/2 of one device -> one unit)
+    units = {}
+    for kq in rows_of(db, "KQ"):
+        units.setdefault(kq.get("device", ""), []).append(kq)
+
+    for dev, kqs in units.items():
+        kq0 = kqs[0]
+        inst_name = "FDBACK_" + _fld(kq0)
+        for extra in kqs[1:]:                       # extra KQ channels of the unit
+            inst_name += "_" + str(extra.get("device", ""))
+        inst = {
+            "instanceOf-FDBACK":            inst_name,
+            "NetworkComment":               inst_name,                 # TODO: confirm comment format
+            "03_FDBACK_RAW.{db_element}":    kq0.get("name_in_db", ""),
+        }
+        # ContactorOutput + its QBadInput, one slot per KQ channel
+        for n, kq in enumerate(kqs, start=1):
+            tag = kq.get("name_in_tagtable", "")
+            inst[f"tagName:Contactor{n}_Output"] = tag
+            inst[f"tagName:Contactor{n}_QBadInput"] = f"QBAD_{tag}" if tag else ""
+        # FeedbackInput, one slot per KI of the unit's device(s)
+        devices = {kq.get("device", "") for kq in kqs}
+        kis = [r for r in rows_of(db, "KI") if r.get("device", "") in devices]
+        for n, ki in enumerate(kis, start=1):
+            inst[f"tagName:Contactor{n}_FeedbackInput"] = ki.get("name_in_tagtable", "")
+        # OnCondition + Reset, one slot per area the KQ belongs to
+        areas = [a for a in str(kq0.get("matrix_areas", "")).split("|") if a]
+        for i, area in enumerate(areas, start=1):
+            nn = f"{int(area_index(area)):02d}" if area_index(area) else area
+            inst[f"05_EM_STATE.{{matrix_areas.{i}}}"] = f"AREA {nn} Q_Delayed"
+            inst[f"05_EM_STATE.{{matrix_areas.{i}}}_RESET"] = f"AREA {nn} RESET"
+        # per-family counts -> the engine picks TemplateType from the 3-family sidecar
+        inst["_sizes"] = {"OnCondition": len(areas), "FeedbackInput": len(kis),
+                          "ContactorOutput": len(kqs)}
+        out.append(inst)
+    return out
+
+
+# template file stem -> builder
+BUILDERS = {
+    'TEMPLATE--v1.0--03_Zone Cumulative': build_03_zone_cumulative,
+    'TEMPLATE--v1.0--04_ESTOP': build_04_estop,
+    'TEMPLATE--v1.0--06_Feedback Error': build_06_feedback_error,
+    'TEMPLATE--v1.0--07_Speed Control': build_07_speed_control,
+    'TEMPLATE--v1.0--08_Gate Manager': build_08_gate_manager,
+    'TEMPLATE--v1.1--00_Only for Commissioning': build_00_only_for_commissioning,
+    'TEMPLATE--v1.1--02_EM Push Button': build_02_em_push_button,
+    'TEMPLATE--v1.1--05_Output Feedback': build_05_output_feedback,
+}
