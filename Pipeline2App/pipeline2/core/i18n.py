@@ -27,6 +27,61 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "No checks implemented yet",
         "it": "Nessun controllo implementato al momento",
     },
+    # --- iolist_diag populator (script_type/index/diag + DiagnosisBlocks, before staging) --- #
+    "idiag_phase": {
+        "en": "I/O List diagnosis population",
+        "it": "Popolamento diagnostica I/O List",
+    },
+    "idiag_summary": {
+        "en": "{processed} rows | {indexed} indexed | {diag} diagnosed | {unresolved} unresolved | {unknown} unknown-type | {skipped} skipped",
+        "it": "{processed} righe | {indexed} indicizzate | {diag} diagnosticate | {unresolved} irrisolte | {unknown} tipo sconosciuto | {skipped} saltate",
+    },
+    "idiag_wrote": {
+        "en": "Wrote populated I/O List -> {path}",
+        "it": "Scritta I/O List popolata -> {path}",
+    },
+    "idiag_unresolved_warn": {
+        "en": "WARNING: {n} entr(y/ies) need manual entry - see the '{sheet}' sheet.",
+        "it": "ATTENZIONE: {n} voce/i da inserire manualmente - vedi il foglio '{sheet}'.",
+    },
+    "idiag_all_resolved": {
+        "en": "All rows resolved.",
+        "it": "Tutte le righe risolte.",
+    },
+    "idiag_halt": {
+        "en": "Halting before staging: {n} unresolved entr(y/ies) must be filled in, then re-run.",
+        "it": "Arresto prima dello staging: compilare le {n} voci irrisolte, poi rieseguire.",
+    },
+    "idiag_ur_title": {"en": "Unresolved index / type entries", "it": "Voci indice/tipo irrisolte"},
+    "idiag_ur_h_row": {"en": "Source", "it": "Origine"},
+    "idiag_ur_h_type": {"en": "Script Type", "it": "Script Type"},
+    "idiag_ur_h_fld": {"en": "Device (FLD)", "it": "Dispositivo (FLD)"},
+    "idiag_ur_h_desc": {"en": "Description", "it": "Descrizione"},
+    "idiag_ur_h_reason": {"en": "Reason", "it": "Motivo"},
+    "idiag_reason_unmatched_type": {
+        "en": "script_type could not be determined - enter it manually",
+        "it": "script_type non determinabile - inserirlo manualmente",
+    },
+    "idiag_reason_unknown_type": {
+        "en": "script_type is not in the catalogue - check it / add it to signal_types.csv",
+        "it": "script_type non in catalogo - verificarlo / aggiungerlo a signal_types.csv",
+    },
+    "idiag_reason_manual_member": {
+        "en": "relay/PLC input - enter the object index manually",
+        "it": "ingresso rele'/PLC - inserire l'indice manualmente",
+    },
+    "idiag_reason_ki_without_kq": {
+        "en": "contactor feedback with no matching KQ output",
+        "it": "feedback contattore senza uscita KQ corrispondente",
+    },
+    "idiag_reason_channel_fld_mismatch": {
+        "en": "channel pair on different devices (data-entry defect)",
+        "it": "coppia di canali su dispositivi diversi (errore di inserimento)",
+    },
+    "idiag_reason_door_member_unlinked": {
+        "en": "door member not linked to a door sensor",
+        "it": "membro porta non collegato a un sensore porta",
+    },
 
     # --- missing / unreadable documents ------------------------------------ #
     "iolist_missing": {

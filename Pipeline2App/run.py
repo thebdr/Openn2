@@ -35,6 +35,7 @@ if _HERE not in sys.path:
 
 from pipeline2.core import config, staging, validation, outputs, hardware
 from pipeline2.interfaces import interface_tool
+from pipeline2 import iolist_diag
 
 
 def _abs(path: str) -> str:
@@ -66,6 +67,16 @@ def main(argv=None) -> int:
     types = config.load_signal_types()
     dtd = config.load_device_types_db(params)
     print(f"output dir: {out_dir}")
+
+    # ---- I/O List population (runs before staging; its output IS staging's input) ----
+    _section("I/O LIST POPULATION  (script_type / index / diag + DiagnosisBlocks)")
+    pop = iolist_diag.populate(params, out_dir=out_dir)
+    params["io_list"] = dict(params["io_list"], path=pop.output_path)   # staging consumes the populated copy
+    io_path = pop.output_path
+    if pop.unresolved:
+        print(f"\n  -> exit 1: {pop.unresolved} unresolved entr(y/ies) - fill them in the "
+              f"'_UnresolvedIndex' sheet of\n     {pop.output_path}\n     and re-run (staging skipped).")
+        return 1
 
     # ---- staging -------------------------------------------------------
     _section("STAGING  (reading the I/O List)")

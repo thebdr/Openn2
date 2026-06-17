@@ -204,7 +204,9 @@ def load_diagnostic_blocks(params: dict) -> dict:
     per-cabinet variant (e.g. '01'-'04'), '' when that column is absent/blank. Columns are
     found by header name; {} if the sheet (or ID_SWP column) is missing."""
     wb = load_workbook(params["io_list"]["path"], data_only=True)
-    sheet = next((s for s in wb.sheetnames if s.strip().lower() == "diagnosticblocks"), None)
+    # accept both spellings: the iolist_diag populator writes "DiagnosisBlocks" (spec/golden), older
+    # hand-made lists used "DiagnosticBlocks".
+    sheet = next((s for s in wb.sheetnames if s.strip().lower() in ("diagnosisblocks", "diagnosticblocks")), None)
     if sheet is None:
         wb.close()
         return {}

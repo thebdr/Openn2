@@ -56,8 +56,8 @@ IO_ROWS = [
 
     # ---- Phase-2 reverse WARN: ce_mandatory=warn, absent from C&E ----
     dict(functional_unit=FU, location="+DM1.CC1", device="-S10003", bit="I0.2",
-         script_type="RES", desc_l1="EMERGENCY RESET", type_hw="DI",
-         drawing="DWG-001", index="0003"),                                          # rev WARN(warn absent) (RES not in-diag)
+         script_type="R*", desc_l1="EMERGENCY RESET", type_hw="DI",
+         drawing="DWG-001", index="0003"),                                          # rev WARN(warn absent) (R* reset, not in-diag)
 
     # ---- Phase-1 forward FAIL (address mismatch) + Phase-2 reverse FAIL (fld-only partial) ----
     dict(functional_unit=FU, location="+DM1.CC1", device="-S10004", bit="I0.3", normal_condition="1",

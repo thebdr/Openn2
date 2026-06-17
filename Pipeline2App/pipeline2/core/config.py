@@ -56,6 +56,8 @@ OUTPUT_PATHS = {
     "blocks_creation_dir": os.path.join("TiaPortalProjectInterface", "BuilderData", "SoftwareBlocks", "CreationInfo"),
     "blocks_import_dir":   os.path.join("TiaPortalProjectInterface", "BuilderData", "SoftwareBlocks", "ImportReady"),
     "io_tags_dir":         os.path.join("TiaPortalProjectInterface", "BuilderData", "PlcTags"),
+    # the iolist_diag populator writes the populated I/O List here; run.py points staging at it.
+    "populated_iolist":    os.path.join("ProjectDocumentation", "InformationDatabase", "PopulatedIoList"),
 }
 
 
@@ -305,6 +307,10 @@ def load_signal_types() -> dict:
             # device must appear in the C&E (else ERROR); 'warn' -> same but WARNING;
             # 'no'/'' -> not required (the row is ignored by that check).
             "ce_mandatory": (r.get("ce_mandatory") or "").strip().lower(),
+            # diag_container_check: which diagnosis cabinet a diagnosed signal maps to -
+            # '{functional_unit}{location}' (node, A/W), '...|Field' (PA/PW), 'door', 'encoder',
+            # etc. Used by the iolist_diag populator (§8); object families override via their block.
+            "diag_container_check": (r.get("diag_container_check") or "").strip(),
         }
     # A paired channel-2 type (e.g. E2/2) usually leaves tagtable_name blank; let it
     # inherit the sibling's table (same pair_key) so both channels of one device land

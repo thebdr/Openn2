@@ -57,7 +57,7 @@ Query or VBA.
 
 ## The `pipeline2/` package
 
-All app code is one package, `pipeline2/`, with five subpackages. Modules use **absolute
+All app code is one package, `pipeline2/`, with six subpackages. Modules use **absolute
 imports** (`from pipeline2.core import config`); intra-subpackage code uses relative
 (`from . import …` / `from .. import …`). Each submodule also bootstraps the app root onto
 `sys.path` (`_APP_ROOT = dirname(dirname(dirname(__file__)))`), so even `python
@@ -67,13 +67,15 @@ pipeline2/gui/gui.py` works; the thin root entry scripts do the same.
 - `config.py` — the single source of truth for the layout. Anchors `APP_ROOT`,
   `CONFIG_PROJECT`, `INPUT_DOCS_DIR`, `DIAGNOSIS_DIR`, `USER_INPUT`, `SHARED`,
   `TEMPLATES_DIR`, `BLOCK_TEMPLATES_DIR`, `OUTPUT_ROOT`, `PARAMS_FILE`,
-  `BLOCK_TEMPLATES_JSON`, the Shared defaults `DEVICE_TYPES_DB_DEFAULT` /
+  `BLOCK_TEMPLATES_JSON`, `PROJECTS_DIR` (where New/Save As create projects), the Shared defaults `DEVICE_TYPES_DB_DEFAULT` /
   `INTERFACE_TEMPLATE_DEFAULT`, and the **`OUTPUT_PATHS`** map + `output_root(params)` /
   `out_path(out_root, key, *extra)` (see "Output tree"). `APP_ROOT` = `sys._MEIPASS` /
   `dirname(sys.executable)` when frozen, else this file's great-grandparent (Pipeline2App).
   Loaders: `load_params(path)` (ruamel safe-load YAML, or `.json` for back-compat; resolves
   doc paths relative to the params file's folder; **defaults `device_types_db` /
-  `interface_template` to the Shared copies** when the project omits them), `load_signal_types`,
+  `interface_template` to the Shared copies** when the project omits them; for a project's own
+  params file it defaults `output_dir` to `Output` and resolves it to `<project>/Output`),
+  `load_signal_types`,
   `load_device_types_db`, `resolve_type` (pattern-aware), `parse_params_by_type`,
   `sorter_areas`, `load_iolist_columns` / `load_permanent_parts` (the ported Phase-0A
   glossaries from `input_docs/`), `resolve_sheets`/`resolve_sheet` (match the regex
@@ -83,8 +85,9 @@ pipeline2/gui/gui.py` works; the thin root entry scripts do the same.
   headers, so a name map is unsafe). `io_list.sheet` entries are **regex patterns**
   (`config.resolve_sheets`, case-insensitive `re.search`, literal fallback). Excludes struck
   rows and rows with a Skip Reason. Resolves each row's signal type.
-  `load_diagnostic_blocks` — the I/O List `DiagnosticBlocks` sheet (`{cabinet_id: {index,
-  fld, template_type}}`).
+  `load_diagnostic_blocks` — the I/O List diagnosis-block sheet (`{cabinet_id: {index,
+  fld, template_type}}`, keyed by `ID_SWP`); accepts the sheet named **`DiagnosisBlocks`** (what
+  the `iolist_diag` populator writes, and the golden) **or** the older `DiagnosticBlocks`.
 - `matrix.py` — reads the C&E workbook; enriches each staged row with `matrix_areas` (see
   "the CentralDatabase" under software-block templates).
 - `validation/` — **a package** (split from the old monolithic `validation.py`). Public
@@ -172,6 +175,42 @@ pipeline2/gui/gui.py` works; the thin root entry scripts do the same.
   rule-generated `>List_Logic`. Writes `DiagList_IO.csv` / `DiagList_Logic.csv` (diagnosis
   dir) and **`Diagnostic_for_OPC.scl`** (the `ImportReady/` slot).
 
+### `pipeline2/iolist_diag/` — the I/O-List diagnosis populator (runs **before** staging)
+Turns a *fresh* Emergency I/O List (empty `script_type`/`index`/`diag_cabinet`/`diag_bit`, no
+`DiagnosisBlocks` sheet) into the populated workbook staging consumes. **Idempotent +
+non-destructive**: every column is written **only into an empty cell**; a pre-filled cell is
+preserved and audit-logged. `run.py` runs it first and **halts before staging** if anything is
+unresolved (`<input required>`). `populate(params)` is the entry; it copies the input (never mutates
+it in place — the copy keeps COVER, the suggested-type array formula, the `_TRO_TRAILING` LAMBDA and
+all formatting), reading cached values with `data_only=True` and writing through a formula-preserving
+load.
+- `models.py` — frozen `SignalTypeDef`/`ObjectFamily`/`IoRow`/`DiagBlock` + a mutable `RowResult`;
+  `Category`/`BlockKind`/`LinkKind` enums; the sentinels (`<input required>`, the `???` marker, the
+  `"-"` mnemonic) and sheet-name constants.
+- `columns.py` — `ColumnResolver` (canonical ⇄ letter ⇄ index from `column_map.csv`); **nothing
+  else hardcodes a column letter**.
+- `reader.py` — read the I/O sheet(s) (regex via `config.resolve_sheets`, `--sheets` overrides),
+  detect the first data row (skip the node-meta `50` line), build `IoRow`s with the strike flag.
+- `families.py` — load `object_families.csv` + `family_for(script_type)`.
+- `script_type.py` (§6) — faithful port of the AC suggested-type regex ladder → `suggested_type`
+  (incl. its quirks: Node→`type_hw`, unclassified→`False`, In/Out-unmatched→`???`); `to_canonical`
+  maps the legacy names to the catalogue (`ENC→N`, `FA→Z`, `RES→R*`/`R<area>`) and surfaces `???`
+  as `<input required>`.
+- `index_assign.py` (§7) — per-family contiguous progressive in row order; object grouping (channel
+  = strict FLD, series = KQ↔KI, fld = door `DI1/2`/`DD`, pattern = `Z`, none = `R`/standalone);
+  unresolvable members → `<input required>` (+ report).
+- `diag_alloc.py` (§8) — `in_diag` gating; node cabinets (P from `diag_bit_max` down, non-P from
+  `diag_bit_min` up); the PA/PW **Field inference** (lone field bit → shared `+FieldIODevices`); the
+  Type-2 per-family bit layouts; returns the ordered `DiagBlock` list (Type-1 FL, then Type-2).
+- `blocks.py` (§9) — (re)write the `DiagnosisBlocks` sheet. `ID_Local == ID_SWP`; `FullName`/FU are
+  **materialized as text** (`data_type 's'`) so the leading `=` isn't a formula and staging reads
+  them via `data_only=True` (the spill `_TRO_TRAILING` formulas aren't reproduced — openpyxl can't
+  cache a formula result, and the sheet is regenerated each run).
+- `report.py` (§10) — the `_UnresolvedIndex` sheet (one clickable internal hyperlink per entry) +
+  the console summary + the Mode-2 audit lines.
+- `populate.py` — the orchestrator + `PopulateResult`; writes to
+  `OUTPUT_PATHS["populated_iolist"]`.
+
 ### `pipeline2/interfaces/`
 - `interface_tool.py` — IOC interface-table generator (standalone + invoked by `run.py`/GUI).
 - `verify.py` — **coverage check + report**: per CentralDatabase row, which outputs it lands
@@ -196,17 +235,28 @@ pipeline2/gui/gui.py` works; the thin root entry scripts do the same.
   (theme/logview/project/gui_common).
 - `logview.py` — `LogView`: the colour-coded, link-aware, thread-safe log pane + `excel_goto`.
 - `gui_common.py` — shared widgets: the validation cascade, the File/Language menu bar, the
-  Archive popup, and `render_validation_log`.
-- `project.py` — folder-based **Project Manager** (pure functions): `new/open/save/save_as` +
-  `archive_project`. Both GUIs launch on `config.PARAMS_FILE` (no auto-reopen of a "last
-  project"); File ▸ Open/New switches project for the session only.
+  Archive popup, the **new-project name prompt** (`ask_project_name` — name entry + live
+  `<base>/<name>` preview + validation), and `render_validation_log`.
+- `project.py` — folder-based **Project Manager** (pure functions). A *project* is a
+  self-contained directory: `project.yaml` + `Input/` (copied workbooks) + `Output/` (its
+  generated tree). **New / Save As prompt for a name** (`gui_common.ask_project_name`) and create
+  `<config.PROJECTS_DIR>/<name>` (env `PIPELINE2_PROJECTS`, default `~/Pipeline2 Projects`);
+  `copy_inputs_on_save` copies the I/O List + C&E into `Input/` and rewrites their paths to
+  `Input/<name>`. `default_doc` seeds `output_dir: Output`, so an open project writes into
+  `<project>/Output` (see "Output tree"); `archive_project` zips the whole folder. Both GUIs launch
+  on the built-in `config.PARAMS_FILE` (no auto-reopen of a "last project"); File ▸ Open opens an
+  existing project for the session.
 - `editor.py` — the GUI's **Files** tab: a file tree beside a `FileEditor` (`.csv`/`.xlsx`
   open in a tksheet grid with filter-rows/columns; `.db`/`.json` in a text editor).
 - `theme.py` — light/dark palettes + log tag colours, shared by gui + editor.
 
 ### Root entry scripts + tests (in `Pipeline2App/`)
-- `run.py` — the pipeline CLI: documents → staging → validation → every output. `--strict`
-  fails on validation FAILs; exits 1 on a hardware ERROR, 2 on a missing doc.
+- `run.py` — the pipeline CLI: documents → **I/O-list population** → staging → validation → every
+  output. The populator runs first and points staging at its populated copy; the run **halts (exit 1)
+  before staging** if any index/type is unresolved. `--strict` fails on validation FAILs; exits 1 on
+  a hardware ERROR, 2 on a missing doc.
+- `run_populate.py` — the `iolist_diag` populator as a standalone CLI (`--params`/`--out`/`--sheets`);
+  exit 1 when entries need manual entry.
 - `run_validation.py` — validation-only CLI (console output).
 - `launch_gui.py` / `launch_designer.py` — thin launchers (put Pipeline2App on `sys.path`,
   then `from pipeline2.gui import gui` / `gui_designer` and call `main()`).
@@ -217,7 +267,9 @@ pipeline2/gui/gui.py` works; the thin root entry scripts do the same.
   non-zero on failure. The **data-independent set is the green gate** (`test_i18n`,
   `test_iolist_checks`, `test_validation`, `test_demo_validation`, `test_error_management`,
   `test_outputs`, `test_hardware`, `test_diagnostic_opc`, `test_interface_tool`,
-  `test_project`). `test_staging.py` / `test_softwareblocks.py` *integration* parts assume the
+  `test_project`, `test_iolist_diag`). `test_iolist_diag_golden.py` (the §13 acceptance) runs against
+  the golden workbook and **skips cleanly** when the golden or the configured catalogue isn't present.
+  `test_staging.py` / `test_softwareblocks.py` *integration* parts assume the
   specific real I/O List in `project_params.yaml`, so they FAIL when it points at a different
   project's documents (or when that workbook is open/file-locked) — **data-dependent, not a
   code regression**.
@@ -240,12 +292,17 @@ user_input/
 the layout plumbing (device DB, interface template, output dir) is **config-defaulted** to the
 Shared copies, so those keys can be omitted.
 
+A GUI-created **project** is a separate self-contained directory — `<config.PROJECTS_DIR>/<name>/`
+with its own `project.yaml`, `Input/` (copied workbooks), and `Output/` tree — that **reuses** these
+app-level config CSVs + the `Shared/` data (only inputs + outputs are per-project). See `project.py`.
+
 ## Output tree (`Shared/OutputTree/`)
 
 Every writer asks `config.out_path(out_root, key)` for its destination instead of hardcoding a
-folder; `out_root = config.output_root(params)` (default `OUTPUT_ROOT = Shared/OutputTree`; an
-absolute `params['output_dir']` overrides it for a self-contained project). The semantic keys
-(`config.OUTPUT_PATHS`):
+folder; `out_root = config.output_root(params)` (default `OUTPUT_ROOT = Shared/OutputTree`; a
+**project** carries `output_dir: Output`, which `load_params` resolves to an absolute
+`<project>/Output` so the project writes into itself; an absolute `output_dir` also wins). The
+semantic keys (`config.OUTPUT_PATHS`):
 
 | key | path under the output root | written by |
 |---|---|---|
@@ -258,6 +315,7 @@ absolute `params['output_dir']` overrides it for a self-contained project). The 
 | `blocks_creation_dir` | `TiaPortalProjectInterface/BuilderData/SoftwareBlocks/CreationInfo/` (`<NN_Name>.csv`, `InstanceDBs.csv`, `SoftwareBlocks.xlsm`) | `softwareblocks` / `blockshells` |
 | `blocks_import_dir` | `TiaPortalProjectInterface/BuilderData/SoftwareBlocks/ImportReady/` (`*.db`, `Diagnostic_for_OPC.scl`) | `outputs.write_dbs` / `diagnostic_opc` |
 | `io_tags_dir` | `TiaPortalProjectInterface/BuilderData/PlcTags/` (`PLCTags.xlsx`) | `outputs.write_io_tags` |
+| `populated_iolist` | `ProjectDocumentation/InformationDatabase/PopulatedIoList/` (the populated `.xlsx`) | `iolist_diag.populate` |
 
 SoftwareBlocks deliberately splits **`CreationInfo/`** (the generation artifacts — the builder
 CSVs + shell workbook) from **`ImportReady/`** (the `.db` files + the OPC SCL that `Open2App`
@@ -287,7 +345,7 @@ device key used everywhere).
 
 ## Signal types (`config_project/input_docs/signal_types.csv`)
 
-One row per type (incl. `IOC` interface + pattern type `FA#`). **Names and comments are
+One row per type (incl. `IOC` interface + the pattern type `Z#` emergency-area). **Names and comments are
 per-type `{canonical}`-interpolation TEMPLATES** resolved per row (`outputs._interp`):
 - `tag_name` — the I/O tag name (`''` ⇒ the type isn't tagged on its own, e.g. a channel-2
   type that shares its sibling's device tag);
@@ -297,12 +355,20 @@ per-type `{canonical}`-interpolation TEMPLATES** resolved per row (`outputs._int
   CentralDatabase + List_IO/List_Logic).
 
 Other columns: `type_id_desc`, `category` (Safety/Diag/Std/Interface), `pair_key`+`channel`
-(paired channels E/B/ENC/DI = x1/2+x2/2), `is_pattern`, `tagtable_name` (PLC tag-table Path; a
+(paired channels E/B/N/DI/F = x1/2+x2/2), `is_pattern`, `tagtable_name` (PLC tag-table Path; a
 channel-2 type with a blank one **inherits its sibling's** by `pair_key`), `db_kind`
 (`db`/`safe_db`), `db_names` (**`|`-separated** — several identical DBs / types may share one),
 `in_diag`, `diag_logic` (`mirror`→ML TRUE / `invert`→ML FALSE / blank→from `normal_condition`),
 `ce_mandatory` (reverse-C&E rule, `validation.check_ce_mandatory`: `yes`→must be in the C&E
-else **ERROR**, `warn`→else **WARNING**, `no`/blank→not required).
+else **ERROR**, `warn`→else **WARNING**, `no`/blank→not required), and `diag_container_check`
+(which diagnosis cabinet a diagnosed signal maps to — used by `iolist_diag`).
+
+The current keys are the migrated single-letter scheme: encoder `N` (was `ENC`), reset `R*`/`R#`
+(was `RES`), emergency-area `Z#` (was `FA#`), fire-alarm `F` (new); `Z#` and `F1/2` are now
+`in_diag=yes`. The `iolist_diag` suggested-type port still emits the **legacy** names and maps
+old→new, so the catalogue stays the source of truth. **Object grouping** for the populator lives in
+the sibling `config_project/input_docs/object_families.csv` (one row per family: `key`, members,
+`anchor`, `link` channel/series/fld/pattern/none, `index_stride`, `bits`, `diag_block`).
 
 ## Output rules (current)
 
@@ -460,9 +526,11 @@ diagnosis path (`DiagList_IO` + rule-generated `DiagList_Logic` + the OPC `.scl`
 done: the **5-phase validation interface** with **Phase 0A** + EN/IT (`i18n`), the **error
 registry** (`user_input/error_management.csv` + warn/skip/skip_type), the partial-match
 **both-workbooks links**, the folder-based **Project Manager**, the slim **designer GUI**
-(shipped as a one-folder `.exe`), and the **`_Openn2` relocation** (the `pipeline2/` package on
-`Shared/OutputTree/`, with `validation.py`/`gui.py` split). The data-independent `test_*.py` are
-green. Remaining:
+(shipped as a one-folder `.exe`), the **`_Openn2` relocation** (the `pipeline2/` package on
+`Shared/OutputTree/`, with `validation.py`/`gui.py` split), and the **`iolist_diag` populator** —
+the pre-staging stage that fills `script_type`/`index`/`diag_cabinet`/`diag_bit`, generates
+`DiagnosisBlocks`, reports unresolved entries, and halts the run before staging (verified by the §13
+acceptance test against the golden). The data-independent `test_*.py` are green. Remaining:
 
 - **`05_Output Feedback`** only defines `tagName:` keys up to ~Contactor2/4, but `block_builders`
   emits `Contactor3/4/5_*` for projects with more contactors → those keys are dropped. Extend
@@ -476,10 +544,21 @@ green. Remaining:
   `Shared/Templates/Tia Portal Software Blocks/InstanceOf/`.
 - **Block CSV names** still carry `[ … ]` brackets / old wording from `signal_types.csv` —
   retune those templates to drop them.
-- **Deferred from the reorg**: rework `gui_designer.spec` + the `.exe` build for the new tree;
-  move the root `test_*.py` into a `tests/` subfolder; a doc/print-staleness sweep (e.g.
-  `config.py`'s module docstring still says `Pipeline2App/safetydb/config.py`); reconcile the
-  folder-based Project Manager (`project.py`'s `Inputs/Output`) with the fixed
-  `config_project`/`user_input`/`Shared/OutputTree` layout; `git init` `_Openn2`.
+- **`iolist_diag` follow-ups**: fire-alarm `script_type` can't be auto-derived (the ladder yields
+  `???` → `<input required>`) and the contactor series `KIx/n` channels are human refinements (the
+  ladder emits bare `KI`) — both need manual entry on a fresh list. The populator **owns the diagnosis
+  numbering**: a fresh list (empty AE) is numbered from scratch and the run is idempotent on its own
+  output; a **fully-populated** list (existing `DiagnosisBlocks` + every AE filled) is left untouched
+  (the sheet isn't regenerated), so a human numbering survives. The unhandled edge is a *partial*
+  hand-edit that both leaves some AE blank **and** reorders nodes — recompute from a blanked AE in that
+  case. Per-area reset `R#`/`R2` is indexed via its family but isn't a catalogue pattern (add an `R#`
+  row to validate it). Minor/observability follow-ups from the review: `diag_container_check` is loaded
+  but routing is derived from `node_fl` + the family `diag_block` (equivalent, kept data-driven); a
+  channel-pair FLD-mismatch is reported with its own reason but not a separate ERROR count. No GUI
+  button yet (CLI + `run.py` only).
+- **Deferred follow-ups**: rework `gui_designer.spec` + the `.exe` build for the new tree, and move
+  the root `test_*.py` into a `tests/` subfolder. (Done since the reorg: the doc/print-staleness
+  sweep; the self-contained-project Manager rework — name-prompted New/Save As, `Input/`, per-project
+  `Output/`; `git init` `_Openn2` on branch `tia181920`; and the `iolist_diag` populator.)
 - Out of scope here: filling the template XML (and the InstanceOf `.db` templates) from the CSV
   is **Open2App's** job (Pipeline2 stops at the CSV).
