@@ -192,6 +192,7 @@ class TabsMixin:
             messagebox.showerror("Save failed", str(e))
             return
         self._rows = None  # config changed -> re-stage next run
+        self._populated_path = None            # drop the previous Fill output (paths may have changed)
         self._reload_params()                  # reflect any copy-inputs path rewrite
         self._log("OK", "project saved (staged rows invalidated).", None)
         self.status.set("project saved")
@@ -258,17 +259,18 @@ class TabsMixin:
     def _set_language(self):
         self._lang = self.lang_var.get()
         self._build_menubar()
-        self._build_cascade()                # relabel the cascade buttons
+        self._populate_phasebar()            # relabel the phase bar + popups
         self.status.set("Ready")
 
     def _after_project_change(self):
         self._rows = None
+        self._populated_path = None           # don't keep the previous project's Fill output
         self._params = None                  # don't keep the previous project's params/out dir
         self._lang = self._read_language()
         self.lang_var.set(self._lang)
         self.copy_inputs_var.set(self._read_copy_inputs())
         self._build_menubar()
-        self._build_cascade()                # relabel in the new project's language
+        self._populate_phasebar()            # relabel in the new project's language
         self._reload_params()
         self._update_title()
         self._log("INFO", f"project: {self._project_path}", None)

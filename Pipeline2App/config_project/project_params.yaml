@@ -16,7 +16,7 @@ ce_excluded_words: ["circuit breaker", "power supply", "profinet switch", "coupl
 ce_always_excluded_words: ["ch2"]   # always skipped, even under ce_full_check
 ce_fuzzy_chars: 2               # Levenshtein tolerance for word matching (0 disables)
 ce_full_check: true             # ignore ce_excluded_words (check every row)
-ce_full_print: true             # log every PASS/SKIP, not just FAIL/WARN
+ce_full_print: true              # log every PASS/SKIP, not just FAIL/WARN
 safety_nets: [192.168.50, 192.168.51]             # PROFINET safety subnet /24 prefixes
 
 ce: # The Cause & Effect Matrix workbook ::: validation cross-checks this against the I/O List

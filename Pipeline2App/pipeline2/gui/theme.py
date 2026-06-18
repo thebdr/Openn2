@@ -38,6 +38,34 @@ def palette(dark: bool) -> dict:
     return DARK if dark else LIGHT
 
 
+# Semantic phase-bar button fills (matching assets/ButtonsLayout.xlsx). Light mode reproduces the
+# spreadsheet's pastel fills with dark text; dark mode uses muted/darker tints with light text.
+# {style_name: {bg, fg, active}} - active is the hover/pressed shade.
+_BUTTON_LIGHT = {
+    "Run.TButton":      {"bg": "#f2cfee", "fg": "#1c1c1c", "active": "#e7b6e1"},  # pink  (run-all)
+    "Phase.TButton":    {"bg": "#ffffff", "fg": "#1c1c1c", "active": "#eef2f7"},  # white (phase header)
+    "Chevron.TButton":  {"bg": "#d9d9d9", "fg": "#1c1c1c", "active": "#c8c8c8"},  # grey  (open popup)
+    "Action.TButton":   {"bg": "#ffffff", "fg": "#1c1c1c", "active": "#eef2f7"},  # white (generate/run step)
+    "Open.TButton":     {"bg": "#cfe2f3", "fg": "#10243a", "active": "#bcd6ee"},  # light blue (open file/folder)
+    "Special.TButton":  {"bg": "#fce5cd", "fg": "#5a3b16", "active": "#f8d6b0"},  # light orange (special)
+    "Disabled.TButton": {"bg": "#f0f0f0", "fg": "#9a9a9a", "active": "#f0f0f0"},  # greyed stub
+}
+_BUTTON_DARK = {
+    "Run.TButton":      {"bg": "#5a3a57", "fg": "#f3e0f0", "active": "#6d4869"},
+    "Phase.TButton":    {"bg": "#2d2d30", "fg": "#e6e6e6", "active": "#3a3a3d"},
+    "Chevron.TButton":  {"bg": "#3a3a3d", "fg": "#e6e6e6", "active": "#4a4a4d"},
+    "Action.TButton":   {"bg": "#2d2d30", "fg": "#e6e6e6", "active": "#3a3a3d"},
+    "Open.TButton":     {"bg": "#27384a", "fg": "#cfe2f3", "active": "#324a61"},
+    "Special.TButton":  {"bg": "#4d3a23", "fg": "#fce5cd", "active": "#5f4830"},
+    "Disabled.TButton": {"bg": "#2a2a2c", "fg": "#6a6a6a", "active": "#2a2a2c"},
+}
+
+
+def button_styles(dark: bool) -> dict:
+    """The semantic phase-bar button styles for the current palette."""
+    return _BUTTON_DARK if dark else _BUTTON_LIGHT
+
+
 def log_tags(dark: bool) -> dict:
     """level -> Text tag config (foreground + optional font)."""
     if dark:
@@ -96,3 +124,24 @@ def apply_ttk(style, pal: dict) -> None:
     style.configure("TPanedwindow", background=bg)
     style.configure("TProgressbar", background=pal["accent"], troughcolor=pal["tab"])
     style.configure("TScrollbar", background=pal["tab"], troughcolor=bg, arrowcolor=fg)
+
+    # the semantic phase-bar buttons (assets/ButtonsLayout.xlsx colours)
+    styles = button_styles(pal["name"] == "dark")
+    bold = {"Run.TButton", "Phase.TButton"}
+    muted_fg = styles["Disabled.TButton"]["fg"]
+    for name, c in styles.items():
+        pad = (6, 3)
+        if name == "Chevron.TButton":
+            font = ("Segoe UI", 10)                    # keep the ▼ glyph in a font that renders it
+            pad = (6, 0)                               # minimal vertical padding -> a short chevron strip
+        elif name in bold:
+            font = ("Courier New", 9, "bold")
+        else:
+            font = ("Courier New", 9)
+        # anchor + justify center: labels (incl. wrapped multi-line ones) are centred horizontally
+        style.configure(name, background=c["bg"], foreground=c["fg"], padding=pad,
+                        anchor="center", justify="center",
+                        bordercolor=pal["border"], focuscolor=c["bg"], relief="raised", font=font)
+        style.map(name,
+                  background=[("disabled", c["bg"]), ("active", c["active"]), ("pressed", c["active"])],
+                  foreground=[("disabled", muted_fg)])

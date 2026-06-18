@@ -34,6 +34,8 @@ TEMPLATES_DIR = os.path.join(SHARED, "Templates")
 BLOCK_TEMPLATES_DIR = os.path.join(TEMPLATES_DIR, "Tia Portal Software Blocks")
 OUTPUT_ROOT = os.path.join(SHARED, "OutputTree")
 PARAMS_FILE = os.path.join(CONFIG_PROJECT, "project_params.yaml")
+# the slim designer GUI ships with its own validation-focused base (no diagnosis/output knobs)
+DESIGNER_PARAMS_FILE = os.path.join(CONFIG_PROJECT, "designer_params.yaml")
 BLOCK_TEMPLATES_JSON = os.path.join(CONFIG_PROJECT, "block_templates.json")
 CONFIG_DIR = CONFIG_PROJECT                # alias: "open the config folder" = the project config
 
@@ -158,7 +160,8 @@ def load_params(path: str | None = None) -> dict:
     # the project: default a missing/blank output_dir to "Output", then resolve a relative one to absolute
     # (relative keeps the project portable - zip + move stays valid). The built-in default leaves it unset
     # -> output_root() falls back to Shared/OutputTree.
-    if os.path.abspath(path) != os.path.abspath(PARAMS_FILE) and not str(params.get("output_dir") or "").strip():
+    _builtin = {os.path.abspath(PARAMS_FILE), os.path.abspath(DESIGNER_PARAMS_FILE)}
+    if os.path.abspath(path) not in _builtin and not str(params.get("output_dir") or "").strip():
         params["output_dir"] = "Output"
     if params.get("output_dir") and not os.path.isabs(params["output_dir"]):
         params["output_dir"] = _resolve_doc(base, params["output_dir"])

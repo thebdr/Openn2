@@ -64,40 +64,8 @@ ce9c30c5da,2,Address present in the Cause&Effect matrix under a different device
 db33ca8009,2,Address present in the Cause&Effect matrix under a different device.,,NET SAFETY 50!O470,Address present in the Cause&Effect matrix under a different device.
 8e0f41a21d,2,Mandatory signal absent from the Cause&Effect matrix.,,NET SAFETY 50!O442,Mandatory signal absent from the Cause&Effect matrix.
 14edbc3ad1,2,Mandatory signal absent from the Cause&Effect matrix.,,NET SAFETY 50!O444,Mandatory signal absent from the Cause&Effect matrix.
-8faea2081e,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE210,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-bc09550049,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE211,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-2808a82776,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE264,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-b8a7fbb910,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE318,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-a37e5c5937,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE339,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-a94154d4aa,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE340,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-14d65be4d9,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE341,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-a4cc4e767f,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE342,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-7e92cc8ba8,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE405,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-5787f75896,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE406,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-aa1fe08156,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE407,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-4b2fc9e47a,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE408,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-53a83d9a1b,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE409,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-70697e042a,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE410,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-24f2625ebc,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE411,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-1f002fcdd6,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE412,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-309f0b3cd7,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE417,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-37bdd84299,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE419,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-89cab60fc4,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE458,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-6ed5bead59,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE459,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-f848575ebf,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE460,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-965f7321bb,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE461,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-6a16243651,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE462,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-402d758dc3,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE463,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-c6bb7bffb9,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE464,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-0e7654b979,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE465,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-b751651ba8,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE470,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-2fd97aa414,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE472,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-2319313a1e,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE519,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-69084dec8c,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE521,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-fa2c1f1dc4,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE522,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-95f2e8d480,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE564,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-99ad0c87dc,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE566,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-f9d13cb60a,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE567,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-ec56d090ea,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE609,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-b72421e909,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE611,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
-bf254f37e8,3,"in-diagnosis signal missing/invalid Diag Cabinet (), Diag Bit ()",,NET SAFETY 50!AE612,"in-diagnosis signal missing/invalid Diag Cabinet (''), Diag Bit ('')"
+d8281fd125,2,Safety-related signal absent from the Cause&Effect matrix.,,NET SAFETY 50!O136,Safety-related signal absent from the Cause&Effect matrix.
+3bd34fa422,2,Safety-related signal absent from the Cause&Effect matrix.,,NET SAFETY 50!O137,Safety-related signal absent from the Cause&Effect matrix.
+87a3ed1bb4,2,Safety-related signal absent from the Cause&Effect matrix.,,NET SAFETY 50!O138,Safety-related signal absent from the Cause&Effect matrix.
+d637112454,2,Safety-related signal absent from the Cause&Effect matrix.,,NET SAFETY 50!O176,Safety-related signal absent from the Cause&Effect matrix.
+99ae64ca8e,2,Safety-related signal absent from the Cause&Effect matrix.,,NET SAFETY 50!O177,Safety-related signal absent from the Cause&Effect matrix.

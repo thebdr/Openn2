@@ -33,6 +33,7 @@ from pipeline2.gui import theme
 from pipeline2.gui import logview
 from pipeline2.gui import project
 from pipeline2.gui import gui_common
+from pipeline2.gui import phasebar
 
 APP_ICON = os.path.join(_HERE, "assets", "Pipeline2")     # + .ico / .png
 
@@ -67,14 +68,14 @@ FORM_SECTIONS = [
 ]
 FIELDS = [f for _sec, fs in FORM_SECTIONS for f in fs]      # flat (key, label, kind) list
 
-# the validation cascade: (i18n label key, phase set), top-to-bottom. Run-all = 0A,0B,1,2.
-CASCADE_STEPS = [
-    ("btn_iolist_validation", {"0A"}),     # I/O List Validation
-    ("btn_ce_validation",     {"0B"}),     # C&E Matrix Validation
-    ("btn_io_in_ce",          {"2"}),      # I/O presence in C&E
-    ("btn_ce_in_io",          {"1"}),      # C&E presence in I/O
+# the only knobs the designer needs inline (beside the Documents Validation button): the two source
+# files + the two matrix-validation toggles. Everything else stays at its project.yaml default.
+INLINE_FIELDS = [
+    ("io_list.path",  "lbl_iolist_file",   "file"),
+    ("ce.path",       "lbl_ce_file",       "file"),
+    ("ce_full_check", "lbl_ce_full_check", "bool"),
+    ("ce_full_print", "lbl_ce_full_print", "bool"),
 ]
-RUN_ALL_PHASES = {"0A", "0B", "1", "2"}
 
 
 # --- tiny dotted-dict + form-value helpers (kept local; no gui.py import) --- #
@@ -129,8 +130,9 @@ class App:
         self._cfg_vars: dict[str, tk.StringVar] = {}
 
         # the canonical config is always config_project/project_params.yaml; File > Open/New switches the
-        # project for the session (no auto-reopen of a "last project" on launch).
-        self._project_path = config.PARAMS_FILE
+        # the designer ships with its OWN validation-focused base (not the main project_params.yaml);
+        # File > Open/New switches the project for the session (no auto-reopen of a "last project").
+        self._project_path = config.DESIGNER_PARAMS_FILE
         self._lang = self._read_language()
         self.lang_var = tk.StringVar(value=self._lang)
         self.copy_inputs_var = tk.BooleanVar(value=self._read_copy_inputs())
@@ -170,7 +172,7 @@ class App:
             pass
 
     def _update_title(self):
-        if os.path.abspath(self._project_path) == os.path.abspath(config.PARAMS_FILE):
+        if os.path.abspath(self._project_path) == os.path.abspath(config.DESIGNER_PARAMS_FILE):
             name = i18n.tr("no_project", self._lang)
         else:
             name = project.project_name(self._project_path)
@@ -185,78 +187,95 @@ class App:
         }, self.lang_var, self.copy_inputs_var)
 
     def _build_body(self):
-        # persistent skeleton: a rebuildable LEFT panel (cascade + form + buttons) and a
-        # PERSISTENT log view filling the right (so the log survives language/project rebuilds).
-        self._body = ttk.Frame(self.root, padding=6)
-        self._body.pack(side="top", fill="both", expand=True)
-        self._left_holder = ttk.Frame(self._body)
-        self._left_holder.pack(side="left", fill="y")
-        ttk.Separator(self._body, orient="vertical").pack(side="left", fill="y", padx=4)
-        self.logview = logview.LogView(self._body, on_status=self.status.set, on_busy=self._set_busy)
-        self.logview.pack(side="left", fill="both", expand=True)
+        # a rebuildable TOP bar (the Documents Validation phase button + the few inline controls) and a
+        # PERSISTENT log view filling the rest (so the log survives language/project rebuilds).
+        self._top_holder = ttk.Frame(self.root, padding=(6, 4))
+        self._top_holder.pack(side="top", fill="x")
+        self.logview = logview.LogView(self.root, on_status=self.status.set, on_busy=self._set_busy)
+        self.logview.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 4))
         self.logview.apply_theme(theme.palette(False), False)
-        self._build_left()
+        self._build_topbar()
 
-    def _build_left(self):
-        holder = self._left_holder
-        # cascade (fixed, top)
-        cascade = gui_common.build_validation_cascade(
-            holder, (i18n.tr("btn_run_all", self._lang), RUN_ALL_PHASES),
-            [(i18n.tr(key, self._lang), phases) for key, phases in CASCADE_STEPS],
-            self._on_run, self._run_buttons)
-        cascade.pack(side="top", fill="x")
-        ttk.Separator(holder, orient="horizontal").pack(side="top", fill="x", pady=6)
-        # action buttons (fixed, bottom)
-        btns = ttk.Frame(holder)
-        btns.pack(side="bottom", fill="x", pady=(6, 0))
-        ttk.Button(btns, text=i18n.tr("btn_save", self._lang), command=self._save).pack(side="left")
-        ttk.Button(btns, text=i18n.tr("btn_reload", self._lang), command=self._reload_form).pack(side="left", padx=4)
-        ttk.Button(btns, text=i18n.tr("btn_open_config", self._lang), command=self._open_config).pack(side="left", padx=4)
-        ttk.Button(btns, text=i18n.tr("btn_clear_log", self._lang), command=self.logview.clear).pack(side="left", padx=4)
-        ttk.Button(btns, text=i18n.tr("btn_open_output", self._lang), command=self._open_output).pack(side="left", padx=4)
-        # config form (scrollable, fills the middle)
-        self._build_form(holder)
+    def _phase_spec(self):
+        """The single 'Documents Validation' phase for the designer (no other generation phases)."""
+        L = lambda k: i18n.tr(k, self._lang)                       # noqa: E731
+        val = lambda ps: (lambda: self._on_run(set(ps)))           # noqa: E731
+        phase = {"label": L("ph_validation"), "run": val({"0A", "1", "2"}), "buttons": [
+            {"label": L("pb_validate_iolist"), "kind": "action", "command": val({"0A"})},
+            {"label": L("pb_validate_ce"), "kind": "disabled", "command": None},
+            {"label": L("pb_xcheck_cem_iol"), "kind": "action", "command": val({"1"})},
+            {"label": L("pb_xcheck_iol_cem"), "kind": "action", "command": val({"2"})},
+            {"label": L("pb_open_errmgmt"), "kind": "open",
+             "command": lambda: self._open_file(os.path.join(config.USER_INPUT, error_management.CSV_NAME))},
+            {"label": L("pb_open_iolist"), "kind": "open",
+             "command": lambda: self._open_file(self._doc_path("io_list"))},
+            {"label": L("pb_open_ce"), "kind": "open",
+             "command": lambda: self._open_file(self._doc_path("ce"))},
+            {"label": L("pb_open_val_logs"), "kind": "open", "command": self._open_reports},
+        ]}
+        return None, [phase]
 
-    def _build_form(self, holder):
-        """A vertically-scrollable, grouped config form. Layout per row: label | browse | widget
-        (the browse '...' button comes BEFORE the entry)."""
-        canvas = tk.Canvas(holder, width=470, highlightthickness=0,
-                           background=theme.palette(False)["bg"])
-        vs = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=vs.set)
-        vs.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-        frm = ttk.Frame(canvas, padding=(2, 2))
-        win = canvas.create_window((0, 0), window=frm, anchor="nw")
-        frm.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
-        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _wheel))
-        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+    def _doc_path(self, key) -> str:
+        try:
+            return (config.load_params(self._project_path).get(key) or {}).get("path", "")
+        except Exception:  # noqa: BLE001
+            return ""
 
-        def _wheel(e):
-            canvas.yview_scroll(int(-e.delta / 120), "units")
+    def _open_file(self, path: str):
+        if path and os.path.exists(path):
+            try:
+                os.startfile(path)  # type: ignore[attr-defined]
+            except Exception as e:  # noqa: BLE001
+                messagebox.showerror("Open", str(e))
+        else:
+            self.status.set(f"not found: {path}")
 
+    def _open_reports(self):
+        try:
+            out = config.output_root(config.load_params(self._project_path))
+        except Exception:  # noqa: BLE001
+            out = config.OUTPUT_ROOT
+        folder = os.path.dirname(config.out_path(out, "validation_report"))
+        os.makedirs(folder, exist_ok=True)
+        self._open_file(folder)
+
+    def _build_topbar(self):
+        holder = self._top_holder
+        for w in holder.winfo_children():
+            w.destroy()
+        self._run_buttons.clear()
+        # the single-phase bar (Documents Validation) on the left
+        run, phases = self._phase_spec()
+        bar = phasebar.PhaseBar(holder, run, phases, self._run_buttons, padding=(2, 4))
+        bar.pack(side="left", fill="y")
+        self._phasebar = bar
+        ttk.Button(holder, text=i18n.tr("btn_clear_log", self._lang),
+                   command=self.logview.clear).pack(side="right", padx=8)
+        # the few inline controls on the RIGHT of the Documents Validation button: the two source-file
+        # pickers + the matrix-validation toggles (everything else stays at its project.yaml default).
         self._cfg_vars.clear()
+        ctrls = ttk.Frame(holder, padding=(14, 2))
+        ctrls.pack(side="left", fill="x", expand=True)
         r = 0
-        for sec_key, fields in FORM_SECTIONS:
-            ttk.Label(frm, text=i18n.tr(sec_key, self._lang), font=("Segoe UI", 9, "bold")).grid(
-                row=r, column=0, columnspan=3, sticky="w", pady=(8, 2))
+        for key, label_key, kind in INLINE_FIELDS:
+            if kind != "file":
+                continue
+            ttk.Label(ctrls, text=i18n.tr(label_key, self._lang)).grid(row=r, column=0, sticky="e", padx=(0, 6), pady=2)
+            var = tk.StringVar()
+            ttk.Entry(ctrls, textvariable=var, width=52).grid(row=r, column=1, sticky="we", pady=2)
+            ttk.Button(ctrls, text="...", width=3, command=lambda v=var: self._browse_file(v)).grid(row=r, column=2, padx=(4, 0))
+            self._cfg_vars[key] = var
             r += 1
-            for key, label_key, kind in fields:
-                ttk.Label(frm, text=i18n.tr(label_key, self._lang)).grid(
-                    row=r, column=0, sticky="w", padx=(2, 8), pady=1)
-                if kind == "bool":
-                    var = tk.BooleanVar()
-                    ttk.Checkbutton(frm, variable=var).grid(row=r, column=2, sticky="w", pady=1)
-                else:
-                    var = tk.StringVar()
-                    if kind == "file":
-                        ttk.Button(frm, text="...", width=3,
-                                   command=lambda v=var: self._browse_file(v)).grid(row=r, column=1, padx=(0, 4))
-                    ttk.Entry(frm, textvariable=var, width=46).grid(row=r, column=2, sticky="we", pady=1)
-                self._cfg_vars[key] = var
-                r += 1
-        frm.columnconfigure(2, weight=1)
+        checks = ttk.Frame(ctrls)
+        checks.grid(row=r, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        for key, label_key, kind in INLINE_FIELDS:
+            if kind != "bool":
+                continue
+            var = tk.BooleanVar()
+            ttk.Checkbutton(checks, text=i18n.tr(label_key, self._lang), variable=var).pack(side="left", padx=(0, 16))
+            self._cfg_vars[key] = var
+        ctrls.columnconfigure(1, weight=1)
+        self._reload_form()
 
     def _build_statusbar(self):
         bar = ttk.Frame(self.root)
@@ -265,23 +284,19 @@ class App:
         self.progress.pack(side="right", padx=6, pady=2)
         ttk.Label(bar, textvariable=self.status, anchor="w").pack(side="left", fill="x", expand=True, padx=8)
 
-    def _rebuild_left(self):
-        """Rebuild only the left panel (cascade + form + buttons) on a language/project change;
-        the log view persists."""
-        self._run_buttons.clear()
-        for w in self._left_holder.winfo_children():
-            w.destroy()
-        self._build_left()
-        self._reload_form()
+    def _rebuild_topbar(self):
+        """Rebuild the top bar (phase button + inline controls) on a language/project change; the
+        log view persists."""
+        self._build_topbar()
 
-    # ---- config form <-> project doc ---- #
+    # ---- inline controls <-> project doc (only the few INLINE_FIELDS) ---- #
     def _reload_form(self):
         try:
             doc = project.load_doc(self._project_path)
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("project.yaml", str(e))
             return
-        for key, _label, kind in FIELDS:
+        for key, _label, kind in INLINE_FIELDS:
             if kind == "bool":
                 self._cfg_vars[key].set(bool(_get(doc, key)))
             else:
@@ -291,8 +306,8 @@ class App:
         self._params = None
 
     def _collect_doc(self):
-        doc = project.load_doc(self._project_path)
-        for key, _label, kind in FIELDS:
+        doc = project.load_doc(self._project_path)        # preserve every other param; set only the inline ones
+        for key, _label, kind in INLINE_FIELDS:
             if kind == "bool":
                 _set(doc, key, bool(self._cfg_vars[key].get()))
             else:
@@ -364,14 +379,14 @@ class App:
         self.lang_var.set(self._lang)
         self._update_title()
         self._build_menubar()
-        self._rebuild_left()
+        self._rebuild_topbar()
         self.status.set(status_msg)
 
     def _set_language(self):
         self._lang = self.lang_var.get()
         self._update_title()
         self._build_menubar()
-        self._rebuild_left()
+        self._rebuild_topbar()
         self.status.set(i18n.tr("status_ready", self._lang))
 
     # ---- browse / open ---- #
@@ -412,6 +427,12 @@ class App:
     def _on_run(self, phase_set):
         if self.busy:
             return
+        try:                                   # persist the inline file/flag picks so load_params sees them
+            project.save_project(self._collect_doc(), self._project_path, copy_inputs=False)
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror(i18n.tr("menu_save", self._lang), str(e))
+            return
+        self._rows = self._params = None
         self.logview.post_busy(True)
         threading.Thread(target=self._guard(lambda: self._work_validate(set(phase_set))), daemon=True).start()
 

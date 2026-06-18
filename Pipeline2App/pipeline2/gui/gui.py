@@ -38,6 +38,7 @@ from pipeline2.interfaces import interface_tool
 from pipeline2.gui import editor
 from pipeline2.gui import project
 from pipeline2.gui import gui_common
+from pipeline2.gui import phasebar
 from pipeline2.gui import theme
 from pipeline2.blocks import block_templates
 from pipeline2.blocks import block_builders
@@ -204,6 +205,7 @@ class App(ActionsMixin, TabsMixin):
         self._links: dict[str, dict] = {}
         self._lnk = 0
         self._rows = None          # cached staged rows (invalidated on config save)
+        self._populated_path = None  # the "Fill I/O List" output copy; staging reads it once set
         self._run_buttons: list[ttk.Button] = []
         self.status = tk.StringVar(value="Ready")
         self._style = ttk.Style(self.root)
@@ -220,8 +222,8 @@ class App(ActionsMixin, TabsMixin):
 
         self._error_csv = None     # current run's error_management.csv ([FAIL] tag links to it)
         self._build_menubar()
-        self._build_toolbar()
-        self._build_main()         # left validation cascade + the notebook
+        self._build_phasebar()     # the horizontal phase bar + chevron dropdown popups (top)
+        self._build_body()         # the Log / Configuration / Files notebook
         self._build_statusbar()
         self._apply_theme()        # colours, tab font, log tags (light by default)
         self._update_title()
@@ -263,32 +265,104 @@ class App(ActionsMixin, TabsMixin):
             "set_language": self._set_language, "toggle_copy_inputs": None,
         }, self.lang_var, self.copy_inputs_var)
 
-    def _build_main(self):
+    def _build_body(self):
         body = ttk.Frame(self.root)
         body.pack(side="top", fill="both", expand=True)
-        self._cascade_holder = ttk.Frame(body)         # rebuilt on language change
-        self._cascade_holder.pack(side="left", fill="y")
-        ttk.Separator(body, orient="vertical").pack(side="left", fill="y", padx=2)
-        self._build_cascade()
         self._build_notebook(body)
 
-    def _build_cascade(self):
-        holder = self._cascade_holder
-        for w in holder.winfo_children():              # rebuildable: clear + drop dead buttons
+    # ---- the horizontal phase bar (replaces the old toolbar + left cascade) --- #
+    def _build_phasebar(self):
+        self._phasebar_holder = ttk.Frame(self.root)
+        self._phasebar_holder.pack(side="top", fill="x")
+        self._populate_phasebar()
+
+    def _populate_phasebar(self):
+        """(Re)build the phase bar - called on launch and on a language/project change to relabel."""
+        holder = self._phasebar_holder
+        for w in holder.winfo_children():
             w.destroy()
         self._run_buttons[:] = [b for b in self._run_buttons if b.winfo_exists()]
-        steps = [(i18n.tr("btn_iolist_validation", self._lang), {"0A"}),
-                 (i18n.tr("btn_ce_validation", self._lang), {"0B"}),
-                 (i18n.tr("btn_io_in_ce", self._lang), {"2"}),
-                 (i18n.tr("btn_ce_in_io", self._lang), {"1"}),
-                 (i18n.tr("btn_diagnosis", self._lang), {"3"})]
-        cascade = gui_common.build_validation_cascade(
-            holder, (i18n.tr("btn_run_all", self._lang), {"0A", "0B", "1", "2", "3"}),
-            steps, self._run_validation_phases, self._run_buttons)
-        cascade.pack(side="left", fill="y", padx=(2, 2))
+        run, phases = self._phase_spec()
+        bar = phasebar.PhaseBar(holder, run, phases, self._run_buttons, padding=(6, 4))
+        bar.pack(side="left", fill="x")
+        self._phasebar = bar
+        # the utility cluster (Open Output / Clear Log / Large font / Dark mode) lives beside the
+        # notebook tab selector now - see _build_utilities.
 
-    def _run_validation_phases(self, phase_set):
-        self._start(lambda: self._phase_validation(set(phase_set)))
+    def _phase_spec(self):
+        """The declarative phase spec consumed by phasebar.PhaseBar (labels via i18n; action commands
+        wrapped in the worker-thread `_start`; opens call the helpers directly; stubs have command=None)."""
+        L = lambda k: i18n.tr(k, self._lang)                       # noqa: E731
+        act = lambda fn: (lambda: self._start(fn))                 # noqa: E731  run a worker on the thread
+        val = lambda ps: act(lambda: self._phase_validation(set(ps)))   # noqa: E731
+
+        phases = [
+            {"label": L("ph_validation"), "run": val({"0A", "1", "2", "3"}), "buttons": [
+                {"label": L("pb_validate_iolist"), "kind": "action", "command": val({"0A"})},
+                {"label": L("pb_validate_ce"), "kind": "disabled", "command": None},
+                {"label": L("pb_xcheck_cem_iol"), "kind": "action", "command": val({"1"})},
+                {"label": L("pb_xcheck_iol_cem"), "kind": "action", "command": val({"2"})},
+                {"label": L("pb_validate_diag"), "kind": "action", "command": val({"3"})},
+                {"label": L("pb_open_errmgmt"), "kind": "open", "command": self._open_errmgmt},
+                {"label": L("pb_open_iolist"), "kind": "open", "command": self._open_io_list},
+                {"label": L("pb_open_ce"), "kind": "open", "command": self._open_ce},
+                {"label": L("pb_open_val_logs"), "kind": "open", "command": self._open_reports},
+            ]},
+            {"label": L("ph_fill"), "run": act(self._phase_fill), "buttons": [
+                {"label": L("pb_fill_iolist"), "kind": "action", "command": act(self._phase_fill)},
+                {"label": L("pb_open_iolist"), "kind": "open", "command": self._open_io_list},
+                {"label": L("pb_open_fill_config"), "kind": "open",
+                 "command": lambda: self._open_input_doc("object_families.csv")},
+                {"label": L("pb_open_signal_types"), "kind": "open",
+                 "command": lambda: self._open_input_doc("signal_types.csv")},
+            ]},
+            {"label": L("ph_staging"), "run": act(self._phase_staging), "buttons": [
+                {"label": L("pb_stage_iolist"), "kind": "action", "command": act(self._phase_staging)},
+                {"label": L("pb_gen_io_database"), "kind": "action", "command": act(self._work_export_central)},
+                {"label": L("pb_open_io_database"), "kind": "open", "command": self._open_central},
+            ]},
+            {"label": L("ph_interfaces"), "run": act(self._phase_interfaces), "buttons": [
+                {"label": L("pb_gen_interfaces"), "kind": "action", "command": act(self._phase_interfaces)},
+                {"label": L("pb_open_interfaces"), "kind": "open",
+                 "command": lambda: self._open_out_folder("interfaces_dir")},
+                {"label": L("pb_gen_custom_iface"), "kind": "special", "command": None},   # stub (orange)
+            ]},
+            {"label": L("ph_signals"), "run": act(lambda: (self._phase_iotags(), self._phase_dbs())), "buttons": [
+                {"label": L("pb_gen_io_tags"), "kind": "action", "command": act(self._phase_iotags)},
+                {"label": L("pb_gen_data_blocks"), "kind": "action", "command": act(self._phase_dbs)},
+                {"label": L("pb_open_io_tags"), "kind": "open",
+                 "command": lambda: self._open_out_file("io_tags_dir", "PLCTags.xlsx")},
+                {"label": L("pb_open_data_blocks"), "kind": "open",
+                 "command": lambda: self._open_out_folder("blocks_import_dir")},
+            ]},
+            {"label": L("ph_diagnosis"), "run": act(self._phase_diagnosis), "buttons": [
+                {"label": L("pb_gen_diag_list"), "kind": "action", "command": act(self._phase_diagnosis)},
+                {"label": L("pb_gen_diag_blocks"), "kind": "action", "command": act(self._phase_fill)},
+                {"label": L("pb_open_diag_data"), "kind": "open",
+                 "command": lambda: self._open_out_folder("diagnosis_dir")},
+                {"label": L("pb_open_diag_config"), "kind": "open", "command": self._open_diag_config},
+            ]},
+            {"label": L("ph_hardware"), "run": act(self._phase_hardware), "buttons": [
+                {"label": L("pb_gen_stations"), "kind": "action", "command": act(self._phase_hardware)},
+                {"label": L("pb_gen_modules"), "kind": "action", "command": act(self._phase_hardware)},
+                {"label": L("pb_open_hardware"), "kind": "open",
+                 "command": lambda: self._open_out_folder("hardware_dir")},
+            ]},
+            {"label": L("ph_software"), "run": act(lambda: (self._work_softwareblocks(), self._work_shells())),
+             "buttons": [
+                {"label": L("pb_gen_blocks"), "kind": "action", "command": act(self._work_softwareblocks)},
+                {"label": L("pb_gen_instances"), "kind": "action", "command": act(self._work_softwareblocks)},
+                {"label": L("pb_gen_shells"), "kind": "action", "command": act(self._work_shells)},
+                {"label": L("pb_open_shells"), "kind": "open", "command": self._open_shell_xlsm},
+            ]},
+            {"label": L("ph_reporting"), "run": act(self._work_coverage), "buttons": [
+                {"label": L("pb_gen_cov_p2"), "kind": "action", "command": act(self._work_coverage)},
+                {"label": L("pb_gen_cov_tia"), "kind": "disabled", "command": None},
+                {"label": L("pb_open_reports"), "kind": "open", "command": self._open_reports},
+            ]},
+        ]
+        run = {"label": L("pb_run_pipeline"), "command": act(self._work_run_all)}
+        return run, phases
 
     def _apply_theme(self):
         """Apply the current (light/dark) palette to ttk, the log, and the editor."""
@@ -321,31 +395,6 @@ class App(ActionsMixin, TabsMixin):
         except Exception:  # noqa: BLE001 - icon is cosmetic
             pass
 
-    def _build_toolbar(self):
-        bar = ttk.Frame(self.root, padding=(8, 6))
-        bar.pack(side="top", fill="x")
-
-        run_all = ttk.Button(bar, text="Run All", command=self._on_run_all)
-        run_all.pack(side="left")
-        self._run_buttons.append(run_all)
-        ttk.Separator(bar, orient="vertical").pack(side="left", fill="y", padx=8)
-
-        for name in PHASES:
-            if name == "Validation":          # validation lives in the left cascade now
-                continue
-            b = ttk.Button(bar, text=name, width=10, command=lambda n=name: self._on_run_phase(n))
-            b.pack(side="left", padx=2)
-            self._run_buttons.append(b)
-
-        ttk.Separator(bar, orient="vertical").pack(side="left", fill="y", padx=8)
-        ttk.Button(bar, text="Open Output", command=self._open_output).pack(side="left", padx=2)
-        ttk.Button(bar, text="Clear Log", command=self._clear_log).pack(side="left", padx=2)
-
-        ttk.Checkbutton(bar, text="Dark mode", variable=self._dark,
-                        command=self._apply_theme).pack(side="right")
-        ttk.Checkbutton(bar, text="Large font", variable=self._large_font,
-                        command=self._apply_theme).pack(side="right", padx=(0, 12))
-
     def _build_notebook(self, parent=None):
         nb = ttk.Notebook(parent or self.root)
         nb.pack(side="left", fill="both", expand=True, padx=6, pady=(0, 4))
@@ -372,6 +421,18 @@ class App(ActionsMixin, TabsMixin):
         nb.add(files_tab, text="Files")
         self._files_tab = files_tab
         self._build_files_tab(files_tab)
+
+        # the utility cluster sits beside the tab selector (top-right of the notebook tab strip)
+        util = ttk.Frame(parent or self.root)
+        ttk.Button(util, text="Open Output", command=self._open_output).pack(side="left", padx=2)
+        ttk.Button(util, text="Clear Log", command=self._clear_log).pack(side="left", padx=2)
+        ttk.Checkbutton(util, text="Large font", variable=self._large_font,
+                        command=self._apply_theme).pack(side="left", padx=(8, 0))
+        ttk.Checkbutton(util, text="Dark mode", variable=self._dark,
+                        command=self._apply_theme).pack(side="left", padx=(8, 0))
+        util.place(in_=nb, relx=1.0, x=-8, y=3, anchor="ne")
+        util.lift()
+        self._util = util
 
     def _build_statusbar(self):
         bar = ttk.Frame(self.root, padding=(8, 4))

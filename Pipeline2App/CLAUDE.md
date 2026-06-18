@@ -67,7 +67,9 @@ pipeline2/gui/gui.py` works; the thin root entry scripts do the same.
 - `config.py` — the single source of truth for the layout. Anchors `APP_ROOT`,
   `CONFIG_PROJECT`, `INPUT_DOCS_DIR`, `DIAGNOSIS_DIR`, `USER_INPUT`, `SHARED`,
   `TEMPLATES_DIR`, `BLOCK_TEMPLATES_DIR`, `OUTPUT_ROOT`, `PARAMS_FILE`,
-  `BLOCK_TEMPLATES_JSON`, `PROJECTS_DIR` (where New/Save As create projects), the Shared defaults `DEVICE_TYPES_DB_DEFAULT` /
+  `BLOCK_TEMPLATES_JSON`, `PROJECTS_DIR` (where New/Save As create projects), `DESIGNER_PARAMS_FILE`
+  (the slim designer GUI's own validation-focused base; both built-in bases skip the project output
+  routing), the Shared defaults `DEVICE_TYPES_DB_DEFAULT` /
   `INTERFACE_TEMPLATE_DEFAULT`, and the **`OUTPUT_PATHS`** map + `output_root(params)` /
   `out_path(out_root, key, *extra)` (see "Output tree"). `APP_ROOT` = `sys._MEIPASS` /
   `dirname(sys.executable)` when frozen, else this file's great-grandparent (Pipeline2App).
@@ -226,15 +228,41 @@ load.
   **`_app_tabs.py`** (`TabsMixin`) holds the Files + Configuration tabs and the project
   actions. The pipeline runs on a worker thread (queue → `root.after` drain). **Clickable
   links** open the source workbook in Excel **at that cell** via pywin32 COM (falls back to
-  `os.startfile`). Dark-mode toggle; window icon `assets/Pipeline2.ico|png`. Validation phases
-  sit in a **left vertical cascade**; a **File** menu hosts the Project Manager + a
-  **Language** menu (EN/IT).
+  `os.startfile`). Dark-mode toggle; window icon `assets/Pipeline2.ico|png`. The actions live in a
+  top **phase bar** (see `phasebar.py`): a row of phase headers (Documents Validation · Fill Out ·
+  Staging · Interfaces · Signals · Diagnosis · Hardware · Software · Reporting) separated by `>`,
+  with the pink **Run Pipeline** master on the left. A phase header **runs the whole phase**; the
+  grey chevron under it opens that phase's dropdown of individual buttons. `_phase_spec()` is the
+  declarative wiring (header `run` + per-button `command`s → the existing `_phase_*`/`_work_*`
+  workers; "Open" buttons → `_open_*` helpers; the three undefined buttons are disabled stubs).
+  Documents Validation's buttons are Validate I/O List `{0A}` · *Validate C&E Matrix* (stub) ·
+  Cross-Check CEM→IOL `{1}` · Cross-Check IOL→CEM `{2}` · **Validate Diagnosis Assignments** `{3}` +
+  the Opens; the header runs `{0A,1,2,3}`. `_phase_fill` = the `iolist_diag.populate` stage
+  (subsequent staging reads its populated copy via `_populated_path`). A **File** menu hosts the
+  Project Manager + a **Language** menu (EN/IT). The utility controls (**Open Output / Clear Log /
+  Large font / Dark mode**) are `place`d beside the notebook **tab selector** (top-right of the tab
+  strip), not on the phase bar.
+- `phasebar.py` — the reusable widget layer: `PhaseBar` (the header+chevron grid; `run=None` drops
+  the pink master for the designer) and `_Dropdown` (an anchored `overrideredirect` popup with a
+  scrollable interior, capped to the window height, that closes on Escape / click-outside / another
+  chevron). Sizing: the header is double height, the chevron a short strip; headers, chevrons and
+  popup buttons all share one width (`_BTN_WIDTH`, ~6/10 of the old single-line header) and their
+  labels **word-wrap** (`_wrap`) + are **centre-justified, Courier New** (the chevron keeps a glyph
+  font for ▼), so the popup (sized to the chevron column) lines up under its header. Click-outside is
+  detected by **widget ancestry**, not coordinates (DPI-safe). Button colours come from the semantic
+  ttk styles in `theme.button_styles`.
 - `gui_designer.py` — the slim **"I/O List Checker"** for electrical designers (shipped as a
-  one-folder `.exe`). Validation only (Staging → Phase 0A → Phases 1/2, never Diagnosis).
-  Imports only `core` (config/staging/validation/i18n/error_management) + `gui`
-  (theme/logview/project/gui_common).
+  one-folder `.exe`); it ships with its **own base params** (`config.DESIGNER_PARAMS_FILE` =
+  `config_project/designer_params.yaml`, validation-only). Validation only (Staging → Phase 0A →
+  Phases 1/2, never Diagnosis). The body is a single top bar: the `phasebar.PhaseBar` carrying **only
+  the Documents Validation** phase (no pink Run, no diagnosis button), a **Clear Log** button, plus,
+  to its right, the only inline controls a designer needs (`INLINE_FIELDS`: the two source-file
+  pickers + the **Full check** / **Log everything** toggles) — no config form. The persistent
+  `LogView` fills the rest; a validation run first saves those inline picks to the project so
+  `load_params` sees them. Imports only `core` (config/staging/validation/i18n/error_management) +
+  `gui` (theme/logview/project/gui_common/phasebar).
 - `logview.py` — `LogView`: the colour-coded, link-aware, thread-safe log pane + `excel_goto`.
-- `gui_common.py` — shared widgets: the validation cascade, the File/Language menu bar, the
+- `gui_common.py` — shared widgets: `build_validation_cascade` (the in-popup action cascade), the File/Language menu bar, the
   Archive popup, the **new-project name prompt** (`ask_project_name` — name entry + live
   `<base>/<name>` preview + validation), and `render_validation_log`.
 - `project.py` — folder-based **Project Manager** (pure functions). A *project* is a
@@ -248,7 +276,9 @@ load.
   existing project for the session.
 - `editor.py` — the GUI's **Files** tab: a file tree beside a `FileEditor` (`.csv`/`.xlsx`
   open in a tksheet grid with filter-rows/columns; `.db`/`.json` in a text editor).
-- `theme.py` — light/dark palettes + log tag colours, shared by gui + editor.
+- `theme.py` — light/dark palettes + log tag colours (shared by gui + editor) + `button_styles` /
+  the semantic phase-bar button styles (`Run`/`Phase`/`Chevron`/`Action`/`Open`/`Special`/`Disabled`
+  `.TButton`, registered in `apply_ttk` from the `assets/ButtonsLayout.xlsx` colours).
 
 ### Root entry scripts + tests (in `Pipeline2App/`)
 - `run.py` — the pipeline CLI: documents → **I/O-list population** → staging → validation → every

@@ -146,12 +146,37 @@ class ActionsMixin:
 
     def _ensure_staged(self):
         self._load_models()
+        # after a "Fill I/O List" run, staging reads the POPULATED copy (like run.py points staging at it)
+        if getattr(self, "_populated_path", None):
+            self._params["io_list"] = dict(self._params["io_list"], path=self._populated_path)
         if self._rows is None:
             io_path = self._params["io_list"]["path"]
             if not os.path.exists(io_path):
                 raise FileNotFoundError(f"I/O List not found: {io_path}")
             self._stat("staging - reading I/O List ...")
             self._rows, self._warns = staging.load_io_list(self._params, self._types)
+
+    # ---- Documents Fill Out (the iolist_diag populator, run.py's pre-staging stage) ---- #
+    def _phase_fill(self):
+        self._section("FILL I/O LIST  (script_type / index / diag_cabinet / diag_bit + DiagnosisBlocks)")
+        from pipeline2 import iolist_diag
+        self._load_models()
+        self._stat("filling I/O List ...")
+        res = iolist_diag.populate(self._params, out_dir=self._out_dir(), lang=self._lang, quiet=True)
+        c = res.counts
+        self._log("OK", f"{c['processed']} rows | {c['indexed']} indexed | {c['diag']} diagnosed | "
+                        f"{c['unresolved']} unresolved | {c['unknown']} unknown-type | {c['skipped']} skipped")
+        io = self._params["io_list"]
+        sheets = config.as_sheet_list(io.get("sheet"))
+        link = {"path": res.output_path, "sheet": "_UnresolvedIndex", "cell": "A1"}
+        self._log("INFO", f"populated I/O List  ->  {res.output_path}",
+                  link if (sheets and res.reported) else None)
+        if res.reported:
+            self._log("WARNING", f"{res.reported} entr(y/ies) need manual entry - see the _UnresolvedIndex sheet")
+        # subsequent staging (and the rest of Run Pipeline) read the populated copy
+        self._populated_path = res.output_path
+        self._rows = None
+        return res
 
     def _staging_link(self, warning: str):
         cm = re.search(r"column ([A-Z]+)", warning)
@@ -263,15 +288,79 @@ class ActionsMixin:
         self._stat(f"{name} done")
 
     def _work_run_all(self):
-        self._rows = None  # always start from a fresh stage
-        for name in PHASES:
-            getattr(self, self._PHASE_FN[name])()
+        """Run the whole pipeline (the phase-bar 'Run Pipeline'), mirroring run.py: Fill -> Stage ->
+        Validate -> Signals -> Diagnosis -> Hardware -> Interfaces -> Software -> Reporting. Halts
+        after Fill when entries are unresolved (so staging never consumes an incomplete list)."""
+        self._rows = None
+        self._populated_path = None
+        res = self._phase_fill()
+        if res is not None and res.unresolved:
+            self._log("WARNING", f"Run Pipeline halted: {res.unresolved} unresolved entr(y/ies) - fill "
+                                 "them in the _UnresolvedIndex sheet and re-run.")
+            self._stat("halted - unresolved entries")
+            return
+        self._phase_staging()
+        self._phase_validation()
+        self._phase_iotags()
+        self._phase_dbs()
+        self._phase_diagnosis()
+        self._phase_hardware()
+        self._phase_interfaces()
+        self._work_softwareblocks()
+        self._work_shells()
+        self._work_coverage()
         self._section("DONE")
         self._log("OK", f"pipeline complete  ->  {self._out_dir()}")
-        self._stat("Run All done")
+        self._stat("Run Pipeline done")
 
-    # ---- misc ----------------------------------------------------------- #
+    # ---- "Open ..." helpers for the phase-bar blue buttons -------------- #
     def _open_output(self):
         out = self._out_dir()
         os.makedirs(out, exist_ok=True)
         self._open_path(out)
+
+    def _open_resolved(self, path: str, folder: bool = False):
+        """makedirs (the file's parent, or the folder itself) then open it - so a folder/file button
+        works even before its run has produced anything."""
+        try:
+            os.makedirs(path if folder else (os.path.dirname(path) or "."), exist_ok=True)
+        except OSError:
+            pass
+        self._open_path(path)
+
+    def _open_out_folder(self, key: str):
+        """Open the OUTPUT directory for a *_dir key (interfaces_dir, hardware_dir, ...)."""
+        self._open_resolved(config.out_path(self._out_dir(), key), folder=True)
+
+    def _open_reports(self):
+        """Open the Reports/ folder (parent of the validation/coverage report file-prefix)."""
+        self._open_resolved(os.path.dirname(config.out_path(self._out_dir(), "validation_report")), folder=True)
+
+    def _open_out_file(self, key: str, *extra):
+        self._open_resolved(config.out_path(self._out_dir(), key, *extra))
+
+    def _open_io_list(self):
+        try:
+            p = getattr(self, "_populated_path", None) or config.load_params(self._project_path)["io_list"]["path"]
+        except Exception:  # noqa: BLE001
+            p = ""
+        self._open_path(p)
+
+    def _open_ce(self):
+        try:
+            p = (config.load_params(self._project_path).get("ce") or {}).get("path", "")
+        except Exception:  # noqa: BLE001
+            p = ""
+        self._open_path(p)
+
+    def _open_input_doc(self, fname: str):
+        self._open_path(os.path.join(config.INPUT_DOCS_DIR, fname))
+
+    def _open_diag_config(self):
+        self._open_resolved(config.DIAGNOSIS_DIR, folder=True)
+
+    def _open_errmgmt(self):
+        self._open_path(os.path.join(config.USER_INPUT, error_management.CSV_NAME))
+
+    def _open_shell_xlsm(self):
+        self._open_resolved(blockshells.shell_path())
