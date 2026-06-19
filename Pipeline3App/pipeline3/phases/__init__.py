@@ -2,3 +2,4 @@
 (side-effect imports). Add new phases here as they are built.
 """
 from pipeline3.phases import p200_fillout  # noqa: F401
+from pipeline3.phases import p300_staging  # noqa: F401

@@ -48,7 +48,7 @@ Every ordered enumeration uses gapped numbers so steps insert without renumberin
 |---|---|---|---|
 | 100 | Documents Validation | 110 Validate I/O List · 120 Validate C&E Matrix · 130 Cross-Check CEM→IOL · 140 Cross-Check IOL→CEM · 150 Validate Diagnosis Assignments | TODO (M6) |
 | 200 | Documents Fill Out | 210 Fill Script Type · 220 Fill Index · 230 Fill Diag Cabinet · 240 Fill Diag Bit | **DONE** |
-| 300 | Documents Staging | 310 Stage I/O List · 320 Generate IO Database | TODO (M5) |
+| 300 | Documents Staging | 310 Stage I/O List · 320 Generate IO Database | **DONE** |
 | 400 | Interfaces Generation | 410 Generate Interfaces · 430 Generate Custom Interface… | TODO (M7) |
 | 500 | Signals Mapping | 510 Generate I/O Tags · 520 Generate Data Blocks | TODO (M7) |
 | 600 | Diagnosis Mapping | 610 Generate Diag List · 620 Generate Diag Software Blocks | TODO (M8) |
@@ -137,6 +137,32 @@ and audit-logged as Mode-2). Output: `populated_iolist`
   `strike_handling == "exclude"`; for `"error"`/`"ignore"` the row is KEPT (the distinction drives
   the *validation* severity later, phase 100).
 
+## Phase 300 — Documents Staging (the single database) — DONE
+
+`domain/staging.py` + `domain/matrix.py` + `domain/identity.py` + `phases/p300_staging.py`. Reads
+the (populated) I/O List through the ONE shared reader (`io.workbook`), by column position per
+`column_map`, into staged rows = the single database. 310 stages (→ `ctx.rows`); 320 writes
+`IODatabase.csv` (`io_database` output); the header runs both. Keeps every non-empty row (incl.
+node-meta rows), excludes struck rows only on `strike_handling == "exclude"` + Skip-Reason rows;
+numbering/enrichment is GLOBAL across matched sheets; non-matching sheets logged as skipped.
+
+- **C&E enrichment** (`matrix.annotate`, best-effort — blanks if the C&E doc is absent):
+  - `matrix_areas` — inputs from the CAUSE&EFFECT MATRIX `X` marks (area columns = headers matching
+    the `areas` regex); outputs from the AREA n sheets that list the Q-address. Paired channels
+    share the union.
+  - `ce_functional_unit` / `ce_location` / `ce_device` — the C&E-side FLD (matrix cols J/K/L) for
+    every input with a counterpart (paired channels inherit it).
+  - `numerazione_linea` — AREA col B, for outputs.
+  - `areas_description` — per-area text from the **CONCEPT** sheet (`ce.concept_sheet` /
+    `ce.concept_row`), mapped POSITIONALLY to the ordered matrix area columns; newlines→spaces;
+    `|`-joined per the row's areas.
+- **Identity fields** (`domain/identity.py` — the `{canonical}` template interpolation, shared with
+  the generators): `name_in_db`, `name_in_tagtable`, `tagtable`, `datablocks`, `diag_desc`,
+  `diag_block_name`/`diag_block_template` (from the DiagnosisBlocks sheet), `subnet_name`,
+  I/Q byte ranges, `IsSorterArea`, `type_id_resolved`/`type_category`.
+- `IODatabase.csv` = the IoList canonical columns + the enrichment/identity columns above
+  (`staging._EXTRA`). The single database in CSV form; `ctx.rows` is just it loaded.
+
 ## Testing
 
 Plain-`python` tests (no pytest) under `tests/unit/`, via `tests/unit/_harness.py` (PASS/FAIL,
@@ -144,18 +170,18 @@ non-zero exit on failure). Run one: `python tests/unit/test_iolist_diag.py`. The
 suite is the green gate** — it passes with no real documents present. Data-dependent outputs follow
 **review-then-freeze**: the user reviews a phase's real-document artifact, and once blessed it is
 frozen as a Pipeline3 golden under `tests/golden/` (Pipeline2 is NOT a golden source). Current:
-**58 unit tests green** (numbering, model, config, i18n, registry, workbook, render, iolist_diag).
+**62 unit tests green** (numbering, model, config, i18n, registry, workbook, render, iolist_diag,
+staging).
 
 ## Status & still to build
 
 - **DONE**: M1 foundation (config/numbering/model/i18n), M2 phase abstraction + registry + context
-  + profiles, M3 the shared reader + log renderer, M4 Phase 200 Fill.
-- **NEXT**: M5 Phase 300 Staging — the single `IODatabase.csv` with C&E enrichment
-  (`ce_functional_unit/ce_location/ce_device`, `numerazione_linea` from AREA n sheets,
-  `matrix_areas` for output/Q signals too).
-- **THEN**: M6 Validation (110–150 + `errors.py` warn/skip/accept registry, two reports), M7
-  generators (interfaces/signals/hardware/coverage), M8 diagnosis, M9 software, M10 CLI +
-  Open2App-path contract test, M11–13 GUIs (dark-by-default, registry-driven phase bar,
+  + profiles, M3 the shared reader + log renderer, M4 Phase 200 Fill, M5 Phase 300 Staging (single
+  `IODatabase.csv` + C&E enrichment incl. `areas_description`).
+- **NEXT**: M6 Phase 100 Validation — sub-phases 110–150 + `core/errors.py` (the warn/skip/accept
+  treatment registry keyed by uid) + the two reports (complete + error-only).
+- **THEN**: M7 generators (interfaces/signals/hardware/coverage), M8 diagnosis, M9 software, M10 CLI
+  + Open2App-path contract test, M11–13 GUIs (dark-by-default, registry-driven phase bar,
   YAML-explorer config, selectable projects root) + designer + Project Manager, M14 packaging
   (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.
 
