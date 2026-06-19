@@ -36,12 +36,15 @@ def _skip_reason_present(v) -> bool:
 
 
 def _read_view(v, colmap, strike_exclude, signal_types, warnings) -> list:
-    # header verification (warning for optional, error for required)
+    # header verification (warning for optional, error for required). The pipeline-generated columns
+    # (preliminary_check_exclude=yes: AA-AG) carry no header on an as-authored doc - the populator
+    # writes them - so a missing header there is a warning even when the column is "required" (this
+    # is what lets the validation-only/designer profile stage a raw, un-filled I/O List).
     for m in colmap:
         if not v.header_matches(m["column"], m["expected_header"]):
             msg = (f"IoList[{v.name}] column {m['column']}: header {v.header(m['column'])!r} != "
                    f"expected {m['expected_header']!r} (-> {m['canonical']})")
-            if m["required"]:
+            if m["required"] and not m.get("preliminary_check_exclude"):
                 raise SystemExit("ERROR " + msg)
             warnings.append(msg)
     rows = []

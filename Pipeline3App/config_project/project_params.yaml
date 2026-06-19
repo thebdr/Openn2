@@ -11,12 +11,12 @@ io_list:      # The I/O List workbook ::: validation checks format and cross-che
   header_row: 1
 
 # Parameters
-strike_handling: "ignore"                                                                               # how struck-through I/O List rows (even partiallly) are treated
+strike_handling: "exclude"                                                                               # how struck-through I/O List rows (even partiallly) are treated. exclude=do not process, ignore=process anyway, error=log as error
 ce_mandatory_words: ["emergency", "safety", "relay", "contactor", "enable"]                             # A row's description naming a safety concept must appear in the C&E.
 ce_excluded_words: ["circuit breaker", "power supply", "profinet switch", "coupler", "door"]            # rows containing these words are skipped, unless 'ce_full_check'
 ce_always_excluded_words: ["ch2"]                                                                       # always skipped, even under ce_full_check
 ce_fuzzy_chars: 2                                                                                       # Levenshtein tolerance for word matching (0 disables)
-ce_full_check: true                                                                                     # ignore ce_excluded_words (check every row)
+ce_full_check: false                                                                                    # ignore ce_excluded_words (check every row)
 ce_full_print: true                                                                                     # log every PASS/SKIP, not just FAIL/WARN
 safety_nets: '192.168.5\d'                                                                              # PROFINET safety subnet /24 prefixes
 

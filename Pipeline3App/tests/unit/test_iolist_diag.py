@@ -136,9 +136,20 @@ def test_writes_columns_and_diagblocks():
 def test_fire_alarm_rung():
     r1 = IoRow(sheet="s", row=1, addr="I20.3", desc_l1="FIRE ALARM", desc_l1b="CH1")
     r2 = IoRow(sheet="s", row=2, addr="I20.7", desc_l1="FIRE ALARM", desc_l1b="CH2")
-    eq(st.suggested_type(r1), "F1/2")
-    eq(st.to_canonical(st.suggested_type(r1), r1), "F1/2", "fire alarm CH1 -> F1/2 (like E1/2)")
-    eq(st.to_canonical(st.suggested_type(r2), r2), "F2/2", "fire alarm CH2 -> F2/2")
+    eq(st.suggested_type(r1), "F1/2", "fire alarm CH1 -> F1/2 (like E1/2)")
+    eq(st.suggested_type(r2), "F2/2", "fire alarm CH2 -> F2/2")
+
+
+def test_ladder_yields_canonical_directly():
+    # the legacy ENC/FA/RES intermediates are gone: the ladder returns N/Z/R directly (== AB).
+    enc = IoRow(sheet="s", row=1, addr="I3.0", desc_l1="SAFETY ENCODER PHOTOCELL", desc_l1b="CELL 1")
+    eq(st.suggested_type(enc), "N1/2", "encoder -> N, not legacy ENC")
+    fa = IoRow(sheet="s", row=2, addr="Q3.0", desc_l1="INDICATOR", desc_l1b="EMERGENCY AREA 3")
+    eq(st.suggested_type(fa), "Z3", "emergency-area output -> Z, not legacy FA")
+    res = IoRow(sheet="s", row=3, addr="I3.1", desc_l1="EMERGENCY RESET", desc_l1b="")
+    eq(st.suggested_type(res), "R*", "reset without an area -> R*, not legacy RES")
+    res2 = IoRow(sheet="s", row=4, addr="I3.2", desc_l1="EMERGENCY RESET", desc_l1b="AREA 2")
+    eq(st.suggested_type(res2), "R2", "reset with an area -> R<area>")
 
 
 def test_strike_handling():
@@ -206,6 +217,20 @@ def test_idempotent_rerun():
     _run(check)
 
 
+def test_fills_source_in_place_and_backs_up():
+    def check(params, out, d):
+        io = params["io_list"]["path"]
+        baks = lambda: [f for f in os.listdir(d) if ".bak_" in f]
+        r1 = pop.populate(params, out_dir=out, emit=lambda *_: None)
+        eq(r1.output_path, io, "the SOURCE is filled in place (it becomes the populated doc)")
+        ok(r1.backup and os.path.exists(r1.backup), "a changing fill keeps a timestamped backup")
+        eq(len(baks()), 1, "exactly one backup after the changing run")
+        r2 = pop.populate(params, out_dir=out, emit=lambda *_: None)
+        eq(r2.backup, "", "a no-op re-fill removes its own backup")
+        eq(len(baks()), 1, "the no-op run leaves no new backup")
+    _run(check)
+
+
 if __name__ == "__main__":
     raise SystemExit(run("iolist_diag", [
         ("populates_and_skips_nodemeta", test_populates_and_skips_nodemeta),
@@ -213,7 +238,9 @@ if __name__ == "__main__":
         ("diag_allocation", test_diag_allocation),
         ("writes_columns_and_diagblocks", test_writes_columns_and_diagblocks),
         ("fire_alarm_rung", test_fire_alarm_rung),
+        ("ladder_yields_canonical_directly", test_ladder_yields_canonical_directly),
         ("strike_handling", test_strike_handling),
         ("multi_sheet_global_and_skip_log", test_multi_sheet_global_and_skip_log),
         ("idempotent_rerun", test_idempotent_rerun),
+        ("fills_source_in_place_and_backs_up", test_fills_source_in_place_and_backs_up),
     ]))

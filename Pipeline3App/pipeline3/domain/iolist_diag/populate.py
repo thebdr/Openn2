@@ -1,13 +1,14 @@
 """The phase-200 populator orchestrator.
 
-Copies the source I/O List into the PopulatedIoList output (only when missing or older than the
-source - so a re-fill picks up the user's manual edits in the SOURCE, while incremental column
-fills accumulate in the copy), reads rows (data_only, with fonts for strike), computes script_type
-(AB) + suggested (AC) + index (AD) + diag cabinet/bit (AE/AF), writes ONLY empty cells
-(non-destructive; pre-filled cells are preserved + audit-logged), (re)writes the DiagnosisBlocks +
-_UnresolvedIndex sheets, and reports unresolved entries (the caller halts the pipeline on those).
+Fills the SOURCE I/O List **in place** - after a fill the source workbook IS the populated document
+(so the next fill picks up any manual edits, and staging/validation read the filled source). Reads
+rows (data_only, with fonts for strike), computes script_type (AB) + suggested (AC) + index (AD) +
+diag cabinet/bit (AE/AF), writes ONLY empty cells (non-destructive; pre-filled cells are preserved +
+audit-logged), (re)writes the DiagnosisBlocks + _UnresolvedIndex sheets, and reports unresolved
+entries (the caller halts the pipeline on those). Idempotent: a re-run fills nothing new.
 """
 from __future__ import annotations
+import datetime
 import os
 import shutil
 from dataclasses import dataclass, field
@@ -52,6 +53,7 @@ class PopulateResult:
     audit: list = field(default_factory=list)
     skipped_sheets: list = field(default_factory=list)
     results: list = field(default_factory=list)
+    backup: str = ""             # timestamped backup kept (changed); "" when none/removed (no change)
 
     @property
     def halt(self) -> bool:
@@ -84,9 +86,7 @@ def _skip_reason(io: IoRow, type_def: dict | None, params: dict) -> str:
 
 def _classify(io: IoRow, types: dict, fams: list, params: dict) -> RowResult:
     r = RowResult(iorow=io)
-    suggested = st.suggested_type(io)
-    computed = st.to_canonical(suggested, io)
-    r.suggested_type = suggested
+    computed = st.suggested_type(io)      # the §6 ladder yields the canonical script_type directly
     r.computed_script_type = computed
 
     ex_ab = io.ex_script_type.strip()
@@ -114,9 +114,9 @@ def _write_row(ws, cr, r, write: set) -> None:
     if "script_type" in write:
         if _blank(io.ex_script_type) and r.script_type:
             cr.set(ws, io.row, "script_type", r.script_type)
-        # AC = the auto-inferred CANONICAL script type, kept for reference (== AB in Mode-1; in
-        # Mode-2 it shows what the tool would have suggested vs the hand-entered AB). It is a
-        # derived column, so it is refreshed (overwritten) each run to stay current.
+        # AC "Suggested Type" = exactly what the app would write in script_type (the computed
+        # canonical type): == AB in Mode-1; in Mode-2 it shows the app's suggestion beside the
+        # hand-entered AB. Derived column -> refreshed (overwritten) each run to stay current.
         if "suggested_type" in cr and r.computed_script_type:
             cr.set(ws, io.row, "suggested_type", r.computed_script_type)
     if "index" in write and _blank(io.ex_index) and r.index:
@@ -138,21 +138,50 @@ def _write_headers(ws, cr, header_row: int) -> None:
             cr.set(ws, header_row, canon, hdr)
 
 
-def _ensure_dest(src: str, dest_dir: str) -> str:
-    os.makedirs(dest_dir, exist_ok=True)
-    dest = os.path.join(dest_dir, os.path.basename(src))
-    if not os.path.exists(dest) or os.path.getmtime(src) > os.path.getmtime(dest):
-        shutil.copy2(src, dest)
-    return dest
+def _backup_path(src: str) -> str:
+    """A timestamped, collision-free backup path beside the source: <base>.bak_<YYYYMMDD_HHMMSS><ext>."""
+    base, ext = os.path.splitext(src)
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    cand = f"{base}.bak_{ts}{ext}"
+    i = 1
+    while os.path.exists(cand):
+        cand = f"{base}.bak_{ts}_{i}{ext}"
+        i += 1
+    return cand
+
+
+def _same_content(a: str, b: str) -> bool:
+    """True if two workbooks have identical sheet names + cell values (ignores file metadata - an
+    openpyxl re-save perturbs the bytes but not the values, so an idempotent re-fill compares equal)."""
+    wa, wbk = load_workbook(a), load_workbook(b)
+    try:
+        if wa.sheetnames != wbk.sheetnames:
+            return False
+        for nm in wa.sheetnames:
+            sa, sb = wa[nm], wbk[nm]
+            if sa.max_row != sb.max_row or sa.max_column != sb.max_column:
+                return False
+            for row in sa.iter_rows():
+                for cell in row:
+                    if cell.value != sb[cell.coordinate].value:
+                        return False
+        return True
+    finally:
+        wa.close()
+        wbk.close()
 
 
 def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -> PopulateResult:
+    # out_dir is retained for call-site compatibility but no longer used: the populator now fills
+    # the SOURCE I/O List in place (it becomes the populated document) instead of a copy.
     write = set(write) if write is not None else set(ALL_COLS)
     src = params.get("io_list", {}).get("path")
     if not src or not os.path.exists(src):
         raise ValueError(f"I/O List not found: {src}")
-    out_root = out_dir or config.output_root(params)
-    dest = _ensure_dest(src, config.out_path(out_root, "populated_iolist"))
+    dest = src
+    # Snapshot the source BEFORE editing; kept only if the fill actually changes the file (below).
+    backup = _backup_path(src)
+    shutil.copy2(src, backup)
 
     cr = ColumnResolver("IoList")
     wb_vals = load_workbook(dest, data_only=True)
@@ -180,8 +209,13 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
     reported = report.write_unresolved_sheet(wb, results, cr)
     wb.save(dest)
 
+    # Keep the backup only if the fill changed the file; otherwise delete it (no-op re-fill).
+    if _same_content(backup, dest):
+        os.remove(backup)
+        backup = ""
+
     res = PopulateResult(
-        output_path=dest, sheets=sheets, results=results,
+        output_path=dest, sheets=sheets, results=results, backup=backup,
         processed=len(results),
         indexed=sum(1 for r in results if r.index and r.index != INPUT_REQUIRED),
         diagnosed=sum(1 for r in results if r.diag_cabinet),
@@ -195,4 +229,5 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
     )
     emit(report.summary(res.counts))
     emit(f"populated I/O List -> {dest}")
+    emit(f"backup -> {os.path.basename(backup)}" if backup else "no changes - backup removed")
     return res

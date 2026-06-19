@@ -1,14 +1,16 @@
-"""The §6 suggested-type regex ladder + to_canonical (clean-room port of Pipeline2).
+"""The §6 script-type regex ladder (clean-room port of Pipeline2).
 
-Phase 210 computes the suggested type (legacy names, written to AC) and the canonical script_type
-(written to AB) IN CODE - replacing the legacy Excel array formula (so there is no spill/array-lock
-hazard). The ladder classifies a row as In/Out/Node by its address (col G) / id (col F), then matches
-the bilingual description against an ordered set of patterns.
+Phase 210 computes the canonical script_type IN CODE - replacing the legacy Excel array formula (so
+there is no spill/array-lock hazard). The ladder classifies a row as In/Out/Node by its address
+(col G) / id (col F), then matches the bilingual description against an ordered set of patterns and
+returns the catalogue type the app writes to AB. The legacy intermediate names (ENC/FA/RES) are
+gone - the ladder yields N / Z / R<area> directly, so the AC "Suggested Type" column simply mirrors
+what the app would write in script_type.
 """
 from __future__ import annotations
 import re
 
-from pipeline3.domain.iolist_diag.models import IoRow, INPUT_REQUIRED, SUGGEST_UNMATCHED
+from pipeline3.domain.iolist_diag.models import IoRow, INPUT_REQUIRED
 
 
 def _clean(s) -> str:
@@ -41,8 +43,10 @@ def in_out_node(row: IoRow) -> str:
     return ""
 
 
-def suggested_type(row: IoRow):
-    """The §6 ladder. Returns a legacy type string, '???', '' or False (the formula's dangling IF)."""
+def suggested_type(row: IoRow) -> str:
+    """The §6 ladder: classify the row and return the CANONICAL script_type the app writes to AB
+    (encoders -> N, emergency-area outputs -> Z, resets -> R<area>/R*; the legacy ENC/FA/RES
+    intermediates are gone). A described-but-unclassifiable row -> <input required>; otherwise ''."""
     d1 = _clean(row.desc_l1)
     d2 = _clean(row.desc_l1b)
     desc = f"{d1} {d2}".strip()
@@ -60,15 +64,16 @@ def suggested_type(row: IoRow):
                 return "DR"
             return "DD"
         if _test(desc, r"SAFETY ENCODER.*PHOTO"):
-            return "ENC" + _last(r"CELL.\d", d2) + "/2"
+            return "N" + _last(r"CELL.\d", d2) + "/2"
         if _test(desc, r"SWITCH DISCONNECTOR.*OPEN"):
             return "B" + _last(r"CH.", d2) + "/2"
         if _test(desc, r"FIRE ALARM"):
             return "F" + _last(r"CH.", d2) + "/2"
         if _test(desc, r"EMERG.*RESET"):
-            return "RES"
+            area = _last(r"AREA .", d2)
+            return f"R{area}" if area.isdigit() else "R*"
         if len(desc) > 3:
-            return row.type_hw if row.type_hw.strip() else SUGGEST_UNMATCHED
+            return row.type_hw if row.type_hw.strip() else INPUT_REQUIRED
         return ""
 
     if ion == "Out":
@@ -81,31 +86,12 @@ def suggested_type(row: IoRow):
         if _test(desc, r"DOOR.*LAMP"):
             return "DL"
         if _test(d2, r"EMERGENCY AREA \d"):
-            return "FA" + _last(r"AREA .", d2)
+            return "Z" + _last(r"AREA .", d2)
         if len(desc) > 3:
-            return SUGGEST_UNMATCHED
+            return INPUT_REQUIRED
         return ""
 
     if ion == "Node":
         return row.type_hw           # the type_hw column (col R) as-is
 
-    return False                     # neither I/O nor Node
-
-
-def to_canonical(suggested, row: IoRow) -> str:
-    """Map a legacy suggested type to the catalogue: ENC->N, FA->Z, RES->R<area>/R*; '???' surfaces
-    as <input required>; everything else passes through."""
-    if suggested is False or suggested == "":
-        return ""
-    s = str(suggested)
-    if s == SUGGEST_UNMATCHED:
-        return INPUT_REQUIRED
-    up = s.upper()
-    if up.startswith("ENC"):
-        return "N" + s[3:]
-    if up.startswith("FA"):
-        return "Z" + s[2:]
-    if up == "RES":
-        area = _last(r"AREA .", _clean(row.desc_l1b))
-        return f"R{area}" if area.isdigit() else "R*"
-    return s
+    return ""                        # neither I/O nor Node

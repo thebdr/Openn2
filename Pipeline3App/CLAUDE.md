@@ -46,7 +46,7 @@ Every ordered enumeration uses gapped numbers so steps insert without renumberin
 
 | # | Phase | Buttons (number — label) | Status |
 |---|---|---|---|
-| 100 | Documents Validation | 110 Validate I/O List · 120 Validate C&E Matrix · 130 Cross-Check CEM→IOL · 140 Cross-Check IOL→CEM · 150 Validate Diagnosis Assignments | TODO (M6) |
+| 100 | Documents Validation | 110 Validate I/O List · 120 Validate C&E Matrix · 130 Cross-Check CEM→IOL · 140 Cross-Check IOL→CEM · 150 Validate Diagnosis Assignments | **DONE** |
 | 200 | Documents Fill Out | 210 Fill Script Type · 220 Fill Index · 230 Fill Diag Cabinet · 240 Fill Diag Bit | **DONE** |
 | 300 | Documents Staging | 310 Stage I/O List · 320 Generate IO Database | **DONE** |
 | 400 | Interfaces Generation | 410 Generate Interfaces · 430 Generate Custom Interface… | TODO (M7) |
@@ -68,7 +68,7 @@ pipeline3/
   phase.py          # Phase / SubPhase / PhaseResult / Button dataclasses
   registry.py       # PhaseRegistry: register / presentation_order / topo_order / profiles
   context.py        # PipelineContext (state threaded through phases)
-  core/             # config.py, numbering.py, i18n.py, model.py  (errors.py TODO M6)
+  core/             # config.py, numbering.py, i18n.py, model.py  (errors.py TODO M6b)
   io/               # workbook.py (THE shared reader), csv_tables.py, render.py
   phases/           # p200_fillout.py (+ p100…p900 as built)
   domain/iolist_diag/   # the populator internals (DONE)
@@ -85,9 +85,13 @@ config_project/  user_input/  assets/  tests/{unit,golden}/
   this — no other module opens a sheet for reading.
 - **One log structure** — `core/model.py::LogEntry`. Fixed left/middle, variable right `detail`:
   `[LEVEL] <id>  <location>  | bit | FLD | desc_l1 | desc_l1b | drawing | type-index :: <detail>`.
-  `id` = `<phase>-<NNN>` (per-phase incremental). `uid` = a stable hash of the *finding*
-  (phase+type+location+normalized detail) — excludes the volatile level/seq, so a cross-run
-  treatment keeps matching. `io/render.py::render_lines(log, errors_only)` renders both the
+  TWO index concepts: **`id` = `<phase>-<type>`** — a code-traceable **log-type index**; the `type`
+  slug is the i18n key suffix (`v_<type>`) AND the grep anchor that leads to the exact builder (NOT a
+  per-run ordinal). **`uid`** = a stable per-FAIL hash of the *finding* (phase+type+location+detail)
+  — excludes the level/seq AND the workbook identity, so a treatment survives a doc revision. The
+  **`location` is `Sheet!Cell` only — never the workbook name**; the workbook rides on
+  `LogEntry.doc`/`doc2` (for the GUI link) and is not rendered; a cross-check's matched 2nd-workbook
+  cell renders as ` -> <Sheet!Cell>`. `io/render.py::render_lines(log, errors_only)` renders both the
   complete report and the error-only view (PHASE+INFO+WARN+FAIL, dropping PASS/SKIP).
 - **No hardcoded input columns** — all IoList/CE/AREA access resolves through `column_map.csv`
   (`config.load_column_map` / `iolist_diag.columns.ColumnResolver`). The only fixed integer columns
@@ -112,15 +116,20 @@ escape and fails to parse.
 
 ## Phase 200 — Documents Fill Out (the populator) — DONE
 
-`domain/iolist_diag/` + `phases/p200_fillout.py`. Turns a fresh Emergency I/O List into the
-populated workbook staging consumes. Idempotent + non-destructive (writes only blank cells; the
-`<input required>` sentinel counts as blank and is recomputed; a genuine human entry is preserved
-and audit-logged as Mode-2). Output: `populated_iolist`
-(`…/PopulatedIoList/<name>.xlsx`). **Halts** the pipeline if any entry is unresolved.
+`domain/iolist_diag/` + `phases/p200_fillout.py`. Fills the **SOURCE** I/O List **in place** — after
+a fill the source workbook IS the populated document (staging/validation read it directly).
+Idempotent + non-destructive (writes only blank cells; the `<input required>` sentinel counts as
+blank and is recomputed; a genuine human entry is preserved and audit-logged as Mode-2). A
+**timestamped backup** (`<name>.bak_<YYYYMMDD_HHMMSS>.xlsx`, gitignored) is taken beside the source
+*before* editing and **deleted if the fill changed nothing** (content compared cell-by-cell). The
+`populated_iolist` artifact now points at the source itself. **Halts** the pipeline if any entry is
+unresolved (the `_UnresolvedIndex` sheet lists them).
 
-- `script_type.py` — the §6 suggested-type ladder (In/Out/Node classification → legacy type) +
-  `to_canonical` (ENC→N, FA→Z, RES→R*/R<area>; `???`→`<input required>`). Fire-alarm rows →
-  `F1/2`/`F2/2` (mirrors the E1/2 channel logic).
+- `script_type.py` — the §6 type ladder (In/Out/Node classification → the catalogue type, computed
+  **in code**, replacing the legacy Excel array formula). It yields the **canonical** type directly
+  (encoder→N, emergency-area output→Z, reset→R<area>/R*; unmatched-but-described→`<input required>`);
+  the legacy ENC/FA/RES intermediates + `to_canonical` are **gone**. Fire-alarm rows → `F1/2`/`F2/2`
+  (mirrors the E1/2 channel logic). The AC "Suggested Type" column mirrors what the app writes to AB.
 - `index_assign.py` — §7 per-family contiguous index with object grouping (channel pairs by FLD,
   KQ↔KI series, door FLD, Z pattern, standalone); unresolvable members → `<input required>`.
 - `diag_alloc.py` — §8 cabinet/bit allocation: node cabinets (non-P bits up from `diag_bit_min`,
@@ -163,24 +172,54 @@ numbering/enrichment is GLOBAL across matched sheets; non-matching sheets logged
 - `IODatabase.csv` = the IoList canonical columns + the enrichment/identity columns above
   (`staging._EXTRA`). The single database in CSV form; `ctx.rows` is just it loaded.
 
+## Phase 100 — Documents Validation — DONE
+
+`domain/validation/` + `phases/p100_validation.py`. Five sub-phases validate the hand-authored docs
+and write two reports (complete `documents_validation_report.txt` + error-only
+`documents_validation_errors.txt`; `.html` deferred to the GUI). `requires=(300,)`; the **designer**
+profile is `(300, 100)` and **disables 150** (its inputs come from Fill, which the designer skips).
+110/120 read workbooks through the ONE reader; 130/140/150 read `ctx.rows` (130/140 also read the C&E).
+Every builder returns `list[LogEntry]`; each emit site declares a `type` slug (the log-type index).
+
+- **110 `iolist.py`** — standalone I/O List: header glossary from `column_map("IoList")` (only columns
+  **not** `preliminary_check_exclude`, i.e. the customer A–Z; AA–AG are pipeline-written and skipped);
+  per-row IP-error/dup-IP/dup-FLD (node rows require an FU), G⊕F exclusion, address format (`address.py`),
+  permanent-part + TS-ref for A/W(/PA/PW), Profinet identity for PA/PW, node-count thresholds. A clean
+  row emits a `row_ok` **PASS** "all checks passed" (full report only). `strike_handling=="error"`⇒struck FAIL.
+- **120 `matrix.py`** — C&E standalone (new design): no Q/O on the matrix, no I on AREA sheets, no dup
+  address per sheet. C&E absent ⇒ one `ce_absent` **SKIP**.
+- **130 `crosscheck.py`** — CEM→IOL: each C&E ref present+consistent in the IOL (io-index by FLD);
+  partials link the matched IOL cell via `location2`/`doc2`.
+- **140 `crosscheck.py`** — IOL→CEM decision tree: **typed & `ce_mandatory` yes/warn → CHECK** (yes→FAIL,
+  warn→WARN); **typed `no`/unset → NO_CHECK** (skip); **untyped**: always-excluded→skip; `ce_full_check`
+  OR a `ce_mandatory_words` safety match → CHECK; otherwise (excluded word / plain) → NO_CHECK (skip).
+  `NO_CHECK` rows emit a SKIP that documents why; partials link the C&E cell.
+- **150 `diagnosis.py`** — (cabinet,bit) numeric + unique per ALARM/WARNING family (family = WARNING
+  when the type ends `W`, so an alarm+warning on one slot is not a collision).
+- **Deferred (M6b):** `core/errors.py` + `user_input/error_management.csv` warn/skip/accept treatments
+  (keyed by the per-FAIL `uid`) + the mark-stale policy. Every FAIL already carries a stable `uid`.
+
 ## Testing
 
 Plain-`python` tests (no pytest) under `tests/unit/`, via `tests/unit/_harness.py` (PASS/FAIL,
 non-zero exit on failure). Run one: `python tests/unit/test_iolist_diag.py`. The **data-independent
 suite is the green gate** — it passes with no real documents present. Data-dependent outputs follow
 **review-then-freeze**: the user reviews a phase's real-document artifact, and once blessed it is
-frozen as a Pipeline3 golden under `tests/golden/` (Pipeline2 is NOT a golden source). Current:
-**62 unit tests green** (numbering, model, config, i18n, registry, workbook, render, iolist_diag,
-staging).
+frozen as a Pipeline3 golden under `tests/golden/` (Pipeline2 is NOT a golden source). The phase-100
+reports are the first blessed golden; `tests/unit/test_golden_validation.py` regenerates + compares
+them (data-dependent, skips when the real docs are absent; re-freeze with `--freeze`). Current:
+**88 unit tests green** (numbering, model, config, i18n, registry, workbook, render, iolist_diag,
+staging, the five validation suites + the phase-100 phase test + golden parity).
 
 ## Status & still to build
 
 - **DONE**: M1 foundation (config/numbering/model/i18n), M2 phase abstraction + registry + context
-  + profiles, M3 the shared reader + log renderer, M4 Phase 200 Fill, M5 Phase 300 Staging (single
-  `IODatabase.csv` + C&E enrichment incl. `areas_description`).
-- **NEXT**: M6 Phase 100 Validation — sub-phases 110–150 + `core/errors.py` (the warn/skip/accept
-  treatment registry keyed by uid) + the two reports (complete + error-only).
-- **THEN**: M7 generators (interfaces/signals/hardware/coverage), M8 diagnosis, M9 software, M10 CLI
+  + profiles, M3 the shared reader + log renderer, M4 Phase 200 Fill (writes the source in place +
+  dated backup), M5 Phase 300 Staging (single `IODatabase.csv` + C&E enrichment incl.
+  `areas_description`), **M6 Phase 100 Validation** (sub-phases 110–150 + the two reports + golden).
+- **NEXT**: M6b — `core/errors.py` (the warn/skip/accept treatment registry keyed by the per-FAIL
+  `uid`) + `user_input/error_management.csv` + the mark-stale policy + the designer suppression list;
+  then M7 generators (interfaces/signals/hardware/coverage), M8 diagnosis, M9 software, M10 CLI
   + Open2App-path contract test, M11–13 GUIs (dark-by-default, registry-driven phase bar,
   YAML-explorer config, selectable projects root) + designer + Project Manager, M14 packaging
   (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.

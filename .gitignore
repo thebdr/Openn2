@@ -16,6 +16,10 @@ __pycache__/
 Pipeline2App/Output/
 Shared/OutputTree/
 
+# Phase-200 fill backups (timestamped copies made beside the source I/O List)
+*.bak_*.xlsx
+*.precleared_*.xlsx
+
 # NuGet restore output
 Open2App/packages/
 

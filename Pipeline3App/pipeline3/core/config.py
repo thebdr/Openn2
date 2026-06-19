@@ -259,7 +259,10 @@ def load_permanent_parts() -> list:
 
 
 def load_column_map(document: str) -> list:
-    """Column map rows for one document: {column, canonical, expected_header, required(bool)}."""
+    """Column map rows for one document:
+    {column, canonical, expected_header, required(bool), preliminary_check_exclude(bool)}.
+    `preliminary_check_exclude` marks pipeline-generated columns (AA-AG) that the phase-100
+    standalone I/O List validation must ignore (they aren't part of the customer-authored doc)."""
     rows = []
     for r in _read_csv("column_map.csv"):
         if r["document"] != document:
@@ -269,6 +272,7 @@ def load_column_map(document: str) -> list:
             "canonical": r["canonical"].strip(),
             "expected_header": r["expected_header"].strip(),
             "required": as_bool(r["required"]),
+            "preliminary_check_exclude": as_bool(r.get("preliminary_check_exclude")),
         })
     return rows
 

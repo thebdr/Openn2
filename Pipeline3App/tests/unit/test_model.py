@@ -3,16 +3,25 @@ from _harness import run, eq, ok
 from pipeline3.core.model import LogEntry, InfoBlock, number_entries, banner, ERROR_REPORT_LEVELS
 
 
-def test_id_format():
-    e = LogEntry(level="FAIL", phase=130, seq=7)
-    eq(e.id, "130-007")
-    eq(LogEntry(level="WARN", phase=110, seq=123).id, "110-123")
+def test_id_is_phase_and_type():
+    e = LogEntry(level="FAIL", phase=130, type="cem_match")
+    eq(e.id, "130-cem_match", "id is the code-traceable log-type index <phase>-<type>")
+    eq(LogEntry(level="WARN", phase=110, type="addr_format").id, "110-addr_format")
+    eq(LogEntry(level="INFO", phase=110).id, "110", "no type -> just the phase")
 
 
 def test_uid_stable_across_level_and_seq():
     a = LogEntry(level="FAIL", phase=130, type="t", location="IOList!A1", detail="x vs y", seq=1)
     b = LogEntry(level="WARN", phase=130, type="t", location="IOList!A1", detail="x vs y", seq=99)
     eq(a.uid, b.uid, "uid must ignore level + seq")
+
+
+def test_uid_unchanged_when_doc_changes():
+    # revision-stability: the workbook identity (doc) is NOT part of the uid, so a finding keeps the
+    # same uid across a document revision (renamed/updated input file).
+    a = LogEntry(level="FAIL", phase=130, type="t", location="NET!A1", detail="x", doc="IOList_v1.xlsx")
+    b = LogEntry(level="FAIL", phase=130, type="t", location="NET!A1", detail="x", doc="IOList_v2.xlsx")
+    eq(a.uid, b.uid, "uid must ignore the workbook identity")
 
 
 def test_uid_varies_with_finding():
@@ -31,16 +40,16 @@ def test_uid_normalizes_whitespace():
 def test_number_entries_per_phase():
     entries = [
         banner(100, "PHASE 100"),
-        LogEntry(level="FAIL", phase=110),
-        LogEntry(level="PASS", phase=110),
-        LogEntry(level="FAIL", phase=130),
-        LogEntry(level="WARN", phase=110),
+        LogEntry(level="FAIL", phase=110, type="a"),
+        LogEntry(level="PASS", phase=110, type="b"),
+        LogEntry(level="FAIL", phase=130, type="c"),
+        LogEntry(level="WARN", phase=110, type="d"),
     ]
     number_entries(entries)
     eq([e.seq for e in entries], [0, 1, 2, 1, 3], "seq increments per phase, banners skipped")
-    eq(entries[1].id, "110-001")
-    eq(entries[4].id, "110-003")
-    eq(entries[3].id, "130-001")
+    eq(entries[1].id, "110-a")
+    eq(entries[4].id, "110-d")
+    eq(entries[3].id, "130-c")
 
 
 def test_error_report_levels():
@@ -56,8 +65,9 @@ def test_infoblock_cells():
 
 if __name__ == "__main__":
     raise SystemExit(run("model", [
-        ("id_format", test_id_format),
+        ("id_is_phase_and_type", test_id_is_phase_and_type),
         ("uid_stable_across_level_and_seq", test_uid_stable_across_level_and_seq),
+        ("uid_unchanged_when_doc_changes", test_uid_unchanged_when_doc_changes),
         ("uid_varies_with_finding", test_uid_varies_with_finding),
         ("uid_normalizes_whitespace", test_uid_normalizes_whitespace),
         ("number_entries_per_phase", test_number_entries_per_phase),

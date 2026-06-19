@@ -19,6 +19,22 @@ from openpyxl.utils import get_column_letter, column_index_from_string
 from pipeline3.core import config
 
 
+class FileLockedError(Exception):
+    """A workbook could not be opened because it is locked (open in Excel). The GUI turns this into
+    a retry / abort msgbox; the engine/CLI emits a clear FAIL. Carries the offending path."""
+    def __init__(self, path: str):
+        self.path = path
+        super().__init__(f"{os.path.basename(path)} may already be in use (open in Excel?)")
+
+
+def _load(path: str, **kw):
+    """load_workbook, but a PermissionError (file locked / open in Excel) becomes FileLockedError."""
+    try:
+        return load_workbook(path, **kw)
+    except PermissionError as e:
+        raise FileLockedError(path) from e
+
+
 def _norm_header(s) -> str:
     """Newline -> space, then whitespace-collapse + strip. The canonical header form for matching."""
     text = str(s if s is not None else "").replace("\r", " ").replace("\n", " ")
@@ -33,16 +49,16 @@ def _colidx(col) -> int:
 
 
 def open_workbook(path: str, *, data_only: bool = True, read_only: bool = False):
-    return load_workbook(path, data_only=data_only, read_only=read_only)
+    return _load(path, data_only=data_only, read_only=read_only)
 
 
 def load_for_write(path: str):
     """Formula-preserving load for editing + saving (the populator). Not data_only, not read_only."""
-    return load_workbook(path, data_only=False, read_only=False)
+    return _load(path, data_only=False, read_only=False)
 
 
 def available_sheets(path: str) -> list:
-    wb = load_workbook(path, read_only=True)
+    wb = _load(path, read_only=True)
     try:
         return list(wb.sheetnames)
     finally:
@@ -104,8 +120,9 @@ class SheetView:
         return range(self.first_data_row, self.max_row + 1)
 
     def location(self, row: int, col) -> str:
-        """A clickable 'doc!sheet!cell' link string, e.g. 'IOList.xlsx!NET SAFETY 50!G7'."""
-        return f"{self.doc}!{self.name}!{get_column_letter(_colidx(col))}{row}"
+        """A clickable 'sheet!cell' link string, e.g. 'NET SAFETY 50!G7'. The workbook name is NOT
+        included (carried separately as `self.doc` -> LogEntry.doc for the GUI)."""
+        return f"{self.name}!{get_column_letter(_colidx(col))}{row}"
 
     def close(self):
         try:

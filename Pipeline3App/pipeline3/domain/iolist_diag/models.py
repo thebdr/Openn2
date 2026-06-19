@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 
 # --- sentinels + sheet names (the exact strings staging/validation also recognize) --- #
 INPUT_REQUIRED = "<input required>"     # written into a cell that can't be auto-resolved (halts)
-SUGGEST_UNMATCHED = "???"               # the ladder's unclassified marker
 DASH = "-"                              # mnemonic value marking a deleted/spare row
 DIAGBLOCKS_SHEET = "DiagnosisBlocks"    # generated sheet (also accept legacy "DiagnosticBlocks")
 DIAGBLOCKS_LEGACY = "DiagnosticBlocks"
@@ -82,7 +81,6 @@ class RowResult:
     type_def: dict | None = None        # signal_types record (config.load_signal_types) or None
     family: ObjectFamily | None = None
     script_type: str = ""               # AB (computed Mode-1 or preserved Mode-2)
-    suggested_type: object = ""          # AC (str / False)
     index: str = ""                      # AD
     diag_cabinet: str = ""               # AE
     diag_bit: str = ""                   # AF

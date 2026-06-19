@@ -32,6 +32,24 @@ def test_renamed_diag_swblocks():
     eq(i18n.tr("pb_gen_diag_swblocks", "en"), "Generate Diag Software Blocks")
 
 
+def test_validation_keys_have_both_langs():
+    vkeys = [k for k in i18n.STRINGS if k.startswith("v_")]
+    ok(len(vkeys) >= 40, f"expected the full v_* validation set, found {len(vkeys)}")
+    for k in vkeys:
+        for lang in ("en", "it"):
+            ok(i18n.STRINGS[k].get(lang), f"{k}/{lang} missing")
+
+
+def test_validation_it_differs_from_en():
+    eq(i18n.tr("v_addr_format", "en"), "Invalid address format")
+    ok(i18n.tr("v_addr_format", "it") != i18n.tr("v_addr_format", "en"), "IT must differ from EN")
+
+
+def test_validation_format_placeholders():
+    eq(i18n.tr("v_too_many_nodes", "en", n=200), "Too many nodes: 200 (max 126)")
+    ok("{addr}" not in i18n.tr("v_matrix_addr_kind", "en", addr="Q0.0"))
+
+
 if __name__ == "__main__":
     raise SystemExit(run("i18n", [
         ("known_key", test_known_key),
@@ -40,4 +58,7 @@ if __name__ == "__main__":
         ("format", test_format),
         ("all_phase_headers_present", test_all_phase_headers_present),
         ("renamed_diag_swblocks", test_renamed_diag_swblocks),
+        ("validation_keys_have_both_langs", test_validation_keys_have_both_langs),
+        ("validation_it_differs_from_en", test_validation_it_differs_from_en),
+        ("validation_format_placeholders", test_validation_format_placeholders),
     ]))

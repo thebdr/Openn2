@@ -84,6 +84,8 @@ def test_data_rows_and_location():
             loc = v.location(2, "G")
             ok(loc.endswith("G2"), loc)
             ok("NET SAFETY 50" in loc, loc)
+            ok(".xlsx" not in loc, "the workbook name is NOT in the link")
+            eq(loc.count("!"), 1, "link is sheet!cell, not doc!sheet!cell")
         finally:
             v.close()
     _with_wb(check)

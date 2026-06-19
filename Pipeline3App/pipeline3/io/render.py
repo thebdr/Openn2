@@ -2,7 +2,9 @@
 differs - the complete log, and the error-only view (PHASE headers + INFO + WARN + FAIL, dropping
 PASS/SKIP). Columns auto-fit per phase.
 
-Rendered finding line:
+Rendered finding line (`<id>` is the log-type index `<phase>-<type>`; `<location>` is `sheet!cell`,
+never the workbook name - the `doc`/`doc2` workbook identity rides on the LogEntry for the GUI and
+is not rendered):
     [LEVEL] <id>  <location>  |  bit | FLD | desc_l1 | desc_l1b | drawing | type-index  ::  <detail>
 A PHASE entry renders as a banner.
 """
@@ -43,6 +45,8 @@ def render_lines(log, errors_only: bool = False) -> list:
         info = " | ".join(str(c).ljust(w["info"][i]) for i, c in enumerate(e.info.cells()))
         loc = e.location.ljust(w["loc"])
         line = f"[{e.level:<4}] {e.id:<{max(1, w['id'])}}  {loc}  | {info}  :: {e.detail}"
+        if e.location2:                       # cross-check: the matched cell in the OTHER workbook
+            line += f"  ->  {e.location2}"     # sheet!cell only; the workbook (doc2) is not rendered
         lines.append(line.rstrip())
     return lines
 
