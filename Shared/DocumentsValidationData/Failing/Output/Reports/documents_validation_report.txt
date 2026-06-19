@@ -1,0 +1,199 @@
+[INFO] params.yaml {
+  "io_list": {
+    "path": "C:\\Source\\Repos\\_Openn2\\Shared\\DocumentsValidationData\\Failing\\8XXX_IOyyyy_R0.0_EmergencyIoListValidationTemplate_DEMO.xlsx",
+    "sheet": [
+      "NET SAFETY 50"
+    ],
+    "header_row": 1
+  },
+  "ce": {
+    "path": "C:\\Source\\Repos\\_Openn2\\Shared\\DocumentsValidationData\\Failing\\8XXX_Cause and Effect Matrix_R0.0_ValidationTemplate_DEMO.xlsx",
+    "matrix_sheet": "CAUSE&EFFECT MATRIX",
+    "matrix_header_row": 2,
+    "matrix_data_row": 5,
+    "area_header_row": 3,
+    "area_data_row": 4
+  },
+  "output_dir": "C:\\Source\\Repos\\_Openn2\\Shared\\DocumentsValidationData\\Failing\\Output",
+  "strike_handling": "exclude",
+  "ce_fuzzy_chars": 2,
+  "ce_mandatory_words": [
+    "emergency",
+    "safety",
+    "relay",
+    "contactor",
+    "enable"
+  ],
+  "ce_excluded_words": [
+    "circuit breaker",
+    "power supply",
+    "profinet switch",
+    "coupler",
+    "door"
+  ],
+  "ce_always_excluded_words": [
+    "ch2"
+  ],
+  "ce_full_check": false,
+  "ce_full_print": true,
+  "diag_bit_min": 0,
+  "diag_bit_max": 62,
+  "language": "en"
+}
+
+==============================================================================
+PHASE 0A - I/O List standalone validation
+==============================================================================
+[INFO] COVER Skipped sheet 'COVER'
+[INFO] NET SAFETY 50 Processing sheet 'NET SAFETY 50'
+[FAIL] NET SAFETY 50!D1 Wrong column name 'Cod.'. Correct name for column 4 is 'Cod. Fives'
+[FAIL] NET SAFETY 50!V5   |         | =S1+MC1.CC1-K66001 | PROFINET SWITCH                           |  | 8FVX_Q0002    | PW-0001    : IP address is missing
+[FAIL] NET SAFETY 50!W5   |         | =S1+MC1.CC1-K66001 | PROFINET SWITCH                           |  | 8FVX_Q0002    | PW-0001    : Invalid Profinet name (must start with 'n' and contain none of _ . / = *)
+[FAIL] NET SAFETY 50!V6   |         | =S1+MC1.CC1-K66201 | FIELD BUS FAILURE - COUPLER               |  | 8FVX_Q0002    | PA-0001    : IP address is missing
+[FAIL] NET SAFETY 50!W6   |         | =S1+MC1.CC1-K66201 | FIELD BUS FAILURE - COUPLER               |  | 8FVX_Q0002    | PA-0001    : Invalid Profinet name (must start with 'n' and contain none of _ . / = *)
+[FAIL] NET SAFETY 50!V8   |         | =S1+MS1.CC1-K65001 | FIELD BUS FAILURE - INPUT / OUTPUT MODULE |  | 8FVX_Q0001    | PA-0003    : IP address is missing
+[FAIL] NET SAFETY 50!W8   |         | =S1+MS1.CC1-K65001 | FIELD BUS FAILURE - INPUT / OUTPUT MODULE |  | 8FVX_Q0001    | PA-0003    : Invalid Profinet name (must start with 'n' and contain none of _ . / = *)
+[FAIL] NET SAFETY 50!K24  | I1.7    | =S1+MS1.CC1        |                                           |  | 8FVX_Q0001    |            : Empty permanent part
+[FAIL] NET SAFETY 50!U24  | I1.7    | =S1+MS1.CC1        |                                           |  | 8FVX_Q0001    |            : T.S. ref is missing
+[FAIL] NET SAFETY 50!U29  | I4.4    | =S1+IN1.CC1-K60001 | PROFINET SWITCH FAULT                     |  | 8EED_S2001_06 | W-0017     : T.S. ref is missing
+[FAIL] NET SAFETY 50!U37  | I5.4    | =S1+IN2.CC1-K60001 | PROFINET SWITCH FAULT                     |  | 8EED_S2001_06 | A-0022     : T.S. ref is missing
+[FAIL] NET SAFETY 50!V65  |         | =S1+PC1.CC1-K65001 | FIELD BUS FAILURE - INPUT / OUTPUT MODULE |  | 8FVX_P1003    | PA-0005    : IP address is missing
+[FAIL] NET SAFETY 50!W65  |         | =S1+PC1.CC1-K65001 | FIELD BUS FAILURE - INPUT / OUTPUT MODULE |  | 8FVX_P1003    | PA-0005    : Invalid Profinet name (must start with 'n' and contain none of _ . / = *)
+[FAIL] NET SAFETY 50!U66  | I100.0  | =S1+PC1.CC1-Q80001 | FEEDBACK OF SAFETY RELAY FAULT            |  | 8FVX_P1003    | KI1/4-0040 : T.S. ref is missing
+[FAIL] NET SAFETY 50!U67  | I100.1  | =S1+PC1.CC1-Q80002 | FEEDBACK OF SAFETY RELAY FAULT            |  | 8FVX_P1003    | KI2/4-0040 : T.S. ref is missing
+[FAIL] NET SAFETY 50!U68  | I100.2  | =S1+PC1.CC1-Q80003 | FEEDBACK OF SAFETY RELAY FAULT            |  | 8FVX_P1003    | KI3/4-0040 : T.S. ref is missing
+[FAIL] NET SAFETY 50!U69  | I100.3  | =S1+PC1.CC1-Q80004 | FEEDBACK OF SAFETY RELAY FAULT            |  | 8FVX_P1003    | KI4/4-0040 : T.S. ref is missing
+[FAIL] NET SAFETY 50!V122 |         | =S1+SM72-XNS1      | FIELD BUS FAILURE - INPUT / OUTPUT MODULE |  | 8FVX_W0001    | PA-0018    : IP address is missing
+[FAIL] NET SAFETY 50!W122 |         | =S1+SM72-XNS1      | FIELD BUS FAILURE - INPUT / OUTPUT MODULE |  | 8FVX_W0001    | PA-0018    : Invalid Profinet name (must start with 'n' and contain none of _ . / = *)
+[INFO] DiagnosisBlocks Skipped sheet 'DiagnosisBlocks'
+[INFO] NET SAFETY 0A Processing sheet 'NET SAFETY 0A'
+[FAIL] NET SAFETY 0A!A1 Wrong column name 'WRONG COLUMN NAME'. Correct name for column 1 is 'Description Module'
+[WARN] NET SAFETY 0A!AH1 Unexpected column name in column 34: 'EXTRA HELPER COLUMN'
+[WARN] NET SAFETY 0A!AI1 Unexpected column name in column 35: 'Functional unit'
+[FAIL] NET SAFETY 0A!AI1 Duplicated column name in column 35: 'Functional unit'
+[FAIL] NET SAFETY 0A!V2   |         | =S9+0A.C1-E0001    |                                           |  |               |            : Error in the Profinet IP cell
+[FAIL] NET SAFETY 0A!V4   |         | =S9+0A.C1-E0003    |                                           |  |               |            : Duplicated IP 192.168.99.20 (first seen at NET SAFETY 0A!G3)
+[FAIL] NET SAFETY 0A!W6   |         | =S9+0A.C2-E0004    |                                           |  |               |            : Duplicated Functional Unit + Location - Device (first seen at NET SAFETY 0A!G5)
+[FAIL] NET SAFETY 0A!V7   | 1       | =S9+0A.C3-E0005    |                                           |  |               |            : Column G has a value, so column F must be empty
+[FAIL] NET SAFETY 0A!G8   | Z.1.2.3 | =S9+0A.C3-E0006    |                                           |  |               |            : Invalid address format
+[FAIL] NET SAFETY 0A!K9   |         | =S9+0A.C4-E0007    |                                           |  |               |            : Empty permanent part
+[FAIL] NET SAFETY 0A!K10  |         | =S9+0A.C4-E0008    | BOGUS PERMANENT PART                      |  |               |            : Unknown permanent part 'BOGUS PERMANENT PART'
+[FAIL] NET SAFETY 0A!U11  |         | =S9+0A.C4-E0009    | OVERTEMPERATURE ALARM                     |  |               |            : T.S. ref is missing
+[FAIL] NET SAFETY 0A!V12  |         | =S9+0A.C5-E0010    |                                           |  |               |            : IP address is missing
+[FAIL] NET SAFETY 0A!W13  |         | =S9+0A.C5-E0011    |                                           |  |               |            : Invalid Profinet name (must start with 'n' and contain none of _ . / = *)
+[INFO] NET SAFETY NODES Processing sheet 'NET SAFETY NODES'
+[FAIL] NET SAFETY NODES Too many nodes: 127 (max 126)
+[WARN] NET SAFETY NODES More than 64 nodes (127): this card cannot be used for induction line PH SYNCH / PH FEEDBACK
+
+==============================================================================
+PHASE 0B - Cause&Effect Matrix standalone validation
+==============================================================================
+[INFO] C&E Matrix No checks implemented yet
+
+==============================================================================
+PHASE 1 - C&E in IOList  (every C&E / AREA reference exists in the I/O List)
+==============================================================================
+[INFO] I/O List 66 distinct device key(s) indexed
+[PASS] CAUSE&EFFECT MATRIX!F5  vs IOList |  I20.0 === I20.0  |    =S1+MS1.CC1-S67001 === =S1+MS1.CC1-S67001    | EMERGENCY PUSH BUTTON PRESSED CH1 + MS1  8FVX_Q0001  E1/2-0001                   : Reconciled against the I/O List.
+[PASS] CAUSE&EFFECT MATRIX!F6  vs IOList |  I20.1 === I20.1  |    =S1+MS1.CC1-Q67001 === =S1+MS1.CC1-Q67001    | SWITCH DISCONNECTOR IS OPEN CH1  8FVX_Q0001  B1/2-0001                           : Reconciled against the I/O List.
+[PASS] CAUSE&EFFECT MATRIX!F7  vs IOList | I120.0 === I120.0 |            =S1+SG1-B1 === =S1+SG1-B1            | SAFETY DOOR OPEN CH1  8FVX_P1003  DI1/2-0001                                     : Reconciled against the I/O List.
+[PASS] CAUSE&EFFECT MATRIX!F8  vs IOList | I120.2 === I120.2 |            =S1+SG2-B1 === =S1+SG2-B1            | SAFETY DOOR OPEN CH1  8FVX_P1003  DI1/2-0002                                     : Reconciled against the I/O List.
+[PASS] CAUSE&EFFECT MATRIX!F9  vs IOList | I110.0 === I110.0 |    =S1+PC1.CC1-X80101 === =S1+PC1.CC1-X80101    | EMERGENCY PUSH BUTTON PRESSED MAINTENANCE CONSOLE CH1  8FVX_P1003  E1/2-0002     : Reconciled against the I/O List.
+[PASS] CAUSE&EFFECT MATRIX!F10 vs IOList |  I20.2 === I20.2  |    =S1+MS1.CC1-S67002 === =S1+MS1.CC1-S67002    | EMERGENCY RESET  8FVX_Q0001  R*-0001                                             : Reconciled against the I/O List.
+[PASS] CAUSE&EFFECT MATRIX!F26 vs IOList |  I96.0 === I96.0  |   =S9+DEMO.CC5-D96001 === =S9+DEMO.CC5-D96001   | SAFETY RELAY OUTPUT  KQ2/2-                                                      : Reconciled against the I/O List.
+[FAIL] CAUSE&EFFECT MATRIX!F27 vs IOList |  Q96.9 =/= Q96.5  |   =S9+DEMO.CC5-D96005 === =S9+DEMO.CC5-D96005   | SAFETY RELAY OUTPUT  KQ2/2-                                                      : Declared in the I/O List at a different address.   [open NET SAFETY 50!O149]
+[FAIL] CAUSE&EFFECT MATRIX!F28 vs IOList |  Q96.6 =/= (none) |   =S9+DEMO.CC5-D96099 =/= (none)                |                                                                                  : Device not declared in the I/O List.
+[FAIL] CAUSE&EFFECT MATRIX!F29 | I95.8 |  |  |  |  |  : Reference carries no device designation.
+[INFO] CAUSE&EFFECT MATRIX 10 reference(s) checked
+[PASS] AREA 1!C4               vs IOList | Q130.0 === Q130.0 | =S1+PC1.CC1-Q66401..2 === =S1+PC1.CC1-Q66401..2 | FEEDBACK OF SAFETY RELAY FAULT DRIVE UNIT 1-2-3-10  8FVX_P1003  KI-0001          : Reconciled against the I/O List.
+[FAIL] AREA 1!C63              vs IOList |  Q97.0 =/= (none) |   =S9+DEMO.CC6-D97001 =/= (none)                |                                                                                  : Device not declared in the I/O List.
+[INFO] AREA 1 2 reference(s) checked
+[PASS] AREA 2!C4               vs IOList | Q130.1 === Q130.1 |    =S1+PC1.CC1-X80201 === =S1+PC1.CC1-X80201    | FEEDBACK OF SAFETY RELAY FAULT 70V CUT-OFF MAINTENANCE AREA  8FVX_P1003  KI-0002 : Reconciled against the I/O List.
+[INFO] AREA 2 1 reference(s) checked
+[INFO] AREA 3 0 reference(s) checked
+[INFO] AREA 4 0 reference(s) checked
+
+==============================================================================
+PHASE 2 - IOList in C&E  (every mandatory I/O signal appears in the C&E)
+==============================================================================
+[PASS] NET SAFETY 50!O57  vs CEMatrix |  I20.0 === I20.0  |    =S1+MS1.CC1-S67001 === =S1+MS1.CC1-S67001    | EMERGENCY PUSH BUTTON PRESSED CH1 + MS1  8FVX_Q0001  E1/2-0001               : Present in the Cause&Effect matrix; device and address match.
+[PASS] NET SAFETY 50!O58  vs CEMatrix |  I20.1 === I20.1  |    =S1+MS1.CC1-Q67001 === =S1+MS1.CC1-Q67001    | SWITCH DISCONNECTOR IS OPEN CH1  8FVX_Q0001  B1/2-0001                       : Present in the Cause&Effect matrix; device and address match.
+[PASS] NET SAFETY 50!O59  vs CEMatrix |  I20.2 === I20.2  |    =S1+MS1.CC1-S67002 === =S1+MS1.CC1-S67002    | EMERGENCY RESET  8FVX_Q0001  R*-0001                                         : Present in the Cause&Effect matrix; device and address match.
+[SKIP] NET SAFETY 50!O61  | I20.4  | =S1+MS1.CC1-S67001  | EMERGENCY PUSH BUTTON PRESSED | CH2 + MS1               | 8FVX_Q0001 | E2/2-0001  : skipped - matches ce_always_excluded_words 'ch2'
+[SKIP] NET SAFETY 50!O62  | I20.5  | =S1+MS1.CC1-Q67001  | SWITCH DISCONNECTOR IS OPEN   | CH2                     | 8FVX_Q0001 | B2/2-0001  : skipped - matches ce_always_excluded_words 'ch2'
+[FAIL] NET SAFETY 50!O63  vs CEMatrix |  I20.6 =/= (none) |    =S1+MS1.CC1-S67008 =/= (none)                | EMERGENCY RESET AREA 2  8FVX_Q0001  R2-0002                                  : Safety-related signal absent from the Cause&Effect matrix.
+[SKIP] NET SAFETY 50!O64  | I20.7  | =S1+MS1.CC1-X40001  | FIRE ALARM                    | CH2                     | 8FVX_Q0001 | F2/2-      : skipped - matches ce_always_excluded_words 'ch2'
+[WARN] NET SAFETY 50!O80  vs CEMatrix | I101.6 =/= (none) |    =S1+PC1.CC1-X81001 =/= (none)                | SAFETY ENCODER FAILURE PHOTOCELL 1  8FVX_P1003  N1/2-0001                    : Not found in the Cause&Effect matrix.
+[WARN] NET SAFETY 50!O81  vs CEMatrix | I101.7 =/= (none) |    =S1+PC1.CC1-X81001 =/= (none)                | SAFETY ENCODER FAILURE PHOTOCELL 2  8FVX_P1003  N2/2-0001                    : Not found in the Cause&Effect matrix.
+[PASS] NET SAFETY 50!O98  vs CEMatrix | I110.0 === I110.0 |    =S1+PC1.CC1-X80101 === =S1+PC1.CC1-X80101    | EMERGENCY PUSH BUTTON PRESSED MAINTENANCE CONSOLE CH1  8FVX_P1003  E1/2-0002 : Present in the Cause&Effect matrix; device and address match.
+[SKIP] NET SAFETY 50!O102 | I110.4 | =S1+PC1.CC1-X80101  | EMERGENCY PUSH BUTTON PRESSED | MAINTENANCE CONSOLE CH2 | 8FVX_P1003 | E2/2-0002  : skipped - matches ce_always_excluded_words 'ch2'
+[PASS] NET SAFETY 50!O106 vs CEMatrix | I120.0 === I120.0 |            =S1+SG1-B1 === =S1+SG1-B1            | SAFETY DOOR OPEN CH1  8FVX_P1003  DI1/2-0001                                 : Present in the Cause&Effect matrix; device and address match.
+[PASS] NET SAFETY 50!O108 vs CEMatrix | I120.2 === I120.2 |            =S1+SG2-B1 === =S1+SG2-B1            | SAFETY DOOR OPEN CH1  8FVX_P1003  DI1/2-0002                                 : Present in the Cause&Effect matrix; device and address match.
+[SKIP] NET SAFETY 50!O110 | I120.4 | =S1+SG1-B1          | SAFETY DOOR OPEN              | CH2                     | 8FVX_P1003 | DI2/2-0001 : skipped - matches ce_always_excluded_words 'ch2'
+[SKIP] NET SAFETY 50!O112 | I120.6 | =S1+SG2-B1          | SAFETY DOOR OPEN              | CH2                     | 8FVX_P1003 | DI2/2-0002 : skipped - matches ce_always_excluded_words 'ch2'
+[PASS] NET SAFETY 50!O114 vs CEMatrix | Q130.0 === Q130.0 | =S1+PC1.CC1-Q66401..2 === =S1+PC1.CC1-Q66401..2 | SAFETY RELAY - ENABLE DRIVE UNIT DRIVE UNIT 1-2-3-10  8FVX_P1003  KQ-0001    : Present in the Cause&Effect matrix; device and address match.
+[PASS] NET SAFETY 50!O115 vs CEMatrix | Q130.1 === Q130.1 |    =S1+PC1.CC1-X80201 === =S1+PC1.CC1-X80201    | SAFETY RELAY 70V CUT-OFF MAINTENANCE AREA  8FVX_P1003  KQ-0002               : Present in the Cause&Effect matrix; device and address match.
+[FAIL] NET SAFETY 50!O118 vs CEMatrix | Q140.0 =/= (none) |    =S1+PC1.CC1-Q80001 =/= (none)                | SAFETY RELAY  8FVX_P1003  KQ-0040                                            : Mandatory signal absent from the Cause&Effect matrix.
+[PASS] NET SAFETY 50!O146 vs CEMatrix |  I96.0 === I96.0  |   =S9+DEMO.CC5-D96001 === =S9+DEMO.CC5-D96001   | SAFETY RELAY OUTPUT  KQ2/2-                                                  : Present in the Cause&Effect matrix; device and address match.
+[FAIL] NET SAFETY 50!O147 vs CEMatrix |  Q96.0 =/= (none) |   =S9+DEMO.CC5-D96002 =/= (none)                | SAFETY RELAY OUTPUT  KQ2/2-                                                  : Mandatory signal absent from the Cause&Effect matrix.
+[WARN] NET SAFETY 50!O148 vs CEMatrix |  I96.4 =/= (none) |   =S9+DEMO.CC5-D96004 =/= (none)                | EMERGENCY RESET  R*-                                                         : Not found in the Cause&Effect matrix.
+[FAIL] NET SAFETY 50!O149 vs CEMatrix |  Q96.5 =/= Q96.9  |   =S9+DEMO.CC5-D96005 === =S9+DEMO.CC5-D96005   | SAFETY RELAY OUTPUT  KQ2/2-                                                  : Present in the Cause&Effect matrix at a different address.   [open CAUSE&EFFECT MATRIX!J27]
+[FAIL] NET SAFETY 50!O150 vs CEMatrix |  Q96.6 === Q96.6  |   =S9+DEMO.CC5-D96006 =/= =S9+DEMO.CC5-D96099   | SAFETY RELAY OUTPUT  KQ2/2-                                                  : Address present in the Cause&Effect matrix under a different device.   [open CAUSE&EFFECT MATRIX!F28]
+[SKIP] NET SAFETY 50!O151 | I96.8  | =S9+DEMO.CC5-D96008 | POWER SUPPLY UNIT FAILURE     |                         |            |            : skipped - matches ce_excluded_words 'power supply'
+[WARN] NET SAFETY 50!O158 vs CEMatrix |  I98.0 =/= (none) |   =S9+DEMO.CC8-D98001 =/= (none)                | MISC UNCLASSIFIED FIELD SIGNAL                                               : Not found in the Cause&Effect matrix.
+[WARN] NET SAFETY 50!O159 vs CEMatrix |  I98.1 =/= (none) |   =S9+DEMO.CC8-D98002 =/= (none)                | BOGUS TYPE ROW  XYZ-                                                         : Not found in the Cause&Effect matrix.
+[SKIP] NET SAFETY 50!O160 | I98.2  | =S9+DEMO.CC8-D98003 | DOOR RESET                    | CH2                     |            | DR-        : skipped - matches ce_always_excluded_words 'ch2'
+[INFO] IOList in C&E 19 I/O signal(s) checked vs C&E
+[INFO] IOList in C&E 8 row(s) skipped (excluded words)
+
+==============================================================================
+PHASE 3 - Diagnosis Coherence Check  (in-diagnosis cabinet/bit map)
+==============================================================================
+[FAIL] NET SAFETY 50!AE154 | I97.2  | =S9+DEMO.CC7-D97012   | GENERAL ALARM                             |                                         |               | A-         : in-diagnosis signal missing/invalid Diag Cabinet ('')
+[FAIL] NET SAFETY 50!AF155 | I97.3  | =S9+DEMO.CC7-D97013   | GENERAL ALARM                             |                                         |               | A-         : in-diagnosis signal missing/invalid Diag Bit ('')
+[PASS] NET SAFETY 50!AE6   |        | =S1+MC1.CC1-K66201    | FIELD BUS FAILURE - COUPLER               |                                         | 8FVX_Q0002    | PA-0001    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE5   |        | =S1+MC1.CC1-K66001    | PROFINET SWITCH                           |                                         | 8FVX_Q0002    | PW-0001    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE17  | I1.0   | =S1+MS1.CC1-F09001    | CIRCUIT BREAKER TRIPPED                   | 400V INDUCTION LINE GROUP IN1.CC1       | 8FVX_Q0001    | A-0001     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE18  | I1.1   | =S1+MS1.CC1-F09002    | CIRCUIT BREAKER TRIPPED                   | 400V INDUCTION LINE GROUP IN2.CC1       | 8FVX_Q0001    | A-0002     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE19  | I1.2   | =S1+MS1.CC1-F09003    | CIRCUIT BREAKER TRIPPED                   | 400V UPSTREAM CABINET UL1.CC1           | 8FVX_Q0001    | A-0003     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE20  | I1.3   | =S1+MS1.CC1-F09004    | CIRCUIT BREAKER TRIPPED                   | 400V UPSTREAM CABINET UL2.CC1           | 8FVX_Q0001    | A-0004     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE21  | I1.4   | =S1+MS1.CC1-F09005    | CIRCUIT BREAKER TRIPPED                   | 400V CHUTE CABINET DL1.CC1              | 8FVX_Q0001    | A-0005     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE22  | I1.5   | =S1+MS1.CC1-F09101    | CIRCUIT BREAKER TRIPPED                   | 400V CHUTE CABINET DL2.CC1              | 8FVX_Q0001    | A-0006     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE23  | I1.6   | =S1+MS1.CC1-F09102    | CIRCUIT BREAKER TRIPPED                   | 400V CHUTE CABINET DL2.CC1              | 8FVX_Q0001    | A-0007     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE8   |        | =S1+MS1.CC1-K65001    | FIELD BUS FAILURE - INPUT / OUTPUT MODULE |                                         | 8FVX_Q0001    | PA-0003    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE25  | I4.0   | =S1+IN1.CC1-F30001    | CIRCUIT BREAKER TRIPPED                   | POWER INFEED 400V SAFETY IN1.CC1        | 8EED_S2001_06 | W-0013     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE26  | I4.1   | =S1+IN1.CC1-T30001    | POWER SUPPLY UNIT FAILURE                 | IN1.CC1                                 | 8EED_S2001_06 | W-0014     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE27  | I4.2   | =S1+IN1.CC1-F30102    | CIRCUIT BREAKER TRIPPED                   | POWER SUPPLY 24V SAFETY AND I/O IN1.CC1 | 8EED_S2001_06 | W-0015     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE28  | I4.3   | =S1+IN1.CC1-F30101    | CIRCUIT BREAKER TRIPPED                   | POWER SUPPLY 24V SWITCH IN1.CC1         | 8EED_S2001_06 | W-0016     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE29  | I4.4   | =S1+IN1.CC1-K60001    | PROFINET SWITCH FAULT                     |                                         | 8EED_S2001_06 | W-0017     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE33  | I5.0   | =S1+IN2.CC1-F30001    | CIRCUIT BREAKER TRIPPED                   | POWER INFEED 400V SAFETY IN2.CC1        | 8EED_S2001_06 | A-0018     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE34  | I5.1   | =S1+IN2.CC1-T30001    | POWER SUPPLY UNIT FAILURE                 | IN2.CC1                                 | 8EED_S2001_06 | A-0019     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE35  | I5.2   | =S1+IN2.CC1-F30102    | CIRCUIT BREAKER TRIPPED                   | POWER SUPPLY 24V SAFETY AND I/O IN2.CC1 | 8EED_S2001_06 | A-0020     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE36  | I5.3   | =S1+IN2.CC1-F30101    | CIRCUIT BREAKER TRIPPED                   | POWER SUPPLY 24V SWITCH IN2.CC1         | 8EED_S2001_06 | A-0021     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE37  | I5.4   | =S1+IN2.CC1-K60001    | PROFINET SWITCH FAULT                     |                                         | 8EED_S2001_06 | A-0022     : diagnosis slot unique
+[PASS] NET SAFETY 50!AE114 | Q130.0 | =S1+PC1.CC1-Q66401..2 | SAFETY RELAY - ENABLE DRIVE UNIT          | DRIVE UNIT 1-2-3-10                     | 8FVX_P1003    | KQ-0001    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE115 | Q130.1 | =S1+PC1.CC1-X80201    | SAFETY RELAY                              | 70V CUT-OFF MAINTENANCE AREA            | 8FVX_P1003    | KQ-0002    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE118 | Q140.0 | =S1+PC1.CC1-Q80001    | SAFETY RELAY                              |                                         | 8FVX_P1003    | KQ-0040    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE65  |        | =S1+PC1.CC1-K65001    | FIELD BUS FAILURE - INPUT / OUTPUT MODULE |                                         | 8FVX_P1003    | PA-0005    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE122 |        | =S1+SM72-XNS1         | FIELD BUS FAILURE - INPUT / OUTPUT MODULE |                                         | 8FVX_W0001    | PA-0018    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE106 | I120.0 | =S1+SG1-B1            | SAFETY DOOR OPEN                          | CH1                                     | 8FVX_P1003    | DI1/2-0001 : diagnosis slot unique
+[PASS] NET SAFETY 50!AE107 | I120.1 | =S1+SG1-B1            | SAFETY DOOR OPEN                          |                                         | 8FVX_P1003    | DD-0001    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE108 | I120.2 | =S1+SG2-B1            | SAFETY DOOR OPEN                          | CH1                                     | 8FVX_P1003    | DI1/2-0002 : diagnosis slot unique
+[PASS] NET SAFETY 50!AE109 | I120.3 | =S1+SG2-B1            | SAFETY DOOR OPEN                          |                                         | 8FVX_P1003    | DD-0002    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE80  | I101.6 | =S1+PC1.CC1-X81001    | SAFETY ENCODER FAILURE                    | PHOTOCELL 1                             | 8FVX_P1003    | N1/2-0001  : diagnosis slot unique
+[PASS] NET SAFETY 50!AE81  | I101.7 | =S1+PC1.CC1-X81001    | SAFETY ENCODER FAILURE                    | PHOTOCELL 2                             | 8FVX_P1003    | N2/2-0001  : diagnosis slot unique
+[PASS] NET SAFETY 50!AE58  | I20.1  | =S1+MS1.CC1-Q67001    | SWITCH DISCONNECTOR IS OPEN               | CH1                                     | 8FVX_Q0001    | B1/2-0001  : diagnosis slot unique
+[PASS] NET SAFETY 50!AE60  | I20.3  | =S1+MS1.CC1-X40001    | FIRE ALARM                                | CH1                                     | 8FVX_Q0001    | F1/2-0001  : diagnosis slot unique
+[PASS] NET SAFETY 50!AE57  | I20.0  | =S1+MS1.CC1-S67001    | EMERGENCY PUSH BUTTON PRESSED             | CH1 + MS1                               | 8FVX_Q0001    | E1/2-0001  : diagnosis slot unique
+[PASS] NET SAFETY 50!AE98  | I110.0 | =S1+PC1.CC1-X80101    | EMERGENCY PUSH BUTTON PRESSED             | MAINTENANCE CONSOLE CH1                 | 8FVX_P1003    | E1/2-0002  : diagnosis slot unique
+[PASS] NET SAFETY 50!AE41  | Q0.0   | =S1+MS1.CC1-Q66501    |                                           | EMERGENCY AREA 1                        | 8FVX_Q0001    | Z1-0001    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE42  | Q0.1   | =S1+MS1.CC1-Q66502    |                                           | EMERGENCY AREA 2                        | 8FVX_Q0001    | Z2-0001    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE43  | Q0.2   | =S1+MS1.CC1-Q66503    |                                           | EMERGENCY AREA 3                        | 8FVX_Q0001    | Z3-0001    : diagnosis slot unique
+[PASS] NET SAFETY 50!AE152 | I97.0  | =S9+DEMO.CC7-D97010   | OVERTEMPERATURE ALARM                     |                                         |               | A-         : diagnosis slot unique
+[PASS] NET SAFETY 50!AE153 | I97.1  | =S9+DEMO.CC7-D97011   | OVERTEMPERATURE ALARM                     |                                         |               | W-         : diagnosis slot unique
+[FAIL] NET SAFETY 50!AF156 | I97.4  | =S9+DEMO.CC7-D97014   | DUPLICATE SLOT ALARM A                    |                                         |               | A-         : duplicate diagnosis slot 902.05 ALARM - also at NET SAFETY 50!AF157
+[FAIL] NET SAFETY 50!AF157 | I97.5  | =S9+DEMO.CC7-D97015   | DUPLICATE SLOT ALARM B                    |                                         |               | A-         : duplicate diagnosis slot 902.05 ALARM - also at NET SAFETY 50!AF156
+[PASS] NET SAFETY 50!AE163 | I98.5  | =S9+DEMO.CC8-D98006   | DOOR DIAGNOSIS INPUT                      |                                         |               | DD-        : diagnosis slot unique
+[INFO] Diagnosis 45 in-diagnosis signal(s) checked
+
+SUMMARY: 59 passed, 45 failed, 8 warning(s), 8 skipped
