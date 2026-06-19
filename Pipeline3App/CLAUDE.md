@@ -68,7 +68,7 @@ pipeline3/
   phase.py          # Phase / SubPhase / PhaseResult / Button dataclasses
   registry.py       # PhaseRegistry: register / presentation_order / topo_order / profiles
   context.py        # PipelineContext (state threaded through phases)
-  core/             # config.py, numbering.py, i18n.py, model.py  (errors.py TODO M6b)
+  core/             # config.py, numbering.py, i18n.py, model.py, errors.py (treatment registry)
   io/               # workbook.py (THE shared reader), csv_tables.py, render.py
   phases/           # p200_fillout.py (+ p100…p900 as built)
   domain/iolist_diag/   # the populator internals (DONE)
@@ -196,8 +196,12 @@ Every builder returns `list[LogEntry]`; each emit site declares a `type` slug (t
   `NO_CHECK` rows emit a SKIP that documents why; partials link the C&E cell.
 - **150 `diagnosis.py`** — (cabinet,bit) numeric + unique per ALARM/WARNING family (family = WARNING
   when the type ends `W`, so an alarm+warning on one slot is not a collision).
-- **Deferred (M6b):** `core/errors.py` + `user_input/error_management.csv` warn/skip/accept treatments
-  (keyed by the per-FAIL `uid`) + the mark-stale policy. Every FAIL already carries a stable `uid`.
+- **Treatments (M6b, `core/errors.py`):** keyed by the per-FAIL `uid`, `user_input/error_management.csv`
+  records `warn`→WARNING / `skip`→SKIP / `accept`→(write the C&E-side FLD into the I/O List description,
+  idempotent + gated to `iol_cem_addr_only`)→SKIP. Each operator run reconciles the registry
+  (current FAILs refreshed, untreated-gone pruned, **treated-gone kept + marked `stale`**). The designer
+  build instead reads `user_input/designer_suppressions.csv` (suppress-only). Both CSVs are gitignored
+  (user-local). Applied in the phase-100 header before rendering.
 
 ## Testing
 
@@ -208,18 +212,18 @@ suite is the green gate** — it passes with no real documents present. Data-dep
 frozen as a Pipeline3 golden under `tests/golden/` (Pipeline2 is NOT a golden source). The phase-100
 reports are the first blessed golden; `tests/unit/test_golden_validation.py` regenerates + compares
 them (data-dependent, skips when the real docs are absent; re-freeze with `--freeze`). Current:
-**88 unit tests green** (numbering, model, config, i18n, registry, workbook, render, iolist_diag,
-staging, the five validation suites + the phase-100 phase test + golden parity).
+**94 unit tests green** (numbering, model, config, i18n, registry, workbook, render, iolist_diag,
+staging, the five validation suites + the phase-100 phase test + golden parity + the treatment registry).
 
 ## Status & still to build
 
 - **DONE**: M1 foundation (config/numbering/model/i18n), M2 phase abstraction + registry + context
   + profiles, M3 the shared reader + log renderer, M4 Phase 200 Fill (writes the source in place +
   dated backup), M5 Phase 300 Staging (single `IODatabase.csv` + C&E enrichment incl.
-  `areas_description`), **M6 Phase 100 Validation** (sub-phases 110–150 + the two reports + golden).
-- **NEXT**: M6b — `core/errors.py` (the warn/skip/accept treatment registry keyed by the per-FAIL
-  `uid`) + `user_input/error_management.csv` + the mark-stale policy + the designer suppression list;
-  then M7 generators (interfaces/signals/hardware/coverage), M8 diagnosis, M9 software, M10 CLI
+  `areas_description`), **M6 Phase 100 Validation** (sub-phases 110–150 + the two reports + golden),
+  **M6b** the treatment registry (`core/errors.py`: warn/skip/accept keyed by uid + mark-stale +
+  designer suppression).
+- **NEXT**: M7 generators (interfaces/signals/hardware/coverage), M8 diagnosis, M9 software, M10 CLI
   + Open2App-path contract test, M11–13 GUIs (dark-by-default, registry-driven phase bar,
   YAML-explorer config, selectable projects root) + designer + Project Manager, M14 packaging
   (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.

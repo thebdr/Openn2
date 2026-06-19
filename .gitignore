@@ -20,6 +20,9 @@ Shared/OutputTree/
 *.bak_*.xlsx
 *.precleared_*.xlsx
 
+# Per-user phase-100 treatment registry / suppressions (auto-managed, user-local)
+Pipeline3App/user_input/*.csv
+
 # NuGet restore output
 Open2App/packages/
 

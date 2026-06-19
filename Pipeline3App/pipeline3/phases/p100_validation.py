@@ -18,6 +18,7 @@ from pipeline3.core import config
 from pipeline3.core.i18n import tr
 from pipeline3.core.model import banner
 from pipeline3.io import render
+from pipeline3.core import errors
 from pipeline3.domain import validation
 
 # (number, button/i18n label key, builder, enabled-in-designer)
@@ -48,13 +49,20 @@ def _run_sub(ctx, number, name_key, builder, designer_ok):
 
 
 def run(ctx) -> PhaseResult:
-    """Phase header: run every (profile-enabled) sub-phase, write both reports."""
+    """Phase header: run every (profile-enabled) sub-phase, apply treatments, write both reports."""
     log = [banner(100, tr("ph_validation", ctx.lang))]
     for number, name_key, builder, designer_ok in SUBS:
         if ctx.profile == "designer" and not designer_ok:
             continue
         log.append(banner(number, tr(name_key, ctx.lang)))
         log.extend(builder(ctx))
+    # Treatments (M6b): the designer build only suppresses lines locally; the operator build applies
+    # warn/skip/accept from error_management.csv and reconciles the registry (mark-stale + prune).
+    if ctx.profile == "designer":
+        errors.apply_suppressions(log)
+    else:
+        reg = errors.apply_and_reconcile(ctx, log)
+        ctx.emit(f"treatments: registry -> {os.path.basename(reg)}")
     bodies = render.reports(log)
     rep = _write(ctx.out_root, "validation_report", bodies["complete"])
     err = _write(ctx.out_root, "validation_errors", bodies["errors"])
@@ -80,6 +88,7 @@ BUTTONS = [
     Button("pb_open_iolist", KIND_OPEN, 160, "open:io_list"),
     Button("pb_open_ce", KIND_OPEN, 170, "open:ce"),
     Button("pb_open_val_logs", KIND_OPEN, 180, "open:validation_report"),
+    Button("pb_open_errmgmt", KIND_OPEN, 190, "open:error_management"),
 ]
 
 register(Phase(
