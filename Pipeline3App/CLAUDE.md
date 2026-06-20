@@ -52,7 +52,7 @@ Every ordered enumeration uses gapped numbers so steps insert without renumberin
 | 400 | Interfaces Generation | 410 Generate Interfaces · 430 Generate Custom Interface… | **DONE** |
 | 500 | Signals Mapping | 510 Generate I/O Tags · 520 Generate Data Blocks | **DONE** |
 | 600 | Diagnosis Mapping | 610 Generate Diag List · 620 Generate Diag Software Blocks | **DONE** |
-| 700 | Hardware Generation | 710 Generate Stations · 720 Generate Modules | TODO (M7) |
+| 700 | Hardware Generation | 710 Generate Stations · 720 Generate Modules | **DONE** |
 | 800 | Software Generation | 810 Empty Shells · 820 Generate Blocks · 830 Generate Instances | TODO (M9) |
 | 900 | Reporting | 910 Pipeline Coverage Report · 920 TIA Project Coverage Report | TODO (M7/future) |
 
@@ -312,6 +312,31 @@ Data / Diag Config folder) are GUI-era (M11).
   contains the signal's address. The output is **UTF-8 BOM + CRLF** (matching the exported template)
   and the **FUNCTION is renamed** to drop the `TEMPLATE--vX.Y--` prefix (→ `06_Diagnostic for OPC`).
 
+## Phase 700 — Hardware Generation — DONE
+
+`domain/hardware.py` + `phases/p700_hardware.py`. A single ordered pass over `ctx.rows` produces both
+format-2 CSVs → `hardware_dir` (the Open2App BuilderData surface). `requires=(300,)`; 710 Stations +
+720 Modules share one `extract` (each sub-phase writes both; the header runs once). `730` (Open
+Hardware Data Folder) is GUI-era (M11). DeviceTypesDatabase via `config.load_device_types_db`.
+
+- **Roles / heads**: Script Type `PLC`→`Plc`, `PlcCardCm`→`PlcCardCm`, else Type (col R) first letter
+  `P`→`IoDevice`. A head opens a station; the rows after it (until the next head) are its signals. A
+  head whose model (Part No) isn't in the DTD → **ERROR** (the phase `ok=False`), **WARNING** for a
+  switch (description contains "SWITCH"); the station is skipped either way.
+- **Stations**: Name = `profinet_name`, Model Id = Part No (spaces stripped), Subnet from the IP,
+  Group = `<functional_unit>_IODevices`. Custom Parameters = the DTD col-7 "I/O Addresses Parameter"
+  (`%I%`/`%Q%` → the device start byte, `+N` arithmetic) then I/O-List col-AG (override, last).
+- **Modules** (IoDevice only): signal rows grouped into cards by Slot (col E); a card whose Slot == the
+  device's own tag is the TIA-auto-plugged card and is skipped. I Addr = Q Addr = the card start byte,
+  Comment = the DTD comment. Custom Parameters = `PotentialGroup=1` on the **first** card (2+ come from
+  col-AG) + the DTD col-6 "Parameters by Signal Type" blocks (`Ch(#)` → the signal's channel) then
+  col-AG (override, last). Default cards (DTD ids `<PARENT>:SUFFIX`) add one row per station of PARENT.
+- **DTD col-5 "Parameters" are NEVER written** (Open2App applies them); only col-6/col-7 + col-AG are,
+  AG last. Output matches the committed reference (`Shared/.../TestData/Passing`): **comma format-2, no
+  BOM, CRLF**, a `#!format=2` tag + a descriptive `# header` comment (the header is a comment; Open2App
+  reads by position). NOTE: this reference format differs from Pipeline2's `_format2` (BOM + LF +
+  raw-key headers); Pipeline3 follows the reference artifact.
+
 ## Testing
 
 Plain-`python` tests (no pytest) under `tests/unit/`, via `tests/unit/_harness.py` (PASS/FAIL,
@@ -329,7 +354,10 @@ I/O List insertion + the table-validity regression; the **Phase-500 signals suit
 16 cases: the two tag sources + interface-tag reading, the data-type map, the F_DB-XML vs `.db` split
 with BOM/CRLF, the member dedup; the **Phase-600 diagnosis suite** `test_diagnosis.py`, 17 cases: the
 DiagList_IO columns + `$PLC_Binding$`, the OR/per-row logic rules + sibling co-location + next-free-bit,
-`ml_value`/`fl_value`/`node_of`, and the SCL render incl. tristate + the FUNCTION rename + BOM/CRLF).
+`ml_value`/`fl_value`/`node_of`, and the SCL render incl. tristate + the FUNCTION rename + BOM/CRLF;
+the **Phase-700 hardware suite** `test_hardware.py`, 11 cases: roles/address/param-merge-override/
+I-O-address-template, the extract (auto-plug skip, PotentialGroup, by-type channel params, default
+cards), the missing-DTD ERROR/switch-WARNING, and the format-2 output (no BOM, CRLF, descriptive headers)).
 
 ## Status & still to build
 
@@ -344,8 +372,10 @@ DiagList_IO columns + `$PLC_Binding$`, the OR/per-row logic rules + sibling co-l
   the inserted `IF_` sheets; 520 data blocks — type-based + rule-driven members, safe ⇒ F_DB Openness
   XML, normal ⇒ `.db`), **M8 Phase 600 Diagnosis** (610 DiagList_IO/Logic — OR/per-row rules +
   paired-channel co-location; 620 the OPC SCL fill — node-resolved FL, tristate variants, FUNCTION
-  rename + BOM/CRLF).
-- **NEXT**: M7 remaining generators (700 hardware / 910 coverage), M9 software, M10 CLI
+  rename + BOM/CRLF), **M7 Phase 700 Hardware** (710 Stations + 720 Modules, one extract → format-2
+  CSVs matching the committed reference; DTD roles + auto-plug + PotentialGroup + by-type params +
+  default cards; head-not-in-DTD ERROR/switch-WARNING).
+- **NEXT**: M7 remaining generator (910 coverage), M9 software, M10 CLI
   + Open2App-path contract test, M11–13 GUIs (dark-by-default, registry-driven phase bar,
   YAML-explorer config, selectable projects root) + designer + Project Manager, M14 packaging
   (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.
