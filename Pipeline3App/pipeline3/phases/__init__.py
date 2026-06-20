@@ -8,3 +8,4 @@ from pipeline3.phases import p400_interfaces  # noqa: F401
 from pipeline3.phases import p500_signals  # noqa: F401
 from pipeline3.phases import p600_diagnosis  # noqa: F401
 from pipeline3.phases import p700_hardware  # noqa: F401
+from pipeline3.phases import p800_software  # noqa: F401
