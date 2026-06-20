@@ -6,3 +6,4 @@ from pipeline3.phases import p200_fillout  # noqa: F401
 from pipeline3.phases import p300_staging  # noqa: F401
 from pipeline3.phases import p400_interfaces  # noqa: F401
 from pipeline3.phases import p500_signals  # noqa: F401
+from pipeline3.phases import p600_diagnosis  # noqa: F401

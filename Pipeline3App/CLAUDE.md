@@ -51,7 +51,7 @@ Every ordered enumeration uses gapped numbers so steps insert without renumberin
 | 300 | Documents Staging | 310 Stage I/O List · 320 Generate IO Database | **DONE** |
 | 400 | Interfaces Generation | 410 Generate Interfaces · 430 Generate Custom Interface… | **DONE** |
 | 500 | Signals Mapping | 510 Generate I/O Tags · 520 Generate Data Blocks | **DONE** |
-| 600 | Diagnosis Mapping | 610 Generate Diag List · 620 Generate Diag Software Blocks | TODO (M8) |
+| 600 | Diagnosis Mapping | 610 Generate Diag List · 620 Generate Diag Software Blocks | **DONE** |
 | 700 | Hardware Generation | 710 Generate Stations · 720 Generate Modules | TODO (M7) |
 | 800 | Software Generation | 810 Empty Shells · 820 Generate Blocks · 830 Generate Instances | TODO (M9) |
 | 900 | Reporting | 910 Pipeline Coverage Report · 920 TIA Project Coverage Report | TODO (M7/future) |
@@ -282,6 +282,36 @@ phase 400 to have inserted the `IF_` sheets (absent ⇒ I/O-only, degrades grace
   `S7_Optimized_Access` is `'TRUE'` for both — it is **NOT** a safety marker. `blocks_import_dir` is
   swept of prior `*.db`/`*.xml` on re-run (the phase-620 SCL is left intact).
 
+## Phase 600 — Diagnosis Mapping — DONE
+
+`domain/diagnosis.py` + `phases/p600_diagnosis.py`. Two generators over the staged database; progress
+strings only (no LogEntries). `requires=(300,)`; the rule cabinet mapping + the SCL cabinets read the
+`DiagnosisBlocks` sheet (`staging.load_diagnostic_blocks`, from Fill 230/240). `630/640` (Open Diag
+Data / Diag Config folder) are GUI-era (M11).
+
+- **610 Generate Diag List** → `diagnosis_dir` (`DiagList_IO.csv` + `DiagList_Logic.csv`; comma CSV via
+  `io/csv_tables`). Columns are config-driven (`diagnosis/diagnosis_columns.csv`: `header,expression`,
+  each cell a `{canonical}` interpolation of the row; the one sentinel `$PLC_Binding$` →
+  `identity.plc_binding`). **DiagList_IO** = one row per in-diagnosis signal (`_type.in_diagnosis`).
+  **DiagList_Logic** = rule-generated from `diagnosis_logic_rules.csv`: **`required_types` is an OR
+  list (the `|`), firing once per row whose script_type is ANY of them** (the same per-row model as
+  the datablock rules — NOT Pipeline2's "ALL required, once per cabinet"), each at the next free bit
+  of its cabinet's alarm/warning family (`type_hw`/`dev_type` ending `W` = warning), bound to
+  `"<db_name>"."<member>"`. A matched row's cabinet = its numeric `diag_cabinet`, else a
+  **paired-channel sibling**'s cabinet (a row sharing its device FLD that carries one — e.g. the
+  diagnosis channel DI2/2 inherits DI1/2's cabinet), else FLD → DiagnosisBlocks.
+- **620 Generate Diag Software Blocks** → `blocks_import_dir/Diagnostic_for_OPC.scl` (the Open2App
+  surface). Fills the `06_Diagnostic for OPC.scl` template: one FUNCTION, one REGION per cabinet, each
+  a CabState call + one BoolToUDInt call per packed DWord (`ALARM1/2`, `WARNING1/2`). Per channel
+  `IN_xx` = `identity.plc_binding`, `ML_xx` = `diagnosis.ml_value` (mirror→TRUE/invert→FALSE/else from
+  `normal_condition`), `FL_xx` = `diagnosis.fl_value` (the row's node alarm `"PROFINET_NODES_ALARM".
+  "<pname> <pip>"`, or `false`; a PA/PW node-alarm never self-filters). `diag_bit` 0-31 → DWord 1,
+  32-63 → DWord 2, channel = `bit % 32`; the cabinet variant (01-04) comes from `DiagnosisBlocks`
+  `TemplateType`, Tristate (02/04) pairs each alarm DWord with its warning DWord. **node resolution**
+  (`node_of`) finds the Profinet node whose I/Q byte range (staging's `I_/Q_startByte/endByte`)
+  contains the signal's address. The output is **UTF-8 BOM + CRLF** (matching the exported template)
+  and the **FUNCTION is renamed** to drop the `TEMPLATE--vX.Y--` prefix (→ `06_Diagnostic for OPC`).
+
 ## Testing
 
 Plain-`python` tests (no pytest) under `tests/unit/`, via `tests/unit/_harness.py` (PASS/FAIL,
@@ -297,7 +327,9 @@ treatment registry + the **Phase-400 interface suite** `test_interfaces.py`, ~36
 membership, byte packing, the names/`interface_tagname` split, the WORD/BOOL layout, the lossless
 I/O List insertion + the table-validity regression; the **Phase-500 signals suite** `test_signals.py`,
 16 cases: the two tag sources + interface-tag reading, the data-type map, the F_DB-XML vs `.db` split
-with BOM/CRLF, the member dedup).
+with BOM/CRLF, the member dedup; the **Phase-600 diagnosis suite** `test_diagnosis.py`, 17 cases: the
+DiagList_IO columns + `$PLC_Binding$`, the OR/per-row logic rules + sibling co-location + next-free-bit,
+`ml_value`/`fl_value`/`node_of`, and the SCL render incl. tristate + the FUNCTION rename + BOM/CRLF).
 
 ## Status & still to build
 
@@ -310,8 +342,10 @@ with BOM/CRLF, the member dedup).
   `interface_tagname`/Expression split + BOOL 2-byte-block / WORD-row layout + the lossless
   `insert_interface_sheets`), **M7 Phase 500 Signals** (510 I/O Tags incl. the interface tags from
   the inserted `IF_` sheets; 520 data blocks — type-based + rule-driven members, safe ⇒ F_DB Openness
-  XML, normal ⇒ `.db`).
-- **NEXT**: M7 remaining generators (700 hardware / 910 coverage), M8 diagnosis, M9 software, M10 CLI
+  XML, normal ⇒ `.db`), **M8 Phase 600 Diagnosis** (610 DiagList_IO/Logic — OR/per-row rules +
+  paired-channel co-location; 620 the OPC SCL fill — node-resolved FL, tristate variants, FUNCTION
+  rename + BOM/CRLF).
+- **NEXT**: M7 remaining generators (700 hardware / 910 coverage), M9 software, M10 CLI
   + Open2App-path contract test, M11–13 GUIs (dark-by-default, registry-driven phase bar,
   YAML-explorer config, selectable projects root) + designer + Project Manager, M14 packaging
   (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.
@@ -335,5 +369,10 @@ with BOM/CRLF, the member dedup).
   the CPU from an OPC write faulting it to STOP); a normal DB ⇒ a `.db` external source
   (`DB_Accessible_From_OPC_UA := 'TRUE'`). **`S7_Optimized_Access` is NOT the safety marker** (it's
   `'TRUE'` on both). Files are UTF-8-BOM.
+- **Diagnosis logic rules** (`diagnosis_logic_rules.csv`, phase 610/620) are **OR / per-row**: the `|`
+  in `required_types` is OR and the rule fires once per matching row (NOT Pipeline2's "ALL required,
+  once per cabinet"). Matching is by **script_type** (exact); a pair_key like `DI`/`N` matches no
+  script_type, so it no-ops unless a row with that literal type exists. The **OPC SCL** is UTF-8-BOM +
+  CRLF (the exported-template format) with the FUNCTION renamed to drop the `TEMPLATE--vX.Y--` prefix.
 - Run/test from the `Pipeline3App` root. When committing `_Openn2`, end commit messages with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
