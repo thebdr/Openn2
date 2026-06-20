@@ -603,16 +603,18 @@ def test_insert_interface_sheets():
                 _srow("B1/2", "01", db_kind="db", db_names=["DB1"], name_in_db="Breaker", datablocks="DB1",
                       interface_tagname="PNC_Q_{interface_id}_Breaker", row=3)]
         res = interfaces.generate(rows, out, tpl, overwrite=True, iolist_path=iol)
-        ok(any("inserted" in a and "SORTER-01" in a for a in res["iolist"]), "sheet inserted")
+        ok(any("inserted" in a and "IF_SORTER-01" in a for a in res["iolist"]), "sheet inserted")
         ok(any(".bak_" in a for a in res["iolist"]) and
            any(f.startswith("iolist.xlsx.bak_") for f in os.listdir(d)), "I/O List backed up first")
         wb2 = load_workbook(iol)
-        ok("SORTER-01" in wb2.sheetnames and "NET SAFETY 50" in wb2.sheetnames, "inserted + original kept")
-        ok("SORTER_SIGNALS_SORTER_01" in list(wb2["SORTER-01"].tables), "table renamed per-instance")
+        ok("IF_SORTER-01" in wb2.sheetnames and "NET SAFETY 50" in wb2.sheetnames,
+           "inserted sheet is IF_-prefixed + original kept")
+        ok("SORTER-01" not in wb2.sheetnames, "the un-prefixed name is NOT used")
+        ok("SORTER_SIGNALS_IF_SORTER_01" in list(wb2["IF_SORTER-01"].tables), "table renamed per-instance")
         # idempotent: a second run leaves the sheet alone
         res2 = interfaces.generate(rows, out, tpl, overwrite=True, iolist_path=iol)
-        ok(any("already present" in a and "SORTER-01" in a for a in res2["iolist"]), "second run skips")
-        eq(load_workbook(iol).sheetnames.count("SORTER-01"), 1, "no duplicate sheet")
+        ok(any("already present" in a and "IF_SORTER-01" in a for a in res2["iolist"]), "second run skips")
+        eq(load_workbook(iol).sheetnames.count("IF_SORTER-01"), 1, "no duplicate sheet")
 
 
 def test_insert_preserves_formula_values():

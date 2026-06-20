@@ -50,7 +50,7 @@ Every ordered enumeration uses gapped numbers so steps insert without renumberin
 | 200 | Documents Fill Out | 210 Fill Script Type · 220 Fill Index · 230 Fill Diag Cabinet · 240 Fill Diag Bit | **DONE** |
 | 300 | Documents Staging | 310 Stage I/O List · 320 Generate IO Database | **DONE** |
 | 400 | Interfaces Generation | 410 Generate Interfaces · 430 Generate Custom Interface… | **DONE** |
-| 500 | Signals Mapping | 510 Generate I/O Tags · 520 Generate Data Blocks | TODO (M7) |
+| 500 | Signals Mapping | 510 Generate I/O Tags · 520 Generate Data Blocks | **DONE** |
 | 600 | Diagnosis Mapping | 610 Generate Diag List · 620 Generate Diag Software Blocks | TODO (M8) |
 | 700 | Hardware Generation | 710 Generate Stations · 720 Generate Modules | TODO (M7) |
 | 800 | Software Generation | 810 Empty Shells · 820 Generate Blocks · 830 Generate Instances | TODO (M9) |
@@ -239,7 +239,8 @@ machine type / base address / node side 1 / node side 2 / index); **420/430** ar
   (keyed by `ID_Local`). Addresses are the template's own `_xlfn.LET` structured-ref formulas, copied
   verbatim (Excel recomputes on open).
 - **`insert_interface_sheets`** (project_params bool): when true, generation **overwrites** existing
-  `IF_*.xlsx` AND **inserts each interface as a sheet into the I/O List** if not already present
+  `IF_*.xlsx` AND **inserts each interface as a sheet named `IF_<instance>`** (e.g. `IF_SORTER-01`)
+  into the I/O List if not already present
   (a timestamped `.bak` is taken first; idempotent). The insertion is **lossless**: openpyxl writes
   the combined workbook keeping every formula, then the existing formula cells' cached values — which
   openpyxl drops on re-save — are **patched back at the ZIP/XML level** (`_capture_formula_caches` /
@@ -247,7 +248,39 @@ machine type / base address / node side 1 / node side 2 / index); **420/430** ar
   Atomic save (temp + `os.replace`). Copied tables are **re-created with clean columns** (id+name
   only, dropping the source's out-of-range `dataDxfId` + stale `calculatedColumnFormula`) and given
   per-instance names, else Excel drops the table on open. The interface sheets don't match
-  `io_list.sheet`, so staging/validation ignore them.
+  `io_list.sheet`, so staging/validation ignore them; **phase 500's 510 reads the interface tags
+  from these `IF_` sheets**.
+
+## Phase 500 — Signals Mapping — DONE
+
+`domain/signals.py` + `phases/p500_signals.py`. Two generators over the staged database (progress
+strings only, no LogEntries — like 300/400). `requires=(300,)`; the interface tags additionally need
+phase 400 to have inserted the `IF_` sheets (absent ⇒ I/O-only, degrades gracefully). `530/540`
+(Open IO Tags / Open Data Blocks Folder) are GUI-era (M11).
+
+- **510 Generate I/O Tags** → `io_tags_dir/PLCTags.xlsx` (single TIA "PLC Tags" workbook: a
+  `PLC Tags` sheet + a `TagTable Properties` sheet; values text, addresses **%-prefixed**, Hmi flags
+  `True`). TWO sources: (a) the **resolved I/O signals** — reusing the staged identity columns
+  `name_in_tagtable` (tag name) + `tagtable` (Path), address = the I/Q bit %-prefixed, comment = the
+  type `io_comment`; (b) the **interface tags** from the inserted `IF_` sheets — per the interface
+  table columns **`Signal Name Side 1`** (tag name) and **`I/O Address Side 1`** (the LET-formula's
+  Excel-cached value, read via `data_only`; %-prefixed), `Data Type`→Bool/Word, `Description`→comment,
+  **Path = the `IF_` sheet name**. A named interface row whose address didn't resolve is skipped+warned.
+- **520 Generate Data Blocks** → `blocks_import_dir/*` — members from TWO sources: (a) each row's
+  staged `name_in_db` into every DB in its `datablocks`; (b) **rule-driven** additions from
+  `datablock_elements_rules.csv` (any `required_types` script_type present ⇒ add the interpolated
+  `member` to `db_name`, per-row — the phase-400 follower model; `dev_type` not a filter). Every DB
+  is seeded with **`Always FALSE` / `Always TRUE`** (space, no underscore). A DATA_BLOCK can't repeat
+  a member name, so exact duplicates are dropped (kept once) + warned.
+- **Safe vs normal DB output** (key gotcha): a **SAFE DB** (any contributing type is `safe_db`) is
+  written as a TIA **Openness `SW.Blocks.GlobalDB` XML** `<name>.xml` carrying
+  **`ProgrammingLanguage=F_DB`** (the fail-safe marker the `.db` external-source format CANNOT
+  express) + `DBAccessibleFromOPCUA=false` (a safe DB must not be OPC-writable — an unexpected write
+  can fault the CPU to STOP) + per-member external-access attrs + `MemoryLayout=Optimized`. A
+  **NORMAL DB** is the `.db` external source `<name>.db` (`DB_Accessible_From_OPC_UA := 'TRUE'`). Both
+  are **UTF-8 BOM**; `.db` is CRLF, the XML is CRLF + no trailing newline (matching a real export).
+  `S7_Optimized_Access` is `'TRUE'` for both — it is **NOT** a safety marker. `blocks_import_dir` is
+  swept of prior `*.db`/`*.xml` on re-run (the phase-620 SCL is left intact).
 
 ## Testing
 
@@ -262,7 +295,9 @@ data-independent suite is green (numbering, model, config, i18n, registry, workb
 iolist_diag, staging, the five validation suites + the phase-100 phase test + golden parity + the
 treatment registry + the **Phase-400 interface suite** `test_interfaces.py`, ~36 cases: mirroring
 membership, byte packing, the names/`interface_tagname` split, the WORD/BOOL layout, the lossless
-I/O List insertion + the table-validity regression).
+I/O List insertion + the table-validity regression; the **Phase-500 signals suite** `test_signals.py`,
+16 cases: the two tag sources + interface-tag reading, the data-type map, the F_DB-XML vs `.db` split
+with BOM/CRLF, the member dedup).
 
 ## Status & still to build
 
@@ -273,8 +308,10 @@ I/O List insertion + the table-validity regression).
   **M6b** the treatment registry (`core/errors.py`: warn/skip/accept keyed by uid + mark-stale +
   designer suppression), **M7 Phase 400 Interfaces** (generation + signal mirroring +
   `interface_tagname`/Expression split + BOOL 2-byte-block / WORD-row layout + the lossless
-  `insert_interface_sheets`).
-- **NEXT**: M7 remaining generators (500 signals / 700 hardware / 910 coverage), M8 diagnosis, M9 software, M10 CLI
+  `insert_interface_sheets`), **M7 Phase 500 Signals** (510 I/O Tags incl. the interface tags from
+  the inserted `IF_` sheets; 520 data blocks — type-based + rule-driven members, safe ⇒ F_DB Openness
+  XML, normal ⇒ `.db`).
+- **NEXT**: M7 remaining generators (700 hardware / 910 coverage), M8 diagnosis, M9 software, M10 CLI
   + Open2App-path contract test, M11–13 GUIs (dark-by-default, registry-driven phase bar,
   YAML-explorer config, selectable projects root) + designer + Project Manager, M14 packaging
   (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.
@@ -293,5 +330,10 @@ I/O List insertion + the table-validity regression).
 - **openpyxl can't preserve formula caches** across a re-save — when modifying the I/O List in place,
   capture + patch them back at the ZIP/XML level; and **re-create copied tables with clean columns**
   (no `dataDxfId`/`calculatedColumnFormula`) or Excel drops them ("Removed Records: Table").
+- **Data-block output is safety-aware** (phase 520): a `safe_db` type ⇒ an **F_DB Openness XML**
+  (`<name>.xml` — the only form that carries fail-safe + `DBAccessibleFromOPCUA=false`, which protects
+  the CPU from an OPC write faulting it to STOP); a normal DB ⇒ a `.db` external source
+  (`DB_Accessible_From_OPC_UA := 'TRUE'`). **`S7_Optimized_Access` is NOT the safety marker** (it's
+  `'TRUE'` on both). Files are UTF-8-BOM.
 - Run/test from the `Pipeline3App` root. When committing `_Openn2`, end commit messages with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.

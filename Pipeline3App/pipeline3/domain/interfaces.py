@@ -758,8 +758,9 @@ def generate(rows, out_dir, template_path, *, overwrite=False, iolist_path=None)
     """410 auto path: one interface per IOC row of the staged database, each with its mirrored
     custom block. Returns {'created', 'preserved', 'warnings', 'fallback', 'errors', 'iolist'}.
     With `overwrite` an existing IF_*.xlsx is regenerated (not preserved). With `iolist_path` each
-    generated interface sheet is inserted into that I/O List workbook if not already present (a
-    timestamped '.bak' of the I/O List is taken first); the actions land in result['iolist']."""
+    generated interface sheet is inserted (named IF_<instance>) into that I/O List workbook if not
+    already present (a timestamped '.bak' of the I/O List is taken first); the actions land in
+    result['iolist']."""
     os.makedirs(out_dir, exist_ok=True)
     records, warnings = find_interfaces(rows)
     result = {"created": [], "preserved": [], "warnings": list(warnings), "fallback": [], "errors": [],
@@ -825,7 +826,10 @@ def generate(rows, out_dir, template_path, *, overwrite=False, iolist_path=None)
             result[status].append(os.path.basename(path))
         seen.setdefault(itf["instance"], itf["source"])
         if iolist_path:
-            to_insert.append((_safe_name(itf["instance"]), path))
+            # Inserted I/O List sheets are PREFIXED with IF_ (e.g. IF_SORTER-01): they read as
+            # interfaces at a glance, stay clear of the NET SAFETY sheets staging/validation match,
+            # and give phase 500 (510 I/O Tags) a stable prefix to find the interface tags by.
+            to_insert.append((_safe_name(f"IF_{itf['instance']}"), path))
 
     if iolist_path and to_insert and os.path.exists(iolist_path):
         stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
