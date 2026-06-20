@@ -11,13 +11,14 @@ Pipeline3App/CLAUDE.md and the approved design plan at
 ~/.claude/plans/the-codebase-in-openn2-pipeline2app-rippling-canyon.md (per-phase contracts = §2,
 the Open2App import contract = §10, the Pipeline2 reference files = §9).
 
-STATUS (all committed + pushed on branch tia181920; 94 unit tests green):
-M1–M5 foundation/fill/staging, M6 Phase 100 Validation, M6b treatment registry. Phase 100 is
-complete. The single database is Shared/OutputTree/.../IODatabase.csv (loaded as ctx.rows); every
-downstream phase consumes it.
+STATUS (committed on branch tia181920, origin = github.com/thebdr/Openn2; data-independent gate green):
+M1–M5 foundation/fill/staging, M6 Phase 100 Validation, M6b treatment registry, M7 Phase 400
+Interfaces (generation + signal mirroring + interface_tagname/Expression split + BOOL 2-byte-block /
+WORD-row layout + the lossless insert_interface_sheets). Phases 100 and 400 are COMPLETE. The single
+database is Shared/OutputTree/.../IODatabase.csv (loaded as ctx.rows); every downstream phase consumes it.
 
-NEXT — build the generators in NUMERICAL order, ONE phase at a time:
-  400 Interfaces → 500 Signals → 600 Diagnosis → 700 Hardware → 800 Software → 900 Reporting
+NEXT — build the remaining generators in NUMERICAL order, ONE phase at a time:
+  500 Signals → 600 Diagnosis → 700 Hardware → 800 Software → 900 Reporting
 (910 only; 920 TIA-project coverage is deferred/future — it needs Open2App's project text export.)
 
 CADENCE (unchanged): build one phase FROM SCRATCH (Pipeline2App is a reference for INTENT only —
@@ -51,11 +52,12 @@ RUNNING ON THE REAL DOCS — gotcha: the main pipeline HALTs at Fill (200) becau
 Shared/DocumentsValidationData/Passing/.
 
 PHASE QUICK-MAP (plan §2 contracts + §9 Pipeline2 references — INTENT only):
-  400 Interfaces (req 300): 410 Generate Interfaces — IOC rows (Index "MACHINETYPE-nn") →
-      interfaces_dir/IF_<instance>.xlsx from the MachineInterfaces template (existing preserved);
-      420 Open folder; 430 Generate Custom Interface… (special popup: Base Address, Node Side 1,
-      Node Side 2, Machine Type = dropdown of the template's sheet names → one workbook manually).
-      Ref: pipeline2/interfaces/interface_tool.py + verify.py.
+  400 Interfaces — DONE (domain/interfaces.py + phases/p400_interfaces.py): per-IOC generation +
+      signal mirroring (I/O List "Interface Mapping" col AH, the interface_tagname / Expression
+      split, +DIAG, BOOL 2-byte-block / WORD-row byte layout) + the lossless insert_interface_sheets.
+      The 430 "Custom Interface…" popup is GUI-era (M11); its primitive interfaces.generate_one
+      exists. interface_tagname lives in signal_types.csv + all three rule CSVs; swp_cabinet is
+      imported at staging. See the Phase-400 section of CLAUDE.md for the full contract.
   500 Signals (req 300): 510 Generate I/O Tags → io_tags_dir/PLCTags.xlsx; 520 Generate Data Blocks
       → blocks_import_dir/*.db, RULE-DRIVEN by config_project/input_docs/datablock_elements_rules.csv
       (when any required_type is present, add the element to db_name, creating the DB if absent).
@@ -74,6 +76,9 @@ PHASE QUICK-MAP (plan §2 contracts + §9 Pipeline2 references — INTENT only):
   900 Reporting: 910 Pipeline Coverage Report → coverage_report (Reports/io_project_coverage_report.{csv,txt});
       every signal lands somewhere; flag ORPHAN / UNPLACED MEMBER. 920 = deferred/future.
 
-START NOW WITH PHASE 400: read interface_tool.py + verify.py and the §2 Phase-400 contract, propose
-the approach, then build 410/420/430, run on the real docs, and stop for my review.
+START NOW WITH PHASE 500 (Signals): read pipeline2/core/outputs.py and the §2 Phase-500 contract,
+propose the approach, then build 510 (I/O Tags → io_tags_dir/PLCTags.xlsx) and 520 (Data Blocks →
+blocks_import_dir/*.db, rule-driven by datablock_elements_rules.csv), run on the real docs, and stop
+for my review. Reuse domain/identity (name_in_tagtable / name_in_db / tagtable / datablocks already on
+ctx.rows) and the signal_types catalogue (tag_name / db_element / db_names / tagtable_name).
 ```
