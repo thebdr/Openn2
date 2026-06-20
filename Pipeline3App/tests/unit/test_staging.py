@@ -31,10 +31,19 @@ def _make_iolist(path):
     _set(ws, "G", 2, "I20.0"); _set(ws, "K", 2, "EMERGENCY PUSH-BUTTON PRESSED"); _set(ws, "L", 2, "CH1")
     _set(ws, "O", 2, "=S1", text=True); _set(ws, "P", 2, "+MS1.CC1", text=True)
     _set(ws, "Q", 2, "-S67001", text=True); _set(ws, "AB", 2, "E1/2"); _set(ws, "AD", 2, "0001")
-    # a contactor output (KQ -> DB-backed)
+    # a contactor output (KQ -> DB-backed); diag_cabinet (AE) points at a DiagnosisBlocks row
     _set(ws, "G", 3, "Q0.0")
     _set(ws, "O", 3, "=S1", text=True); _set(ws, "P", 3, "+MS1.CC1", text=True)
     _set(ws, "Q", 3, "-Q67001", text=True); _set(ws, "AB", 3, "KQ"); _set(ws, "AD", 3, "0001")
+    _set(ws, "AE", 3, "5")
+    # DiagnosisBlocks: ID_Local 5 maps to a distinct ID_SWP 15 (swp_cabinet import)
+    db = wb.create_sheet("DiagnosisBlocks")
+    for col, hdr in (("A", "ID_Local"), ("B", "ID_SWP"), ("C", "Functional Unit"),
+                     ("D", "Location"), ("E", "FullName"), ("F", "TemplateType")):
+        _set(db, col, 1, hdr)
+    _set(db, "A", 2, 5); _set(db, "B", 2, 15)
+    _set(db, "C", 2, "=S1", text=True); _set(db, "D", 2, "+MS1.CC1", text=True)
+    _set(db, "E", 2, "=S1+MS1.CC1", text=True); _set(db, "F", 2, 1)
     wb.save(path)
 
 
@@ -110,6 +119,26 @@ def test_identity_fields():
     _run(check)
 
 
+def test_interface_tagname_staged():
+    def check(p, rows):
+        e1 = _by_addr(rows, "I20.0")
+        ok(e1["interface_tagname"].startswith("PNC_Q_"), "interface_tagname computed at staging")
+        ok("Emergency Push Button" in e1["interface_tagname"], "nested {tag_name} resolved")
+    _run(check)
+
+
+def test_swp_cabinet_from_diagnosis_blocks():
+    def check(p, rows):
+        kq = _by_addr(rows, "Q0.0")
+        eq(kq["diag_cabinet"], "5", "local cabinet (ID_Local) on the row")
+        eq(kq["swp_cabinet"], "15", "swp_cabinet = the cabinet's ID_SWP (imported, may differ)")
+        eq(kq["diag_block_name"], "=S1+MS1.CC1", "diag_block_name still resolves (via ID_Local)")
+        eq(kq["diag_block_template"], "1")
+        e1 = _by_addr(rows, "I20.0")
+        eq(e1["swp_cabinet"], "", "a row with no diag cabinet -> blank swp_cabinet")
+    _run(check)
+
+
 def test_iodatabase_csv():
     with tempfile.TemporaryDirectory() as d:
         p, io = _params(d)
@@ -133,5 +162,7 @@ if __name__ == "__main__":
         ("input_matrix_areas_and_ce_fld", test_input_matrix_areas_and_ce_fld),
         ("output_areas_and_numerazione", test_output_areas_and_numerazione),
         ("identity_fields", test_identity_fields),
+        ("interface_tagname_staged", test_interface_tagname_staged),
+        ("swp_cabinet_from_diagnosis_blocks", test_swp_cabinet_from_diagnosis_blocks),
         ("iodatabase_csv", test_iodatabase_csv),
     ]))

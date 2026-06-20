@@ -28,10 +28,11 @@ IoList,Z,tag_filter,Tag filter,no,
 IoList,AA,skip_reason,Skip Reason,no,yes
 IoList,AB,script_type,Script Type,yes,yes
 IoList,AC,suggested_type,Suggested Type,no,yes
-IoList,AD,index,Index,no,yes
+IoList,AD,index,Index,yes,yes
 IoList,AE,diag_cabinet,Diag Cabinet,no,yes
 IoList,AF,diag_bit,Diag Bit,no,yes
 IoList,AG,hardware_params,Hardware Parameters,no,yes
+IoList,AH,interface_mapping,Interface Mapping,no,yes
 CE,F,address,BIT (ADDRESS),yes,
 CE,J,functional_unit,FUNCTIONAL UNIT,yes,
 CE,K,location,LOCATION,yes,

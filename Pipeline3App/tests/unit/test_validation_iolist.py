@@ -37,7 +37,7 @@ def _make(path):
     for col, hdr in (("F", "ID"), ("O", "Functional unit"), ("P", "Location"), ("Q", "Device")):
         _set(ws, col, 1, hdr)
     _set(ws, "AB", 1, "Definitely Not Script Type")   # excluded col -> must NOT be flagged
-    _set(ws, "AH", 1, "Extra Thing")           # outside map -> col_unexpected
+    _set(ws, "AJ", 1, "Extra Thing")           # outside map (AH is now interface_mapping) -> col_unexpected
     _set(ws, "AI", 1, "Device")                # duplicates a standard name -> col_duplicated
 
     _set(ws, "V", 2, "#REF!", text=True); _fld(ws, 2, "=S0", "+M0", "-D0")   # ip_error

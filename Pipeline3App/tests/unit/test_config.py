@@ -103,6 +103,26 @@ def test_load_device_types_db():
     ok(len(db["by_id"]) > 0)
 
 
+def test_column_map_interface_mapping():
+    rows = c.load_column_map("IoList")
+    by_can = {r["canonical"]: r["column"] for r in rows}
+    eq(by_can["hardware_params"], "AG")
+    eq(by_can["interface_mapping"], "AH", "interface_mapping at AH, not colliding with AG")
+    cols = [r["column"] for r in rows]
+    eq(len(cols), len(set(cols)), "no two IoList canonicals share a column letter")
+
+
+def test_load_interface_elements_rules():
+    rules = c.load_interface_elements_rules()
+    ok(isinstance(rules, list) and len(rules) >= 1, "seed rules load")
+    r = rules[0]
+    for k in ("name", "required_types", "direction", "data_type", "script_type", "member"):
+        ok(k in r, k)
+    ok(r["direction"] in ("I", "Q")); ok(r["data_type"] in ("BOOL", "WORD"))
+    ok(isinstance(r["required_types"], list))
+    eq(c.INTERFACE_CUSTOM_GAP, 8)
+
+
 if __name__ == "__main__":
     raise SystemExit(run("config", [
         ("output_paths_keys", test_output_paths_keys),
@@ -117,4 +137,6 @@ if __name__ == "__main__":
         ("load_signal_types", test_load_signal_types),
         ("load_rules_datablocks", test_load_rules_datablocks),
         ("load_device_types_db", test_load_device_types_db),
+        ("column_map_interface_mapping", test_column_map_interface_mapping),
+        ("load_interface_elements_rules", test_load_interface_elements_rules),
     ]))

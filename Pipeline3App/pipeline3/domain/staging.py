@@ -22,7 +22,7 @@ _GENERATED = {DIAGBLOCKS_SHEET.lower(), DIAGBLOCKS_LEGACY.lower(), UNRESOLVED_SH
 _EXTRA = ["matrix_areas", "areas_description",
           "ce_functional_unit", "ce_location", "ce_device", "numerazione_linea",
           "IsSorterArea", "name_in_db", "name_in_tagtable", "tagtable", "datablocks", "diag_desc",
-          "diag_block_name", "diag_block_template", "subnet_name",
+          "interface_tagname", "diag_block_name", "diag_block_template", "swp_cabinet", "subnet_name",
           "I_startByte", "I_endByte", "Q_startByte", "Q_endByte",
           "source_cell", "_source_sheet", "_source_row", "type_id_resolved", "type_category"]
 
@@ -97,10 +97,12 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
             row["name_in_tagtable"] = ""
             row["tagtable"] = ""
         row["diag_desc"] = identity.diag_desc(row)
+        row["interface_tagname"] = identity.interface_tagname(row)
         dc = str(row.get("diag_cabinet", "")).strip()
         blk = diag_blocks.get(int(dc)) if dc.lstrip("-").isdigit() else None
         row["diag_block_name"] = blk["fld"] if blk else ""
         row["diag_block_template"] = blk["template_type"] if blk else ""
+        row["swp_cabinet"] = blk["swp"] if blk else ""
         t = row.get("_type") or {}
         row["datablocks"] = ("|".join(t.get("db_names") or [])
                              if t.get("db_kind") in ("db", "safe_db") and row["name_in_db"] else "")
@@ -143,8 +145,11 @@ def _add_node_address_ranges(rows) -> None:
 
 
 def load_diagnostic_blocks(io_path: str) -> dict:
-    """Read the DiagnosisBlocks sheet -> {cabinet_id:int -> {index, fld, template_type}} keyed by
-    ID_SWP. {} if the sheet/column is missing. Accepts the legacy 'DiagnosticBlocks' spelling."""
+    """Read the DiagnosisBlocks sheet -> {cabinet_id:int -> {index, fld, template_type, swp}} keyed
+    by ID_Local (= the I/O List row's diag_cabinet, the local cabinet). `swp` is the ID_SWP (software
+    cabinet; equals ID_Local on a generated sheet, may differ in general). {} if the sheet/column is
+    missing. Accepts the legacy 'DiagnosticBlocks' spelling; falls back to ID_SWP as the key when
+    ID_Local is absent (older sheets)."""
     wb = load_workbook(io_path, data_only=True)
     sheet = next((s for s in wb.sheetnames
                   if s.strip().lower() in (DIAGBLOCKS_SHEET.lower(), DIAGBLOCKS_LEGACY.lower())), None)
@@ -161,12 +166,13 @@ def load_diagnostic_blocks(io_path: str) -> dict:
         key = " ".join(name.split()).lower()
         return next((i for i, h in enumerate(header) if h == key), None)
 
-    c_id, c_fld, c_tt = col("ID_SWP"), col("FullName"), col("TemplateType")
-    if c_id is None:
+    c_local, c_swp, c_fld, c_tt = col("ID_Local"), col("ID_SWP"), col("FullName"), col("TemplateType")
+    c_key = c_local if c_local is not None else c_swp
+    if c_key is None:
         return {}
     out = {}
     for r in grid[1:]:
-        raw = _norm(r[c_id]) if c_id < len(r) else ""
+        raw = _norm(r[c_key]) if c_key < len(r) else ""
         if not raw or not raw.lstrip("-").isdigit():
             continue
         cid = int(raw)
@@ -174,6 +180,7 @@ def load_diagnostic_blocks(io_path: str) -> dict:
             "index": f"{cid:03d}",
             "fld": _norm(r[c_fld]) if c_fld is not None and c_fld < len(r) else "",
             "template_type": _norm(r[c_tt]) if c_tt is not None and c_tt < len(r) else "",
+            "swp": _norm(r[c_swp]) if (c_swp is not None and c_swp < len(r)) else raw,
         }
     return out
 

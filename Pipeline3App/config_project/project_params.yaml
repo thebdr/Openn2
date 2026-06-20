@@ -19,7 +19,7 @@ ce_fuzzy_chars: 2                                                               
 ce_full_check: false                                                                                    # ignore ce_excluded_words (check every row)
 ce_full_print: true                                                                                     # log every PASS/SKIP, not just FAIL/WARN
 safety_nets: '192.168.5\d'                                                                              # PROFINET safety subnet /24 prefixes
-
+insert_interface_sheets: true                                                                           # Generated Interfaces will be copied in I/O List. Output folder will not be considered for downstream pipeline phases.
 
 ce:           # The Cause & Effect Matrix workbook ::: validation cross-checks this against the I/O List
   path: "C:\\Source\\Repos\\_Openn2\\Shared\\DocumentsValidationData\\Passing\\8XXX_Cause and Effect Matrix_R0.0_ValidationTemplate.xlsx"

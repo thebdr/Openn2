@@ -49,7 +49,7 @@ Every ordered enumeration uses gapped numbers so steps insert without renumberin
 | 100 | Documents Validation | 110 Validate I/O List · 120 Validate C&E Matrix · 130 Cross-Check CEM→IOL · 140 Cross-Check IOL→CEM · 150 Validate Diagnosis Assignments | **DONE** |
 | 200 | Documents Fill Out | 210 Fill Script Type · 220 Fill Index · 230 Fill Diag Cabinet · 240 Fill Diag Bit | **DONE** |
 | 300 | Documents Staging | 310 Stage I/O List · 320 Generate IO Database | **DONE** |
-| 400 | Interfaces Generation | 410 Generate Interfaces · 430 Generate Custom Interface… | TODO (M7) |
+| 400 | Interfaces Generation | 410 Generate Interfaces · 430 Generate Custom Interface… | **DONE** |
 | 500 | Signals Mapping | 510 Generate I/O Tags · 520 Generate Data Blocks | TODO (M7) |
 | 600 | Diagnosis Mapping | 610 Generate Diag List · 620 Generate Diag Software Blocks | TODO (M8) |
 | 700 | Hardware Generation | 710 Generate Stations · 720 Generate Modules | TODO (M7) |
@@ -203,6 +203,52 @@ Every builder returns `list[LogEntry]`; each emit site declares a `type` slug (t
   build instead reads `user_input/designer_suppressions.csv` (suppress-only). Both CSVs are gitignored
   (user-local). Applied in the phase-100 header before rendering.
 
+## Phase 400 — Interfaces Generation — DONE
+
+`domain/interfaces.py` + `phases/p400_interfaces.py`. **410** builds one `IF_<instance>.xlsx` per IOC
+row of the staged database (Script Type `IOC`, Index `MACHINETYPE[+DIAG]-nn`) from the
+`Shared/Templates/MachineInterfaces` template → `interfaces_dir`
+(`ProjectDocumentation/.../Interfaces` — documentation, **NOT** the Open2App BuilderData surface).
+The machine type picks a template sheet (else `<GENERIC>`); the trailing digits are the index. Per
+IOC row the template is copied, other sheets dropped, the sheet retitled to the full instance
+(`IF_SORTER+DIAG-02.xlsx`), and the IOC row's Base Address (Bit) + Base Node (ID) + Index plugged into
+the **Side rows only** (via the `Side` column), `<index>` tokens replaced. Existing files are
+**preserved** (unless `insert_interface_sheets`, below). Interface **indices must be unique** across
+IOC rows (`_idx_key` int-compare, so `02`==`2`) — a collision is an ERROR. `generate_one` is the
+shared single-interface primitive the GUI-era **430** "Custom Interface…" popup will call (explicit
+machine type / base address / node side 1 / node side 2 / index); **420/430** are GUI-era (M11).
+
+- **Signal mirroring** (the I/O List **`Interface Mapping`** column = col **AH**, a `|`-list of
+  interface indices): a flagged signal is mirrored onto the named coupler interface(s) in a "custom
+  data" block. **Signal Name Side 1** = the **`interface_tagname`** (per-type template in
+  `signal_types.csv` + the three rule CSVs; computed at **staging** into the IODatabase via
+  `identity.interface_tagname` with `{tag_name}` resolved + `{interface_name}`/`{interface_id}` kept,
+  then filled per-interface by the generator; rules use `{direction}`/`{member}`). **Expression
+  Side 1** = the binding `identity.plc_binding` (`"<leftmost db>"."<name_in_db>"` else `"<tag>"`,
+  shared with phase 600). A **`+DIAG`** suffix on the IOC Index mirrors **all `in_diag`** signals
+  automatically. `datablock_elements_rules` + `diagnosis_logic_rules` followers follow each mirror
+  (Q); the new **`interface_elements_rules.csv`** (`config.load_interface_elements_rules`) is the only
+  source that may add **input (I)** rows. Direct I/O-list mirrors are always **output (Q)**.
+- **Byte layout** (`allocate_bytes`/`_append_custom_rows`): per direction independently, starting
+  `≥ INTERFACE_CUSTOM_GAP (8)` free bytes after the template's last used `I/O Offset Byte` (detected
+  fresh each run, 2-byte-aligned). Grouped by `script_type`, never two types in a byte. Each **BOOL**
+  type fills a **full 2-byte block** (its bits low, the rest blank addressed rows for the engineer) +
+  a blank separator; a **WORD** is **one row + a blank separator**. Diagnosis columns
+  (`diag_cabinet`/`swp_cabinet`/`diag_bit`) are written only where the chosen sheet has them; staging
+  imports **`swp_cabinet`** = the `ID_SWP` of the row's local cabinet from the `DiagnosisBlocks` sheet
+  (keyed by `ID_Local`). Addresses are the template's own `_xlfn.LET` structured-ref formulas, copied
+  verbatim (Excel recomputes on open).
+- **`insert_interface_sheets`** (project_params bool): when true, generation **overwrites** existing
+  `IF_*.xlsx` AND **inserts each interface as a sheet into the I/O List** if not already present
+  (a timestamped `.bak` is taken first; idempotent). The insertion is **lossless**: openpyxl writes
+  the combined workbook keeping every formula, then the existing formula cells' cached values — which
+  openpyxl drops on re-save — are **patched back at the ZIP/XML level** (`_capture_formula_caches` /
+  `_patch_formula_cache`), so data_only readers (staging/validation) still see e.g. Profinet IP/name.
+  Atomic save (temp + `os.replace`). Copied tables are **re-created with clean columns** (id+name
+  only, dropping the source's out-of-range `dataDxfId` + stale `calculatedColumnFormula`) and given
+  per-instance names, else Excel drops the table on open. The interface sheets don't match
+  `io_list.sheet`, so staging/validation ignore them.
+
 ## Testing
 
 Plain-`python` tests (no pytest) under `tests/unit/`, via `tests/unit/_harness.py` (PASS/FAIL,
@@ -211,9 +257,12 @@ suite is the green gate** — it passes with no real documents present. Data-dep
 **review-then-freeze**: the user reviews a phase's real-document artifact, and once blessed it is
 frozen as a Pipeline3 golden under `tests/golden/` (Pipeline2 is NOT a golden source). The phase-100
 reports are the first blessed golden; `tests/unit/test_golden_validation.py` regenerates + compares
-them (data-dependent, skips when the real docs are absent; re-freeze with `--freeze`). Current:
-**94 unit tests green** (numbering, model, config, i18n, registry, workbook, render, iolist_diag,
-staging, the five validation suites + the phase-100 phase test + golden parity + the treatment registry).
+them (data-dependent, skips when the real docs are absent; re-freeze with `--freeze`). Current: the
+data-independent suite is green (numbering, model, config, i18n, registry, workbook, render,
+iolist_diag, staging, the five validation suites + the phase-100 phase test + golden parity + the
+treatment registry + the **Phase-400 interface suite** `test_interfaces.py`, ~36 cases: mirroring
+membership, byte packing, the names/`interface_tagname` split, the WORD/BOOL layout, the lossless
+I/O List insertion + the table-validity regression).
 
 ## Status & still to build
 
@@ -222,8 +271,10 @@ staging, the five validation suites + the phase-100 phase test + golden parity +
   dated backup), M5 Phase 300 Staging (single `IODatabase.csv` + C&E enrichment incl.
   `areas_description`), **M6 Phase 100 Validation** (sub-phases 110–150 + the two reports + golden),
   **M6b** the treatment registry (`core/errors.py`: warn/skip/accept keyed by uid + mark-stale +
-  designer suppression).
-- **NEXT**: M7 generators (interfaces/signals/hardware/coverage), M8 diagnosis, M9 software, M10 CLI
+  designer suppression), **M7 Phase 400 Interfaces** (generation + signal mirroring +
+  `interface_tagname`/Expression split + BOOL 2-byte-block / WORD-row layout + the lossless
+  `insert_interface_sheets`).
+- **NEXT**: M7 remaining generators (500 signals / 700 hardware / 910 coverage), M8 diagnosis, M9 software, M10 CLI
   + Open2App-path contract test, M11–13 GUIs (dark-by-default, registry-driven phase bar,
   YAML-explorer config, selectable projects root) + designer + Project Manager, M14 packaging
   (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.
@@ -236,5 +287,11 @@ staging, the five validation suites + the phase-100 phase test + golden parity +
 - Tag/device strings (`=S1`, `+MS1.CC1`, `-S67001`) are **text**; generated cells that start with
   `=`/`+`/`-` are materialized `data_type="s"` (else openpyxl treats them as formulas).
 - **Comma CSV** everywhere on write; readers sniff `,`/`;`.
+- **Interface mirroring binds template columns by NAME** (the `<GENERIC>` and machine sheets differ;
+  tables are user-renamed) — the data table is found by its `Category` header. **`interface_tagname`
+  is computed at staging** (keeps `{interface_name}`/`{interface_id}` for the generator to fill).
+- **openpyxl can't preserve formula caches** across a re-save — when modifying the I/O List in place,
+  capture + patch them back at the ZIP/XML level; and **re-create copied tables with clean columns**
+  (no `dataDxfId`/`calculatedColumnFormula`) or Excel drops them ("Removed Records: Table").
 - Run/test from the `Pipeline3App` root. When committing `_Openn2`, end commit messages with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.

@@ -55,6 +55,10 @@ PROJECTS_DIR = os.environ.get("PIPELINE3_PROJECTS") or os.path.join(os.path.expa
 DEVICE_TYPES_DB_DEFAULT = os.path.join(SHARED, "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
 INTERFACE_TEMPLATE_DEFAULT = os.path.join(TEMPLATES_DIR, "MachineInterfaces", "TEMPLATE_INTERFACES_v0.0.xlsx")
 
+# Phase 400 interface mirroring: free bytes left between the template's last used I/O Offset Byte and
+# the start of the mirrored "custom data" block (per direction).
+INTERFACE_CUSTOM_GAP = 8
+
 # Generated outputs land under the run's output root (default OUTPUT_ROOT = Shared/OutputTree) at
 # these semantic subpaths. The BuilderData/* keys are the Open2App import contract (keep stable).
 OUTPUT_PATHS = {
@@ -298,6 +302,35 @@ def load_rules(name: str, base: str | None = None) -> list:
             "dev_type": (r.get("dev_type") or "").strip(),
             "db_name": (r.get("db_name") or "").strip(),
             "member": (r.get("member") or "").strip(),
+            "interface_tagname": (r.get("interface_tagname") or "").strip(),
+        })
+    return rules
+
+
+def load_interface_elements_rules(base: str | None = None) -> list:
+    """Interface mirroring rules (phase 400): a mirrored signal of a matching script_type spawns an
+    extra coupler element. Columns: name, required_types ('|'-separated trigger script_types),
+    dev_type (optional filter), direction (I/Q - the ONLY source that may add an input row),
+    data_type (BOOL/WORD), script_type (byte-grouping label; defaults to name), member (mirror-name
+    template, {functional_unit}{location}{device} interpolated). Missing file -> []."""
+    path = os.path.join(base or INPUT_DOCS_DIR, "interface_elements_rules.csv")
+    if not os.path.exists(path):
+        return []
+    rules = []
+    for r in _read_csv("interface_elements_rules.csv", base):
+        if not (r.get("name") or "").strip():
+            continue
+        direction = (r.get("direction") or "Q").strip().upper()
+        data_type = (r.get("data_type") or "BOOL").strip().upper()
+        rules.append({
+            "name": (r.get("name") or "").strip(),
+            "required_types": [t.strip() for t in (r.get("required_types") or "").split("|") if t.strip()],
+            "dev_type": (r.get("dev_type") or "").strip(),
+            "direction": "I" if direction == "I" else "Q",
+            "data_type": "WORD" if data_type == "WORD" else "BOOL",
+            "script_type": (r.get("script_type") or "").strip() or (r.get("name") or "").strip(),
+            "member": (r.get("member") or "").strip(),
+            "interface_tagname": (r.get("interface_tagname") or "").strip(),
         })
     return rules
 
@@ -327,6 +360,7 @@ def load_signal_types() -> dict:
             "io_comment": (r.get("io_comment") or "").strip(),
             "ce_mandatory": (r.get("ce_mandatory") or "").strip().lower(),
             "diag_container_check": (r.get("diag_container_check") or "").strip(),
+            "interface_tagname": (r.get("interface_tagname") or "").strip(),
         }
     by_pair = {}
     for t in types.values():
