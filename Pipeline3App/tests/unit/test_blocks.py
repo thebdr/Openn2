@@ -163,6 +163,94 @@ def test_xml_emit_and_coil_fc_from_table():
         eq(len(gids), len(set(gids)), "global object IDs unique")
 
 
+def test_xml_emitted_block_skips_creation_csv():
+    registry.clear()
+
+    @registry.builds("TestBlock")
+    def _b(db):
+        t = Table("TestBlock")
+        t.add(template_type="01", nameOfDB="X")
+        return t
+
+    orig = xml_emit.write_fc_xml
+    xml_emit.write_fc_xml = (lambda name, table, ref, out_dir:
+                             os.path.join(out_dir, f"{name}.xml") if name == "TestBlock" else "")
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            res = engine.generate_blocks(_rows(), d, emit=lambda *_: None)
+            ok(not os.path.exists(os.path.join(res["dir"], "TestBlock.csv")),
+               "a direct-XML block writes NO CreationInfo CSV")
+            ok("TestBlock" not in [os.path.basename(f) for f in res["files"]], "CSV not in the result list")
+            ok(any("TestBlock.xml" in x for x in res["xml_files"]), "the FC XML is recorded instead")
+    finally:
+        xml_emit.write_fc_xml = orig
+        registry.clear()
+
+
+def test_standard_sheet_mirrors_csv_and_reads_back():
+    from pipeline3.domain.blocks.engine import _ordered_columns, _wrap, _at_row_cells
+    with tempfile.TemporaryDirectory() as out:
+        t = Table("00_Only for Commissioning")
+        t.add(template_type="01", NetworkComment="n1 1.2.3.4", **{"00_Commissioning.{db_element}": "n1 1.2.3.4"})
+        t.add(template_type="01", NetworkComment="n2 1.2.3.5", **{"00_Commissioning.{db_element}": "n2 1.2.3.5"})
+        keys = ["TemplateType", "00_Commissioning.{db_element}", "NetworkComment"]
+        ordered = _ordered_columns(keys, t)
+        p = shells.write_standard_sheet(out, "00_Only for Commissioning", [_wrap(c) for c in ordered],
+                                        [_at_row_cells(r, ordered) for r in t.rows], r"C:\t\00.xml")
+        ws = load_workbook(p)["00_Only for Commissioning"]
+        eq([ws["A1"].value, ws["A2"].value, ws["A3"].value], ["$", "$", "%"], "$ template / $ mode / % markers")
+        eq(ws["B2"].value, "fill", "mode preserved (default fill)")
+        eq([ws["B3"].value, ws["A4"].value], ["TemplateType", "@"], "% header + @ data rows")
+        ws.parent.close()
+        back = shells.read_override_table(out, "00_Only for Commissioning")
+        eq(len(back), 2, "the mirrored @ rows read back via override")
+        eq(back.rows[0]["00_Commissioning.{db_element}"], "n1 1.2.3.4")
+        eq(back.rows[1]["NetworkComment"], "n2 1.2.3.5")
+
+
+def test_coil_columns_round_trip():
+    with tempfile.TemporaryDirectory() as out:
+        t = Table("03_Zone Cumulative")
+        t.add(template_type="01", nameOfDB="01_Pushbutton", NetworkComment="AREA 1 PB - Sorter",
+              **{"02_COM.{db_element}": "AREA 1 PB"}, ITERATOR_STRINGS=["PB a", "PB b", "PB c"])
+        t.add(template_type="01", nameOfDB="03_FDBACK", NetworkComment="AREA 1 FDB - Sorter",
+              **{"02_COM.{db_element}": "AREA 1 FDB"}, ITERATOR_STRINGS=["FB a"])
+        p = shells.write_coil_columns(out, "03_Zone Cumulative", t, r"C:\t\03.xml")
+        ok(os.path.exists(p), "coil-columns shell written")
+        ws = load_workbook(p)["03_Zone Cumulative"]
+        eq([ws["A3"].value, ws["A4"].value, ws["A5"].value], ["%coil", "nameOfDB", "comment"], "row markers")
+        eq([ws["B3"].value, ws["C3"].value], ["AREA 1 PB", "AREA 1 FDB"], "one column per coil")
+        eq([ws["B6"].value, ws["B7"].value, ws["B8"].value], ["PB a", "PB b", "PB c"], "inputs down the column")
+        eq(ws["C6"].value, "FB a")
+        ws.parent.close()
+        # round-trip: read it back to an equivalent table
+        back = shells.read_coil_columns(out, "03_Zone Cumulative")
+        m = {r["02_COM.{db_element}"]: r for r in back.rows}
+        eq(sorted(m), ["AREA 1 FDB", "AREA 1 PB"])
+        eq(m["AREA 1 PB"]["nameOfDB"], "01_Pushbutton")
+        eq(m["AREA 1 PB"]["NetworkComment"], "AREA 1 PB - Sorter")
+        eq(m["AREA 1 PB"]["ITERATOR_STRINGS"], ["PB a", "PB b", "PB c"], "AND inputs recovered, in order")
+        eq(m["AREA 1 FDB"]["ITERATOR_STRINGS"], ["FB a"])
+
+
+def test_override_writes_csv_verbatim_with_iterator():
+    def check(out):
+        shells.generate_shells(out, emit=lambda *_: None)        # T1 standard sheet (mode fill)
+        path = shells._shell_path(out)
+        wb = load_workbook(path)
+        ws = wb["T1"]
+        ws["B2"] = "override"
+        ws["A4"] = "@"; ws["B4"] = "01"; ws["C4"] = "DB1"
+        for i, m in enumerate(["m1", "m2", "m3"]):                # a spread ITERATOR (3 members)
+            ws.cell(row=4, column=4 + i, value=m)                 # D4, E4, F4
+        wb.save(path)
+        res = engine.generate_blocks([], out, emit=lambda *_: None)
+        at = [r for r in _read(os.path.join(res["dir"], "T1.csv")) if r and r[0] == "@"]
+        eq(len(at), 1)
+        eq(at[0], ["@", "01", "DB1", "m1", "m2", "m3"], "override @ row copied verbatim, iterator preserved")
+    _with_synthetic_templates(check)
+
+
 def test_shells_scan_and_inventory():
     def check(out):
         res = shells.generate_shells(out, emit=lambda *_: None)
@@ -220,6 +308,10 @@ if __name__ == "__main__":
         ("engine_writes_com_db_with_constants", test_engine_writes_com_db_with_constants),
         ("xml_emit_flgnet_exactly_sized", test_xml_emit_flgnet_exactly_sized),
         ("xml_emit_and_coil_fc_from_table", test_xml_emit_and_coil_fc_from_table),
+        ("xml_emitted_block_skips_creation_csv", test_xml_emitted_block_skips_creation_csv),
+        ("standard_sheet_mirrors_csv_and_reads_back", test_standard_sheet_mirrors_csv_and_reads_back),
+        ("coil_columns_round_trip", test_coil_columns_round_trip),
+        ("override_writes_csv_verbatim_with_iterator", test_override_writes_csv_verbatim_with_iterator),
         ("shells_scan_and_inventory", test_shells_scan_and_inventory),
         ("output_header_is_full_shell_keyset", test_output_header_is_full_shell_keyset),
         ("override_uses_shell_rows", test_override_uses_shell_rows),

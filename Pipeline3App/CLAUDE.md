@@ -351,7 +351,7 @@ BASE for hand-written builders over the single database — no rules, no sidecar
   query `db`, return a `Table`. Currently stubs + a worked example. (Replaces Pipeline2's
   sidecar/capacity/ITERATOR rules + AST `sync_builders`.)
 - **`registry.py`** — the `@builds` decorator; the engine runs every registered builder.
-- **`shells.py` (810)** — `CreationInfo/SoftwareBlocks.xlsm`, the **KEY INVENTORY**: scans the template
+- **`shells.py` (810)** — `CreationInfo/SoftwareBlocksBuilderShells.xlsm`, the **KEY INVENTORY**: scans the template
   `*.xml` for `!!key$$` and writes one sheet per template with the FULL key set. Per sheet: B1
   `$ template=<ABSOLUTE path>`, B2 `$ <mode>` (keep/fill/override), row 3 `% TemplateType !!key$$ …`.
   Additive (edits/mode/added keys survive); `read_shells` reads modes + the key set back.
@@ -421,7 +421,7 @@ synthetic template to stay data-independent).
 - Regex YAML params must be **single-quoted**; JS `/…/flags` literals are accepted (`config.js_to_re`).
 - `strike_handling` excludes struck rows only on `"exclude"`.
 - Phase 800: `block_templates.json` is **deprecated** (neither read nor emitted) — the
-  `SoftwareBlocks.xlsm` shell IS the key inventory (810 scans the template `*.xml`); the `$ template=`
+  `SoftwareBlocksBuilderShells.xlsm` shell IS the key inventory (810 scans the template `*.xml`); the `$ template=`
   ref is an **absolute** path; the per-template builders in `domain/blocks/builders.py` are
   user-authored free-form Python. Delete a stale shell to regenerate in the current format.
 - Tag/device strings (`=S1`, `+MS1.CC1`, `-S67001`) are **text**; generated cells that start with
