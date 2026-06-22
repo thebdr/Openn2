@@ -28,7 +28,7 @@ def _row(in_diag=True, script_type="A", diag_cabinet="001", diag_bit="05", type_
 
 
 _DOOR_RULE = [{"name": "Door Alarm", "required_types": ["DI1/2", "DI2/2"], "dev_type": "A",
-               "db_name": "05_DOORS", "member": "Door Alarm [ {functional_unit}{location}{device} ]"}]
+               "db_name": "07_DOOR", "member": "Door Alarm [ {functional_unit}{location}{device} ]"}]
 
 
 # --- 610a: DiagList_IO ---------------------------------------------------------------------- #
@@ -68,7 +68,7 @@ def test_logic_or_per_row():
     eq([l["DevType"] for l in logic], ["Door Alarm", "Door Alarm"], "DevType = the rule name")
     eq([l["Type"] for l in logic], ["A", "A"], "Type = the rule dev_type")
     eq({l["PLC_Binding"] for l in logic},
-       {'"05_DOORS"."Door Alarm [ =S1+SG1-B1 ]"', '"05_DOORS"."Door Alarm [ =S1+SG2-B2 ]"'})
+       {'"07_DOOR"."Door Alarm [ =S1+SG1-B1 ]"', '"07_DOOR"."Door Alarm [ =S1+SG2-B2 ]"'})
 
 
 def test_logic_fires_on_any():
@@ -91,7 +91,7 @@ def test_logic_next_free_bit():
 def test_logic_paired_channel_sibling():
     # a rule matching the diagnosis channel DI2/2 (in_diag=no, no cabinet) co-locates it with its
     # DI1/2 sibling (same device FLD, carries the cabinet)
-    rule = [{"name": "Door", "required_types": ["DI2/2"], "dev_type": "A", "db_name": "05_DOORS",
+    rule = [{"name": "Door", "required_types": ["DI2/2"], "dev_type": "A", "db_name": "07_DOOR",
              "member": "Door Alarm [ {functional_unit}{location}{device} ]"}]
     rows = [_row(in_diag=True, script_type="DI1/2", diag_cabinet="010", diag_bit="01", type_hw="A",
                  fu="=S1", loc="+SG1", dev="-B1"),
@@ -100,7 +100,7 @@ def test_logic_paired_channel_sibling():
     logic = diagnosis.build_diag_list_logic(rows, {}, rules=rule)
     eq(len(logic), 1, "DI2/2 matches; co-locates to its sibling's cabinet 010")
     eq(logic[0]["Diag Cabinet"], "010"); eq(logic[0]["Diag Bit"], "00")
-    eq(logic[0]["PLC_Binding"], '"05_DOORS"."Door Alarm [ =S1+SG1-B1 ]"')
+    eq(logic[0]["PLC_Binding"], '"07_DOOR"."Door Alarm [ =S1+SG1-B1 ]"')
 
 
 def test_logic_fld_fallback_cabinet():

@@ -99,6 +99,26 @@ def test_run_all_full():
     eq(order, [200, 300, 100, 400])
 
 
+def test_file_write_error_logs_and_halts():
+    order, msgs = [], []
+    reg = PhaseRegistry()
+
+    def _boom(ctx):
+        order.append(300)
+        raise PermissionError(13, "Permission denied", "out/locked.csv")   # errno, strerror, filename
+
+    reg.register(Phase(200, "fill", "ph_fill", _mkrun(order, 200), requires=()))
+    reg.register(Phase(300, "staging", "ph_staging", _boom, requires=(200,)))
+    reg.register(Phase(400, "interfaces", "ph_i", _mkrun(order, 400), requires=(300,)))
+    ctx = PipelineContext(params={}, out_root="", profile="main", emit=msgs.append)
+    result = app.run_phase(ctx, 400, reg=reg)
+    ok(result is not None and result.halt and not result.ok, "a file-write OSError -> halting result")
+    eq(order, [200, 300], "stopped at the failed write; 400 never ran")
+    ok(300 not in ctx.completed, "the failed phase is left un-completed (retriable after the lock clears)")
+    ok(any("[ERROR]" in m and "could not write file" in m and "locked.csv" in m for m in msgs),
+       "logged a clean ERROR with the path - not a raw traceback")
+
+
 if __name__ == "__main__":
     raise SystemExit(run("registry", [
         ("presentation_order", test_presentation_order),
@@ -111,4 +131,5 @@ if __name__ == "__main__":
         ("run_phase_memoizes", test_run_phase_memoizes),
         ("run_all_halts", test_run_all_halts),
         ("run_all_full", test_run_all_full),
+        ("file_write_error_logs_and_halts", test_file_write_error_logs_and_halts),
     ]))

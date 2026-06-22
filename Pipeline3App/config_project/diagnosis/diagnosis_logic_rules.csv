@@ -1,3 +1,3 @@
 name,required_types,dev_type,db_name,member,interface_tagname
 Safety Encoder Failure,N1/2|N,A,04_SPEED,Safety Encoder Failure [ {functional_unit}{location}{device} ],PNC_Q_{member}
-Safety Door Alarm - Not Properly Closed,DI1/2|DI,A,05_DOORS,Door Alarm [ {functional_unit}{location}{device} ],PNC_Q_{member}
+Safety Door Alarm - Not Properly Closed,DI1/2|DI,A,07_DOOR,Door Alarm [ {functional_unit}{location}{device} ],PNC_Q_{member}

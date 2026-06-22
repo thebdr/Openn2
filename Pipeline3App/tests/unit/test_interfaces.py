@@ -383,18 +383,18 @@ def test_byte_packing_by_script_type():
 
 
 def test_follower_and_if_rules():
-    rows = [_srow("DI1/2", "01", db_kind="db", db_names=["05_DOORS"], name_in_db="Door Closed",
-                  datablocks="05_DOORS", fu="=S1", loc="+SG1", dev="-B1")]
+    rows = [_srow("DI1/2", "01", db_kind="db", db_names=["07_DOOR"], name_in_db="Door Closed",
+                  datablocks="07_DOOR", fu="=S1", loc="+SG1", dev="-B1")]
     db_rules = [{"name": "Door Alarm", "required_types": ["DI1/2"], "dev_type": "",
-                 "db_name": "05_DOORS", "member": "Door Alarm [ {functional_unit}{location}{device} ]"}]
+                 "db_name": "07_DOOR", "member": "Door Alarm [ {functional_unit}{location}{device} ]"}]
     if_rules = [{"name": "Door Cmd", "required_types": ["DI1/2"], "dev_type": "", "direction": "I",
                  "data_type": "BOOL", "script_type": "IF_DOOR_CMD",
                  "member": "Open [ {functional_unit}{location}{device} ]"}]
     e, _ = interfaces.collect_mirror_set(rows, index="01", is_diag=False,
                                          db_rules=db_rules, diag_rules=[], if_rules=if_rules)
-    eq(next(x for x in e if x.source == "mirror").mirror_name, '"05_DOORS"."Door Closed"', "db-qualified")
+    eq(next(x for x in e if x.source == "mirror").mirror_name, '"07_DOOR"."Door Closed"', "db-qualified")
     fol = next(x for x in e if x.source == "follow")
-    eq(fol.mirror_name, '"05_DOORS"."Door Alarm [ =S1+SG1-B1 ]"', "follower db-qualified"); eq(fol.direction, "Q")
+    eq(fol.mirror_name, '"07_DOOR"."Door Alarm [ =S1+SG1-B1 ]"', "follower db-qualified"); eq(fol.direction, "Q")
     ifr = next(x for x in e if x.source == "if_rule")
     eq((ifr.direction, ifr.script_type), ("I", "IF_DOOR_CMD"), "if-rule may add an input")
     ok("Open [ =S1+SG1-B1 ]" in ifr.mirror_name)

@@ -9,10 +9,26 @@ _TOKEN = re.compile(r"\{([A-Za-z0-9_]+)\}")
 
 
 def fld(row) -> str:
-    """FUNCTIONAL UNIT + LOCATION + DEVICE, as written (the device key used everywhere)."""
+    """FUNCTIONAL UNIT + LOCATION + DEVICE, as written (the device key used everywhere).
+    Staged as the `iol_FLD` column."""
     return (str(row.get("functional_unit") or "").strip()
             + str(row.get("location") or "").strip()
             + str(row.get("device") or "").strip())
+
+
+def ce_fld(row) -> str:
+    """The C&E-side FUNCTIONAL UNIT + LOCATION + DEVICE (matrix cols J/K/L). Staged as `ce_FLD`."""
+    return (str(row.get("ce_functional_unit") or "").strip()
+            + str(row.get("ce_location") or "").strip()
+            + str(row.get("ce_device") or "").strip())
+
+
+def combined_fld(row) -> str:
+    """The device key with the C&E-side FLD appended ONLY when it differs (else just the I/O FLD).
+    Staged as `combined_FLD`; the signal-type templates use `{combined_FLD}` in place of the old
+    `{functional_unit}{location}{device} {ce_functional_unit}{ce_location}{ce_device}` doubling."""
+    a, b = fld(row), ce_fld(row)
+    return f"{a} {b}" if b and b != a else a
 
 
 def interp(template: str, row) -> str:

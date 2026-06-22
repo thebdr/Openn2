@@ -13,7 +13,7 @@ TWO sources, both as plain text like a real TIA export:
 
 520 Generate Data Blocks -> blocks_import_dir: members from two sources (each row's staged
 name_in_db into its datablocks; plus datablock_elements_rules additions), seeded with Always
-FALSE/TRUE. A SAFE DB (any contributing type is safe_db) is written as a TIA Openness
+FALSE/TRUE + a No Operation no-op (the builder pad). A SAFE DB (any contributing type is safe_db) is written as a TIA Openness
 SW.Blocks.GlobalDB XML (<name>.xml) carrying ProgrammingLanguage=F_DB + DBAccessibleFromOPCUA=false -
 the fail-safe markers the .db external-source format cannot express; a NORMAL DB is written as the
 .db source (<name>.db, OPC-UA accessible).
@@ -144,11 +144,15 @@ def interface_tags(iolist_path) -> tuple[list, list]:
 # write the single PLC Tags workbook
 # --------------------------------------------------------------------------------------------- #
 
-def _clear(directory, *patterns) -> None:
+def _clear(directory, *patterns, keep=()) -> None:
     """Drop previously-generated artifacts so a re-run leaves only the current ones (tag membership
-    changes with the config / the inserted interfaces)."""
+    changes with the config / the inserted interfaces). `keep` basenames are preserved (e.g. the
+    phase-800-owned 02_COM.xml in the shared blocks_import_dir)."""
+    keep = {k.lower() for k in keep}
     for pat in patterns:
         for p in glob.glob(os.path.join(directory, pat)):
+            if os.path.basename(p).lower() in keep:
+                continue
             try:
                 os.remove(p)
             except OSError:
@@ -215,9 +219,16 @@ def generate_io_tags(rows, out_root, *, iolist_path=None) -> dict:
 # 520 Generate Data Blocks -> blocks_import_dir/*.db
 # ============================================================================================== #
 
-# Every DB opens with these two constant booleans (TIA spelling, with a space - no underscore).
-DB_CONSTANTS = ["Always FALSE", "Always TRUE"]
+# Every DB opens with these seed booleans (TIA spelling, with a space - no underscore). "No Operation"
+# is the dedicated no-op member builders use to PAD a template's unused fixed slots, so an unused slot
+# never references "Always TRUE"/"Always FALSE" (whose definite TRUE/FALSE could be misread).
+DB_CONSTANTS = ["Always FALSE", "Always TRUE", "No Operation"]
 _DB_RULES_FILE = "datablock_elements_rules.csv"
+
+# The 02_COM zone-cumulative custom DB is OWNED by phase 800 (its members are the block builders'
+# 02_COM.{db_element} cumulatives, not signal rows), but it lives in blocks_import_dir beside the 520
+# DBs - so the 520 sweep below PRESERVES it. See write_zone_cumulative_db (called from the 800 engine).
+COM_DB = "02_COM"
 
 
 def _safe(name) -> str:
@@ -398,7 +409,7 @@ def write_data_blocks(dbs, out_root) -> tuple[str, int]:
     Returns (dir, count)."""
     db_dir = config.out_path(out_root, "blocks_import_dir")
     os.makedirs(db_dir, exist_ok=True)
-    _clear(db_dir, "*.db", "*.xml")
+    _clear(db_dir, "*.db", "*.xml", keep={f"{COM_DB}.xml"})   # 02_COM is phase-800-owned, not swept here
     for number, (name, db) in enumerate(sorted(dbs.items()), start=1):
         if db["safe"]:
             text, ext = _db_xml(name, db, number), ".xml"
@@ -407,6 +418,23 @@ def write_data_blocks(dbs, out_root) -> tuple[str, int]:
         with open(os.path.join(db_dir, _safe(name) + ext), "w", encoding="utf-8-sig", newline="") as f:
             f.write(text)
     return db_dir, len(dbs)
+
+
+def write_safe_db(out_root, name, member_names) -> str:
+    """Write ONE custom SAFE DB (F_DB Openness XML) into blocks_import_dir WITHOUT sweeping. The
+    DB-format primitive the phase-800 block engine uses to emit its custom DBs (e.g. 02_COM, whose
+    members it decides) - the 520 sweep preserves a COM_DB.xml so it survives a standalone re-run.
+    `member_names` are de-duplicated, order preserved. Returns the path, or '' when empty."""
+    members = [m for m in dict.fromkeys(str(x).strip() for x in member_names) if m]
+    if not members:
+        return ""
+    db = {"safe": True, "members": [{"name": m, "comment": ""} for m in members]}
+    db_dir = config.out_path(out_root, "blocks_import_dir")
+    os.makedirs(db_dir, exist_ok=True)
+    path = os.path.join(db_dir, _safe(name) + ".xml")
+    with open(path, "w", encoding="utf-8-sig", newline="") as f:
+        f.write(_db_xml(name, db, 1))
+    return path
 
 
 def generate_data_blocks(rows, out_root) -> dict:

@@ -21,6 +21,7 @@ _GENERATED = {DIAGBLOCKS_SHEET.lower(), DIAGBLOCKS_LEGACY.lower(), UNRESOLVED_SH
 # IODatabase.csv = the IoList canonical columns + these derived/enriched columns.
 _EXTRA = ["matrix_areas", "areas_description",
           "ce_functional_unit", "ce_location", "ce_device", "numerazione_linea",
+          "iol_FLD", "ce_FLD", "combined_FLD",
           "IsSorterArea", "name_in_db", "name_in_tagtable", "tagtable", "datablocks", "diag_desc",
           "interface_tagname", "diag_block_name", "diag_block_template", "swp_cabinet", "subnet_name",
           "I_startByte", "I_endByte", "Q_startByte", "Q_endByte",
@@ -89,6 +90,10 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
     for row in rows:
         if not row.get("source_cell") and row.get("_source_row"):
             row["source_cell"] = f"{row.get('_source_sheet', '')}!{fu_col}{row['_source_row']}"
+        # combined device keys (must precede name_in_db/diag_desc - the templates reference them)
+        row["iol_FLD"] = identity.fld(row)
+        row["ce_FLD"] = identity.ce_fld(row)
+        row["combined_FLD"] = identity.combined_fld(row)
         row["name_in_db"] = identity.member_name(row)
         if identity.is_io_signal(row) and identity.tag_name(row):
             row["name_in_tagtable"] = identity.tag_name(row)

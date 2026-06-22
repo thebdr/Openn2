@@ -6,6 +6,7 @@ whose result.halt is True stops the run (e.g. phase 200 left unresolved entries)
 """
 from __future__ import annotations
 
+from pipeline3.phase import PhaseResult
 from pipeline3.registry import registry as _global_registry
 
 
@@ -37,7 +38,16 @@ def run_all(ctx, reg=None):
 
 
 def _run_one(ctx, phase):
-    result = phase.run(ctx)
+    try:
+        result = phase.run(ctx)
+    except OSError as e:
+        # a file write/access failure (e.g. an output locked open) is a clean ERROR that STOPS the
+        # pipeline - not a raw traceback. The phase is left un-completed, so it retries on a re-run.
+        path = getattr(e, "filename", "") or ""
+        reason = e.strerror or str(e)
+        ctx.emit(f"[ERROR] phase {phase.number} ({phase.key}): could not write file"
+                 + (f" {path}" if path else "") + f" ({reason}); pipeline stopped")
+        return PhaseResult(ok=False, halt=True, summary=f"file write failed: {path or reason}")
     ctx.absorb(result)
     ctx.completed.add(phase.number)
     if result is not None and result.halt:

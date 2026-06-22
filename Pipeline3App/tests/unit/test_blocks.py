@@ -12,10 +12,13 @@ import tempfile
 from _harness import run, eq, ok
 from openpyxl import load_workbook
 
+import re
+import xml.etree.ElementTree as ET
+
 from pipeline3.core import config
 from pipeline3.domain.blocks.database import Database
 from pipeline3.domain.blocks.table import Table
-from pipeline3.domain.blocks import registry, engine, shells
+from pipeline3.domain.blocks import registry, engine, shells, xml_emit
 
 _TEMPLATE_XML = (
     "<Document>!!nameOfDB$$ !!02_COM.{db_element}$$ !!NetworkComment$$ "
@@ -97,6 +100,69 @@ def test_engine_absolute_ref_and_instances():
         registry.clear()
 
 
+def test_engine_writes_com_db_with_constants():
+    registry.clear()
+
+    @registry.builds("ZC")
+    def _b(db):
+        t = Table("ZC")
+        t.add(template_type="01", **{"02_COM.{db_element}": "AREA 1 PB"})
+        t.add(template_type="01", **{"02_COM.{db_element}": "AREA 1 FDB"})
+        return t
+
+    try:
+        from pipeline3.domain import signals
+        with tempfile.TemporaryDirectory() as d:
+            engine.generate_blocks(_rows(), d, emit=lambda *_: None)
+            com = os.path.join(config.out_path(d, "blocks_import_dir"), "02_COM.xml")
+            ok(os.path.exists(com), "the block engine wrote the 02_COM custom DB")
+            xml = open(com, encoding="utf-8-sig").read()
+            for m in signals.DB_CONSTANTS:
+                ok(f'<Member Name="{m}"' in xml, f"standard seed member {m} present")
+            ok('<Member Name="AREA 1 PB"' in xml and '<Member Name="AREA 1 FDB"' in xml, "cumulatives present")
+            ok(xml.index("No Operation") < xml.index("AREA 1 PB"), "standard seeds precede the cumulatives")
+    finally:
+        registry.clear()
+
+
+def test_xml_emit_flgnet_exactly_sized():
+    # the FlgNet core: an AND of N inputs -> a coil, sized to N (no tiers/padding), wiring resolves
+    flg = "\n".join(xml_emit._flgnet_lines(
+        [("01_Pushbutton", "PB a"), ("01_Pushbutton", "PB b")], "02_COM", "AREA 1 PB", ""))
+    eq(re.search(r"Card[^>]*>(\d+)<", flg).group(1), "2", "A-box Card = the real input count")
+    ok('Name="in1"' in flg and 'Name="in2"' in flg and 'Name="in3"' not in flg, "exactly N AND pins")
+    ok('<Component Name="02_COM" />' in flg and '<Component Name="AREA 1 PB" />' in flg,
+       "coil writes 02_COM.<output>")
+    parts, wrs = flg.split("<Wires>")
+    uids = set(re.findall(r'UId="(\d+)"', parts))
+    refs = set(re.findall(r'(?:IdentCon|NameCon) UId="(\d+)"', wrs))
+    ok(refs and refs <= uids, "every wire UId resolves to a Part/Access")
+
+
+def test_xml_emit_and_coil_fc_from_table():
+    with tempfile.TemporaryDirectory() as d:
+        tpl = os.path.join(d, "T.xml")
+        with open(tpl, "w", encoding="utf-8") as f:                 # a minimal FC header (Name + AttributeList)
+            f.write('<?xml version="1.0" encoding="utf-8"?><Document><SW.Blocks.FC ID="0"><AttributeList>'
+                    '<Name>TEMPLATE--v1.0--T</Name><ProgrammingLanguage>F_FBD</ProgrammingLanguage>'
+                    '</AttributeList><ObjectList /></SW.Blocks.FC></Document>')
+        t = Table("T")
+        t.add(template_type="01", nameOfDB="01_Pushbutton", NetworkComment="zone one",
+              **{"02_COM.{db_element}": "AREA 1 PB"}, ITERATOR_STRINGS=["PB a", "PB b"])
+        t.add(template_type="01", nameOfDB="03_FDBACK", NetworkComment="zone two",
+              **{"02_COM.{db_element}": "AREA 1 FDB"}, ITERATOR_STRINGS=["FB a"])
+        xml = xml_emit.and_coil_fc(t, tpl, "T")
+        ET.fromstring(xml)                                          # well-formed
+        ok("\r\n" in xml and not xml.startswith("﻿"), "CRLF body, no BOM char (BOM added on write)")
+        eq(xml.count("<SW.Blocks.CompileUnit"), 2, "one network per @ row")
+        eq(re.search(r"<Name>([^<]*)</Name>", xml).group(1), "T", "block name swapped (prefix dropped)")
+        ok("AREA 1 PB" in xml and "AREA 1 FDB" in xml, "both coil outputs present")
+        ok("zone one" in xml and "zone two" in xml, "per-network titles")
+        # global object IDs are unique (TIA reassigns, but they must not collide)
+        gids = re.findall(r'<(?:SW\.Blocks\.CompileUnit|MultilingualText|MultilingualTextItem) ID="(\d+)"', xml)
+        eq(len(gids), len(set(gids)), "global object IDs unique")
+
+
 def test_shells_scan_and_inventory():
     def check(out):
         res = shells.generate_shells(out, emit=lambda *_: None)
@@ -151,6 +217,9 @@ if __name__ == "__main__":
         ("database_queries", test_database_queries),
         ("table_add", test_table_add),
         ("engine_absolute_ref_and_instances", test_engine_absolute_ref_and_instances),
+        ("engine_writes_com_db_with_constants", test_engine_writes_com_db_with_constants),
+        ("xml_emit_flgnet_exactly_sized", test_xml_emit_flgnet_exactly_sized),
+        ("xml_emit_and_coil_fc_from_table", test_xml_emit_and_coil_fc_from_table),
         ("shells_scan_and_inventory", test_shells_scan_and_inventory),
         ("output_header_is_full_shell_keyset", test_output_header_is_full_shell_keyset),
         ("override_uses_shell_rows", test_override_uses_shell_rows),

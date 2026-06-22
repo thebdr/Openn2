@@ -1,2 +1,2 @@
 name,required_types,dev_type,db_name,member,interface_tagname
-Safety Encoder Failure,ENC1/2|ENC/2,,04_SPEED,Safety Encoder Failure [ {functional_unit}{location}{device} ],PNC_Q_{member}
+Safety Encoder Failure,N1/2,,04_SPEED,Safety Encoder {index} Healthy [ {iol_FLD} ],PNC_Q_{member}

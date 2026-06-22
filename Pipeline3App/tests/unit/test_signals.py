@@ -173,7 +173,7 @@ def test_clear_on_rerun():
 
 # --- 520 Generate Data Blocks -------------------------------------------------------------- #
 
-def _db_row(script_type="DI1/2", name_in_db="Door Closed", datablocks="05_DOORS", db_kind="safe_db",
+def _db_row(script_type="DI1/2", name_in_db="Door Closed", datablocks="07_DOOR", db_kind="safe_db",
             io_comment="", fu="=S1", loc="+SG1", dev="-B1"):
     return {"script_type": script_type, "name_in_db": name_in_db, "datablocks": datablocks,
             "functional_unit": fu, "location": loc, "device": dev,
@@ -181,56 +181,56 @@ def _db_row(script_type="DI1/2", name_in_db="Door Closed", datablocks="05_DOORS"
 
 
 _DB_RULES = [{"name": "Door Alarm", "required_types": ["DI1/2", "DI2/2"], "dev_type": "A",
-              "db_name": "05_DOORS", "member": "Door Alarm [ {functional_unit}{location}{device} ]",
+              "db_name": "07_DOOR", "member": "Door Alarm [ {functional_unit}{location}{device} ]",
               "interface_tagname": ""}]
 
 
 def test_build_data_blocks():
     rows = [
-        _db_row("DI1/2", "Door Closed A", "05_DOORS", "safe_db", io_comment="closed {device}", dev="-B1"),
-        _db_row("DI2/2", "Door Closed B", "05_DOORS", "safe_db", dev="-B2"),
+        _db_row("DI1/2", "Door Closed A", "07_DOOR", "safe_db", io_comment="closed {device}", dev="-B1"),
+        _db_row("DI2/2", "Door Closed B", "07_DOOR", "safe_db", dev="-B2"),
         _db_row("KQ", "Contactor FB", "03_FDBACK", "safe_db"),
         _db_row("KQ", "Contactor FB", "03_FDBACK", "safe_db"),               # duplicate -> dropped
         _db_row("PA", "Node X", "PROFINET_NODES_ALARM", "db"),               # non-safe
         _db_row("X", "", ""),                                                # no name_in_db -> ignored
     ]
     dbs, warnings = signals.build_data_blocks(rows, _DB_RULES)
-    eq(sorted(dbs), ["03_FDBACK", "05_DOORS", "PROFINET_NODES_ALARM"])
-    eq(dbs["05_DOORS"]["safe"], True, "DI safe_db -> fail-safe DB")
+    eq(sorted(dbs), ["03_FDBACK", "07_DOOR", "PROFINET_NODES_ALARM"])
+    eq(dbs["07_DOOR"]["safe"], True, "DI safe_db -> fail-safe DB")
     eq(dbs["PROFINET_NODES_ALARM"]["safe"], False, "db kind -> not fail-safe")
-    doors = [m["name"] for m in dbs["05_DOORS"]["members"]]
-    eq(doors[:2], signals.DB_CONSTANTS, "constants first (Always FALSE/TRUE)")
+    doors = [m["name"] for m in dbs["07_DOOR"]["members"]]
+    eq(doors[:len(signals.DB_CONSTANTS)], signals.DB_CONSTANTS, "constants first (Always FALSE/TRUE/No Operation)")
     ok("Door Closed A" in doors and "Door Closed B" in doors, "type-based members")
     ok("Door Alarm [ =S1+SG1-B1 ]" in doors and "Door Alarm [ =S1+SG1-B2 ]" in doors, "rule-driven members")
     fb = [m["name"] for m in dbs["03_FDBACK"]["members"]]
     eq(fb.count("Contactor FB"), 1, "duplicate DB member collapsed to one")
     ok(any("Contactor FB" in w and "contributed 2 times" in w for w in warnings), "dup reported")
     # type-member comment from io_comment
-    cm = next(m for m in dbs["05_DOORS"]["members"] if m["name"] == "Door Closed A")
+    cm = next(m for m in dbs["07_DOOR"]["members"] if m["name"] == "Door Closed A")
     eq(cm["comment"], "closed -B1")
 
 
 def test_constants_spelling():
-    eq(signals.DB_CONSTANTS, ["Always FALSE", "Always TRUE"], "space, no underscore")
+    eq(signals.DB_CONSTANTS, ["Always FALSE", "Always TRUE", "No Operation"], "space, no underscore")
 
 
 def test_write_safe_db_xml():
     # a SAFE DB is exported as an F_DB Openness XML (the .db cannot express fail-safe)
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("DI1/2", "Door Closed A", "05_DOORS", "safe_db", dev="-B1")]
+        rows = [_db_row("DI1/2", "Door Closed A", "07_DOOR", "safe_db", dev="-B1")]
         dbs, _ = signals.build_data_blocks(rows, _DB_RULES)
         db_dir, count = signals.write_data_blocks(dbs, d)
         eq(count, 1)
-        ok(os.path.exists(os.path.join(db_dir, "05_DOORS.xml")), "safe DB -> .xml")
-        ok(not os.path.exists(os.path.join(db_dir, "05_DOORS.db")), "no .db for a safe DB")
-        raw = open(os.path.join(db_dir, "05_DOORS.xml"), "rb").read()
+        ok(os.path.exists(os.path.join(db_dir, "07_DOOR.xml")), "safe DB -> .xml")
+        ok(not os.path.exists(os.path.join(db_dir, "07_DOOR.db")), "no .db for a safe DB")
+        raw = open(os.path.join(db_dir, "07_DOOR.xml"), "rb").read()
         ok(raw.startswith(b"\xef\xbb\xbf"), "UTF-8 BOM (matches a real TIA export)")
         ok(raw.count(b"\n") > 0 and raw.count(b"\n") == raw.count(b"\r\n"), "CRLF only (no lone LF)")
         ok(not raw.rstrip(b"\r\n>").endswith(b"\n"), "no trailing newline after </Document>")
         xtxt = raw.decode("utf-8-sig")
         ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in xtxt, "F_DB fail-safe marker")
         ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in xtxt, "safe DB not OPC-UA accessible")
-        ok("<Name>05_DOORS</Name>" in xtxt, "DB name")
+        ok("<Name>07_DOOR</Name>" in xtxt, "DB name")
         ok('<Member Name="Door Closed A"' in xtxt, "type member emitted")
         ok('<Member Name="Always FALSE"' in xtxt and '<Member Name="Always TRUE"' in xtxt, "constants kept")
         ok('<Member Name="Door Alarm [ =S1+SG1-B1 ]"' in xtxt, "rule-driven member present")
@@ -275,11 +275,11 @@ def test_write_clears_db_and_xml_not_scl():
 def test_generate_data_blocks_real_rules():
     # uses the real datablock_elements_rules.csv via config.load_rules
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("DI1/2", "Door Closed", "05_DOORS", "safe_db", dev="-B1")]
+        rows = [_db_row("DI1/2", "Door Closed", "07_DOOR", "safe_db", dev="-B1")]
         res = signals.generate_data_blocks(rows, d)
-        ok("05_DOORS" in res["dbs"]); ok("05_DOORS" in res["safe"])
+        ok("07_DOOR" in res["dbs"]); ok("07_DOOR" in res["safe"])
         ok(res["count"] >= 1)
-        ok(os.path.exists(os.path.join(res["dir"], "05_DOORS.xml")), "safe DB -> .xml")
+        ok(os.path.exists(os.path.join(res["dir"], "07_DOOR.xml")), "safe DB -> .xml")
 
 
 # --- phase wiring -------------------------------------------------------------------------- #
@@ -297,7 +297,7 @@ def test_phase_run():
         ctx = PipelineContext(params={"io_list": {"path": iol}}, out_root=os.path.join(d, "out"),
                               emit=lambda *_a, **_k: None)
         ctx.rows = [_io_row("TAG_A", "SafetyTags", "I0.0"),
-                    _db_row("DI1/2", "Door Closed", "05_DOORS", "safe_db", dev="-B1")]
+                    _db_row("DI1/2", "Door Closed", "07_DOOR", "safe_db", dev="-B1")]
         res = p500_signals.run(ctx)
         ok(res.ok)
         tag_dir = config.out_path(ctx.out_root, "io_tags_dir")
@@ -305,7 +305,30 @@ def test_phase_run():
         eq(res.artifacts["io_tags_dir"], tag_dir)
         eq(res.artifacts["blocks_import_dir"], db_dir)
         ok(os.path.exists(os.path.join(tag_dir, "PLCTags.xlsx")))
-        ok(os.path.exists(os.path.join(db_dir, "05_DOORS.xml")), "safe DB exported as F_DB XML")
+        ok(os.path.exists(os.path.join(db_dir, "07_DOOR.xml")), "safe DB exported as F_DB XML")
+
+
+def test_write_safe_db_xml_and_dedup():
+    with tempfile.TemporaryDirectory() as d:
+        p = signals.write_safe_db(d, signals.COM_DB, ["AREA 1 PB", "AREA 1 FDB", "AREA 1 PB"])  # dup last
+        ok(p.endswith("02_COM.xml"), "02_COM.xml path")
+        xml = open(p, encoding="utf-8-sig").read()
+        ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in xml, "safe F_DB")
+        ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in xml, "not OPC-writable")
+        eq(xml.count('<Member Name="AREA 1 PB"'), 1, "duplicate member dropped")
+        ok(xml.index("AREA 1 PB") < xml.index("AREA 1 FDB"), "member order preserved")
+        eq(signals.write_safe_db(d, signals.COM_DB, []), "", "no members -> no file written")
+
+
+def test_sweep_preserves_zone_cumulative_db():
+    with tempfile.TemporaryDirectory() as d:
+        com = signals.write_safe_db(d, signals.COM_DB, ["AREA 1 PB"])
+        ok(os.path.exists(com), "02_COM written")
+        # a 520 write sweeps *.db/*.xml but must PRESERVE the phase-800-owned 02_COM.xml
+        signals.write_data_blocks({"OTHER": {"safe": True, "members": [{"name": "x", "comment": ""}]}}, d)
+        ok(os.path.exists(com), "02_COM preserved through the 520 sweep")
+        db_dir = config.out_path(d, "blocks_import_dir")
+        ok(os.path.exists(os.path.join(db_dir, "OTHER.xml")), "the 520-written DB present")
 
 
 if __name__ == "__main__":
@@ -324,6 +347,8 @@ if __name__ == "__main__":
         ("write_normal_db_source", test_write_normal_db_source),
         ("write_clears_db_and_xml_not_scl", test_write_clears_db_and_xml_not_scl),
         ("generate_data_blocks_real_rules", test_generate_data_blocks_real_rules),
+        ("write_safe_db_xml_and_dedup", test_write_safe_db_xml_and_dedup),
+        ("sweep_preserves_zone_cumulative_db", test_sweep_preserves_zone_cumulative_db),
         ("phase_registered", test_phase_registered),
         ("phase_run", test_phase_run),
     ]))

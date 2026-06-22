@@ -11,7 +11,7 @@ from openpyxl import Workbook
 from openpyxl.utils import column_index_from_string as CI
 
 from pipeline3.core import config
-from pipeline3.domain import staging
+from pipeline3.domain import staging, identity
 
 
 def _set(ws, col, row, val, text=False):
@@ -119,6 +119,25 @@ def test_identity_fields():
     _run(check)
 
 
+def test_combined_fld_dedup():
+    # the helper: equal iol/ce -> collapse; differ -> keep both (space-joined); no ce -> just iol
+    base = {"functional_unit": "=S1", "location": "+A", "device": "-B"}
+    eq(identity.combined_fld({**base, "ce_functional_unit": "=S1", "ce_location": "+A",
+                              "ce_device": "-B"}), "=S1+A-B", "iol==ce -> collapsed")
+    eq(identity.combined_fld({**base, "ce_functional_unit": "=S2", "ce_location": "+C",
+                              "ce_device": "-D"}), "=S1+A-B =S2+C-D", "iol!=ce -> both")
+    eq(identity.combined_fld(base), "=S1+A-B", "no ce side -> just iol_FLD")
+
+    # staged: the synthetic E1/2 has iol==ce, so name_in_db collapses to a single FLD (no doubling)
+    def check(p, rows):
+        e1 = _by_addr(rows, "I20.0")
+        eq(e1["iol_FLD"], "=S1+MS1.CC1-S67001")
+        eq(e1["ce_FLD"], "=S1+MS1.CC1-S67001")
+        eq(e1["combined_FLD"], "=S1+MS1.CC1-S67001", "collapsed")
+        eq(e1["name_in_db"], "Emergency Push Button [ =S1+MS1.CC1-S67001 ]", "deduped single FLD")
+    _run(check)
+
+
 def test_interface_tagname_staged():
     def check(p, rows):
         e1 = _by_addr(rows, "I20.0")
@@ -150,6 +169,7 @@ def test_iodatabase_csv():
         eq(len(recs), 2)
         hdr = recs[0].keys()
         for col in ("ce_functional_unit", "ce_location", "ce_device", "numerazione_linea",
+                    "iol_FLD", "ce_FLD", "combined_FLD",
                     "matrix_areas", "areas_description", "name_in_db", "type_id_resolved"):
             ok(col in hdr, f"IODatabase has column {col}")
         e1 = next(r for r in recs if r["bit"] == "I20.0")
@@ -162,6 +182,7 @@ if __name__ == "__main__":
         ("input_matrix_areas_and_ce_fld", test_input_matrix_areas_and_ce_fld),
         ("output_areas_and_numerazione", test_output_areas_and_numerazione),
         ("identity_fields", test_identity_fields),
+        ("combined_fld_dedup", test_combined_fld_dedup),
         ("interface_tagname_staged", test_interface_tagname_staged),
         ("swp_cabinet_from_diagnosis_blocks", test_swp_cabinet_from_diagnosis_blocks),
         ("iodatabase_csv", test_iodatabase_csv),

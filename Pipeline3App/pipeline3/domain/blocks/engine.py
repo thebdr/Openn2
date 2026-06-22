@@ -15,12 +15,14 @@ import csv
 import os
 
 from pipeline3.core import config
+from pipeline3.domain import signals
 from pipeline3.domain.blocks.database import Database
 from pipeline3.domain.blocks.table import Table
 from pipeline3.domain.blocks.registry import registry
-from pipeline3.domain.blocks import shells
+from pipeline3.domain.blocks import shells, xml_emit
 
 INSTANCE_OF = "instanceOf-"
+COM_MEMBER_COL = "02_COM.{db_element}"   # builders writing this column define the 02_COM custom DB members
 
 
 def _wrap(col: str) -> str:
@@ -67,6 +69,34 @@ def write_creation_csv(creation_dir: str, table, template_ref: str, canonical_ke
     return path
 
 
+def _com_members(tables) -> list:
+    """Distinct 02_COM.{db_element} cumulatives across all built tables, in first-seen order (the
+    zone-cumulative custom DB members - phase 800 owns the 02_COM DB)."""
+    out = []
+    for t in tables:
+        if COM_MEMBER_COL not in t.columns:
+            continue
+        for r in t.rows:
+            v = str(r.get(COM_MEMBER_COL, "") or "").strip()
+            if v and v not in out:
+                out.append(v)
+    return out
+
+
+def write_com_db(out_root, tables, emit=print) -> str:
+    """The block builder's task: emit the 02_COM custom DB (safe F_DB XML) - the standard DB seed
+    members (Always FALSE/TRUE/No Operation) followed by the builders' 02_COM.{db_element} cumulatives.
+    signals.write_safe_db is just the DB-format primitive; the membership is decided here in phase 800."""
+    cumulatives = _com_members(tables)
+    if not cumulatives:
+        return ""
+    members = list(signals.DB_CONSTANTS) + cumulatives
+    path = signals.write_safe_db(out_root, signals.COM_DB, members)
+    if path:
+        emit(f"zone-cumulative DB: {signals.COM_DB} ({len(members)} member(s)) -> {path}")
+    return path
+
+
 def _instance_rows(tables) -> list:
     """(name, fb) for every non-empty instanceOf-<FB> cell across all tables (-> InstanceDBs.csv)."""
     out = []
@@ -103,7 +133,8 @@ def generate_blocks(rows, out_root: str, emit=print, write_instances: bool = Tru
     builders = registry()
     names = list(builders) + [n for n, i in info.items() if i["mode"] == "override" and n not in builders]
 
-    tables, files, warnings = [], [], []
+    import_dir = config.out_path(out_root, "blocks_import_dir")
+    tables, files, xml_files, warnings = [], [], [], []
     for name in names:
         si = info.get(name)
         keys = si["keys"] if si else []
@@ -123,6 +154,13 @@ def generate_blocks(rows, out_root: str, emit=print, write_instances: bool = Tru
                 warnings.append(f"{name}: builder returned no rows (stub?) - header only")
         files.append(write_creation_csv(creation_dir, table, ref, keys))
         tables.append(table)
+        # task 2: blocks with a direct-XML emitter ALSO get a ready FC XML (sized exactly) in ImportReady
+        xml_path = xml_emit.write_fc_xml(name, table, ref, import_dir)
+        if xml_path:
+            xml_files.append(xml_path)
+            emit(f"  FC XML: {name} ({len(table)} network(s)) -> {xml_path}")
+
+    com_path = write_com_db(out_root, tables, emit)   # the 02_COM zone-cumulative custom DB (phase 800)
 
     inst_n, inst_path = 0, ""
     if write_instances:
@@ -130,6 +168,7 @@ def generate_blocks(rows, out_root: str, emit=print, write_instances: bool = Tru
     for w in warnings:
         emit(f"  WARN {w}")
     emit(f"software blocks: {len(files)} CSV(s)"
+         + (f" + {len(xml_files)} FC XML" if xml_files else "")
          + (f" + {inst_n} instance(s)" if write_instances else "") + f" -> {creation_dir}")
-    return {"dir": creation_dir, "files": files, "instances": inst_n,
-            "instance_path": inst_path, "warnings": warnings, "count": len(files)}
+    return {"dir": creation_dir, "files": files, "xml_files": xml_files, "instances": inst_n,
+            "instance_path": inst_path, "com_path": com_path, "warnings": warnings, "count": len(files)}
