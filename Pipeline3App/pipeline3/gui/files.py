@@ -17,7 +17,7 @@ from tkinter import ttk
 from tksheet import Sheet
 
 from pipeline3.io import csv_tables
-from pipeline3.gui import extedit, objedit
+from pipeline3.gui import extedit, objedit, grid
 
 _OBJ_EXT = (".yaml", ".yml", ".json", ".xml")        # -> the structured object editor (tree)
 _TEXT_EXT = (".scl", ".db", ".txt", ".md", ".log")   # -> the plain text editor
@@ -162,6 +162,7 @@ class FilesPanel(ttk.Frame):
         sheet.enable_bindings()                                  # full editing
         self._toolbar(path, save=lambda s=sheet, p=path: self._save_csv(s, p))
         sheet.pack(side="top", fill="both", expand=True)
+        self._grid = grid.decorate(sheet, self.dark)            # zebra + right-click sort/filter
 
     def _save_csv(self, sheet, path):
         rows = sheet.get_sheet_data()
@@ -190,6 +191,7 @@ class FilesPanel(ttk.Frame):
                 f"Edit externally to keep formulas/macros.")
         ttk.Label(self.editor, text=note, padding=(6, 2)).pack(side="bottom", anchor="w")
         sheet.pack(side="top", fill="both", expand=True)
+        self._grid = grid.decorate(sheet, self.dark)            # zebra + right-click sort/filter
 
     # ---- text editor ----------------------------------------------------- #
     def _text(self, path):
