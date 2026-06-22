@@ -24,7 +24,7 @@ Shared/OutputTree/
 Pipeline3App/user_input/*.csv
 
 # NuGet restore output
-Open2App/packages/
+Openn2App/packages/
 
 # Large reference doc (not needed for builds)
-Open2App/lib/HW Parameter description/
+Openn2App/lib/HW Parameter description/
