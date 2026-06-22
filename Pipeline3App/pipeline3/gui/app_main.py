@@ -4,11 +4,11 @@ A dark-by-default window (dark title bar too) whose top **phase bar is generated
 registry** (`phasebar.build_spec` over `registry().presentation_order()`), with the pink Run-Pipeline
 master on the left. A phase header runs the whole phase; its chevron dropdown lists that phase's
 buttons (action steps / opens / specials). The pipeline runs on a worker thread; its `emit` output is
-queued and drained into the `LogView` on the Tk main thread. Font: bundled Monaspace Neon.
+queued and drained into the `LogView` on the Tk main thread. Font: bundled Monaspace Neon; theme: sv-ttk.
 
-First GUI slice (M11): the registry-driven bar + dark theme/title + Monaspace + worker-run wiring +
-log view. The YAML-explorer config, Files tab, Project Manager, designer GUI, and Excel-cell links
-land in later slices.
+Slice 2 (Main GUI polish): EN/IT relabel toggle + dark/light toggle (live re-theme incl. the title
+bar), clickable Sheet!Cell log links (open the I/O List in Excel via COM), and full open-artifact
+wiring. Still deferred: YAML-explorer config, Files tab, Project Manager, the designer GUI.
 """
 from __future__ import annotations
 import os
@@ -22,15 +22,16 @@ import pipeline3.phases  # noqa: F401  (side-effect: registers every phase into 
 from pipeline3.context import PipelineContext
 from pipeline3.core import config
 from pipeline3.registry import registry
-from pipeline3.gui import fonts, theme, darktitle, phasebar, logview
+from pipeline3.gui import fonts, theme, darktitle, phasebar, logview, excel
 
 _ICON = os.path.join(config.APP_ROOT, "assets", "Pipeline3.png")
 
 
 class App:
-    def __init__(self, root: tk.Tk, profile: str = "main"):
+    def __init__(self, root: tk.Tk, profile: str = "main", lang: str = "en"):
         self.root = root
         self.profile = profile
+        self.lang = lang
         self.reg = registry()
         self.q: queue.Queue = queue.Queue()
         self._run_buttons: list = []
@@ -44,7 +45,7 @@ class App:
 
         root.title("Pipeline3")
         root.configure(bg=self.pal["bg"])
-        root.geometry("1180x740")
+        root.geometry("1180x760")
         root.minsize(900, 560)
         try:
             self._icon = tk.PhotoImage(file=_ICON)
@@ -53,7 +54,7 @@ class App:
             pass
 
         self._build()
-        darktitle.apply(root)
+        darktitle.apply(root, self.dark)
         root.after(60, self._drain)
 
     # ---- layout ---------------------------------------------------------- #
@@ -63,19 +64,17 @@ class App:
         ttk.Label(top, text="PIPELINE3", font=(self.font_family, 13, "bold")).pack(side="left")
         ttk.Button(top, text="Clear Log", command=self._clear).pack(side="right")
         ttk.Button(top, text="Open Output", command=lambda: self._startfile(self._out_root())).pack(side="right", padx=6)
+        self._theme_btn = ttk.Button(top, text="◐ Theme", command=self._toggle_theme)
+        self._theme_btn.pack(side="right", padx=(0, 6))
+        self._lang_btn = ttk.Button(top, text=f"Lang: {self.lang.upper()}", command=self._toggle_lang)
+        self._lang_btn.pack(side="right", padx=(0, 6))
 
-        run, phases = phasebar.build_spec(
-            self.reg, "en",
-            run_cb=lambda: self._start_all,
-            phase_cb=lambda ph: (lambda n=ph.number: self._start(n)),
-            button_cb=self._button_cb,
-            include_run=(self.profile == "main"))
-        self.bar = phasebar.PhaseBar(self.root, run, phases, self._run_buttons,
-                                     dark=self.dark, bg=self.pal["bg"], font=self.font_family, padding=(6, 2))
-        self.bar.pack(side="top", fill="x", padx=4)
+        self._bar_holder = ttk.Frame(self.root)
+        self._bar_holder.pack(side="top", fill="x", padx=4)
+        self._build_bar()
         ttk.Separator(self.root, orient="horizontal").pack(side="top", fill="x", pady=(4, 0))
 
-        self.log = logview.LogView(self.root, self.pal, self.font_family)
+        self.log = logview.LogView(self.root, self.pal, self.font_family, on_link=self._open_link)
         self.log.pack(side="top", fill="both", expand=True, padx=4, pady=4)
 
         bottom = ttk.Frame(self.root, padding=(8, 2))
@@ -85,9 +84,48 @@ class App:
         self.progress = ttk.Progressbar(bottom, mode="indeterminate", length=160)
         self.progress.pack(side="right")
 
+        self._banner()
+
+    def _banner(self):
         self.log.append("Pipeline3 - operator GUI", "SECTION")
-        self.log.append(f"font: {self.font_family}   profile: {self.profile}   "
+        self.log.append(f"font: {self.font_family}   theme: {'dark' if self.dark else 'light'}   "
+                        f"lang: {self.lang}   profile: {self.profile}   "
                         f"phases: {', '.join(str(p.number) for p in self.reg.presentation_order())}")
+
+    def _build_bar(self):
+        self._run_buttons = []
+        run, phases = phasebar.build_spec(
+            self.reg, self.lang,
+            run_cb=lambda: self._start_all,
+            phase_cb=lambda ph: (lambda n=ph.number: self._start(n)),
+            button_cb=self._button_cb,
+            include_run=(self.profile == "main"))
+        self.bar = phasebar.PhaseBar(self._bar_holder, run, phases, self._run_buttons,
+                                     dark=self.dark, bg=self.pal["bg"], font=self.font_family, padding=(6, 2))
+        self.bar.pack(fill="x")
+
+    def _rebuild_bar(self):
+        try:
+            self.bar.destroy()
+        except Exception:  # noqa: BLE001
+            pass
+        self._build_bar()
+
+    # ---- toggles --------------------------------------------------------- #
+    def _toggle_lang(self):
+        self.lang = "it" if self.lang == "en" else "en"
+        self._lang_btn.configure(text=f"Lang: {self.lang.upper()}")
+        self._rebuild_bar()
+        self.status.set(f"language: {self.lang}")
+
+    def _toggle_theme(self):
+        self.dark = not self.dark
+        self.pal = theme.apply_base(self.root, self.font_family, self.dark)
+        self.root.configure(bg=self.pal["bg"])
+        self.log.retheme(self.pal)
+        self._rebuild_bar()
+        darktitle.apply(self.root, self.dark)
+        self.status.set(f"theme: {'dark' if self.dark else 'light'}")
 
     # ---- button wiring (from the registry) ------------------------------- #
     def _button_cb(self, button, phase):
@@ -133,6 +171,8 @@ class App:
             try:
                 ctx = self._ensure_ctx()
                 work(ctx)
+                if ctx.rows:
+                    self.q.put(("sheets", {r.get("_source_sheet") for r in ctx.rows}))
                 self.q.put(("status", "Ready"))
             except Exception as e:  # noqa: BLE001
                 self.q.put(("log", f"[ERROR] {type(e).__name__}: {e}"))
@@ -167,6 +207,8 @@ class App:
                     self._set_busy(ev[1])
                 elif ev[0] == "status":
                     self.status.set(ev[1])
+                elif ev[0] == "sheets":
+                    self.log.set_sheets(ev[1])
         except queue.Empty:
             pass
         self.root.after(60, self._drain)
@@ -183,9 +225,22 @@ class App:
         else:
             self.progress.stop()
 
-    # ---- opens / utilities ----------------------------------------------- #
+    # ---- opens / links --------------------------------------------------- #
     def _clear(self):
         self.log.clear()
+
+    def _io_list_path(self) -> str:
+        return (config.load_params().get("io_list") or {}).get("path", "")
+
+    def _open_link(self, sheet: str, cell: str):
+        """A Sheet!Cell link in the log -> open the I/O List in Excel there (worker thread, COM)."""
+        path = self._io_list_path()
+        self.status.set(f"opening Excel at {sheet}!{cell} ...")
+
+        def job():
+            ok, msg = excel.goto(path, sheet, cell)
+            self.q.put(("status", msg))
+        threading.Thread(target=job, daemon=True).start()
 
     def _startfile(self, path: str):
         if path and os.path.exists(path):
@@ -204,6 +259,12 @@ class App:
             return self._startfile((params.get("io_list") or {}).get("path", ""))
         if key == "ce":
             return self._startfile((params.get("ce") or {}).get("path", ""))
+        fixed = {"signal_types": os.path.join(config.INPUT_DOCS_DIR, "signal_types.csv"),
+                 "fill_config": config.INPUT_DOCS_DIR,
+                 "diag_config": config.DIAGNOSIS_DIR,
+                 "error_management": os.path.join(config.USER_INPUT, "error_management.csv")}
+        if key in fixed:
+            return self._startfile(fixed[key])
         if key in config.OUTPUT_PATHS:
             base = config.out_path(self._out_root(), key)
             for cand in (base, base + ".txt", base + ".csv"):     # report bases carry an extension
@@ -213,9 +274,9 @@ class App:
         self.status.set(f"open '{key}': not wired yet")
 
 
-def main(profile: str = "main"):
+def main(profile: str = "main", lang: str = "en"):
     root = tk.Tk()
-    App(root, profile=profile)
+    App(root, profile=profile, lang=lang)
     root.mainloop()
 
 

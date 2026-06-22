@@ -8,8 +8,9 @@ from __future__ import annotations
 import sys
 
 
-def apply(window) -> bool:
-    """Make `window`'s native title bar dark. Returns True on success."""
+def apply(window, dark: bool = True) -> bool:
+    """Set `window`'s native title bar to dark (or back to light when `dark=False`). Returns True on
+    success."""
     if sys.platform != "win32":
         return False
     try:
@@ -26,7 +27,7 @@ def apply(window) -> bool:
             return bool(h) and bool(ctypes.windll.user32.GetWindowLongW(h, GWL_STYLE) & WS_CAPTION)
 
         hwnd = child if _has_caption(child) else (parent if _has_caption(parent) else (parent or child))
-        value = ctypes.c_int(1)
+        value = ctypes.c_int(1 if dark else 0)
         DWMWA_USE_IMMERSIVE_DARK_MODE = 20          # Win10 2004+ ; 19 on older 1809/1903 builds
         for attr in (DWMWA_USE_IMMERSIVE_DARK_MODE, 19):
             res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
