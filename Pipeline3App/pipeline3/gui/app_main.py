@@ -1,4 +1,4 @@
-"""app_main.py - the Pipeline3 operator window (the interactive twin of the CLI).
+"""app_main.py - Broski Session, the operator window (the interactive twin of the CLI).
 
 A dark-by-default window (dark title bar too) whose top **phase bar is generated from the phase
 registry** (`phasebar.build_spec` over `registry().presentation_order()`), with the pink Run-Pipeline
@@ -43,7 +43,7 @@ class App:
         self.dark = True
         self.pal = theme.apply_base(root, self.font_family, self.dark)   # sv-ttk + Monaspace default
 
-        root.title("Pipeline3")
+        root.title("Broski Session")
         root.configure(bg=self.pal["bg"])
         root.geometry("1180x760")
         root.minsize(900, 560)
@@ -62,7 +62,7 @@ class App:
         self.status = tk.StringVar(value="Ready")
         top = ttk.Frame(self.root, padding=(8, 6, 8, 2))
         top.pack(side="top", fill="x")
-        ttk.Label(top, text="PIPELINE3", font=(self.font_family, 13, "bold")).pack(side="left")
+        ttk.Label(top, text="BROSKI SESSION", font=(self.font_family, 13, "bold")).pack(side="left")
         ttk.Button(top, text="Clear Log", command=self._clear).pack(side="right")
         ttk.Button(top, text="Open Output", command=lambda: self._startfile(self._out_root())).pack(side="right", padx=6)
         self._theme_btn = ttk.Button(top, text="◐ Theme", command=self._toggle_theme)
@@ -96,7 +96,7 @@ class App:
         self._banner()
 
     def _banner(self):
-        self.log.append("Pipeline3 - operator GUI", "SECTION")
+        self.log.append("Broski Session - Pipeline3 operator GUI", "SECTION")
         self.log.append(f"font: {self.font_family}   theme: {'dark' if self.dark else 'light'}   "
                         f"lang: {self.lang}   profile: {self.profile}   "
                         f"phases: {', '.join(str(p.number) for p in self.reg.presentation_order())}")
