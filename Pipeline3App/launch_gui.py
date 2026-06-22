@@ -1,4 +1,4 @@
-"""Thin launcher for Broski Session - the Pipeline3 operator GUI.
+"""Thin launcher for the Pipeline 3 operator GUI (the "Broski Session" - the main profile).
 
 Puts Pipeline3App on sys.path and starts the main window. Run with `pythonw launch_gui.py` for no
 console window, or `python launch_gui.py` while developing.

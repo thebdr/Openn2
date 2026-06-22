@@ -1,4 +1,8 @@
-"""app_main.py - Broski Session, the operator window (the interactive twin of the CLI).
+"""app_main.py - the Pipeline 3 operator window (the interactive twin of the CLI).
+
+The app is **Pipeline 3**; each profile is a named session shown in the title + log banner as
+"Pipeline 3 - <session> (<profile>)": the main operator session is **Broski Session (main)**, the
+slim designer session is **IOList & CEMatrix Validation (designer)**.
 
 A dark-by-default window (dark title bar too) whose top **phase bar is generated from the phase
 registry** (`phasebar.build_spec` over `registry().presentation_order()`), with the pink Run-Pipeline
@@ -25,6 +29,8 @@ from pipeline3.registry import registry
 from pipeline3.gui import fonts, theme, darktitle, phasebar, logview, excel, files
 
 _ICON = os.path.join(config.APP_ROOT, "assets", "Pipeline3.png")
+_APP_NAME = "Pipeline 3"
+_SESSIONS = {"main": "Broski Session", "designer": "IOList & CEMatrix Validation"}
 
 
 class App:
@@ -43,7 +49,7 @@ class App:
         self.dark = True
         self.pal = theme.apply_base(root, self.font_family, self.dark)   # sv-ttk + Monaspace default
 
-        root.title("Broski Session")
+        root.title(self._session_title())
         root.configure(bg=self.pal["bg"])
         root.geometry("1180x760")
         root.minsize(900, 560)
@@ -62,7 +68,7 @@ class App:
         self.status = tk.StringVar(value="Ready")
         top = ttk.Frame(self.root, padding=(8, 6, 8, 2))
         top.pack(side="top", fill="x")
-        ttk.Label(top, text="BROSKI SESSION", font=(self.font_family, 13, "bold")).pack(side="left")
+        ttk.Label(top, text="PIPELINE 3", font=(self.font_family, 13, "bold")).pack(side="left")
         ttk.Button(top, text="Clear Log", command=self._clear).pack(side="right")
         ttk.Button(top, text="Open Output", command=lambda: self._startfile(self._out_root())).pack(side="right", padx=6)
         self._theme_btn = ttk.Button(top, text="◐ Theme", command=self._toggle_theme)
@@ -95,8 +101,12 @@ class App:
 
         self._banner()
 
+    def _session_title(self) -> str:
+        """'Pipeline 3 - <session> (<profile>)' - the app name + the named session for this profile."""
+        return f"{_APP_NAME} - {_SESSIONS.get(self.profile, self.profile)} ({self.profile})"
+
     def _banner(self):
-        self.log.append("Broski Session - Pipeline3 operator GUI", "SECTION")
+        self.log.append(self._session_title(), "SECTION")
         self.log.append(f"font: {self.font_family}   theme: {'dark' if self.dark else 'light'}   "
                         f"lang: {self.lang}   profile: {self.profile}   "
                         f"phases: {', '.join(str(p.number) for p in self.reg.presentation_order())}")
