@@ -17,12 +17,13 @@ from tkinter import ttk
 from tksheet import Sheet
 
 from pipeline3.io import csv_tables
-from pipeline3.gui import extedit
+from pipeline3.gui import extedit, objedit
 
-_TEXT_EXT = (".yaml", ".yml", ".json", ".scl", ".db", ".xml", ".txt", ".md", ".log")
+_OBJ_EXT = (".yaml", ".yml", ".json", ".xml")        # -> the structured object editor (tree)
+_TEXT_EXT = (".scl", ".db", ".txt", ".md", ".log")   # -> the plain text editor
 _GRID_EXT = (".csv",)
 _XLSX_EXT = (".xlsx", ".xlsm", ".xls")
-_SHOW_EXT = _TEXT_EXT + _GRID_EXT + _XLSX_EXT
+_SHOW_EXT = _OBJ_EXT + _TEXT_EXT + _GRID_EXT + _XLSX_EXT
 _SKIP = ("__pycache__", ".pyc")
 _MAX_ROWS, _MAX_COLS = 1000, 80          # xlsx preview cap
 
@@ -138,6 +139,8 @@ class FilesPanel(ttk.Frame):
                 self._csv(path)
             elif low.endswith(_XLSX_EXT):
                 self._xlsx(path)
+            elif low.endswith(_OBJ_EXT):
+                self._obj(path)
             elif low.endswith(_TEXT_EXT):
                 self._text(path)
             else:
@@ -207,6 +210,11 @@ class FilesPanel(ttk.Frame):
         with open(path, "w", encoding="utf-8", newline="") as f:
             f.write(txt.get("1.0", "end-1c"))
         self.on_status(f"saved {os.path.basename(path)}")
+
+    def _obj(self, path):
+        self._clear_editor()
+        ed = objedit.ObjectEditor(self.editor, path, self.pal, self.font_family, on_status=self.on_status)
+        ed.pack(side="top", fill="both", expand=True)
 
     def _external(self, path):
         ok, msg = extedit.open_external(path)
