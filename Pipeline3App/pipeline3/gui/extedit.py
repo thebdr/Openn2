@@ -39,6 +39,25 @@ def open_external(path: str, prefer: str = "auto") -> tuple[bool, str]:
         return _default(path)
 
 
+def reveal(path: str) -> tuple[bool, str]:
+    """Open the file's containing folder in the OS file manager with the file SELECTED
+    (Windows `explorer /select`, macOS `open -R`, else `xdg-open <dir>`). Returns (ok, message)."""
+    if not path or not os.path.exists(path):
+        return False, f"not found: {path}"
+    try:
+        if sys.platform == "win32":
+            # explorer returns exit 1 even on success - fire and forget (don't wait/check)
+            subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
+            return True, f"revealed {os.path.basename(path)} in Explorer"
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", path])
+            return True, f"revealed {os.path.basename(path)}"
+        subprocess.Popen(["xdg-open", os.path.dirname(os.path.abspath(path))])
+        return True, f"opened {os.path.dirname(path)}"
+    except Exception:  # noqa: BLE001
+        return _default(os.path.dirname(os.path.abspath(path)))
+
+
 def _default(path: str) -> tuple[bool, str]:
     try:
         if sys.platform == "win32":

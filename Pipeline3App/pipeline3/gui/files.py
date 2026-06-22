@@ -17,7 +17,7 @@ from tkinter import ttk
 from tksheet import Sheet
 
 from pipeline3.io import csv_tables
-from pipeline3.gui import extedit, objedit, grid
+from pipeline3.gui import extedit, objedit, grid, widgets
 
 _OBJ_EXT = (".yaml", ".yml", ".json", ".xml")        # -> the structured object editor (tree)
 _TEXT_EXT = (".scl", ".db", ".txt", ".md", ".log")   # -> the plain text editor
@@ -55,6 +55,7 @@ class FilesPanel(ttk.Frame):
         self.tree.pack(side="left", fill="both", expand=True)
         tvs.pack(side="right", fill="y")
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
+        self.tree.bind("<Button-3>", self._tree_menu)
         ttk.Button(left, text="Refresh", command=self.refresh).pack(side="bottom", fill="x")
         paned.add(left, weight=1)
 
@@ -110,6 +111,22 @@ class FilesPanel(ttk.Frame):
         if path:
             self._load(path)
 
+    def _tree_menu(self, event):
+        item = self.tree.identify_row(event.y)
+        path = self._paths.get(item)
+        if not path:
+            return
+        self.tree.selection_set(item)
+        menu = tk.Menu(self.tree, tearoff=0)
+        menu.add_command(label="Open containing folder",
+                         command=lambda p=path: self.on_status(extedit.reveal(p)[1]))
+        menu.add_command(label="Open externally",
+                         command=lambda p=path: self.on_status(extedit.open_external(p)[1]))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
     # ---- editor dispatch ------------------------------------------------- #
     def _clear_editor(self):
         for w in self.editor.winfo_children():
@@ -120,9 +137,8 @@ class FilesPanel(ttk.Frame):
         ttk.Label(self.editor, text=msg, padding=20).pack(anchor="nw")
 
     def _toolbar(self, path, *, save=None, external=False):
-        bar = ttk.Frame(self.editor, padding=(6, 4))
-        bar.pack(side="top", fill="x")
-        ttk.Label(bar, text=os.path.basename(path)).pack(side="left")
+        header, bar = widgets.editor_header(self.editor, path, self.on_status)
+        header.pack(side="top", fill="x")
         ttk.Button(bar, text="Reload", command=lambda: self._load(path)).pack(side="right")
         if external:
             ttk.Button(bar, text="Edit externally",

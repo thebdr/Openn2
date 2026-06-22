@@ -18,6 +18,8 @@ import tkinter as tk
 from tkinter import ttk
 import xml.etree.ElementTree as ET
 
+from pipeline3.gui import widgets
+
 
 def _coerce(new: str, old):
     """Keep a JSON/YAML scalar's type across an edit where possible (bool/int/float), else string."""
@@ -53,9 +55,8 @@ class ObjectEditor(ttk.Frame):
         self._yaml = None
         self._data = self._parse(self._raw)
 
-        bar = ttk.Frame(self, padding=(6, 4))
-        bar.pack(side="top", fill="x")
-        ttk.Label(bar, text=os.path.basename(path)).pack(side="left")
+        header, bar = widgets.editor_header(self, path, on_status)
+        header.pack(side="top", fill="x")
         ttk.Button(bar, text="Reload", command=self.reload).pack(side="right")
         self._mode_btn = ttk.Button(bar, text="Text view", command=self._toggle_mode)
         self._mode_btn.pack(side="right", padx=6)
