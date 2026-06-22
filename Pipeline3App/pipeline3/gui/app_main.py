@@ -22,7 +22,7 @@ import pipeline3.phases  # noqa: F401  (side-effect: registers every phase into 
 from pipeline3.context import PipelineContext
 from pipeline3.core import config
 from pipeline3.registry import registry
-from pipeline3.gui import fonts, theme, darktitle, phasebar, logview, excel
+from pipeline3.gui import fonts, theme, darktitle, phasebar, logview, excel, files
 
 _ICON = os.path.join(config.APP_ROOT, "assets", "Pipeline3.png")
 
@@ -59,6 +59,7 @@ class App:
 
     # ---- layout ---------------------------------------------------------- #
     def _build(self):
+        self.status = tk.StringVar(value="Ready")
         top = ttk.Frame(self.root, padding=(8, 6, 8, 2))
         top.pack(side="top", fill="x")
         ttk.Label(top, text="PIPELINE3", font=(self.font_family, 13, "bold")).pack(side="left")
@@ -74,12 +75,20 @@ class App:
         self._build_bar()
         ttk.Separator(self.root, orient="horizontal").pack(side="top", fill="x", pady=(4, 0))
 
-        self.log = logview.LogView(self.root, self.pal, self.font_family, on_link=self._open_link)
-        self.log.pack(side="top", fill="both", expand=True, padx=4, pady=4)
+        self.nb = nb = ttk.Notebook(self.root)
+        nb.pack(side="top", fill="both", expand=True, padx=4, pady=4)
+        log_tab = ttk.Frame(nb)
+        nb.add(log_tab, text="Log")
+        self.log = logview.LogView(log_tab, self.pal, self.font_family, on_link=self._open_link)
+        self.log.pack(fill="both", expand=True)
+        files_tab = ttk.Frame(nb)
+        nb.add(files_tab, text="Files")
+        self.files = files.FilesPanel(files_tab, self.pal, self.font_family, self._file_sections(),
+                                      on_status=lambda m: self.status.set(m), dark=self.dark)
+        self.files.pack(fill="both", expand=True)
 
         bottom = ttk.Frame(self.root, padding=(8, 2))
         bottom.pack(side="bottom", fill="x")
-        self.status = tk.StringVar(value="Ready")
         ttk.Label(bottom, textvariable=self.status).pack(side="left")
         self.progress = ttk.Progressbar(bottom, mode="indeterminate", length=160)
         self.progress.pack(side="right")
@@ -123,6 +132,8 @@ class App:
         self.pal = theme.apply_base(self.root, self.font_family, self.dark)
         self.root.configure(bg=self.pal["bg"])
         self.log.retheme(self.pal)
+        if hasattr(self, "files"):
+            self.files.retheme(self.pal, self.dark)
         self._rebuild_bar()
         darktitle.apply(self.root, self.dark)
         self.status.set(f"theme: {'dark' if self.dark else 'light'}")
@@ -231,6 +242,18 @@ class App:
 
     def _io_list_path(self) -> str:
         return (config.load_params().get("io_list") or {}).get("path", "")
+
+    def _file_sections(self):
+        """The 3 Files-tree sections: project configuration / user editable files / bare outputs."""
+        params = config.load_params()
+        io = (params.get("io_list") or {}).get("path", "")
+        ce = (params.get("ce") or {}).get("path", "")
+        user = [p for p in (io, ce) if p]
+        if os.path.isdir(config.USER_INPUT):
+            user.append(config.USER_INPUT)
+        return [("Project configuration", [config.CONFIG_PROJECT]),
+                ("User editable files", user),
+                ("Bare output files", [self._out_root()])]
 
     def _open_link(self, sheet: str, cell: str):
         """A Sheet!Cell link in the log -> open the I/O List in Excel there (worker thread, COM)."""
