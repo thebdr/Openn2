@@ -53,7 +53,7 @@ Every ordered enumeration uses gapped numbers so steps insert without renumberin
 | 500 | Signals Mapping | 510 Generate I/O Tags · 520 Generate Data Blocks | **DONE** |
 | 600 | Diagnosis Mapping | 610 Generate Diag List · 620 Generate Diag Software Blocks | **DONE** |
 | 700 | Hardware Generation | 710 Generate Stations · 720 Generate Modules | **DONE** |
-| 800 | Software Generation | 810 Empty Shells · 820 Generate Blocks · 830 Generate Instances | **SKELETON** (builders user-written) |
+| 800 | Software Generation | 810 Empty Shells · 820 Generate Blocks · 830 Generate Instances | **DONE** (8 builders; 03 direct FC XML; editable shells) |
 | 900 | Reporting | 910 Pipeline Coverage Report · 920 TIA Project Coverage Report | TODO (M7/future) |
 
 True dependency DAG: `config → 200 Fill → 300 Staging → {100, 400, 500, 600, 700, 800, 900}`
@@ -337,31 +337,49 @@ Hardware Data Folder) is GUI-era (M11). DeviceTypesDatabase via `config.load_dev
   reads by position). NOTE: this reference format differs from Pipeline2's `_format2` (BOM + LF +
   raw-key headers); Pipeline3 follows the reference artifact.
 
-## Phase 800 — Software Generation — SKELETON (builders are user-authored)
+## Phase 800 — Software Generation — DONE (8 builders + 03 direct-XML + editable shells)
 
-`domain/blocks/` (package) + `phases/p800_software.py`. The most-reworked phase, rebuilt clean as a
-BASE for hand-written builders over the single database — no rules, no sidecars, no
-`block_templates.json` (deprecated). `requires=(300,)`.
+`domain/blocks/` (package) + `phases/p800_software.py`. Rebuilt clean over the single database — no
+rules, no sidecars, `block_templates.json` deprecated. `requires=(300,)`. All 8 per-template builders
+are written (data-independent cases in `tests/unit/test_builders.py`; real-doc CSVs/XML are review-then-freeze).
 
-- **`database.py` `Database`** — the single source = `ctx.rows` (the staged IODatabase) + query
-  helpers (`by_type`/`by_db`/`by_area`/`by_tagtable`/`where`/`areas`).
-- **`table.py` `Table(name, columns, rows)`** — what a builder returns (`add(template_type=…, **values)`);
-  a list-valued cell is the horizontal ITERATOR (emitted last).
-- **`builders.py` — USER-EDITABLE** — one `@builds("<output name>")` per template, free-form Python:
-  query `db`, return a `Table`. Currently stubs + a worked example. (Replaces Pipeline2's
-  sidecar/capacity/ITERATOR rules + AST `sync_builders`.)
+- **`database.py` `Database`** — the single source = `ctx.rows` + helpers (`by_type`/`by_db`/`by_area`/
+  `by_tagtable`/`where`/`first`/`areas`).
+- **`table.py` `Table`** — what a builder returns (`add(template_type=…, **values)` / `add_row`); a
+  list-valued cell is the horizontal ITERATOR (emitted last).
+- **`builders.py`** — one `@builds("<output>")` per template, free-form Python over `db`. The 8:
+  `00` commissioning bypass (one network per diag node = a node carrying `name_in_db`), `02` EM push
+  button (a `00_Push-Button_Input` FB per node, E1/2 grouped by I/Q address range, chunked to the FB's
+  4 slots), `03` zone cumulative (per AREA: `PB`/`FDB` always + `SAFETY_BREAKERS`/`DOORS` when present →
+  one `02_COM` AND-coil each), `04` ESTOP (per AREA; SORTER door-capacity tier 01-05 when sorter-area
+  OR has doors, else GENERIC `06`), `05` output feedback (per K-family `index` group; 3-family capacity
+  variant), `06` feedback error (a `03_FDBACK error` FB per node, KQ chunked to 8), `07` speed control
+  (per N1/2+N2/2 encoder pair by numeric index), `08` gate manager (one row per sorter + one per door
+  `DQ`). Node grouping is by I/Q address range; **`index` (global) groups the K family + the door
+  family**; **`No Operation`** (a ph-520 DB seed member) pads a template's unused fixed slots.
 - **`registry.py`** — the `@builds` decorator; the engine runs every registered builder.
-- **`shells.py` (810)** — `CreationInfo/SoftwareBlocksBuilderShells.xlsm`, the **KEY INVENTORY**: scans the template
-  `*.xml` for `!!key$$` and writes one sheet per template with the FULL key set. Per sheet: B1
-  `$ template=<ABSOLUTE path>`, B2 `$ <mode>` (keep/fill/override), row 3 `% TemplateType !!key$$ …`.
-  Additive (edits/mode/added keys survive); `read_shells` reads modes + the key set back.
-- **`engine.py` (820/830)** — runs builders honoring the shell: fill/keep → `builder(db)`; override →
-  the shell sheet's `@` rows ARE the table. Serializes each Table to `CreationInfo/<name>.csv` in the
-  kept `$/#/%/@` layout — the `%` header is the shell's FULL key set (builder fills values, blanks for
-  the rest), the `$` ref is the ABSOLUTE template path. `instanceOf-<FB>` cells → `InstanceDBs.csv`.
-  Output names drop the `TEMPLATE--vX.Y--` prefix.
-- **No golden** for this format yet (Pipeline2's output never worked) — produced fresh for review.
-  840/850 (Open …) are GUI-era (M11). Delete a stale shell to regenerate in the current format.
+- **`shells.py` (810)** — `CreationInfo/SoftwareBlocksBuilderShells.xlsm` is BOTH the key inventory AND
+  the **editable working surface**. Per sheet: B1 `$ template=<ABS path>`, B2 `$ <mode>`
+  (fill/keep/override). Saved as a **valid macro-enabled .xlsm**: openpyxl writes the xlsx content type
+  even to a `.xlsm` (Excel rejects the mismatch as corrupt), so `_save_xlsm` patches `[Content_Types].xml`
+  to macro-enabled after every save, and loads use `keep_vba=True` so user VBA survives a re-run. Two
+  sheet layouts: **standard** (`%`/`@` key header) for 7 blocks; **coil-columns** for `03`
+  (`COIL_COLUMN_BLOCKS`) — one column per coil = the cause→effect linking (row3 `%coil` the `02_COM`
+  member, row4 `nameOfDB`, row5 `comment`, rows6+ the AND inputs).
+- **`engine.py` (820/830)** — per block, by B2 mode: **fill** → `builder(db)` → CSV + seed the sheet
+  (standard = exact `$/%/@` copy of the CSV via `write_standard_sheet`; `03` = `write_coil_columns`);
+  **keep** → `builder(db)` → CSV, sheet left alone; **override** → write the CSV **from the sheet
+  VERBATIM** (`read_override_grid`, preserving the ITERATOR spread) — `03` reads its coil columns
+  instead. `%` header = the shell's full key set; `instanceOf-<FB>` cells → `InstanceDBs.csv`; output
+  names drop the `TEMPLATE--vX.Y--` prefix.
+- **`xml_emit.py` — direct FC XML.** A block in `xml_emit.EMITTERS` (currently `03`) is emitted as a
+  ready `SW.Blocks.FC` XML into the Open2App **ImportReady** surface (one exactly-sized `A`(AND)→`Coil`
+  network per cumulative; **UTF-8 BOM + CRLF + indented**, modelled on the template's FlgNet) and its
+  CreationInfo **CSV is dropped** (Open2App imports the XML, not a template-fill CSV). `02_COM` is
+  generated here too — a custom safe F_DB (`signals.write_safe_db`), members = the standard seeds + the
+  AREA-n cumulatives.
+- 840/850 (Open …) are GUI-era (M11). A file-write `OSError` (e.g. a locked output) is a logged ERROR
+  that HALTS the run (`app._run_one`), not a traceback.
 
 ## Testing
 
@@ -384,10 +402,13 @@ DiagList_IO columns + `$PLC_Binding$`, the OR/per-row logic rules + sibling co-l
 the **Phase-700 hardware suite** `test_hardware.py`, 11 cases: roles/address/param-merge-override/
 I-O-address-template, the extract (auto-plug skip, PotentialGroup, by-type channel params, default
 cards), the missing-DTD ERROR/switch-WARNING, and the format-2 output (no BOM, CRLF, descriptive headers));
-the **Phase-800 blocks-skeleton suite** `test_blocks.py`, 6 cases: Database/Table/`@builds`, the
-`$/#/%/@` writer (absolute `$` ref + InstanceDBs + ITERATOR-last), the shell scan/inventory + the
-full-key `%` header + the override path (shell-dependent cases point `BLOCK_TEMPLATES_DIR` at a
-synthetic template to stay data-independent).
+the **Phase-800 blocks suite** `test_blocks.py` (Database/Table/`@builds`, the `$/#/%/@` writer +
+full-key `%` header, the shell scan/inventory, the direct-FC-XML emit — exactly-sized AND + the
+CSV-drop, the coil-columns round-trip, the standard-sheet CSV mirror, the **override-verbatim** CSV
+preserving the ITERATOR spread; shell-dependent cases point `BLOCK_TEMPLATES_DIR` at a synthetic
+template) + the **per-builder suite** `test_builders.py` (one group per template `00/02/03/04/05/06/07/08`
+over synthetic rows: the grouping/membership/variant/naming of each builder + the `combined_FLD` dedup);
+`test_registry.py` also covers the file-write-error halt.
 
 ## Status & still to build
 
@@ -404,12 +425,14 @@ synthetic template to stay data-independent).
   paired-channel co-location; 620 the OPC SCL fill — node-resolved FL, tristate variants, FUNCTION
   rename + BOM/CRLF), **M7 Phase 700 Hardware** (710 Stations + 720 Modules, one extract → format-2
   CSVs matching the committed reference; DTD roles + auto-plug + PotentialGroup + by-type params +
-  default cards; head-not-in-DTD ERROR/switch-WARNING), **M9 Phase 800 Software — SKELETON** (the clean
-  builder base: `domain/blocks/` Database + Table + `@builds` registry + the engine emitting the kept
-  `$/#/%/@` CreationInfo CSV with an absolute `$` ref + InstanceDBs; 810 shells scan the template
-  `*.xml` for the key inventory; `block_templates.json` deprecated. The per-template builders in
-  `domain/blocks/builders.py` are USER-authored free-form Python — currently stubs).
-- **NEXT**: the per-template block builders (`domain/blocks/builders.py`, user-authored); 910 Pipeline
+  default cards; head-not-in-DTD ERROR/switch-WARNING), **M9 Phase 800 Software — DONE** (all 8
+  per-template builders `00/02/03/04/05/06/07/08` over the single DB; the FLD dedup
+  `iol_FLD`/`ce_FLD`/`combined_FLD` + `No Operation` DB seed; `02_COM` safe-DB generated in phase 800;
+  `05_DOORS`→`07_DOOR` rename; `03` emitted as a direct exactly-sized `SW.Blocks.FC` XML
+  (`xml_emit`, BOM+CRLF, CSV dropped); the editable `.xlsm` shell — standard `%`/`@` sheets seeded as a
+  CSV copy on `fill`, `03` as a coil-columns cause→effect sheet; `override` writes the CSV from the
+  sheet verbatim; a file-write error halts cleanly).
+- **NEXT**: extend the direct-FC-XML / coil-columns approach to other blocks if wanted; 910 Pipeline
   Coverage Report (phase 900); M10 CLI + Open2App-path contract test; M11–13 GUIs (dark-by-default,
   registry-driven phase bar, YAML-explorer config, selectable projects root) + designer + Project
   Manager; M14 packaging (two exes). **920** (TIA project coverage) is future — pending Open2App's
@@ -420,10 +443,19 @@ synthetic template to stay data-independent).
 - Pipeline3App has its **own** `config_project/` — edit it, not Pipeline2App's.
 - Regex YAML params must be **single-quoted**; JS `/…/flags` literals are accepted (`config.js_to_re`).
 - `strike_handling` excludes struck rows only on `"exclude"`.
-- Phase 800: `block_templates.json` is **deprecated** (neither read nor emitted) — the
-  `SoftwareBlocksBuilderShells.xlsm` shell IS the key inventory (810 scans the template `*.xml`); the `$ template=`
-  ref is an **absolute** path; the per-template builders in `domain/blocks/builders.py` are
-  user-authored free-form Python. Delete a stale shell to regenerate in the current format.
+- Phase 800: `block_templates.json` is **deprecated** — `SoftwareBlocksBuilderShells.xlsm` IS the key
+  inventory + the editable surface (`$ template=` ref is an **absolute** path). Modes (B2): **fill**
+  (default — rewrite the sheet from the builder each run), **keep** (builder drives, sheet untouched),
+  **override** (the sheet drives — CSV written verbatim, preserving the ITERATOR spread). `03` uses the
+  **coil-columns** layout + is emitted as a direct **FC XML** (no CSV). The shell is a **macro-enabled
+  `.xlsm`**: openpyxl emits the xlsx content type even to `.xlsm` (Excel = "corrupt"), so `_save_xlsm`
+  patches `[Content_Types].xml` and loads use `keep_vba=True`. Delete a stale shell to regenerate.
+- A direct-FC-XML block (`xml_emit.EMITTERS`) ships a ready `SW.Blocks.FC` to ImportReady — **UTF-8 BOM
+  + CRLF + multi-line** (a double BOM / LF-only / single-line file fails the Openness importer at line 1)
+  — and its CreationInfo CSV is dropped.
+- A **file-write `OSError`** (e.g. an output locked open in TIA/Excel) is caught at `app._run_one`,
+  logged `[ERROR] … could not write file …; pipeline stopped`, and HALTS the run (the phase stays
+  un-completed, so it retries once the lock clears) — never a raw traceback.
 - Tag/device strings (`=S1`, `+MS1.CC1`, `-S67001`) are **text**; generated cells that start with
   `=`/`+`/`-` are materialized `data_type="s"` (else openpyxl treats them as formulas).
 - **Comma CSV** everywhere on write; readers sniff `,`/`;`.
