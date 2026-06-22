@@ -289,9 +289,11 @@ def load_diagnosis_columns() -> list:
 
 
 def load_rules(name: str, base: str | None = None) -> list:
-    """Generic rule table (name, required_types, dev_type, db_name, member). Used by both
-    datablock_elements_rules.csv (DB element generation, phase 520) and diagnosis_logic_rules.csv
-    (List_Logic generation, phase 610). `required_types` is '|'-separated."""
+    """Generic rule table (name, required_types, dev_type, db_name, member, interface_tagname,
+    diag_desc). Used by both datablock_elements_rules.csv (DB element generation, phase 520) and
+    diagnosis_logic_rules.csv (List_Logic generation, phase 610). `required_types` is '|'-separated.
+    `diag_desc` is the optional rule-supplied diagnosis description ({canonical} template) the 610
+    List_Logic rows carry instead of the source signal's own diag_desc (blank -> keep the source's)."""
     rules = []
     for r in _read_csv(name, base):
         if not (r.get("name") or "").strip():
@@ -303,6 +305,7 @@ def load_rules(name: str, base: str | None = None) -> list:
             "db_name": (r.get("db_name") or "").strip(),
             "member": (r.get("member") or "").strip(),
             "interface_tagname": (r.get("interface_tagname") or "").strip(),
+            "diag_desc": (r.get("diag_desc") or "").strip(),
         })
     return rules
 

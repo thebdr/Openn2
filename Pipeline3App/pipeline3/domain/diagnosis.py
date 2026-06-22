@@ -114,8 +114,9 @@ def _resolve_logic(rows, blocks, rules) -> list:
 
 def build_diag_list_logic(rows, blocks, rules=None) -> list:
     """Rule-generated DiagList_Logic rows (dicts keyed by the diagnosis_columns headers). A synthetic
-    row carries the rule's assigned diag_cabinet/diag_bit + dev_type/name for the column interpolation;
-    the PLC_Binding column is the rule binding."""
+    row carries the rule's assigned diag_cabinet/diag_bit + dev_type/name for the column interpolation,
+    plus the rule's diag_desc (when set) for the Diag Desc column; the PLC_Binding column is the rule
+    binding."""
     if rules is None:
         rules = config.load_rules(_LOGIC_RULES_FILE, config.DIAGNOSIS_DIR)
     cols = config.load_diagnosis_columns()
@@ -125,6 +126,10 @@ def build_diag_list_logic(rows, blocks, rules=None) -> list:
         row["diag_cabinet"], row["diag_bit"] = f"{it['cabinet']:03d}", f"{it['bit']:02d}"
         row["type_hw"] = it["rule"]["dev_type"]
         row["script_type"] = it["rule"]["name"] or it["src"].get("script_type")
+        # a rule-supplied diag_desc names the rule-generated diagnosis (e.g. "SAFETY ENCODER FAILURE
+        # <FLD>") rather than the source signal's own diag_desc; blank -> keep the source signal's.
+        if it["rule"].get("diag_desc"):
+            row["diag_desc"] = identity.interp(it["rule"]["diag_desc"], row)
         out.append({h: (it["binding"] if expr.strip() == PLC_BINDING_SENTINEL else identity.interp(expr, row))
                     for h, expr in cols})
     return out

@@ -113,6 +113,23 @@ def test_logic_fld_fallback_cabinet():
     eq(len(logic), 1); eq(logic[0]["Diag Cabinet"], "007", "cabinet from FLD->DiagnosisBlocks")
 
 
+def test_logic_diag_desc_rule_override_and_fallback():
+    # a rule-supplied diag_desc names the rule-generated diagnosis (e.g. "SAFETY ENCODER FAILURE
+    # <FLD>"); a rule WITHOUT one (or with a blank) keeps the source signal's own diag_desc.
+    base = {"name": "Enc", "required_types": ["N1/2"], "dev_type": "A", "db_name": "04_SPEED",
+            "member": "Safety Encoder Healthy [ {functional_unit}{location}{device} ]"}
+    row = _row(in_diag=True, script_type="N1/2", diag_cabinet="011", diag_bit="00", type_hw="A",
+               fu="=S1", loc="+PC1", dev="-X1", diag_desc="SOURCE ENCODER DESC")
+    with_desc = [{**base, "diag_desc": "SAFETY ENCODER FAILURE {functional_unit}{location}{device}"}]
+    a = diagnosis.build_diag_list_logic([row], {}, rules=with_desc)
+    eq(a[0]["Diag Desc"], "SAFETY ENCODER FAILURE =S1+PC1-X1", "rule diag_desc drives the Diag Desc")
+    eq(a[0]["PLC_Binding"], '"04_SPEED"."Safety Encoder Healthy [ =S1+PC1-X1 ]"')
+    b = diagnosis.build_diag_list_logic([row], {}, rules=[base])              # no diag_desc key
+    eq(b[0]["Diag Desc"], "SOURCE ENCODER DESC", "no rule diag_desc -> keep the source signal's")
+    c = diagnosis.build_diag_list_logic([row], {}, rules=[{**base, "diag_desc": ""}])  # blank
+    eq(c[0]["Diag Desc"], "SOURCE ENCODER DESC", "blank rule diag_desc -> keep the source signal's")
+
+
 def test_logic_warning_family():
     # the warning family (dev_type ends 'W') is independent of the alarm family in a cabinet
     rule = [{"name": "Warn", "required_types": ["A"], "dev_type": "AW", "db_name": "DB", "member": "M{device}"}]
@@ -282,6 +299,7 @@ if __name__ == "__main__":
         ("logic_next_free_bit", test_logic_next_free_bit),
         ("logic_paired_channel_sibling", test_logic_paired_channel_sibling),
         ("logic_fld_fallback_cabinet", test_logic_fld_fallback_cabinet),
+        ("logic_diag_desc_rule_override_and_fallback", test_logic_diag_desc_rule_override_and_fallback),
         ("logic_warning_family", test_logic_warning_family),
         ("generate_diag_list", test_generate_diag_list),
         ("ml_value", test_ml_value),

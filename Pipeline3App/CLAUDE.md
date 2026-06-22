@@ -54,7 +54,7 @@ Every ordered enumeration uses gapped numbers so steps insert without renumberin
 | 600 | Diagnosis Mapping | 610 Generate Diag List · 620 Generate Diag Software Blocks | **DONE** |
 | 700 | Hardware Generation | 710 Generate Stations · 720 Generate Modules | **DONE** |
 | 800 | Software Generation | 810 Empty Shells · 820 Generate Blocks · 830 Generate Instances | **DONE** (8 builders; 03 direct FC XML; editable shells) |
-| 900 | Reporting | 910 Pipeline Coverage Report · 920 TIA Project Coverage Report | TODO (M7/future) |
+| 900 | Reporting | 910 Pipeline Coverage Report · 920 TIA Project Coverage Report | **910 DONE** (920 deferred) |
 
 True dependency DAG: `config → 200 Fill → 300 Staging → {100, 400, 500, 600, 700, 800, 900}`
 (everything downstream depends only on Staging). **Two run profiles** share one engine: `main`
@@ -381,6 +381,34 @@ are written (data-independent cases in `tests/unit/test_builders.py`; real-doc C
 - 840/850 (Open …) are GUI-era (M11). A file-write `OSError` (e.g. a locked output) is a logged ERROR
   that HALTS the run (`app._run_one`), not a traceback.
 
+## Phase 900 — Reporting — 910 DONE (920 deferred)
+
+`domain/coverage.py` + `phases/p900_reporting.py`. **910 Generate Pipeline Coverage Report** traces
+each staged signal's life from validation (100) through staging (300) to every downstream output, by
+**reading the ACTUAL on-disk output artifacts** (NOT an in-memory re-derivation — phases 400–800 permit
+user inputs: the editable `.xlsm` shells in override/keep mode, hand-filled interface Side-2 rows,
+treatments; only the produced files reflect reality). It reuses each staged row's identity (`name_in_db`/
+`name_in_tagtable`/`plc_binding`/`profinet_name`) to find where that signal landed. `requires=(300,)` and
+reads artifacts as-they-are (richer once 400–800 have run; a missing artifact degrades to a noted gap —
+run-all runs 400→800 before 900, so a full run is current). Writes `Reports/io_project_coverage_report.{csv,txt}`
+— **documentation, NOT an Open2App import surface**. `ok=True` (informational); 930 (Open Reports) is GUI-era.
+
+- **What it reads** (`collect_outputs`, split from the pure `attribute` so the green gate stays hermetic):
+  `PlcTags/PLCTags.xlsx` (tags) · `ImportReady/*.db`+`*.xml` GlobalDB (DB members) · `DiagList_*.csv` +
+  `Diagnostic_for_OPC.scl` (diagnosis bindings) · `IF_*.xlsx` Expression Side 1 (interface mirrors) +
+  the IF_ instance files · `Stations/Modules.csv` (hardware station names) · `CreationInfo/*.csv` +
+  ImportReady FC-XML `<Component>` (software refs). A channel is "covered by hardware" when its node
+  (via `diagnosis.node_of`) is a generated station.
+- **Row kinds**: `signal` (resolved type OR carries a DB/tag identity) · `channel` (untyped row with an
+  I/Q address = a raw module point) · `structural` (untyped, no address — headers, CM partner cards).
+- **ORPHAN** = a `signal` whose identity appears in NONE of the output artifacts (channels/structural
+  are never ORPHAN). **UNPLACED** = a qualified `"<db>"."<member>"` reference an output emits (a
+  diagnosis binding / an interface-mirror Expression) whose DB is one Pipeline3 generates (it has an
+  actual `.db`/`.xml`) but whose member is NOT in that DB's actual members — an output pointing at a
+  data-block member that was never created. Refs to DBs Pipeline3 does NOT generate (`05_EM_STATE`,
+  `SPEED_STATE_REC` — hand-authored in TIA) are 920's scope, ignored here.
+- **920 TIA Project Coverage** — a disabled stub (no `run`), deferred pending a real TIA project export.
+
 ## Testing
 
 Plain-`python` tests (no pytest) under `tests/unit/`, via `tests/unit/_harness.py` (PASS/FAIL,
@@ -408,7 +436,11 @@ CSV-drop, the coil-columns round-trip, the standard-sheet CSV mirror, the **over
 preserving the ITERATOR spread; shell-dependent cases point `BLOCK_TEMPLATES_DIR` at a synthetic
 template) + the **per-builder suite** `test_builders.py` (one group per template `00/02/03/04/05/06/07/08`
 over synthetic rows: the grouping/membership/variant/naming of each builder + the `combined_FLD` dedup);
-`test_registry.py` also covers the file-write-error halt.
+the **Phase-900 coverage suite** `test_coverage.py` (9 cases: signal/channel/structural classification,
+the per-stage attribution + ORPHAN-only-for-signals, the UNPLACED dangling-member detector `find_unplaced`,
+and the output-artifact readers over a tiny synthetic output tree — hermetic, the trace splits file-I/O
+`collect_outputs` from the pure `attribute`); `test_diagnosis.py` also covers the optional `diag_desc`
+rule column (override + absent + blank fallback); `test_registry.py` also covers the file-write-error halt.
 
 ## Status & still to build
 
@@ -431,12 +463,14 @@ over synthetic rows: the grouping/membership/variant/naming of each builder + th
   `05_DOORS`→`07_DOOR` rename; `03` emitted as a direct exactly-sized `SW.Blocks.FC` XML
   (`xml_emit`, BOM+CRLF, CSV dropped); the editable `.xlsm` shell — standard `%`/`@` sheets seeded as a
   CSV copy on `fill`, `03` as a coil-columns cause→effect sheet; `override` writes the CSV from the
-  sheet verbatim; a file-write error halts cleanly).
-- **NEXT**: extend the direct-FC-XML / coil-columns approach to other blocks if wanted; 910 Pipeline
-  Coverage Report (phase 900); M10 CLI + Open2App-path contract test; M11–13 GUIs (dark-by-default,
-  registry-driven phase bar, YAML-explorer config, selectable projects root) + designer + Project
-  Manager; M14 packaging (two exes). **920** (TIA project coverage) is future — pending Open2App's
-  project text-export.
+  sheet verbatim; a file-write error halts cleanly), **Phase 900 / 910 Pipeline Coverage Report — DONE**
+  (`domain/coverage.py`: trace each staged signal across the on-disk outputs; ORPHAN = a signal in no
+  output, UNPLACED = a `"<db>"."<member>"` reference to a generated-DB member 520 never created; reads
+  the actual artifacts so user edits to shells/interfaces are honored; CSV + TXT under `Reports/`).
+- **NEXT**: extend the direct-FC-XML / coil-columns approach to other blocks if wanted; M10 CLI +
+  Open2App-path contract test; M11–13 GUIs (dark-by-default, registry-driven phase bar, YAML-explorer
+  config, selectable projects root) + designer + Project Manager; M14 packaging (two exes). **920**
+  (TIA project coverage) is future — pending Open2App's project text-export.
 
 ## Conventions & gotchas
 
@@ -475,5 +509,10 @@ over synthetic rows: the grouping/membership/variant/naming of each builder + th
   once per cabinet"). Matching is by **script_type** (exact); a pair_key like `DI`/`N` matches no
   script_type, so it no-ops unless a row with that literal type exists. The **OPC SCL** is UTF-8-BOM +
   CRLF (the exported-template format) with the FUNCTION renamed to drop the `TEMPLATE--vX.Y--` prefix.
+  A rule's **`member` must name a DB member 520 actually creates** (a `datablock_elements_rules` member
+  or a signal type's `db_element`), else the diagnosis binding dangles — the 910 coverage report flags
+  it **UNPLACED**. The optional **`diag_desc`** column (`config.load_rules`) gives the rule-generated
+  DiagList_Logic row its OWN Diag Desc (a `{canonical}` template, e.g. `SAFETY ENCODER FAILURE {combined_FLD}`);
+  blank/absent ⇒ the row keeps the source signal's `diag_desc` (`diagnosis.build_diag_list_logic`).
 - Run/test from the `Pipeline3App` root. When committing `_Openn2`, end commit messages with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
