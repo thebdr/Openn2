@@ -3,4 +3,4 @@ openpyxl>=3.1        # Excel read/write (strikethrough, formulas)
 ruamel.yaml>=0.17    # comment-preserving YAML round-trip for project_params.yaml
 tksheet>=7.0         # GUI grid (Files tab / config explorer)
 pywin32>=306 ; sys_platform == "win32"   # Excel-cell links via COM (GUI)
-# sv-ttk>=2.6        # optional modern dark ttk theme (GUI, M11)
+sv-ttk>=2.6          # modern Win11-style (Sun Valley) dark ttk theme (GUI)
