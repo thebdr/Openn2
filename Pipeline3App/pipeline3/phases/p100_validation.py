@@ -40,22 +40,28 @@ def _write(out_root: str, key: str, text: str) -> str:
 
 
 def _run_sub(ctx, number, name_key, builder, designer_ok):
-    """One sub-phase, self-contained (its prerequisites are topo-run by app.run_phase)."""
+    """One sub-phase, self-contained (its prerequisites are topo-run by app.run_phase; its
+    `<number> <Title>` banner is emitted by the engine's run_subphase). Appends its findings to
+    ctx.log - the ONE log every phase shares."""
     if ctx.profile == "designer" and not designer_ok:
         return PhaseResult(ok=True, summary=f"{number}: disabled in the designer profile")
-    log = [banner(number, tr(name_key, ctx.lang))] + list(builder(ctx))
-    fails = sum(e.level == "FAIL" for e in log)
-    return PhaseResult(ok=(fails == 0), log=log, summary=f"{number}: {fails} FAIL")
+    findings = list(builder(ctx))
+    ctx.log.extend(findings)
+    fails = sum(e.level == "FAIL" for e in findings)
+    return PhaseResult(ok=(fails == 0), summary=f"{number}: {fails} FAIL")
 
 
 def run(ctx) -> PhaseResult:
-    """Phase header: run every (profile-enabled) sub-phase, apply treatments, write both reports."""
-    log = [banner(100, tr("ph_validation", ctx.lang))]
+    """Phase header: the engine has already emitted the `100 Documents Validation` banner; append each
+    sub-banner + its findings to ctx.log, then apply treatments + write both reports over THIS phase's
+    slice (ctx.log[_phase_start:]) - the entries are shared objects, so the in-place treatment + the
+    report see the same LogEntries the GUI later renders."""
     for number, name_key, builder, designer_ok in SUBS:
         if ctx.profile == "designer" and not designer_ok:
             continue
-        log.append(banner(number, tr(name_key, ctx.lang)))
-        log.extend(builder(ctx))
+        ctx.log.append(banner(number, tr(name_key, ctx.lang)))
+        ctx.log.extend(builder(ctx))
+    log = ctx.log[ctx._phase_start:]            # the '100' banner + sub-banners + findings
     # Treatments (M6b): the designer build only suppresses lines locally; the operator build applies
     # warn/skip/accept from error_management.csv and reconciles the registry (mark-stale + prune).
     if ctx.profile == "designer":
@@ -63,12 +69,12 @@ def run(ctx) -> PhaseResult:
     else:
         reg = errors.apply_and_reconcile(ctx, log)
         ctx.emit(f"treatments: registry -> {os.path.basename(reg)}")
-    bodies = render.reports(log)
+    bodies = render.reports(log)                # the two summary emits fire AFTER this slice (GUI-only)
     rep = _write(ctx.out_root, "validation_report", bodies["complete"])
     err = _write(ctx.out_root, "validation_errors", bodies["errors"])
     fails = sum(e.level == "FAIL" for e in log)
     ctx.emit(f"validation: {fails} FAIL -> {os.path.basename(rep)} / {os.path.basename(err)}")
-    return PhaseResult(ok=(fails == 0), halt=False, log=log,
+    return PhaseResult(ok=(fails == 0), halt=False,
                        artifacts={"validation_report": rep, "validation_errors": err},
                        summary=f"{fails} FAIL, 2 reports written")
 

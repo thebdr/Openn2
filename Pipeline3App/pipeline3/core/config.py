@@ -66,6 +66,7 @@ OUTPUT_PATHS = {
     "validation_report":   os.path.join("Reports", "documents_validation_report"),     # + .txt / .html (complete log)
     "validation_errors":   os.path.join("Reports", "documents_validation_errors"),      # + .txt / .html (errors-only view)
     "coverage_report":     os.path.join("Reports", "io_project_coverage_report"),       # + .csv / .txt
+    "run_log":             os.path.join("Reports", "pipeline_run_log"),                 # + .txt (GUI "Log to File" tee)
     "io_database":         os.path.join("ProjectDocumentation", "InformationDatabase", "IODatabase.csv"),
     "diagnosis_dir":       os.path.join("ProjectDocumentation", "InformationDatabase", "DiagnosisData"),
     "interfaces_dir":      os.path.join("ProjectDocumentation", "InformationDatabase", "Interfaces"),

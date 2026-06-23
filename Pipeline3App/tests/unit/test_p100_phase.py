@@ -43,8 +43,7 @@ def _ctx(d, profile):
     return PipelineContext(
         params={"io_list": {"path": io, "sheet": "NET SAFETY 50", "header_row": 1},
                 "strike_handling": "ignore", "ce": {"path": ""}},
-        out_root=os.path.join(d, "out"), rows=_diag_rows(), lang="en", profile=profile,
-        emit=lambda *_a, **_k: None)
+        out_root=os.path.join(d, "out"), rows=_diag_rows(), lang="en", profile=profile)
 
 
 def test_registration_and_profiles():
@@ -65,19 +64,21 @@ def test_header_runner_writes_both_reports():
         rep, err = res.artifacts["validation_report"], res.artifacts["validation_errors"]
         ok(os.path.exists(rep) and os.path.exists(err), "both report files written")
         ok(os.path.getsize(rep) > os.path.getsize(err), "complete report is longer than errors-only")
-        # directive 2A: every non-banner entry carries a code-traceable type
-        for e in res.log:
-            if e.level != "PHASE":
-                ok(e.type, f"entry without a type: {e!r}")
-        ok(any(e.type.startswith("diag_") for e in res.log), "150 ran in the main profile")
+        # directive 2A: every builder FINDING carries a code-traceable type. (The phase-header's own
+        # ctx.emit status lines are not findings - they carry phase 0 here, since run() is called
+        # directly without the engine setting _current_phase.)
+        for e in ctx.log:
+            if e.level != "PHASE" and e.phase != 0:
+                ok(e.type, f"finding without a type: {e!r}")
+        ok(any(e.type.startswith("diag_") for e in ctx.log), "150 ran in the main profile")
 
 
 def test_designer_skips_150():
     with tempfile.TemporaryDirectory() as d:
         ctx = _ctx(d, "designer")
         res = p100_validation.run(ctx)
-        ok(not any(e.type.startswith("diag_") for e in res.log), "150 disabled in the designer profile")
-        ok(any(e.type == "ce_absent" for e in res.log), "130/140 skip (C&E absent) still recorded")
+        ok(not any(e.type.startswith("diag_") for e in ctx.log), "150 disabled in the designer profile")
+        ok(any(e.type == "ce_absent" for e in ctx.log), "130/140 skip (C&E absent) still recorded")
 
 
 def test_file_locked_surfaces_as_iolist_locked():

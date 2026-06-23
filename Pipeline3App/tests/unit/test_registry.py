@@ -61,7 +61,7 @@ def test_cycle_detected():
 
 
 def _ctx(profile="main"):
-    return PipelineContext(params={}, out_root="", profile=profile, emit=lambda *_: None)
+    return PipelineContext(params={}, out_root="", profile=profile)
 
 
 def test_run_phase_runs_prereqs():
@@ -110,7 +110,7 @@ def test_file_write_error_logs_and_halts():
     reg.register(Phase(200, "fill", "ph_fill", _mkrun(order, 200), requires=()))
     reg.register(Phase(300, "staging", "ph_staging", _boom, requires=(200,)))
     reg.register(Phase(400, "interfaces", "ph_i", _mkrun(order, 400), requires=(300,)))
-    ctx = PipelineContext(params={}, out_root="", profile="main", emit=msgs.append)
+    ctx = PipelineContext(params={}, out_root="", profile="main", on_progress=msgs.append)
     result = app.run_phase(ctx, 400, reg=reg)
     ok(result is not None and result.halt and not result.ok, "a file-write OSError -> halting result")
     eq(order, [200, 300], "stopped at the failed write; 400 never ran")

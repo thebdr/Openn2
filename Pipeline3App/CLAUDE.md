@@ -86,19 +86,32 @@ launch_gui.py                                             # the operator-GUI lau
   formula-preserving for the populator), regex sheet resolution, by-**position** cell access, and
   the header check that **normalizes newline→space then prefix-matches**. Every phase reads through
   this — no other module opens a sheet for reading.
-- **One log structure** — `core/model.py::LogEntry`. Fixed left/middle, variable right `detail`:
+- **One log engine — EVERY phase logs the same way (§4.1).** `core/model.py::LogEntry`, fixed
+  left/middle, variable right `detail`:
   `[LEVEL] <id>  <location>  | bit | FLD | desc_l1 | desc_l1b | drawing | type-index :: <detail>`.
   TWO index concepts: **`id` = `<phase>-<type>`** — a code-traceable **log-type index**; the `type`
   slug is the i18n key suffix (`v_<type>`) AND the grep anchor that leads to the exact builder (NOT a
   per-run ordinal). **`uid`** = a stable per-FAIL hash of the *finding* (phase+type+location+detail)
   — excludes the level/seq AND the workbook identity, so a treatment survives a doc revision. The
   **`location` is `Sheet!Cell` only — never the workbook name**; the workbook rides on
-  `LogEntry.doc`/`doc2` (for the GUI link) and is not rendered; a cross-check's matched 2nd-workbook
-  cell renders as ` -> <Sheet!Cell>`. `io/render.py::render_lines(log, errors_only)` renders both the
-  complete report and the error-only view (PHASE+INFO+WARN+FAIL, dropping PASS/SKIP). Its GUI twin
-  **`render_records`** returns the SAME text plus, per line, the char spans of `location`/`location2`
-  and their workbook (`doc`/`doc2`) — both share the one `_format_line`/`banner_lines` helper, so the
-  report text (the golden) is a single source and can't drift from the GUI records.
+  `LogEntry.doc`/`doc2` (for the GUI link), not rendered; a cross-check's matched 2nd-workbook cell
+  renders as ` -> <Sheet!Cell>`.
+  - **The engine (`app._run_one`/`run_subphase`) emits a `<number> <Title>` PHASE banner** per
+    (sub-)phase (`model.banner` prepends the id → `100 Documents Validation`, `300 Documents
+    Staging`), with the title from the registry's `name_key` via i18n. So `ctx._current_phase` is set
+    before the phase runs and `ctx._phase_start` marks its slice.
+  - **`ctx.emit(str)` is part of the engine, not a side-channel**: it appends a `LogEntry`
+    (`model.split_level` infers the level from a leading `[FAIL]`/`WARN`/`ERROR`/… token and strips
+    it; default INFO) tagged with the current phase, AND forwards the raw text to `ctx.on_progress`
+    (the GUI status bar). So phases **200–900 generators** (which only call `ctx.emit`) now produce a
+    banner + INFO/WARN/FAIL lines in the SAME form as phase 100 — no separate plain-string path.
+  - `io/render.py::render_lines(log, errors_only)` renders both the complete report and the
+    error-only view (PHASE+INFO+WARN+FAIL, dropping PASS/SKIP). Its GUI twin **`render_records`**
+    returns the SAME text plus, per line, the char spans of `location`/`location2` and their workbook
+    (`doc`/`doc2`) — both share the one `_format_line`/`banner_lines` helper, so the report text (the
+    golden) is a single source and can't drift from the GUI records.
+  - The engine fires **`ctx.on_phase_log(slice)`** as each (sub-)phase completes, so the GUI renders
+    each phase's block **incrementally** (and a long `run_all` shows blocks as they finish).
 - **No hardcoded input columns** — all IoList/CE/AREA access resolves through `column_map.csv`
   (`config.load_column_map` / `iolist_diag.columns.ColumnResolver`). The only fixed integer columns
   are the two sheets Pipeline3 *generates* (DiagnosisBlocks, _UnresolvedIndex).
@@ -441,14 +454,19 @@ each profile is a **named session** shown in the title + log banner as `Pipeline
   the native **Windows title bar** (DWM `IMMERSIVE_DARK_MODE` on the caption HWND; reversible). `fonts.py`
   loads `assets/fonts/MonaspaceNeon-Var.ttf` privately per-process (`AddFontResourceEx(FR_PRIVATE)`;
   resolves as `"Monaspace Neon Var"`).
-- **`logview.py`** — the colour-coded log (level tags). The validation log is fed as **structured
-  records** (`render.render_records`): `append_records` makes each line's `location`/`location2` cell a
+- **`logview.py`** — the colour-coded log (level tags). EVERY phase's log is fed as **structured
+  records** (`render.render_records`) via the engine's per-phase `on_phase_log` hook (`app_main._phase_log`
+  → one `("records", …)` event per phase, rendered as each phase completes — live sub-step text goes to
+  the status bar via `ctx.on_progress`). `append_records` makes each line's `location`/`location2` cell a
   **clickable link that opens ITS OWN workbook** (I/O List or C&E, from the record's `doc`/`doc2`) in
   Excel at that cell via COM (`excel.py`, worker thread) — `_open_link(doc, sheet, cell)` resolves the
   basename to a path — and tags the leading **`[FAIL]`/`[ERROR]`** as an `errlink` opening
   `error_management.csv`. Binding from the record (not by re-parsing text against "known sheets")
   is what makes cross-workbook links work and can't race; the old `set_sheets`/regex shortcut is gone.
-  Plain progress strings still go through `append(text)` (level colour only, no links).
+  A **"Log to File"** toolbar checkbox tees each rendered phase block to `Reports/pipeline_run_log.txt`
+  (the `run_log` OUTPUT_PATHS key; phase 100's own reports are unaffected). **`excel.py::goto`** now
+  **brings Excel to the foreground** after the cell jump (`_bring_to_front`, ported from Pipeline2:
+  `ShowWindow(SW_RESTORE)` + `AttachThreadInput` around `BringWindowToTop`/`SetForegroundWindow`).
 - **`files.py`** — the Files tab: a **3-section tree** (Project configuration / User editable files / Bare
   output files) + a type-aware editor. `.csv` → editable tksheet **grid** (Save = comma CSV); `.yaml/.json/
   .xml` → the **object editor** (`objedit.py`); `.scl/.db/.txt/...` → text editor; `.xlsx/.xlsm` → the

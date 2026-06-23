@@ -274,7 +274,7 @@ def test_phase_registered():
 def test_phase_run():
     with tempfile.TemporaryDirectory() as d:
         ctx = PipelineContext(params={"io_list": {"path": os.path.join(d, "nope.xlsx")}},
-                              out_root=os.path.join(d, "out"), emit=lambda *_a, **_k: None)
+                              out_root=os.path.join(d, "out"))
         ctx.rows = [_row(in_diag=True, script_type="A", diag_cabinet="001", diag_bit="00", type_hw="A",
                          name_in_db="A", datablocks="01_PB")]
         res = p600_diagnosis.run(ctx)

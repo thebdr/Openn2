@@ -44,6 +44,7 @@ class App:
         self._run_buttons: list = []
         self._busy = False
         self._ctx: PipelineContext | None = None
+        self._logfile = None                       # the "Log to File" run-log handle (None = off)
 
         fonts.register()
         self.font_family = fonts.family(root)
@@ -71,6 +72,9 @@ class App:
         top.pack(side="top", fill="x")
         ttk.Label(top, text="PIPELINE3", font=(self.font_family, 13, "bold")).pack(side="left")
         ttk.Button(top, text="Clear Log", command=self._clear).pack(side="right")
+        self._logfile_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(top, text="Log to File", variable=self._logfile_var,
+                        command=self._toggle_logfile).pack(side="right", padx=6)
         ttk.Button(top, text="Open Output", command=lambda: self._startfile(self._out_root())).pack(side="right", padx=6)
         self._theme_btn = ttk.Button(top, text="◐ Theme", command=self._toggle_theme)
         self._theme_btn.pack(side="right", padx=(0, 6))
@@ -165,17 +169,29 @@ class App:
     # ---- worker run ------------------------------------------------------ #
     def _ensure_ctx(self) -> PipelineContext:
         if self._ctx is None:
-            self._ctx = PipelineContext.create(profile=self.profile, emit=self._emit)
+            ctx = PipelineContext.create(profile=self.profile)
+            ctx.on_progress = lambda m: self.q.put(("status", m))   # live sub-step text -> status bar
+            ctx.on_phase_log = self._phase_log                       # each phase's block -> log pane (+ file)
+            self._ctx = ctx
         return self._ctx
+
+    def _phase_log(self, entries):
+        """A completed (sub-)phase's LogEntry slice (worker thread): render it into the log pane as one
+        structured block, and tee it to the run-log file when 'Log to File' is on."""
+        self.q.put(("records", render.render_records(entries)))
+        f = self._logfile
+        if f is not None:
+            try:
+                f.write(render.render_text(entries) + "\n")
+                f.flush()
+            except Exception:  # noqa: BLE001
+                pass
 
     def _out_root(self) -> str:
         try:
             return self._ensure_ctx().out_root
         except Exception:  # noqa: BLE001
             return config.output_root(config.load_params())
-
-    def _emit(self, *args):                            # the ctx.emit sink (called on the worker thread)
-        self.q.put(("log", " ".join(str(a) for a in args)))
 
     def _start(self, number: int):
         self._run(lambda ctx: self._run_number(ctx, number), f"running {number} ...")
@@ -195,11 +211,7 @@ class App:
         def job():
             try:
                 ctx = self._ensure_ctx()
-                n0 = len(ctx.log)
-                work(ctx)
-                entries = ctx.log[n0:]                  # the LogEntries this run produced (phase 100 etc.)
-                if entries:                             # ONE structured event - text + per-line link spans
-                    self.q.put(("records", render.render_records(entries)))
+                work(ctx)                               # each phase renders its own block via ctx.on_phase_log
                 self.q.put(("status", "Ready"))
             except Exception as e:  # noqa: BLE001
                 self.q.put(("log", f"[ERROR] {type(e).__name__}: {e}"))
@@ -221,9 +233,9 @@ class App:
             app.run_phase(ctx, req)
         sub = next((s for s in (ph.sub_phases or []) if s.number == number), None)
         if sub is None or sub.run is None:
-            self._emit(f"{number}: not implemented")
+            self.q.put(("log", f"{number}: not implemented"))
             return
-        ctx.absorb(sub.run(ctx))
+        app.run_subphase(ctx, sub)
 
     # ---- queue drain (main thread) --------------------------------------- #
     def _drain(self):
@@ -257,6 +269,27 @@ class App:
     # ---- opens / links --------------------------------------------------- #
     def _clear(self):
         self.log.clear()
+
+    def _toggle_logfile(self):
+        """The 'Log to File' checkbox: open (truncate) the run-log when turned on, close it when off.
+        _phase_log tees each rendered phase block to this handle while it is open."""
+        if self._logfile is not None:
+            try:
+                self._logfile.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._logfile = None
+        if self._logfile_var.get():
+            path = config.out_path(self._out_root(), "run_log") + ".txt"
+            try:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                self._logfile = open(path, "w", encoding="utf-8")
+                self.status.set(f"logging to {os.path.basename(path)}")
+            except Exception as e:  # noqa: BLE001
+                self._logfile_var.set(False)
+                self.status.set(f"could not open log file: {e}")
+        else:
+            self.status.set("file logging off")
 
     def _io_list_path(self) -> str:
         return (config.load_params().get("io_list") or {}).get("path", "")

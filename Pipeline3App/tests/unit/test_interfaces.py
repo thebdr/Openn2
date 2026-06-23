@@ -261,8 +261,7 @@ def test_phase_registered():
 def test_phase_run():
     with tempfile.TemporaryDirectory() as d:
         tpl = os.path.join(d, "tpl.xlsx"); _make_template(tpl)
-        ctx = PipelineContext(params={"interface_template": tpl}, out_root=os.path.join(d, "out"),
-                              emit=lambda *_: None)
+        ctx = PipelineContext(params={"interface_template": tpl}, out_root=os.path.join(d, "out"))
         ctx.rows = _rows()
         res = p400_interfaces.run(ctx)
         ok(res.ok)

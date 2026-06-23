@@ -6,7 +6,7 @@ from pipeline3.core import config as c
 
 def test_output_paths_keys():
     expected = {
-        "validation_report", "validation_errors", "coverage_report", "io_database",
+        "validation_report", "validation_errors", "coverage_report", "run_log", "io_database",
         "diagnosis_dir", "interfaces_dir", "populated_iolist",
         "hardware_dir", "blocks_creation_dir", "blocks_import_dir", "io_tags_dir",
     }

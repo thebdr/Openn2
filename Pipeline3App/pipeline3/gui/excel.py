@@ -37,12 +37,51 @@ def goto(path: str, sheet: str, cell: str) -> tuple[bool, str]:
             ws = wb.Worksheets(sheet)
             ws.Activate()
             xl.Goto(ws.Range(cell), True)
+            _bring_to_front(xl)
             return True, f"opened {sheet}!{cell}"
         except Exception:  # noqa: BLE001
             wb.Activate()
+            _bring_to_front(xl)
             return True, f"opened {os.path.basename(path)} (sheet/cell not located)"
     except Exception:  # noqa: BLE001
         return _startfile(path)
+
+
+def _bring_to_front(xl) -> None:
+    """Force the Excel window to the foreground (works around Windows' focus-steal lock) so a clicked
+    log link actually surfaces Excel at the cell, not behind the GUI. Best-effort - never raises.
+    Ported from Pipeline2's `_bring_to_front`: restore if minimized, then AttachThreadInput around
+    BringWindowToTop + SetForegroundWindow."""
+    try:
+        hwnd = int(xl.Hwnd)
+    except Exception:  # noqa: BLE001
+        return
+    if not hwnd:
+        return
+    try:
+        import win32api
+        import win32con
+        import win32gui
+        import win32process
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        fg = win32gui.GetForegroundWindow()
+        cur = win32api.GetCurrentThreadId()
+        other = win32process.GetWindowThreadProcessId(fg)[0] if fg else 0
+        attached = bool(other) and other != cur
+        if attached:
+            win32process.AttachThreadInput(other, cur, True)
+        try:
+            win32gui.BringWindowToTop(hwnd)
+            win32gui.SetForegroundWindow(hwnd)
+        finally:
+            if attached:
+                win32process.AttachThreadInput(other, cur, False)
+    except Exception:  # noqa: BLE001
+        try:
+            xl.ActiveWindow.Activate()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _startfile(path: str) -> tuple[bool, str]:

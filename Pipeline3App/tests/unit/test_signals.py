@@ -294,8 +294,7 @@ def test_phase_registered():
 def test_phase_run():
     with tempfile.TemporaryDirectory() as d:
         iol = os.path.join(d, "iolist.xlsx"); _make_iolist(iol)
-        ctx = PipelineContext(params={"io_list": {"path": iol}}, out_root=os.path.join(d, "out"),
-                              emit=lambda *_a, **_k: None)
+        ctx = PipelineContext(params={"io_list": {"path": iol}}, out_root=os.path.join(d, "out"))
         ctx.rows = [_io_row("TAG_A", "SafetyTags", "I0.0"),
                     _db_row("DI1/2", "Door Closed", "07_DOOR", "safe_db", dev="-B1")]
         res = p500_signals.run(ctx)

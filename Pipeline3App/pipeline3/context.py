@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from pipeline3.core.model import LogEntry, split_level
+
 
 @dataclass
 class PipelineContext:
@@ -26,17 +28,34 @@ class PipelineContext:
     diag_blocks: Optional[dict] = None  # cabinet -> block info (from the DiagnosisBlocks sheet)
 
     # accumulated across phases
-    log: list = field(default_factory=list)        # LogEntry objects
+    log: list = field(default_factory=list)        # LogEntry objects - the ONE log for every phase
     artifacts: dict = field(default_factory=dict)   # OUTPUT_PATHS key -> written path
     completed: set = field(default_factory=set)     # phase numbers already run (memoization)
 
-    emit: Callable = print              # progress sink: emit(message) - CLI prints / GUI queues / tests collect
+    # the unified log engine (§4.1): emit() appends a LogEntry tagged with the phase the engine runs.
+    _current_phase: int = 0             # set by the engine (app._run_one / run_subphase) before a phase runs
+    _phase_start: int = 0               # index in `log` where the current phase's entries begin
+    on_progress: Optional[Callable] = None   # live hook for the raw emit text (GUI status bar / CLI print)
+    on_phase_log: Optional[Callable] = None  # fired with a phase's LogEntry slice when it completes (GUI render)
+
+    def emit(self, *args) -> None:
+        """The progress sink, now part of the ONE log engine: every emit becomes a LogEntry under the
+        current phase's banner (level inferred + token stripped by model.split_level), and the raw text
+        is forwarded to the live hook (status bar / console)."""
+        msg = " ".join(str(a) for a in args)
+        level, detail = split_level(msg)
+        self.log.append(LogEntry(level=level, phase=self._current_phase, detail=detail))
+        if self.on_progress is not None:
+            self.on_progress(msg)
 
     def absorb(self, result) -> None:
-        """Merge a PhaseResult's log + artifacts into the context."""
+        """Merge a PhaseResult's artifacts (and any log it still returns) into the context. Phases now
+        append their LogEntries to ctx.log directly (via emit()/ctx.log); `result.log` is kept only as
+        an incremental-safety path for a phase that still returns one."""
         if result is None:
             return
-        self.log.extend(result.log)
+        if result.log:
+            self.log.extend(result.log)
         self.artifacts.update(result.artifacts)
 
     def io_list_path(self) -> str:
@@ -46,13 +65,15 @@ class PipelineContext:
 
     @classmethod
     def create(cls, params: dict | None = None, profile: str = "main",
-               lang: str | None = None, emit: Callable = print) -> "PipelineContext":
+               lang: str | None = None, emit: Callable | None = None) -> "PipelineContext":
         from pipeline3.core import config
         params = params if params is not None else config.load_params()
-        return cls(
+        ctx = cls(
             params=params,
             out_root=config.output_root(params),
             lang=lang or params.get("language") or "en",
             profile=profile,
-            emit=emit,
         )
+        if emit is not None and emit is not print:   # back-compat: `emit=` now drives the live hook
+            ctx.on_progress = emit
+        return ctx

@@ -162,7 +162,7 @@ def test_phase_registered():
 
 def test_phase_run():
     with tempfile.TemporaryDirectory() as d:
-        ctx = PipelineContext(params={}, out_root=os.path.join(d, "out"), emit=lambda *_a, **_k: None)
+        ctx = PipelineContext(params={}, out_root=os.path.join(d, "out"))
         ctx.rows = _rows()
         ctx.device_db = _dtd()                       # inject so no DTD file is needed
         res = p700_hardware.run(ctx)

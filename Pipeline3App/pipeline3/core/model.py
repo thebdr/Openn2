@@ -85,5 +85,26 @@ def number_entries(entries) -> list:
 
 
 def banner(phase: int, text: str) -> LogEntry:
-    """A PHASE section-header entry."""
-    return LogEntry(level="PHASE", phase=phase, detail=text)
+    """A PHASE section-header entry. The detail carries the phase id - `<number> <Title>` - so every
+    rendered banner reads e.g. `100 Documents Validation` / `110 Validate I/O List`."""
+    return LogEntry(level="PHASE", phase=phase, detail=f"{phase} {text}")
+
+
+# Map a leading level token in a free-form emit() string to a LogEntry level. The generators (and the
+# engine's OSError/HALT) emit progress text like "  WARN bad sheet", "[ERROR] ...", "staging: 5 rows".
+_EMIT_LEVELS = {"FAIL": "FAIL", "ERROR": "FAIL", "HALT": "FAIL",
+                "WARN": "WARN", "WARNING": "WARN", "SKIP": "SKIP", "PASS": "PASS", "INFO": "INFO"}
+
+
+def split_level(msg) -> tuple:
+    """A free-form emit() string -> (level, detail). Infers the level from a leading `[TOKEN]` or
+    `TOKEN` word (case-insensitive) and STRIPS that token from the detail; defaults to INFO with the
+    message kept verbatim. So `  WARN bad sheet` -> ('WARN', 'bad sheet'); `[ERROR] locked` ->
+    ('FAIL', 'locked'); `staging: 5 rows` -> ('INFO', 'staging: 5 rows')."""
+    s = str(msg).strip()
+    m = re.match(r"\[(\w+)\]\s*", s) or re.match(r"(\w+)\b\s*", s)
+    if m:
+        token = m.group(1).upper()
+        if token in _EMIT_LEVELS:
+            return _EMIT_LEVELS[token], s[m.end():]
+    return "INFO", s
