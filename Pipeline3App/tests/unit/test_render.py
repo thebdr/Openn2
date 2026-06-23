@@ -55,6 +55,25 @@ def test_reports_helper():
     ok(len(r["complete"]) > len(r["errors"]))
 
 
+def test_html_report_viewer_no_wrap():
+    html = render.render_html(_log())
+    ok("white-space:pre" in html and "pre-wrap" not in html, "lines do NOT wrap (like the wrap='none' viewer)")
+    for cls in ("line section", "line pass", "line skip", "line info", "line warn", "line fail"):
+        ok(cls in html, f"level class {cls!r} present (mirrors the logview palette)")
+    ok('<span class="loc">AREA 1!F5</span>' in html, "the location cell carries the viewer link styling")
+    ok('<span class="loc">NET SAFETY 50!O30</span>' in html, "the second cross-check cell too")
+    ok("missing in C&amp;E" in html, "the log body is HTML-escaped")
+    ok("1 passed, 1 failed, 1 warning(s), 1 skipped" in html, "summary counts")
+
+
+def test_html_errors_only_and_helper():
+    errs = render.render_html(_log(), errors_only=True)
+    ok("header ok" not in errs and "skipped row" not in errs, "errors-only drops PASS/SKIP")
+    ok("missing in C&amp;E" in errs, "FAIL kept in the errors-only HTML")
+    h = render.html_reports(_log())
+    ok(set(h) == {"complete", "errors"} and len(h["complete"]) > len(h["errors"]))
+
+
 if __name__ == "__main__":
     raise SystemExit(run("render", [
         ("complete_has_everything", test_complete_has_everything),
@@ -62,4 +81,6 @@ if __name__ == "__main__":
         ("id_and_detail_present", test_id_and_detail_present),
         ("location_has_no_workbook_name", test_location_has_no_workbook_name),
         ("reports_helper", test_reports_helper),
+        ("html_report_viewer_no_wrap", test_html_report_viewer_no_wrap),
+        ("html_errors_only_and_helper", test_html_errors_only_and_helper),
     ]))

@@ -626,7 +626,8 @@ class App:
             return self._startfile(fixed[key])
         if key in config.OUTPUT_PATHS:
             base = config.out_path(self._out_root(), key)
-            for cand in (base, base + ".txt", base + ".csv"):     # report bases carry an extension
+            # prefer the .html report (the GUI-viewer-look validation report) -> opens in the browser
+            for cand in (base + ".html", base, base + ".txt", base + ".csv"):
                 if os.path.exists(cand):
                     return self._startfile(cand)
             return self._startfile(base)

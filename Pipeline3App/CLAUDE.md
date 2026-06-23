@@ -202,8 +202,12 @@ numbering/enrichment is GLOBAL across matched sheets; non-matching sheets logged
 ## Phase 100 — Documents Validation — DONE
 
 `domain/validation/` + `phases/p100_validation.py`. Five sub-phases validate the hand-authored docs
-and write two reports (complete `documents_validation_report.txt` + error-only
-`documents_validation_errors.txt`; `.html` deferred to the GUI). `requires=(300,)`; the **designer**
+and write each report as BOTH `.txt` (the golden) and a no-wrap `.html` (complete
+`documents_validation_report.{txt,html}` + error-only `documents_validation_errors.{txt,html}`). The
+HTML (`render.render_html`/`html_reports`) replicates the GUI log viewer — the same `render_records`
+text, the dark `theme.log_tags` palette + level colours, `Sheet!Cell` link styling — but with
+`white-space:pre` (lines do NOT wrap, like the pane's `wrap="none"`); the "Open validation logs"
+button now prefers the `.html`. `requires=(300,)`; the **designer**
 profile is `(300, 100)` and **disables 150** (its inputs come from Fill, which the designer skips).
 110/120 read workbooks through the ONE reader; 130/140/150 read `ctx.rows` (130/140 also read the C&E).
 Every builder returns `list[LogEntry]`; each emit site declares a `type` slug (the log-type index).

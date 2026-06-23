@@ -133,3 +133,79 @@ def reports(log) -> dict:
     """Both report bodies: {'complete': <full log>, 'errors': <errors-only view>}."""
     return {"complete": render_text(log, errors_only=False),
             "errors": render_text(log, errors_only=True)}
+
+
+# --- HTML report: the GUI log-viewer look as a standalone file; lines do NOT wrap ----------------- #
+# Colours mirror gui/theme.log_tags(dark) + the dark log_bg/fg/accent so the report matches the in-app
+# log pane. The ONE difference from a wrapping report is `white-space:pre` (+ horizontal scroll), which
+# is exactly what the log pane already does (its Text is wrap="none").
+_HTML_CSS = """
+  :root{color-scheme:dark;}
+  body{background:#1c1c1c;color:#e6e6e6;margin:0;padding:16px;
+       font:13px/1.5 'Monaspace Neon','Cascadia Mono',Consolas,'Courier New',monospace;}
+  h1{color:#e6e6e6;font-size:17px;margin:0 0 4px;}
+  .summary{color:#9ad67d;font-weight:bold;margin:0 0 12px;}
+  .log{overflow-x:auto;}
+  .line{white-space:pre;width:max-content;min-width:100%;}   /* NO WRAP - horizontal scroll */
+  .line.section{color:#4ea1ff;font-weight:bold;}
+  .line.fail{color:#ff6b6b;font-weight:bold;}
+  .line.warn{color:#e0a458;}
+  .line.pass{color:#9ad67d;}
+  .line.skip{color:#a8a8a8;}
+  .line.ok{color:#3fb950;font-weight:bold;}
+  .line.info{color:#e6e6e6;}
+  .loc{color:#4ea1ff;text-decoration:underline;}            /* the viewer's clickable-cell styling */
+"""
+
+_LEVEL_CLASS = {"FAIL": "fail", "ERROR": "fail", "HALT": "fail", "WARN": "warn", "WARNING": "warn",
+                "PASS": "pass", "SKIP": "skip", "OK": "ok", "INFO": "info"}
+
+
+def _esc(s: str) -> str:
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _line_html(rec) -> str:
+    """A finding line -> escaped HTML, with its location link-spans wrapped in <span class="loc"> (the
+    viewer's clickable-cell styling; cells aren't live links in a standalone file)."""
+    text = rec.text
+    if not rec.links:
+        return _esc(text)
+    out, prev = [], 0
+    for span in sorted(rec.links, key=lambda s: s.start):
+        if span.start < prev:                  # defensive: ignore any overlap
+            continue
+        out.append(_esc(text[prev:span.start]))
+        out.append(f'<span class="loc">{_esc(text[span.start:span.end])}</span>')
+        prev = span.end
+    out.append(_esc(text[prev:]))
+    return "".join(out)
+
+
+def render_html(log, errors_only: bool = False, *, title: str = "Documents Validation") -> str:
+    """The validation log as a standalone HTML document that REPLICATES the in-app log viewer
+    (gui/logview): the same per-phase-aligned text (from render_records), the dark log palette and
+    level colours. The ONE difference is that lines do NOT wrap (`white-space:pre` + horizontal scroll,
+    matching the pane's wrap="none"). PHASE banners render as their 3 banner_lines; location cells
+    carry the viewer's link styling. `errors_only` keeps PHASE/INFO/WARN/FAIL."""
+    recs = render_records(log, errors_only=errors_only)
+    c = {lv: sum(1 for e in log if e.level == lv) for lv in ("PASS", "FAIL", "WARN", "SKIP")}
+    summary = f"{c['PASS']} passed, {c['FAIL']} failed, {c['WARN']} warning(s), {c['SKIP']} skipped"
+    body = []
+    for r in recs:
+        if r.kind == "banner":
+            for bl in banner_lines(r.text):
+                body.append(f'<div class="line section">{_esc(bl)}</div>')
+        else:
+            body.append(f'<div class="line {_LEVEL_CLASS.get(r.level, "info")}">{_line_html(r)}</div>')
+    head = _esc(title) + (" - errors only" if errors_only else "")
+    return ("<!DOCTYPE html>\n<html lang='en'><head><meta charset='utf-8'>"
+            f"<title>{_esc(title)}</title><style>{_HTML_CSS}</style></head><body>"
+            f"<h1>{head}</h1><p class='summary'>{_esc(summary)}</p>\n"
+            "<div class='log'>\n" + "\n".join(body) + "\n</div></body></html>\n")
+
+
+def html_reports(log) -> dict:
+    """Both HTML report bodies (the GUI-viewer look, no-wrap): {'complete': …, 'errors': …}."""
+    return {"complete": render_html(log, errors_only=False),
+            "errors": render_html(log, errors_only=True)}

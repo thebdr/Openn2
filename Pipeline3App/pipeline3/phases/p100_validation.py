@@ -31,8 +31,8 @@ SUBS = (
 )
 
 
-def _write(out_root: str, key: str, text: str) -> str:
-    path = config.out_path(out_root, key) + ".txt"
+def _write(out_root: str, key: str, text: str, ext: str = ".txt") -> str:
+    path = config.out_path(out_root, key) + ext
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
@@ -72,11 +72,15 @@ def run(ctx) -> PhaseResult:
     bodies = render.reports(log)                # the two summary emits fire AFTER this slice (GUI-only)
     rep = _write(ctx.out_root, "validation_report", bodies["complete"])
     err = _write(ctx.out_root, "validation_errors", bodies["errors"])
+    html = render.html_reports(log)             # the GUI-log-viewer look as standalone HTML (no-wrap)
+    rep_h = _write(ctx.out_root, "validation_report", html["complete"], ".html")
+    err_h = _write(ctx.out_root, "validation_errors", html["errors"], ".html")
     fails = sum(e.level == "FAIL" for e in log)
-    ctx.emit(f"validation: {fails} FAIL -> {os.path.basename(rep)} / {os.path.basename(err)}")
+    ctx.emit(f"validation: {fails} FAIL -> {os.path.basename(rep)} / {os.path.basename(err)} (+ .html)")
     return PhaseResult(ok=(fails == 0), halt=False,
-                       artifacts={"validation_report": rep, "validation_errors": err},
-                       summary=f"{fails} FAIL, 2 reports written")
+                       artifacts={"validation_report": rep, "validation_errors": err,
+                                  "validation_report_html": rep_h, "validation_errors_html": err_h},
+                       summary=f"{fails} FAIL, 2 reports written (+ HTML)")
 
 
 SUB_PHASES = [
