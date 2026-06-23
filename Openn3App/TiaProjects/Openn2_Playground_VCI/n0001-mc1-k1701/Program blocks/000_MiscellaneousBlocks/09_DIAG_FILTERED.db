@@ -1,0 +1,11 @@
+﻿DATA_BLOCK "09_DIAG_FILTERED"
+{ DB_Accessible_From_OPC_UA := 'FALSE' ;
+ DB_Accessible_From_Webserver := 'FALSE' ;
+ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+
+BEGIN
+
+END_DATA_BLOCK
+

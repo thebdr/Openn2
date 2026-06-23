@@ -1,0 +1,10 @@
+<?xml version="1.0" standalone="no"?>
+<?xml-stylesheet type='text/xsl' href='MassDataHandlerLogFile.xsl'?>
+<LogFile titleName="IOList_Tags_5.xml" projectName="Z:\SD\temp\IOList_Tags.xlsx" typeText="Type" messageText="Message" timeText="Time">
+  <LogEntry type="Warning" dateTime="08:56:11">
+    <Message>The version ID is missing in the XLSX file. It is assumed that this is the latest version.</Message>
+  </LogEntry>
+  <LogEntry type="Error" dateTime="08:56:11">
+    <Message>Worksheet "PLC Tags" does not have the required format.</Message>
+  </LogEntry>
+</LogFile>

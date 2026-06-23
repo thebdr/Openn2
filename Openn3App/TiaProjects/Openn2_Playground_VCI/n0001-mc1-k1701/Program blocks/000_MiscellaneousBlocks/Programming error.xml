@@ -1,0 +1,116 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V18" />
+  <SW.Blocks.OB ID="0">
+    <AttributeList>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input">
+    <Member Name="BlockNr" Datatype="UInt" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Number of causing block</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="Reaction" Datatype="USInt" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">0:ignore, 1:substitute, 2:skip</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="Fault_ID" Datatype="Byte" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Fault identifier</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="BlockType" Datatype="USInt" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">16#01:OB, 16#02:FC, 16#03:FB, 16#04:SFC, 16#05:SFB, 16#06:DB: Type of block causing the error</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="Area" Datatype="USInt" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Area where the error occured</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="DBNr" Datatype="DB_ANY" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">DB number if Area = DB or DI</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="Csg_OBNr" Datatype="OB_ANY" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Number of OB causing the error</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="Csg_Prio" Datatype="USInt" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Priority of OB causing the error</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="Width" Datatype="USInt" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">0:bit, 1:byte, 2:word, 3:dword, 4:lword</MultiLanguageText>
+      </Comment>
+    </Member>
+  </Section>
+  <Section Name="Temp" />
+  <Section Name="Constant" />
+</Sections></Interface>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>Programming error</Name>
+      <Namespace />
+      <Number>121</Number>
+      <ProgrammingLanguage>LAD</ProgrammingLanguage>
+      <SecondaryType>ProgrammingError</SecondaryType>
+      <SetENOAutomatically>false</SetENOAutomatically>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource />
+          <ProgrammingLanguage>LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="8" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="9" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.OB>
+</Document>

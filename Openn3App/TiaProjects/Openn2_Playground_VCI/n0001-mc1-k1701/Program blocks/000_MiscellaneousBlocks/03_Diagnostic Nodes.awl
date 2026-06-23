@@ -1,0 +1,12 @@
+﻿FUNCTION "03_Diagnostic Nodes" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+NETWORK
+TITLE = One network per subnet
+      AN "10_PN_NETWORK".SUBNET_10[3];
+      = "08_AL_FILTER"."n0003-mc1-k3201_SN10";
+
+END_FUNCTION
+

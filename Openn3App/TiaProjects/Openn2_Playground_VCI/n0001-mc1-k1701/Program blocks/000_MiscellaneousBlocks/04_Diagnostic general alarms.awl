@@ -1,0 +1,15 @@
+﻿FUNCTION "04_Diagnostic general alarms" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//for other alarms diagnosed by the PLC
+
+BEGIN
+NETWORK
+TITLE = 
+
+//To be used only in case of diagnostic to MSC via COupler
+//From Safety Pilot, insert what you find in the file "04_Diagnostic General Alarms.txt"
+
+
+END_FUNCTION
+

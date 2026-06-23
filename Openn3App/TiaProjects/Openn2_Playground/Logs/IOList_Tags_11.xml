@@ -1,0 +1,7 @@
+<?xml version="1.0" standalone="no"?>
+<?xml-stylesheet type='text/xsl' href='MassDataHandlerLogFile.xsl'?>
+<LogFile titleName="IOList_Tags_11.xml" projectName="Z:\SD\temp\IOList_Tags.xlsx" typeText="Type" messageText="Message" timeText="Time">
+  <LogEntry type="Error" dateTime="10:19:55">
+    <Message>Error found while loading file Z:\SD\temp\IOList_Tags.xlsx, the file may be in use or read-only.</Message>
+  </LogEntry>
+</LogFile>

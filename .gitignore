@@ -28,3 +28,13 @@ Openn2App/packages/
 
 # Large reference doc (not needed for builds)
 Openn2App/lib/HW Parameter description/
+
+# Openn3App (C#, the current app) — build output, NuGet, and large/binary working dirs
+Openn3App/obj/
+Openn3App/bin/
+Openn3App/packages/
+Openn3App/lib/*.pdf
+Openn3App/lib/Siemens.Engineering.dll
+Openn3App/GeneratedBlocks/
+Openn3App/AttributeDumps/
+Openn3App/Logs/

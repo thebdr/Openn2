@@ -1,0 +1,21 @@
+﻿DATA_BLOCK "DiagnosticTags"
+{ DB_Accessible_From_Webserver := 'FALSE' ;
+ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      "S1.CABINET!!cabinetIndex$$.STATE" { ExternalWritable := 'False'} : UDInt;
+      "S1.CABINET!!cabinetIndex$$.ALARM1" { ExternalWritable := 'False'} : UDInt;
+      "S1.CABINET!!cabinetIndex$$.ALARM2" { ExternalWritable := 'False'} : UDInt;
+      "S1.CABINET!!cabinetIndex$$.WARNING1" { ExternalWritable := 'False'} : UDInt;
+      "S1.CABINET!!cabinetIndex$$.WARNING2" { ExternalWritable := 'False'} : UDInt;
+      "S1.CABINET!!cabinetIndex$$.!!Alarm_Warning_DW$$" : UDInt;
+      "S1.CABINET!!cabinetIndex$$.!!Alarm_DW$$" : UDInt;
+      "S1.CABINET!!cabinetIndex$$.!!Warning_DW$$" : UDInt;
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+

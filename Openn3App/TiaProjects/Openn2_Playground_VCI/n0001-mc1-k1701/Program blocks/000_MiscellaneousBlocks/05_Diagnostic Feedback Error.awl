@@ -1,0 +1,13 @@
+﻿FUNCTION "05_Diagnostic Feedback Error" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+NETWORK
+TITLE = Example
+
+//To be used only in case of diagnostic to MSC via COupler
+//From Safety Pilot, insert what you find in the file "05_Diagnostic Feedback Error.txt"
+
+END_FUNCTION
+
