@@ -126,7 +126,11 @@ blank and is recomputed; a genuine human entry is preserved and audit-logged as 
 **timestamped backup** (`<name>.bak_<YYYYMMDD_HHMMSS>.xlsx`, gitignored) is taken beside the source
 *before* editing and **deleted if the fill changed nothing** (content compared cell-by-cell). The
 `populated_iolist` artifact now points at the source itself. **Halts** the pipeline if any entry is
-unresolved (the `_UnresolvedIndex` sheet lists them).
+unresolved (the `_UnresolvedIndex` sheet lists them). **The re-save preserves formula caches**
+(`io/xlsx_cache.restore`, patched back from the pre-edit backup): openpyxl drops every formula cell's
+cached `<v>` on save, so without this even a no-op fill would leave a `data_only` reader seeing `None`
+for e.g. the Profinet IP/name `_xlfn.LET` formulas — which is what corrupted the I/O List (and broke
+the golden) when phase 200 ran from the GUI.
 
 - `script_type.py` — the §6 type ladder (In/Out/Node classification → the catalogue type, computed
   **in code**, replacing the legacy Excel array formula). It yields the **canonical** type directly
@@ -582,9 +586,10 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   off to LibreOffice/Excel) — never round-trip them through openpyxl (drops formulas/array-formula/VBA).
 - **The golden test is DATA-DEPENDENT** (`test_golden_validation.py`, phase 100 vs the frozen golden):
   when it goes red, check the **working tree first** — a changed `config_project/project_params.yaml`
-  (e.g. `strike_handling`) or a mutated source I/O List, not a code regression. **Do NOT run the
-  source-mutating phases (200 Fill / 400 `insert_interface_sheets`) against the committed sample doc** —
-  they rewrite it in place (and 400 can drop the Profinet IP/name formula caches); `git checkout` the doc
-  to restore, or run on a copy.
+  (e.g. `strike_handling`) or a mutated source I/O List, not a code regression. **Phase 200 Fill / 400
+  `insert_interface_sheets` re-save the source in place** (so they git-dirty it), but both **preserve the
+  formula caches** now (`io/xlsx_cache.restore`), so they no longer DEGRADE it / break the golden — a
+  `git checkout` restores the bytes. (The earlier `dd954dc` commit had committed a Fill-degraded sample
+  because Fill used to drop the V/W caches; fixed.)
 - Run/test from the `Pipeline3App` root. When committing `_Openn2`, end commit messages with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.

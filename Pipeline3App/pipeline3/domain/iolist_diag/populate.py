@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from openpyxl import load_workbook
 
 from pipeline3.core import config
+from pipeline3.io import xlsx_cache
 from pipeline3.domain.iolist_diag import script_type as st, index_assign, diag_alloc, blocks as blk, report
 from pipeline3.domain.iolist_diag.columns import ColumnResolver
 from pipeline3.domain.iolist_diag.families import load_families, family_for
@@ -208,6 +209,13 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
         blk.write_diagnosis_blocks(wb, block_list, results)
     reported = report.write_unresolved_sheet(wb, results, cr)
     wb.save(dest)
+    # openpyxl drops the cached value of EVERY formula cell on save (it can't recompute) - so without
+    # this, every fill (even a no-op re-fill that writes nothing) degrades the source: a data_only
+    # reader would then see None for e.g. the Profinet IP/name LET formulas. Patch the caches back
+    # from the pre-edit backup (the filled cells we wrote are plain values, not formulas, so they are
+    # untouched). This is what made phase 200 corrupt the I/O List when run from the GUI.
+    with open(backup, "rb") as f:
+        xlsx_cache.restore(f.read(), dest)
 
     # Keep the backup only if the fill changed the file; otherwise delete it (no-op re-fill).
     if _same_content(backup, dest):
