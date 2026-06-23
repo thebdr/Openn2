@@ -105,5 +105,8 @@ register(Phase(
     outputs=("validation_report", "validation_errors"),
 ))
 
-# Designer profile = validation-only: 300 read-only stage -> 100 (sub-phases 110-140).
-registry().define_profile("designer", (300, 100))
+# Designer profile = validation-only: 300 read-only stage -> 100 (sub-phases 110-140; 150 disabled).
+# RUNNABLE = (300, 100) but only 100 is SHOWN (300 stages as a hidden prerequisite). The GUI attrs
+# turn on the two input-file pickers + the copy-the-live-source-on-every-run behaviour (plan §4-§6).
+registry().define_profile("designer", (300, 100), present=(100,),
+                          attrs={"input_pickers": True, "live_source": True})

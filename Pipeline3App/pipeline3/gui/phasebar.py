@@ -57,13 +57,14 @@ def _button(parent, label, kind, dark, font, command, *, bold=False, width=_BTN_
 # --------------------------------------------------------------------------------------------- #
 # spec generated from the registry (the Pipeline3 change from Pipeline2's hand-written _phase_spec)
 # --------------------------------------------------------------------------------------------- #
-def build_spec(reg, lang, *, run_cb, phase_cb, button_cb, include_run=True):
+def build_spec(reg, lang, *, run_cb, phase_cb, button_cb, include_run=True, profile=None):
     """(run, phases) for PhaseBar from the registry's presentation order + i18n labels.
     `run_cb()` -> the pink master command (or None); `phase_cb(phase)` -> the header command;
     `button_cb(button, phase)` -> a dropdown Button's command (None = disabled). `include_run=False`
-    (the designer profile) drops the pink master."""
+    (the designer profile) drops the pink master. `profile` filters the bar to that profile's
+    PRESENTATION set (designer -> only ph100; None/'main' -> all phases)."""
     phases = []
-    for ph in reg.presentation_order():
+    for ph in reg.presentation_order(profile):
         phases.append({
             "label": i18n.tr(ph.name_key, lang),
             "run": phase_cb(ph),

@@ -11,7 +11,9 @@ from __future__ import annotations
 class PhaseRegistry:
     def __init__(self):
         self._by_number: dict = {}
-        self._profiles: dict = {}     # name -> set of phase numbers
+        self._profiles: dict = {}     # name -> RUNNABLE keep-set (phase numbers)
+        self._present: dict = {}      # name -> phase numbers SHOWN in the bar (defaults to the keep-set)
+        self._attrs: dict = {}        # name -> per-profile GUI behaviour flags (input_pickers, live_source…)
 
     # --- registration --------------------------------------------------- #
     def register(self, phase):
@@ -21,8 +23,22 @@ class PhaseRegistry:
         self._by_number[phase.number] = phase
         return phase
 
-    def define_profile(self, name: str, numbers) -> None:
+    def define_profile(self, name: str, numbers, *, present=None, attrs=None) -> None:
+        """`numbers` = the RUNNABLE keep-set (what topo_order may run). `present` = the subset SHOWN in
+        the phase bar (default = the keep-set); a number that is runnable-but-not-present runs as a
+        HIDDEN prerequisite (e.g. designer stages 300 but only shows 100). `attrs` = arbitrary GUI
+        behaviour flags read via profile_attr (so new profiles opt into behaviours by data, not code)."""
         self._profiles[name] = set(numbers)
+        self._present[name] = set(present) if present is not None else set(numbers)
+        self._attrs[name] = dict(attrs or {})
+
+    def has_profile(self, name) -> bool:
+        """True for 'main' (the implicit all-phases profile) or any defined profile."""
+        return name == "main" or name in self._profiles
+
+    def profile_attr(self, profile, key, default=None):
+        """A per-profile GUI behaviour flag (e.g. 'input_pickers', 'live_source'); default when unset."""
+        return self._attrs.get(profile, {}).get(key, default)
 
     def get(self, number):
         return self._by_number[number]
@@ -45,8 +61,15 @@ class PhaseRegistry:
         return [self._by_number[n] for n in nums if n in keep]
 
     def presentation_order(self, profile: str | None = None) -> list:
-        """Left->right phase-bar order = ascending number."""
-        return self.phases(profile)
+        """Left->right phase-bar order = ascending number, filtered to the profile's PRESENTATION set
+        (which may be a subset of the runnable keep-set: a hidden prerequisite runs but isn't shown).
+        profile None/'main' = all phases."""
+        if profile in (None, "main"):
+            return self.phases(None)
+        if profile not in self._profiles:
+            raise KeyError(f"unknown profile {profile!r}")
+        show = self._present.get(profile) or self._profiles[profile]
+        return [self._by_number[n] for n in sorted(self._by_number) if n in show]
 
     def topo_order(self, target: int | None = None, profile: str | None = None) -> list:
         """Dependency order via Kahn's algorithm over `requires`, restricted to the profile.

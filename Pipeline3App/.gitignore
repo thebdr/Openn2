@@ -12,3 +12,6 @@ dist/
 .idea/
 *.swp
 .DS_Store
+
+# per-installation launch profile (main|designer); absent -> main. User-local, like user_input/*.csv.
+config_project/app_config.yaml

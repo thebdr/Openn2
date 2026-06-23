@@ -89,26 +89,32 @@ def _seed_config(folder: str) -> None:
         shutil.copytree(config.CONFIG_PROJECT, dst)
 
 
-def default_doc():
-    """A fresh project.yaml, seeded from config_project/project_params.yaml (comments kept) with the
-    input paths blanked + the project knobs defaulted (copy inputs on; output_dir -> <project>/Output)."""
-    doc = load_doc(config.PARAMS_FILE)
+def default_doc(base_params: str | None = None, keep_inputs: bool = False):
+    """A fresh project.yaml, seeded from a params base (default project_params.yaml; comments kept) with
+    the project knobs defaulted (copy inputs on; output_dir -> <project>/Output). The input paths are
+    blanked unless `keep_inputs` (a 'live source' profile, e.g. designer): then each seeded path is also
+    recorded as its `source` so refresh_inputs can re-copy the live file on every run."""
+    doc = load_doc(base_params or config.PARAMS_FILE)
     for key in _INPUT_KEYS:
-        if key in doc and "path" in doc[key]:
-            doc[key]["path"] = ""
+        if key in doc and isinstance(doc[key], dict) and "path" in doc[key]:
+            if keep_inputs:
+                doc[key]["source"] = doc[key]["path"]      # remember the live source (never rewritten)
+            else:
+                doc[key]["path"] = ""
     doc.setdefault("copy_inputs_on_save", True)
     doc.setdefault("language", "en")
     doc["output_dir"] = "Output"           # relative -> load_params resolves it to <project>/Output
     return doc
 
 
-def new_project(folder: str, doc=None) -> str:
+def new_project(folder: str, doc=None, base_params: str | None = None, keep_inputs: bool = False) -> str:
     """Create the project layout (Input/ Output/ user_input/ + its own config_project/) and write
-    project.yaml. Returns its path."""
+    project.yaml. Returns its path. `base_params`/`keep_inputs` feed default_doc when `doc` is None
+    (so a designer project seeds from designer_params.yaml and keeps its source paths)."""
     _ensure_layout(folder)
     _seed_config(folder)
     path = project_yaml(folder)
-    dump_doc(doc if doc is not None else default_doc(), path)
+    dump_doc(doc if doc is not None else default_doc(base_params, keep_inputs), path)
     return path
 
 
@@ -150,3 +156,32 @@ def save_project(doc, project_path: str, copy_inputs: bool = False) -> str:
         _copy_inputs(doc, folder)
     dump_doc(doc, project_path)
     return project_path
+
+
+def refresh_inputs(doc, folder: str) -> list:
+    """Re-copy each input's ORIGINAL `source` (the live file the user keeps editing) onto the file its
+    `path` points at (Input/<name>), WITHOUT touching `path` or `source`. The designer/'live source'
+    behaviour: every validation run re-ingests the latest saved bytes. Binary copy (shutil.copy2 ->
+    formula caches/VBA survive). Missing/blank source-or-path and a locked file are skipped (best-effort,
+    a caught OSError). Returns the basenames refreshed."""
+    refreshed = []
+    for key in _INPUT_KEYS:
+        node = doc.get(key)
+        if not isinstance(node, dict):
+            continue
+        src = str(node.get("source") or "").strip()
+        dst_rel = str(node.get("path") or "").strip()
+        if not src or not dst_rel:
+            continue
+        abs_src = src if os.path.isabs(src) else os.path.normpath(os.path.join(folder, src))
+        abs_dst = dst_rel if os.path.isabs(dst_rel) else os.path.normpath(os.path.join(folder, dst_rel))
+        if not os.path.isfile(abs_src):
+            continue
+        try:
+            os.makedirs(os.path.dirname(abs_dst), exist_ok=True)
+            if os.path.abspath(abs_src) != os.path.abspath(abs_dst):
+                shutil.copy2(abs_src, abs_dst)            # binary copy - formula caches/VBA survive
+        except OSError:
+            continue
+        refreshed.append(os.path.basename(abs_dst))
+    return refreshed

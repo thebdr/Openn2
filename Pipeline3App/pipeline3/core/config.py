@@ -43,6 +43,7 @@ BLOCK_TEMPLATES_DIR = os.path.join(TEMPLATES_DIR, "Tia Portal Software Blocks")
 OUTPUT_ROOT = os.path.join(SHARED, "OutputTree")
 PARAMS_FILE = os.path.join(CONFIG_PROJECT, "project_params.yaml")
 DESIGNER_PARAMS_FILE = os.path.join(CONFIG_PROJECT, "designer_params.yaml")
+APP_CONFIG_FILE = os.path.join(CONFIG_PROJECT, "app_config.yaml")   # picks the launch profile (main|designer|…)
 BLOCK_TEMPLATES_JSON = os.path.join(CONFIG_PROJECT, "block_templates.json")
 CONFIG_DIR = CONFIG_PROJECT                # alias: "open the config folder"
 
@@ -241,6 +242,26 @@ def load_params(path: str | None = None) -> dict:
             cand = _resolve_doc(base, val)
             params[key] = cand if os.path.exists(cand) else dflt
     return params
+
+
+def load_app_profile() -> str:
+    """The launch profile from config_project/app_config.yaml (`profile: <name>`), lowercased.
+    Missing / blank / unreadable -> 'main'. NOT validated here (the GUI checks it against the
+    REGISTERED profiles), so adding a future profile needs no change to this loader."""
+    try:
+        data = _read_params_file(APP_CONFIG_FILE)
+    except Exception:  # noqa: BLE001  (no file / malformed -> safe default)
+        return "main"
+    return str((data or {}).get("profile") or "").strip().lower() or "main"
+
+
+def profile_params_file(profile: str | None) -> str:
+    """The builtin params base for a profile (= no project open): project_params.yaml for 'main',
+    else config_project/<profile>_params.yaml. So 'designer' -> the existing designer_params.yaml and
+    a future 'foo' -> foo_params.yaml, by convention, with no code change."""
+    if not profile or profile == "main":
+        return PARAMS_FILE
+    return os.path.join(CONFIG_PROJECT, f"{profile}_params.yaml")
 
 
 def sorter_areas(params: dict | None = None) -> set:

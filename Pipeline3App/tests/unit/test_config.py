@@ -78,6 +78,32 @@ def test_load_params_builtin():
     ok(p["device_types_db"].endswith("DeviceTypesDatabase.csv"))
 
 
+def test_load_app_profile():
+    import tempfile
+    old = c.APP_CONFIG_FILE
+    with tempfile.TemporaryDirectory() as d:
+        try:
+            p = os.path.join(d, "app_config.yaml")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write("profile: designer\n")
+            c.APP_CONFIG_FILE = p
+            eq(c.load_app_profile(), "designer")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write("profile: Bogus\n")
+            eq(c.load_app_profile(), "bogus", "lenient: lowercased, validated by the GUI not here")
+            c.APP_CONFIG_FILE = os.path.join(d, "absent.yaml")
+            eq(c.load_app_profile(), "main", "missing file -> main")
+        finally:
+            c.APP_CONFIG_FILE = old
+
+
+def test_profile_params_file():
+    eq(c.profile_params_file("main"), c.PARAMS_FILE)
+    eq(c.profile_params_file(None), c.PARAMS_FILE)
+    eq(c.profile_params_file("designer"), c.DESIGNER_PARAMS_FILE, "designer -> designer_params.yaml")
+    eq(c.profile_params_file("foo"), os.path.join(c.CONFIG_PROJECT, "foo_params.yaml"), "convention")
+
+
 def test_load_signal_types():
     types = c.load_signal_types()
     ok(len(types) > 0)
@@ -134,6 +160,8 @@ if __name__ == "__main__":
         ("js_to_re", test_js_to_re),
         ("resolve_sheets_js_literal", test_resolve_sheets_js_literal),
         ("load_params_builtin", test_load_params_builtin),
+        ("load_app_profile", test_load_app_profile),
+        ("profile_params_file", test_profile_params_file),
         ("load_signal_types", test_load_signal_types),
         ("load_rules_datablocks", test_load_rules_datablocks),
         ("load_device_types_db", test_load_device_types_db),

@@ -48,6 +48,19 @@ def test_profile_designer():
     eq([p.number for p in reg.topo_order(profile="designer")], [300, 100])
 
 
+def test_profile_presentation_subset():
+    """A profile may SHOW a subset of its runnable keep-set: a runnable-but-hidden phase (300) stages as
+    a prerequisite while only its visible phase (100) appears in the bar."""
+    reg, _ = _dag()
+    reg.define_profile("slim", {100, 300}, present={100}, attrs={"input_pickers": True, "live_source": True})
+    eq([p.number for p in reg.presentation_order("slim")], [100], "presentation hides the prereq 300")
+    eq([p.number for p in reg.topo_order(profile="slim")], [300, 100], "but 300 still runs")
+    eq([p.number for p in reg.topo_order(target=100, profile="slim")], [300, 100], "running 100 stages 300")
+    eq(reg.profile_attr("slim", "live_source"), True)
+    eq(reg.profile_attr("slim", "missing", "dflt"), "dflt", "absent attr -> default")
+    ok(reg.has_profile("slim") and reg.has_profile("main") and not reg.has_profile("ghost"))
+
+
 def test_duplicate_number_rejected():
     reg, _ = _dag()
     raises(ValueError, lambda: reg.register(Phase(100, "dup", "x", lambda ctx: PhaseResult())))
@@ -125,6 +138,7 @@ if __name__ == "__main__":
         ("topo_order_full", test_topo_order_full),
         ("topo_order_target", test_topo_order_target),
         ("profile_designer", test_profile_designer),
+        ("profile_presentation_subset", test_profile_presentation_subset),
         ("duplicate_number_rejected", test_duplicate_number_rejected),
         ("cycle_detected", test_cycle_detected),
         ("run_phase_runs_prereqs", test_run_phase_runs_prereqs),

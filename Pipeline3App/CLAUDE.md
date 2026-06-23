@@ -440,7 +440,7 @@ run-all runs 400→800 before 900, so a full run is current). Writes `Reports/io
   `SPEED_STATE_REC` — hand-authored in TIA) are 920's scope, ignored here.
 - **920 TIA Project Coverage** — a disabled stub (no `run`), deferred pending a real TIA project export.
 
-## GUI — M11 operator window ("Broski Session") — DONE (designer GUI still TODO)
+## GUI — M11 operator window ("Broski Session") — DONE (+ designer mode)
 
 `pipeline3/gui/` + `launch_gui.py` (`python launch_gui.py`). A Tkinter window; the app is **Pipeline3**,
 each profile is a **named session** shown in the title + log banner as `Pipeline3 - <session> (<profile>)`:
@@ -576,9 +576,19 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   adds the toolbar cluster **New Project · Open Project ▾** (recent · Open… · Set projects root… · Re-select
   IOList… · Re-select CEMatrix… · Close) + an active-project indicator in the title/banner; it **auto-reopens
   the last project** on launch. `tests/unit/test_project.py` (module + state + `use_project` routing).
-- **NEXT**: the **designer GUI** (validation-only 2nd exe, profile `designer`, no pink master); M10 CLI +
-  the Open2App-path contract test; object-editor polish (Browse pickers on path leaves, add/remove nodes);
-  M14 packaging (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.
+- **Designer mode (M11b) — DONE.** ONE GUI; the launch profile is `config_project/app_config.yaml`
+  (`profile: main|designer`, read by `config.load_app_profile`; unknown/missing → main). The registry now
+  separates **presentation** from the runnable keep-set (`define_profile(present=, attrs=)`) + carries
+  per-profile GUI **attrs** (`input_pickers`/`live_source`), so the designer bar shows **ONLY ph100** (300
+  stages as a hidden prerequisite, Fill 200 skipped). It reads `designer_params.yaml`
+  (`config.profile_params_file`), uses a **full Project-Manager project** (New Project seeds from the
+  designer base, no file prompts), adds **two input pickers** beside ph100, and **re-copies each input's
+  `source` into Input/ on every ph1x0 run** (`project.refresh_inputs` + a ctx re-stage). Covered by
+  `test_registry` (present-subset/attrs), `test_config` (`load_app_profile`/`profile_params_file`),
+  `test_project` (`refresh_inputs`/`default_doc` bases).
+- **NEXT**: M10 CLI + the Open2App-path contract test; object-editor polish (Browse pickers on path leaves,
+  add/remove nodes); M14 packaging (now **ONE** PyInstaller exe — the profile is a shipped config value).
+  **920** (TIA project coverage) is future — pending Open2App's project text-export.
 
 ## Conventions & gotchas
 

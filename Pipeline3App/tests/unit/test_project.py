@@ -40,6 +40,44 @@ def test_copy_inputs_rewrites_path():
            "path rewritten to Input/<name>")
 
 
+def test_refresh_inputs_recopies_source():
+    """Designer 'live source': the project remembers the original `source`; every run re-copies its
+    latest bytes onto the Input/ copy while `path` (Input/<name>) is untouched."""
+    with tempfile.TemporaryDirectory() as d:
+        folder = os.path.join(d, "ProjLive")
+        project.new_project(folder)
+        src = os.path.join(d, "Live.xlsx")
+        with open(src, "wb") as f:
+            f.write(b"v1-original")
+        doc = project.load_doc(project.project_yaml(folder))
+        node = doc.setdefault("io_list", {})
+        node["path"] = src
+        node["source"] = src                                       # remember the live source
+        project.save_project(doc, project.project_yaml(folder), copy_inputs=True)
+        doc2 = project.load_doc(project.project_yaml(folder))
+        eq(str(doc2["io_list"]["path"]), "Input/Live.xlsx", "path rewritten to the Input/ copy")
+        eq(str(doc2["io_list"]["source"]), src, "source preserved across copy_inputs (never rewritten)")
+        with open(src, "wb") as f:                                 # the user edits the live source
+            f.write(b"v2-edited")
+        names = project.refresh_inputs(doc2, folder)
+        eq(names, ["Live.xlsx"], "refresh reports the re-copied input")
+        with open(os.path.join(folder, "Input", "Live.xlsx"), "rb") as f:
+            eq(f.read(), b"v2-edited", "Input/ copy now holds the latest source bytes")
+        eq(str(doc2["io_list"]["path"]), "Input/Live.xlsx", "path unchanged by refresh")
+
+
+def test_default_doc_bases():
+    main_doc = project.default_doc()                               # main: input paths blanked
+    for key in ("io_list", "ce"):
+        if key in main_doc and isinstance(main_doc[key], dict) and "path" in main_doc[key]:
+            eq(str(main_doc[key]["path"]), "", f"{key} path blanked for main")
+    des = project.default_doc(config.DESIGNER_PARAMS_FILE, keep_inputs=True)   # designer: keep + source
+    for key in ("io_list", "ce"):
+        node = des.get(key)
+        if isinstance(node, dict) and str(node.get("path") or "").strip():
+            eq(str(node.get("source")), str(node["path"]), f"{key} source == seeded path (live source)")
+
+
 def test_open_missing_raises():
     with tempfile.TemporaryDirectory() as d:
         try:
@@ -110,6 +148,8 @@ if __name__ == "__main__":
     raise SystemExit(run("project", [
         ("new_project_layout", test_new_project_layout),
         ("copy_inputs_rewrites_path", test_copy_inputs_rewrites_path),
+        ("refresh_inputs_recopies_source", test_refresh_inputs_recopies_source),
+        ("default_doc_bases", test_default_doc_bases),
         ("open_missing_raises", test_open_missing_raises),
         ("config_paths_resolve_under_project", test_config_paths_resolve_under_project),
         ("state_roundtrip", test_state_roundtrip),

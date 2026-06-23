@@ -97,6 +97,13 @@ class App:
         self._bar_holder = ttk.Frame(self.root)
         self._bar_holder.pack(side="top", fill="x", padx=4)
         self._build_bar()
+        # designer chrome: the two input-file pickers, in their OWN holder (NOT inside self.bar, so the
+        # theme/lang _rebuild_bar never orphans them). Shown only for profiles that opt in (input_pickers).
+        self._picker_entries: dict = {}
+        if self.reg.profile_attr(self.profile, "input_pickers"):
+            strip = ttk.Frame(self.root, padding=(8, 2, 8, 0))
+            strip.pack(side="top", fill="x")
+            self._build_designer_pickers(strip)
         ttk.Separator(self.root, orient="horizontal").pack(side="top", fill="x", pady=(4, 0))
 
         self.nb = nb = ttk.Notebook(self.root)
@@ -128,7 +135,7 @@ class App:
         self.log.append(self._session_title(), "SECTION")
         self.log.append(f"font: {self.font_family}   theme: {'dark' if self.dark else 'light'}   "
                         f"lang: {self.lang}   profile: {self.profile}   "
-                        f"phases: {', '.join(str(p.number) for p in self.reg.presentation_order())}")
+                        f"phases: {', '.join(str(p.number) for p in self.reg.presentation_order(self.profile))}")
         proj = project.project_name(self.project_path) if self.project_path else "(none -> Shared/OutputTree)"
         self.log.append(f"project: {proj}   output: {self._out_root()}")
 
@@ -139,7 +146,7 @@ class App:
             run_cb=lambda: self._start_all,
             phase_cb=lambda ph: (lambda n=ph.number: self._start(n)),
             button_cb=self._button_cb,
-            include_run=(self.profile == "main"))
+            include_run=(self.profile == "main"), profile=self.profile)
         self.bar = phasebar.PhaseBar(self._bar_holder, run, phases, self._run_buttons,
                                      dark=self.dark, bg=self.pal["bg"], font=self.font_family, padding=(6, 2))
         self.bar.pack(fill="x")
@@ -184,7 +191,7 @@ class App:
             except Exception:  # noqa: BLE001  (vanished / corrupt -> fall back to builtin)
                 pass
         config.use_builtin()
-        self.params = config.load_params()
+        self.params = config.load_params(config.profile_params_file(self.profile))
 
     def _update_project_label(self):
         name = project.project_name(self.project_path) if self.project_path else "(none — shared output)"
@@ -222,7 +229,7 @@ class App:
             state.push_recent(path)
         else:
             config.use_builtin()
-            self.params = config.load_params()
+            self.params = config.load_params(config.profile_params_file(self.profile))
             self.project_path = None
             state.clear_last_opened()
         self._ctx = None                                   # rebuild on the next run with the new params
@@ -234,6 +241,7 @@ class App:
         self.files.refresh()
         self.root.title(self._session_title())
         self._update_project_label()
+        self._refresh_designer_pickers()
         self._banner()
         self.status.set(f"project: {project.project_name(path)}" if path else "closed project — shared output")
 
@@ -248,17 +256,24 @@ class App:
             self.status.set(f"already exists: {os.path.basename(folder)}")
             return
         try:
-            path = project.new_project(folder)
-            doc = project.load_doc(path)
-            io = filedialog.askopenfilename(parent=self.root, title="I/O List workbook (optional)",
-                                            filetypes=[("Excel", "*.xlsx *.xlsm"), ("All files", "*.*")])
-            ce = filedialog.askopenfilename(parent=self.root, title="Cause & Effect Matrix (optional)",
-                                            filetypes=[("Excel", "*.xlsx *.xlsm"), ("All files", "*.*")])
-            if io:
-                doc.setdefault("io_list", {})["path"] = io
-            if ce:
-                doc.setdefault("ce", {})["path"] = ce
-            project.save_project(doc, path, copy_inputs=True)
+            if self.reg.profile_attr(self.profile, "input_pickers"):
+                # picker-profile (designer): seed from the profile base (designer_params), keep its source
+                # paths, copy them in - NO file dialogs; the user (re)picks via the persistent pickers.
+                path = project.new_project(folder, base_params=config.profile_params_file(self.profile),
+                                           keep_inputs=True)
+                project.save_project(project.load_doc(path), path, copy_inputs=True)
+            else:
+                path = project.new_project(folder)
+                doc = project.load_doc(path)
+                io = filedialog.askopenfilename(parent=self.root, title="I/O List workbook (optional)",
+                                                filetypes=[("Excel", "*.xlsx *.xlsm"), ("All files", "*.*")])
+                ce = filedialog.askopenfilename(parent=self.root, title="Cause & Effect Matrix (optional)",
+                                                filetypes=[("Excel", "*.xlsx *.xlsm"), ("All files", "*.*")])
+                if io:
+                    doc.setdefault("io_list", {})["path"] = io
+                if ce:
+                    doc.setdefault("ce", {})["path"] = ce
+                project.save_project(doc, path, copy_inputs=True)
         except Exception as e:  # noqa: BLE001
             self.status.set(f"new project failed: {e}")
             return
@@ -310,6 +325,72 @@ class App:
         self.files.sections = self._file_sections()
         self.files.refresh()
         self.status.set(f"{label} -> Input/{os.path.basename(picked)}")
+
+    # ---- designer input pickers ----------------------------------------- #
+    def _build_designer_pickers(self, parent):
+        """The two input workbooks (I/O List + C&E) as readonly path fields + Browse buttons (designer
+        chrome beside the ph100 bar). A pick updates the active project's `source` (re-copied into Input/
+        on save + on every run) or, with no project, the in-memory params path."""
+        for key, caption in (("io_list", "I/O List"), ("ce", "C&E Matrix")):
+            row = ttk.Frame(parent)
+            row.pack(side="top", fill="x", pady=1)
+            ttk.Label(row, text=f"{caption}:", width=11).pack(side="left")
+            ent = ttk.Entry(row)
+            ent.pack(side="left", fill="x", expand=True, padx=(0, 6))
+            ent.insert(0, self._source_path_for(key))      # gotcha: insert THEN readonly; keep the ref
+            ent.configure(state="readonly")
+            self._picker_entries[key] = ent
+            ttk.Button(row, text="Browse…", command=lambda k=key: self._pick_source(k)).pack(side="left")
+
+    def _source_path_for(self, key: str) -> str:
+        """The ORIGINAL source workbook for a picker field - the `source` sub-key (the live file), else
+        the resolved path. (load_params preserves `source`; `path` may point at the Input/ copy.)"""
+        node = self.params.get(key) or {}
+        return node.get("source") or node.get("path") or ""
+
+    def _set_picker_text(self, key: str, text: str):
+        ent = self._picker_entries.get(key)
+        if ent is None:
+            return
+        ent.configure(state="normal")
+        ent.delete(0, "end")
+        ent.insert(0, text)
+        ent.configure(state="readonly")
+
+    def _refresh_designer_pickers(self):
+        for key in self._picker_entries:
+            self._set_picker_text(key, self._source_path_for(key))
+
+    def _pick_source(self, key: str):
+        if self._busy:
+            self.status.set("busy — finish the run first")
+            return
+        label = "I/O List" if key == "io_list" else "C&E Matrix"
+        picked = filedialog.askopenfilename(parent=self.root, title=f"Select {label}",
+                                            filetypes=[("Excel", "*.xlsx *.xlsm"), ("All files", "*.*")])
+        if not picked:
+            return
+        try:
+            if self.project_path:
+                doc = project.load_doc(self.project_path)
+                node = doc.setdefault(key, {})
+                node["path"] = picked
+                node["source"] = picked                    # the live file; copied into Input/ now + every run
+                project.save_project(doc, self.project_path, copy_inputs=True)
+                self.params = config.load_params(self.project_path)
+            else:                                          # no project: validate the picked source directly
+                node = self.params.setdefault(key, {})
+                node["path"] = picked
+                node["source"] = picked
+        except Exception as e:  # noqa: BLE001
+            self.status.set(f"select failed: {e}")
+            return
+        self._ctx = None
+        self._set_picker_text(key, self._source_path_for(key))
+        if hasattr(self, "files"):
+            self.files.sections = self._file_sections()
+            self.files.refresh()
+        self.status.set(f"{label} source: {os.path.basename(picked)}")
 
     # ---- button wiring (from the registry) ------------------------------- #
     def _button_cb(self, button, phase):
@@ -381,6 +462,8 @@ class App:
     def _run_number(self, ctx, number: int):
         """Run a whole phase (hundreds) or one sub-phase (its prerequisites first). Clicking a phase
         RE-RUNS it (prereqs stay memoized) so its log refreshes each time."""
+        if self.reg.profile_attr(self.profile, "live_source") and number // 100 == 1:
+            self._refresh_designer_inputs(ctx)             # re-copy the live source before any ph1x0 run
         if number % 100 == 0:
             ctx.completed.discard(number)
             app.run_phase(ctx, number)
@@ -394,6 +477,24 @@ class App:
             self.q.put(("log", f"{number}: not implemented"))
             return
         app.run_subphase(ctx, sub)
+
+    def _refresh_designer_inputs(self, ctx):
+        """'Live source' profiles (designer): before each ph1x0 run, re-copy the project's input `source`
+        files onto their Input/ copies (so validation reads the latest saved bytes), then invalidate the
+        staged rows + the 300/100 memoization so the next run_phase re-stages off the fresh bytes. With no
+        project open, validation already reads the picked source directly - we only re-stage."""
+        try:
+            if self.project_path:
+                doc = project.load_doc(self.project_path)
+                names = project.refresh_inputs(doc, project.project_dir(self.project_path))
+                if names:
+                    self.q.put(("status", f"refreshed source: {', '.join(names)}"))
+        except Exception as e:  # noqa: BLE001
+            self.q.put(("log", f"[WARN] could not refresh source: {e}"))
+        ctx.rows = None                                    # re-stage this run (p300 memoizes on ctx.rows)
+        ctx.populated_path = ""
+        ctx.completed.discard(300)
+        ctx.completed.discard(100)
 
     # ---- queue drain (main thread) --------------------------------------- #
     def _drain(self):
@@ -529,7 +630,16 @@ class App:
         self.status.set(f"open '{key}': not wired yet")
 
 
-def main(profile: str = "main", lang: str = "en"):
+def main(profile: str | None = None, lang: str = "en"):
+    """Launch the operator window. The profile defaults to config_project/app_config.yaml's `profile`
+    (so launch_gui.py stays argument-free); an unknown profile falls back to 'main'. ONE GUI, one exe -
+    the profile is a shipped config value, not a separate build."""
+    if profile is None:
+        profile = config.load_app_profile()
+    reg = registry()
+    if not reg.has_profile(profile):
+        print(f"app_config.yaml: unknown profile {profile!r} -> falling back to 'main'")
+        profile = "main"
     root = tk.Tk()
     App(root, profile=profile, lang=lang)
     root.mainloop()
