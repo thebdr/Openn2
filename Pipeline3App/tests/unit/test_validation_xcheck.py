@@ -69,8 +69,10 @@ def test_130_forward():
     eq(mm.level, "FAIL")
     eq(mm.location2, "NET SAFETY 50!O5", "links the matched I/O List cell")
     eq(mm.doc2, "IOList.xlsx", "doc2 is the I/O List workbook")
-    ok("=/=" in mm.detail and "===" in mm.detail, "cmp body present")
+    ok(mm.cmp is not None and not mm.cmp.addr_eq and mm.cmp.fld_eq, "structured cmp: addr differs, fld matches")
     ok(".xlsx" not in mm.location, "C&E link is sheet!cell only")
+    # full match links BOTH workbooks: the C&E ref cell + the matched I/O List cell
+    eq((by["cem_match"].location2, by["cem_match"].doc2), ("NET SAFETY 50!O5", "IOList.xlsx"))
 
 
 def test_130_absent_skips():
@@ -113,6 +115,8 @@ def test_140_reverse():
     eq(fld.location2, "CAUSE&EFFECT MATRIX!F5", "links the C&E cell")
     eq(fld.doc2, "ce.xlsx", "doc2 is the C&E workbook")
     eq(fld.location, "NET SAFETY 50!O10", "primary link is the I/O List row, sheet!cell only")
+    miss = next(x for x in out if x.type == "iol_cem_missing_mandatory")
+    eq((miss.location2, miss.doc2), ("C&E Matrix", "ce.xlsx"), "a miss links the C&E FILE (label, no cell)")
 
 
 def test_140_full_check_false_gates_untyped():

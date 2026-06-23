@@ -7,22 +7,20 @@ small normalization + fuzzy-match + cross-check-rendering helpers.
 from __future__ import annotations
 import re
 
-from pipeline3.core.model import LogEntry, InfoBlock
+from pipeline3.core.model import LogEntry, InfoBlock, Cmp
 from pipeline3.core.i18n import tr
 
 
 # --- the one entry factory -------------------------------------------------- #
 def entry(level: str, phase: int, type_: str, lang: str, *, location: str = "", doc: str = "",
-          location2: str = "", doc2: str = "", info: InfoBlock | None = None, cmp: str = "",
+          location2: str = "", doc2: str = "", info: InfoBlock | None = None, cmp: Cmp | None = None,
           **fmt) -> LogEntry:
     """Build a LogEntry. `type_` is the log-type slug → the rendered id `<phase>-<type_>` AND the
-    i18n key `v_<type_>` (localized with **fmt). For a cross-check, pass `cmp` (the `===`/`=/=`
-    comparison body) - the detail becomes `<cmp> :: <message>`."""
-    msg = tr(f"v_{type_}", lang, **fmt)
-    detail = f"{cmp} :: {msg}" if cmp else msg
-    return LogEntry(level=level, phase=phase, type=type_, detail=detail,
+    i18n key `v_<type_>` (localized with **fmt). The detail is the localized message; a cross-check's
+    `cmp` (a `Cmp`) rides structured on the entry so the renderer aligns it per-phase."""
+    return LogEntry(level=level, phase=phase, type=type_, detail=tr(f"v_{type_}", lang, **fmt),
                     location=location, doc=doc, location2=location2, doc2=doc2,
-                    info=info or InfoBlock())
+                    cmp=cmp, info=info or InfoBlock())
 
 
 # --- normalization ---------------------------------------------------------- #
@@ -97,9 +95,8 @@ def matches_words(text: str, words, max_dist: int) -> bool:
 
 # --- cross-check comparison body (phases 130/140) --------------------------- #
 def cmp_detail(caller_addr: str, other_addr: str, caller_fld: str, other_fld: str,
-               addr_eq: bool, fld_eq: bool) -> str:
-    """The `<addr> op <addr> | <fld> op <fld>` body; op is `===` (equal) or `=/=` (differ)."""
-    oa = "===" if addr_eq else "=/="
-    of = "===" if fld_eq else "=/="
-    return (f"{caller_addr or '(none)'} {oa} {other_addr or '(none)'} | "
-            f"{caller_fld or '(none)'} {of} {other_fld or '(none)'}")
+               addr_eq: bool, fld_eq: bool) -> Cmp:
+    """The STRUCTURED cross-check comparison (IO address + FLD, each with its equality). The renderer
+    aligns the four fields per-phase and prints `<addr> op <addr> | <fld> op <fld>` (op `===`/`=/=`)."""
+    return Cmp(caller_addr or "(none)", other_addr or "(none)", addr_eq,
+               caller_fld or "(none)", other_fld or "(none)", fld_eq)

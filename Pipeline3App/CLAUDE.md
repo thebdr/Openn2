@@ -94,8 +94,11 @@ launch_gui.py                                             # the operator-GUI lau
   per-run ordinal). **`uid`** = a stable per-FAIL hash of the *finding* (phase+type+location+detail)
   — excludes the level/seq AND the workbook identity, so a treatment survives a doc revision. The
   **`location` is `Sheet!Cell` only — never the workbook name**; the workbook rides on
-  `LogEntry.doc`/`doc2` (for the GUI link), not rendered; a cross-check's matched 2nd-workbook cell
-  renders as ` -> <Sheet!Cell>`.
+  `LogEntry.doc`/`doc2` (for the GUI link), not rendered. A **cross-check renders both workbooks
+  inline in the location column** as `<loc1> vs <loc2>` (both clickable) — `loc2` is the matched
+  `Sheet!Cell` in the other workbook, or, on a **miss**, a workbook LABEL (no `!`) that opens that
+  file. A mismatch also carries a structured **`Cmp`** (`io.render` aligns it per-phase as
+  `<addr> op <addr> | <fld> op <fld>`, op `===`/`=/=`).
   - **The engine (`app._run_one`/`run_subphase`) emits a `<number> <Title>` PHASE banner** per
     (sub-)phase (`model.banner` prepends the id → `100 Documents Validation`, `300 Documents
     Staging`), with the title from the registry's `name_key` via i18n. So `ctx._current_phase` is set
@@ -211,12 +214,16 @@ Every builder returns `list[LogEntry]`; each emit site declares a `type` slug (t
   row emits a `row_ok` **PASS** "all checks passed" (full report only). `strike_handling=="error"`⇒struck FAIL.
 - **120 `matrix.py`** — C&E standalone (new design): no Q/O on the matrix, no I on AREA sheets, no dup
   address per sheet. C&E absent ⇒ one `ce_absent` **SKIP**.
-- **130 `crosscheck.py`** — CEM→IOL: each C&E ref present+consistent in the IOL (io-index by FLD);
-  partials link the matched IOL cell via `location2`/`doc2`.
+- **130 `crosscheck.py`** — CEM→IOL: each C&E ref present+consistent in the IOL (io-index by FLD).
+  Every line links **BOTH workbooks** as `<C&E cell> vs <other>` — `<other>` is the matched I/O List
+  cell (PASS/partial) or, on a device-missing FAIL, the **I/O List file** label (opens the file). A
+  mismatch carries a `Cmp` (addr + FLD, `===`/`=/=`).
 - **140 `crosscheck.py`** — IOL→CEM decision tree: **typed & `ce_mandatory` yes/warn → CHECK** (yes→FAIL,
   warn→WARN); **typed `no`/unset → NO_CHECK** (skip); **untyped**: always-excluded→skip; `ce_full_check`
   OR a `ce_mandatory_words` safety match → CHECK; otherwise (excluded word / plain) → NO_CHECK (skip).
-  `NO_CHECK` rows emit a SKIP that documents why; partials link the C&E cell.
+  `NO_CHECK` rows emit a SKIP that documents why. Every checked line links **BOTH workbooks** as
+  `<I/O List cell> vs <other>` — `<other>` is the matched C&E cell (PASS/partial) or, on a not-in-C&E
+  miss, the **C&E file** label (opens the file). A mismatch carries a `Cmp` (addr + FLD, `===`/`=/=`).
 - **150 `diagnosis.py`** — (cabinet,bit) numeric + unique per ALARM/WARNING family (family = WARNING
   when the type ends `W`, so an alarm+warning on one slot is not a collision).
 - **Treatments (M6b, `core/errors.py`):** keyed by the per-FAIL `uid`, `user_input/error_management.csv`

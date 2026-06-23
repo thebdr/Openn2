@@ -34,8 +34,11 @@ is level-inferred into INFO/WARN/FAIL LogEntries, so generators 200-900 now log 
 each phase block renders incrementally (on_phase_log), live sub-step text -> status bar. The validation
 log is fed as structured records (render.render_records -> logview.append_records): each Sheet!Cell is a
 clickable link opening ITS OWN workbook (I/O List or C&E, via the LogEntry doc/doc2) in Excel (now
-brought to the FOREGROUND) and the [FAIL] tag a link to error_management.csv. A "Log to File" checkbox
-tees the run log to Reports/pipeline_run_log.txt. And the Files tab (3-section tree + a CSV grid with
+brought to the FOREGROUND) and the [FAIL] tag a link to error_management.csv. A cross-check (130/140)
+shows BOTH workbooks inline as "<loc1> vs <loc2>" (vs aligned per-phase; loc2 = the matched cell, or on
+a miss a workbook LABEL that opens that file) + an aligned "<addr> op <addr> | <fld> op <fld>" (===/=/=)
+comparison. A "Log to File" checkbox tees the run log to Reports/pipeline_run_log.txt. And the Files tab
+(3-section tree + a CSV grid with
 zebra/right-click sort/filter, a
 YAML/JSON/XML object editor that preserves YAML comments, an xlsx read-only preview + Edit-externally
 via LibreOffice/Excel, a full-path header + Open-folder). The app is Pipeline3; each profile is a named

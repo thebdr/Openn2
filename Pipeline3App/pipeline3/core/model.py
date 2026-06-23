@@ -19,7 +19,13 @@ TWO distinct index concepts (the two never collide):
 from __future__ import annotations
 import hashlib
 import re
+from collections import namedtuple
 from dataclasses import dataclass, field
+
+# A cross-check comparison (130/140): the caller-side vs the other-workbook value, for the IO ADDRESS
+# and the FLD, each with its equality flag. The renderer aligns the four fields per-phase and prints
+# `<addr> op <addr> | <fld> op <fld>` with op = `===` (equal) / `=/=` (differ).
+Cmp = namedtuple("Cmp", "caller_addr other_addr addr_eq caller_fld other_fld fld_eq")
 
 # Severity levels.  PHASE is a banner (a section header), not a finding.
 LEVELS = ("PHASE", "INFO", "PASS", "SKIP", "WARN", "FAIL")
@@ -54,8 +60,9 @@ class LogEntry:
     type: str = ""                               # log-type slug; the id suffix, treatment gate + grep anchor
     location: str = ""                           # clickable Sheet!Cell (primary) - NO workbook name
     doc: str = ""                                # workbook identity for `location` (basename); for the GUI, NOT rendered, NOT in uid
-    location2: str = ""                          # second-workbook link (cross-checks); "" otherwise
+    location2: str = ""                          # cross-check 2nd link: a Sheet!Cell (matched) OR a workbook label (a miss -> open the file)
     doc2: str = ""                               # workbook identity for `location2`
+    cmp: object = None                           # a Cmp for a cross-check mismatch; aligned + rendered by io.render
     info: InfoBlock = field(default_factory=InfoBlock)
     seq: int = 0                                 # 1-based incremental within its phase (assigned by number_entries; ordering/debug only)
 

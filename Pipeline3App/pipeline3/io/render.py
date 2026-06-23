@@ -29,16 +29,48 @@ LinkSpan = namedtuple("LinkSpan", "start end doc")
 RenderRec = namedtuple("RenderRec", "kind level text links")
 
 
+_VS = " vs "                                  # the cross-check location separator: `<loc1> vs <loc2>`
+
+
+def _location_text(e, loc1w: int = 0) -> str:
+    """The location column: `<loc1> vs <loc2>` for a cross-check (loc1 left-padded to the per-phase
+    caller-cell width `loc1w` so the `vs` lines up down the column; loc2 = the matched cell, or the
+    other-workbook label on a miss), else just `<loc1>`."""
+    if e.location and e.location2:
+        return f"{e.location:<{loc1w}}{_VS}{e.location2}"
+    return e.location
+
+
+def _cmp_text(c, w) -> str:
+    """The cross-check comparison, columns aligned per-phase so the `===`/`=/=` operators line up:
+    `<caller_addr> op <other_addr> | <caller_fld> op <other_fld>` (left elements right-justified, right
+    elements left-justified, so each element hugs its operator)."""
+    op_a = "===" if c.addr_eq else "=/="
+    op_f = "===" if c.fld_eq else "=/="
+    return (f"{c.caller_addr:>{w['ca']}} {op_a} {c.other_addr:<{w['oa']}} | "
+            f"{c.caller_fld:>{w['cf']}} {op_f} {c.other_fld:<{w['of']}}")
+
+
 def _phase_widths(entries) -> dict:
-    w = defaultdict(lambda: {"id": 0, "loc": 0, "info": [0] * len(INFO_HEADERS)})
-    for e in entries:
+    w = defaultdict(lambda: {"id": 0, "loc": 0, "loc1": 0, "info": [0] * len(INFO_HEADERS),
+                             "ca": 0, "oa": 0, "cf": 0, "of": 0})
+    for e in entries:                         # pass 1: per-field maxima (incl. the caller-cell width)
         if e.level == "PHASE":
             continue
         ph = w[e.phase]
         ph["id"] = max(ph["id"], len(e.id))
-        ph["loc"] = max(ph["loc"], len(e.location))
+        if e.location and e.location2:        # a cross-check's caller cell -> the `vs`-alignment width
+            ph["loc1"] = max(ph["loc1"], len(e.location))
         for i, c in enumerate(e.info.cells()):
             ph["info"][i] = max(ph["info"][i], len(str(c)))
+        if e.cmp is not None:
+            ph["ca"], ph["oa"] = max(ph["ca"], len(e.cmp.caller_addr)), max(ph["oa"], len(e.cmp.other_addr))
+            ph["cf"], ph["of"] = max(ph["cf"], len(e.cmp.caller_fld)), max(ph["of"], len(e.cmp.other_fld))
+    for e in entries:                         # pass 2: the combined-location width (needs loc1 from pass 1)
+        if e.level == "PHASE":
+            continue
+        ph = w[e.phase]
+        ph["loc"] = max(ph["loc"], len(_location_text(e, ph["loc1"])))
     return w
 
 
@@ -48,20 +80,20 @@ def banner_lines(detail: str) -> list:
 
 
 def _format_line(e, w) -> tuple:
-    """One finding entry -> (text, [LinkSpan]). The text is byte-identical to the legacy inline
-    formatting (same fields, the `  ->  ` location2 suffix, the trailing rstrip); the spans cover the
-    `location`/`location2` cell glyphs (not their right-padding), computed on the pre-rstrip line."""
+    """One finding entry -> (text, [LinkSpan]). The location column is `<loc1> vs <loc2>` for a
+    cross-check (both cells/labels clickable); a cross-check mismatch prepends its aligned comparison
+    body to the detail. Spans cover the cell/label glyphs (not padding), computed on the pre-rstrip line."""
     info = " | ".join(str(c).ljust(w["info"][i]) for i, c in enumerate(e.info.cells()))
-    loc = e.location.ljust(w["loc"])
-    line = f"[{e.level:<4}] {e.id:<{max(1, w['id'])}}  {loc}  | {info}  :: {e.detail}"
+    loc = _location_text(e, w["loc1"]).ljust(w["loc"])
+    detail = f"{_cmp_text(e.cmp, w)} :: {e.detail}" if e.cmp is not None else e.detail
+    line = f"[{e.level:<4}] {e.id:<{max(1, w['id'])}}  {loc}  | {info}  :: {detail}"
     spans = []
-    if e.location:                            # primary cell: leftmost occurrence is the loc field
-        s = line.index(e.location)            # (before info/detail), so the span is the cell, not padding
+    if e.location:                            # loc1: leftmost occurrence is the location field
+        s = line.index(e.location)
         spans.append(LinkSpan(s, s + len(e.location), e.doc))
-    if e.location2:                           # cross-check: the matched cell in the OTHER workbook
-        line += f"  ->  {e.location2}"        # sheet!cell only; the workbook (doc2) is not rendered
-        s2 = len(line) - len(e.location2)
-        spans.append(LinkSpan(s2, s2 + len(e.location2), e.doc2))
+        if e.location2:                       # loc2 sits after the per-phase-padded loc1 + " vs "
+            s2 = s + w["loc1"] + len(_VS)
+            spans.append(LinkSpan(s2, s2 + len(e.location2), e.doc2))
     return line.rstrip(), spans               # rstrip drops only trailing space; spans stay valid
 
 

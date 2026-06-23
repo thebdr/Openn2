@@ -14,6 +14,9 @@ from pipeline3.io.workbook import FileLockedError
 from pipeline3.domain.validation import model as vm, indexes
 
 _DEFAULT_WORDS = ("emergency", "safety", "relay", "contactor", "enable")
+# The "<caller> vs <other>" link text when there is NO matched cell in the other workbook (a miss):
+# location2 carries this label (no "!"), doc2 the workbook -> the GUI opens that file (no cell).
+_IO_LABEL, _CE_LABEL = "I/O List", "C&E Matrix"
 
 
 def _ce_present(ce) -> bool:
@@ -43,10 +46,14 @@ def run_xcheck_cem_iol(ctx) -> list:
             continue
         hit = io_index.get(ref["key"])
         if hit is None:
-            out.append(vm.entry("FAIL", 130, "cem_dev_missing", ctx.lang, location=ref["loc"], doc=ce_doc, info=info))
+            # no I/O List cell to point at -> link the I/O List FILE (open it) as the second link
+            out.append(vm.entry("FAIL", 130, "cem_dev_missing", ctx.lang, location=ref["loc"], doc=ce_doc,
+                                location2=_IO_LABEL, doc2=io_doc, info=info))
             continue
         if ref["addr"] in hit["addrs"]:
-            out.append(vm.entry("PASS", 130, "cem_match", ctx.lang, location=ref["loc"], doc=ce_doc, info=info))
+            # full match: link BOTH workbooks - the C&E ref cell (primary) AND the matched I/O List cell
+            out.append(vm.entry("PASS", 130, "cem_match", ctx.lang, location=ref["loc"], doc=ce_doc,
+                                location2=hit.get("source_cell", ""), doc2=io_doc, info=info))
             continue
         io_addrs = ", ".join(sorted(hit["raw_addr"].values())) or "(none)"
         cmp = vm.cmp_detail(ref["raw_addr"], io_addrs, ref["raw_fld"], hit["raw_fld"], addr_eq=False, fld_eq=True)
@@ -134,7 +141,9 @@ def run_xcheck_iol_cem(ctx) -> list:
         checked += 1
         status = _ce_match(k, a, idx)
         if status == "full":
-            out.append(vm.entry("PASS", 140, "iol_cem_match", ctx.lang, location=loc, doc=io_doc, info=info))
+            # full match: link BOTH workbooks - the I/O List cell (primary) AND the matched C&E cell
+            out.append(vm.entry("PASS", 140, "iol_cem_match", ctx.lang, location=loc, doc=io_doc,
+                                location2=idx["loc_by_key"].get(k, ""), doc2=ce_doc, info=info))
             continue
         if status == "missing":
             if t and mand == "yes":
@@ -143,7 +152,9 @@ def run_xcheck_iol_cem(ctx) -> list:
                 lvl, typ = "FAIL", "iol_cem_missing_safety"
             else:
                 lvl, typ = "WARN", "iol_cem_missing_plain"
-            out.append(vm.entry(lvl, 140, typ, ctx.lang, location=loc, doc=io_doc, info=info))
+            # no C&E cell to point at -> link the C&E FILE (open it) as the second link
+            out.append(vm.entry(lvl, 140, typ, ctx.lang, location=loc, doc=io_doc,
+                                location2=_CE_LABEL, doc2=ce_doc, info=info))
             continue
 
         lvl = "FAIL" if is_fail else "WARN"

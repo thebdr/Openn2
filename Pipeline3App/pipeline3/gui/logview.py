@@ -110,14 +110,13 @@ class LogView(ttk.Frame):
         self.text.configure(state="disabled")
 
     def _tag_link_span(self, line_start: str, span) -> None:
-        """Make the `Sheet!Cell` at [span.start, span.end) a clickable link to its workbook."""
+        """Make the span at [start, end) a clickable link: a `Sheet!Cell` jumps to that cell; a label
+        with no `!` (a cross-check miss) opens the workbook with no cell."""
         if not (self.on_link and span.start < span.end):
             return
         s, e = f"{line_start}+{span.start}c", f"{line_start}+{span.end}c"
-        sheet_cell = self.text.get(s, e)
-        if "!" not in sheet_cell:
-            return
-        sheet, cell = sheet_cell.split("!", 1)
+        token = self.text.get(s, e)
+        sheet, cell = token.split("!", 1) if "!" in token else ("", "")
         tag = f"link{self._links}"
         self._links += 1
         self.text.tag_add(tag, s, e)
