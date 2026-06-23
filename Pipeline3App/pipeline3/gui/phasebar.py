@@ -101,6 +101,20 @@ def _scrollable(parent, bg: str):
     return outer, canvas, vs, inner
 
 
+def _foreground_is_other_app() -> bool:
+    """True when the OS foreground window belongs to a DIFFERENT process - i.e. this app has lost focus
+    (alt-tab / clicking another application). Best-effort: returns False without pywin32 / off Windows,
+    so the popup just keeps its click-away behaviour there."""
+    try:
+        import os
+        import win32gui
+        import win32process
+        fg = win32gui.GetForegroundWindow()
+        return bool(fg) and win32process.GetWindowThreadProcessId(fg)[1] != os.getpid()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 class _Dropdown(tk.Toplevel):
     """An anchored, scrollable, click-away-to-close popup of a phase's buttons."""
 
@@ -111,7 +125,7 @@ class _Dropdown(tk.Toplevel):
         self._ignore = ignore
         self._on_close = on_close
         self._closed = False
-        self._deact = None
+        self._poll = None
         self.overrideredirect(True)
         try:
             self.attributes("-topmost", True)
@@ -151,15 +165,18 @@ class _Dropdown(tk.Toplevel):
 
         self.bind("<Escape>", lambda e: self.close())
         root.bind_all("<Button-1>", self._maybe_close, "+")
-        # also close when the app loses focus to another window (alt-tab / clicking another app), which
-        # the click-away handler can't see. Armed AFTER the open/lift settles so that sequence doesn't
-        # trip it; the close is delayed + idempotent, so a dropdown button's own click-close wins the
-        # race and the button's command still fires.
-        root.after(200, self._arm_blur)
+        # also close when the app loses focus to another application (alt-tab / clicking another app),
+        # which the click-away handler can't see. <Deactivate> proved unreliable for an overrideredirect
+        # topmost popup, so POLL the OS foreground window instead (started once the open/lift settles).
+        root.after(120, self._blur_poll)
 
-    def _arm_blur(self):
-        if not self._closed:
-            self._deact = self._owner.bind("<Deactivate>", lambda _e: self._owner.after(150, self.close), "+")
+    def _blur_poll(self):
+        if self._closed:
+            return
+        if _foreground_is_other_app():          # another process owns the foreground -> the app lost focus
+            self.close()
+            return
+        self._poll = self._owner.after(150, self._blur_poll)
 
     def _fire(self, spec):
         cmd = spec.get("command")
@@ -184,8 +201,8 @@ class _Dropdown(tk.Toplevel):
         try:
             self._owner.unbind_all("<MouseWheel>")
             self._owner.unbind_all("<Button-1>")
-            if self._deact:
-                self._owner.unbind("<Deactivate>", self._deact)
+            if self._poll is not None:
+                self._owner.after_cancel(self._poll)
         except tk.TclError:
             pass
         if self._on_close:
