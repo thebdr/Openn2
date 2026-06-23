@@ -19,12 +19,15 @@ from tkinter import ttk
 from pipeline3.core import i18n
 from pipeline3.gui import theme
 
-_CHEVRON = "▼"
-_CASCADE = "˅"
+# Between-button glyphs (assets/ButtonsLayout.xlsx). Drawn in GLYPH_FONT - a mono UI face may lack them.
+_CHEVRON = "▼"           # opens a phase's dropdown
+_SEP = "→"               # between phase headers
+_CASCADE = "↓"           # between two ACTION steps (cascade)
+_DIVIDER = "—"           # before an open / at a section boundary
 _BTN_WIDTH = 12          # header / chevron / popup-button width (characters); labels word-wrap to fit
 _HEADER_H = 60           # phase-header row height (~double a single-line button)
 _CHEVRON_H = 20          # chevron row height (a short strip)
-_GAP_H = 18              # inter-button gap height (˅ arrow or divider)
+_GAP_H = 18              # inter-button gap height (↓ cascade or — divider)
 
 
 def _wrap(text: str, width: int) -> str:
@@ -74,12 +77,11 @@ def build_spec(reg, lang, *, run_cb, phase_cb, button_cb, include_run=True):
 # the dropdown popup
 # --------------------------------------------------------------------------------------------- #
 def _gap(parent, arrow: bool):
+    """The inter-button gap: a `↓` cascade between two action steps, else a `—` divider."""
     g = ttk.Frame(parent, height=_GAP_H)
     g.pack_propagate(False)
-    if arrow:
-        ttk.Label(g, text=_CASCADE, anchor="center").pack(fill="both", expand=True)
-    else:
-        ttk.Separator(g, orient="horizontal").pack(fill="x", expand=True, padx=10)
+    ttk.Label(g, text=_CASCADE if arrow else _DIVIDER, anchor="center",
+              font=(theme.GLYPH_FONT, 11)).pack(fill="both", expand=True)
     g.pack(fill="x")
 
 
@@ -205,7 +207,8 @@ class PhaseBar(ttk.Frame):
 
         for phase in phases:
             if col > 0:
-                ttk.Label(self, text=">").grid(row=0, column=col, rowspan=2, padx=2)
+                ttk.Label(self, text=_SEP, font=(theme.GLYPH_FONT, 13)).grid(
+                    row=0, column=col, rowspan=2, padx=2)
                 col += 1
             header = _button(self, _wrap(phase["label"], _BTN_WIDTH), "phase", dark, font,
                              command=phase.get("run"), bold=True)
@@ -214,7 +217,9 @@ class PhaseBar(ttk.Frame):
                 run_buttons.append(header)
             chev = _button(self, _CHEVRON, "chevron", dark, font, command=None)
             chev.grid(row=1, column=col, sticky="nsew", padx=1, pady=(0, 2))
-            chev.configure(command=lambda p=phase, c=chev: self._toggle(p, c))
+            # the command lambda needs `chev` to exist first, so it's set here - re-enable the button
+            # too (creating it with command=None left it state="disabled", which ate every click).
+            chev.configure(command=lambda p=phase, c=chev: self._toggle(p, c), state="normal")
             self._chevrons.append(chev)
             col += 1
 
