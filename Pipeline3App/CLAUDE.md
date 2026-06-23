@@ -75,7 +75,8 @@ pipeline3/
   domain/{validation,blocks}/  hardware.py  diagnosis.py  coverage.py   # DONE
   gui/   # M11 operator window DONE: app_main, phasebar, theme, logview, fonts, darktitle,
          #   files, objedit, grid, widgets, extedit, excel  (designer GUI + project mgr = TODO)
-  cli/  project/                                          # TODO (M10, M13)
+  project/  # project.py (folder projects) + state.py (persisted root/recent) - M13 Project Manager DONE
+  cli/                                                    # TODO (M10)
 config_project/  user_input/  assets/{fonts/}  tests/{unit,golden/}
 launch_gui.py                                             # the operator-GUI launcher
 ```
@@ -561,11 +562,21 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   worker-thread runs streamed to a clickable LogView, and the **Files tab** (3-section tree + a CSV grid
   with zebra/sort/filter, a YAML/JSON/XML object editor, an xlsx read-only preview + LibreOffice/Excel
   external edit, full-path header + Open-folder). See the **GUI** section above.
-- **NEXT**: the **designer GUI** (validation-only 2nd exe, profile `designer`, no pink master) + the
-  **Project Manager** (folder projects + selectable root). **NB the default `Shared/OutputTree/` is the
-  SHARED handoff consumed by `Openn3App`** (the C# importer, ex-`Openn2App`) — so the Project Manager's
-  per-project output routing (`output_dir`) must keep that shared BuilderData surface intact (a project
-  writes into its own `<project>/Output`, but the shared default stays the Openn3 contract). M10 CLI +
+- **Project Manager (M13) — DONE.** Folder projects + a user-selectable, **persisted** projects root. A
+  project is a self-contained `<root>/<name>/` = `project.yaml` (run params) + `Input/` (the copied I/O List
+  + C&E) + `Output/` (its OUTPUT_PATHS tree) + its OWN `config_project/` (the config CSVs) + `user_input/`
+  (the treatment registry) — **fully ISOLATED**. `pipeline3/project/project.py` (pure new/open/save/
+  copy_inputs + helpers; ruamel round-trip keeps project.yaml comments; workbooks copied BINARY) + `state.py`
+  (`%LOCALAPPDATA%/Pipeline3/state.json`: projects root + recent + last_opened). **`config.use_project(root)`**
+  / `use_builtin()` points the CSV loaders + the treatment registry at the project's copies (the dir
+  functions `config_project_dir`/`input_docs_dir`/`diagnosis_dir`/`user_input_dir`); **no project open =
+  the builtin app config + `Shared/OutputTree`, the Open2App/Openn3 import contract**, kept intact by
+  construction (an open project gets an absolute `<project>/Output` via `load_params`, and the BuilderData
+  subpaths are relative → byte-identical either way). The operator GUI threads `self.params` everywhere and
+  adds the toolbar cluster **New Project · Open Project ▾** (recent · Open… · Set projects root… · Re-select
+  IOList… · Re-select CEMatrix… · Close) + an active-project indicator in the title/banner; it **auto-reopens
+  the last project** on launch. `tests/unit/test_project.py` (module + state + `use_project` routing).
+- **NEXT**: the **designer GUI** (validation-only 2nd exe, profile `designer`, no pink master); M10 CLI +
   the Open2App-path contract test; object-editor polish (Browse pickers on path leaves, add/remove nodes);
   M14 packaging (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.
 

@@ -46,6 +46,44 @@ DESIGNER_PARAMS_FILE = os.path.join(CONFIG_PROJECT, "designer_params.yaml")
 BLOCK_TEMPLATES_JSON = os.path.join(CONFIG_PROJECT, "block_templates.json")
 CONFIG_DIR = CONFIG_PROJECT                # alias: "open the config folder"
 
+# The ACTIVE project's root (None = the builtin app config). The GUI calls use_project() on project
+# open/close so the CSV loaders + the treatment registry read the project's OWN config_project/ +
+# user_input/ (per-project isolation). None keeps the app defaults - and so the default output
+# Shared/OutputTree, which is the Open2App/Openn3 import contract.
+_PROJECT_ROOT: str | None = None
+
+
+def use_project(root: str | None) -> None:
+    """Point the config-CSV loaders + the treatment registry at <root>/config_project + <root>/user_input.
+    `None` reverts to the builtin app config (config_project/ + user_input/)."""
+    global _PROJECT_ROOT
+    _PROJECT_ROOT = root or None
+
+
+def use_builtin() -> None:
+    """Revert to the builtin app config (no project)."""
+    use_project(None)
+
+
+def active_project() -> str | None:
+    return _PROJECT_ROOT
+
+
+def config_project_dir() -> str:
+    return os.path.join(_PROJECT_ROOT, "config_project") if _PROJECT_ROOT else CONFIG_PROJECT
+
+
+def input_docs_dir() -> str:
+    return os.path.join(config_project_dir(), "input_docs")
+
+
+def diagnosis_dir() -> str:
+    return os.path.join(config_project_dir(), "diagnosis")
+
+
+def user_input_dir() -> str:
+    return os.path.join(_PROJECT_ROOT, "user_input") if _PROJECT_ROOT else USER_INPUT
+
 # Where New / Save As create a project (a self-contained <PROJECTS_DIR>/<name> directory). The
 # default is overridable by the PIPELINE3_PROJECTS env var AND, at runtime, user-selectable
 # (persisted by the GUI) - see plan §4 Project Manager.
@@ -118,7 +156,7 @@ def _sniff_delim(text: str) -> str:
 
 
 def _read_csv(name: str, base: str | None = None) -> list:
-    path = os.path.join(base or INPUT_DOCS_DIR, name)
+    path = os.path.join(base or input_docs_dir(), name)
     with open(path, newline="", encoding="utf-8-sig") as f:
         text = f.read()
     return list(csv.DictReader(text.splitlines(), delimiter=_sniff_delim(text)))
@@ -286,7 +324,7 @@ def load_diagnosis_columns() -> list:
     """The >List_IO / >List_Logic column layout: [(header, expression)] from
     diagnosis/diagnosis_columns.csv."""
     return [(r["header"].strip(), (r.get("expression") or "").strip())
-            for r in _read_csv("diagnosis_columns.csv", DIAGNOSIS_DIR) if (r.get("header") or "").strip()]
+            for r in _read_csv("diagnosis_columns.csv", diagnosis_dir()) if (r.get("header") or "").strip()]
 
 
 def load_rules(name: str, base: str | None = None) -> list:
@@ -317,7 +355,7 @@ def load_interface_elements_rules(base: str | None = None) -> list:
     dev_type (optional filter), direction (I/Q - the ONLY source that may add an input row),
     data_type (BOOL/WORD), script_type (byte-grouping label; defaults to name), member (mirror-name
     template, {functional_unit}{location}{device} interpolated). Missing file -> []."""
-    path = os.path.join(base or INPUT_DOCS_DIR, "interface_elements_rules.csv")
+    path = os.path.join(base or input_docs_dir(), "interface_elements_rules.csv")
     if not os.path.exists(path):
         return []
     rules = []

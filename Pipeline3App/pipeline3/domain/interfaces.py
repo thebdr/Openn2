@@ -258,7 +258,7 @@ def _load_mirror_cfg() -> dict:
     """The 3 rule tables + the byte gap, loaded once per generate() run."""
     return {
         "db_rules": config.load_rules("datablock_elements_rules.csv"),
-        "diag_rules": config.load_rules("diagnosis_logic_rules.csv", config.DIAGNOSIS_DIR),
+        "diag_rules": config.load_rules("diagnosis_logic_rules.csv", config.diagnosis_dir()),
         "if_rules": config.load_interface_elements_rules(),
         "gap": config.INTERFACE_CUSTOM_GAP,
     }

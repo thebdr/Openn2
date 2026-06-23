@@ -44,14 +44,20 @@ YAML/JSON/XML object editor that preserves YAML comments, an xlsx read-only prev
 via LibreOffice/Excel, a full-path header + Open-folder). The app is Pipeline3; each profile is a named
 session shown as "Pipeline3 - <session> (<profile>)".
 
+ALSO DONE: the PROJECT MANAGER (M13) — pipeline3/project/{project.py,state.py} + the operator GUI toolbar
+(New Project / Open Project ▾ = recent / Open… / Set projects root… / Re-select IOList… / Re-select
+CEMatrix… / Close) + an active-project title/banner indicator + AUTO-REOPEN of the last project. A project
+is a self-contained <root>/<name>/ = project.yaml + Input/ (copied workbooks) + Output/ (its OUTPUT_PATHS
+tree) + its OWN config_project/ + user_input/ (FULLY ISOLATED config + treatments). config.use_project(root)
+/ use_builtin() routes the CSV loaders + the treatment registry (via config_project_dir/input_docs_dir/
+diagnosis_dir/user_input_dir); NO project open = the builtin config + Shared/OutputTree (the Openn3 import
+contract, byte-identical BuilderData by construction). The persisted root + recent + last_opened live in
+%LOCALAPPDATA%/Pipeline3/state.json. v1 defers Save As + Archive (the pure module can grow them).
+
 NEXT (pick one, PROPOSE + SHOW before building):
   - the DESIGNER GUI — the slim validation-only 2nd exe (profile "designer", sub 110–150, no pink
     master, its own designer_params base). app_main already supports profile="designer" and names it
     "IOList & CEMatrix Validation (designer)"; the phase bar should show only Documents Validation.
-  - the PROJECT MANAGER — folder projects (project.yaml + Input/ + Output/), New/Save As, a
-    USER-SELECTABLE projects root (persisted), archive zip. NB: the default Shared/OutputTree/ is the
-    SHARED handoff consumed by Openn3App (the C# importer) — keep that shared BuilderData surface intact
-    (a project writes into its own <project>/Output; the shared default stays the Openn3 contract).
   - M10 CLI (run.py / run_validation.py / run_phase.py over the registry) + the Open2App-path CONTRACT
     TEST (assert the 4 BuilderData OUTPUT_PATHS keys = config.OPEN2APP_KEYS, byte-stable).
   - object-editor polish (Browse pickers on path-valued leaves, add/remove nodes); M14 packaging (two

@@ -118,7 +118,7 @@ def build_diag_list_logic(rows, blocks, rules=None) -> list:
     plus the rule's diag_desc (when set) for the Diag Desc column; the PLC_Binding column is the rule
     binding."""
     if rules is None:
-        rules = config.load_rules(_LOGIC_RULES_FILE, config.DIAGNOSIS_DIR)
+        rules = config.load_rules(_LOGIC_RULES_FILE, config.diagnosis_dir())
     cols = config.load_diagnosis_columns()
     out = []
     for it in _resolve_logic(rows, blocks, rules):
@@ -353,7 +353,7 @@ def generate_diag_scl(rows, out_root, io_path, *, template_path=None) -> dict:
         return {"dir": scl_dir, "path": None, "cabinets": 0, "entries": 0,
                 "warnings": [f"SCL template not found: {template_path}"]}
     blocks = staging.load_diagnostic_blocks(io_path) if io_path and os.path.exists(io_path) else {}
-    rules = config.load_rules(_LOGIC_RULES_FILE, config.DIAGNOSIS_DIR)
+    rules = config.load_rules(_LOGIC_RULES_FILE, config.diagnosis_dir())
     entries = diag_entries(rows, blocks, rules)
     text = render_scl(blocks, entries, open(template_path, encoding="utf-8-sig").read())
     path = os.path.join(scl_dir, DIAG_SCL_FILE)

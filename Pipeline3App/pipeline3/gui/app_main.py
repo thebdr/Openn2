@@ -19,7 +19,7 @@ import os
 import queue
 import threading
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog, simpledialog
 
 from pipeline3 import app
 import pipeline3.phases  # noqa: F401  (side-effect: registers every phase into the registry)
@@ -28,6 +28,7 @@ from pipeline3.core import config
 from pipeline3.io import render
 from pipeline3.registry import registry
 from pipeline3.gui import fonts, theme, darktitle, phasebar, logview, excel, files
+from pipeline3.project import project, state
 
 _ICON = os.path.join(config.APP_ROOT, "assets", "Pipeline3.png")
 _APP_NAME = "Pipeline3"
@@ -45,6 +46,9 @@ class App:
         self._busy = False
         self._ctx: PipelineContext | None = None
         self._logfile = None                       # the "Log to File" run-log handle (None = off)
+        self.project_path: str | None = None       # the active project's project.yaml (None = builtin/shared)
+        self.params: dict = {}
+        self._init_project()                       # auto-reopen the last project, else the shared profile
 
         fonts.register()
         self.font_family = fonts.family(root)
@@ -71,6 +75,15 @@ class App:
         top = ttk.Frame(self.root, padding=(8, 6, 8, 2))
         top.pack(side="top", fill="x")
         ttk.Label(top, text="PIPELINE3", font=(self.font_family, 13, "bold")).pack(side="left")
+        # Project Manager cluster (left): New / Open▾ (recent + Open… + Set root… + Close) + active-project label
+        ttk.Button(top, text="New Project", command=self._new_project).pack(side="left", padx=(12, 2))
+        self._proj_mb = ttk.Menubutton(top, text="Open Project ▾")
+        self._proj_menu = tk.Menu(self._proj_mb, tearoff=False, postcommand=self._build_project_menu)
+        self._proj_mb.configure(menu=self._proj_menu)
+        self._proj_mb.pack(side="left", padx=2)
+        self._proj_label_var = tk.StringVar()
+        ttk.Label(top, textvariable=self._proj_label_var).pack(side="left", padx=(10, 0))
+        self._update_project_label()
         ttk.Button(top, text="Clear Log", command=self._clear).pack(side="right")
         self._logfile_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(top, text="Log to File", variable=self._logfile_var,
@@ -107,14 +120,17 @@ class App:
         self._banner()
 
     def _session_title(self) -> str:
-        """'Pipeline 3 - <session> (<profile>)' - the app name + the named session for this profile."""
-        return f"{_APP_NAME} - {_SESSIONS.get(self.profile, self.profile)} ({self.profile})"
+        """'Pipeline3 - <session> (<profile>)[ - <project>]' - app name, named session, active project."""
+        base = f"{_APP_NAME} - {_SESSIONS.get(self.profile, self.profile)} ({self.profile})"
+        return f"{base} - {project.project_name(self.project_path)}" if self.project_path else base
 
     def _banner(self):
         self.log.append(self._session_title(), "SECTION")
         self.log.append(f"font: {self.font_family}   theme: {'dark' if self.dark else 'light'}   "
                         f"lang: {self.lang}   profile: {self.profile}   "
                         f"phases: {', '.join(str(p.number) for p in self.reg.presentation_order())}")
+        proj = project.project_name(self.project_path) if self.project_path else "(none -> Shared/OutputTree)"
+        self.log.append(f"project: {proj}   output: {self._out_root()}")
 
     def _build_bar(self):
         self._run_buttons = []
@@ -153,6 +169,148 @@ class App:
         darktitle.apply(self.root, self.dark)
         self.status.set(f"theme: {'dark' if self.dark else 'light'}")
 
+    # ---- project manager ------------------------------------------------- #
+    def _init_project(self):
+        """Resolve the active project at launch: auto-reopen the last-opened one (your choice), else the
+        builtin profile (-> Shared/OutputTree, the Open2App/Openn3 import contract)."""
+        last = state.last_opened()
+        if last:
+            try:
+                project.open_project(last)
+                config.use_project(project.project_dir(last))
+                self.params = config.load_params(last)
+                self.project_path = last
+                return
+            except Exception:  # noqa: BLE001  (vanished / corrupt -> fall back to builtin)
+                pass
+        config.use_builtin()
+        self.params = config.load_params()
+
+    def _update_project_label(self):
+        name = project.project_name(self.project_path) if self.project_path else "(none — shared output)"
+        self._proj_label_var.set(f"Project: {name}")
+
+    def _build_project_menu(self):
+        """(Re)build the Open-Project dropdown on post so the recent list stays current."""
+        m = self._proj_menu
+        m.delete(0, "end")
+        recents = [p for p in state.recent_projects() if p != self.project_path]
+        for path in recents:
+            m.add_command(label=f"  {project.project_name(path)}", command=lambda p=path: self._open_project(p))
+        if recents:
+            m.add_separator()
+        m.add_command(label="Open…", command=lambda: self._open_project(None))
+        m.add_command(label="Set projects root…", command=self._set_projects_root)
+        if self.project_path:
+            m.add_separator()
+            m.add_command(label="Re-select IOList…", command=lambda: self._reselect_input("io_list"))
+            m.add_command(label="Re-select CEMatrix…", command=lambda: self._reselect_input("ce"))
+        m.add_separator()
+        m.add_command(label="Close project", command=lambda: self._switch_project(None),
+                      state=("normal" if self.project_path else "disabled"))
+
+    def _switch_project(self, path):
+        """Activate `path` (a project.yaml) or, with None, close to the builtin shared profile. Rebuilds
+        the ctx + files tree + title; resets the log + the run-log handle (it pointed at the old output)."""
+        if self._busy:
+            self.status.set("busy — finish the run first")
+            return
+        if path:
+            config.use_project(project.project_dir(path))
+            self.params = config.load_params(path)
+            self.project_path = path
+            state.push_recent(path)
+        else:
+            config.use_builtin()
+            self.params = config.load_params()
+            self.project_path = None
+            state.clear_last_opened()
+        self._ctx = None                                   # rebuild on the next run with the new params
+        if self._logfile is not None:                      # the old handle points at the old output root
+            self._logfile_var.set(False)
+            self._toggle_logfile()
+        self.log.clear()
+        self.files.sections = self._file_sections()
+        self.files.refresh()
+        self.root.title(self._session_title())
+        self._update_project_label()
+        self._banner()
+        self.status.set(f"project: {project.project_name(path)}" if path else "closed project — shared output")
+
+    def _new_project(self):
+        if self._busy:
+            return
+        name = simpledialog.askstring("New Project", "Project name:", parent=self.root)
+        if not name or not name.strip():
+            return
+        folder = os.path.join(state.projects_root(), name.strip())
+        if os.path.exists(folder):
+            self.status.set(f"already exists: {os.path.basename(folder)}")
+            return
+        try:
+            path = project.new_project(folder)
+            doc = project.load_doc(path)
+            io = filedialog.askopenfilename(parent=self.root, title="I/O List workbook (optional)",
+                                            filetypes=[("Excel", "*.xlsx *.xlsm"), ("All files", "*.*")])
+            ce = filedialog.askopenfilename(parent=self.root, title="Cause & Effect Matrix (optional)",
+                                            filetypes=[("Excel", "*.xlsx *.xlsm"), ("All files", "*.*")])
+            if io:
+                doc.setdefault("io_list", {})["path"] = io
+            if ce:
+                doc.setdefault("ce", {})["path"] = ce
+            project.save_project(doc, path, copy_inputs=True)
+        except Exception as e:  # noqa: BLE001
+            self.status.set(f"new project failed: {e}")
+            return
+        self._switch_project(path)
+
+    def _open_project(self, path=None):
+        if path is None:
+            folder = filedialog.askdirectory(parent=self.root, title="Open Project (pick its folder)",
+                                             initialdir=state.projects_root())
+            if not folder:
+                return
+            path = project.project_yaml(folder)
+        try:
+            project.open_project(path)
+        except FileNotFoundError:
+            self.status.set("no project.yaml in that folder")
+            return
+        self._switch_project(path)
+
+    def _set_projects_root(self):
+        folder = filedialog.askdirectory(parent=self.root, title="Projects root", initialdir=state.projects_root())
+        if folder:
+            state.set_projects_root(folder)
+            self.status.set(f"projects root: {folder}")
+
+    def _reselect_input(self, key: str):
+        """Re-pick the ACTIVE project's I/O List (key='io_list') or C&E (key='ce') workbook: copy it into
+        the project's Input/ + repoint project.yaml, then refresh the active params / ctx / files tree."""
+        if not self.project_path:
+            self.status.set("open a project first")
+            return
+        if self._busy:
+            self.status.set("busy — finish the run first")
+            return
+        label = "I/O List" if key == "io_list" else "Cause & Effect Matrix"
+        picked = filedialog.askopenfilename(parent=self.root, title=f"Re-select {label}",
+                                            filetypes=[("Excel", "*.xlsx *.xlsm"), ("All files", "*.*")])
+        if not picked:
+            return
+        try:
+            doc = project.load_doc(self.project_path)
+            doc.setdefault(key, {})["path"] = picked
+            project.save_project(doc, self.project_path, copy_inputs=True)   # copies into Input/, repoints
+            self.params = config.load_params(self.project_path)
+        except Exception as e:  # noqa: BLE001
+            self.status.set(f"re-select failed: {e}")
+            return
+        self._ctx = None                                   # rebuild on the next run with the new input
+        self.files.sections = self._file_sections()
+        self.files.refresh()
+        self.status.set(f"{label} -> Input/{os.path.basename(picked)}")
+
     # ---- button wiring (from the registry) ------------------------------- #
     def _button_cb(self, button, phase):
         if button.kind == "disabled":
@@ -169,7 +327,7 @@ class App:
     # ---- worker run ------------------------------------------------------ #
     def _ensure_ctx(self) -> PipelineContext:
         if self._ctx is None:
-            ctx = PipelineContext.create(profile=self.profile)
+            ctx = PipelineContext.create(profile=self.profile, params=self.params)
             ctx.on_progress = lambda m: self.q.put(("status", m))   # live sub-step text -> status bar
             ctx.on_phase_log = self._phase_log                       # each phase's block -> log pane (+ file)
             self._ctx = ctx
@@ -191,7 +349,7 @@ class App:
         try:
             return self._ensure_ctx().out_root
         except Exception:  # noqa: BLE001
-            return config.output_root(config.load_params())
+            return config.output_root(self.params)
 
     def _start(self, number: int):
         self._run(lambda ctx: self._run_number(ctx, number), f"running {number} ...")
@@ -292,26 +450,26 @@ class App:
             self.status.set("file logging off")
 
     def _io_list_path(self) -> str:
-        return (config.load_params().get("io_list") or {}).get("path", "")
+        return (self.params.get("io_list") or {}).get("path", "")
 
     def _file_sections(self):
-        """The 3 Files-tree sections: project configuration / user editable files / bare outputs."""
-        params = config.load_params()
-        io = (params.get("io_list") or {}).get("path", "")
-        ce = (params.get("ce") or {}).get("path", "")
+        """The 3 Files-tree sections: project configuration / user editable files / bare outputs - all
+        under the ACTIVE config (a project's, or the app's when none is open)."""
+        io = (self.params.get("io_list") or {}).get("path", "")
+        ce = (self.params.get("ce") or {}).get("path", "")
         user = [p for p in (io, ce) if p]
-        if os.path.isdir(config.USER_INPUT):
-            user.append(config.USER_INPUT)
-        return [("Project configuration", [config.CONFIG_PROJECT]),
+        uin = config.user_input_dir()
+        if os.path.isdir(uin):
+            user.append(uin)
+        return [("Project configuration", [config.config_project_dir()]),
                 ("User editable files", user),
                 ("Bare output files", [self._out_root()])]
 
     def _doc_path_map(self) -> dict:
         """{workbook basename -> abspath} for the docs the log links into (I/O List + C&E), with an
         os.path.normcase alias so a case-differing basename still resolves on Windows."""
-        params = config.load_params()
         io = self._ctx.io_list_path() if self._ctx is not None else self._io_list_path()
-        ce = (params.get("ce") or {}).get("path", "")
+        ce = (self.params.get("ce") or {}).get("path", "")
         m = {}
         for p in (io, ce):
             if p:
@@ -326,7 +484,7 @@ class App:
         return m.get(doc) or m.get(os.path.normcase(doc or "")) or self._io_list_path()
 
     def _error_csv_path(self) -> str:
-        return os.path.join(config.USER_INPUT, "error_management.csv")
+        return os.path.join(config.user_input_dir(), "error_management.csv")
 
     def _open_link(self, doc: str, sheet: str, cell: str):
         """A Sheet!Cell link in the log -> open ITS workbook (I/O List or C&E) in Excel at that cell
@@ -351,15 +509,15 @@ class App:
         self.status.set("not found (run the phase first)" if path else "nothing to open")
 
     def _open_artifact(self, key: str):
-        params = config.load_params()
+        params = self.params
         if key == "io_list":
             return self._startfile((params.get("io_list") or {}).get("path", ""))
         if key == "ce":
             return self._startfile((params.get("ce") or {}).get("path", ""))
-        fixed = {"signal_types": os.path.join(config.INPUT_DOCS_DIR, "signal_types.csv"),
-                 "fill_config": config.INPUT_DOCS_DIR,
-                 "diag_config": config.DIAGNOSIS_DIR,
-                 "error_management": os.path.join(config.USER_INPUT, "error_management.csv")}
+        fixed = {"signal_types": os.path.join(config.input_docs_dir(), "signal_types.csv"),
+                 "fill_config": config.input_docs_dir(),
+                 "diag_config": config.diagnosis_dir(),
+                 "error_management": os.path.join(config.user_input_dir(), "error_management.csv")}
         if key in fixed:
             return self._startfile(fixed[key])
         if key in config.OUTPUT_PATHS:

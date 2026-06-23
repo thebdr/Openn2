@@ -33,8 +33,14 @@ FIELDS = ["uid", "id", "phase", "type", "treatment", "status", "location", "mess
 TREATMENTS = ("warn", "skip", "accept")
 ACCEPT_TYPES = ("iol_cem_addr_only",)          # address matches, device (FLD) differs
 
-ERR_MGMT_CSV = os.path.join(config.USER_INPUT, "error_management.csv")
-DESIGNER_SUPPRESS_CSV = os.path.join(config.USER_INPUT, "designer_suppressions.csv")
+def _err_mgmt_csv() -> str:
+    """The operator treatment registry, under the ACTIVE config (a project's user_input/, or the
+    app's when no project is open) - so each project owns its own treatments."""
+    return os.path.join(config.user_input_dir(), "error_management.csv")
+
+
+def _designer_suppress_csv() -> str:
+    return os.path.join(config.user_input_dir(), "designer_suppressions.csv")
 
 
 @dataclass
@@ -73,7 +79,7 @@ def apply_and_reconcile(ctx, log, path: str | None = None) -> str:
     """Operator/main path: apply the recorded treatments to FAIL lines (mutating `log`), then
     reconcile the registry (refresh current findings, prune untreated-gone, mark treated-gone stale)
     and write it back. Returns the CSV path."""
-    path = path or ERR_MGMT_CSV
+    path = path or _err_mgmt_csv()
     treatments = load(path)
     seen: dict = {}
     for e in log:
@@ -119,7 +125,7 @@ def _write(path: str, merged: dict) -> str:
 def apply_suppressions(log, path: str | None = None) -> int:
     """Designer build: SKIP any FAIL/WARN line whose uid is listed in designer_suppressions.csv.
     Returns the number suppressed. Read-only (never writes the registry)."""
-    sup = load(path or DESIGNER_SUPPRESS_CSV)
+    sup = load(path or _designer_suppress_csv())
     n = 0
     for e in log:
         if e.level in ("FAIL", "WARN") and e.uid in sup:
