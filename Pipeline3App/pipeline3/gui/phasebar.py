@@ -206,10 +206,10 @@ class PhaseBar(ttk.Frame):
             run_buttons.append(b_run)
             col += 1
 
-        for phase in phases:
-            if col > 0:                              # row 0 only -> centered on the HEADER, not header+chevron
+        for i, phase in enumerate(phases):
+            if i > 0:                                # an arrow only BETWEEN phases (not after Run / before ph100)
                 ttk.Label(self, text=_SEP, font=(theme.EMOJI_FONT, 16)).grid(
-                    row=0, column=col, padx=2)
+                    row=0, column=col, padx=2)      # row 0 only -> centered on the HEADER, not header+chevron
                 col += 1
             header = _button(self, _wrap(phase["label"], _BTN_WIDTH), "phase", dark, font,
                              command=phase.get("run"), bold=True)
