@@ -72,9 +72,12 @@ pipeline3/
   io/               # workbook.py (THE shared reader), csv_tables.py, render.py
   phases/           # p200_fillout.py (+ p100…p900 as built)
   domain/iolist_diag/   # the populator internals (DONE)
-  domain/{validation,blocks}/  hardware.py  diagnosis.py   # TODO
-  cli/  gui/  project/                                     # TODO (M10–M13)
-config_project/  user_input/  assets/  tests/{unit,golden}/
+  domain/{validation,blocks}/  hardware.py  diagnosis.py  coverage.py   # DONE
+  gui/   # M11 operator window DONE: app_main, phasebar, theme, logview, fonts, darktitle,
+         #   files, objedit, grid, widgets, extedit, excel  (designer GUI + project mgr = TODO)
+  cli/  project/                                          # TODO (M10, M13)
+config_project/  user_input/  assets/{fonts/}  tests/{unit,golden/}
+launch_gui.py                                             # the operator-GUI launcher
 ```
 
 ### Shared primitives (the contracts every phase obeys)
@@ -409,6 +412,47 @@ run-all runs 400→800 before 900, so a full run is current). Writes `Reports/io
   `SPEED_STATE_REC` — hand-authored in TIA) are 920's scope, ignored here.
 - **920 TIA Project Coverage** — a disabled stub (no `run`), deferred pending a real TIA project export.
 
+## GUI — M11 operator window ("Broski Session") — DONE (designer GUI still TODO)
+
+`pipeline3/gui/` + `launch_gui.py` (`python launch_gui.py`). A Tkinter window; the app is **Pipeline3**,
+each profile is a **named session** shown in the title + log banner as `Pipeline3 - <session> (<profile>)`:
+**Broski Session (main)** / **IOList & CEMatrix Validation (designer)** (`app_main._SESSIONS`).
+
+- **`app_main.py`** — the window: a top toolbar (PIPELINE3 brand · Lang EN/IT · ◐ Theme · Open Output ·
+  Clear Log), the registry-driven phase bar, and a **Log | Files** notebook + a status bar/progress.
+  The pipeline runs on a **worker thread**; its `emit` output is queued and drained into the LogView via
+  `root.after`. A phase header runs the whole phase; a sub-phase button runs that step (prereqs first);
+  opens `startfile` the artifact. Holds ONE session `ctx` (memoized). **EN/IT** + **dark/light** toggles
+  rebuild the bar / re-theme live (incl. the title bar).
+- **`phasebar.py`** — the `PhaseBar`/`_Dropdown` widget, but the spec is **generated from the registry**
+  (`build_spec` over `registry().presentation_order()` + i18n labels), never a hand-written ordering.
+  The buttons are **classic `tk.Button`s** coloured from `theme.tk_button_opts` (the ButtonsLayout fills:
+  pink run / white phase / grey chevron / white action / light-blue open / orange special / grey disabled)
+  — sv-ttk's themed buttons are image-based and can't take a custom bg, so the colored bar uses plain tk.
+- **`theme.py`** — applies **sv-ttk** (Sun Valley dark/light) for the chrome + sets the bundled **Monaspace
+  Neon** as the default UI font; returns a palette read back from the active theme. `darktitle.py` darkens
+  the native **Windows title bar** (DWM `IMMERSIVE_DARK_MODE` on the caption HWND; reversible). `fonts.py`
+  loads `assets/fonts/MonaspaceNeon-Var.ttf` privately per-process (`AddFontResourceEx(FR_PRIVATE)`;
+  resolves as `"Monaspace Neon Var"`).
+- **`logview.py`** — the colour-coded log (level tags) + **clickable `Sheet!Cell` links** (known I/O-List
+  sheets) that open the I/O List in Excel at that cell via COM (`excel.py`, on a worker thread).
+- **`files.py`** — the Files tab: a **3-section tree** (Project configuration / User editable files / Bare
+  output files) + a type-aware editor. `.csv` → editable tksheet **grid** (Save = comma CSV); `.yaml/.json/
+  .xml` → the **object editor** (`objedit.py`); `.scl/.db/.txt/...` → text editor; `.xlsx/.xlsm` →
+  **read-only** value grid + "Edit externally" (the Excel files carry formulas/array-formula/VBA an
+  openpyxl save would drop). Every editor shares `widgets.editor_header`: a **selectable full-path field**
+  + an **Open folder** button (`extedit.reveal` = `explorer /select`). The tree right-click also has Open
+  containing folder / Open externally. **`grid.py`** decorates each tksheet with **zebra** striping +
+  right-click **Sort ▲/▼ · Filter… · Clear** — VIEW-only (via `display_rows`, never reorders the saved file).
+- **`objedit.py`** — a `ttk.Treeview` **object editor** for YAML/JSON/XML, edited in each format's own
+  structure: **YAML via ruamel `CommentedMap` in place (comments survive; `width=4096` so a Save doesn't
+  re-wrap long lines)**, JSON type-preserving, XML element/`@attr`/`#text`. Scalars edit inline (double-
+  click the Value); a **Tree | Text** toggle drops to raw and re-parses. (No off-the-shelf lib fit — they
+  are JSON-only / web-based and strip YAML comments.)
+- **`extedit.py`** — `open_external` (the spreadsheet editor: **LibreOffice → Excel → OS default**) +
+  `reveal` (containing folder, file selected). Embedding LibreOffice in-window is not feasible; it opens
+  as its own app.
+
 ## Testing
 
 Plain-`python` tests (no pytest) under `tests/unit/`, via `tests/unit/_harness.py` (PASS/FAIL,
@@ -466,10 +510,16 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   sheet verbatim; a file-write error halts cleanly), **Phase 900 / 910 Pipeline Coverage Report — DONE**
   (`domain/coverage.py`: trace each staged signal across the on-disk outputs; ORPHAN = a signal in no
   output, UNPLACED = a `"<db>"."<member>"` reference to a generated-DB member 520 never created; reads
-  the actual artifacts so user edits to shells/interfaces are honored; CSV + TXT under `Reports/`).
-- **NEXT**: extend the direct-FC-XML / coil-columns approach to other blocks if wanted; M10 CLI +
-  Open2App-path contract test; M11–13 GUIs (dark-by-default, registry-driven phase bar, YAML-explorer
-  config, selectable projects root) + designer + Project Manager; M14 packaging (two exes). **920**
+  the actual artifacts so user edits to shells/interfaces are honored; CSV + TXT under `Reports/`),
+  the **`diag_desc` rule column** (optional `diagnosis_logic_rules.csv` column → the List_Logic Diag Desc),
+  and **M11 the main operator GUI ("Broski Session")** — `pipeline3/gui/` + `launch_gui.py`: the
+  registry-driven phase bar (sv-ttk dark + Monaspace + dark title bar), EN/IT + dark/light toggles,
+  worker-thread runs streamed to a clickable LogView, and the **Files tab** (3-section tree + a CSV grid
+  with zebra/sort/filter, a YAML/JSON/XML object editor, an xlsx read-only preview + LibreOffice/Excel
+  external edit, full-path header + Open-folder). See the **GUI** section above.
+- **NEXT**: the **designer GUI** (validation-only 2nd exe, profile `designer`, no pink master) + the
+  **Project Manager** (folder projects + selectable root); M10 CLI + the Open2App-path contract test;
+  object-editor polish (Browse pickers on path leaves, add/remove nodes); M14 packaging (two exes). **920**
   (TIA project coverage) is future — pending Open2App's project text-export.
 
 ## Conventions & gotchas
@@ -514,5 +564,18 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   it **UNPLACED**. The optional **`diag_desc`** column (`config.load_rules`) gives the rule-generated
   DiagList_Logic row its OWN Diag Desc (a `{canonical}` template, e.g. `SAFETY ENCODER FAILURE {combined_FLD}`);
   blank/absent ⇒ the row keeps the source signal's `diag_desc` (`diagnosis.build_diag_list_logic`).
+- **GUI (M11) gotchas**: the phase bar uses **classic `tk.Button`** for its coloured buttons (sv-ttk's
+  themed buttons are image-based and ignore a custom `bg`). A bundled **private font** must be inserted
+  before-or-after `tk.Tk()` via `AddFontResourceEx(FR_PRIVATE)` and used by its resolved family
+  (`"Monaspace Neon Var"`, NOT `"Monaspace Neon"` → Arial). A path **`ttk.Entry`** must `insert` then go
+  readonly — a local `StringVar` gets GC'd and blanks it. The Files object editor writes YAML via ruamel
+  with **`width=4096`** so a Save doesn't re-wrap. **`.xlsx`/`.xlsm` are view-only** in-app (edit hands
+  off to LibreOffice/Excel) — never round-trip them through openpyxl (drops formulas/array-formula/VBA).
+- **The golden test is DATA-DEPENDENT** (`test_golden_validation.py`, phase 100 vs the frozen golden):
+  when it goes red, check the **working tree first** — a changed `config_project/project_params.yaml`
+  (e.g. `strike_handling`) or a mutated source I/O List, not a code regression. **Do NOT run the
+  source-mutating phases (200 Fill / 400 `insert_interface_sheets`) against the committed sample doc** —
+  they rewrite it in place (and 400 can drop the Profinet IP/name formula caches); `git checkout` the doc
+  to restore, or run on a copy.
 - Run/test from the `Pipeline3App` root. When committing `_Openn2`, end commit messages with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
