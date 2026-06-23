@@ -56,6 +56,12 @@ class FilesPanel(ttk.Frame):
         tvs.pack(side="right", fill="y")
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.tree.bind("<Button-3>", self._tree_menu)
+        # arrow-key navigation (deterministic; "break" so the default Treeview bindings don't double-act):
+        # Up/Down move through the VISIBLE items, Left collapses (or steps out), Right expands (or steps in).
+        self.tree.bind("<Up>", self._key_up)
+        self.tree.bind("<Down>", self._key_down)
+        self.tree.bind("<Left>", self._key_left)
+        self.tree.bind("<Right>", self._key_right)
         ttk.Button(left, text="Refresh", command=self.refresh).pack(side="bottom", fill="x")
         paned.add(left, weight=1)
 
@@ -110,6 +116,78 @@ class FilesPanel(ttk.Frame):
         path = self._paths.get(sel[0]) if sel else None
         if path:
             self._load(path)
+
+    # ---- arrow-key navigation -------------------------------------------- #
+    def _current(self):
+        sel = self.tree.selection()
+        return sel[0] if sel else (self.tree.focus() or None)
+
+    def _select(self, item):
+        """Move the selection (fires <<TreeviewSelect>> -> loads a file) and scroll it into view."""
+        if item:
+            self.tree.see(item)
+            self.tree.selection_set(item)
+            self.tree.focus(item)
+
+    def _is_open(self, item) -> bool:
+        return bool(self.tree.get_children(item)) and bool(self.tree.item(item, "open"))
+
+    def _visible_next(self, item):
+        """The next item in display order, descending only into OPEN nodes."""
+        if self._is_open(item):
+            return self.tree.get_children(item)[0]
+        cur = item
+        while cur:
+            nxt = self.tree.next(cur)
+            if nxt:
+                return nxt
+            cur = self.tree.parent(cur)
+        return None
+
+    def _visible_prev(self, item):
+        """The previous item in display order (the deepest open descendant of the prior sibling)."""
+        prev = self.tree.prev(item)
+        if prev:
+            while self._is_open(prev):
+                prev = self.tree.get_children(prev)[-1]
+            return prev
+        return self.tree.parent(item) or None
+
+    def _key_down(self, _e):
+        cur = self._current()
+        if cur is None:
+            roots = self.tree.get_children()
+            self._select(roots[0] if roots else None)
+        else:
+            self._select(self._visible_next(cur))
+        return "break"
+
+    def _key_up(self, _e):
+        cur = self._current()
+        if cur:
+            self._select(self._visible_prev(cur))
+        return "break"
+
+    def _key_left(self, _e):
+        cur = self._current()
+        if not cur:
+            return "break"
+        if self._is_open(cur):
+            self.tree.item(cur, open=False)              # collapse
+        else:
+            self._select(self.tree.parent(cur) or None)  # already closed -> step out to the parent
+        return "break"
+
+    def _key_right(self, _e):
+        cur = self._current()
+        if not cur:
+            return "break"
+        kids = self.tree.get_children(cur)
+        if kids and not self.tree.item(cur, "open"):
+            self.tree.item(cur, open=True)               # expand
+        elif kids:
+            self._select(kids[0])                        # already open -> step into the first child
+        return "break"
 
     def _tree_menu(self, event):
         item = self.tree.identify_row(event.y)
