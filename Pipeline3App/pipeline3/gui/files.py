@@ -115,8 +115,10 @@ class FilesPanel(ttk.Frame):
         path = self._paths.get(sel[0]) if sel else None
         if path:
             self._load(path)
-            # the editor (a tksheet grid, etc.) grabs keyboard focus on build; give it back to the
-            # tree so arrow navigation keeps working as you browse (click into a grid to use it).
+            # keep keyboard focus on the TREE so arrow navigation keeps working after a file loads
+            # (the editor/tksheet can grab it). Re-assert now + when idle to beat a late grab; clicking
+            # into a grid (which does NOT change the tree selection) leaves that grid focused.
+            self.tree.focus_set()
             self.tree.after_idle(self.tree.focus_set)
 
     # ---- arrow-key navigation -------------------------------------------- #
@@ -258,7 +260,7 @@ class FilesPanel(ttk.Frame):
         sheet.enable_bindings()                                  # full editing
         self._toolbar(path, save=lambda s=sheet, p=path: self._save_csv(s, p))
         sheet.pack(side="top", fill="both", expand=True)
-        self._grid = grid.decorate(sheet, self.dark)            # zebra + right-click sort/filter
+        self._grid = grid.decorate(sheet, self.dark, on_status=self.on_status)   # zebra + sort/filter
 
     def _save_csv(self, sheet, path):
         rows = sheet.get_sheet_data()

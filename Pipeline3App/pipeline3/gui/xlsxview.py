@@ -85,7 +85,7 @@ class XlsxViewer(ttk.Frame):
         sheet = Sheet(self.holder, theme="dark blue" if self.dark else "light blue", data=rows or [[""]])
         sheet.enable_bindings(*_BINDINGS)
         sheet.pack(side="top", fill="both", expand=True)
-        self._grid = grid.decorate(sheet, self.dark)
+        self._grid = grid.decorate(sheet, self.dark, on_status=self.on_status)
         # repurpose Tab / Shift+Tab on the table -> step sheets (read-only: cells use the arrow keys)
         for w in (sheet, sheet.MT):
             w.bind("<Tab>", lambda e: self._step(1))

@@ -445,8 +445,11 @@ each profile is a **named session** shown in the title + log banner as `Pipeline
   (Up/Down visible items, Left collapse/out, Right expand/in; selection loads the file and keyboard focus
   stays on the tree). Every editor shares `widgets.editor_header`: a **selectable full-path field** + an
   **Open folder** button (`extedit.reveal` = `explorer /select`). The tree right-click also has Open
-  containing folder / Open externally. **`grid.py`** decorates each tksheet with **zebra** striping +
-  right-click **Sort ▲/▼ · Filter… · Clear** — VIEW-only (via `display_rows`, never reorders the saved file).
+  containing folder / Open externally. **`grid.py`** decorates each tksheet with **zebra** + right-click
+  **Sort ↑/↓ · Filter… · Clear** (active column marked ` ↑`/` ↓`/` ▽` on its header). **Filter** is a
+  case-insensitive **regex** (or pick distinct values), view-only + save-safe (`display_rows` hides rows,
+  all kept by a Save); **sort** physically reorders the rows (tksheet can't reorder a display) — Clear /
+  Reload reverts (the original order is snapshotted on first sort/filter).
 - **`objedit.py`** — a `ttk.Treeview` **object editor** for YAML/JSON/XML, edited in each format's own
   structure: **YAML via ruamel `CommentedMap` in place (comments survive; `width=4096` so a Save doesn't
   re-wrap long lines)**, JSON type-preserving, XML element/`@attr`/`#text`. Scalars edit inline (double-
