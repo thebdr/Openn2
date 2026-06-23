@@ -17,7 +17,7 @@ from tkinter import ttk
 from tksheet import Sheet
 
 from pipeline3.io import csv_tables
-from pipeline3.gui import extedit, objedit, grid, widgets
+from pipeline3.gui import extedit, objedit, grid, widgets, xlsxview
 
 _OBJ_EXT = (".yaml", ".yml", ".json", ".xml")        # -> the structured object editor (tree)
 _TEXT_EXT = (".scl", ".db", ".txt", ".md", ".log")   # -> the plain text editor
@@ -25,7 +25,6 @@ _GRID_EXT = (".csv",)
 _XLSX_EXT = (".xlsx", ".xlsm", ".xls")
 _SHOW_EXT = _OBJ_EXT + _TEXT_EXT + _GRID_EXT + _XLSX_EXT
 _SKIP = ("__pycache__", ".pyc")
-_MAX_ROWS, _MAX_COLS = 1000, 80          # xlsx preview cap
 
 
 def _allowed(name: str) -> bool:
@@ -116,6 +115,9 @@ class FilesPanel(ttk.Frame):
         path = self._paths.get(sel[0]) if sel else None
         if path:
             self._load(path)
+            # the editor (a tksheet grid, etc.) grabs keyboard focus on build; give it back to the
+            # tree so arrow navigation keeps working as you browse (click into a grid to use it).
+            self.tree.after_idle(self.tree.focus_set)
 
     # ---- arrow-key navigation -------------------------------------------- #
     def _current(self):
@@ -265,27 +267,12 @@ class FilesPanel(ttk.Frame):
 
     # ---- xlsx/xlsm (read-only value grid) -------------------------------- #
     def _xlsx(self, path):
-        from openpyxl import load_workbook
-        wb = load_workbook(path, data_only=True, read_only=True)
-        try:
-            ws = wb.active
-            rows = []
-            for i, row in enumerate(ws.iter_rows(values_only=True)):
-                if i >= _MAX_ROWS:
-                    break
-                rows.append(["" if c is None else str(c) for c in row[:_MAX_COLS]])
-        finally:
-            wb.close()
+        # the richer Excel preview: sheet selector + Show-formulas + Tab/Shift+Tab sheet nav + the
+        # zebra/sort/filter grid; edit hands off to LibreOffice/Excel (see xlsxview.py).
         self._clear_editor()
-        sheet = Sheet(self.editor, theme=self._sheet_theme(), data=rows or [[""]])
-        sheet.enable_bindings("single_select", "drag_select", "row_select", "column_select",
-                              "column_width_resize", "arrowkeys", "copy", "rc_select")
-        self._toolbar(path, external=True)                       # edit happens in LibreOffice/Excel
-        note = (f"read-only preview of '{ws.title}' (values only; capped {_MAX_ROWS}x{_MAX_COLS}). "
-                f"Edit externally to keep formulas/macros.")
-        ttk.Label(self.editor, text=note, padding=(6, 2)).pack(side="bottom", anchor="w")
-        sheet.pack(side="top", fill="both", expand=True)
-        self._grid = grid.decorate(sheet, self.dark)            # zebra + right-click sort/filter
+        self._xlsxview = xlsxview.XlsxViewer(self.editor, path, self.pal, self.font_family, self.dark,
+                                             self.on_status, self._external)
+        self._xlsxview.pack(side="top", fill="both", expand=True)
 
     # ---- text editor ----------------------------------------------------- #
     def _text(self, path):
