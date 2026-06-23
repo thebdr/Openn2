@@ -98,6 +98,23 @@ class LogView(ttk.Frame):
                 self.text.tag_bind(tag, "<Button-1>",
                                    lambda _e, sh=sheet, c=cell: self.on_link(sh, c))
 
+    def append_report(self, lines) -> None:
+        """Append already-rendered report lines (render.render_lines): a `[LEVEL]`-prefixed entry gets
+        its level colour; a PHASE banner (a title line + its `===` underline) is SECTION; Sheet!Cell
+        tokens become clickable."""
+        def _rule(s):
+            return bool(s) and all(c == "=" for c in s)
+        self.text.configure(state="normal")
+        n = len(lines)
+        for i, line in enumerate(lines):
+            nxt = lines[i + 1] if i + 1 < n else ""
+            level = "SECTION" if (_rule(line) or _rule(nxt)) else level_of(line)
+            start = self.text.index("end-1c")
+            self.text.insert("end", line + "\n", level)
+            self._linkify(start, line)
+        self.text.see("end")
+        self.text.configure(state="disabled")
+
     def clear(self) -> None:
         self.text.configure(state="normal")
         self.text.delete("1.0", "end")

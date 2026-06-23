@@ -25,6 +25,7 @@ from pipeline3 import app
 import pipeline3.phases  # noqa: F401  (side-effect: registers every phase into the registry)
 from pipeline3.context import PipelineContext
 from pipeline3.core import config
+from pipeline3.io import render
 from pipeline3.registry import registry
 from pipeline3.gui import fonts, theme, darktitle, phasebar, logview, excel, files
 
@@ -180,7 +181,10 @@ class App:
         self._run(lambda ctx: self._run_number(ctx, number), f"running {number} ...")
 
     def _start_all(self):
-        self._run(app.run_all, "running the whole pipeline ...")
+        def work(ctx):
+            ctx.completed.clear()                      # a fresh full run each time "Run Pipeline" is pressed
+            app.run_all(ctx)
+        self._run(work, "running the whole pipeline ...")
 
     def _run(self, work, status: str):
         if self._busy:
@@ -191,7 +195,11 @@ class App:
         def job():
             try:
                 ctx = self._ensure_ctx()
+                n0 = len(ctx.log)
                 work(ctx)
+                entries = ctx.log[n0:]                  # the LogEntries this run produced (phase 100 etc.)
+                if entries:
+                    self.q.put(("report", render.render_lines(entries)))
                 if ctx.rows:
                     self.q.put(("sheets", {r.get("_source_sheet") for r in ctx.rows}))
                 self.q.put(("status", "Ready"))
@@ -203,8 +211,10 @@ class App:
         threading.Thread(target=job, daemon=True).start()
 
     def _run_number(self, ctx, number: int):
-        """Run a whole phase (hundreds) or one sub-phase (its prerequisites first)."""
+        """Run a whole phase (hundreds) or one sub-phase (its prerequisites first). Clicking a phase
+        RE-RUNS it (prereqs stay memoized) so its log refreshes each time."""
         if number % 100 == 0:
+            ctx.completed.discard(number)
             app.run_phase(ctx, number)
             return
         parent = (number // 100) * 100
@@ -224,6 +234,8 @@ class App:
                 ev = self.q.get_nowait()
                 if ev[0] == "log":
                     self.log.append(ev[1])
+                elif ev[0] == "report":
+                    self.log.append_report(ev[1])
                 elif ev[0] == "busy":
                     self._set_busy(ev[1])
                 elif ev[0] == "status":
