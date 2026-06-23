@@ -13,6 +13,7 @@ import tkinter.font as tkfont
 from tkinter import ttk
 
 GLYPH_FONT = "Segoe UI Symbol"        # for the ▼ chevron glyph (a mono face may lack it)
+EMOJI_FONT = "Segoe UI Emoji"         # for the ➡/⬇ flow arrows - renders them BOLD (even monochrome on Tk 8.6)
 
 LIGHT = {"name": "light", "bg": "#fafafa", "fg": "#1c1c1c", "field": "#ffffff", "border": "#c8c8c8",
          "log_bg": "#ffffff", "log_fg": "#1c1c1c", "accent": "#0b5fff", "select": "#cce4ff"}

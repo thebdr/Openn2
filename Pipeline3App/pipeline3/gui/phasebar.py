@@ -19,10 +19,11 @@ from tkinter import ttk
 from pipeline3.core import i18n
 from pipeline3.gui import theme
 
-# Between-button glyphs (assets/ButtonsLayout.xlsx). Drawn in GLYPH_FONT - a mono UI face may lack them.
-_CHEVRON = "▼"           # opens a phase's dropdown
-_SEP = "→"               # between phase headers
-_CASCADE = "↓"           # between two ACTION steps (cascade)
+# Between-button glyphs (assets/ButtonsLayout.xlsx). The flow arrows are heavy emoji codepoints drawn
+# in EMOJI_FONT so they render BOLD (not a thin line); the chevron stays a GLYPH_FONT triangle.
+_CHEVRON = "▼"           # opens a phase's dropdown (GLYPH_FONT)
+_SEP = "➡"               # between phase headers (EMOJI_FONT, U+27A1)
+_CASCADE = "⬇"           # between two ACTION steps (cascade; EMOJI_FONT, U+2B07)
 _DIVIDER = "—"           # before an open / at a section boundary
 _BTN_WIDTH = 12          # header / chevron / popup-button width (characters); labels word-wrap to fit
 _HEADER_H = 60           # phase-header row height (~double a single-line button)
@@ -81,7 +82,7 @@ def _gap(parent, arrow: bool):
     g = ttk.Frame(parent, height=_GAP_H)
     g.pack_propagate(False)
     ttk.Label(g, text=_CASCADE if arrow else _DIVIDER, anchor="center",
-              font=(theme.GLYPH_FONT, 11)).pack(fill="both", expand=True)
+              font=(theme.EMOJI_FONT, 12)).pack(fill="both", expand=True)
     g.pack(fill="x")
 
 
@@ -206,9 +207,9 @@ class PhaseBar(ttk.Frame):
             col += 1
 
         for phase in phases:
-            if col > 0:
-                ttk.Label(self, text=_SEP, font=(theme.GLYPH_FONT, 13)).grid(
-                    row=0, column=col, rowspan=2, padx=2)
+            if col > 0:                              # row 0 only -> centered on the HEADER, not header+chevron
+                ttk.Label(self, text=_SEP, font=(theme.EMOJI_FONT, 16)).grid(
+                    row=0, column=col, padx=2)
                 col += 1
             header = _button(self, _wrap(phase["label"], _BTN_WIDTH), "phase", dark, font,
                              command=phase.get("run"), bold=True)
