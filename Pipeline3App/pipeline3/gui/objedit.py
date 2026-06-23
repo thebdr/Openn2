@@ -71,6 +71,7 @@ class ObjectEditor(ttk.Frame):
             from ruamel.yaml import YAML
             self._yaml = YAML()
             self._yaml.preserve_quotes = True
+            self._yaml.width = 4096           # don't re-wrap long lines on save (preserve formatting)
             return self._yaml.load(text) if text.strip() else {}
         if self.ext == ".json":
             return json.loads(text) if text.strip() else {}
