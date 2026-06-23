@@ -244,15 +244,48 @@ def load_params(path: str | None = None) -> dict:
     return params
 
 
-def load_app_profile() -> str:
-    """The launch profile from config_project/app_config.yaml (`profile: <name>`), lowercased.
-    Missing / blank / unreadable -> 'main'. NOT validated here (the GUI checks it against the
-    REGISTERED profiles), so adding a future profile needs no change to this loader."""
+# UI launch settings (start values - the window stays resizable; the theme/log toggles still work).
+# The defaults reproduce today's look, so a missing app_config.yaml / user_interface block = current.
+APP_UI_DEFAULTS = {"width": 1180, "height": 760, "theme": "dark", "log_to_file": False}
+
+
+def load_app_config() -> dict:
+    """The full config_project/app_config.yaml mapping (profile + user_interface …); {} on any error
+    (missing / malformed) so callers can read it without guarding."""
     try:
-        data = _read_params_file(APP_CONFIG_FILE)
+        return _read_params_file(APP_CONFIG_FILE) or {}
     except Exception:  # noqa: BLE001  (no file / malformed -> safe default)
-        return "main"
-    return str((data or {}).get("profile") or "").strip().lower() or "main"
+        return {}
+
+
+def load_app_profile() -> str:
+    """The launch profile from app_config.yaml (`profile: <name>`), lowercased. Missing / blank /
+    unreadable -> 'main'. NOT validated here (the GUI checks it against the REGISTERED profiles), so
+    adding a future profile needs no change to this loader."""
+    return str(load_app_config().get("profile") or "").strip().lower() or "main"
+
+
+def load_app_ui() -> dict:
+    """The `user_interface` launch block, merged over APP_UI_DEFAULTS and validated: width/height ->
+    positive int else default (START size only - the window stays resizable); theme -> 'dark'|'light'
+    else default; log_to_file -> bool (only when the key is present). Unknown keys are ignored, so a
+    new setting can be added to app_config.yaml without breaking an older build."""
+    ui = dict(APP_UI_DEFAULTS)
+    raw = load_app_config().get("user_interface")
+    if isinstance(raw, dict):
+        for k in ("width", "height"):
+            try:
+                v = int(raw.get(k))
+            except (TypeError, ValueError):
+                continue
+            if v > 0:
+                ui[k] = v
+        theme = str(raw.get("theme") or "").strip().lower()
+        if theme in ("dark", "light"):
+            ui["theme"] = theme
+        if "log_to_file" in raw:
+            ui["log_to_file"] = as_bool(raw.get("log_to_file"))
+    return ui
 
 
 def profile_params_file(profile: str | None) -> str:

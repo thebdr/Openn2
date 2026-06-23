@@ -97,6 +97,32 @@ def test_load_app_profile():
             c.APP_CONFIG_FILE = old
 
 
+def test_load_app_ui():
+    import tempfile
+    old = c.APP_CONFIG_FILE
+    with tempfile.TemporaryDirectory() as d:
+        try:
+            p = os.path.join(d, "app_config.yaml")
+            c.APP_CONFIG_FILE = os.path.join(d, "absent.yaml")
+            eq(c.load_app_ui(), c.APP_UI_DEFAULTS, "missing file -> defaults (today's look)")
+            c.APP_CONFIG_FILE = p
+            with open(p, "w", encoding="utf-8") as f:
+                f.write("profile: designer\n")                     # no user_interface block
+            eq(c.load_app_ui(), c.APP_UI_DEFAULTS, "absent user_interface -> defaults")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write("user_interface:\n  width: 1000\n  height: 700\n  theme: light\n  log_to_file: true\n")
+            eq(c.load_app_ui(), {"width": 1000, "height": 700, "theme": "light", "log_to_file": True},
+               "full block applied")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write("user_interface:\n  width: big\n  theme: blue\n  height: 0\n")
+            ui = c.load_app_ui()
+            eq(ui["width"], c.APP_UI_DEFAULTS["width"], "non-int width -> default")
+            eq(ui["height"], c.APP_UI_DEFAULTS["height"], "non-positive height -> default")
+            eq(ui["theme"], c.APP_UI_DEFAULTS["theme"], "unknown theme -> default")
+        finally:
+            c.APP_CONFIG_FILE = old
+
+
 def test_profile_params_file():
     eq(c.profile_params_file("main"), c.PARAMS_FILE)
     eq(c.profile_params_file(None), c.PARAMS_FILE)
@@ -161,6 +187,7 @@ if __name__ == "__main__":
         ("resolve_sheets_js_literal", test_resolve_sheets_js_literal),
         ("load_params_builtin", test_load_params_builtin),
         ("load_app_profile", test_load_app_profile),
+        ("load_app_ui", test_load_app_ui),
         ("profile_params_file", test_profile_params_file),
         ("load_signal_types", test_load_signal_types),
         ("load_rules_datablocks", test_load_rules_datablocks),

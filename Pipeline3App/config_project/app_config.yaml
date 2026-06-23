@@ -1,0 +1,15 @@
+# Pipeline3 launch profile (read once at startup by gui/app_main.main via config.load_app_profile).
+# One GUI, one exe - this value picks the session:
+#   main      - the full operator pipeline (Broski Session): all 9 phases + the pink Run master.
+#   designer  - the slim validation-only session (IOList & CEMatrix Validation): only ph100, reads
+#               designer_params.yaml, skips Fill, with the two input-file pickers + live-source re-copy.
+# An unknown / missing value falls back to 'main'. Switching mode = edit this line + relaunch.
+profile: designer
+
+# read on app launch
+user_interface:
+  width: 1200
+  height: 800
+  theme: dark
+  log_to_file: false
+  

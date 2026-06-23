@@ -50,14 +50,15 @@ class App:
         self.params: dict = {}
         self._init_project()                       # auto-reopen the last project, else the shared profile
 
+        self._ui = config.load_app_ui()             # app_config.yaml user_interface: launch settings
         fonts.register()
         self.font_family = fonts.family(root)
-        self.dark = True
+        self.dark = (self._ui["theme"] == "dark")
         self.pal = theme.apply_base(root, self.font_family, self.dark)   # sv-ttk + Monaspace default
 
         root.title(self._session_title())
         root.configure(bg=self.pal["bg"])
-        root.geometry("1180x760")
+        root.geometry(f"{self._ui['width']}x{self._ui['height']}")      # START size only - stays resizable
         root.minsize(900, 560)
         try:
             self._icon = tk.PhotoImage(file=_ICON)
@@ -67,6 +68,8 @@ class App:
 
         self._build()
         darktitle.apply(root, self.dark)
+        if self._ui["log_to_file"]:                 # honor the launch setting (programmatic set doesn't fire)
+            self._toggle_logfile()
         root.after(60, self._drain)
 
     # ---- layout ---------------------------------------------------------- #
@@ -85,7 +88,7 @@ class App:
         ttk.Label(top, textvariable=self._proj_label_var).pack(side="left", padx=(10, 0))
         self._update_project_label()
         ttk.Button(top, text="Clear Log", command=self._clear).pack(side="right")
-        self._logfile_var = tk.BooleanVar(value=False)
+        self._logfile_var = tk.BooleanVar(value=self._ui["log_to_file"])   # launch default from app_config
         ttk.Checkbutton(top, text="Log to File", variable=self._logfile_var,
                         command=self._toggle_logfile).pack(side="right", padx=6)
         ttk.Button(top, text="Open Output", command=lambda: self._startfile(self._out_root())).pack(side="right", padx=6)

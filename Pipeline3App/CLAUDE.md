@@ -583,9 +583,12 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   stages as a hidden prerequisite, Fill 200 skipped). It reads `designer_params.yaml`
   (`config.profile_params_file`), uses a **full Project-Manager project** (New Project seeds from the
   designer base, no file prompts), adds **two input pickers** beside ph100, and **re-copies each input's
-  `source` into Input/ on every ph1x0 run** (`project.refresh_inputs` + a ctx re-stage). Covered by
-  `test_registry` (present-subset/attrs), `test_config` (`load_app_profile`/`profile_params_file`),
-  `test_project` (`refresh_inputs`/`default_doc` bases).
+  `source` into Input/ on every ph1x0 run** (`project.refresh_inputs` + a ctx re-stage).
+  `app_config.yaml` is **tracked** (a normal in-repo config) and also carries a **`user_interface`**
+  launch block — `width`/`height` (START size; the window stays **resizable**), `theme` (`dark`|`light`),
+  `log_to_file` — read by `config.load_app_ui` and applied in `App.__init__`. Covered by
+  `test_registry` (present-subset/attrs), `test_config`
+  (`load_app_profile`/`load_app_ui`/`profile_params_file`), `test_project` (`refresh_inputs`/`default_doc`).
 - **NEXT**: M10 CLI + the Open2App-path contract test; object-editor polish (Browse pickers on path leaves,
   add/remove nodes); M14 packaging (now **ONE** PyInstaller exe — the profile is a shipped config value).
   **920** (TIA project coverage) is future — pending Open2App's project text-export.
