@@ -111,6 +111,7 @@ class _Dropdown(tk.Toplevel):
         self._ignore = ignore
         self._on_close = on_close
         self._closed = False
+        self._deact = None
         self.overrideredirect(True)
         try:
             self.attributes("-topmost", True)
@@ -150,6 +151,15 @@ class _Dropdown(tk.Toplevel):
 
         self.bind("<Escape>", lambda e: self.close())
         root.bind_all("<Button-1>", self._maybe_close, "+")
+        # also close when the app loses focus to another window (alt-tab / clicking another app), which
+        # the click-away handler can't see. Armed AFTER the open/lift settles so that sequence doesn't
+        # trip it; the close is delayed + idempotent, so a dropdown button's own click-close wins the
+        # race and the button's command still fires.
+        root.after(200, self._arm_blur)
+
+    def _arm_blur(self):
+        if not self._closed:
+            self._deact = self._owner.bind("<Deactivate>", lambda _e: self._owner.after(150, self.close), "+")
 
     def _fire(self, spec):
         cmd = spec.get("command")
@@ -174,6 +184,8 @@ class _Dropdown(tk.Toplevel):
         try:
             self._owner.unbind_all("<MouseWheel>")
             self._owner.unbind_all("<Button-1>")
+            if self._deact:
+                self._owner.unbind("<Deactivate>", self._deact)
         except tk.TclError:
             pass
         if self._on_close:
