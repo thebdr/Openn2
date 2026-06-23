@@ -1,22 +1,31 @@
 """logview.py - the colour-coded, link-aware log pane (the pipeline's `emit` sink, rendered).
 
-A read-only `tk.Text` with a vertical scrollbar, Monaspace font, and per-level colour tags
-(theme.log_tags). `append(text)` infers the level from a leading `[LEVEL]` tag or a leading level
-word (ERROR/WARNING/HALT/...), else INFO, and makes any `<Sheet>!<Cell>` token of a KNOWN I/O-List
-sheet a clickable link (-> `on_link(sheet, cell)`, which the App opens in Excel via COM). Inserts must
-happen on the Tk main thread - the App drains its worker queue into here via `root.after`.
+A read-only `tk.Text` with per-level colour tags (theme.log_tags). Two feeds:
+- `append(text)` - plain progress strings (the worker `emit`): infers the level from a leading
+  `[LEVEL]` tag or level word, else INFO; no links.
+- `append_records(records, error_csv, resolve_doc)` - the STRUCTURED validation log
+  (`render.render_records`). Each record carries the line text + the char spans of its `Sheet!Cell`
+  cells and their workbook (`doc`/`doc2`). Each span becomes a clickable link (-> `on_link(doc, sheet,
+  cell)`, which the App opens in the RIGHT workbook in Excel via COM); the leading `[FAIL]`/`[ERROR]`
+  tag becomes an `errlink` opening the error-management CSV. Binding from the record (not by
+  re-parsing text against "known sheets") is what makes cross-workbook links work and can't race.
+Inserts must happen on the Tk main thread - the App drains its worker queue into here via `root.after`.
 """
 from __future__ import annotations
+import os
 import re
 import tkinter as tk
 from tkinter import ttk
 
 from pipeline3.gui import theme
+from pipeline3.io.render import banner_lines
 
 _LEVELS = ("ERROR", "FAIL", "HALT", "WARNING", "PASS", "SKIP", "OK", "INFO", "SECTION")
 _TAGGED = re.compile(r"^\s*\[(\w+)\]")
 _LEADING = re.compile(r"^\s*(\w+)\b")
-_CELL = r"!([A-Z]{1,3}\d+)"
+# A finding's LogEntry level -> the theme colour tag (theme.log_tags keys).
+_LEVEL_TAG = {"FAIL": "FAIL", "WARN": "WARNING", "INFO": "INFO", "PASS": "PASS",
+              "SKIP": "SKIP", "ERROR": "ERROR", "OK": "OK", "HALT": "HALT"}
 
 
 def level_of(line: str) -> str:
@@ -35,8 +44,8 @@ class LogView(ttk.Frame):
     def __init__(self, parent, pal: dict, font_family: str, on_link=None, **kw):
         super().__init__(parent, **kw)
         self.font_family = font_family
-        self.on_link = on_link
-        self._sheets: list = []
+        self.on_link = on_link                  # on_link(doc, sheet, cell) -> open that workbook in Excel
+        self._error_csv = None                  # the [FAIL]/[ERROR] errlink target (set per run)
         self._links = 0
         self.text = tk.Text(self, wrap="none", relief="flat", borderwidth=0,
                             background=pal["log_bg"], foreground=pal["log_fg"],
@@ -52,6 +61,11 @@ class LogView(ttk.Frame):
         self.grid_columnconfigure(0, weight=1)
         self._accent = pal.get("accent", "#4ea1ff")
         self._retag()
+        # the shared [FAIL]/[ERROR] -> error_management.csv link (underline only; keeps the level colour)
+        self.text.tag_configure("errlink", underline=True)
+        self.text.tag_bind("errlink", "<Button-1>", lambda _e: self._open_error_csv())
+        self.text.tag_bind("errlink", "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
+        self.text.tag_bind("errlink", "<Leave>", lambda _e: self.text.configure(cursor=""))
 
     # ---- theming --------------------------------------------------------- #
     def _retag(self):
@@ -68,52 +82,65 @@ class LogView(ttk.Frame):
         self._retag()
 
     # ---- content --------------------------------------------------------- #
-    def set_sheets(self, sheets) -> None:
-        """The known I/O-List sheet names to turn into clickable Sheet!Cell links (longest first)."""
-        self._sheets = sorted({s for s in sheets if s}, key=len, reverse=True)
-
     def append(self, text: str, level: str | None = None) -> None:
+        """A plain progress string (no links): level-colour each line."""
         self.text.configure(state="normal")
         for line in str(text).splitlines() or [""]:
-            start = self.text.index("end-1c")
             self.text.insert("end", line + "\n", level or level_of(line))
-            self._linkify(start, line)
         self.text.see("end")
         self.text.configure(state="disabled")
 
-    def _linkify(self, line_start: str, line: str) -> None:
-        if not (self._sheets and self.on_link):
-            return
-        for sheet in self._sheets:
-            for m in re.finditer(re.escape(sheet) + _CELL, line):
-                cell = m.group(1)
-                tag = f"link{self._links}"
-                self._links += 1
-                s = f"{line_start}+{m.start()}c"
-                e = f"{line_start}+{m.end()}c"
-                self.text.tag_add(tag, s, e)
-                self.text.tag_configure(tag, foreground=self._accent, underline=True)
-                self.text.tag_bind(tag, "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
-                self.text.tag_bind(tag, "<Leave>", lambda _e: self.text.configure(cursor=""))
-                self.text.tag_bind(tag, "<Button-1>",
-                                   lambda _e, sh=sheet, c=cell: self.on_link(sh, c))
-
-    def append_report(self, lines) -> None:
-        """Append already-rendered report lines (render.render_lines): a `[LEVEL]`-prefixed entry gets
-        its level colour; a PHASE banner (a title line + its `===` underline) is SECTION; Sheet!Cell
-        tokens become clickable."""
-        def _rule(s):
-            return bool(s) and all(c == "=" for c in s)
+    def append_records(self, records, error_csv_path=None, resolve_doc=None) -> None:
+        """Append the structured validation log (`render.render_records`). Each link span becomes a
+        clickable cell (-> on_link(doc, sheet, cell)); a `[FAIL]`/`[ERROR]` prefix opens
+        `error_csv_path`. `resolve_doc` is unused here (the App resolves the workbook in on_link)."""
+        self._error_csv = error_csv_path
         self.text.configure(state="normal")
-        n = len(lines)
-        for i, line in enumerate(lines):
-            nxt = lines[i + 1] if i + 1 < n else ""
-            level = "SECTION" if (_rule(line) or _rule(nxt)) else level_of(line)
+        for rec in records:
+            if rec.kind == "banner":
+                for bl in banner_lines(rec.text):
+                    self.text.insert("end", bl + "\n", "SECTION")
+                continue
             start = self.text.index("end-1c")
-            self.text.insert("end", line + "\n", level)
-            self._linkify(start, line)
+            self.text.insert("end", rec.text + "\n", _LEVEL_TAG.get(rec.level, "INFO"))
+            self._tag_errlink(start, rec)
+            for span in rec.links:
+                self._tag_link_span(start, span)
         self.text.see("end")
         self.text.configure(state="disabled")
+
+    def _tag_link_span(self, line_start: str, span) -> None:
+        """Make the `Sheet!Cell` at [span.start, span.end) a clickable link to its workbook."""
+        if not (self.on_link and span.start < span.end):
+            return
+        s, e = f"{line_start}+{span.start}c", f"{line_start}+{span.end}c"
+        sheet_cell = self.text.get(s, e)
+        if "!" not in sheet_cell:
+            return
+        sheet, cell = sheet_cell.split("!", 1)
+        tag = f"link{self._links}"
+        self._links += 1
+        self.text.tag_add(tag, s, e)
+        self.text.tag_configure(tag, foreground=self._accent, underline=True)
+        self.text.tag_bind(tag, "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
+        self.text.tag_bind(tag, "<Leave>", lambda _e: self.text.configure(cursor=""))
+        self.text.tag_bind(tag, "<Button-1>",
+                           lambda _e, d=span.doc, sh=sheet, c=cell: self.on_link(d, sh, c))
+
+    def _tag_errlink(self, line_start: str, rec) -> None:
+        """Tag the leading `[FAIL]`/`[ERROR]` token as the error_management.csv link."""
+        if rec.level not in ("FAIL", "ERROR") or not self._error_csv:
+            return
+        end = f"{line_start}+{len(rec.level) + 2}c"          # "[" + level + "]"
+        self.text.tag_add("errlink", line_start, end)
+
+    def _open_error_csv(self) -> None:
+        path = self._error_csv
+        if path and os.path.exists(path):
+            try:
+                os.startfile(path)  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001
+                pass
 
     def clear(self) -> None:
         self.text.configure(state="normal")

@@ -95,7 +95,10 @@ launch_gui.py                                             # the operator-GUI lau
   **`location` is `Sheet!Cell` only — never the workbook name**; the workbook rides on
   `LogEntry.doc`/`doc2` (for the GUI link) and is not rendered; a cross-check's matched 2nd-workbook
   cell renders as ` -> <Sheet!Cell>`. `io/render.py::render_lines(log, errors_only)` renders both the
-  complete report and the error-only view (PHASE+INFO+WARN+FAIL, dropping PASS/SKIP).
+  complete report and the error-only view (PHASE+INFO+WARN+FAIL, dropping PASS/SKIP). Its GUI twin
+  **`render_records`** returns the SAME text plus, per line, the char spans of `location`/`location2`
+  and their workbook (`doc`/`doc2`) — both share the one `_format_line`/`banner_lines` helper, so the
+  report text (the golden) is a single source and can't drift from the GUI records.
 - **No hardcoded input columns** — all IoList/CE/AREA access resolves through `column_map.csv`
   (`config.load_column_map` / `iolist_diag.columns.ColumnResolver`). The only fixed integer columns
   are the two sheets Pipeline3 *generates* (DiagnosisBlocks, _UnresolvedIndex).
@@ -438,8 +441,14 @@ each profile is a **named session** shown in the title + log banner as `Pipeline
   the native **Windows title bar** (DWM `IMMERSIVE_DARK_MODE` on the caption HWND; reversible). `fonts.py`
   loads `assets/fonts/MonaspaceNeon-Var.ttf` privately per-process (`AddFontResourceEx(FR_PRIVATE)`;
   resolves as `"Monaspace Neon Var"`).
-- **`logview.py`** — the colour-coded log (level tags) + **clickable `Sheet!Cell` links** (known I/O-List
-  sheets) that open the I/O List in Excel at that cell via COM (`excel.py`, on a worker thread).
+- **`logview.py`** — the colour-coded log (level tags). The validation log is fed as **structured
+  records** (`render.render_records`): `append_records` makes each line's `location`/`location2` cell a
+  **clickable link that opens ITS OWN workbook** (I/O List or C&E, from the record's `doc`/`doc2`) in
+  Excel at that cell via COM (`excel.py`, worker thread) — `_open_link(doc, sheet, cell)` resolves the
+  basename to a path — and tags the leading **`[FAIL]`/`[ERROR]`** as an `errlink` opening
+  `error_management.csv`. Binding from the record (not by re-parsing text against "known sheets")
+  is what makes cross-workbook links work and can't race; the old `set_sheets`/regex shortcut is gone.
+  Plain progress strings still go through `append(text)` (level colour only, no links).
 - **`files.py`** — the Files tab: a **3-section tree** (Project configuration / User editable files / Bare
   output files) + a type-aware editor. `.csv` → editable tksheet **grid** (Save = comma CSV); `.yaml/.json/
   .xml` → the **object editor** (`objedit.py`); `.scl/.db/.txt/...` → text editor; `.xlsx/.xlsm` → the

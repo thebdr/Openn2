@@ -198,10 +198,8 @@ class App:
                 n0 = len(ctx.log)
                 work(ctx)
                 entries = ctx.log[n0:]                  # the LogEntries this run produced (phase 100 etc.)
-                if entries:
-                    self.q.put(("report", render.render_lines(entries)))
-                if ctx.rows:
-                    self.q.put(("sheets", {r.get("_source_sheet") for r in ctx.rows}))
+                if entries:                             # ONE structured event - text + per-line link spans
+                    self.q.put(("records", render.render_records(entries)))
                 self.q.put(("status", "Ready"))
             except Exception as e:  # noqa: BLE001
                 self.q.put(("log", f"[ERROR] {type(e).__name__}: {e}"))
@@ -234,14 +232,12 @@ class App:
                 ev = self.q.get_nowait()
                 if ev[0] == "log":
                     self.log.append(ev[1])
-                elif ev[0] == "report":
-                    self.log.append_report(ev[1])
+                elif ev[0] == "records":
+                    self.log.append_records(ev[1], self._error_csv_path(), self._resolve_doc)
                 elif ev[0] == "busy":
                     self._set_busy(ev[1])
                 elif ev[0] == "status":
                     self.status.set(ev[1])
-                elif ev[0] == "sheets":
-                    self.log.set_sheets(ev[1])
         except queue.Empty:
             pass
         self.root.after(60, self._drain)
@@ -277,9 +273,32 @@ class App:
                 ("User editable files", user),
                 ("Bare output files", [self._out_root()])]
 
-    def _open_link(self, sheet: str, cell: str):
-        """A Sheet!Cell link in the log -> open the I/O List in Excel there (worker thread, COM)."""
-        path = self._io_list_path()
+    def _doc_path_map(self) -> dict:
+        """{workbook basename -> abspath} for the docs the log links into (I/O List + C&E), with an
+        os.path.normcase alias so a case-differing basename still resolves on Windows."""
+        params = config.load_params()
+        io = self._ctx.io_list_path() if self._ctx is not None else self._io_list_path()
+        ce = (params.get("ce") or {}).get("path", "")
+        m = {}
+        for p in (io, ce):
+            if p:
+                b = os.path.basename(p)
+                m[b] = p
+                m[os.path.normcase(b)] = p
+        return m
+
+    def _resolve_doc(self, doc: str) -> str:
+        """The workbook path for a link's `doc` basename; falls back to the I/O List."""
+        m = self._doc_path_map()
+        return m.get(doc) or m.get(os.path.normcase(doc or "")) or self._io_list_path()
+
+    def _error_csv_path(self) -> str:
+        return os.path.join(config.USER_INPUT, "error_management.csv")
+
+    def _open_link(self, doc: str, sheet: str, cell: str):
+        """A Sheet!Cell link in the log -> open ITS workbook (I/O List or C&E) in Excel at that cell
+        (worker thread, COM); `doc` is the workbook basename the LogEntry carried."""
+        path = self._resolve_doc(doc)
         self.status.set(f"opening Excel at {sheet}!{cell} ...")
 
         def job():

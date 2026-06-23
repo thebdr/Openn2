@@ -14,10 +14,10 @@ and the plan ~/.claude/plans/the-codebase-in-openn2-pipeline2app-rippling-canyon
 Run the data-independent green gate first:
     cd Pipeline3App && for t in tests/unit/test_*.py; do python "$t" || break; done
 (test_golden_validation.py is DATA-DEPENDENT — when it's red, check the WORKING TREE first: a changed
-config_project/project_params.yaml or a mutated sample I/O List, NOT a code regression. Do NOT run the
-source-mutating phases 200 Fill / 400 insert_interface_sheets against the committed sample doc — they
-rewrite it in place; git checkout the doc to restore. Re-freeze with --freeze only if the docs
-legitimately changed.)
+config_project/project_params.yaml or a mutated sample I/O List, NOT a code regression. Phases 200 Fill /
+400 insert_interface_sheets re-save the source in place (so they git-dirty it) but now PRESERVE its
+formula caches (io/xlsx_cache.restore), so they no longer DEGRADE it; git checkout the doc to restore the
+bytes. Re-freeze with --freeze only if the docs legitimately changed.)
 
 DONE: phases 100–900 — documents validation, fill, staging, interfaces, signals, diagnosis, hardware,
 all of software generation (8 builders + the 03 direct FC XML + the editable shells), and 910 Pipeline
@@ -27,8 +27,11 @@ The single database is the staged ctx.rows / Shared/OutputTree/.../IODatabase.cs
 
 ALSO DONE: M11 the main operator GUI ("Broski Session") — pipeline3/gui/ + launch_gui.py. A registry-
 driven phase bar (build_spec over registry().presentation_order()), sv-ttk dark + bundled Monaspace
-Neon + dark Windows title bar; EN/IT + dark/light toggles; worker-thread runs streamed to a clickable
-LogView; and the Files tab (3-section tree + a CSV grid with zebra/right-click sort/filter, a
+Neon + dark Windows title bar; EN/IT + dark/light toggles; worker-thread runs streamed to the LogView,
+whose validation log (fed as structured records: render.render_records -> logview.append_records) makes
+each Sheet!Cell a clickable link opening ITS OWN workbook (I/O List or C&E, via the LogEntry doc/doc2)
+in Excel and the [FAIL] tag a link to error_management.csv (the old set_sheets/regex relink is gone);
+and the Files tab (3-section tree + a CSV grid with zebra/right-click sort/filter, a
 YAML/JSON/XML object editor that preserves YAML comments, an xlsx read-only preview + Edit-externally
 via LibreOffice/Excel, a full-path header + Open-folder). The app is Pipeline3; each profile is a named
 session shown as "Pipeline3 - <session> (<profile>)".
