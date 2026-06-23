@@ -38,7 +38,9 @@ NEXT (pick one, PROPOSE + SHOW before building):
     master, its own designer_params base). app_main already supports profile="designer" and names it
     "IOList & CEMatrix Validation (designer)"; the phase bar should show only Documents Validation.
   - the PROJECT MANAGER — folder projects (project.yaml + Input/ + Output/), New/Save As, a
-    USER-SELECTABLE projects root (persisted), archive zip.
+    USER-SELECTABLE projects root (persisted), archive zip. NB: the default Shared/OutputTree/ is the
+    SHARED handoff consumed by Openn3App (the C# importer) — keep that shared BuilderData surface intact
+    (a project writes into its own <project>/Output; the shared default stays the Openn3 contract).
   - M10 CLI (run.py / run_validation.py / run_phase.py over the registry) + the Open2App-path CONTRACT
     TEST (assert the 4 BuilderData OUTPUT_PATHS keys = config.OPEN2APP_KEYS, byte-stable).
   - object-editor polish (Browse pickers on path-valued leaves, add/remove nodes); M14 packaging (two

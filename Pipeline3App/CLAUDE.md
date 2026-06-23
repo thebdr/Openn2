@@ -438,10 +438,13 @@ each profile is a **named session** shown in the title + log banner as `Pipeline
   sheets) that open the I/O List in Excel at that cell via COM (`excel.py`, on a worker thread).
 - **`files.py`** — the Files tab: a **3-section tree** (Project configuration / User editable files / Bare
   output files) + a type-aware editor. `.csv` → editable tksheet **grid** (Save = comma CSV); `.yaml/.json/
-  .xml` → the **object editor** (`objedit.py`); `.scl/.db/.txt/...` → text editor; `.xlsx/.xlsm` →
-  **read-only** value grid + "Edit externally" (the Excel files carry formulas/array-formula/VBA an
-  openpyxl save would drop). Every editor shares `widgets.editor_header`: a **selectable full-path field**
-  + an **Open folder** button (`extedit.reveal` = `explorer /select`). The tree right-click also has Open
+  .xml` → the **object editor** (`objedit.py`); `.scl/.db/.txt/...` → text editor; `.xlsx/.xlsm` → the
+  **read-only Excel viewer** (`xlsxview.py`: a **sheet selector** + **Tab/Shift+Tab** to step sheets, a
+  **Show formulas** checkbox = openpyxl `data_only=False`, 3000-row cap; "Edit externally" since the Excel
+  files carry formulas/array-formula/VBA an openpyxl save would drop). **Arrow keys** navigate the tree
+  (Up/Down visible items, Left collapse/out, Right expand/in; selection loads the file and keyboard focus
+  stays on the tree). Every editor shares `widgets.editor_header`: a **selectable full-path field** + an
+  **Open folder** button (`extedit.reveal` = `explorer /select`). The tree right-click also has Open
   containing folder / Open externally. **`grid.py`** decorates each tksheet with **zebra** striping +
   right-click **Sort ▲/▼ · Filter… · Clear** — VIEW-only (via `display_rows`, never reorders the saved file).
 - **`objedit.py`** — a `ttk.Treeview` **object editor** for YAML/JSON/XML, edited in each format's own
@@ -518,9 +521,12 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   with zebra/sort/filter, a YAML/JSON/XML object editor, an xlsx read-only preview + LibreOffice/Excel
   external edit, full-path header + Open-folder). See the **GUI** section above.
 - **NEXT**: the **designer GUI** (validation-only 2nd exe, profile `designer`, no pink master) + the
-  **Project Manager** (folder projects + selectable root); M10 CLI + the Open2App-path contract test;
-  object-editor polish (Browse pickers on path leaves, add/remove nodes); M14 packaging (two exes). **920**
-  (TIA project coverage) is future — pending Open2App's project text-export.
+  **Project Manager** (folder projects + selectable root). **NB the default `Shared/OutputTree/` is the
+  SHARED handoff consumed by `Openn3App`** (the C# importer, ex-`Openn2App`) — so the Project Manager's
+  per-project output routing (`output_dir`) must keep that shared BuilderData surface intact (a project
+  writes into its own `<project>/Output`, but the shared default stays the Openn3 contract). M10 CLI +
+  the Open2App-path contract test; object-editor polish (Browse pickers on path leaves, add/remove nodes);
+  M14 packaging (two exes). **920** (TIA project coverage) is future — pending Open2App's project text-export.
 
 ## Conventions & gotchas
 
