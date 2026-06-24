@@ -68,6 +68,54 @@ def test_html_escaping():
     ok("a&amp;b&lt;c&gt;" in out, "value is XML-escaped")
 
 
+def test_build_sheet_xml_grid():
+    x = xe.build_sheet_xml([["H1", "H2"], ["=text", 7], [None, "", "x"]], hyperlinks=[("A2", "S!A1", "d")])
+    _wf(x)
+    ok('<c r="A1" t="inlineStr"><is><t xml:space="preserve">H1</t></is></c>' in x, "header cell")
+    ok('<c r="A2" t="inlineStr"><is><t xml:space="preserve">=text</t></is></c>' in x, "leading = is TEXT not a formula")
+    ok('<c r="B2"><v>7</v></c>' in x, "int -> numeric cell")
+    ok('<c r="C3"' in x and '<c r="A3"' not in x, "blank cells skipped, later cell still placed")
+    ok('<hyperlink ref="A2" location="S!A1" display="d"/>' in x, "internal hyperlink")
+
+
+def test_new_sheets_add_replace_delete_preserves_arrays():
+    import os, tempfile, zipfile, warnings
+    warnings.simplefilter("ignore")
+    import openpyxl
+    from openpyxl.worksheet.formula import ArrayFormula
+    path = os.path.join(tempfile.mkdtemp(), "w.xlsx")
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Data"
+    ws["A1"] = "keep"
+    ws["C2"] = ArrayFormula("C2:C4", "=A1")          # an array we must NOT touch -> must survive
+    wb.create_sheet("Legacy")["A1"] = "old"
+    wb.save(path)
+    wb.close()
+
+    xe.edit_workbook(path, new_sheets=[
+        {"name": "Gen", "rows": [["ID", "Count"], ["=S1+X", 5]], "hyperlinks": [("A2", "Data!A1", "go")]}],
+        delete_sheets=["Legacy"])
+    with zipfile.ZipFile(path) as z:
+        ok(z.testzip() is None, "valid zip after add/delete sheets")
+        dpart = xe._sheet_name_to_part(open(path, "rb").read())["Data"]
+        ok('t="array"' in z.read(dpart).decode("utf-8"), "the untouched Data array is byte-preserved")
+    wb = openpyxl.load_workbook(path)
+    ok("Gen" in wb.sheetnames and "Legacy" not in wb.sheetnames, "Gen added, Legacy deleted")
+    ok("Data" in wb.sheetnames, "untouched sheet kept")
+    g = wb["Gen"]
+    eq(g["A1"].value, "ID", "grid header")
+    eq(g["B2"].value, 5, "numeric cell read back as a number")
+    eq(g["A2"].value, "=S1+X", "a leading '=' stays TEXT, not a formula")
+    wb.close()
+
+    xe.edit_workbook(path, new_sheets=[{"name": "Gen", "rows": [["ONLY"]]}])   # re-run -> replace Gen
+    wb = openpyxl.load_workbook(path)
+    eq(wb["Gen"]["A1"].value, "ONLY", "Gen replaced in place")
+    ok(wb["Gen"]["A2"].value is None, "the old Gen rows are gone")
+    wb.close()
+
+
 if __name__ == "__main__":
     raise SystemExit(run("xlsx_edit", [
         ("edit_existing_cell_preserves_style_neighbours_and_unrelated_array",
@@ -76,4 +124,6 @@ if __name__ == "__main__":
         ("insert_cell_into_row_column_sorted", test_insert_cell_into_row_column_sorted),
         ("insert_new_row_sorted", test_insert_new_row_sorted),
         ("html_escaping", test_html_escaping),
+        ("build_sheet_xml_grid", test_build_sheet_xml_grid),
+        ("new_sheets_add_replace_delete_preserves_arrays", test_new_sheets_add_replace_delete_preserves_arrays),
     ]))

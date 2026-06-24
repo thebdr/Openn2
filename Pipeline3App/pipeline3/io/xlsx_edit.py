@@ -156,38 +156,140 @@ def _sheet_name_to_part(zbytes) -> dict:
     return out
 
 
-def edit_workbook(path: str, *, cell_edits: dict | None = None, dest: str | None = None) -> list:
-    """THE primitive: apply `cell_edits` = {sheet_name: {cell_ref: value}} to `path`, editing ONLY the
-    affected worksheet parts and byte-copying every other part. Atomic (temp + os.replace); `dest`
-    defaults to `path` (in-place). Returns a list of (sheet_name, master_ref, range) for any array
-    formulas FROZEN to their cached values to make room for an edit (the caller logs these as
-    warnings); [] when nothing was written. new_sheets support (DiagnosisBlocks / _UnresolvedIndex /
-    interface sheets) is added next."""
+def _num_to_col(n: int) -> str:
+    s = ""
+    while n > 0:
+        n, r = divmod(n - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
+_WS_CT = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
+_WS_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+
+
+def build_sheet_xml(rows: list, hyperlinks: list | None = None) -> str:
+    """A fresh worksheet XML for a grid (`rows` = list of row lists). int/float -> a numeric cell;
+    everything else -> an INLINE STRING (so a leading '='/'+'/'-' is text, not a formula). `hyperlinks`
+    = [(cell_ref, location, display)] for internal links (e.g. #'NET SAFETY 50'!K23)."""
+    body = []
+    for ri, row in enumerate(rows, 1):
+        cells = []
+        for ci, val in enumerate(row, 1):
+            if val is None or val == "":
+                continue
+            ref = f"{_num_to_col(ci)}{ri}"
+            if isinstance(val, bool):
+                cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{_esc(val)}</t></is></c>')
+            elif isinstance(val, (int, float)):
+                cells.append(f'<c r="{ref}"><v>{val}</v></c>')
+            else:
+                cells.append(f'<c r="{ref}" t="inlineStr"><is><t xml:space="preserve">{_esc(val)}</t></is></c>')
+        body.append(f'<row r="{ri}">{"".join(cells)}</row>')
+    hl = ""
+    if hyperlinks:
+        items = "".join(f'<hyperlink ref="{ref}" location="{_esc(loc)}" display="{_esc(disp)}"/>'
+                        for ref, loc, disp in hyperlinks)
+        hl = f"<hyperlinks>{items}</hyperlinks>"
+    return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            f'<sheetData>{"".join(body)}</sheetData>{hl}</worksheet>')
+
+
+def _remove_sheet(wbxml, relsxml, ctxml, name, part):
+    """Unregister a sheet by `name`: drop its <sheet> (+ its r:id rel) and its content-type Override."""
+    m = re.search(r'<sheet\b[^>]*\bname="' + re.escape(name) + r'"[^>]*/>', wbxml)
+    if not m:
+        return wbxml, relsxml, ctxml
+    rid = re.search(r'r:id="([^"]+)"', m.group(0))
+    wbxml = wbxml[:m.start()] + wbxml[m.end():]
+    if rid:
+        relsxml = re.sub(r'<Relationship\b[^>]*\bId="' + re.escape(rid.group(1)) + r'"[^>]*/>', "", relsxml, count=1)
+    ctxml = re.sub(r'<Override\b[^>]*\bPartName="/' + re.escape(part) + r'"[^>]*/>', "", ctxml, count=1)
+    return wbxml, relsxml, ctxml
+
+
+def _register_sheet(existing_parts, wbxml, relsxml, ctxml, name):
+    """Add a new worksheet `name`: pick a free part + rId + sheetId, insert into workbook.xml (<sheets>),
+    workbook.xml.rels and [Content_Types].xml. Returns (part, wbxml, relsxml, ctxml)."""
+    n = 1
+    while f"xl/worksheets/sheet{n}.xml" in existing_parts:
+        n += 1
+    part = f"xl/worksheets/sheet{n}.xml"
+    rids = [int(i[3:]) for i in re.findall(r'Id="(rId\d+)"', relsxml)]
+    rid = f"rId{(max(rids) + 1) if rids else 1}"
+    sids = [int(s) for s in re.findall(r'sheetId="(\d+)"', wbxml)]
+    sid = (max(sids) + 1) if sids else 1
+    sheet_el = '<sheet name="' + _esc(name) + '" sheetId="' + str(sid) + '" r:id="' + rid + '"/>'
+    rel_el = '<Relationship Id="' + rid + '" Type="' + _WS_REL + '" Target="worksheets/sheet' + str(n) + '.xml"/>'
+    ct_el = '<Override PartName="/' + part + '" ContentType="' + _WS_CT + '"/>'
+    wbxml = wbxml.replace("</sheets>", sheet_el + "</sheets>", 1)
+    relsxml = relsxml.replace("</Relationships>", rel_el + "</Relationships>", 1)
+    ctxml = ctxml.replace("</Types>", ct_el + "</Types>", 1)
+    return part, wbxml, relsxml, ctxml
+
+
+def edit_workbook(path: str, *, cell_edits: dict | None = None, new_sheets: list | None = None,
+                  delete_sheets: list | None = None, dest: str | None = None) -> list:
+    """THE primitive that modifies an .xlsx. `cell_edits` = {sheet_name: {cell_ref: value}} surgically
+    rewrites cells (freezing any array spill it lands in); `new_sheets` = [{name, rows, hyperlinks?}]
+    adds/replaces whole app-owned sheets (e.g. DiagnosisBlocks / _UnresolvedIndex / interface sheets);
+    `delete_sheets` = [names] drops legacy sheets. ONLY the affected/added/removed parts change - every
+    other part (incl. dynamic-array sheets the populator doesn't touch) is byte-copied. Atomic (temp +
+    os.replace); `dest` defaults to in-place. Returns the (sheet, master_ref, range) of any array frozen
+    to its cached values (the caller logs a WARN); [] if nothing changed."""
     cell_edits = cell_edits or {}
-    if not cell_edits:
+    new_sheets = new_sheets or []
+    delete_sheets = list(delete_sheets or [])
+    if not (cell_edits or new_sheets or delete_sheets):
         return []
     dest = dest or path
     with open(path, "rb") as f:
         data = f.read()
-    parts = _sheet_name_to_part(data)
-    repl = {}
+    name_to_part = _sheet_name_to_part(data)
     materialized = []
-    for sheet_name, edits in cell_edits.items():
-        part = parts.get(sheet_name)
-        if not part or not edits:
-            continue
-        with zipfile.ZipFile(io.BytesIO(data)) as z:
-            xml = z.read(part).decode("utf-8")
-        new_xml, mats = set_cells(xml, edits)
-        repl[part] = new_xml.encode("utf-8")
-        materialized += [(sheet_name, m, r) for (m, r) in mats]
-    if not repl:
-        return []
-    out = io.BytesIO()
-    with zipfile.ZipFile(io.BytesIO(data)) as zin, \
-            zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
-        for it in zin.infolist():
-            zout.writestr(it, repl.get(it.filename) or zin.read(it.filename))
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        repl = {}
+        for sheet_name, edits in cell_edits.items():            # 1. surgical cell edits
+            part = name_to_part.get(sheet_name)
+            if part and edits:
+                new_xml, mats = set_cells(z.read(part).decode("utf-8"), edits)
+                repl[part] = new_xml.encode("utf-8")
+                materialized += [(sheet_name, m, r) for (m, r) in mats]
+
+        added = {}                                              # 2. add/replace/delete whole sheets
+        wbxml = z.read("xl/workbook.xml").decode("utf-8")
+        relsxml = z.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+        ctxml = z.read("[Content_Types].xml").decode("utf-8")
+        deleted = set()
+        present = set(z.namelist())
+        for dn in delete_sheets:
+            if dn in name_to_part:
+                wbxml, relsxml, ctxml = _remove_sheet(wbxml, relsxml, ctxml, dn, name_to_part[dn])
+                deleted.add(name_to_part[dn])
+        for spec in new_sheets:
+            xml = build_sheet_xml(spec["rows"], spec.get("hyperlinks")).encode("utf-8")
+            part = name_to_part.get(spec["name"])
+            if part and part not in deleted:
+                repl[part] = xml                                # replace an existing app-owned sheet
+            else:
+                part, wbxml, relsxml, ctxml = _register_sheet(present | set(added), wbxml, relsxml, ctxml, spec["name"])
+                added[part] = xml
+        if new_sheets or delete_sheets:
+            repl["xl/workbook.xml"] = wbxml.encode("utf-8")
+            repl["xl/_rels/workbook.xml.rels"] = relsxml.encode("utf-8")
+            repl["[Content_Types].xml"] = ctxml.encode("utf-8")
+        if not (repl or added):
+            return materialized
+
+        out = io.BytesIO()
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+            for it in z.infolist():
+                if it.filename in deleted:
+                    continue
+                zout.writestr(it, repl.get(it.filename) or z.read(it.filename))
+            for part, content in added.items():
+                zout.writestr(part, content)
     tmp = dest + ".tmp_edit"
     with open(tmp, "wb") as f:
         f.write(out.getvalue())
