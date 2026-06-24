@@ -496,8 +496,11 @@ each profile is a **named session** shown in the title + log banner as `Pipeline
 - **`objedit.py`** — a `ttk.Treeview` **object editor** for YAML/JSON/XML, edited in each format's own
   structure: **YAML via ruamel `CommentedMap` in place (comments survive; `width=4096` so a Save doesn't
   re-wrap long lines)**, JSON type-preserving, XML element/`@attr`/`#text`. Scalars edit inline (double-
-  click the Value); a **Tree | Text** toggle drops to raw and re-parses. (No off-the-shelf lib fit — they
-  are JSON-only / web-based and strip YAML comments.)
+  click the Value); a **right-click context menu** (a per-item `_model` registry) adds the structural
+  edits — **Browse file/folder** into a leaf, **Add key/item** (dict/list) / **Add child element /
+  attribute** (XML), **Delete** any non-root node — mutating the in-memory tree (Save persists; the pure
+  `add_key`/`add_item`/`delete_node` helpers are unit-tested for comment + type preservation). A **Tree |
+  Text** toggle drops to raw and re-parses. (No off-the-shelf lib fit — JSON-only / web-based + strip YAML comments.)
 - **`extedit.py`** — `open_external` (the spreadsheet editor: **LibreOffice → Excel → OS default**) +
   `reveal` (containing folder, file selected). Embedding LibreOffice in-window is not feasible; it opens
   as its own app.

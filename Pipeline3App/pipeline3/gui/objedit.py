@@ -4,8 +4,10 @@ Edits each format IN ITS OWN structure and serializes back faithfully:
   - YAML -> ruamel `CommentedMap`/`CommentedSeq`, mutated in place so **comments survive** the edit;
   - JSON -> stdlib dict/list (type-preserving scalar edits);
   - XML  -> ElementTree (element text + attributes).
-Leaf scalars are edited in place (double-click the Value cell). A **Tree | Text** toggle drops to a raw
-monospace editor for edge cases (and re-parses on the way back). Save writes the current view.
+Leaf scalars are edited in place (double-click the Value cell). A **right-click context menu** adds the
+structural edits: Browse a file/folder into a leaf, Add a key/item/element/attribute, Delete a node -
+all mutating the in-memory tree (Save persists; comments + JSON scalar types are preserved). A
+**Tree | Text** toggle drops to a raw monospace editor for edge cases (and re-parses on the way back).
 
 No external dependency beyond ruamel (already required) - the off-the-shelf editors are JSON-only /
 web-based and would strip YAML comments (see the library survey).
@@ -15,7 +17,7 @@ import io
 import json
 import os
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog, simpledialog
 import xml.etree.ElementTree as ET
 
 from pipeline3.gui import widgets
@@ -38,6 +40,39 @@ def _coerce(new: str, old):
     return new
 
 
+# --- pure structural mutations (Tk-free, unit-tested) ------------------------------------------- #
+_PATH_DIR_HINTS = ("dir", "folder", "output")
+
+
+def _key_wants_dir(key: str) -> bool:
+    """A leaf whose key hints at a directory (so the context menu offers 'Browse folder' first)."""
+    return any(h in str(key).lower() for h in _PATH_DIR_HINTS)
+
+
+def add_key(mapping, name: str) -> None:
+    """Add a new empty-string scalar under a dict / ruamel CommentedMap; KeyError on a duplicate."""
+    if name in mapping:
+        raise KeyError(f"key {name!r} already exists")
+    mapping[name] = ""
+
+
+def add_item(seq) -> None:
+    """Append a new empty-string scalar to a list / ruamel CommentedSeq."""
+    seq.append("")
+
+
+def delete_node(container, key, kind: str, node=None) -> None:
+    """Remove a node from its container: a dict key / a list index / an XML element|attr|text."""
+    if kind == "xml_elem":
+        container.remove(node)
+    elif kind == "xml_attr":
+        container.attrib.pop(key, None)
+    elif kind == "xml_text":
+        container.text = ""
+    else:                                   # dict key or list index
+        del container[key]
+
+
 class ObjectEditor(ttk.Frame):
     def __init__(self, parent, path, pal, font_family, on_status=lambda *_a: None, **kw):
         super().__init__(parent, **kw)
@@ -47,6 +82,7 @@ class ObjectEditor(ttk.Frame):
         self.font_family = font_family
         self.on_status = on_status
         self._setters: dict = {}        # tree item id -> setter(new_str) for leaves
+        self._model: dict = {}          # tree item id -> (kind, container, key, node) for the context menu
         self._cell = None               # the in-place edit Entry
         self._mode = "tree"
         self._textw = None
@@ -91,6 +127,7 @@ class ObjectEditor(ttk.Frame):
         for w in self.body.winfo_children():
             w.destroy()
         self._setters.clear()
+        self._model.clear()
         self.tree = ttk.Treeview(self.body, columns=("value",), show="tree headings", selectmode="browse")
         self.tree.heading("#0", text="Key")
         self.tree.heading("value", text="Value")
@@ -103,45 +140,59 @@ class ObjectEditor(ttk.Frame):
         self.body.grid_rowconfigure(0, weight=1)
         self.body.grid_columnconfigure(0, weight=1)
         if self.ext == ".xml":
-            self._pop_xml("", self._data)
+            self._pop_xml("", self._data, None)
         else:
             self._pop("", os.path.basename(self.path), self._data, None, None)
         self.tree.bind("<Double-1>", self._begin_edit)
+        self.tree.bind("<Button-3>", self._popup_menu)
 
     def _pop(self, parent, label, node, container, key):
-        """Insert `node` (dict/list/scalar) under `parent`. (container,key) locate a scalar for editing."""
+        """Insert `node` (dict/list/scalar) under `parent`; record (kind, container, key, node) in
+        `_model` for the context menu, and a leaf setter (container,key locate a scalar) for editing."""
         if isinstance(node, dict):
             item = self.tree.insert(parent, "end", text=label, values=("",), open=True)
+            self._model[item] = ("dict", container, key, node)
             for k, v in node.items():
                 self._pop(item, str(k), v, node, k)
         elif isinstance(node, (list, tuple)):
             item = self.tree.insert(parent, "end", text=label, values=(f"[{len(node)}]",), open=True)
+            self._model[item] = ("list", container, key, node)
             for i, v in enumerate(node):
                 self._pop(item, f"[{i}]", v, node, i)
         else:
             item = self.tree.insert(parent, "end", text=label,
                                     values=("" if node is None else str(node),))
+            self._model[item] = ("scalar", container, key, node)
             if container is not None:
                 self._setters[item] = lambda new, c=container, k=key, old=node: c.__setitem__(k, _coerce(new, old))
 
-    def _pop_xml(self, parent, el):
+    def _pop_xml(self, parent, el, parent_el):
         item = self.tree.insert(parent, "end", text=el.tag, values=("",), open=True)
+        self._model[item] = ("xml_elem", parent_el, None, el)        # container=parent element (None=root)
         for name, val in el.attrib.items():
             a = self.tree.insert(item, "end", text=f"@{name}", values=(val,))
+            self._model[a] = ("xml_attr", el, name, val)
             self._setters[a] = lambda new, e=el, n=name: e.set(n, new)
         if el.text and el.text.strip():
             t = self.tree.insert(item, "end", text="#text", values=(el.text.strip(),))
+            self._model[t] = ("xml_text", el, None, el.text)
             self._setters[t] = lambda new, e=el: setattr(e, "text", new)
         for child in list(el):
-            self._pop_xml(item, child)
+            self._pop_xml(item, child, el)
 
     # ---- in-place leaf editing ------------------------------------------ #
     def _begin_edit(self, event):
         if self.tree.identify_column(event.x) != "#1":
             return
         item = self.tree.identify_row(event.y)
-        if not item or item not in self._setters:
+        if item and item in self._setters:
+            self._edit_item(item)
+
+    def _edit_item(self, item):
+        """Open the in-place Value editor for a leaf (double-click, or right after Add key/item)."""
+        if item not in self._setters:
             return
+        self.tree.see(item)
         bbox = self.tree.bbox(item, "#1")
         if not bbox:
             return
@@ -172,6 +223,111 @@ class ObjectEditor(ttk.Frame):
         if self._cell is not None:
             self._cell.destroy()
             self._cell = None
+
+    # ---- context menu: browse / add / delete ---------------------------- #
+    def _popup_menu(self, event):
+        self._cancel_edit()
+        item = self.tree.identify_row(event.y)
+        if not item or item not in self._model:
+            return
+        self.tree.selection_set(item)
+        kind, container, _key, _node = self._model[item]
+        menu = tk.Menu(self.tree, tearoff=False)
+        if kind == "scalar":
+            opts = [("Browse file…", "file"), ("Browse folder…", "dir")]
+            if _key_wants_dir(self.tree.item(item, "text")):
+                opts.reverse()                          # a dir-ish key offers the folder picker first
+            for label, which in opts:
+                menu.add_command(label=label, command=lambda it=item, w=which: self._browse(it, w))
+        elif kind == "dict":
+            menu.add_command(label="Add key…", command=lambda it=item: self._add_child(it, "dict"))
+        elif kind == "list":
+            menu.add_command(label="Add item…", command=lambda it=item: self._add_child(it, "list"))
+        elif kind == "xml_elem":
+            menu.add_command(label="Add child element…", command=lambda it=item: self._add_child(it, "xml_child"))
+            menu.add_command(label="Add attribute…", command=lambda it=item: self._add_child(it, "xml_attr"))
+        if container is not None:                       # the root has no container -> not deletable
+            menu.add_separator()
+            menu.add_command(label="Delete", command=lambda it=item: self._delete(it))
+        if menu.index("end") is not None:
+            menu.tk_popup(event.x_root, event.y_root)
+
+    def _browse(self, item, which):
+        """Pick a file/folder into a leaf - reuses the leaf's setter so the backing data updates."""
+        cur = self.tree.set(item, "value")
+        initial = os.path.dirname(cur) if cur and os.path.isabs(cur) else os.getcwd()
+        if which == "dir":
+            picked = filedialog.askdirectory(parent=self, title="Select folder", initialdir=initial)
+        else:
+            picked = filedialog.askopenfilename(parent=self, title="Select file", initialdir=initial)
+        if not picked:
+            return
+        picked = os.path.normpath(picked)
+        self.tree.set(item, "value", picked)
+        setter = self._setters.get(item)
+        if setter is not None:
+            try:
+                setter(picked)
+            except Exception as e:  # noqa: BLE001
+                self.on_status(f"set failed: {e}")
+                return
+        self.on_status(f"{self.tree.item(item, 'text')} = {picked}")
+
+    def _add_child(self, item, kind):
+        node = self._model[item][3]
+        if kind == "dict":
+            name = simpledialog.askstring("Add key", "New key name:", parent=self)
+            if not name:
+                return
+            try:
+                add_key(node, name)
+            except KeyError as e:
+                self.on_status(str(e))
+                return
+            self._add_leaf(item, name, node, name)
+            self.on_status(f"added {name}")
+        elif kind == "list":
+            add_item(node)
+            idx = len(node) - 1
+            self.tree.set(item, "value", f"[{len(node)}]")
+            self._add_leaf(item, f"[{idx}]", node, idx)
+            self.on_status("added item")
+        elif kind == "xml_child":
+            tag = simpledialog.askstring("Add child element", "Element tag:", parent=self)
+            if not tag:
+                return
+            ET.SubElement(node, tag)
+            self._show_tree()
+            self.on_status(f"added <{tag}>")
+        elif kind == "xml_attr":
+            name = simpledialog.askstring("Add attribute", "Attribute name:", parent=self)
+            if not name:
+                return
+            node.set(name, "")
+            self._show_tree()
+            self.on_status(f"added @{name}")
+
+    def _add_leaf(self, parent_item, label, container, key):
+        """Insert one new empty scalar leaf incrementally (append needs no sibling reindex), register it,
+        then open it for editing - mirrors `_pop`'s scalar branch."""
+        child = self.tree.insert(parent_item, "end", text=label, values=("",))
+        self._model[child] = ("scalar", container, key, "")
+        self._setters[child] = lambda new, c=container, k=key, old="": c.__setitem__(k, _coerce(new, old))
+        self.tree.item(parent_item, open=True)
+        self.tree.selection_set(child)
+        self._edit_item(child)
+
+    def _delete(self, item):
+        kind, container, key, node = self._model[item]
+        if container is None:
+            return
+        try:
+            delete_node(container, key, kind, node)
+        except Exception as e:  # noqa: BLE001
+            self.on_status(f"delete failed: {e}")
+            return
+        self._show_tree()                               # full re-pop: list indices reindex correctly
+        self.on_status("deleted")
 
     # ---- text view + toggle --------------------------------------------- #
     def _show_text(self):
