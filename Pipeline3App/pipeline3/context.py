@@ -38,13 +38,14 @@ class PipelineContext:
     on_progress: Optional[Callable] = None   # live hook for the raw emit text (GUI status bar / CLI print)
     on_phase_log: Optional[Callable] = None  # fired with a phase's LogEntry slice when it completes (GUI render)
 
-    def emit(self, *args) -> None:
+    def emit(self, *args, type: str = "") -> None:
         """The progress sink, now part of the ONE log engine: every emit becomes a LogEntry under the
         current phase's banner (level inferred + token stripped by model.split_level), and the raw text
-        is forwarded to the live hook (status bar / console)."""
+        is forwarded to the live hook (status bar / console). `type` is the log-type slug so the line's
+        id renders `<phase>-<type>` (e.g. `210-backup`); default `""` keeps the bare phase id."""
         msg = " ".join(str(a) for a in args)
         level, detail = split_level(msg)
-        self.log.append(LogEntry(level=level, phase=self._current_phase, detail=detail))
+        self.log.append(LogEntry(level=level, phase=self._current_phase, detail=detail, type=type))
         if self.on_progress is not None:
             self.on_progress(msg)
 

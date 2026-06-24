@@ -657,9 +657,11 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
 - **The golden test is DATA-DEPENDENT** (`test_golden_validation.py`, phase 100 vs the frozen golden):
   when it goes red, check the **working tree first** — a changed `config_project/project_params.yaml`
   (e.g. `strike_handling`) or a mutated source I/O List, not a code regression. **Phase 200 Fill / 400
-  `insert_interface_sheets` re-save the source in place** (so they git-dirty it), but both **preserve the
-  formula caches** now (`io/xlsx_cache.restore`), so they no longer DEGRADE it / break the golden — a
-  `git checkout` restores the bytes. (The earlier `dd954dc` commit had committed a Fill-degraded sample
-  because Fill used to drop the V/W caches; fixed.)
+  `insert_interface_sheets` write the source in place** (so they git-dirty it), but no longer DEGRADE it:
+  phase 200 is **surgical** (`io/xlsx_edit` — only the edited cells/sheets change, everything else is
+  byte-copied) and phase 400 **freezes any openpyxl-flattened array + drops the stale calcChain**
+  (`xlsx_edit.freeze_arrays`), so both stay Excel-valid and don't break the golden — a `git checkout`
+  restores the bytes. (`io/xlsx_cache` is retired; surgical editing never re-serialises, so there is no
+  cache to drop/restore.)
 - Run/test from the `Pipeline3App` root. When committing `_Openn2`, end commit messages with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.

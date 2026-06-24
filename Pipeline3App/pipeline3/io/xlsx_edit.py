@@ -10,9 +10,10 @@ survive because they are never touched. Cell edits are a regex rewrite of the ex
 master whose range an edit writes into, so the app can OWN a column (e.g. phase 200's Suggested Type)
 with no master+literal overlap left behind.
 
-This is meant to be the ONE place that writes an .xlsx (folding in the old io/xlsx_cache formula-cache
-restore and, later, the interface-sheet/table insertion from domain/interfaces). `set_cells` is the
-pure per-sheet engine; `edit_workbook` is the zip-level orchestrator (atomic temp + os.replace).
+This REPLACES io/xlsx_cache (removed): because it never re-serialises the whole workbook, openpyxl's
+formula-cache drop never happens, so there is nothing to restore. `set_cells` is the pure per-sheet
+engine; `edit_workbook` is the zip-level orchestrator (atomic temp + os.replace); `freeze_arrays` is
+the post-process the openpyxl-based phase-400 insert still calls.
 """
 from __future__ import annotations
 import io

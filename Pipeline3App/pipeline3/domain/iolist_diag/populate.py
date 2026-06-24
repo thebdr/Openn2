@@ -177,6 +177,13 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
     # out_dir is retained for call-site compatibility but no longer used: the populator now fills
     # the SOURCE I/O List in place (it becomes the populated document) instead of a copy.
     write = set(write) if write is not None else set(ALL_COLS)
+    _sink = emit                            # normalize: forward `type` to a kwarg-aware sink (ctx.emit),
+
+    def emit(*a, type=""):                  # else drop it - so any plain callable still works as `emit`
+        try:
+            _sink(*a, type=type)
+        except TypeError:
+            _sink(*a)
     src = params.get("io_list", {}).get("path")
     if not src or not os.path.exists(src):
         raise ValueError(f"I/O List not found: {src}")
@@ -192,9 +199,9 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
     header_vals = {name: {c: cr.get(wb_vals[name], header_row, c) for c in HEADER_COLS if c in cr}
                    for name in sheets}
     wb_vals.close()
-    emit(f"I/O sheets processed: {', '.join(sheets)}")
+    emit(f"I/O sheets processed: {', '.join(sheets)}", type="sheets")
     for s in skipped_sheets:
-        emit(f"  skipped sheet (no io_list.sheet match): {s}")
+        emit(f"  skipped sheet (no io_list.sheet match): {s}", type="sheet_skipped")
 
     types = config.load_signal_types()
     fams = load_families()
@@ -223,7 +230,7 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
         delete_sheets=[DIAGBLOCKS_LEGACY] if wrote_diag else None)
     for sheet_name, master, rng in frozen:
         emit(f"[WARN] froze legacy array formula {sheet_name}!{master} (spill {rng}) to its cached "
-             "values - the original formula is preserved in the backup")
+             "values - the original formula is preserved in the backup", type="array_frozen")
 
     # Keep the backup only if the fill changed the file; otherwise delete it (no-op re-fill).
     if _same_content(backup, dest):
@@ -243,7 +250,7 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
         audit=report.audit_lines(results),
         skipped_sheets=skipped_sheets,
     )
-    emit(report.summary(res.counts))
-    emit(f"populated I/O List -> {dest}")
-    emit(f"backup -> {os.path.basename(backup)}" if backup else "no changes - backup removed")
+    emit(report.summary(res.counts), type="summary")
+    emit(f"populated I/O List -> {dest}", type="populated")
+    emit(f"backup -> {os.path.basename(backup)}" if backup else "no changes - backup removed", type="backup")
     return res
