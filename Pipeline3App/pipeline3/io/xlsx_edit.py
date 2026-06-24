@@ -241,6 +241,55 @@ def _register_sheet(existing_parts, wbxml, relsxml, ctxml, name):
     return part, wbxml, relsxml, ctxml
 
 
+def freeze_arrays(path: str, *, dest: str | None = None) -> list:
+    """Post-process an openpyxl-saved .xlsx (the openpyxl-based writers - e.g. phase 400's interface-
+    sheet insert - that CAN'T avoid the flatten): FREEZE every array formula in place (remove the master
+    <f>, keeping its + the spill cells' cached values), so an openpyxl-flattened dynamic array (a master
+    + literal slaves) becomes static values with NO overlapping-array corruption; and DROP a stale
+    xl/calcChain.xml. Atomic (temp + os.replace). Returns the (sheet, master_ref, range) frozen (WARN
+    log)."""
+    dest = dest or path
+    with open(path, "rb") as f:
+        data = f.read()
+    part_to_name = {p: n for n, p in _sheet_name_to_part(data).items()}
+    repl, frozen = {}, []
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        present = set(z.namelist())
+        for part in present:
+            if not (part.startswith("xl/worksheets/") and part.endswith(".xml")):
+                continue
+            xml = z.read(part).decode("utf-8")
+            masters = _ARRAY_MASTER.findall(xml)
+            if not masters:
+                continue
+            for mref, rng in masters:
+                xml = _freeze_array_range(xml, rng)
+                frozen.append((part_to_name.get(part, part), mref, rng))
+            repl[part] = xml.encode("utf-8")
+        deleted = set()
+        if "xl/calcChain.xml" in present:
+            deleted.add("xl/calcChain.xml")
+            repl["xl/_rels/workbook.xml.rels"] = re.sub(
+                r'<Relationship\b[^>]*calcChain\.xml[^>]*/>', "",
+                z.read("xl/_rels/workbook.xml.rels").decode("utf-8"), count=1).encode("utf-8")
+            repl["[Content_Types].xml"] = re.sub(
+                r'<Override\b[^>]*PartName="/xl/calcChain\.xml"[^>]*/>', "",
+                z.read("[Content_Types].xml").decode("utf-8"), count=1).encode("utf-8")
+        if not (repl or deleted):
+            return frozen
+        out = io.BytesIO()
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+            for it in z.infolist():
+                if it.filename in deleted:
+                    continue
+                zout.writestr(it, repl.get(it.filename) or z.read(it.filename))
+    tmp = dest + ".tmp_freeze"
+    with open(tmp, "wb") as f:
+        f.write(out.getvalue())
+    os.replace(tmp, dest)
+    return frozen
+
+
 def edit_workbook(path: str, *, cell_edits: dict | None = None, new_sheets: list | None = None,
                   delete_sheets: list | None = None, dest: str | None = None) -> list:
     """THE primitive that modifies an .xlsx. `cell_edits` = {sheet_name: {cell_ref: value}} surgically

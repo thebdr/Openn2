@@ -118,8 +118,36 @@ def test_new_sheets_add_replace_delete_preserves_arrays():
     wb.close()
 
 
+def test_freeze_arrays_post_process():
+    import os, tempfile, zipfile, warnings
+    warnings.simplefilter("ignore")
+    import openpyxl
+    from openpyxl.worksheet.formula import ArrayFormula
+    path = os.path.join(tempfile.mkdtemp(), "w.xlsx")
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "D"
+    ws["A1"] = 1
+    ws["A2"] = ArrayFormula("A2:A3", "=A1")          # an (openpyxl-flattened) array
+    ws["B1"] = "keep"
+    wb.save(path)
+    part = xe._sheet_name_to_part(open(path, "rb").read())["D"]
+    with zipfile.ZipFile(path) as z:
+        ok('t="array"' in z.read(part).decode("utf-8"), "fixture has an array master")
+
+    frozen = xe.freeze_arrays(path)
+    ok(any(f[0] == "D" for f in frozen), "reports the frozen array (sheet, master, range) for the WARN")
+    with zipfile.ZipFile(path) as z:
+        ok(z.testzip() is None, "valid zip after freeze")
+        ok('t="array"' not in z.read(part).decode("utf-8"), "the array formula is gone (no overlap)")
+    wbx = openpyxl.load_workbook(path)
+    eq(wbx["D"]["B1"].value, "keep", "untouched cells preserved")
+    wbx.close()
+
+
 if __name__ == "__main__":
     raise SystemExit(run("xlsx_edit", [
+        ("freeze_arrays_post_process", test_freeze_arrays_post_process),
         ("edit_existing_cell_preserves_style_neighbours_and_unrelated_array",
          test_edit_existing_cell_preserves_style_neighbours_and_unrelated_array),
         ("edit_into_array_freezes_to_cached_values_no_overlap", test_edit_into_array_freezes_to_cached_values_no_overlap),

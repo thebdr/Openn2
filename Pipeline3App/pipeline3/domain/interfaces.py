@@ -34,6 +34,8 @@ from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries, get_column_letter
 from openpyxl.worksheet.table import Table, TableColumn
 
+from pipeline3.io import xlsx_edit
+
 _MAIN_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _REL_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 
@@ -740,6 +742,12 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
         with open(tmp, "wb") as fh:
             fh.write(out.getvalue())
         os.replace(tmp, iolist_path)
+        # openpyxl's save FLATTENS any dynamic array in the I/O List's other sheets into a master +
+        # literal slaves (an "overlapping array formula" Excel reports as corrupt). Post-process with the
+        # surgical writer: freeze every such array to its cached values (+ drop a stale calcChain).
+        for sheet_name, master, rng in xlsx_edit.freeze_arrays(iolist_path):
+            actions.append(f"[WARN] froze legacy array {sheet_name}!{master} (spill {rng}) to its cached "
+                           "values to avoid corruption (the original formula is in the backup)")
     except (OSError, ET.ParseError, zipfile.BadZipFile) as e:
         try:
             dst.close()
