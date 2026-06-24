@@ -171,29 +171,41 @@ _WS_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/w
 def build_sheet_xml(rows: list, hyperlinks: list | None = None) -> str:
     """A fresh worksheet XML for a grid (`rows` = list of row lists). int/float -> a numeric cell;
     everything else -> an INLINE STRING (so a leading '='/'+'/'-' is text, not a formula). `hyperlinks`
-    = [(cell_ref, location, display)] for internal links (e.g. #'NET SAFETY 50'!K23)."""
+    = [(cell_ref, location, display)] for internal links (e.g. 'NET SAFETY 50'!K23). Mirrors the full
+    structure Excel writes (dimension/sheetViews/sheetFormatPr/pageMargins) - a bare <sheetData>-only
+    worksheet makes Excel report the workbook corrupt."""
     body = []
+    maxc = 1
     for ri, row in enumerate(rows, 1):
         cells = []
         for ci, val in enumerate(row, 1):
             if val is None or val == "":
                 continue
+            maxc = max(maxc, ci)
             ref = f"{_num_to_col(ci)}{ri}"
             if isinstance(val, bool):
                 cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{_esc(val)}</t></is></c>')
             elif isinstance(val, (int, float)):
                 cells.append(f'<c r="{ref}"><v>{val}</v></c>')
             else:
-                cells.append(f'<c r="{ref}" t="inlineStr"><is><t xml:space="preserve">{_esc(val)}</t></is></c>')
+                sp = ' xml:space="preserve"' if str(val) != str(val).strip() else ""
+                cells.append(f'<c r="{ref}" t="inlineStr"><is><t{sp}>{_esc(val)}</t></is></c>')
         body.append(f'<row r="{ri}">{"".join(cells)}</row>')
+    dim = f"A1:{_num_to_col(maxc)}{max(1, len(rows))}"
     hl = ""
     if hyperlinks:
         items = "".join(f'<hyperlink ref="{ref}" location="{_esc(loc)}" display="{_esc(disp)}"/>'
                         for ref, loc, disp in hyperlinks)
         hl = f"<hyperlinks>{items}</hyperlinks>"
     return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            f'<sheetData>{"".join(body)}</sheetData>{hl}</worksheet>')
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            f'<dimension ref="{dim}"/>'
+            '<sheetViews><sheetView workbookViewId="0"/></sheetViews>'
+            '<sheetFormatPr defaultRowHeight="15"/>'
+            f'<sheetData>{"".join(body)}</sheetData>{hl}'
+            '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'
+            '</worksheet>')
 
 
 def _remove_sheet(wbxml, relsxml, ctxml, name, part):
@@ -263,10 +275,21 @@ def edit_workbook(path: str, *, cell_edits: dict | None = None, new_sheets: list
         ctxml = z.read("[Content_Types].xml").decode("utf-8")
         deleted = set()
         present = set(z.namelist())
+        bookkeeping = False
+        # ALWAYS drop xl/calcChain.xml. Any edit can add/remove/change a formula cell (a fill overwrites
+        # a formula with a value; a regenerated sheet drops its formulas), and a STALE calcChain (listing
+        # a formula cell that no longer exists) makes Excel report the workbook CORRUPT. Excel rebuilds
+        # the chain on open - this is exactly why openpyxl drops it on every save.
+        if "xl/calcChain.xml" in present:
+            deleted.add("xl/calcChain.xml")
+            relsxml = re.sub(r'<Relationship\b[^>]*calcChain\.xml[^>]*/>', "", relsxml, count=1)
+            ctxml = re.sub(r'<Override\b[^>]*PartName="/xl/calcChain\.xml"[^>]*/>', "", ctxml, count=1)
+            bookkeeping = True
         for dn in delete_sheets:
             if dn in name_to_part:
                 wbxml, relsxml, ctxml = _remove_sheet(wbxml, relsxml, ctxml, dn, name_to_part[dn])
                 deleted.add(name_to_part[dn])
+                bookkeeping = True
         for spec in new_sheets:
             xml = build_sheet_xml(spec["rows"], spec.get("hyperlinks")).encode("utf-8")
             part = name_to_part.get(spec["name"])
@@ -275,7 +298,8 @@ def edit_workbook(path: str, *, cell_edits: dict | None = None, new_sheets: list
             else:
                 part, wbxml, relsxml, ctxml = _register_sheet(present | set(added), wbxml, relsxml, ctxml, spec["name"])
                 added[part] = xml
-        if new_sheets or delete_sheets:
+                bookkeeping = True
+        if bookkeeping:
             repl["xl/workbook.xml"] = wbxml.encode("utf-8")
             repl["xl/_rels/workbook.xml.rels"] = relsxml.encode("utf-8")
             repl["[Content_Types].xml"] = ctxml.encode("utf-8")

@@ -26,6 +26,19 @@ def cabinet_counts(results: list) -> dict:
     return counts
 
 
+def diagnosis_blocks_grid(blocks: list, results: list) -> list:
+    """The DiagnosisBlocks sheet as a value GRID (HEADERS + one row per block) for the surgical writer
+    (io.xlsx_edit builds the sheet fresh - every non-numeric cell becomes an inline string, so the
+    FU/Location/FullName values with a leading '='/'+' stay TEXT, like the old data_type='s'; Count is
+    numeric). ID_SWP == ID_Local."""
+    counts = cabinet_counts(results)
+    rows = [list(HEADERS)]
+    for b in blocks:
+        rows.append([b.id_local, b.id_local, b.fu, b.location, b.full_name,
+                     b.template_type, "", counts.get(b.cabinet_text, 0)])
+    return rows
+
+
 def write_diagnosis_blocks(wb, blocks: list, results: list):
     for name in list(wb.sheetnames):
         if name.strip().lower() in (DIAGBLOCKS_SHEET.lower(), DIAGBLOCKS_LEGACY.lower()):

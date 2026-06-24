@@ -71,8 +71,10 @@ def test_html_escaping():
 def test_build_sheet_xml_grid():
     x = xe.build_sheet_xml([["H1", "H2"], ["=text", 7], [None, "", "x"]], hyperlinks=[("A2", "S!A1", "d")])
     _wf(x)
-    ok('<c r="A1" t="inlineStr"><is><t xml:space="preserve">H1</t></is></c>' in x, "header cell")
-    ok('<c r="A2" t="inlineStr"><is><t xml:space="preserve">=text</t></is></c>' in x, "leading = is TEXT not a formula")
+    ok('<dimension ref="A3:C3"' not in x and '<dimension ref="' in x, "has a dimension")
+    ok("<sheetViews>" in x and "<sheetFormatPr" in x and "<pageMargins" in x, "full Excel worksheet structure")
+    ok('<c r="A1" t="inlineStr"><is><t>H1</t></is></c>' in x, "header cell (no xml:space when unneeded)")
+    ok('<c r="A2" t="inlineStr"><is><t>=text</t></is></c>' in x, "leading = is TEXT not a formula")
     ok('<c r="B2"><v>7</v></c>' in x, "int -> numeric cell")
     ok('<c r="C3"' in x and '<c r="A3"' not in x, "blank cells skipped, later cell still placed")
     ok('<hyperlink ref="A2" location="S!A1" display="d"/>' in x, "internal hyperlink")

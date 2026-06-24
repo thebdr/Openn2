@@ -146,11 +146,16 @@ blank and is recomputed; a genuine human entry is preserved and audit-logged as 
 **timestamped backup** (`<name>.bak_<YYYYMMDD_HHMMSS>.xlsx`, gitignored) is taken beside the source
 *before* editing and **deleted if the fill changed nothing** (content compared cell-by-cell). The
 `populated_iolist` artifact now points at the source itself. **Halts** the pipeline if any entry is
-unresolved (the `_UnresolvedIndex` sheet lists them). **The re-save preserves formula caches**
-(`io/xlsx_cache.restore`, patched back from the pre-edit backup): openpyxl drops every formula cell's
-cached `<v>` on save, so without this even a no-op fill would leave a `data_only` reader seeing `None`
-for e.g. the Profinet IP/name `_xlfn.LET` formulas — which is what corrupted the I/O List (and broke
-the golden) when phase 200 ran from the GUI.
+unresolved (the `_UnresolvedIndex` sheet lists them). **The write is SURGICAL** (`io/xlsx_edit`): it
+edits ONLY the filled cells in place + (re)builds `DiagnosisBlocks`/`_UnresolvedIndex` as fresh sheets,
+and **byte-copies every other part** — so the template's dynamic-array / shared formulas, caches,
+tables and styles SURVIVE. A full openpyxl `load_workbook`→`save` round-trip instead FLATTENS dynamic
+arrays into an "overlapping array formula" (Excel = corrupt) and drops formula caches; that is what
+corrupted the I/O List from the GUI. A fill landing in an array spill **freezes that array to its
+cached values + logs a WARN** (the formula stays in the backup). `xlsx_edit` also **drops
+`xl/calcChain.xml`** (a stale chain that lists a now-removed formula cell makes Excel report corrupt;
+Excel rebuilds it on open). `io/xlsx_edit` is the ONE place that writes an `.xlsx` (phase 400 folds in
+next; `io/xlsx_cache` is retired).
 
 - `script_type.py` — the §6 type ladder (In/Out/Node classification → the catalogue type, computed
   **in code**, replacing the legacy Excel array formula). It yields the **canonical** type directly

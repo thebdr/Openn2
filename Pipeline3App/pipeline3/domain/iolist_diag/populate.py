@@ -16,11 +16,12 @@ from dataclasses import dataclass, field
 from openpyxl import load_workbook
 
 from pipeline3.core import config
-from pipeline3.io import xlsx_cache
+from pipeline3.io import xlsx_edit
 from pipeline3.domain.iolist_diag import script_type as st, index_assign, diag_alloc, blocks as blk, report
 from pipeline3.domain.iolist_diag.columns import ColumnResolver
 from pipeline3.domain.iolist_diag.families import load_families, family_for
-from pipeline3.domain.iolist_diag.models import IoRow, RowResult, INPUT_REQUIRED, DASH
+from pipeline3.domain.iolist_diag.models import (IoRow, RowResult, INPUT_REQUIRED, DASH,
+                                                 DIAGBLOCKS_SHEET, DIAGBLOCKS_LEGACY, UNRESOLVED_SHEET)
 from pipeline3.domain.iolist_diag.reader import read_iolist
 
 ALL_COLS = ("script_type", "index", "diag_cabinet", "diag_bit")
@@ -110,33 +111,33 @@ def _classify(io: IoRow, types: dict, fams: list, params: dict) -> RowResult:
     return r
 
 
-def _write_row(ws, cr, r, write: set) -> None:
+def _collect_row(edits: dict, cr, r, write: set) -> None:
+    """Record one row's AB..AF fills into `edits` ({cell_ref: value}) - the surgical equivalent of the
+    old openpyxl _write_row. AC (suggested_type) is ALWAYS written (the app-owned derived column, kept
+    current); the input columns only when the existing cell is blank (non-destructive)."""
     io = r.iorow
     if "script_type" in write:
         if _blank(io.ex_script_type) and r.script_type:
-            cr.set(ws, io.row, "script_type", r.script_type)
-        # AC "Suggested Type" = exactly what the app would write in script_type (the computed
-        # canonical type): == AB in Mode-1; in Mode-2 it shows the app's suggestion beside the
-        # hand-entered AB. Derived column -> refreshed (overwritten) each run to stay current.
+            edits[f"{cr.letter('script_type')}{io.row}"] = r.script_type
         if "suggested_type" in cr and r.computed_script_type:
-            cr.set(ws, io.row, "suggested_type", r.computed_script_type)
+            edits[f"{cr.letter('suggested_type')}{io.row}"] = r.computed_script_type
     if "index" in write and _blank(io.ex_index) and r.index:
-        cr.set(ws, io.row, "index", r.index)
+        edits[f"{cr.letter('index')}{io.row}"] = r.index
     if "diag_cabinet" in write and _blank(io.ex_diag_cabinet) and r.diag_cabinet:
-        cr.set(ws, io.row, "diag_cabinet", r.diag_cabinet)
+        edits[f"{cr.letter('diag_cabinet')}{io.row}"] = r.diag_cabinet
     if "diag_bit" in write and _blank(io.ex_diag_bit) and r.diag_bit:
-        cr.set(ws, io.row, "diag_bit", r.diag_bit)
+        edits[f"{cr.letter('diag_bit')}{io.row}"] = r.diag_bit
 
 
-def _write_headers(ws, cr, header_row: int) -> None:
-    """Write the column_map headers for the AA..AG output block into a blank header cell."""
+def _collect_headers(edits: dict, cr, header_row: int, header_vals: dict) -> None:
+    """Record the AA..AG column_map headers into `edits`, only where the existing header cell is blank."""
     for canon in HEADER_COLS:
         if canon not in cr:
             continue
         hdr = cr.expected_header(canon)
-        cur = cr.get(ws, header_row, canon)
+        cur = header_vals.get(canon)
         if hdr and (cur is None or str(cur).strip() == ""):
-            cr.set(ws, header_row, canon, hdr)
+            edits[f"{cr.letter(canon)}{header_row}"] = hdr
 
 
 def _backup_path(src: str) -> str:
@@ -185,8 +186,11 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
     shutil.copy2(src, backup)
 
     cr = ColumnResolver("IoList")
+    header_row = int(params.get("io_list", {}).get("header_row", 1) or 1)
     wb_vals = load_workbook(dest, data_only=True)
     rows, sheets, skipped_sheets = read_iolist(wb_vals, params, cr)
+    header_vals = {name: {c: cr.get(wb_vals[name], header_row, c) for c in HEADER_COLS if c in cr}
+                   for name in sheets}
     wb_vals.close()
     emit(f"I/O sheets processed: {', '.join(sheets)}")
     for s in skipped_sheets:
@@ -198,24 +202,28 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
     index_assign.assign_indices(results, fams)
     block_list = diag_alloc.allocate(results, params)
 
-    wb = load_workbook(dest)
-    header_row = int(params.get("io_list", {}).get("header_row", 1) or 1)
+    # SURGICAL write (io.xlsx_edit): edit ONLY the filled cells + (re)build the app-owned sheets, byte-
+    # copying every other part. An openpyxl load->save would FLATTEN the template's dynamic-array
+    # formulas into an overlapping-array CORRUPTION (and drop formula caches); editing in place avoids
+    # both. A fill that lands in an array spill freezes that array to its cached values (logged WARN).
+    cell_edits = {name: {} for name in sheets}
     for name in sheets:
-        _write_headers(wb[name], cr, header_row)
+        _collect_headers(cell_edits[name], cr, header_row, header_vals[name])
     for r in results:
-        _write_row(wb[r.iorow.sheet], cr, r, write)
+        _collect_row(cell_edits[r.iorow.sheet], cr, r, write)
     wrote_diag = bool(write & {"diag_cabinet", "diag_bit"})
+    new_sheets = []
     if wrote_diag:
-        blk.write_diagnosis_blocks(wb, block_list, results)
-    reported = report.write_unresolved_sheet(wb, results, cr)
-    wb.save(dest)
-    # openpyxl drops the cached value of EVERY formula cell on save (it can't recompute) - so without
-    # this, every fill (even a no-op re-fill that writes nothing) degrades the source: a data_only
-    # reader would then see None for e.g. the Profinet IP/name LET formulas. Patch the caches back
-    # from the pre-edit backup (the filled cells we wrote are plain values, not formulas, so they are
-    # untouched). This is what made phase 200 corrupt the I/O List when run from the GUI.
-    with open(backup, "rb") as f:
-        xlsx_cache.restore(f.read(), dest)
+        new_sheets.append({"name": DIAGBLOCKS_SHEET, "rows": blk.diagnosis_blocks_grid(block_list, results)})
+    unres_rows, unres_links = report.unresolved_grid(results, cr)
+    new_sheets.append({"name": UNRESOLVED_SHEET, "rows": unres_rows, "hyperlinks": unres_links})
+    reported = len(unres_links)
+    frozen = xlsx_edit.edit_workbook(
+        dest, cell_edits={k: v for k, v in cell_edits.items() if v}, new_sheets=new_sheets,
+        delete_sheets=[DIAGBLOCKS_LEGACY] if wrote_diag else None)
+    for sheet_name, master, rng in frozen:
+        emit(f"[WARN] froze legacy array formula {sheet_name}!{master} (spill {rng}) to its cached "
+             "values - the original formula is preserved in the backup")
 
     # Keep the backup only if the fill changed the file; otherwise delete it (no-op re-fill).
     if _same_content(backup, dest):

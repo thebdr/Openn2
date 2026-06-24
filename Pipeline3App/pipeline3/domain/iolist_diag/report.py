@@ -31,6 +31,27 @@ def needs_attention(r):
     return None
 
 
+def unresolved_grid(results: list, cr) -> tuple:
+    """(rows, hyperlinks) for the _UnresolvedIndex sheet, for the surgical writer (io.xlsx_edit). One row
+    per attention-needing result; the Source cell (col A) links INTERNALLY to the exact cell that needs
+    fixing ('Sheet'!<col><row>). Mirrors write_unresolved_sheet's columns + links."""
+    rows = [["Source", "Script Type", "Device (FLD)", "Description", "Reason"]]
+    links = []
+    out = 2
+    for r in results:
+        att = needs_attention(r)
+        if not att:
+            continue
+        canon, reason = att
+        io = r.iorow
+        rows.append([f"{io.sheet} - Row {io.row} - {r.script_type or '?'}",
+                     "" if r.script_type == INPUT_REQUIRED else r.script_type,
+                     io.fld, io.description, REASONS.get(reason, reason)])
+        links.append((f"A{out}", f"'{io.sheet}'!{cr.letter(canon)}{io.row}", f"{io.sheet} - Row {io.row}"))
+        out += 1
+    return rows, links
+
+
 def write_unresolved_sheet(wb, results: list, cr) -> int:
     for name in list(wb.sheetnames):
         if name.strip().lower() == UNRESOLVED_SHEET.lower():
