@@ -18,8 +18,13 @@ def _fill(ctx, write):
     return res
 
 
-def run(ctx) -> PhaseResult:
-    res = _fill(ctx, None)
+def _fill_phase(ctx, write) -> PhaseResult:
+    """Run the populator (full when write=None, else only the named column) and wrap its PopulateResult
+    in a PhaseResult. The engine's ctx.absorb reads result.log/.artifacts, so a (sub-)phase MUST return
+    a PhaseResult - never the raw PopulateResult. The four sub-buttons (210-240) go through THIS same
+    wrapper as the phase header (previously they returned the bare PopulateResult -> AttributeError in
+    absorb after the file was already written)."""
+    res = _fill(ctx, write)
     s = summary(res.counts)
     if res.halt:
         s += (f"  -> HALT: {res.unresolved} unresolved entr(y/ies) - fill them in the SOURCE "
@@ -28,11 +33,15 @@ def run(ctx) -> PhaseResult:
                        artifacts={"populated_iolist": res.output_path}, summary=s)
 
 
+def run(ctx) -> PhaseResult:
+    return _fill_phase(ctx, None)
+
+
 SUB_PHASES = [
-    SubPhase(210, "fill_script_type", "pb_fill_script_type", lambda ctx: _fill(ctx, {"script_type"})),
-    SubPhase(220, "fill_index", "pb_fill_index", lambda ctx: _fill(ctx, {"index"})),
-    SubPhase(230, "fill_diag_cabinet", "pb_fill_diag_cabinet", lambda ctx: _fill(ctx, {"diag_cabinet"})),
-    SubPhase(240, "fill_diag_bit", "pb_fill_diag_bit", lambda ctx: _fill(ctx, {"diag_bit"})),
+    SubPhase(210, "fill_script_type", "pb_fill_script_type", lambda ctx: _fill_phase(ctx, {"script_type"})),
+    SubPhase(220, "fill_index", "pb_fill_index", lambda ctx: _fill_phase(ctx, {"index"})),
+    SubPhase(230, "fill_diag_cabinet", "pb_fill_diag_cabinet", lambda ctx: _fill_phase(ctx, {"diag_cabinet"})),
+    SubPhase(240, "fill_diag_bit", "pb_fill_diag_bit", lambda ctx: _fill_phase(ctx, {"diag_bit"})),
 ]
 
 BUTTONS = [
