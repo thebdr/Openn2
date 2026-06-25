@@ -25,8 +25,9 @@ INFO_HEADERS = ("bit", "FLD", "desc_l1", "desc_l1b", "drawing", "type-index")
 # basename (`doc`/`doc2`) the cell lives in (resolved to a path by the GUI).
 LinkSpan = namedtuple("LinkSpan", "start end doc")
 # One rendered entry for the GUI: kind "banner" (text = the title) or "line" (text = the finding
-# line); `links` = 0..2 LinkSpans (location, then location2).
-RenderRec = namedtuple("RenderRec", "kind level text links")
+# line); `links` = 0..2 LinkSpans (location, then location2); `uid` = the finding's stable hash (for a
+# FAIL/ERROR line, so the GUI's [FAIL] link can open that row of error_management.csv; "" otherwise).
+RenderRec = namedtuple("RenderRec", "kind level text links uid", defaults=("",))
 
 
 _VS = " vs "                                  # the cross-check location separator: `<loc1> vs <loc2>`
@@ -109,7 +110,7 @@ def render_records(log, errors_only: bool = False) -> list:
             recs.append(RenderRec("banner", "PHASE", e.detail, ()))
             continue
         text, spans = _format_line(e, widths[e.phase])
-        recs.append(RenderRec("line", e.level, text, tuple(spans)))
+        recs.append(RenderRec("line", e.level, text, tuple(spans), e.uid))
     return recs
 
 

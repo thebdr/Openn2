@@ -25,6 +25,7 @@ from pipeline3 import app
 import pipeline3.phases  # noqa: F401  (side-effect: registers every phase into the registry)
 from pipeline3.context import PipelineContext
 from pipeline3.core import config
+from pipeline3.core import errors
 from pipeline3.io import render
 from pipeline3.registry import registry
 from pipeline3.gui import fonts, theme, darktitle, phasebar, logview, excel, files
@@ -91,6 +92,9 @@ class App:
         self._logfile_var = tk.BooleanVar(value=self._ui["log_to_file"])   # launch default from app_config
         ttk.Checkbutton(top, text="Log to File", variable=self._logfile_var,
                         command=self._toggle_logfile).pack(side="right", padx=6)
+        self._fullprint_var = tk.BooleanVar(value=config.as_bool(self.params.get("ce_full_print", True)))
+        ttk.Checkbutton(top, text="Show PASS/SKIP", variable=self._fullprint_var,
+                        command=self._toggle_fullprint).pack(side="right", padx=6)
         ttk.Button(top, text="Open Output", command=lambda: self._startfile(self._out_root())).pack(side="right", padx=6)
         self._theme_btn = ttk.Button(top, text="◐ Theme", command=self._toggle_theme)
         self._theme_btn.pack(side="right", padx=(0, 6))
@@ -113,9 +117,11 @@ class App:
         nb.pack(side="top", fill="both", expand=True, padx=4, pady=4)
         log_tab = ttk.Frame(nb)
         nb.add(log_tab, text="Log")
-        self.log = logview.LogView(log_tab, self.pal, self.font_family, on_link=self._open_link)
+        self.log = logview.LogView(log_tab, self.pal, self.font_family, on_link=self._open_link,
+                                   on_errlink=self._on_errlink, on_errtreat=self._on_errtreat)
         self.log.pack(fill="both", expand=True)
-        files_tab = ttk.Frame(nb)
+        self.log.set_show_passkip(self._fullprint_var.get())     # honor ce_full_print at launch
+        self.files_tab = files_tab = ttk.Frame(nb)
         nb.add(files_tab, text="Files")
         self.files = files.FilesPanel(files_tab, self.pal, self.font_family, self._file_sections(),
                                       on_status=lambda m: self.status.set(m), dark=self.dark)
@@ -240,6 +246,8 @@ class App:
             self._logfile_var.set(False)
             self._toggle_logfile()
         self.log.clear()
+        self._fullprint_var.set(config.as_bool(self.params.get("ce_full_print", True)))   # the new project's setting
+        self.log.set_show_passkip(self._fullprint_var.get())
         self.files.sections = self._file_sections()
         self.files.refresh()
         self.root.title(self._session_title())
@@ -403,6 +411,10 @@ class App:
             key = button.command_key.split(":", 1)[1] if ":" in button.command_key else ""
             return lambda k=key: self._open_artifact(k)
         if button.kind == "special":
+            if button.command_key == "special:clean_iolist":
+                return lambda: self._start_clean("iolist")
+            if button.command_key == "special:clean_cematrix":
+                return lambda: self._start_clean("cematrix")
             return lambda b=button: self.status.set(f"{button.command_key}: not wired yet")
         if button.number is not None:                  # action -> run the (sub-)phase number
             return lambda n=button.number: self._start(n)
@@ -418,13 +430,15 @@ class App:
         return self._ctx
 
     def _phase_log(self, entries):
-        """A completed (sub-)phase's LogEntry slice (worker thread): render it into the log pane as one
-        structured block, and tee it to the run-log file when 'Log to File' is on."""
+        """A completed (sub-)phase's LogEntry slice (worker thread): render it into the log pane (the
+        PASS/SKIP lines are elided live by the 'Show PASS/SKIP' checkbox, so render the FULL block here),
+        and tee it to the run-log file - honoring ce_full_print - when 'Log to File' is on."""
         self.q.put(("records", render.render_records(entries)))
         f = self._logfile
         if f is not None:
+            eo = not config.as_bool(self.params.get("ce_full_print", True))
             try:
-                f.write(render.render_text(entries) + "\n")
+                f.write(render.render_text(entries, errors_only=eo) + "\n")
                 f.flush()
             except Exception:  # noqa: BLE001
                 pass
@@ -443,6 +457,20 @@ class App:
             ctx.completed.clear()                      # a fresh full run each time "Run Pipeline" is pressed
             app.run_all(ctx)
         self._run(work, "running the whole pipeline ...")
+
+    def _start_clean(self, which: str):
+        """Manual-only (165/175): clean the raw I/O List / C&E Matrix in place (no pipeline, no DAG). Each
+        change is logged `Sheet!Cell: old -> new`; the memoized ctx is invalidated so a later 130/140
+        re-reads the cleaned bytes."""
+        from pipeline3.domain import clean
+        label = "I/O List" if which == "iolist" else "C&E Matrix"
+        fn = clean.clean_iolist if which == "iolist" else clean.clean_cematrix
+
+        def work(_ctx):
+            res = fn(self.params, emit=lambda m: self.q.put(("log", m)))
+            self._ctx = None                           # cleaned bytes -> re-stage/re-read on the next run
+            self.q.put(("status", f"cleaned {res.changed} cell(s) in {label}"))
+        self._run(work, f"cleaning {label} ...")
 
     def _run(self, work, status: str):
         if self._busy:
@@ -532,6 +560,14 @@ class App:
     def _clear(self):
         self.log.clear()
 
+    def _toggle_fullprint(self):
+        """The 'Show PASS/SKIP' checkbox: show/hide the PASS/SKIP log lines live (and remember it as
+        ce_full_print for the run-log file + the next run)."""
+        show = bool(self._fullprint_var.get())
+        self.params["ce_full_print"] = show
+        self.log.set_show_passkip(show)
+        self.status.set("log: showing PASS/SKIP" if show else "log: hiding PASS/SKIP")
+
     def _toggle_logfile(self):
         """The 'Log to File' checkbox: open (truncate) the run-log when turned on, close it when off.
         _phase_log tees each rendered phase block to this handle while it is open."""
@@ -589,6 +625,38 @@ class App:
 
     def _error_csv_path(self) -> str:
         return os.path.join(config.user_input_dir(), "error_management.csv")
+
+    def _on_errlink(self, uid: str, csv_path: str):
+        """A [FAIL]/[ERROR] click -> open error_management.csv in the INTERNAL csv editor and select this
+        finding's row (matched by its uid in column A) at column E (treatment), ready to enter
+        warn/skip/accept. Falls back to the OS opener if the row isn't there yet."""
+        path = csv_path or os.path.join(config.user_input_dir(), "error_management.csv")
+        if not (path and os.path.exists(path)):
+            self.status.set("error_management.csv not found - run validation first")
+            return
+        self.nb.select(self.files_tab)
+        if self.files.open_csv_select(path, key_col=0, key=uid, sel_col=4):    # uid=col A, treatment=col E
+            self.status.set("error_management.csv: set the treatment (warn / skip / accept) in column E, then Save")
+        else:
+            self.status.set(f"error_management.csv: no row for this finding yet ({uid[:8]}) - re-run validation")
+
+    def _on_errtreat(self, uid: str, treatment: str):
+        """A [FAIL]/[WARN] RIGHT-click treat: record the treatment in error_management.csv for this
+        finding's uid (preserving the other rows) + log a confirmation. It is NOT re-applied here - the
+        FAIL<->WARN flip happens on your NEXT validation run (we do not auto re-run)."""
+        path = self._error_csv_path()
+        if not (path and os.path.exists(path)):
+            self.status.set("error_management.csv not found - run validation first")
+            return
+        if not errors.set_treatment(path, uid, treatment):
+            self.status.set(f"no error_management.csv row for this finding ({uid[:8]}) - re-run validation first")
+            return
+        if treatment == "warn":
+            self.log.append(f"uid: {uid} flagged as warning by user")
+            self.status.set(f"flagged {uid[:8]} as warning (applies on the next validation run)")
+        else:
+            self.log.append(f"uid: {uid} treatment flag cleared by user")
+            self.status.set(f"cleared the treatment for {uid[:8]} (applies on the next validation run)")
 
     def _open_link(self, doc: str, sheet: str, cell: str):
         """A Sheet!Cell link in the log -> open ITS workbook (I/O List or C&E) in Excel at that cell

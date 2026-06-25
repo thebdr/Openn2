@@ -146,6 +146,17 @@ def test_interface_tagname_staged():
     _run(check)
 
 
+def test_interface_tagname_resolves_db_element():
+    """{db_element} (a signal-type field, itself a {combined_FLD} template) must be RESOLVED in the
+    interface tag name - while {interface_name}/{interface_id} are KEPT for the generator to fill."""
+    row = {"combined_FLD": "=S1+MA1-S8",
+           "_type": {"interface_tagname": "PNC_Q_{interface_name}-{interface_id}_{db_element}",
+                     "db_element": "Door SAFE_STATE [ {combined_FLD} ]", "tag_name": ""}}
+    eq(identity.interface_tagname(row),
+       "PNC_Q_{interface_name}-{interface_id}_Door SAFE_STATE [ =S1+MA1-S8 ]",
+       "{db_element} is resolved; {interface_name}/{interface_id} are kept")
+
+
 def test_swp_cabinet_from_diagnosis_blocks():
     def check(p, rows):
         kq = _by_addr(rows, "Q0.0")
@@ -177,13 +188,37 @@ def test_iodatabase_csv():
         eq(e1["type_id_resolved"], "E1/2")
 
 
+def test_node_address_ranges_positional():
+    # a node's I/Q byte range = the min/max byte address of the rows BELOW it (by position) until the
+    # next node or sheet end - NOT keyed by FLD/location (a safety module's stops carry their own +ES..).
+    rows = [
+        {"_source_sheet": "S1", "profinet_name": "nodeA", "location": "+A", "bit": ""},
+        {"_source_sheet": "S1", "location": "+ES1", "bit": "I900.0"},     # a DIFFERENT location, still nodeA's
+        {"_source_sheet": "S1", "location": "+ES2", "bit": "I901.3"},
+        {"_source_sheet": "S1", "location": "+A", "bit": "Q10.0"},
+        {"_source_sheet": "S1", "profinet_name": "nodeB", "location": "+B", "bit": ""},
+        {"_source_sheet": "S1", "location": "+C", "bit": "I50.0"},
+        {"_source_sheet": "S2", "location": "+D", "bit": "I999.0"},       # new sheet -> NOT nodeB's
+    ]
+    staging._add_node_address_ranges(rows)
+    a, b = rows[0], rows[4]
+    eq((a["I_startByte"], a["I_endByte"]), (900, 901), "nodeA I-range from its positional rows (diff location)")
+    eq((a["Q_startByte"], a["Q_endByte"]), (10, 10), "nodeA Q-range")
+    eq((b["I_startByte"], b["I_endByte"]), (50, 50), "nodeB span ends at the sheet boundary (I999 excluded)")
+    eq(b["Q_startByte"], "", "nodeB has no Q signals")
+    eq(rows[1]["I_startByte"], "", "a signal row carries no range of its own")
+    eq(rows[6]["I_startByte"], "", "a row under no node (after a sheet break) is unranged")
+
+
 if __name__ == "__main__":
     raise SystemExit(run("staging", [
+        ("node_address_ranges_positional", test_node_address_ranges_positional),
         ("input_matrix_areas_and_ce_fld", test_input_matrix_areas_and_ce_fld),
         ("output_areas_and_numerazione", test_output_areas_and_numerazione),
         ("identity_fields", test_identity_fields),
         ("combined_fld_dedup", test_combined_fld_dedup),
         ("interface_tagname_staged", test_interface_tagname_staged),
+        ("interface_tagname_resolves_db_element", test_interface_tagname_resolves_db_element),
         ("swp_cabinet_from_diagnosis_blocks", test_swp_cabinet_from_diagnosis_blocks),
         ("iodatabase_csv", test_iodatabase_csv),
     ]))

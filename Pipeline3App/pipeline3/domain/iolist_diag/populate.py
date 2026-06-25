@@ -198,6 +198,9 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
     rows, sheets, skipped_sheets = read_iolist(wb_vals, params, cr)
     header_vals = {name: {c: cr.get(wb_vals[name], header_row, c) for c in HEADER_COLS if c in cr}
                    for name in sheets}
+    existing_blocks, rows_by_cid, blk_header = blk.read_existing(wb_vals)   # ids (reuse) + rows + header
+    present_name = next((s for s in wb_vals.sheetnames
+                         if s.strip().lower() in (DIAGBLOCKS_SHEET.lower(), DIAGBLOCKS_LEGACY.lower())), None)
     wb_vals.close()
     emit(f"I/O sheets processed: {', '.join(sheets)}", type="sheets")
     for s in skipped_sheets:
@@ -207,7 +210,7 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
     fams = load_families()
     results = [_classify(io, types, fams, params) for io in rows]
     index_assign.assign_indices(results, fams)
-    block_list = diag_alloc.allocate(results, params)
+    block_list = diag_alloc.allocate(results, params, existing=existing_blocks)
 
     # SURGICAL write (io.xlsx_edit): edit ONLY the filled cells + (re)build the app-owned sheets, byte-
     # copying every other part. An openpyxl load->save would FLATTEN the template's dynamic-array
@@ -219,15 +222,39 @@ def populate(params: dict, write=None, out_dir: str | None = None, emit=print) -
     for r in results:
         _collect_row(cell_edits[r.iorow.sheet], cr, r, write)
     wrote_diag = bool(write & {"diag_cabinet", "diag_bit"})
-    new_sheets = []
+    new_sheets, append = [], {}
     if wrote_diag:
-        new_sheets.append({"name": DIAGBLOCKS_SHEET, "rows": blk.diagnosis_blocks_grid(block_list, results)})
+        # Count + unused_bits + non_unique_bits are DERIVED from the REAL post-fill (Diag_Cabinet, Diag_Bit)
+        # of every relevant row (ex value if present, else what this run writes), recomputed every run.
+        min_b = int(params.get("diag_bit_min", 0) or 0)
+        max_b = int(params.get("diag_bit_max", 62) or 62)
+        placed = []
+        for r in results:
+            io = r.iorow
+            cab = (blk._norm_cab(io.ex_diag_cabinet) if not _blank(io.ex_diag_cabinet)
+                   else (r.diag_cabinet if "diag_cabinet" in write else ""))
+            if not cab:
+                continue
+            bit = (blk._bit_int(io.ex_diag_bit) if not _blank(io.ex_diag_bit)
+                   else (blk._bit_int(r.diag_bit) if "diag_bit" in write else None))
+            placed.append((cab, bit))
+        derived = blk.analyze(placed, min_b, max_b)
+        default = (0, blk._fmt_ranges(range(min_b, max_b + 1)), "")
+        if present_name:                                # APPEND-ONLY identity; REFRESH derived columns
+            cell_edits.setdefault(present_name, {}).update(
+                blk.derived_edits(blk_header, rows_by_cid, derived, default))
+            new = [b for b in block_list if b.full_name not in existing_blocks]   # add only missing cabinets
+            if new:
+                append[present_name] = blk.block_rows(new, derived, default)
+        else:                                           # no DiagnosisBlocks sheet yet -> create it fresh
+            new_sheets.append({"name": DIAGBLOCKS_SHEET,
+                               "rows": blk.diagnosis_blocks_grid(block_list, derived, default)})
     unres_rows, unres_links = report.unresolved_grid(results, cr)
     new_sheets.append({"name": UNRESOLVED_SHEET, "rows": unres_rows, "hyperlinks": unres_links})
     reported = len(unres_links)
     frozen = xlsx_edit.edit_workbook(
         dest, cell_edits={k: v for k, v in cell_edits.items() if v}, new_sheets=new_sheets,
-        delete_sheets=[DIAGBLOCKS_LEGACY] if wrote_diag else None)
+        append_rows=append or None)
     for sheet_name, master, rng in frozen:
         emit(f"[WARN] froze legacy array formula {sheet_name}!{master} (spill {rng}) to its cached "
              "values - the original formula is preserved in the backup", type="array_frozen")

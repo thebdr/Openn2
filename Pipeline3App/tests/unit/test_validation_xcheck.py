@@ -49,30 +49,40 @@ def _ctx(rows, ce_path, **over):
 # --- 130 forward ------------------------------------------------------------ #
 def _make_ce_fwd(path):
     wb = Workbook(); m = wb.active; m.title = "CAUSE&EFFECT MATRIX"
-    _mrow(m, 5, "I20.0", "=S1", "+M1", "-D1")    # full match
-    _mrow(m, 6, "I20.1", "=S1", "+M1", "-D1")    # device matches, address differs
-    _mrow(m, 7, "I20.2", "=S9", "+X", "-Z")      # device not in IOL
-    _mrow(m, 8, "I20.3", "", "", "")             # no device
+    _mrow(m, 5, "I20.0", "=S1", "+M1", "-D1")    # full match (address + FLD)
+    _mrow(m, 6, "I30.0", "=SX", "+MX", "-DX")    # address IS in the IOL but under a DIFFERENT FLD
+    _mrow(m, 7, "I99.0", "=S1", "+M1", "-D1")    # FLD IS in the IOL but at a DIFFERENT address
+    _mrow(m, 8, "I88.0", "=SZ", "+MZ", "-DZ")    # neither address nor FLD in the IOL
+    _mrow(m, 9, "I77.0", "", "", "")             # no device
     wb.save(path)
 
 
 def test_130_forward():
     with tempfile.TemporaryDirectory() as d:
         ce = os.path.join(d, "ce.xlsx"); _make_ce_fwd(ce)
-        rows = [_row("=S1", "+M1", "-D1", "I20.0", 5)]
+        rows = [_row("=S1", "+M1", "-D1", "I20.0", 5),       # FLD =S1+M1-D1 @ I20.0
+                _row("=S2", "+M2", "-D2", "I30.0", 6)]       # FLD =S2+M2-D2 @ I30.0
         out = run_xcheck_cem_iol(_ctx(rows, ce))
-    by = {x.type: x for x in out}
-    eq(by["cem_match"].level, "PASS")
-    eq(by["cem_dev_missing"].level, "FAIL")
-    eq(by["cem_ref_empty"].level, "FAIL")
-    mm = by["cem_fld_addr_mismatch"]
-    eq(mm.level, "FAIL")
-    eq(mm.location2, "NET SAFETY 50!O5", "links the matched I/O List cell")
-    eq(mm.doc2, "IOList.xlsx", "doc2 is the I/O List workbook")
-    ok(mm.cmp is not None and not mm.cmp.addr_eq and mm.cmp.fld_eq, "structured cmp: addr differs, fld matches")
-    ok(".xlsx" not in mm.location, "C&E link is sheet!cell only")
-    # full match links BOTH workbooks: the C&E ref cell + the matched I/O List cell
-    eq((by["cem_match"].location2, by["cem_match"].doc2), ("NET SAFETY 50!O5", "IOList.xlsx"))
+    lvl = {x.type: x.level for x in out}
+    # the two searches: a full match PASSes both
+    eq(lvl["cem_addr_ok"], "PASS", "address found with a matching FLD")
+    eq(lvl["cem_fld_ok"], "PASS", "FLD found at a matching address")
+    # search-by-address failures
+    eq(lvl["cem_addr_fld"], "FAIL", "address found under a DIFFERENT FLD (same-address/different-device)")
+    eq(lvl["cem_addr_none"], "FAIL", "address not in the I/O List")
+    # search-by-FLD failures
+    eq(lvl["cem_fld_addr"], "FAIL", "FLD found at a DIFFERENT address")
+    eq(lvl["cem_fld_none"], "FAIL", "FLD not in the I/O List")
+    eq(lvl["cem_ref_empty"], "FAIL", "a C&E ref with no device")
+    # address-found/FLD-differs: addr matches, FLD differs; links the I/O List cell that holds the address
+    af = next(x for x in out if x.type == "cem_addr_fld")
+    ok(af.cmp is not None and af.cmp.addr_eq and not af.cmp.fld_eq, "cmp: addr === , fld =/=")
+    eq((af.location2, af.doc2), ("NET SAFETY 50!O6", "IOList.xlsx"), "links the I/O List cell where the address is")
+    ok(".xlsx" not in af.location, "the C&E link is sheet!cell only")
+    # FLD-found/addr-differs: FLD matches, addr differs; links the I/O List cell that holds the FLD
+    fa = next(x for x in out if x.type == "cem_fld_addr")
+    ok(fa.cmp is not None and not fa.cmp.addr_eq and fa.cmp.fld_eq, "cmp: addr =/= , fld ===")
+    eq(fa.location2, "NET SAFETY 50!O5", "links the I/O List cell where the FLD is")
 
 
 def test_130_absent_skips():

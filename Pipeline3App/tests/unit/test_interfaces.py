@@ -702,8 +702,86 @@ def test_overwrite_vs_preserve():
         eq(r["preserved"], [], "overwrite never reports preserved")
 
 
+def test_io_address_mirror():
+    f = interfaces._io_address
+    isy = "I<base+offset>/.<bit>"
+    eq(f(isy, 10000, ">", "BOOL", 0, 0), "Q10000.0", "BOOL output -> Q with bit")
+    eq(f(isy, 10000, "<", "BOOL", 5, 3), "I10005.3", "BOOL input -> I, base+offset.bit")
+    eq(f(isy, 10000, ">", "WORD", 26, None), "Q10026", "WORD -> byte only (TEXTBEFORE '/'), no bit")
+    eq(f(isy, 10000, "", "BOOL", 0, 0), "", "no direction -> no address")
+    eq(f(isy, None, ">", "BOOL", 0, 0), "", "no base -> no address")
+    eq(f(isy, 10000, ">", "BOOL", None, 0), "", "no offset -> no address")
+
+
+def test_resolve_num_chain():
+    wb = Workbook(); ws = wb.active
+    ws["C2"], ws["D2"] = 1, 0
+    ws["C3"], ws["D3"] = "=C2", "=D2+1"        # the interface table's two offset/bit chain shapes
+    ws["C4"], ws["D4"] = "=C3", "=D3+1"
+    ws["C5"], ws["C6"] = "12.0", "x"
+    memo = {}
+    eq(interfaces._resolve_num(ws, "C4", memo), 1, "=C3 -> =C2 -> 1")
+    eq(interfaces._resolve_num(ws, "D4", memo), 2, "=D3+1 -> (=D2+1)+1 -> 2")
+    eq(interfaces._resolve_num(ws, "C5", memo), 12, "float-string literal -> int")
+    ok(interfaces._resolve_num(ws, "C6", memo) is None, "non-numeric -> None")
+
+
+def _make_if_addr_sheet(path, base=10000):
+    """A minimal inserted-IF_ sheet: the address-relevant headers + an Input Format / Base Address on
+    row 2, a (placeholder) LET-formula address cell per data row, and an offset/bit chain (=C3 / =D3+1)."""
+    wb = Workbook(); ws = wb.active; ws.title = "IF_T"
+    cols = ["Data Type", "Direction </>", "I/O Offset Byte", "I/O Bit", "I/O Address Side 1",
+            "Base Address", "Input Format", "Signal Name Side 1"]     # A..H ; offset=C bit=D addr=E
+    for i, h in enumerate(cols, start=1):
+        ws.cell(1, i, h)
+    LET = "=$A$1"                                                     # any formula -> data_type 'f'
+    def setrow(r, dt, d, off, bit, sig):
+        ws.cell(r, 1, dt); ws.cell(r, 2, d); ws.cell(r, 3, off); ws.cell(r, 4, bit)
+        ws.cell(r, 5, LET); ws.cell(r, 8, sig)
+    setrow(2, "BOOL", ">", 0, 0, "SIG1")          # Q<base>.0
+    setrow(3, "BOOL", ">", 1, 0, "SIG2")          # Q<base+1>.0
+    setrow(4, "BOOL", ">", "=C3", "=D3+1", "SIG3")  # CHAIN -> off 1, bit 1 -> Q<base+1>.1
+    setrow(5, "WORD", ">", 4, None, "SIG4")        # WORD -> Q<base+4>, no bit
+    setrow(6, "BOOL", "<", 0, 0, "SIG5")           # I<base>.0
+    ws.cell(7, 5, LET)                             # blank separator: LET present, no direction -> ''
+    ws.cell(2, 6, base); ws.cell(2, 7, "I<base+offset>/.<bit>")
+    wb.save(path)
+
+
+def test_interface_address_caches():
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "IF_T.xlsx"); _make_if_addr_sheet(p)
+        cache = interfaces._interface_address_caches(p)
+        eq(cache.get("E2"), ("str", "Q10000.0"), "BOOL output bit 0")
+        eq(cache.get("E3"), ("str", "Q10001.0"), "BOOL output byte+1")
+        eq(cache.get("E4"), ("str", "Q10001.1"), "offset/bit CHAIN resolved (=C3 / =D3+1)")
+        eq(cache.get("E5"), ("str", "Q10004"), "WORD: byte only, no bit")
+        eq(cache.get("E6"), ("str", "I10000.0"), "BOOL input -> I")
+        ok("E7" not in cache, "blank separator row (no direction) is not seeded")
+
+
+def test_insert_seeds_interface_address_cache():
+    # the reported phase-500 bug: the inserted IF_ address LET has no Excel cache, so phase 510 reads
+    # None and skips. The insert now SEEDS a computed cache that a data_only reader sees (no Excel).
+    with tempfile.TemporaryDirectory() as d:
+        ifp = os.path.join(d, "IF_T.xlsx"); _make_if_addr_sheet(ifp)
+        iol = os.path.join(d, "iol.xlsx")
+        wb = Workbook(); wb.active.title = "NET SAFETY 50"; wb.active["A1"] = "src"; wb.save(iol)
+        acts = interfaces.insert_sheets_into_iolist(iol, [("IF_SORTER-01", ifp)])
+        ok(any("seeded" in a and "IF_SORTER-01" in a for a in acts), "seeding is reported")
+        ws = load_workbook(iol, data_only=True)["IF_SORTER-01"]
+        eq(ws["E2"].value, "Q10000.0", "data_only reader sees the seeded address (no Excel needed)")
+        eq(ws["E4"].value, "Q10001.1", "the chained-offset address is seeded too")
+        live = load_workbook(iol)["IF_SORTER-01"]["E2"].value                # formula kept for Excel
+        ok(isinstance(live, str) and live.startswith("="), "the live LET formula is preserved")
+
+
 if __name__ == "__main__":
     raise SystemExit(run("interfaces", [
+        ("io_address_mirror", test_io_address_mirror),
+        ("resolve_num_chain", test_resolve_num_chain),
+        ("interface_address_caches", test_interface_address_caches),
+        ("insert_seeds_interface_address_cache", test_insert_seeds_interface_address_cache),
         ("parse_instance", test_parse_instance),
         ("choose_sheet", test_choose_sheet),
         ("find_interfaces", test_find_interfaces),

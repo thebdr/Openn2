@@ -57,15 +57,30 @@ def _pb(bit, name):
     return {"script_type": "E1/2", "bit": bit, "name_in_db": name}
 
 
+def _brk(bit, name):
+    return {"script_type": "B1/2", "bit": bit, "name_in_db": name}
+
+
 def test_02_one_instance_per_node_padded_to_four():
-    rows = [_pb_node("n5-ms1", "192.168.50.5", 20, 23), _pb("I20.0", "PB one"), _pb("I21.0", "PB two")]
+    rows = [_pb_node("n5-ms1", "192.168.50.5", 20, 23),
+            _pb("I20.0", "PB one"), _pb("I21.0", "PB two"),
+            _brk("I22.0", "BRK one")]                          # a B1/2 safety breaker on the same node
     t = build_02_em_push_button(Database(rows))
-    eq(len(t), 1, "one instance for a node with <=4 push buttons")
+    eq(len(t), 1, "one instance for a node with <=4 emergency-stop inputs")
     r = t.rows[0]
     eq(r["instanceOf-00_Push-Button_Input"], "EMPB_n5-ms1_1")
     eq(r["00_Commissioning.{db_element}"], "n5-ms1 192.168.50.5", "Bypass = node '<pname> <ip>'")
     eq(r["NetworkComment"], "EMPB_n5-ms1_1 192.168.50.5")
-    eq(r["ITERATOR_STRINGS"], ["PB one", "PB two", PAD, PAD], "iterator padded to the 4 fixed slots")
+    eq(r["ITERATOR_STRINGS"], ["PB one", "PB two", "BRK one", PAD],
+       "E1/2 push buttons AND B1/2 safety breakers, in address order, padded to the 4 fixed slots")
+
+
+def test_02_includes_safety_breakers():
+    # B1/2 safety breakers are emergency-stop inputs too -> they belong in the push-button-input FB.
+    node = _pb_node("nbrk", "10.0.0.1", 0, 9)
+    t = build_02_em_push_button(Database([node, _brk("I0.0", "BRK only")]))
+    eq(len(t), 1, "a node with only a breaker (no push button) still gets an FB")
+    eq(t.rows[0]["ITERATOR_STRINGS"], ["BRK only", PAD, PAD, PAD], "the breaker is a member")
 
 
 def test_02_chunks_over_four_into_multiple_instances():
@@ -280,6 +295,7 @@ if __name__ == "__main__":
         ("00_commissioning_member_and_title_are_pname_ip", test_00_commissioning_member_and_title_are_pname_ip),
         ("00_commissioning_empty_when_no_nodes", test_00_commissioning_empty_when_no_nodes),
         ("02_one_instance_per_node_padded_to_four", test_02_one_instance_per_node_padded_to_four),
+        ("02_includes_safety_breakers", test_02_includes_safety_breakers),
         ("02_chunks_over_four_into_multiple_instances", test_02_chunks_over_four_into_multiple_instances),
         ("02_pad_is_no_operation", test_02_pad_is_no_operation),
         ("03_zone_cumulative_groups_per_area", test_03_zone_cumulative_groups_per_area),

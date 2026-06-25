@@ -29,8 +29,8 @@ def _data_blocks(ctx) -> PhaseResult:
     res = signals.generate_data_blocks(ctx.rows, ctx.out_root)
     for w in res["warnings"]:
         ctx.emit(f"  WARN {w}")
-    ctx.emit(f"data blocks: {res['count']} DB(s) "
-             f"({len(res['safe'])} safe -> .xml/F_DB, {len(res['normal'])} normal -> .db) -> {res['dir']}")
+    ctx.emit(f"data blocks: {res['count']} DB(s) -> .xml "
+             f"({len(res['safe'])} F_DB + {len(res['normal'])} DB) -> {res['dir']}")
     return PhaseResult(ok=True, artifacts={"blocks_import_dir": res["dir"]},
                        summary=f"{res['count']} data block(s)")
 

@@ -147,9 +147,9 @@ blank and is recomputed; a genuine human entry is preserved and audit-logged as 
 *before* editing and **deleted if the fill changed nothing** (content compared cell-by-cell). The
 `populated_iolist` artifact now points at the source itself. **Halts** the pipeline if any entry is
 unresolved (the `_UnresolvedIndex` sheet lists them). **The write is SURGICAL** (`io/xlsx_edit`): it
-edits ONLY the filled cells in place + (re)builds `DiagnosisBlocks`/`_UnresolvedIndex` as fresh sheets,
-and **byte-copies every other part** — so the template's dynamic-array / shared formulas, caches,
-tables and styles SURVIVE. A full openpyxl `load_workbook`→`save` round-trip instead FLATTENS dynamic
+edits ONLY the filled cells in place, **APPENDS new `DiagnosisBlocks` rows** (never rewrites existing
+ones — see below) + rebuilds the pure-report `_UnresolvedIndex`, and **byte-copies every other part** —
+so the template's dynamic-array / shared formulas, caches, tables and styles SURVIVE. A full openpyxl `load_workbook`→`save` round-trip instead FLATTENS dynamic
 arrays into an "overlapping array formula" (Excel = corrupt) and drops formula caches; that is what
 corrupted the I/O List from the GUI. A fill landing in an array spill **freezes that array to its
 cached values + logs a WARN** (the formula stays in the backup). `xlsx_edit` also **drops
@@ -166,9 +166,29 @@ next; `io/xlsx_cache` is retired).
   KQ↔KI series, door FLD, Z pattern, standalone); unresolvable members → `<input required>`.
 - `diag_alloc.py` — §8 cabinet/bit allocation: node cabinets (non-P bits up from `diag_bit_min`,
   P bits down from `diag_bit_max`), PA/PW field inference (`+FieldIODevices`), Type-2 family blocks.
-- `blocks.py` — (re)writes the `DiagnosisBlocks` sheet (`ID_SWP == ID_Local`; FU/Location/FullName
-  materialized as **text** so a leading `=` isn't a formula). `report.py` — the `_UnresolvedIndex`
-  sheet (one clickable, sheet-qualified hyperlink per entry) + the Mode-2 audit.
+  **IDEMPOTENT** (`allocate(results, params, existing)`): a cabinet's **`ID_Local` is STABLE** — reused
+  from the existing `DiagnosisBlocks` (keyed by `full_name` = FU+Location / `project_fu+Stem_inst`), a
+  new cabinet gets the next free id above every existing one. Bits **continue past those already used**
+  in a cabinet (seeded from rows carrying an `ex_diag_bit`), so re-running 230/240 after rows were added
+  never duplicates a `(cabinet, bit)`. Type-2 family bits are a deterministic function of the signal.
+- `blocks.py` — the `DiagnosisBlocks` sheet splits into **IDENTITY** columns (ID_Local/ID_SWP/Functional
+  Unit/Location/FullName/TemplateType/Notes — **append-only, byte-preserved**) and **DERIVED** columns
+  (Count, unused_bits, non_unique_bits — **recomputed and rewritten every run**). `read_existing(wb)`
+  returns `({full_name → ID_Local}, {ID_Local → row}, {header → col})`; the populator appends ONLY the
+  cabinets not already present (`block_rows`, via `xlsx_edit.append_rows`, which byte-preserves every
+  existing row — a hand-edited `ID_SWP`/`Notes`, an orphan cabinet survive) and **creates the sheet fresh
+  (`diagnosis_blocks_grid`) only when ABSENT**. The 3 derived columns are refreshed via a surgical
+  cell-edit per existing row (`derived_edits`; the two new columns are added at canonical H/I/J on an old
+  8-col sheet) and computed by `analyze(placed, …)` from the **REAL post-fill (Diag_Cabinet, Diag_Bit)** of
+  every relevant row (effective = the `ex_*` on-disk value if non-blank, else what this run writes) — NOT
+  the in-memory `results`: **`Count`** = times the cabinet's ID_Local appears in the Diag_Cabinet column
+  across the sheets; **`unused_bits`** = the free bits in `[diag_bit_min, diag_bit_max]` as compact ranges
+  (`0-7, 9, 18-62`, via `_fmt_ranges`); **`non_unique_bits`** = the bits a cabinet assigns more than once
+  (operator-error surface; the allocator is collision-free), same format. An orphan cabinet → `Count=0`,
+  full `unused_bits`, empty `non_unique_bits`. `ID_SWP == ID_Local` on a generated row; FU/Location/FullName
+  are TEXT (a leading `=` isn't a formula). The legacy `DiagnosticBlocks` sheet is no longer auto-deleted.
+  `report.py` — the `_UnresolvedIndex` sheet (one clickable, sheet-qualified hyperlink per entry) + the
+  Mode-2 audit.
 - The 4 sub-phases (210/220/230/240) each fill one column; the phase header runs the full populate.
   Column **AC** holds the auto-inferred **canonical** type (kept for reference; == AB in Mode-1).
   The output-column **headers (AA…AG)** are written from `column_map` (the template leaves them
@@ -224,10 +244,15 @@ Every builder returns `list[LogEntry]`; each emit site declares a `type` slug (t
   row emits a `row_ok` **PASS** "all checks passed" (full report only). `strike_handling=="error"`⇒struck FAIL.
 - **120 `matrix.py`** — C&E standalone (new design): no Q/O on the matrix, no I on AREA sheets, no dup
   address per sheet. C&E absent ⇒ one `ce_absent` **SKIP**.
-- **130 `crosscheck.py`** — CEM→IOL: each C&E ref present+consistent in the IOL (io-index by FLD).
-  Every line links **BOTH workbooks** as `<C&E cell> vs <other>` — `<other>` is the matched I/O List
-  cell (PASS/partial) or, on a device-missing FAIL, the **I/O List file** label (opens the file). A
-  mismatch carries a `Cmp` (addr + FLD, `===`/`=/=`).
+- **130 `crosscheck.py`** — CEM→IOL: each C&E ref is run through **TWO independent searches** of the
+  I/O List (indexed by FLD *and* by address — `build_io_index` + `build_io_addr_index`). **Search by
+  address**: PASS `cem_addr_ok` (address there with a matching FLD) · FAIL `cem_addr_fld` (address there
+  under a DIFFERENT FLD — the same-address/different-device case) · FAIL `cem_addr_none` (address absent).
+  **Search by FLD**: PASS `cem_fld_ok` (FLD there at a matching address) · FAIL `cem_fld_addr` (FLD there
+  at a DIFFERENT address) · FAIL `cem_fld_none` (FLD absent). So a signal present under a different device
+  is reported precisely (the address IS there) instead of a blanket "device not declared". Every line
+  links **BOTH workbooks** as `<C&E cell> vs <other>` — `<other>` is the matched I/O List cell, or on a
+  no-match the **I/O List file** label; a *-fld*/*-addr* FAIL carries a `Cmp` (addr + FLD, `===`/`=/=`).
 - **140 `crosscheck.py`** — IOL→CEM decision tree: **typed & `ce_mandatory` yes/warn → CHECK** (yes→FAIL,
   warn→WARN); **typed `no`/unset → NO_CHECK** (skip); **untyped**: always-excluded→skip; `ce_full_check`
   OR a `ce_mandatory_words` safety match → CHECK; otherwise (excluded word / plain) → NO_CHECK (skip).
@@ -236,6 +261,17 @@ Every builder returns `list[LogEntry]`; each emit site declares a `type` slug (t
   miss, the **C&E file** label (opens the file). A mismatch carries a `Cmp` (addr + FLD, `===`/`=/=`).
 - **150 `diagnosis.py`** — (cabinet,bit) numeric + unique per ALARM/WARNING family (family = WARNING
   when the type ends `W`, so an alarm+warning on one slot is not a collision).
+- **165 / 175 Clean Addresses & Electrical Names** (`domain/clean.py`) — two **manual-only, ORANGE**
+  (`KIND_SPECIAL`) phase-bar buttons, NOT in `SUBS`/the DAG (never run by Run-Pipeline, never a
+  prerequisite; wired in `gui/app_main._button_cb` "special" branch → a worker-thread `_start_clean`).
+  They remove the configured `clean.CLEAN_SYMBOLS` (default `["'"]`, extend as found) and collapse ALL
+  whitespace (case preserved — the matcher uppercases) from the **address + Functional Unit/Location/
+  Device** cells of the I/O List (165: `bit`/O/P/Q across the `io_list.sheet` sheets) and the C&E (175:
+  the matrix `address`/J/K/L + the AREA sheets' `concat_id`/`address`), so the cross-check (130/140) stops
+  failing on a stray `'` (the matcher strips whitespace + uppercases but NOT apostrophes). Read with
+  `data_only=False` to **skip formula cells** (not flatten them); written back SURGICALLY (`io.xlsx_edit`,
+  a leading `=`/`+`/`-` stays text) with a timestamped backup (dropped on a no-op). Logs each
+  `Sheet!Cell: old -> new`.
 - **Treatments (M6b, `core/errors.py`):** keyed by the per-FAIL `uid`, `user_input/error_management.csv`
   records `warn`→WARNING / `skip`→SKIP / `accept`→(write the C&E-side FLD into the I/O List description,
   idempotent + gated to `iol_cem_addr_only`)→SKIP. Each operator run reconciles the registry
@@ -276,8 +312,13 @@ machine type / base address / node side 1 / node side 2 / index); **420/430** ar
   a blank separator; a **WORD** is **one row + a blank separator**. Diagnosis columns
   (`diag_cabinet`/`swp_cabinet`/`diag_bit`) are written only where the chosen sheet has them; staging
   imports **`swp_cabinet`** = the `ID_SWP` of the row's local cabinet from the `DiagnosisBlocks` sheet
-  (keyed by `ID_Local`). Addresses are the template's own `_xlfn.LET` structured-ref formulas, copied
-  verbatim (Excel recomputes on open).
+  (keyed by `ID_Local`). The interface **`I/O Address Side 1`** is the template's own `_xlfn.LET`
+  structured-ref formula, kept live — but on `insert_interface_sheets` its Excel cache (which openpyxl
+  drops, and which the LET would recompute against the phase-400-plugged Base Address) is **SEEDED with
+  the value computed in Python** (`_interface_address_caches` mirrors the LET: `{I|Q}{base+offset}[.bit]`,
+  offset/bit chains resolved, columns bound by header), so phase 510 reads correct addresses **without
+  Excel** while the formula survives for an engineer who opens the file. (The `<GENERIC>` template's
+  address LET is mis-wired one column off — latent; the header-bound Python value is correct regardless.)
 - **`insert_interface_sheets`** (project_params bool): when true, generation **overwrites** existing
   `IF_*.xlsx` AND **inserts each interface as a sheet named `IF_<instance>`** (e.g. `IF_SORTER-01`)
   into the I/O List if not already present
@@ -312,15 +353,17 @@ phase 400 to have inserted the `IF_` sheets (absent ⇒ I/O-only, degrades grace
   `member` to `db_name`, per-row — the phase-400 follower model; `dev_type` not a filter). Every DB
   is seeded with **`Always FALSE` / `Always TRUE`** (space, no underscore). A DATA_BLOCK can't repeat
   a member name, so exact duplicates are dropped (kept once) + warned.
-- **Safe vs normal DB output** (key gotcha): a **SAFE DB** (any contributing type is `safe_db`) is
-  written as a TIA **Openness `SW.Blocks.GlobalDB` XML** `<name>.xml` carrying
-  **`ProgrammingLanguage=F_DB`** (the fail-safe marker the `.db` external-source format CANNOT
-  express) + `DBAccessibleFromOPCUA=false` (a safe DB must not be OPC-writable — an unexpected write
-  can fault the CPU to STOP) + per-member external-access attrs + `MemoryLayout=Optimized`. A
-  **NORMAL DB** is the `.db` external source `<name>.db` (`DB_Accessible_From_OPC_UA := 'TRUE'`). Both
-  are **UTF-8 BOM**; `.db` is CRLF, the XML is CRLF + no trailing newline (matching a real export).
-  `S7_Optimized_Access` is `'TRUE'` for both — it is **NOT** a safety marker. `blocks_import_dir` is
-  swept of prior `*.db`/`*.xml` on re-run (the phase-620 SCL is left intact).
+- **Unified DB output** (key gotcha): **EVERY DB is a TIA Openness `SW.Blocks.GlobalDB` XML**
+  `<name>.xml` (UTF-8 BOM, CRLF, no trailing newline; per-member external-access attrs;
+  `MemoryLayout=Optimized`). The ONLY difference between a normal and a fail-safe DB is
+  **`<ProgrammingLanguage>` = the type's `db_kind` copied VERBATIM** (`DB` or `F_DB`; `db_kind` is
+  `|`-aligned with `db_names` by position — a single value applies to every DB, so `PA` →
+  `PROFINET_NODES_ALARM` as `DB` + `00_Commissioning` as `F_DB`; on a mixed contribution **F_DB wins**).
+  **`<DBAccessibleFromOPCUA>` follows it**: `false` for `F_DB` (a fail-safe DB must not be OPC-writable —
+  an unexpected write can fault the CPU to STOP), `true` otherwise. The `.db` external-source path is
+  **gone** (`_db_text` removed); `build_data_blocks` carries `db['prog_lang']`, not a `safe` bool.
+  `blocks_import_dir` is still swept of prior `*.db`/`*.xml` on re-run (removing any pre-unification
+  `.db`; the phase-620 SCL is left intact).
 
 ## Phase 600 — Diagnosis Mapping — DONE
 
@@ -349,7 +392,11 @@ Data / Diag Config folder) are GUI-era (M11).
   32-63 → DWord 2, channel = `bit % 32`; the cabinet variant (01-04) comes from `DiagnosisBlocks`
   `TemplateType`, Tristate (02/04) pairs each alarm DWord with its warning DWord. **node resolution**
   (`node_of`) finds the Profinet node whose I/Q byte range (staging's `I_/Q_startByte/endByte`)
-  contains the signal's address. The output is **UTF-8 BOM + CRLF** (matching the exported template)
+  contains the signal's address — and those ranges are **POSITIONAL** (a node owns the rows beneath it
+  in I/O List order until the next node / sheet end; `staging._add_node_address_ranges`), **NOT keyed by
+  FLD/location** (a safety module's stops carry their own `+ES..` location, so a location key left such
+  modules empty-ranged and silently dropped every `node_of` consumer — 02/06/08 builders, diagnosis FL,
+  coverage). The output is **UTF-8 BOM + CRLF** (matching the exported template)
   and the **FUNCTION is renamed** to drop the `TEMPLATE--vX.Y--` prefix (→ `06_Diagnostic for OPC`).
 
 ## Phase 700 — Hardware Generation — DONE
@@ -389,8 +436,9 @@ are written (data-independent cases in `tests/unit/test_builders.py`; real-doc C
   list-valued cell is the horizontal ITERATOR (emitted last).
 - **`builders.py`** — one `@builds("<output>")` per template, free-form Python over `db`. The 8:
   `00` commissioning bypass (one network per diag node = a node carrying `name_in_db`), `02` EM push
-  button (a `00_Push-Button_Input` FB per node, E1/2 grouped by I/Q address range, chunked to the FB's
-  4 slots), `03` zone cumulative (per AREA: `PB`/`FDB` always + `SAFETY_BREAKERS`/`DOORS` when present →
+  button (a `00_Push-Button_Input` FB per node = the node's emergency-stop inputs, **E1/2 push-buttons
+  AND B1/2 safety-breakers**, grouped by node in address order, chunked to the FB's 4 slots), `03` zone
+  cumulative (per AREA: `PB`/`FDB` always + `SAFETY_BREAKERS`/`DOORS` when present →
   one `02_COM` AND-coil each), `04` ESTOP (per AREA; SORTER door-capacity tier 01-05 when sorter-area
   OR has doors, else GENERIC `06`), `05` output feedback (per K-family `index` group; 3-family capacity
   variant), `06` feedback error (a `03_FDBACK error` FB per node, KQ chunked to 8), `07` speed control
@@ -553,8 +601,8 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   designer suppression), **M7 Phase 400 Interfaces** (generation + signal mirroring +
   `interface_tagname`/Expression split + BOOL 2-byte-block / WORD-row layout + the lossless
   `insert_interface_sheets`), **M7 Phase 500 Signals** (510 I/O Tags incl. the interface tags from
-  the inserted `IF_` sheets; 520 data blocks — type-based + rule-driven members, safe ⇒ F_DB Openness
-  XML, normal ⇒ `.db`), **M8 Phase 600 Diagnosis** (610 DiagList_IO/Logic — OR/per-row rules +
+  the inserted `IF_` sheets; 520 data blocks — type-based + rule-driven members, every DB a GlobalDB
+  XML with `<ProgrammingLanguage>` = `db_kind` verbatim, F_DB ⇒ OPC-locked), **M8 Phase 600 Diagnosis** (610 DiagList_IO/Logic — OR/per-row rules +
   paired-channel co-location; 620 the OPC SCL fill — node-resolved FL, tristate variants, FUNCTION
   rename + BOM/CRLF), **M7 Phase 700 Hardware** (710 Stations + 720 Modules, one extract → format-2
   CSVs matching the committed reference; DTD roles + auto-plug + PotentialGroup + by-type params +
@@ -632,11 +680,11 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
 - **openpyxl can't preserve formula caches** across a re-save — when modifying the I/O List in place,
   capture + patch them back at the ZIP/XML level; and **re-create copied tables with clean columns**
   (no `dataDxfId`/`calculatedColumnFormula`) or Excel drops them ("Removed Records: Table").
-- **Data-block output is safety-aware** (phase 520): a `safe_db` type ⇒ an **F_DB Openness XML**
-  (`<name>.xml` — the only form that carries fail-safe + `DBAccessibleFromOPCUA=false`, which protects
-  the CPU from an OPC write faulting it to STOP); a normal DB ⇒ a `.db` external source
-  (`DB_Accessible_From_OPC_UA := 'TRUE'`). **`S7_Optimized_Access` is NOT the safety marker** (it's
-  `'TRUE'` on both). Files are UTF-8-BOM.
+- **Data-block output is unified + safety-aware** (phase 520): EVERY DB is a **`SW.Blocks.GlobalDB`
+  Openness XML** (`<name>.xml`); the type's **`db_kind` is the verbatim `<ProgrammingLanguage>`** (`DB` /
+  `F_DB`, `|`-aligned with `db_names` by position, F_DB-wins on conflict), and `<DBAccessibleFromOPCUA>`
+  follows it (**`false` for `F_DB`** — protects the CPU from an OPC write faulting it to STOP — else
+  `true`). The old `.db` external-source path is gone. Files are UTF-8-BOM, CRLF.
 - **Diagnosis logic rules** (`diagnosis_logic_rules.csv`, phase 610/620) are **OR / per-row**: the `|`
   in `required_types` is OR and the rule fires once per matching row (NOT Pipeline2's "ALL required,
   once per cabinet"). Matching is by **script_type** (exact); a pair_key like `DI`/`N` matches no

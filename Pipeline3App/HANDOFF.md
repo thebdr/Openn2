@@ -7,78 +7,157 @@ index auto-load; the approved design lives in the plan
 ---
 
 ```
-Continue the Pipeline3App rebuild at C:\Source\Repos\_Openn2\Pipeline3App (branch tia181920). First
-read Pipeline3App/CLAUDE.md (esp. Conventions & gotchas, the phase sections, and the GUI/M11 section)
-and the plan ~/.claude/plans/the-codebase-in-openn2-pipeline2app-rippling-canyon.md.
+Continue the Pipeline3App rebuild at C:\Source\Repos\_Openn2\Pipeline3App (branch tia181920, local).
+First read Pipeline3App/CLAUDE.md (architecture + status; esp. Conventions & gotchas, the phase
+sections, the GUI/M11 + Project-Manager + Designer-mode + io/xlsx_edit sections) and the plan
+~/.claude/plans/the-codebase-in-openn2-pipeline2app-rippling-canyon.md.
 
-Run the data-independent green gate first:
+GREEN GATE (data-independent, must stay green — 29 suites):
     cd Pipeline3App && for t in tests/unit/test_*.py; do python "$t" || break; done
-(test_golden_validation.py is DATA-DEPENDENT — when it's red, check the WORKING TREE first: a changed
-config_project/project_params.yaml or a mutated sample I/O List, NOT a code regression. Phases 200 Fill /
-400 insert_interface_sheets re-save the source in place (so they git-dirty it) but now PRESERVE its
-formula caches (io/xlsx_cache.restore), so they no longer DEGRADE it; git checkout the doc to restore the
-bytes. Re-freeze with --freeze only if the docs legitimately changed.)
+test_golden_validation.py is DATA-DEPENDENT: when it's red, check the WORKING TREE FIRST — a changed
+config_project/project_params.yaml or a re-saved sample I/O List, NOT a code regression. Phase 200 Fill
+is now SURGICAL (io/xlsx_edit: only the edited cells/sheets change, everything else is byte-copied) and
+phase 400 freezes any openpyxl-flattened array + drops the stale calcChain, so both stay Excel-valid +
+no longer DEGRADE the sample; `git checkout` the sample to restore the bytes. Re-freeze (--freeze) only
+if the report text legitimately changed.
 
-DONE: phases 100–900 — documents validation, fill, staging, interfaces, signals, diagnosis, hardware,
-all of software generation (8 builders + the 03 direct FC XML + the editable shells), and 910 Pipeline
-Coverage Report (domain/coverage.py: traces each staged signal across the ON-DISK outputs; flags
-ORPHAN / UNPLACED; Reports/io_project_coverage_report.{csv,txt}). Plus the diag_desc logic-rule column.
-The single database is the staged ctx.rows / Shared/OutputTree/.../IODatabase.csv.
+DONE — the engine, phases 100–900: documents validation, fill, staging, interfaces, signals,
+diagnosis, hardware, all software generation (8 builders + 03 direct FC XML + the editable .xlsm
+shells), 910 Pipeline Coverage Report (domain/coverage.py: traces each staged signal across the
+ON-DISK outputs; flags ORPHAN/UNPLACED; Reports/io_project_coverage_report.{csv,txt}), + the diag_desc
+logic-rule column. The single database is the staged ctx.rows / IODatabase.csv.
 
-ALSO DONE: M11 the main operator GUI ("Broski Session") — pipeline3/gui/ + launch_gui.py. A registry-
-driven phase bar (build_spec over registry().presentation_order()), sv-ttk dark + bundled Monaspace
-Neon + dark Windows title bar; EN/IT + dark/light toggles; worker-thread runs streamed to the LogView.
-The log is ONE engine (§4.1): EVERY phase (not just 100) emits LogEntries - the engine (app._run_one /
-run_subphase) emits a "<id> <Title>" PHASE banner per phase (e.g. "300 Documents Staging") and ctx.emit
-is level-inferred into INFO/WARN/FAIL LogEntries, so generators 200-900 now log in phase-100's form;
-each phase block renders incrementally (on_phase_log), live sub-step text -> status bar. The validation
-log is fed as structured records (render.render_records -> logview.append_records): each Sheet!Cell is a
-clickable link opening ITS OWN workbook (I/O List or C&E, via the LogEntry doc/doc2) in Excel (now
-brought to the FOREGROUND) and the [FAIL] tag a link to error_management.csv. A cross-check (130/140)
-shows BOTH workbooks inline as "<loc1> vs <loc2>" (vs aligned per-phase; loc2 = the matched cell, or on
-a miss a workbook LABEL that opens that file) + an aligned "<addr> op <addr> | <fld> op <fld>" (===/=/=)
-comparison. A "Log to File" checkbox tees the run log to Reports/pipeline_run_log.txt. And the Files tab
-(3-section tree + a CSV grid with
-zebra/right-click sort/filter, a
-YAML/JSON/XML object editor that preserves YAML comments, an xlsx read-only preview + Edit-externally
-via LibreOffice/Excel, a full-path header + Open-folder). The app is Pipeline3; each profile is a named
-session shown as "Pipeline3 - <session> (<profile>)".
+RECENT REFINEMENTS (this batch — data-independent gate green; RE-STAGE 300->500 + RE-FREEZE the golden
+after reviewing the 130/150 report changes in the GUI):
+  - DATA BLOCKS UNIFIED (520): EVERY DB is a SW.Blocks.GlobalDB XML; the type's `db_kind` is the verbatim
+    <ProgrammingLanguage> (`DB`/`F_DB`, `|`-aligned with db_names by position, F_DB-wins on conflict),
+    with <DBAccessibleFromOPCUA> = false for F_DB else true. The .db external-source path is GONE. F_DB is
+    canonicalized on write (any casing -> "F_DB" so TIA recognizes it); an unrecognized db_kind is written
+    verbatim + warned. (identity.db_kinds/db_kind_of/is_db_backed; signals._db_xml/build_data_blocks/
+    write_data_blocks; config keeps db_kind verbatim.)
+  - INTERFACE ADDRESSES (400/500): insert_interface_sheets now SEEDS the `I/O Address Side 1` cache with
+    the value computed in Python (interfaces._interface_address_caches mirrors the LET: {I|Q}{base+offset}
+    [.bit], offset/bit chains resolved, columns bound by header), so 510 reads correct addresses WITHOUT
+    Excel; the live LET formula survives. The <GENERIC> template's address LET is mis-wired one column off
+    (LATENT — header-bound Python value is correct regardless; a task chip tracks the template fix).
+    interface_tagname now also resolves {db_element}.
+  - NODE BYTE RANGES are POSITIONAL (staging._add_node_address_ranges): a node owns the rows beneath it in
+    I/O List order until the next node / sheet end — NOT keyed by FLD/location (which left safety modules
+    empty-ranged and silently dropped 94/122 E1/2 from every node_of consumer). Fixes 02/06/08 builders +
+    diagnosis FL + coverage.
+  - 02_EM Push Button now groups the node's emergency-stop inputs = E1/2 push-buttons AND B1/2 safety-
+    breakers (was E1/2 only).
+  - DiagnosisBlocks 230/240 are IDEMPOTENT (append-only rows, stable ID_Local, bits continue past used);
+    derived Count (real iolist occurrences of ID_Local) + unused_bits + non_unique_bits recomputed each run.
+  - VALIDATION: 130 CEM->IOL runs TWO searches (by address + by FLD -> six precise outcomes); 150 adds
+    diag_container_check (the cabinet's DiagnosisBlocks FullName must CONTAIN the type's expected
+    container). Manual ORANGE 165/175 CLEAN buttons strip `'`/whitespace from addresses+names
+    (domain/clean.py). Treatments: right-click a [FAIL]/[WARN] link -> Treat as Warning / Clear Treatment
+    Flag (writes error_management.csv, NO auto re-run, appends a "uid: ... flagged as warning" log line).
+    A live "Show PASS/SKIP" toolbar toggle elides PASS/SKIP (ce_full_print).
 
-ALSO DONE: the PROJECT MANAGER (M13) — pipeline3/project/{project.py,state.py} + the operator GUI toolbar
-(New Project / Open Project ▾ = recent / Open… / Set projects root… / Re-select IOList… / Re-select
-CEMatrix… / Close) + an active-project title/banner indicator + AUTO-REOPEN of the last project. A project
-is a self-contained <root>/<name>/ = project.yaml + Input/ (copied workbooks) + Output/ (its OUTPUT_PATHS
-tree) + its OWN config_project/ + user_input/ (FULLY ISOLATED config + treatments). config.use_project(root)
-/ use_builtin() routes the CSV loaders + the treatment registry (via config_project_dir/input_docs_dir/
-diagnosis_dir/user_input_dir); NO project open = the builtin config + Shared/OutputTree (the Openn3 import
-contract, byte-identical BuilderData by construction). The persisted root + recent + last_opened live in
-%LOCALAPPDATA%/Pipeline3/state.json. v1 defers Save As + Archive (the pure module can grow them).
+DONE — SURGICAL EXCEL WRITE (io/xlsx_edit) — the ONE place that modifies an .xlsx. openpyxl is
+UNUSABLE for editing the I/O List: a load_workbook->save round-trip FLATTENS dynamic-array formulas
+into a master + literal slaves (Excel reports an "overlapping array formula" / corrupt), DROPS formula
+caches, AND leaves a stale xl/calcChain.xml (it lists formula cells a regenerated sheet removed -> Excel
+"Removed Records: Formula from calcChain.xml"). io/xlsx_edit edits ONLY the changed worksheet parts
+inside the zip and BYTE-COPIES the rest, so the template's arrays / shared formulas / caches / tables /
+styles SURVIVE by not being touched. API:
+  - edit_workbook(path, cell_edits={sheet:{ref:val}}, new_sheets=[{name,rows,hyperlinks?}],
+    delete_sheets=[names]) -> list of (sheet,master,range) FROZEN. A cell edit is a regex rewrite of the
+    <c> (inline string, style preserved); an edit landing in an array SPILL freezes that array to its
+    cached values (keeps every spilled value, drops the formula + cm/vm meta) -> no overlap (+WARN; the
+    formula stays in the backup). new_sheets builds a fresh grid via build_sheet_xml (FULL worksheet
+    structure dimension/sheetViews/sheetFormatPr/pageMargins — a bare <sheetData> is Excel-corrupt) +
+    registers it in workbook.xml/rels/[Content_Types]. ALWAYS drops xl/calcChain.xml (+ its rel +
+    Override).
+  - freeze_arrays(path) -> the post-process for openpyxl-based writers that CAN'T avoid the flatten
+    (phase 400): freeze every array master to its cached values + drop calcChain.
+Phase 200 Fill (domain/iolist_diag/populate.py) is FULLY surgical (cell_edits for AB/AC/AD/AE/AF +
+new_sheets for DiagnosisBlocks/_UnresolvedIndex + delete_sheets the legacy alias). Phase 400
+interfaces.insert_sheets_into_iolist keeps openpyxl for the styled IF_ sheet-copy then calls
+freeze_arrays. io/xlsx_cache is RETIRED. Verified in REAL Excel (the filled I/O List opens clean).
+test_xlsx_edit.py (8 cases) + test_p200_phase.py.
+
+DONE — M11 operator GUI ("Broski Session"), pipeline3/gui/ + launch_gui.py: a registry-driven phase
+bar (phasebar.build_spec over registry().presentation_order(profile)), sv-ttk dark + bundled Monaspace
+Neon + dark Windows title bar, EN/IT + dark/light toggles, worker-thread runs streamed to the LogView.
+  - ONE LOG ENGINE (§4.1): EVERY phase emits LogEntries. The engine emits a "<id> <Title>" PHASE banner
+    per (sub-)phase; ctx.emit is level-inferred (model.split_level) into INFO/WARN/FAIL, and now takes a
+    type= slug so an emit line's id renders <phase>-<type> (e.g. "210-backup"). Each phase block renders
+    incrementally (ctx.on_phase_log -> render.render_records -> logview.append_records); live sub-step
+    text -> status bar (ctx.on_progress).
+  - CLICKABLE LINKS: each Sheet!Cell opens ITS OWN workbook in Excel AT the cell (excel.goto +
+    _bring_to_front); [FAIL] opens error_management.csv. A cross-check (130/140) renders BOTH workbooks
+    inline "<loc1> vs <loc2>" + an aligned "<addr> op <addr> | <fld> op <fld>" (model.Cmp).
+  - HTML VALIDATION REPORT: phase 100 writes each report as BOTH .txt (the golden) AND a no-wrap .html
+    (render.render_html/html_reports) that replicates the log viewer (theme.log_tags colours, Sheet!Cell
+    link styling) with white-space:pre (lines do NOT wrap). "Open validation logs" prefers the .html.
+  - "Log to File" tees the run log to Reports/pipeline_run_log.txt. Files tab: a 3-section tree + a CSV
+    grid (zebra, right-click regex sort/filter), the YAML/JSON/XML OBJECT EDITOR (objedit.py) — now with
+    a right-click context menu (Browse file/folder into a leaf · Add key/item or Add child
+    element/attribute · Delete any non-root node; a per-item _model registry; pure add_key/add_item/
+    delete_node helpers; YAML comments + JSON types preserved) — an xlsx read-only preview +
+    Edit-externally, full-path header + Open-folder.
+  - PHASE BAR (assets/ButtonsLayout.xlsx is the canonical map): chevron dropdowns; bold emoji glyphs ➡/⬇/
+    —/▼; no arrow between Run Pipeline and ph100; the dropdown closes on focus loss (GetForegroundWindow
+    poll).
+
+DONE — DESIGNER MODE (M11b) — ONE GUI, the launch profile chosen by config_project/app_config.yaml
+(profile: main|designer, read by config.load_app_profile; unknown/missing -> main; app_main validates
+against the registry). The registry now separates PRESENTATION from the runnable keep-set
+(define_profile(present=, attrs=)) + carries per-profile GUI attrs (input_pickers/live_source). Designer:
+the bar shows ONLY ph100 (300 stages as a hidden prerequisite, Fill 200 skipped), reads designer_params
+.yaml (config.profile_params_file -> <profile>_params.yaml convention), uses a FULL Project-Manager
+project (New Project seeds from the designer base, no file prompts), adds two input-file PICKERS beside
+ph100, and re-copies each input's `source` into Input/ on EVERY ph1x0 run (project.refresh_inputs +
+a ctx re-stage). app_config.yaml is TRACKED and also carries a user_interface launch block
+(width/height = START window size — stays resizable; theme; log_to_file) via config.load_app_ui, applied
+in App.__init__. test_registry/test_config/test_project cover the wiring.
+
+DONE — PROJECT MANAGER (M13), pipeline3/project/{project.py,state.py} + the GUI toolbar (New Project /
+Open Project ▾ = recent / Open… / Set projects root… / Re-select IOList… / Re-select CEMatrix… /
+Close) + an active-project indicator + AUTO-REOPEN of the last project. A project is self-contained
+<root>/<name>/ = project.yaml + Input/ + Output/ + its OWN config_project/ + user_input/ (FULLY
+ISOLATED). config.use_project(root)/use_builtin() routes the loaders + treatment registry; NO project
+open = the builtin config + Shared/OutputTree (the Open2App/Openn3 import contract, byte-identical
+BuilderData). Persisted root + recent + last_opened: %LOCALAPPDATA%/Pipeline3/state.json. v1 defers
+Save As + Archive.
 
 NEXT (pick one, PROPOSE + SHOW before building):
-  - the DESIGNER GUI — the slim validation-only 2nd exe (profile "designer", sub 110–150, no pink
-    master, its own designer_params base). app_main already supports profile="designer" and names it
-    "IOList & CEMatrix Validation (designer)"; the phase bar should show only Documents Validation.
   - M10 CLI (run.py / run_validation.py / run_phase.py over the registry) + the Open2App-path CONTRACT
     TEST (assert the 4 BuilderData OUTPUT_PATHS keys = config.OPEN2APP_KEYS, byte-stable).
-  - object-editor polish (Browse pickers on path-valued leaves, add/remove nodes); M14 packaging (two
-    PyInstaller exes); investigate the phase-400 insert formula-cache drop on the real doc.
+  - M14 packaging — now ONE PyInstaller exe (the profile is a shipped app_config.yaml value): bundle
+    config_project/ + assets/fonts/ + the .png icon + sv-ttk's .tcl + pywin32; decide how the sibling
+    ../Shared folder ships.
+  - PROJECT MANAGER v2 — Save As (clone under a new name) + Archive (zip the project folder); port
+    save_project_as/archive_project from Pipeline2; wire the Open Project ▾ dropdown.
+  - phase-400 FULL surgical sheet-copy (merge styles/sharedStrings/tables at the XML level so phase 400
+    stops using openpyxl entirely — the openpyxl + freeze_arrays path is the pragmatic choice for now);
+    more object-editor polish (path-leaf detection, nested-structure add).
 
 920 TIA Project Coverage — STILL DEFERRED (the export is coming). Design decided: ALL-XML, dispatched
 on the XML ROOT TAG (SW.Blocks.GlobalDB / FC / FB / OB / SW.Types.* UDTs / tag tables) — ONE SimaticML
-loader + a thin per-kind extractor (reuse Pipeline3's own emit schema), plus a small ADAPTER SEAM for
-the non-XML hardware data. Re-runs the 910 signal-lifecycle trace over the project export, cross-checked
-vs the C&E matrix + diagnosis assignments. You MAY sketch the 920 project-model interface, but ASK for a
-real TIA version-control export sample before writing any concrete parser — match real bytes, don't guess.
+loader + a thin per-kind extractor (reuse Pipeline3's emit schema) + a small adapter for the non-XML
+hardware data. Re-runs the 910 signal-lifecycle trace over the project export, cross-checked vs the C&E
+matrix + diagnosis assignments. ASK for a real TIA version-control export sample before writing any
+concrete parser — match real bytes, don't guess.
 
-HOW WE WORK: one focused change at a time; PROPOSE the design + SHOW real output (screenshots: the GUI
-can be captured via a screen-region BitBlt — win32gui/win32ui — into a PNG); ASK when domain judgement
-is needed (it's mine — you implement); iterate until I bless it; keep the green gate green; add a
-data-independent unit case. A question is just a question — answer it, don't change code. Commit/push
-only when I ask.
+HOW WE WORK: one focused change at a time; PROPOSE the design + SHOW real output (the GUI can be
+captured via a screen-region BitBlt — win32gui/win32ui — into a PNG, then Read it; a generated .xlsx is
+verified by sending it for the user to open in Excel — Excel is STRICTER than openpyxl/zipfile, so
+"valid zip + openpyxl re-opens" is NOT proof, and the Excel "repair log" names the exact bad part);
+ASK when domain judgement is needed (it's mine — you implement); iterate until I bless it; keep the
+green gate green; add a data-independent unit case. A question is just a question — answer it, don't
+change code. Commit/push only when I ask (end commit messages with the Co-Authored-By trailer).
 
-HONOR (full detail in CLAUDE.md): reuse the shared primitives + domain/identity; the Open2App contract
-(write only under Shared/OutputTree/TiaPortalProjectInterface/BuilderData/ — byte-stable; the coverage
-report goes under Reports/, which is documentation/NOT imported); comma CSV; tag/device strings are text
-(data_type="s"); generated TIA Openness XML = UTF-8 BOM + CRLF + multi-line. GUI: tk.Button for the
-coloured phase bar (sv-ttk buttons can't take a custom bg); xlsx/xlsm are view-only in-app.
+HONOR (full detail in CLAUDE.md): reuse the shared primitives (io.workbook reader, core.model LogEntry
++ io.render, domain/identity); the Open2App contract (write only under
+Shared/OutputTree/TiaPortalProjectInterface/BuilderData/, byte-stable; Reports/* is documentation, NOT
+imported); comma CSV; tag/device strings are text (data_type="s"); generated TIA Openness XML = UTF-8
+BOM + CRLF + multi-line. **io/xlsx_edit is the ONE .xlsx writer — NEVER do an openpyxl load->save on
+the I/O List** (it flattens dynamic arrays into an Excel-corrupting overlap + drops caches + leaves a
+stale calcChain); edit surgically, or for an openpyxl-based writer call freeze_arrays after. GUI:
+classic tk.Button for the coloured phase bar (sv-ttk buttons can't take a custom bg); xlsx/xlsm are
+view-only in-app (edit hands off to LibreOffice/Excel).
 ```

@@ -7,7 +7,7 @@ project_code: "8XXX"
 
 io_list:      # The I/O List workbook ::: validation checks format and cross-checks it against the Cause & Effect matrix
   path: "C:\\Source\\Repos\\_Openn2\\Shared\\DocumentsValidationData\\Passing\\8XXX_IOyyyy_R0.0_EmergencyIoListValidationTemplate.xlsx"
-  sheet: 'NET SAFETY \d{1,3}/gmi'                                                                       # a single sheet name, a list of names or a regular expression
+  sheet: '^NET SAFETY \d{1,3}|^r\d+\.s\d+\.c\d+/gmi'                                                                       # a single sheet name, a list of names or a regular expression
   header_row: 1
 
 # Parameters

@@ -15,7 +15,9 @@ from openpyxl.utils import column_index_from_string as CI
 from pipeline3.core import config
 from pipeline3.domain.iolist_diag import populate as pop
 from pipeline3.domain.iolist_diag import script_type as st
-from pipeline3.domain.iolist_diag.models import DIAGBLOCKS_SHEET, IoRow
+from pipeline3.domain.iolist_diag import diag_alloc
+from pipeline3.domain.iolist_diag.blocks import HEADERS as DIAG_HEADERS
+from pipeline3.domain.iolist_diag.models import DIAGBLOCKS_SHEET, IoRow, RowResult
 
 
 def _set(ws, col, row, val, text=False):
@@ -231,8 +233,247 @@ def test_fills_source_in_place_and_backs_up():
     _run(check)
 
 
+def _diag_row(sheet, row, fu, loc, ex_cab="", ex_bit=""):
+    """A minimal diagnosed node RowResult (type A, no family) for the pure diag_alloc tests."""
+    io = IoRow(sheet=sheet, row=row, functional_unit=fu, location=loc,
+               ex_diag_cabinet=ex_cab, ex_diag_bit=ex_bit)
+    return RowResult(iorow=io, type_def={"in_diagnosis": "1", "type_id": "A"}, family=None, index="0001")
+
+
+def test_allocate_reuses_and_extends_ids():
+    fn = "=S1" "+A1"
+    r = _diag_row("s", 2, "=S1", "+A1")
+    diag_alloc.allocate([r], {}, existing={fn: 7})
+    eq(r.diag_cabinet, "007", "an existing cabinet's ID_Local is REUSED (keyed by full_name)")
+
+    r2 = _diag_row("s", 3, "=S2", "+B2")               # a new cabinet, with an occupied id gap
+    diag_alloc.allocate([r2], {}, existing={"X": 0, "Y": 2})
+    eq(r2.diag_cabinet, "003", "a new cabinet takes max+1 (above every existing id)")
+
+    r3 = _diag_row("s", 4, "=S3", "+C3")
+    diag_alloc.allocate([r3], {})
+    eq(r3.diag_cabinet, "000", "no existing sheet -> 0-based numbering (regression)")
+
+
+def test_allocate_bit_continues_past_used():
+    fn = "=S1" "+A1"
+    filled = _diag_row("s", 2, "=S1", "+A1", ex_cab="000", ex_bit="00")
+    filled2 = _diag_row("s", 3, "=S1", "+A1", ex_cab="000", ex_bit="01")
+    blank = _diag_row("s", 4, "=S1", "+A1")
+    diag_alloc.allocate([filled, filled2, blank], {}, existing={fn: 0})
+    eq(filled.diag_bit, "00", "an already-assigned bit is kept")
+    eq(blank.diag_bit, "02", "a new blank row CONTINUES past the bits already used (0,1) -> 2")
+
+    a, b = _diag_row("s", 2, "=S1", "+A1"), _diag_row("s", 3, "=S1", "+A1")
+    diag_alloc.allocate([a, b], {})
+    eq([a.diag_bit, b.diag_bit], ["00", "01"], "fresh fill -> 00,01 (regression)")
+
+
+def _seed_diagblocks(path, data_rows, headers=None):
+    """Add a DiagnosisBlocks sheet (`headers` or DIAG_HEADERS + `data_rows`) to an existing I/O List;
+    string cells are written as TEXT (so a FullName like '=S1+A1' isn't stored as a formula). Short
+    `data_rows` just omit trailing cells. The synthetic I/O List has no dynamic arrays, so an openpyxl
+    save here is safe."""
+    wb = load_workbook(path)
+    if DIAGBLOCKS_SHEET in wb.sheetnames:
+        del wb[DIAGBLOCKS_SHEET]
+    ws = wb.create_sheet(DIAGBLOCKS_SHEET)
+    ws.append(list(headers) if headers is not None else list(DIAG_HEADERS))
+    for ri, row in enumerate(data_rows, 2):
+        for ci, val in enumerate(row, 1):
+            c = ws.cell(ri, ci, val)
+            if isinstance(val, str):
+                c.data_type = "s"
+    wb.save(path)
+    wb.close()
+
+
+def _set_iolist_cell(path, sheet, row, canonical, value):
+    """Set an I/O-List cell by CANONICAL column name (e.g. 'diag_cabinet' -> col AE), as TEXT."""
+    from pipeline3.domain.iolist_diag.columns import ColumnResolver
+    col = ColumnResolver("IoList").letter(canonical)
+    wb = load_workbook(path)
+    c = wb[sheet].cell(row=row, column=CI(col), value=value)
+    c.data_type = "s"
+    wb.save(path)
+    wb.close()
+
+
+def test_diagblocks_id_reused_not_renumbered():
+    def check(params, out, d):
+        io = params["io_list"]["path"]
+        # the alarm node's full_name = FU+Location = '=S1+MS1.CC1'; pre-seed it at a NON-zero ID_Local
+        _seed_diagblocks(io, [[5, 5, "=S1", "+MS1.CC1", "=S1+MS1.CC1", 1, "", 1]])
+        res = pop.populate(params, write={"diag_cabinet"}, out_dir=out, emit=lambda *_: None)
+        eq(_by_addr(res.results, "I1.0").diag_cabinet, "005",
+           "the node cabinet REUSES its existing ID_Local (5), it is not renumbered to 000")
+    _run(check)
+
+
+def test_diagblocks_appends_new_cabinet_preserving_existing():
+    def check(params, out, d):
+        io = params["io_list"]["path"]
+        _seed_diagblocks(io, [[0, 777, "ZZ", "ZZ", "ZZZZ", 1, "manual", 9]])   # unrelated cabinet, hand-edited
+        res = pop.populate(params, write={"diag_cabinet"}, out_dir=out, emit=lambda *_: None)
+        wb = load_workbook(res.output_path)
+        grid = [[c.value for c in r] for r in wb[DIAGBLOCKS_SHEET].iter_rows()]
+        wb.close()
+        zz = next(r for r in grid if r[4] == "ZZZZ")
+        eq([zz[0], zz[1], zz[6]], [0, 777, "manual"], "the orphan row's identity (ID_Local/ID_SWP/Notes) is preserved")
+        eq(zz[7], 0, "its Count is refreshed to 0 (no live signals)")
+        eq(zz[8], "0-62", "its unused_bits = the full range")
+        ok(zz[9] in (None, ""), "its non_unique_bits is empty")
+        ok("=S1+MS1.CC1" in [r[4] for r in grid], "the new node cabinet was APPENDED")
+        eq(_by_addr(res.results, "I1.0").diag_cabinet, "001", "the appended cabinet gets a new id above 0")
+    _run(check)
+
+
+def test_diagblocks_count_rewritten_each_run():
+    def check(params, out, d):
+        io = params["io_list"]["path"]
+        # seed the real alarm-node cabinet with a STALE Count (99); populate must rewrite it to the truth
+        _seed_diagblocks(io, [[0, 0, "=S1", "+MS1.CC1", "=S1+MS1.CC1", 1, "", 99]])
+        res = pop.populate(params, write={"diag_cabinet"}, out_dir=out, emit=lambda *_: None)
+        wb = load_workbook(res.output_path)
+        grid = [[c.value for c in r] for r in wb[DIAGBLOCKS_SHEET].iter_rows()]
+        wb.close()
+        node = next(r for r in grid if r[4] == "=S1+MS1.CC1")
+        eq(node[7], 1, "the derived Count is REWRITTEN to the current signal count (1), not the stale 99")
+        eq(node[0], 0, "the cabinet's identity columns (ID_Local) are preserved")
+    _run(check)
+
+
+def test_diagblocks_preserved_and_no_duplicate_on_rerun():
+    def check(params, out, d):
+        io = params["io_list"]["path"]
+        pop.populate(params, write={"diag_cabinet"}, out_dir=out, emit=lambda *_: None)
+        wb = load_workbook(io)
+        ws = wb[DIAGBLOCKS_SHEET]
+        n1 = ws.max_row
+        ws.cell(2, 2, 4242)                            # a hand-edit to an existing row's ID_SWP
+        wb.save(io)
+        wb.close()
+        pop.populate(params, write={"diag_cabinet"}, out_dir=out, emit=lambda *_: None)
+        wb = load_workbook(io)
+        ws = wb[DIAGBLOCKS_SHEET]
+        eq(ws.max_row, n1, "a re-run appends NO duplicate rows")
+        eq(ws.cell(2, 2).value, 4242, "the hand-edited ID_SWP survives the re-run (the row is untouched)")
+        wb.close()
+    _run(check)
+
+
+def test_diagblocks_append_after_header_only_sheet():
+    def check(params, out, d):
+        io = params["io_list"]["path"]
+        _seed_diagblocks(io, [])                       # header only, no data rows
+        res = pop.populate(params, write={"diag_cabinet"}, out_dir=out, emit=lambda *_: None)
+        wb = load_workbook(res.output_path)
+        ws = wb[DIAGBLOCKS_SHEET]
+        eq(ws.cell(1, 1).value, "ID_Local", "the header row is preserved")
+        ok(ws.max_row >= 2, "blocks appended after the header")
+        wb.close()
+        eq(_by_addr(res.results, "I1.0").diag_cabinet, "000", "an empty sheet -> ids start at 000")
+    _run(check)
+
+
+def test_fmt_ranges():
+    from pipeline3.domain.iolist_diag import blocks as b
+    eq(b._fmt_ranges([]), "")
+    eq(b._fmt_ranges([5]), "5")
+    eq(b._fmt_ranges([0, 1, 2, 3, 4, 5, 6, 7, 9, 13] + list(range(18, 63))), "0-7, 9, 13, 18-62")
+    eq(b._fmt_ranges([3, 3, 1]), "1, 3", "deduped + sorted")
+
+
+def test_analyze_and_norm():
+    from pipeline3.domain.iolist_diag import blocks as b
+    eq(b._norm_cab("0"), "000")
+    eq(b._norm_cab("7"), "007")
+    eq(b._norm_cab("xx"), "xx")
+    eq(b._bit_int("05"), 5)
+    ok(b._bit_int("") is None and b._bit_int("<input required>") is None)
+    d = b.analyze([("000", 0), ("000", 1), ("000", 1), ("001", None)], 0, 62)
+    eq(d["000"], (3, "2-62", "1"), "3 rows; bits {0,1} used (1 twice) -> unused 2-62, non_unique 1")
+    eq(d["001"], (1, "0-62", ""), "a row with no bit counts once; full unused; no collision")
+    eq(b.analyze([("002", 70), ("002", 70)], 0, 62)["002"], (2, "0-62", "70"),
+       "an out-of-range duplicated bit shows in non_unique, doesn't shrink unused")
+
+
+def test_real_count_from_effective_diag_cabinet():
+    def check(params, out, d):
+        io = params["io_list"]["path"]
+        _set_iolist_cell(io, "NET SAFETY 50", 3, "diag_cabinet", "005")    # alarm A manually homed to cab 005
+        _seed_diagblocks(io, [[5, 5, "M", "M", "MANUAL5", 1, "", 0]])
+        res = pop.populate(params, write={"diag_cabinet"}, out_dir=out, emit=lambda *_: None)
+        wb = load_workbook(res.output_path)
+        grid = [[c.value for c in r] for r in wb[DIAGBLOCKS_SHEET].iter_rows()]
+        wb.close()
+        m5 = next(r for r in grid if r[4] == "MANUAL5")
+        eq(m5[7], 1, "Count follows the REAL Diag_Cabinet column (the manual 005), not the computed cabinet")
+    _run(check)
+
+
+def test_unused_nonunique_columns_fresh():
+    def check(params, out, d):
+        res = pop.populate(params, out_dir=out, emit=lambda *_: None)   # full fill, no prior sheet -> fresh
+        wb = load_workbook(res.output_path)
+        ws = wb[DIAGBLOCKS_SHEET]
+        eq([c.value for c in ws[1]], list(DIAG_HEADERS), "fresh sheet carries the 10-column header")
+        grid = [[c.value for c in r] for r in ws.iter_rows()]
+        wb.close()
+        node = next(r for r in grid if r[4] == "=S1+MS1.CC1")           # alarm A at bit 0
+        eq(node[8], "1-62", "unused_bits = full range minus the used bit 0")
+        ok(node[9] in (None, ""), "non_unique_bits empty (the allocator never collides)")
+    _run(check)
+
+
+def test_add_columns_to_existing_8col_sheet():
+    def check(params, out, d):
+        io = params["io_list"]["path"]
+        _seed_diagblocks(io, [[0, 0, "=S1", "+MS1.CC1", "=S1+MS1.CC1", 1, "note", 99]],
+                         headers=DIAG_HEADERS[:8])                      # OLD 8-column sheet (no I/J)
+        res = pop.populate(params, write={"diag_cabinet"}, out_dir=out, emit=lambda *_: None)
+        wb = load_workbook(res.output_path)
+        ws = wb[DIAGBLOCKS_SHEET]
+        eq(ws.cell(1, 9).value, "unused_bits", "I1 header added")
+        eq(ws.cell(1, 10).value, "non_unique_bits", "J1 header added")
+        row = [c.value for c in ws[2]]
+        wb.close()
+        eq(row[:7], [0, 0, "=S1", "+MS1.CC1", "=S1+MS1.CC1", 1, "note"], "identity columns A..G preserved")
+        eq(row[7], 1, "Count refreshed at H (was 99)")
+        ok(row[8], "unused_bits populated at I")
+    _run(check)
+
+
+def test_rerun_no_duplicate_columns():
+    def check(params, out, d):
+        io = params["io_list"]["path"]
+        pop.populate(params, out_dir=out, emit=lambda *_: None)
+        pop.populate(params, out_dir=out, emit=lambda *_: None)
+        wb = load_workbook(io)
+        ws = wb[DIAGBLOCKS_SHEET]
+        hdr = [c.value for c in ws[1]]
+        wb.close()
+        eq(ws.max_column, 10, "still exactly 10 columns after a re-run")
+        eq(hdr.count("unused_bits"), 1, "no duplicate unused_bits column")
+        eq(hdr.count("non_unique_bits"), 1, "no duplicate non_unique_bits column")
+    _run(check)
+
+
 if __name__ == "__main__":
     raise SystemExit(run("iolist_diag", [
+        ("fmt_ranges", test_fmt_ranges),
+        ("analyze_and_norm", test_analyze_and_norm),
+        ("real_count_from_effective_diag_cabinet", test_real_count_from_effective_diag_cabinet),
+        ("unused_nonunique_columns_fresh", test_unused_nonunique_columns_fresh),
+        ("add_columns_to_existing_8col_sheet", test_add_columns_to_existing_8col_sheet),
+        ("rerun_no_duplicate_columns", test_rerun_no_duplicate_columns),
+        ("allocate_reuses_and_extends_ids", test_allocate_reuses_and_extends_ids),
+        ("allocate_bit_continues_past_used", test_allocate_bit_continues_past_used),
+        ("diagblocks_id_reused_not_renumbered", test_diagblocks_id_reused_not_renumbered),
+        ("diagblocks_appends_new_cabinet_preserving_existing", test_diagblocks_appends_new_cabinet_preserving_existing),
+        ("diagblocks_count_rewritten_each_run", test_diagblocks_count_rewritten_each_run),
+        ("diagblocks_preserved_and_no_duplicate_on_rerun", test_diagblocks_preserved_and_no_duplicate_on_rerun),
+        ("diagblocks_append_after_header_only_sheet", test_diagblocks_append_after_header_only_sheet),
         ("populates_and_skips_nodemeta", test_populates_and_skips_nodemeta),
         ("script_type_and_index", test_script_type_and_index),
         ("diag_allocation", test_diag_allocation),

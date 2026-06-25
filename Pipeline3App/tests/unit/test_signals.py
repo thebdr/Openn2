@@ -173,7 +173,7 @@ def test_clear_on_rerun():
 
 # --- 520 Generate Data Blocks -------------------------------------------------------------- #
 
-def _db_row(script_type="DI1/2", name_in_db="Door Closed", datablocks="07_DOOR", db_kind="safe_db",
+def _db_row(script_type="DI1/2", name_in_db="Door Closed", datablocks="07_DOOR", db_kind="F_DB",
             io_comment="", fu="=S1", loc="+SG1", dev="-B1"):
     return {"script_type": script_type, "name_in_db": name_in_db, "datablocks": datablocks,
             "functional_unit": fu, "location": loc, "device": dev,
@@ -187,17 +187,17 @@ _DB_RULES = [{"name": "Door Alarm", "required_types": ["DI1/2", "DI2/2"], "dev_t
 
 def test_build_data_blocks():
     rows = [
-        _db_row("DI1/2", "Door Closed A", "07_DOOR", "safe_db", io_comment="closed {device}", dev="-B1"),
-        _db_row("DI2/2", "Door Closed B", "07_DOOR", "safe_db", dev="-B2"),
-        _db_row("KQ", "Contactor FB", "03_FDBACK", "safe_db"),
-        _db_row("KQ", "Contactor FB", "03_FDBACK", "safe_db"),               # duplicate -> dropped
-        _db_row("PA", "Node X", "PROFINET_NODES_ALARM", "db"),               # non-safe
+        _db_row("DI1/2", "Door Closed A", "07_DOOR", "F_DB", io_comment="closed {device}", dev="-B1"),
+        _db_row("DI2/2", "Door Closed B", "07_DOOR", "F_DB", dev="-B2"),
+        _db_row("KQ", "Contactor FB", "03_FDBACK", "F_DB"),
+        _db_row("KQ", "Contactor FB", "03_FDBACK", "F_DB"),                  # duplicate -> dropped
+        _db_row("PA", "Node X", "PROFINET_NODES_ALARM", "DB"),              # normal (ProgrammingLanguage=DB)
         _db_row("X", "", ""),                                                # no name_in_db -> ignored
     ]
     dbs, warnings = signals.build_data_blocks(rows, _DB_RULES)
     eq(sorted(dbs), ["03_FDBACK", "07_DOOR", "PROFINET_NODES_ALARM"])
-    eq(dbs["07_DOOR"]["safe"], True, "DI safe_db -> fail-safe DB")
-    eq(dbs["PROFINET_NODES_ALARM"]["safe"], False, "db kind -> not fail-safe")
+    eq(dbs["07_DOOR"]["prog_lang"], "F_DB", "DI F_DB -> fail-safe DB")
+    eq(dbs["PROFINET_NODES_ALARM"]["prog_lang"], "DB", "DB kind -> normal DB")
     doors = [m["name"] for m in dbs["07_DOOR"]["members"]]
     eq(doors[:len(signals.DB_CONSTANTS)], signals.DB_CONSTANTS, "constants first (Always FALSE/TRUE/No Operation)")
     ok("Door Closed A" in doors and "Door Closed B" in doors, "type-based members")
@@ -210,14 +210,62 @@ def test_build_data_blocks():
     eq(cm["comment"], "closed -B1")
 
 
+def test_db_kind_of_alignment():
+    from pipeline3.domain import identity
+    multi = {"db_kind": "DB|F_DB", "db_names": ["ALARM", "COMM"]}        # the | splitter, verbatim values
+    eq(identity.db_kind_of(multi, "ALARM"), "DB", "positional: first db_name, verbatim")
+    eq(identity.db_kind_of(multi, "COMM"), "F_DB", "positional: second db_name, verbatim")
+    single = {"db_kind": "F_DB", "db_names": ["A", "B"]}
+    eq(identity.db_kind_of(single, "A"), "F_DB", "a single kind applies to every DB")
+    eq(identity.db_kind_of(single, "B"), "F_DB")
+    ok(identity.is_db_backed(multi) and identity.is_db_backed(single), "non-empty db_kind -> DB-backed")
+    ok(not identity.is_db_backed({"db_kind": ""}), "no db_kind -> not DB-backed")
+
+
+def test_build_data_blocks_per_position_db_kind():
+    # db_kind is `|`-aligned with db_names by POSITION: ONE type emits a normal DB AND a fail-safe DB.
+    pa = {"script_type": "PA", "name_in_db": "Node X",
+          "datablocks": "PROFINET_NODES_ALARM|00_Commissioning",
+          "functional_unit": "=S1", "location": "+SM69", "device": "-XNS1",
+          "_type": {"db_kind": "DB|F_DB",
+                    "db_names": ["PROFINET_NODES_ALARM", "00_Commissioning"], "io_comment": ""}}
+    dbs, _ = signals.build_data_blocks([pa], [])
+    eq(dbs["PROFINET_NODES_ALARM"]["prog_lang"], "DB", "position 0 = DB -> normal")
+    eq(dbs["00_Commissioning"]["prog_lang"], "F_DB", "position 1 = F_DB -> fail-safe")
+    ok("Node X" in [m["name"] for m in dbs["PROFINET_NODES_ALARM"]["members"]], "member in the normal DB")
+    ok("Node X" in [m["name"] for m in dbs["00_Commissioning"]["members"]], "member in the safe DB")
+
+
+def test_fdb_marker_canonicalized_and_unknown_warned():
+    # guardrail: a lowercase/padded db_kind meaning F_DB is written as the canonical 'F_DB' (TIA-recognized)
+    # + OPC-locked; a genuinely unrecognized db_kind is written verbatim WITH a warning.
+    rows = [
+        {"script_type": "X", "name_in_db": "M1", "datablocks": "SAFE_LC",
+         "_type": {"db_kind": "f_db ", "db_names": ["SAFE_LC"]}},        # lowercase + padded -> F_DB
+        {"script_type": "Y", "name_in_db": "M2", "datablocks": "WEIRD",
+         "_type": {"db_kind": "ARRAY_DB", "db_names": ["WEIRD"]}},        # unrecognized -> verbatim + warn
+    ]
+    dbs, warnings = signals.build_data_blocks(rows, [])
+    with tempfile.TemporaryDirectory() as d:
+        signals.write_data_blocks(dbs, d)
+        ddir = config.out_path(d, "blocks_import_dir")
+        safe = open(os.path.join(ddir, "SAFE_LC.xml"), encoding="utf-8-sig").read()
+        ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in safe, "lowercase 'f_db ' -> canonical F_DB")
+        ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in safe, "and OPC-locked")
+        weird = open(os.path.join(ddir, "WEIRD.xml"), encoding="utf-8-sig").read()
+        ok("<ProgrammingLanguage>ARRAY_DB</ProgrammingLanguage>" in weird, "unrecognized stays verbatim")
+    ok(any("ARRAY_DB" in w and "TIA may reject" in w for w in warnings), "unrecognized db_kind warned")
+    ok(not any("SAFE_LC" in w for w in warnings), "the canonicalized F_DB does not warn")
+
+
 def test_constants_spelling():
     eq(signals.DB_CONSTANTS, ["Always FALSE", "Always TRUE", "No Operation"], "space, no underscore")
 
 
 def test_write_safe_db_xml():
-    # a SAFE DB is exported as an F_DB Openness XML (the .db cannot express fail-safe)
+    # a fail-safe DB is a GlobalDB XML carrying ProgrammingLanguage=F_DB + DBAccessibleFromOPCUA=false
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("DI1/2", "Door Closed A", "07_DOOR", "safe_db", dev="-B1")]
+        rows = [_db_row("DI1/2", "Door Closed A", "07_DOOR", "F_DB", dev="-B1")]
         dbs, _ = signals.build_data_blocks(rows, _DB_RULES)
         db_dir, count = signals.write_data_blocks(dbs, d)
         eq(count, 1)
@@ -240,27 +288,29 @@ def test_write_safe_db_xml():
 
 
 def test_write_normal_db_source():
-    # a NORMAL DB stays a .db external source, OPC-UA accessible
+    # a NORMAL DB is now ALSO a GlobalDB XML - it differs from F_DB only by ProgrammingLanguage=DB and
+    # DBAccessibleFromOPCUA=true (OPC-UA accessible); the .db external source is gone.
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("PA", "Node X", "PROFINET_NODES_ALARM", "db")]
+        rows = [_db_row("PA", "Node X", "PROFINET_NODES_ALARM", "DB")]
         dbs, _ = signals.build_data_blocks(rows, [])
         db_dir, count = signals.write_data_blocks(dbs, d)
         eq(count, 1)
-        ok(os.path.exists(os.path.join(db_dir, "PROFINET_NODES_ALARM.db")), "normal DB -> .db")
-        raw = open(os.path.join(db_dir, "PROFINET_NODES_ALARM.db"), "rb").read()
+        ok(os.path.exists(os.path.join(db_dir, "PROFINET_NODES_ALARM.xml")), "normal DB -> .xml too")
+        ok(not os.path.exists(os.path.join(db_dir, "PROFINET_NODES_ALARM.db")), "no .db any more")
+        raw = open(os.path.join(db_dir, "PROFINET_NODES_ALARM.xml"), "rb").read()
         ok(raw.startswith(b"\xef\xbb\xbf"), "UTF-8 BOM")
         ok(raw.count(b"\n") > 0 and raw.count(b"\n") == raw.count(b"\r\n"), "CRLF only")
-        prof = raw.decode("utf-8-sig")
-        ok(prof.startswith('DATA_BLOCK "PROFINET_NODES_ALARM"\r\n'), "DATA_BLOCK header")
-        ok("DB_Accessible_From_OPC_UA := 'TRUE'" in prof, "normal DB -> OPC-UA accessible")
-        ok("S7_Optimized_Access := 'TRUE'" in prof and "NON_RETAIN" in prof, "header attrs")
-        ok("   VAR " in prof and "   END_VAR" in prof, "VAR/END_VAR block")
-        ok(prof.rstrip().endswith("END_DATA_BLOCK"), "well-formed tail")
+        xtxt = raw.decode("utf-8-sig")
+        ok("<ProgrammingLanguage>DB</ProgrammingLanguage>" in xtxt, "normal DB -> ProgrammingLanguage=DB")
+        ok("<DBAccessibleFromOPCUA>true</DBAccessibleFromOPCUA>" in xtxt, "normal DB IS OPC-UA accessible")
+        ok('<Member Name="Node X"' in xtxt, "member emitted")
+        ok("SW.Blocks.GlobalDB" in xtxt, "still a GlobalDB block")
+        ET.fromstring(xtxt)  # parses as valid XML
 
 
 def test_write_clears_db_and_xml_not_scl():
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("PA", "Node X", "PROFINET_NODES_ALARM", "db")]
+        rows = [_db_row("PA", "Node X", "PROFINET_NODES_ALARM", "DB")]
         dbs, _ = signals.build_data_blocks(rows, [])
         db_dir, _ = signals.write_data_blocks(dbs, d)
         scl = os.path.join(db_dir, "Diagnostic_for_OPC.scl"); open(scl, "w").write("keep me")
@@ -275,11 +325,11 @@ def test_write_clears_db_and_xml_not_scl():
 def test_generate_data_blocks_real_rules():
     # uses the real datablock_elements_rules.csv via config.load_rules
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("DI1/2", "Door Closed", "07_DOOR", "safe_db", dev="-B1")]
+        rows = [_db_row("DI1/2", "Door Closed", "07_DOOR", "F_DB", dev="-B1")]
         res = signals.generate_data_blocks(rows, d)
         ok("07_DOOR" in res["dbs"]); ok("07_DOOR" in res["safe"])
         ok(res["count"] >= 1)
-        ok(os.path.exists(os.path.join(res["dir"], "07_DOOR.xml")), "safe DB -> .xml")
+        ok(os.path.exists(os.path.join(res["dir"], "07_DOOR.xml")), "DB -> .xml")
 
 
 # --- phase wiring -------------------------------------------------------------------------- #
@@ -296,7 +346,7 @@ def test_phase_run():
         iol = os.path.join(d, "iolist.xlsx"); _make_iolist(iol)
         ctx = PipelineContext(params={"io_list": {"path": iol}}, out_root=os.path.join(d, "out"))
         ctx.rows = [_io_row("TAG_A", "SafetyTags", "I0.0"),
-                    _db_row("DI1/2", "Door Closed", "07_DOOR", "safe_db", dev="-B1")]
+                    _db_row("DI1/2", "Door Closed", "07_DOOR", "F_DB", dev="-B1")]
         res = p500_signals.run(ctx)
         ok(res.ok)
         tag_dir = config.out_path(ctx.out_root, "io_tags_dir")
@@ -324,10 +374,15 @@ def test_sweep_preserves_zone_cumulative_db():
         com = signals.write_safe_db(d, signals.COM_DB, ["AREA 1 PB"])
         ok(os.path.exists(com), "02_COM written")
         # a 520 write sweeps *.db/*.xml but must PRESERVE the phase-800-owned 02_COM.xml
-        signals.write_data_blocks({"OTHER": {"safe": True, "members": [{"name": "x", "comment": ""}]}}, d)
+        signals.write_data_blocks({"OTHER": {"prog_lang": "F_DB", "members": [{"name": "x", "comment": ""}]}}, d)
         ok(os.path.exists(com), "02_COM preserved through the 520 sweep")
         db_dir = config.out_path(d, "blocks_import_dir")
-        ok(os.path.exists(os.path.join(db_dir, "OTHER.xml")), "the 520-written DB present")
+        other = os.path.join(db_dir, "OTHER.xml")
+        ok(os.path.exists(other), "the 520-written DB present")
+        x = open(other, encoding="utf-8-sig").read()
+        ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in x
+           and "<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in x,
+           "prog_lang drives the fail-safe markers (a regression to normal would be caught here)")
 
 
 if __name__ == "__main__":
@@ -341,6 +396,9 @@ if __name__ == "__main__":
         ("generate_io_tags_combined", test_generate_io_tags_combined),
         ("clear_on_rerun", test_clear_on_rerun),
         ("build_data_blocks", test_build_data_blocks),
+        ("db_kind_of_alignment", test_db_kind_of_alignment),
+        ("build_data_blocks_per_position_db_kind", test_build_data_blocks_per_position_db_kind),
+        ("fdb_marker_canonicalized_and_unknown_warned", test_fdb_marker_canonicalized_and_unknown_warned),
         ("constants_spelling", test_constants_spelling),
         ("write_safe_db_xml", test_write_safe_db_xml),
         ("write_normal_db_source", test_write_normal_db_source),

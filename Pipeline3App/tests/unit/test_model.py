@@ -4,8 +4,8 @@ from pipeline3.core.model import LogEntry, InfoBlock, number_entries, banner, ER
 
 
 def test_id_is_phase_and_type():
-    e = LogEntry(level="FAIL", phase=130, type="cem_match")
-    eq(e.id, "130-cem_match", "id is the code-traceable log-type index <phase>-<type>")
+    e = LogEntry(level="FAIL", phase=130, type="cem_fld_none")
+    eq(e.id, "130-cem_fld_none", "id is the code-traceable log-type index <phase>-<type>")
     eq(LogEntry(level="WARN", phase=110, type="addr_format").id, "110-addr_format")
     eq(LogEntry(level="INFO", phase=110).id, "110", "no type -> just the phase")
 

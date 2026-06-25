@@ -44,7 +44,7 @@ def test_reconcile_prune_stale_new():
         seed = {"aaaaaaaaaa": errors.Treatment(uid="aaaaaaaaaa", treatment="skip", type="old", location="S!A1"),
                 "bbbbbbbbbb": errors.Treatment(uid="bbbbbbbbbb", treatment="", type="old2", location="S!A2")}
         errors._write(_csv(d), seed)
-        log = [_fail(130, "cem_dev_missing", "CEM!F5")]            # a NEW finding this run
+        log = [_fail(130, "cem_fld_none", "CEM!F5")]              # a NEW finding this run
         errors.apply_and_reconcile(_ctx(), log, path=_csv(d))
         back = errors.load(_csv(d))
         ok(log[0].uid in back and back[log[0].uid].treatment == "", "new FAIL recorded, untreated")
@@ -112,8 +112,25 @@ def test_accept_gated_to_addr_only():
         eq(load_workbook(io)["NET SAFETY 50"]["L5"].value, "DOOR OPEN", "no mutation for a gated-out type")
 
 
+def test_set_treatment_quick_treat():
+    with tempfile.TemporaryDirectory() as d:
+        log = [_fail(130, "cem_fld_none", "CEM!F5")]
+        uid = log[0].uid
+        errors.apply_and_reconcile(_ctx(), log, path=_csv(d))            # seed the (untreated) row
+        ok(errors.set_treatment(_csv(d), uid, "warn"), "the finding's row is found + set")
+        eq(errors.load(_csv(d))[uid].treatment, "warn", "warn written, other rows preserved")
+        ok(errors.set_treatment(_csv(d), uid, ""), "clear returns True")
+        eq(errors.load(_csv(d))[uid].treatment, "", "treatment cleared")
+        ok(not errors.set_treatment(_csv(d), "deadbeef00", "warn"), "an unknown uid -> False (no write)")
+        errors.set_treatment(_csv(d), uid, "warn")
+        log2 = [_fail(130, "cem_fld_none", "CEM!F5")]                    # the SAME finding next run
+        errors.apply_and_reconcile(_ctx(), log2, path=_csv(d))
+        eq(log2[0].level, "WARN", "the recorded warn downgrades the finding on the next validation run")
+
+
 if __name__ == "__main__":
     raise SystemExit(run("errors", [
+        ("set_treatment_quick_treat", test_set_treatment_quick_treat),
         ("warn_and_skip_downgrade", test_warn_and_skip_downgrade),
         ("reconcile_prune_stale_new", test_reconcile_prune_stale_new),
         ("treatment_roundtrip_by_uid", test_treatment_roundtrip_by_uid),

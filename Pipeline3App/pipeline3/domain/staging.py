@@ -109,8 +109,8 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
         row["diag_block_template"] = blk["template_type"] if blk else ""
         row["swp_cabinet"] = blk["swp"] if blk else ""
         t = row.get("_type") or {}
-        row["datablocks"] = ("|".join(t.get("db_names") or [])
-                             if t.get("db_kind") in ("db", "safe_db") and row["name_in_db"] else "")
+        row["datablocks"] = ("|".join(n for n in (t.get("db_names") or []) if identity.db_kind_of(t, n))
+                             if row["name_in_db"] else "")
         octets = str(row.get("profinet_ip", "")).split(".")
         row["subnet_name"] = f"Subnet{octets[2]}" if len(octets) == 4 and octets[2] else ""
     _add_node_address_ranges(rows)
@@ -132,21 +132,32 @@ def _addr_byte(bit):
 
 
 def _add_node_address_ranges(rows) -> None:
-    by_loc_I, by_loc_Q = {}, {}
+    """A Profinet node's I/Q byte range is POSITIONAL: it owns every row beneath it - in I/O List order -
+    until the next node, or the end of its sheet. The range is the min/max byte address of those rows.
+    NOT keyed by FLD/location: a safety module's emergency stops carry their OWN device location (a push
+    button's +ES..), so a location key misses them and leaves the module's range empty - which then drops
+    those signals from every node-of lookup (02/06/08 builders, diagnosis FL, coverage)."""
+    def _flush(node, ib, qb):
+        if node is None:
+            return
+        node["I_startByte"] = min(ib) if ib else ""
+        node["I_endByte"] = max(ib) if ib else ""
+        node["Q_startByte"] = min(qb) if qb else ""
+        node["Q_endByte"] = max(qb) if qb else ""
+
     for r in rows:
+        r["I_startByte"] = r["I_endByte"] = r["Q_startByte"] = r["Q_endByte"] = ""
+    cur, ib, qb, sheet = None, [], [], object()       # sentinel sheet -> the first row opens one
+    for r in rows:
+        rs = r.get("_source_sheet")
+        if rs != sheet:                                # a new sheet ends the current node's span
+            _flush(cur, ib, qb); cur, ib, qb, sheet = None, [], [], rs
+        if r.get("profinet_name"):                     # a node head opens a new span (and owns its own bit)
+            _flush(cur, ib, qb); cur, ib, qb = r, [], []
         ab = _addr_byte(r.get("bit"))
-        if ab:
-            (by_loc_I if ab[0] == "I" else by_loc_Q).setdefault(r.get("location", ""), []).append(ab[1])
-    for r in rows:
-        if r.get("profinet_name"):
-            ib = by_loc_I.get(r.get("location", ""), [])
-            qb = by_loc_Q.get(r.get("location", ""), [])
-            r["I_startByte"] = min(ib) if ib else ""
-            r["I_endByte"] = max(ib) if ib else ""
-            r["Q_startByte"] = min(qb) if qb else ""
-            r["Q_endByte"] = max(qb) if qb else ""
-        else:
-            r["I_startByte"] = r["I_endByte"] = r["Q_startByte"] = r["Q_endByte"] = ""
+        if ab and cur is not None:
+            (ib if ab[0] == "I" else qb).append(ab[1])
+    _flush(cur, ib, qb)
 
 
 def load_diagnostic_blocks(io_path: str) -> dict:

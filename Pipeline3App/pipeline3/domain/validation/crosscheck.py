@@ -33,7 +33,8 @@ def run_xcheck_cem_iol(ctx) -> list:
     except FileLockedError:
         return [vm.entry("FAIL", 130, "ce_locked", ctx.lang)]
 
-    io_index = indexes.build_io_index(ctx.rows or [])
+    io_fld = indexes.build_io_index(ctx.rows or [])          # FLD -> {addrs, raw_addr, raw_fld, source_cell}
+    io_addr = indexes.build_io_addr_index(ctx.rows or [])    # address -> {keys, raw_fld, source_cell}
     ce_doc, io_doc = os.path.basename(ce["path"]), os.path.basename(ctx.io_list_path())
     out, checked = [], 0
     for ref in refs:
@@ -44,21 +45,37 @@ def run_xcheck_cem_iol(ctx) -> list:
         if not ref["key"]:
             out.append(vm.entry("FAIL", 130, "cem_ref_empty", ctx.lang, location=ref["loc"], doc=ce_doc, info=info))
             continue
-        hit = io_index.get(ref["key"])
-        if hit is None:
-            # no I/O List cell to point at -> link the I/O List FILE (open it) as the second link
-            out.append(vm.entry("FAIL", 130, "cem_dev_missing", ctx.lang, location=ref["loc"], doc=ce_doc,
+
+        # SEARCH BY I/O ADDRESS: PASS if the address is in the I/O List under a MATCHING FLD; FAIL if it's
+        # there under a DIFFERENT FLD; FAIL if the address isn't there at all.
+        ah = io_addr.get(ref["addr"])
+        if ah is None:
+            out.append(vm.entry("FAIL", 130, "cem_addr_none", ctx.lang, location=ref["loc"], doc=ce_doc,
                                 location2=_IO_LABEL, doc2=io_doc, info=info))
-            continue
-        if ref["addr"] in hit["addrs"]:
-            # full match: link BOTH workbooks - the C&E ref cell (primary) AND the matched I/O List cell
-            out.append(vm.entry("PASS", 130, "cem_match", ctx.lang, location=ref["loc"], doc=ce_doc,
-                                location2=hit.get("source_cell", ""), doc2=io_doc, info=info))
-            continue
-        io_addrs = ", ".join(sorted(hit["raw_addr"].values())) or "(none)"
-        cmp = vm.cmp_detail(ref["raw_addr"], io_addrs, ref["raw_fld"], hit["raw_fld"], addr_eq=False, fld_eq=True)
-        out.append(vm.entry("FAIL", 130, "cem_fld_addr_mismatch", ctx.lang, location=ref["loc"], doc=ce_doc,
-                            location2=hit["source_cell"], doc2=io_doc, info=info, cmp=cmp))
+        elif ref["key"] in ah["keys"]:
+            out.append(vm.entry("PASS", 130, "cem_addr_ok", ctx.lang, location=ref["loc"], doc=ce_doc,
+                                location2=ah["source_cell"], doc2=io_doc, info=info))
+        else:
+            io_flds = ", ".join(sorted(ah["raw_fld"].values())) or "(none)"
+            cmp = vm.cmp_detail(ref["raw_addr"], ref["raw_addr"], ref["raw_fld"], io_flds, addr_eq=True, fld_eq=False)
+            out.append(vm.entry("FAIL", 130, "cem_addr_fld", ctx.lang, location=ref["loc"], doc=ce_doc,
+                                location2=ah["source_cell"], doc2=io_doc, info=info, cmp=cmp))
+
+        # SEARCH BY FLD: PASS if the FLD is in the I/O List at a MATCHING address; FAIL if it's there at a
+        # DIFFERENT address; FAIL if the FLD isn't there at all.
+        fh = io_fld.get(ref["key"])
+        if fh is None:
+            out.append(vm.entry("FAIL", 130, "cem_fld_none", ctx.lang, location=ref["loc"], doc=ce_doc,
+                                location2=_IO_LABEL, doc2=io_doc, info=info))
+        elif ref["addr"] in fh["addrs"]:
+            out.append(vm.entry("PASS", 130, "cem_fld_ok", ctx.lang, location=ref["loc"], doc=ce_doc,
+                                location2=fh["source_cell"], doc2=io_doc, info=info))
+        else:
+            io_addrs = ", ".join(sorted(fh["raw_addr"].values())) or "(none)"
+            cmp = vm.cmp_detail(ref["raw_addr"], io_addrs, ref["raw_fld"], fh["raw_fld"], addr_eq=False, fld_eq=True)
+            out.append(vm.entry("FAIL", 130, "cem_fld_addr", ctx.lang, location=ref["loc"], doc=ce_doc,
+                                location2=fh["source_cell"], doc2=io_doc, info=info, cmp=cmp))
+
     out.append(vm.entry("INFO", 130, "cem_summary", ctx.lang, refs=checked))
     return out
 

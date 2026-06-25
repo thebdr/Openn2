@@ -679,8 +679,10 @@ def _capture_formula_caches(zbytes) -> dict:
 
 
 def _patch_formula_cache(xml: str, ref: str, t, value: str) -> str:
-    """Restore a single formula cell's cached value (+ its result-type t) in an openpyxl-written
-    worksheet XML string (openpyxl emits an empty <v/> for formula cells)."""
+    """Set a single formula cell's cached value (+ its result-type t) in an openpyxl-written worksheet
+    XML string. openpyxl usually emits an empty <v/> for a formula cell, but a copied formula cell may
+    carry none at all - so REPLACE an existing <v>...</v>/<v/> when present, else APPEND one after the
+    <f> (used both to restore the I/O List's own caches and to seed the inserted IF_ address values)."""
     esc = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     pat = re.compile(r'(<c r="' + re.escape(ref) + r'")([^>]*)(>)(.*?)(</c>)', re.DOTALL)
 
@@ -688,10 +690,102 @@ def _patch_formula_cache(xml: str, ref: str, t, value: str) -> str:
         attrs = re.sub(r'\s+t="[^"]*"', "", m.group(2))
         if t:
             attrs += f' t="{t}"'
-        body = re.sub(r"<v\s*/>|<v>\s*</v>", f"<v>{esc}</v>", m.group(4))
+        body = m.group(4)
+        if re.search(r"<v\s*/>|<v>.*?</v>", body, re.DOTALL):
+            body = re.sub(r"<v\s*/>|<v>.*?</v>", f"<v>{esc}</v>", body, count=1)
+        else:
+            body += f"<v>{esc}</v>"
         return m.group(1) + attrs + m.group(3) + body + m.group(5)
 
     return pat.sub(repl, xml, count=1)
+
+
+# --- Interface I/O Address Side 1: compute the LET's value in Python (Excel-independent) ----------------
+# Each inserted IF_ sheet carries an `_xlfn.LET` "I/O Address Side 1" formula whose Excel cache openpyxl
+# drops (so phase 510 reads None and skips the tag). The value can't be PRESERVED from the source either:
+# the LET reads the Side-1 Base Address that phase 400 plugs in, so the template's cache is a stale
+# placeholder base. So we MIRROR the LET from plain row data and SEED a correct cache on insert.
+_ADDR_HEADERS = ("Data Type", "Direction </>", "I/O Offset Byte", "I/O Bit",
+                 "I/O Address Side 1", "Base Address", "Input Format")
+_NUMREF = re.compile(r"^=([A-Z]+\d+)([+-]\d+)?$")
+
+
+def _addr_int(v):
+    """int from a cell that may be None, 12, '12', or a float-read '12.0'; None when not numeric."""
+    s = str(v if v is not None else "").strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return int(s) if s.lstrip("-").isdigit() else None
+
+
+def _resolve_num(ws, ref: str, memo: dict):
+    """Resolve a numeric IF_ cell that is a literal OR one of the table's two simple offset/bit chain
+    formulas (=K3 / =L3+1). int, or None when it is non-numeric / the formula shape is unknown."""
+    if ref in memo:
+        return memo[ref]
+    memo[ref] = None                                       # cycle guard
+    cell = ws[ref]
+    v = cell.value
+    if cell.data_type == "f" or (isinstance(v, str) and v.startswith("=")):
+        m = _NUMREF.match(str(v).replace(" ", ""))
+        base = _resolve_num(ws, m.group(1), memo) if m else None
+        val = None if base is None else base + (int(m.group(2)) if m.group(2) else 0)
+    else:
+        val = _addr_int(v)
+    memo[ref] = val
+    return val
+
+
+def _io_address(isynt, base, direction, data_type, offset, bit) -> str:
+    """Mirror the IF_ sheet's `I/O Address Side 1` LET: pick the I (input '<') / Q (output '>') format
+    (qSynt = SUBSTITUTE(iSynt,'I','Q')); for BOOL drop '/' + substitute <bit>, else TEXTBEFORE('/');
+    then substitute <base+offset> with base+offset. '' when there is no direction / the inputs are blank."""
+    d = str(direction or "").strip()
+    if d == "<":
+        synt = str(isynt or "")
+    elif d == ">":
+        synt = str(isynt or "").replace("I", "Q")
+    else:
+        return ""
+    if not synt or base is None or offset is None:
+        return ""
+    if str(data_type or "").strip().upper() == "BOOL":
+        synt = synt.replace("/", "").replace("<bit>", str(bit if bit is not None else 0))
+    else:
+        synt = synt.split("/", 1)[0]
+    return synt.replace("<base+offset>", str(base + offset))
+
+
+def _interface_address_caches(if_path) -> dict:
+    """{cell ref -> ('str', address)} for an inserted IF_ sheet's `I/O Address Side 1` LET cells, each
+    computed from the row's offset/bit/direction + the Side-1 base & format (the LET's $AH$2 / $AI$2) -
+    so the sheet carries a CORRECT cached address WITHOUT Excel. {} when the table headers can't be
+    resolved (phase 510 then degrades to its unresolved-address WARN). Blank separator rows yield ''."""
+    wb = load_workbook(if_path)
+    try:
+        ws = wb[wb.sheetnames[0]]
+        hdr = {str(ws.cell(1, c).value or "").strip(): c for c in range(1, ws.max_column + 1)}
+        if any(h not in hdr for h in _ADDR_HEADERS):
+            return {}
+        addr_col = get_column_letter(hdr["I/O Address Side 1"])
+        off_col, bit_col = get_column_letter(hdr["I/O Offset Byte"]), get_column_letter(hdr["I/O Bit"])
+        c_dir, c_dt = hdr["Direction </>"], hdr["Data Type"]
+        memo = {}
+        base = _resolve_num(ws, f'{get_column_letter(hdr["Base Address"])}2', memo)   # the absolute $AH$2
+        isynt = ws.cell(2, hdr["Input Format"]).value                                 # the absolute $AI$2
+        if base is None or not isynt:
+            return {}
+        out = {}
+        for r in range(2, ws.max_row + 1):
+            if ws.cell(r, hdr["I/O Address Side 1"]).data_type != "f":                # only the LET cells
+                continue
+            a = _io_address(isynt, base, ws.cell(r, c_dir).value, ws.cell(r, c_dt).value,
+                            _resolve_num(ws, f"{off_col}{r}", memo), _resolve_num(ws, f"{bit_col}{r}", memo))
+            if a:
+                out[f"{addr_col}{r}"] = ("str", a)
+        return out
+    finally:
+        wb.close()
 
 
 def insert_sheets_into_iolist(iolist_path, sheets) -> list:
@@ -704,7 +798,7 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
         caches = _capture_formula_caches(fh.read())
 
     dst = load_workbook(iolist_path)               # data_only=False -> keep the existing formulas
-    actions, changed = [], False
+    actions, changed, inserted = [], False, []
     for title, if_path in sheets:
         if title in dst.sheetnames:
             actions.append(f"{title}: already present in the I/O List - skipped")
@@ -712,6 +806,7 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
         src_wb = load_workbook(if_path)
         _copy_sheet(src_wb[src_wb.sheetnames[0]], dst, title)
         src_wb.close()
+        inserted.append((title, if_path))
         actions.append(f"{title}: inserted into the I/O List")
         changed = True
     if not changed:
@@ -725,8 +820,16 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
         with open(tmp, "rb") as fh:
             data = fh.read()
         tparts = _sheet_name_to_part(data)
+        # restore the original I/O List's formula caches AND seed each inserted IF_ sheet's I/O Address
+        # Side 1 (computed base+offset; openpyxl dropped the LET cache and the source cache is base-stale)
+        to_patch = {nm: dict(cc) for nm, cc in caches.items()}
+        for title, if_path in inserted:
+            seeded = _interface_address_caches(if_path)
+            if seeded:
+                to_patch.setdefault(title, {}).update(seeded)
+                actions.append(f"{title}: seeded {len(seeded)} I/O Address Side 1 value(s) (Excel-independent)")
         repl = {}
-        for nm, cc in caches.items():
+        for nm, cc in to_patch.items():
             part = tparts.get(nm)
             if not part:
                 continue

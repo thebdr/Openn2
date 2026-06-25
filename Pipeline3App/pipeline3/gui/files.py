@@ -260,7 +260,30 @@ class FilesPanel(ttk.Frame):
         sheet.enable_bindings()                                  # full editing
         self._toolbar(path, save=lambda s=sheet, p=path: self._save_csv(s, p))
         sheet.pack(side="top", fill="both", expand=True)
+        self._sheet = sheet                                      # for open_csv_select
         self._grid = grid.decorate(sheet, self.dark, on_status=self.on_status)   # zebra + sort/filter
+
+    def open_csv_select(self, path, key_col: int, key: str, sel_col: int) -> bool:
+        """Load CSV `path` into the editable grid and SELECT the cell at column `sel_col` of the row whose
+        column `key_col` == `key` (ready for data entry). Returns True if that row was found."""
+        if not (path and os.path.exists(path)):
+            return False
+        self._sheet = None
+        self._load(path)                                          # builds the grid (-> self._sheet) for a .csv
+        sheet = getattr(self, "_sheet", None)
+        if sheet is None:
+            return False
+        data = sheet.get_sheet_data()
+        target = next((i for i, r in enumerate(data) if r and str(r[key_col]).strip() == key), None)
+        if target is None:
+            return False
+        try:
+            sheet.select_cell(target, sel_col)
+            sheet.see(target, sel_col)
+            sheet.set_currently_selected(target, sel_col)
+        except Exception:  # noqa: BLE001  (defensive across tksheet versions)
+            pass
+        return True
 
     def _save_csv(self, sheet, path):
         rows = sheet.get_sheet_data()

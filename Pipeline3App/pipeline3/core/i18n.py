@@ -29,6 +29,8 @@ STRINGS: dict = {
     "pb_xcheck_cem_iol":  {"en": "Cross-Check CEM->IOL", "it": "Verifica incrociata CEM->IOL"},
     "pb_xcheck_iol_cem":  {"en": "Cross-Check IOL->CEM", "it": "Verifica incrociata IOL->CEM"},
     "pb_validate_diag":   {"en": "Validate Diagnosis Assignments", "it": "Valida Assegnazioni Diagnostica"},
+    "pb_clean_iolist":    {"en": "Clean I/O List Addresses & Names", "it": "Pulisci Indirizzi e Nomi I/O List"},
+    "pb_clean_cematrix":  {"en": "Clean C&E Addresses & Names", "it": "Pulisci Indirizzi e Nomi Matrice C&E"},
     "pb_open_errmgmt":    {"en": "Open Error Management .csv", "it": "Apri Error Management .csv"},
     "pb_open_iolist":     {"en": "Open I/O List", "it": "Apri I/O List"},
     "pb_open_ce":         {"en": "Open Cause&Effect Matrix", "it": "Apri Matrice Cause&Effect"},
@@ -138,11 +140,20 @@ STRINGS: dict = {
     # --- 130 Cross-Check CEM->IOL --------------------------------------------------------- #
     "v_cem_ref_empty":   {"en": "Reference carries no device designation",
                           "it": "Il riferimento non riporta alcun dispositivo"},
-    "v_cem_dev_missing": {"en": "Device not declared in the I/O List",
-                          "it": "Dispositivo non dichiarato nella I/O List"},
-    "v_cem_fld_addr_mismatch": {"en": "Declared in the I/O List at a different address",
-                                "it": "Dichiarato nella I/O List a un indirizzo diverso"},
-    "v_cem_match":       {"en": "Reconciled against the I/O List", "it": "Riconciliato con la I/O List"},
+    # search by I/O address
+    "v_cem_addr_ok":     {"en": "Address found in the I/O List with a matching FLD",
+                          "it": "Indirizzo trovato nella I/O List con FLD corrispondente"},
+    "v_cem_addr_fld":    {"en": "Address found in the I/O List under a DIFFERENT FLD",
+                          "it": "Indirizzo trovato nella I/O List con un FLD DIVERSO"},
+    "v_cem_addr_none":   {"en": "Address not found in the I/O List",
+                          "it": "Indirizzo non trovato nella I/O List"},
+    # search by FLD
+    "v_cem_fld_ok":      {"en": "FLD found in the I/O List at a matching address",
+                          "it": "FLD trovato nella I/O List all'indirizzo corrispondente"},
+    "v_cem_fld_addr":    {"en": "FLD found in the I/O List at a DIFFERENT address",
+                          "it": "FLD trovato nella I/O List a un indirizzo DIVERSO"},
+    "v_cem_fld_none":    {"en": "FLD not found in the I/O List",
+                          "it": "FLD non trovato nella I/O List"},
     "v_cem_summary":     {"en": "{refs} C&E reference(s) checked against the I/O List",
                           "it": "{refs} riferimenti C&E verificati rispetto alla I/O List"},
 
@@ -176,6 +187,10 @@ STRINGS: dict = {
     "v_diag_unique":     {"en": "Diagnosis slot {slot} is unique", "it": "Slot diagnostica {slot} univoco"},
     "v_diag_dup_slot":   {"en": "Duplicate diagnosis slot {slot} - also at {others}",
                           "it": "Slot diagnostica duplicato {slot} - anche in {others}"},
+    "v_diag_container_ok": {"en": "Diagnosis cabinet FullName holds the expected container",
+                            "it": "Il FullName del quadro diagnostica contiene il contenitore atteso"},
+    "v_diag_container_bad": {"en": "Cabinet FullName '{actual}' does not contain the expected diagnosis container ({expected})",
+                             "it": "Il FullName del quadro '{actual}' non contiene il contenitore diagnostica atteso ({expected})"},
     "v_diag_summary":    {"en": "{n} in-diagnosis signal(s) checked", "it": "{n} segnali in diagnostica verificati"},
 }
 

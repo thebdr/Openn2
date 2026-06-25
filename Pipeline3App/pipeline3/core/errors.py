@@ -122,6 +122,18 @@ def _write(path: str, merged: dict) -> str:
     return csv_tables.write_rows(path, FIELDS, rows)
 
 
+def set_treatment(path: str, uid: str, treatment: str) -> bool:
+    """Set or CLEAR one finding's treatment in error_management.csv (the log right-click quick-treat),
+    preserving every other row. Applied on the next validation run. Returns True if the uid was found."""
+    merged = load(path)
+    t = merged.get(uid)
+    if t is None:
+        return False
+    merged[uid] = replace(t, treatment=(treatment or "").strip().lower())
+    _write(path, merged)
+    return True
+
+
 def apply_suppressions(log, path: str | None = None) -> int:
     """Designer build: SKIP any FAIL/WARN line whose uid is listed in designer_suppressions.csv.
     Returns the number suppressed. Read-only (never writes the registry)."""

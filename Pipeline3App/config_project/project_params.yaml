@@ -7,19 +7,24 @@ project_code: "8XXX"
 
 io_list:      # The I/O List workbook ::: validation checks format and cross-checks it against the Cause & Effect matrix
   path: "C:\\Source\\Repos\\_Openn2\\Shared\\DocumentsValidationData\\Passing\\8XXX_IOyyyy_R0.0_EmergencyIoListValidationTemplate.xlsx"
-  sheet: 'NET SAFETY \d{1,3}/gmi'                                                                       # a single sheet name, a list of names or a regular expression
+  sheet: '^NET SAFETY \d{1,3}|^r\d+\.s\d+\.c\d+/gmi'                                                                       # a single sheet name, a list of names or a regular expression
   header_row: 1
 
 # Parameters
-strike_handling: "exclude"                                                                               # how struck-through I/O List rows (even partiallly) are treated. exclude=do not process, ignore=process anyway, error=log as error
-ce_mandatory_words: ["emergency", "safety", "relay", "contactor", "enable"]                             # A row's description naming a safety concept must appear in the C&E.
-ce_excluded_words: ["circuit breaker", "power supply", "profinet switch", "coupler", "door"]            # rows containing these words are skipped, unless 'ce_full_check'
-ce_always_excluded_words: ["ch2"]                                                                       # always skipped, even under ce_full_check
-ce_fuzzy_chars: 2                                                                                       # Levenshtein tolerance for word matching (0 disables)
-ce_full_check: false                                                                                    # ignore ce_excluded_words (check every row)
-ce_full_print: true                                                                                     # log every PASS/SKIP, not just FAIL/WARN
-safety_nets: '192.168.5\d'                                                                              # PROFINET safety subnet /24 prefixes
-insert_interface_sheets: true                                                                           # Generated Interfaces will be copied in I/O List. Output folder will not be considered for downstream pipeline phases.
+strike_handling: "exclude"                                                     # how struck-through I/O List rows (even partiallly) are treated. exclude=do not process, ignore=process anyway, error=log as error
+
+ce_mandatory_words: 
+  ["emergency", "safety", "relay", "contactor", "enable"]                      # A row's description naming a safety concept must appear in the C&E.
+
+ce_excluded_words: 
+  ["circuit breaker", "power supply", "profinet switch", "coupler", "door"]    # rows containing these words are skipped, unless 'ce_full_check'
+
+ce_always_excluded_words: ["ch2"]                                              # always skipped, even under ce_full_check
+ce_fuzzy_chars: 2                                                              # Levenshtein tolerance for word matching (0 disables)
+ce_full_check: false                                                           # ignore ce_excluded_words (check every row)
+ce_full_print: false                                                            # log every PASS/SKIP, not just FAIL/WARN
+safety_nets: '192.168.5\d'                                                     # PROFINET safety subnet /24 prefixes
+insert_interface_sheets: true                                                  # Generated Interfaces will be copied in I/O List. Output folder will not be considered for downstream pipeline phases.
 
 ce:           # The Cause & Effect Matrix workbook ::: validation cross-checks this against the I/O List
   path: "C:\\Source\\Repos\\_Openn2\\Shared\\DocumentsValidationData\\Passing\\8XXX_Cause and Effect Matrix_R0.0_ValidationTemplate.xlsx"
@@ -56,4 +61,3 @@ language: en
 device_types_db: ''
 interface_template: ''
 output_dir: ''
-

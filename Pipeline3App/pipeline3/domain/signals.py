@@ -13,10 +13,11 @@ TWO sources, both as plain text like a real TIA export:
 
 520 Generate Data Blocks -> blocks_import_dir: members from two sources (each row's staged
 name_in_db into its datablocks; plus datablock_elements_rules additions), seeded with Always
-FALSE/TRUE + a No Operation no-op (the builder pad). A SAFE DB (any contributing type is safe_db) is written as a TIA Openness
-SW.Blocks.GlobalDB XML (<name>.xml) carrying ProgrammingLanguage=F_DB + DBAccessibleFromOPCUA=false -
-the fail-safe markers the .db external-source format cannot express; a NORMAL DB is written as the
-.db source (<name>.db, OPC-UA accessible).
+FALSE/TRUE + a No Operation no-op (the builder pad). EVERY DB is written as a TIA Openness
+SW.Blocks.GlobalDB XML (<name>.xml); the ONLY difference between a normal and a fail-safe DB is
+<ProgrammingLanguage> = the type's db_kind VERBATIM ('DB' or 'F_DB', `|`-aligned with db_names by
+position), with DBAccessibleFromOPCUA following it (false for F_DB - a fail-safe DB must not be
+OPC-writable - else true).
 
 Clean-room rebuild of Pipeline2's outputs.write_io_tags / build_io_tags (reference for INTENT only);
 the interface-tag source + the F_DB XML are new in Pipeline3.
@@ -216,7 +217,7 @@ def generate_io_tags(rows, out_root, *, iolist_path=None) -> dict:
 
 
 # ============================================================================================== #
-# 520 Generate Data Blocks -> blocks_import_dir/*.db
+# 520 Generate Data Blocks -> blocks_import_dir/*.xml (every DB a GlobalDB; F_DB vs DB = ProgrammingLanguage)
 # ============================================================================================== #
 
 # Every DB opens with these seed booleans (TIA spelling, with a space - no underscore). "No Operation"
@@ -242,25 +243,29 @@ def build_data_blocks(rows, db_rules) -> tuple[dict, list]:
         (the type's db_element / db_names; comment = the type io_comment);
       - rule-driven (datablock_elements_rules): each row whose script_type is in a rule's
         `required_types` adds the rule's interpolated `member` to the rule's `db_name`.
-    A DB is created on first use and seeded with Always FALSE/TRUE. It is a SAFE DB if ANY
-    contributing row's type is `safe_db` (a safe DB is written as an F_DB Openness XML, not a .db -
-    see write_data_blocks). A DATA_BLOCK cannot carry two members of the same name, so duplicates are
-    dropped (kept once) and reported as a warning.
-    Returns dbs = {name: {'safe': bool, 'members': [{'name', 'comment'}]}}."""
+    A DB is created on first use and seeded with Always FALSE/TRUE. Each DB carries a `prog_lang` = its
+    `db_kind`, the verbatim `<ProgrammingLanguage>` (e.g. 'DB' or 'F_DB' - see write_data_blocks; EVERY
+    DB is now a GlobalDB XML, F_DB being the only fail-safe difference). db_kind is `|`-aligned with
+    db_names BY POSITION - a single kind applies to every DB, multiple kinds map one-to-one - so one type
+    may emit a normal DB and an F_DB (e.g. PA -> PROFINET_NODES_ALARM as `DB` + 00_Commissioning as
+    `F_DB`); on a mixed contribution F_DB wins. A DATA_BLOCK cannot carry two members of the same name, so
+    duplicates are dropped (kept once) and reported as a warning.
+    Returns dbs = {name: {'prog_lang': str, 'members': [{'name', 'comment'}]}}."""
     dbs: dict = {}
     seen: dict = {}                       # name -> set of member names already added
     dup: dict = {}                        # (db, member) -> contribution count (>1 = collapsed)
 
     def ensure(name):
         if name not in dbs:
-            dbs[name] = {"safe": False, "members": [{"name": c, "comment": ""} for c in DB_CONSTANTS]}
+            dbs[name] = {"prog_lang": "", "members": [{"name": c, "comment": ""} for c in DB_CONSTANTS]}
             seen[name] = set(DB_CONSTANTS)
         return dbs[name]
 
-    def add(name, member, comment, safe):
+    def add(name, member, comment, prog_lang):
         g = ensure(name)
-        if safe:
-            g["safe"] = True
+        pl = (prog_lang or "").strip()                # strip to match the emit site (_db_xml) exactly,
+        if pl and (pl.upper() == "F_DB" or not g["prog_lang"]):   # so F_DB never loses the race to padding
+            g["prog_lang"] = pl                       # F_DB (fail-safe) wins; otherwise first non-empty
         if not member:
             return
         if member in seen[name]:
@@ -269,55 +274,41 @@ def build_data_blocks(rows, db_rules) -> tuple[dict, list]:
         seen[name].add(member)
         g["members"].append({"name": member, "comment": comment})
 
-    # (a) type-based membership, from the staged identity columns
+    # (a) type-based membership, from the staged identity columns. Each DB's safety is its OWN db_kind:
+    # db_kind is `|`-aligned with db_names by position (a single kind applies to every DB).
     for r in rows or []:
         member = str(r.get("name_in_db") or "").strip()
         if not member:
             continue
-        safe = (r.get("_type") or {}).get("db_kind") == "safe_db"
+        t = r.get("_type") or {}
         comment = identity.tag_comment(r)
         for db in [d.strip() for d in str(r.get("datablocks") or "").split("|") if d.strip()]:
-            add(db, member, comment, safe)
+            add(db, member, comment, identity.db_kind_of(t, db))
 
     # (b) rule-driven additions (any required_type present -> add the element to db_name)
     for r in rows or []:
         st = str(r.get("script_type") or "").strip()
         if not st:
             continue
-        safe = (r.get("_type") or {}).get("db_kind") == "safe_db"
+        t = r.get("_type") or {}
         for rule in db_rules or []:
             if st in rule["required_types"]:
                 member = identity.interp(rule["member"], r)
                 if member:
-                    add(rule["db_name"], member, "", safe)
+                    add(rule["db_name"], member, "", identity.db_kind_of(t, rule["db_name"]))
 
     warnings = [f"{name}: member {member!r} contributed {count} times - kept 1 "
                 f"(a DATA_BLOCK cannot repeat a member name)"
                 for (name, member), count in sorted(dup.items())]
+    for name, g in sorted(dbs.items()):                  # guardrail: an unrecognized <ProgrammingLanguage>
+        pl = (g.get("prog_lang") or "").strip()          # (a db_kind typo) is written verbatim - flag it.
+        if pl and pl != "DB" and pl.upper() != "F_DB":   # 'F_DB' is canonicalized on write, so it never warns
+            warnings.append(f"{name}: db_kind {pl!r} written verbatim as <ProgrammingLanguage> "
+                            f"(expected 'DB' or 'F_DB') - TIA may reject the import")
     return dbs, warnings
 
 
-def _db_text(name, db) -> str:
-    """One NORMAL DB as a TIA external-source DATA_BLOCK (UTF-8 BOM added on write; CRLF), matching a
-    real .db export. DB_Accessible_From_OPC_UA := 'TRUE' (a normal DB is OPC-UA accessible);
-    S7_Optimized_Access := 'TRUE' (NOT a safety marker). Members live in a VAR ... END_VAR block.
-    SAFE DBs are NOT written this way - the .db source cannot express F_DB (see _db_xml)."""
-    lines = [
-        f'DATA_BLOCK "{name}"',
-        "{ DB_Accessible_From_OPC_UA := 'TRUE' ;",
-        " S7_Optimized_Access := 'TRUE' }",
-        "VERSION : 0.1",
-        "NON_RETAIN",
-        "   VAR ",
-    ]
-    for m in db["members"]:
-        comment = f'   // {m["comment"]}' if m.get("comment") else ""
-        lines.append(f'      "{m["name"]}" : Bool;{comment}')
-    lines += ["   END_VAR", "", "", "BEGIN", "", "END_DATA_BLOCK", ""]
-    return "\r\n".join(lines) + "\r\n"
-
-
-# --- safe DBs: the TIA Openness SW.Blocks.GlobalDB XML (carries F_DB, which the .db cannot) ----- #
+# --- every DB: the TIA Openness SW.Blocks.GlobalDB XML (<ProgrammingLanguage> = db_kind verbatim) ---- #
 _XML_IFACE_NS = "http://www.siemens.com/automation/Openness/SW/Interface/v5"
 
 
@@ -331,12 +322,17 @@ def _xml_text(value) -> str:
 
 
 def _db_xml(name, db, number) -> str:
-    """One SAFE (fail-safe) DB as a TIA Openness SW.Blocks.GlobalDB export (UTF-8 BOM added on write;
-    CRLF; no trailing newline - matching a real export). ProgrammingLanguage=F_DB is the fail-safe
-    marker the .db external-source format cannot express; DBAccessibleFromOPCUA=false (a safe DB must
-    not be OPC-writable - an unexpected write can fault the CPU to STOP). Each member is Bool /
-    NonRetain / Public with the system-default external-access attributes. AutoNumber lets TIA assign
-    the real DB number on import (the emitted Number is a deterministic placeholder)."""
+    """ONE DB as a TIA Openness SW.Blocks.GlobalDB export (UTF-8 BOM added on write; CRLF; no trailing
+    newline - matching a real export). EVERY DB is emitted this way; the only difference between a normal
+    and a fail-safe DB is `<ProgrammingLanguage>` = the type's db_kind VERBATIM (e.g. 'DB' or 'F_DB').
+    DBAccessibleFromOPCUA follows: false for F_DB (a fail-safe DB must not be OPC-writable - an unexpected
+    write can fault the CPU to STOP), true otherwise. Each member is Bool / NonRetain / Public with the
+    system-default external-access attributes. AutoNumber lets TIA assign the real DB number on import
+    (the emitted Number is a deterministic placeholder)."""
+    prog_lang = (db.get("prog_lang") or "DB").strip()
+    if prog_lang.upper() == "F_DB":
+        prog_lang = "F_DB"           # canonicalize the fail-safe marker so TIA always recognizes it
+    opc = "false" if prog_lang == "F_DB" else "true"
     lines = [
         '<?xml version="1.0" encoding="utf-8"?>',
         '<Document>',
@@ -344,7 +340,7 @@ def _db_xml(name, db, number) -> str:
         '  <SW.Blocks.GlobalDB ID="0">',
         '    <AttributeList>',
         '      <AutoNumber>true</AutoNumber>',
-        '      <DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>',
+        f'      <DBAccessibleFromOPCUA>{opc}</DBAccessibleFromOPCUA>',
         '      <DBAccessibleFromWebserver>true</DBAccessibleFromWebserver>',
         '      <HeaderAuthor />',
         '      <HeaderFamily />',
@@ -371,7 +367,7 @@ def _db_xml(name, db, number) -> str:
         f'      <Name>{_xml_text(name)}</Name>',
         '      <Namespace />',
         f'      <Number>{number}</Number>',
-        '      <ProgrammingLanguage>F_DB</ProgrammingLanguage>',
+        f'      <ProgrammingLanguage>{_xml_text(prog_lang)}</ProgrammingLanguage>',
         '    </AttributeList>',
         '    <ObjectList>',
         '      <MultilingualText ID="1" CompositionName="Comment">',
@@ -402,21 +398,17 @@ def _db_xml(name, db, number) -> str:
 
 
 def write_data_blocks(dbs, out_root) -> tuple[str, int]:
-    """Write each data block into blocks_import_dir (UTF-8 BOM + CRLF): a SAFE DB as a TIA Openness
-    SW.Blocks.GlobalDB XML <name>.xml (F_DB - see _db_xml), a NORMAL DB as the .db external source
-    <name>.db (see _db_text). blocks_import_dir is swept of prior *.db / *.xml first (the phase-620
-    SCL is left untouched). DBs are written name-sorted so the placeholder DB numbers are stable.
-    Returns (dir, count)."""
+    """Write each data block into blocks_import_dir as a TIA Openness SW.Blocks.GlobalDB XML <name>.xml
+    (UTF-8 BOM + CRLF) - normal and fail-safe DBs alike; F_DB vs DB is just <ProgrammingLanguage> (see
+    _db_xml). blocks_import_dir is swept of prior *.db / *.xml first (the phase-620 SCL is left untouched;
+    a stale *.db from before the unification is removed). DBs are written name-sorted so the placeholder
+    DB numbers are stable. Returns (dir, count)."""
     db_dir = config.out_path(out_root, "blocks_import_dir")
     os.makedirs(db_dir, exist_ok=True)
     _clear(db_dir, "*.db", "*.xml", keep={f"{COM_DB}.xml"})   # 02_COM is phase-800-owned, not swept here
     for number, (name, db) in enumerate(sorted(dbs.items()), start=1):
-        if db["safe"]:
-            text, ext = _db_xml(name, db, number), ".xml"
-        else:
-            text, ext = _db_text(name, db), ".db"
-        with open(os.path.join(db_dir, _safe(name) + ext), "w", encoding="utf-8-sig", newline="") as f:
-            f.write(text)
+        with open(os.path.join(db_dir, _safe(name) + ".xml"), "w", encoding="utf-8-sig", newline="") as f:
+            f.write(_db_xml(name, db, number))
     return db_dir, len(dbs)
 
 
@@ -428,7 +420,7 @@ def write_safe_db(out_root, name, member_names) -> str:
     members = [m for m in dict.fromkeys(str(x).strip() for x in member_names) if m]
     if not members:
         return ""
-    db = {"safe": True, "members": [{"name": m, "comment": ""} for m in members]}
+    db = {"prog_lang": "F_DB", "members": [{"name": m, "comment": ""} for m in members]}
     db_dir = config.out_path(out_root, "blocks_import_dir")
     os.makedirs(db_dir, exist_ok=True)
     path = os.path.join(db_dir, _safe(name) + ".xml")
@@ -437,14 +429,18 @@ def write_safe_db(out_root, name, member_names) -> str:
     return path
 
 
+def _is_fdb(d) -> bool:
+    return (d.get("prog_lang") or "").strip().upper() == "F_DB"   # strip: match _db_xml's fail-safe test
+
+
 def generate_data_blocks(rows, out_root) -> dict:
-    """520 entry: build the data blocks (type-based + rule-driven) and write them - safe DBs as F_DB
-    Openness XML, normal DBs as .db source. Returns {'dir', 'count', 'dbs' (sorted names), 'safe',
-    'normal', 'members' {name: count}, 'warnings'}."""
+    """520 entry: build the data blocks (type-based + rule-driven) and write them - EVERY DB as a TIA
+    Openness SW.Blocks.GlobalDB XML, F_DB vs DB being just <ProgrammingLanguage>. Returns {'dir', 'count',
+    'dbs' (sorted names), 'safe' (the F_DB DBs), 'normal' (the rest), 'members' {name: count}, 'warnings'}."""
     db_rules = config.load_rules(_DB_RULES_FILE)
     dbs, warnings = build_data_blocks(rows, db_rules)
     db_dir, count = write_data_blocks(dbs, out_root)
     return {"dir": db_dir, "count": count, "dbs": sorted(dbs),
-            "safe": sorted(n for n, d in dbs.items() if d["safe"]),
-            "normal": sorted(n for n, d in dbs.items() if not d["safe"]),
+            "safe": sorted(n for n, d in dbs.items() if _is_fdb(d)),
+            "normal": sorted(n for n, d in dbs.items() if not _is_fdb(d)),
             "members": {n: len(d["members"]) for n, d in dbs.items()}, "warnings": warnings}

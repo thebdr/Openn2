@@ -33,6 +33,24 @@ def build_io_index(rows) -> dict:
     return idx
 
 
+def build_io_addr_index(rows) -> dict:
+    """address key -> {keys:set(FLD), raw_fld:{FLD->raw}, source_cell:str} - the staged database keyed by
+    ADDRESS, for the forward check's 'search by I/O address' (130)."""
+    idx: dict = {}
+    for r in rows or []:
+        a = vm.addr(r.get("bit"))
+        if not a:
+            continue
+        k = vm.key(r.get("functional_unit"), r.get("location"), r.get("device"))
+        e = idx.setdefault(a, {"keys": set(), "raw_fld": {}, "source_cell": ""})
+        if k:
+            e["keys"].add(k)
+            e["raw_fld"].setdefault(k, vm.fld_text(r.get("functional_unit"), r.get("location"), r.get("device")))
+        if not e["source_cell"]:
+            e["source_cell"] = r.get("source_cell", "")
+    return idx
+
+
 def read_ce_refs(params: dict) -> tuple:
     """Read every C&E reference -> (refs, sheet_count). Each ref:
     {sheet, addr(norm), raw_addr, key(FLD), raw_fld, loc('sheet!cell')}."""

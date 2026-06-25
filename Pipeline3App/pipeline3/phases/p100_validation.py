@@ -12,7 +12,7 @@ build never runs, so the designer GUI greys the 150 button.
 from __future__ import annotations
 import os
 
-from pipeline3.phase import Phase, SubPhase, PhaseResult, Button, KIND_ACTION, KIND_OPEN
+from pipeline3.phase import Phase, SubPhase, PhaseResult, Button, KIND_ACTION, KIND_OPEN, KIND_SPECIAL
 from pipeline3.registry import register, registry
 from pipeline3.core import config
 from pipeline3.core.i18n import tr
@@ -95,6 +95,8 @@ BUTTONS = [
     Button("pb_xcheck_cem_iol", KIND_ACTION, 130, "130"),
     Button("pb_xcheck_iol_cem", KIND_ACTION, 140, "140"),
     Button("pb_validate_diag", KIND_ACTION, 150, "150"),
+    Button("pb_clean_iolist", KIND_SPECIAL, 165, "special:clean_iolist"),      # manual-only, orange
+    Button("pb_clean_cematrix", KIND_SPECIAL, 175, "special:clean_cematrix"),  # (NOT in SUBS -> never run-all)
     Button("pb_open_iolist", KIND_OPEN, 160, "open:io_list"),
     Button("pb_open_ce", KIND_OPEN, 170, "open:ce"),
     Button("pb_open_val_logs", KIND_OPEN, 180, "open:validation_report"),

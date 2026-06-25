@@ -89,8 +89,9 @@ def _freeze_array_range(xml: str, rng: str) -> str:
 def set_cells(sheet_xml: str, edits: dict) -> tuple:
     """Return (new_xml, materialized) where `materialized` = [(master_ref, range), ...] for any array
     formula FROZEN to its cached values to make room for an edit. Each {cell_ref: value} edit is applied
-    as an inline string, preserving the cell's existing style; cells/rows that don't exist are inserted
-    in order."""
+    as an inline string (an int/float as a NUMERIC cell - e.g. the DiagnosisBlocks Count; ""/None as a
+    BLANK cell that reads None and clears any stale value), preserving the cell's existing style;
+    cells/rows that don't exist are inserted in order."""
     # 1. an edit that lands in an array's spill range freezes the WHOLE array to its cached values first
     #    (keeps every spilled value; the formula stays in the backup) - so no master+literal overlap.
     materialized = []
@@ -103,7 +104,14 @@ def set_cells(sheet_xml: str, edits: dict) -> tuple:
     for ref, value in edits.items():
         cell_pat = re.compile(r'<c\s+r="' + re.escape(ref) + r'"(?:\s[^/>]*)?\s*(?:/>|>.*?</c>)', re.DOTALL)
         existing = cell_pat.search(sheet_xml)
-        new_cell = f'<c r="{ref}"{(" s=" + chr(34) + _style_of(existing.group(0)) + chr(34)) if existing and _style_of(existing.group(0)) else ""} t="inlineStr"><is><t xml:space="preserve">{_esc(value)}</t></is></c>'
+        style = _style_of(existing.group(0)) if existing else ""
+        s_attr = f' s="{style}"' if style else ""
+        if value is None or value == "":
+            new_cell = f'<c r="{ref}"{s_attr}/>'                  # a blank cell (reads None; clears a stale value)
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            new_cell = f'<c r="{ref}"{s_attr}><v>{value}</v></c>'
+        else:
+            new_cell = f'<c r="{ref}"{s_attr} t="inlineStr"><is><t xml:space="preserve">{_esc(value)}</t></is></c>'
         if existing:
             sheet_xml = sheet_xml[:existing.start()] + new_cell + sheet_xml[existing.end():]
         else:
@@ -169,29 +177,52 @@ _WS_CT = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+
 _WS_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
 
 
+# A clickable cell is rendered as a hyperlink (blue + underlined) via a rich-text RUN on the inline string
+# - no styles.xml font/cellXf is needed, so a regenerated sheet never accumulates orphan styles.
+_LINK_RPR = '<rPr><u/><color rgb="FF0563C1"/></rPr>'
+
+
+def _cell_xml(ref: str, val, link: bool = False) -> str:
+    """One worksheet <c> for `val`: bool/str -> an INLINE STRING (so a leading '='/'+'/'-' stays TEXT,
+    not a formula), int/float -> a numeric <v>, None/"" -> "" (the cell is skipped). When `link`, the
+    inline string is a rich-text run styled like a hyperlink (blue + underlined)."""
+    if val is None or val == "":
+        return ""
+    if link:
+        sp = ' xml:space="preserve"' if str(val) != str(val).strip() else ""
+        return f'<c r="{ref}" t="inlineStr"><is><r>{_LINK_RPR}<t{sp}>{_esc(val)}</t></r></is></c>'
+    if isinstance(val, bool):
+        return f'<c r="{ref}" t="inlineStr"><is><t>{_esc(val)}</t></is></c>'
+    if isinstance(val, (int, float)):
+        return f'<c r="{ref}"><v>{val}</v></c>'
+    sp = ' xml:space="preserve"' if str(val) != str(val).strip() else ""
+    return f'<c r="{ref}" t="inlineStr"><is><t{sp}>{_esc(val)}</t></is></c>'
+
+
+def build_row_xml(row_num: int, values: list, link_refs=None) -> str:
+    """A worksheet <row r=row_num> with one cell per non-blank value (1-based columns). A cell whose ref is
+    in `link_refs` is rendered like a hyperlink (blue + underlined)."""
+    link_refs = link_refs or ()
+    cells = []
+    for ci, v in enumerate(values, 1):
+        ref = f"{_num_to_col(ci)}{row_num}"
+        cells.append(_cell_xml(ref, v, link=ref in link_refs))
+    return f'<row r="{row_num}">{"".join(cells)}</row>'
+
+
 def build_sheet_xml(rows: list, hyperlinks: list | None = None) -> str:
     """A fresh worksheet XML for a grid (`rows` = list of row lists). int/float -> a numeric cell;
     everything else -> an INLINE STRING (so a leading '='/'+'/'-' is text, not a formula). `hyperlinks`
-    = [(cell_ref, location, display)] for internal links (e.g. 'NET SAFETY 50'!K23). Mirrors the full
-    structure Excel writes (dimension/sheetViews/sheetFormatPr/pageMargins) - a bare <sheetData>-only
-    worksheet makes Excel report the workbook corrupt."""
-    body = []
+    = [(cell_ref, location, display)] for internal links (e.g. 'NET SAFETY 50'!K23) - each linked cell is
+    rendered blue + underlined. Mirrors the full structure Excel writes (dimension/sheetViews/
+    sheetFormatPr/pageMargins) - a bare <sheetData>-only worksheet makes Excel report the workbook corrupt."""
+    link_refs = {ref for ref, _, _ in hyperlinks} if hyperlinks else set()
     maxc = 1
-    for ri, row in enumerate(rows, 1):
-        cells = []
+    for row in rows:
         for ci, val in enumerate(row, 1):
-            if val is None or val == "":
-                continue
-            maxc = max(maxc, ci)
-            ref = f"{_num_to_col(ci)}{ri}"
-            if isinstance(val, bool):
-                cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{_esc(val)}</t></is></c>')
-            elif isinstance(val, (int, float)):
-                cells.append(f'<c r="{ref}"><v>{val}</v></c>')
-            else:
-                sp = ' xml:space="preserve"' if str(val) != str(val).strip() else ""
-                cells.append(f'<c r="{ref}" t="inlineStr"><is><t{sp}>{_esc(val)}</t></is></c>')
-        body.append(f'<row r="{ri}">{"".join(cells)}</row>')
+            if not (val is None or val == ""):
+                maxc = max(maxc, ci)
+    body = "".join(build_row_xml(ri, row, link_refs) for ri, row in enumerate(rows, 1))
     dim = f"A1:{_num_to_col(maxc)}{max(1, len(rows))}"
     hl = ""
     if hyperlinks:
@@ -204,9 +235,39 @@ def build_sheet_xml(rows: list, hyperlinks: list | None = None) -> str:
             f'<dimension ref="{dim}"/>'
             '<sheetViews><sheetView workbookViewId="0"/></sheetViews>'
             '<sheetFormatPr defaultRowHeight="15"/>'
-            f'<sheetData>{"".join(body)}</sheetData>{hl}'
+            f'<sheetData>{body}</sheetData>{hl}'
             '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'
             '</worksheet>')
+
+
+def append_to_sheet(sheet_xml: str, rows: list) -> str:
+    """Append `rows` (value-lists) as new <row> elements AFTER the last existing row, BYTE-PRESERVING
+    every existing row (no existing <row>/<c> is matched or rewritten - so a hand-edited cell / style /
+    stale value survives). Row numbers continue from the current max (or 1 for an empty sheet); the block
+    is spliced before </sheetData> (a self-closing <sheetData/> is expanded). Best-effort grows the
+    <dimension> (cosmetic - Excel recomputes the used range on open)."""
+    if not rows:
+        return sheet_xml
+    nums = [int(m.group(1)) for m in re.finditer(r'<row\s+r="(\d+)"', sheet_xml)]
+    start = (max(nums) + 1) if nums else 1
+    block = "".join(build_row_xml(start + i, r) for i, r in enumerate(rows))
+    if "</sheetData>" in sheet_xml:
+        xml = sheet_xml.replace("</sheetData>", block + "</sheetData>", 1)
+    else:
+        xml = re.sub(r"<sheetData\s*/>", "<sheetData>" + block + "</sheetData>", sheet_xml, count=1)
+    return _grow_dimension(xml, start + len(rows) - 1, max((len(r) for r in rows), default=1))
+
+
+def _grow_dimension(xml: str, last_row: int, ncols: int) -> str:
+    """Widen the single <dimension ref="A1:..">  to include (last_row, ncols). Cosmetic + best-effort:
+    returns xml unchanged if there is no plain `A1:XY` dimension."""
+    m = re.search(r'<dimension ref="([A-Z]+\d+):([A-Z]+)(\d+)"/>', xml)
+    if not m:
+        return xml
+    c2 = max(_colnum(m.group(2)), ncols)
+    r2 = max(int(m.group(3)), last_row)
+    new = f'<dimension ref="{m.group(1)}:{_num_to_col(c2)}{r2}"/>'
+    return xml[:m.start()] + new + xml[m.end():]
 
 
 def _remove_sheet(wbxml, relsxml, ctxml, name, part):
@@ -292,18 +353,23 @@ def freeze_arrays(path: str, *, dest: str | None = None) -> list:
 
 
 def edit_workbook(path: str, *, cell_edits: dict | None = None, new_sheets: list | None = None,
-                  delete_sheets: list | None = None, dest: str | None = None) -> list:
+                  delete_sheets: list | None = None, append_rows: dict | None = None,
+                  dest: str | None = None) -> list:
     """THE primitive that modifies an .xlsx. `cell_edits` = {sheet_name: {cell_ref: value}} surgically
     rewrites cells (freezing any array spill it lands in); `new_sheets` = [{name, rows, hyperlinks?}]
-    adds/replaces whole app-owned sheets (e.g. DiagnosisBlocks / _UnresolvedIndex / interface sheets);
-    `delete_sheets` = [names] drops legacy sheets. ONLY the affected/added/removed parts change - every
-    other part (incl. dynamic-array sheets the populator doesn't touch) is byte-copied. Atomic (temp +
-    os.replace); `dest` defaults to in-place. Returns the (sheet, master_ref, range) of any array frozen
-    to its cached values (the caller logs a WARN); [] if nothing changed."""
+    adds/replaces whole app-owned sheets (e.g. _UnresolvedIndex / interface sheets); `append_rows` =
+    {sheet_name: [row, ...]} APPENDS value rows to an existing sheet, byte-preserving its current rows
+    (e.g. DiagnosisBlocks: add only the cabinets not already present); `delete_sheets` = [names] drops
+    legacy sheets. ONLY the affected/added/removed parts change - every other part (incl. dynamic-array
+    sheets the populator doesn't touch) is byte-copied. `new_sheets` and `append_rows` for the SAME sheet
+    are mutually exclusive (append is skipped). Atomic (temp + os.replace); `dest` defaults to in-place.
+    Returns the (sheet, master_ref, range) of any array frozen to its cached values (caller logs a WARN);
+    [] if nothing changed."""
     cell_edits = cell_edits or {}
     new_sheets = new_sheets or []
     delete_sheets = list(delete_sheets or [])
-    if not (cell_edits or new_sheets or delete_sheets):
+    append_rows = append_rows or {}
+    if not (cell_edits or new_sheets or delete_sheets or append_rows):
         return []
     dest = dest or path
     with open(path, "rb") as f:
@@ -349,6 +415,14 @@ def edit_workbook(path: str, *, cell_edits: dict | None = None, new_sheets: list
                 part, wbxml, relsxml, ctxml = _register_sheet(present | set(added), wbxml, relsxml, ctxml, spec["name"])
                 added[part] = xml
                 bookkeeping = True
+
+        new_names = {s["name"] for s in new_sheets}             # 3. append rows to an existing sheet
+        for sheet_name, rows in append_rows.items():            #    (byte-preserving its current rows)
+            part = name_to_part.get(sheet_name)
+            if not part or part in deleted or sheet_name in new_names or not rows:
+                continue
+            base = repl[part].decode("utf-8") if part in repl else z.read(part).decode("utf-8")
+            repl[part] = append_to_sheet(base, rows).encode("utf-8")
         if bookkeeping:
             repl["xl/workbook.xml"] = wbxml.encode("utf-8")
             repl["xl/_rels/workbook.xml.rels"] = relsxml.encode("utf-8")

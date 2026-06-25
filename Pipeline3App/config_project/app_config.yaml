@@ -4,12 +4,11 @@
 #   designer  - the slim validation-only session (IOList & CEMatrix Validation): only ph100, reads
 #               designer_params.yaml, skips Fill, with the two input-file pickers + live-source re-copy.
 # An unknown / missing value falls back to 'main'. Switching mode = edit this line + relaunch.
-profile: designer
+profile: main
 
 # read on app launch
 user_interface:
-  width: 1200
+  width: 1330
   height: 800
   theme: dark
-  log_to_file: false
-  
+  log_to_file: true

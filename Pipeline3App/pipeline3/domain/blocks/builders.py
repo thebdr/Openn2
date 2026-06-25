@@ -118,13 +118,14 @@ def build_00_commissioning(db: Database) -> Table:
 
 @builds("02_EM Push Button")
 def build_02_em_push_button(db: Database) -> Table:
-    """One 00_Push-Button_Input FB instance per node: the node's E1/2 emergency-push-button inputs
-    (grouped by address range), chunked to the FB's 4 IN/OUT slots. The iterator (= each E1/2's
-    name_in_db, which now equals its tag name after the FLD dedup) is padded to 4 with PAD. Bypass_ET200
-    is the node's '<profinet_name> <profinet_ip>' (the same 00_Commissioning member as block 00)."""
+    """One 00_Push-Button_Input FB instance per node: the node's emergency-stop INPUTS - both
+    E1/2 emergency-push-buttons AND B1/2 safety-breakers (grouped by node, in address order),
+    chunked to the FB's 4 IN/OUT slots. The iterator (= each input's name_in_db, which now equals
+    its tag name after the FLD dedup) is padded to 4 with PAD. Bypass_ET200 is the node's
+    '<profinet_name> <profinet_ip>' (the same 00_Commissioning member as block 00)."""
     SLOTS = 4   # the FB's IN_1..4 / OUT_1..4
     t = Table("02_EM Push Button")
-    for node, members in _group_by_node(db, "E1/2"):
+    for node, members in _group_by_node(db, "E1/2", "B1/2"):
         ident = f"{node['profinet_name']} {node['profinet_ip']}".strip()
         for i, chunk in enumerate(_chunked(members, SLOTS), start=1):
             inst = f"EMPB_{node['profinet_name']}_{i}"
