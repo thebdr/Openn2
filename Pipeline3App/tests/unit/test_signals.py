@@ -173,11 +173,11 @@ def test_clear_on_rerun():
 
 # --- 520 Generate Data Blocks -------------------------------------------------------------- #
 
-def _db_row(script_type="DI1/2", name_in_db="Door Closed", datablocks="07_DOOR", db_kind="F_DB",
+def _db_row(script_type="DI1/2", name_in_db="Door Closed", datablocks="07_DOOR",
             io_comment="", fu="=S1", loc="+SG1", dev="-B1"):
     return {"script_type": script_type, "name_in_db": name_in_db, "datablocks": datablocks,
             "functional_unit": fu, "location": loc, "device": dev,
-            "_type": {"db_kind": db_kind, "io_comment": io_comment}}
+            "_type": {"db_names": [d.strip() for d in datablocks.split("|") if d.strip()], "io_comment": io_comment}}
 
 
 def _db(prog_lang, *member_names):
@@ -188,16 +188,14 @@ def _db(prog_lang, *member_names):
                        + [{"name": m, "comment": ""} for m in member_names]}
 
 
-def test_db_kind_of_alignment():
+def test_is_db_backed_off_db_names():
+    # a type is DB-backed iff it declares db_names; the DB's ProgrammingLanguage is owned by the registry,
+    # not the type (db_kind is gone from signal_types).
     from pipeline3.domain import identity
-    multi = {"db_kind": "DB|F_DB", "db_names": ["ALARM", "COMM"]}        # the | splitter, verbatim values
-    eq(identity.db_kind_of(multi, "ALARM"), "DB", "positional: first db_name, verbatim")
-    eq(identity.db_kind_of(multi, "COMM"), "F_DB", "positional: second db_name, verbatim")
-    single = {"db_kind": "F_DB", "db_names": ["A", "B"]}
-    eq(identity.db_kind_of(single, "A"), "F_DB", "a single kind applies to every DB")
-    eq(identity.db_kind_of(single, "B"), "F_DB")
-    ok(identity.is_db_backed(multi) and identity.is_db_backed(single), "non-empty db_kind -> DB-backed")
-    ok(not identity.is_db_backed({"db_kind": ""}), "no db_kind -> not DB-backed")
+    ok(identity.is_db_backed({"db_names": ["ALARM", "COMM"]}), "has db_names -> DB-backed")
+    ok(identity.is_db_backed({"db_names": ["07_DOOR"]}), "single db_name -> DB-backed")
+    ok(not identity.is_db_backed({"db_names": []}), "no db_names -> not DB-backed")
+    ok(not identity.is_db_backed({}), "no _type info -> not DB-backed")
 
 
 def test_fdb_marker_canonicalized_and_unknown_warned():
@@ -250,12 +248,12 @@ def test_config_registry_from_shipped_csvs():
     from pipeline3.domain import datablocks
     n_extra = {"index": "0001", "iol_FLD": "=S1+PC1-X1"}
     rows = [
-        _db_row("E1/2", "Emergency Push Button [ =S1-S1 ]", "01_Pushbutton", "F_DB"),
-        _db_row("DI1/2", "Door Closed SAFE_STATE [ =S1-B1 ]", "07_DOOR", "F_DB"),
-        _db_row("DD", "Door Alarm [ =S1-B1 ]", "07_DOOR", "F_DB"),
-        _db_row("KQ", "Contactor FB [ =S1-Q1 ]", "03_FDBACK|03_FDBACK_RAW", "F_DB"),
-        {**_db_row("N1/2", "Safety Encoder 0001 Sensor 1 Healthy [ =S1+PC1-X1 ]", "04_SPEED", "F_DB"), **n_extra},
-        _db_row("PA", "n0001 1.1.1.1", "PROFINET_NODES_ALARM", "DB"),
+        _db_row("E1/2", "Emergency Push Button [ =S1-S1 ]", "01_Pushbutton"),
+        _db_row("DI1/2", "Door Closed SAFE_STATE [ =S1-B1 ]", "07_DOOR"),
+        _db_row("DD", "Door Alarm [ =S1-B1 ]", "07_DOOR"),
+        _db_row("KQ", "Contactor FB [ =S1-Q1 ]", "03_FDBACK|03_FDBACK_RAW"),
+        {**_db_row("N1/2", "Safety Encoder 0001 Sensor 1 Healthy [ =S1+PC1-X1 ]", "04_SPEED"), **n_extra},
+        _db_row("PA", "n0001 1.1.1.1", "PROFINET_NODES_ALARM"),
     ]
     g, _i, errs, _gw = datablocks.generate(
         rows, config.load_db_definitions(), config.load_db_elements(), config.load_db_types())
@@ -358,7 +356,7 @@ def test_generate_data_blocks_from_registry():
     # the 520 entry drives off the config-driven registry (datablock_definitions/_elements/_types) - a DI1/2
     # row lands in the shipped 07_DOOR F_DB rule (member {name_in_db}); no datablock_elements_rules involved.
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("DI1/2", "Door Closed", "07_DOOR", "F_DB", dev="-B1")]
+        rows = [_db_row("DI1/2", "Door Closed", "07_DOOR", dev="-B1")]
         res = signals.generate_data_blocks(rows, d)
         eq(res["errors"], [])
         ok("07_DOOR" in res["dbs"]); ok("07_DOOR" in res["safe"])
@@ -369,7 +367,7 @@ def test_generate_data_blocks_from_registry():
 def test_generate_data_blocks_halts_on_undeclared_db():
     # CSV 1 is authoritative: a signal naming a DB the registry doesn't declare HALTS 520 (writes nothing).
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("DI1/2", "Door Closed", "07_DOOR|NOPE_DB", "F_DB", dev="-B1")]
+        rows = [_db_row("DI1/2", "Door Closed", "07_DOOR|NOPE_DB", dev="-B1")]
         res = signals.generate_data_blocks(rows, d)
         ok(any("NOPE_DB" in e for e in res["errors"]), "undeclared DB flagged")
         ok(not any("07_DOOR" in e for e in res["errors"]), "the declared DB is not flagged")
@@ -401,7 +399,7 @@ def test_phase_run():
         iol = os.path.join(d, "iolist.xlsx"); _make_iolist(iol)
         ctx = PipelineContext(params={"io_list": {"path": iol}}, out_root=os.path.join(d, "out"))
         ctx.rows = [_io_row("TAG_A", "SafetyTags", "I0.0"),
-                    _db_row("DI1/2", "Door Closed", "07_DOOR", "F_DB", dev="-B1")]
+                    _db_row("DI1/2", "Door Closed", "07_DOOR", dev="-B1")]
         res = p500_signals.run(ctx)
         ok(res.ok)
         tag_dir = config.out_path(ctx.out_root, "io_tags_dir")
@@ -450,7 +448,7 @@ if __name__ == "__main__":
         ("write_plc_tags", test_write_plc_tags),
         ("generate_io_tags_combined", test_generate_io_tags_combined),
         ("clear_on_rerun", test_clear_on_rerun),
-        ("db_kind_of_alignment", test_db_kind_of_alignment),
+        ("is_db_backed_off_db_names", test_is_db_backed_off_db_names),
         ("fdb_marker_canonicalized_and_unknown_warned", test_fdb_marker_canonicalized_and_unknown_warned),
         ("db_xml_config_attributes", test_db_xml_config_attributes),
         ("fdb_opc_locked_regardless_of_config", test_fdb_opc_locked_regardless_of_config),

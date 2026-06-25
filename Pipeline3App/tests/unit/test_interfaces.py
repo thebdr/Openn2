@@ -275,15 +275,14 @@ def test_phase_run():
 # Signal mirroring (the "Interface Mapping" feature)
 # ============================================================================================== #
 
-def _srow(script_type, mapping="", *, in_diag=False, db_kind="", db_names=(), name_in_db="",
+def _srow(script_type, mapping="", *, in_diag=False, db_names=(), name_in_db="",
           tag="", datablocks="", fu="=S1", loc="+L1", dev="-D1", diag_cabinet="", swp_cabinet="",
           diag_bit="", bit="I0.0", sheet="NS50", row=2, interface_tagname="", type_tag_name=""):
     """A synthetic staged row carrying the fields the mirroring engine reads. `interface_tagname` is
     the staging-computed value (may still carry {interface_name}/{interface_id} tokens)."""
     return {
         "script_type": script_type, "interface_mapping": mapping,
-        "_type": {"in_diagnosis": in_diag, "db_kind": db_kind, "db_names": list(db_names),
-                  "tag_name": type_tag_name},
+        "_type": {"in_diagnosis": in_diag, "db_names": list(db_names), "tag_name": type_tag_name},
         "name_in_db": name_in_db, "name_in_tagtable": tag, "datablocks": datablocks,
         "functional_unit": fu, "location": loc, "device": dev, "interface_tagname": interface_tagname,
         "diag_cabinet": diag_cabinet, "swp_cabinet": swp_cabinet, "diag_bit": diag_bit,
@@ -382,7 +381,7 @@ def test_byte_packing_by_script_type():
 
 
 def test_follower_and_if_rules():
-    rows = [_srow("DI1/2", "01", db_kind="db", db_names=["07_DOOR"], name_in_db="Door Closed",
+    rows = [_srow("DI1/2", "01", db_names=["07_DOOR"], name_in_db="Door Closed",
                   datablocks="07_DOOR", fu="=S1", loc="+SG1", dev="-B1")]
     db_rules = [{"name": "Door Alarm", "required_types": ["DI1/2"], "dev_type": "",
                  "db_name": "07_DOOR", "member": "Door Alarm [ {functional_unit}{location}{device} ]"}]
@@ -400,7 +399,7 @@ def test_follower_and_if_rules():
 
 
 def test_mirror_name_precedence():
-    db = _srow("X", db_kind="db", db_names=["DB1"], name_in_db="Member", datablocks="DB1", tag="TagX")
+    db = _srow("X", db_names=["DB1"], name_in_db="Member", datablocks="DB1", tag="TagX")
     eq(interfaces._mirror_name(db), '"DB1"."Member"', "db_element wins over tag")
     eq(interfaces._mirror_name(_srow("Y", name_in_db="", tag="TagY")), '"TagY"', "tag fallback")
     eq(interfaces._mirror_name(_srow("Z", name_in_db="", tag="")), "", "neither -> empty")
@@ -412,7 +411,7 @@ def test_generate_with_mirror():
         out = os.path.join(d, "Interfaces")
         rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "100", "id_node": "5",
                  "_source_sheet": "NS", "_source_row": 2},
-                _srow("B1/2", "01", db_kind="db", db_names=["DB1"], name_in_db="Breaker",
+                _srow("B1/2", "01", db_names=["DB1"], name_in_db="Breaker",
                       datablocks="DB1", diag_cabinet="012", swp_cabinet="12", diag_bit="03", row=10,
                       interface_tagname="PNC_Q_{interface_name}-{interface_id}_Breaker")]
         res = interfaces.generate(rows, out, tpl)
@@ -439,7 +438,7 @@ def test_generic_mirror_omits_diag_columns():
         tpl = os.path.join(d, "tpl.xlsx"); _make_mirror_template(tpl)
         out = os.path.join(d, "Interfaces")
         rows = [{"script_type": "IOC", "index": "FOO-03", "bit": "50", "_source_sheet": "NS", "_source_row": 2},
-                _srow("B1/2", "03", db_kind="db", db_names=["DB1"], name_in_db="Breaker",
+                _srow("B1/2", "03", db_names=["DB1"], name_in_db="Breaker",
                       datablocks="DB1", diag_cabinet="012", swp_cabinet="12", diag_bit="03", row=10,
                       interface_tagname="PNC_Q_{interface_name}-{interface_id}_Breaker")]
         res = interfaces.generate(rows, out, tpl)
@@ -529,7 +528,7 @@ _WORD_RULE = {"name": "Spd", "required_types": ["DI1/2"], "dev_type": "", "direc
 
 
 def test_signal_name_sources():
-    rows = [_srow("DI1/2", "01", db_kind="db", db_names=["DB1"], name_in_db="DC", datablocks="DB1",
+    rows = [_srow("DI1/2", "01", db_names=["DB1"], name_in_db="DC", datablocks="DB1",
                   fu="=S1", loc="+SG1", dev="-B1",
                   interface_tagname="PNC_Q_{interface_name}-{interface_id}_DoorIn")]
     elems, _ = interfaces.collect_mirror_set(rows, index="01", is_diag=False,
@@ -558,7 +557,7 @@ def test_word_single_row():
     # a WORD is ONE row (no bit expansion) + a blank separator.
     with tempfile.TemporaryDirectory() as d:
         rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "1", "_source_sheet": "NS", "_source_row": 2},
-                _srow("DI1/2", "01", db_kind="db", db_names=["DB1"], name_in_db="DC", datablocks="DB1",
+                _srow("DI1/2", "01", db_names=["DB1"], name_in_db="DC", datablocks="DB1",
                       fu="=S1", loc="+SG1", dev="-B1")]
         ws = _gen_one(d, {"db_rules": [], "diag_rules": [], "if_rules": [_WORD_RULE], "gap": 8}, rows)
         name, c1, r1, c2, r2, hdr = interfaces._find_data_table(ws)
@@ -575,7 +574,7 @@ def test_bool_block_full_2bytes():
     # a BOOL group fills a FULL 2-byte block: used bit(s) + blank addressed rows + a separator.
     with tempfile.TemporaryDirectory() as d:
         rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "1", "_source_sheet": "NS", "_source_row": 2},
-                _srow("DI1/2", "01", db_kind="db", db_names=["DB1"], name_in_db="DC", datablocks="DB1",
+                _srow("DI1/2", "01", db_names=["DB1"], name_in_db="DC", datablocks="DB1",
                       fu="=S1", loc="+SG1", dev="-B1", interface_tagname="PNC_Q_{interface_id}_DoorIn")]
         ws = _gen_one(d, {"db_rules": [], "diag_rules": [], "if_rules": [], "gap": 8}, rows)
         name, c1, r1, c2, r2, hdr = interfaces._find_data_table(ws)
@@ -599,7 +598,7 @@ def test_insert_interface_sheets():
         wb = Workbook(); wb.active.title = "NET SAFETY 50"; wb.active["A1"] = "src"; wb.save(iol)
         out = os.path.join(d, "Interfaces")
         rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "1", "_source_sheet": "NS", "_source_row": 2},
-                _srow("B1/2", "01", db_kind="db", db_names=["DB1"], name_in_db="Breaker", datablocks="DB1",
+                _srow("B1/2", "01", db_names=["DB1"], name_in_db="Breaker", datablocks="DB1",
                       interface_tagname="PNC_Q_{interface_id}_Breaker", row=3)]
         res = interfaces.generate(rows, out, tpl, overwrite=True, iolist_path=iol)
         ok(any("inserted" in a and "IF_SORTER-01" in a for a in res["iolist"]), "sheet inserted")

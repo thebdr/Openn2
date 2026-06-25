@@ -530,8 +530,7 @@ def load_signal_types() -> dict:
             "is_pattern": as_bool(r.get("is_pattern")),
             "tagtable_name": (r.get("tagtable_name") or "").strip(),
             "tag_name": (r.get("tag_name") or "").strip(),
-            "db_kind": (r.get("db_kind") or "").strip(),   # DB <ProgrammingLanguage>(s), verbatim; `|`-split per db_name
-            "db_names": db_names,
+            "db_names": db_names,   # the DB(s) this signal is a member of; the registry owns each DB's ProgrammingLanguage
             "db_element": (r.get("db_element") or "").strip(),
             "in_diagnosis": as_bool(r.get("in_diag")),
             "diagnosis_logic": (r.get("diag_logic") or "").strip().lower(),

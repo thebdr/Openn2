@@ -634,8 +634,8 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   designer suppression), **M7 Phase 400 Interfaces** (generation + signal mirroring +
   `interface_tagname`/Expression split + BOOL 2-byte-block / WORD-row layout + the lossless
   `insert_interface_sheets`), **M7 Phase 500 Signals** (510 I/O Tags incl. the interface tags from
-  the inserted `IF_` sheets; 520 data blocks — type-based + rule-driven members, every DB a GlobalDB
-  XML with `<ProgrammingLanguage>` = `db_kind` verbatim, F_DB ⇒ OPC-locked), **M8 Phase 600 Diagnosis** (610 DiagList_IO/Logic — OR/per-row rules +
+  the inserted `IF_` sheets; 520 data blocks — the config-driven registry, every DB a GlobalDB
+  XML with `<ProgrammingLanguage>` from `datablock_definitions.csv`, F_DB ⇒ OPC-locked), **M8 Phase 600 Diagnosis** (610 DiagList_IO/Logic — OR/per-row rules +
   paired-channel co-location; 620 the OPC SCL fill — node-resolved FL, tristate variants, FUNCTION
   rename + BOM/CRLF), **M7 Phase 700 Hardware** (710 Stations + 720 Modules, one extract → format-2
   CSVs matching the committed reference; DTD roles + auto-plug + PotentialGroup + by-type params +
@@ -718,9 +718,11 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   `<DBAccessibleFromOPCUA>` follows it (**`false` for `F_DB`** — protects the CPU from an OPC write faulting
   it to STOP — the F_DB OPC-lock is **code-enforced in `_db_xml`**, a config `opc_ua=true` on an F_DB is
   ignored + warned — else `true`). The DBs are **all** declared in the **`datablock_definitions.csv` registry**
-  (`db_programming_language`/`opc_ua` per DB) — `build_data_blocks` is removed; `signal_types`
-  `db_kind`/`db_names` now only drive the staged `name_in_db`/`datablocks`/`plc_binding` (the registry's
-  `{name_in_db}` rule consumes them). A signal naming an undeclared DB **halts** 520. The old `.db`
+  (`db_programming_language`/`opc_ua` per DB) — `build_data_blocks` is removed; `signal_types` `db_kind` is
+  removed too (the registry owns each DB's `<ProgrammingLanguage>`), so `signal_types` `db_names`/`db_element`
+  now only drive the staged `name_in_db`/`datablocks`/`plc_binding` (the registry's `{name_in_db}` rule
+  consumes them; `is_db_backed`/`datablocks` key off `db_names`). A signal naming an undeclared DB **halts**
+  520. The old `.db`
   external-source path is gone. Files are UTF-8-BOM, CRLF.
 - **Diagnosis logic rules** (`diagnosis_logic_rules.csv`, phase 610/620) are **OR / per-row**: the `|`
   in `required_types` is OR and the rule fires once per matching row (NOT Pipeline2's "ALL required,

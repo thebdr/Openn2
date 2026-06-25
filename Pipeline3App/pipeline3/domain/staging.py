@@ -109,7 +109,7 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
         row["diag_block_template"] = blk["template_type"] if blk else ""
         row["swp_cabinet"] = blk["swp"] if blk else ""
         t = row.get("_type") or {}
-        row["datablocks"] = ("|".join(n for n in (t.get("db_names") or []) if identity.db_kind_of(t, n))
+        row["datablocks"] = ("|".join(n for n in (t.get("db_names") or []) if str(n).strip())
                              if row["name_in_db"] else "")
         octets = str(row.get("profinet_ip", "")).split(".")
         row["subnet_name"] = f"Subnet{octets[2]}" if len(octets) == 4 and octets[2] else ""

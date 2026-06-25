@@ -38,8 +38,9 @@ after reviewing the 130/150 report changes in the GUI):
     for_each 'row where script_type in [...]', seed=true), plus new DiagnosticTags (per-cabinet UDInt + FB
     instance families -> InstanceDBs.csv). generate_data_blocks HALTS if a signal names an undeclared DB.
     F_DB is canonicalized in signals._db_xml; an unrecognized ProgrammingLanguage warns (datablocks.generate).
-    datablock_elements_rules.csv now serves ONLY phase-400 interface mirroring. (identity.db_kind_of still
-    computes the staged `datablocks` column; signals.DB_CONSTANTS kept for coverage + the 02_COM seed.)
+    datablock_elements_rules.csv now serves ONLY phase-400 interface mirroring. signal_types `db_kind` is
+    REMOVED (the registry owns ProgrammingLanguage); is_db_backed + the staged `datablocks` column now key
+    off `db_names` (identity.db_kinds/db_kind_of deleted). signals.DB_CONSTANTS kept for coverage + 02_COM.)
   - INTERFACE ADDRESSES (400/500): insert_interface_sheets now SEEDS the `I/O Address Side 1` cache with
     the value computed in Python (interfaces._interface_address_caches mirrors the LET: {I|Q}{base+offset}
     [.bit], offset/bit chains resolved, columns bound by header), so 510 reads correct addresses WITHOUT

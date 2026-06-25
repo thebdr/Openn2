@@ -236,7 +236,7 @@ def _safe(name) -> str:
     return "".join("_" if ch in bad else ch for ch in str(name)).strip()
 
 
-# --- every DB: the TIA Openness SW.Blocks.GlobalDB XML (<ProgrammingLanguage> = db_kind verbatim) ---- #
+# --- every DB: the TIA Openness SW.Blocks.GlobalDB XML (<ProgrammingLanguage> from the registry) -------- #
 _XML_IFACE_NS = "http://www.siemens.com/automation/Openness/SW/Interface/v5"
 
 
@@ -253,8 +253,8 @@ def _db_xml(name, db, number) -> str:
     """ONE DB as a TIA Openness SW.Blocks.GlobalDB export (UTF-8 BOM added on write; CRLF; no trailing
     newline - matching a real export). The DB-level and per-member attributes are config-driven (the
     datablock_definitions / datablock_elements CSVs); an absent/blank key reproduces the historical default
-    EXACTLY, so the legacy type/rule DBs stay byte-identical. `<ProgrammingLanguage>` = db_kind verbatim
-    (`DB`/`F_DB`, canonicalized); `DBAccessibleFromOPCUA` defaults false for F_DB else true (overridable);
+    EXACTLY, so the migrated type/rule DBs stay byte-identical. `<ProgrammingLanguage>` = the registry's
+    db_programming_language (`DB`/`F_DB`, canonicalized); `DBAccessibleFromOPCUA` is code-locked false for F_DB;
     `IsOnlyStoredInLoadMemory`/`IsWriteProtectedInAS`/`IsRetainMemResEnabled` are emitted only when true.
     A member's `datatype` comes canonical from the type registry; Comment/StartValue only for config members."""
     prog_lang = (db.get("prog_lang") or "DB").strip()

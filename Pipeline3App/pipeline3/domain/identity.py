@@ -98,32 +98,10 @@ def tagtable(row) -> str:
     return (t.get("tagtable_name") or "").strip() or str(row.get("script_type") or "").strip()
 
 
-def db_kinds(t) -> list:
-    """The type's `db_kind` (each DB's `<ProgrammingLanguage>`, VERBATIM - e.g. 'DB', 'F_DB') as a list.
-    db_kind is `|`-aligned with `db_names` by POSITION; a SINGLE kind applies to every db_name. Accepts
-    the parsed string ('DB|F_DB') or an already-split list."""
-    raw = t.get("db_kind")
-    if isinstance(raw, (list, tuple)):
-        return [str(k).strip() for k in raw if str(k).strip()]
-    return [k.strip() for k in str(raw or "").split("|") if k.strip()]
-
-
-def db_kind_of(t, db_name: str) -> str:
-    """The db_kind (`<ProgrammingLanguage>`, verbatim) that applies to `db_name`: the single kind when
-    only one is given (it applies to EVERY DB), else the kind at db_name's position in db_names. '' when
-    the type creates no DB for that name."""
-    kinds = db_kinds(t)
-    if len(kinds) <= 1:
-        return kinds[0] if kinds else ""                 # single value -> every DB
-    names = list(t.get("db_names") or [])
-    if db_name in names and names.index(db_name) < len(kinds):
-        return kinds[names.index(db_name)]               # multi value -> positional with db_names
-    return kinds[0]
-
-
 def is_db_backed(t) -> bool:
-    """True when the type creates at least one DB (it has a non-empty db_kind / ProgrammingLanguage)."""
-    return any(db_kinds(t))
+    """True when the type is a member of at least one DB (it declares `db_names`). The DB's
+    `<ProgrammingLanguage>` is owned by the datablock_definitions.csv registry, not the type."""
+    return bool([n for n in (t.get("db_names") or []) if str(n).strip()])
 
 
 def member_name(row) -> str:
