@@ -180,34 +180,12 @@ def _db_row(script_type="DI1/2", name_in_db="Door Closed", datablocks="07_DOOR",
             "_type": {"db_kind": db_kind, "io_comment": io_comment}}
 
 
-_DB_RULES = [{"name": "Door Alarm", "required_types": ["DI1/2", "DI2/2"], "dev_type": "A",
-              "db_name": "07_DOOR", "member": "Door Alarm [ {functional_unit}{location}{device} ]",
-              "interface_tagname": ""}]
-
-
-def test_build_data_blocks():
-    rows = [
-        _db_row("DI1/2", "Door Closed A", "07_DOOR", "F_DB", io_comment="closed {device}", dev="-B1"),
-        _db_row("DI2/2", "Door Closed B", "07_DOOR", "F_DB", dev="-B2"),
-        _db_row("KQ", "Contactor FB", "03_FDBACK", "F_DB"),
-        _db_row("KQ", "Contactor FB", "03_FDBACK", "F_DB"),                  # duplicate -> dropped
-        _db_row("PA", "Node X", "PROFINET_NODES_ALARM", "DB"),              # normal (ProgrammingLanguage=DB)
-        _db_row("X", "", ""),                                                # no name_in_db -> ignored
-    ]
-    dbs, warnings = signals.build_data_blocks(rows, _DB_RULES)
-    eq(sorted(dbs), ["03_FDBACK", "07_DOOR", "PROFINET_NODES_ALARM"])
-    eq(dbs["07_DOOR"]["prog_lang"], "F_DB", "DI F_DB -> fail-safe DB")
-    eq(dbs["PROFINET_NODES_ALARM"]["prog_lang"], "DB", "DB kind -> normal DB")
-    doors = [m["name"] for m in dbs["07_DOOR"]["members"]]
-    eq(doors[:len(signals.DB_CONSTANTS)], signals.DB_CONSTANTS, "constants first (Always FALSE/TRUE/No Operation)")
-    ok("Door Closed A" in doors and "Door Closed B" in doors, "type-based members")
-    ok("Door Alarm [ =S1+SG1-B1 ]" in doors and "Door Alarm [ =S1+SG1-B2 ]" in doors, "rule-driven members")
-    fb = [m["name"] for m in dbs["03_FDBACK"]["members"]]
-    eq(fb.count("Contactor FB"), 1, "duplicate DB member collapsed to one")
-    ok(any("Contactor FB" in w and "contributed 2 times" in w for w in warnings), "dup reported")
-    # type-member comment from io_comment
-    cm = next(m for m in dbs["07_DOOR"]["members"] if m["name"] == "Door Closed A")
-    eq(cm["comment"], "closed -B1")
+def _db(prog_lang, *member_names):
+    """A data-block dict (seeds + the given members) as datablocks.generate returns - a fixture for the
+    write_data_blocks tests, independent of how the registry built it."""
+    return {"prog_lang": prog_lang,
+            "members": [{"name": c, "comment": ""} for c in signals.DB_CONSTANTS]
+                       + [{"name": m, "comment": ""} for m in member_names]}
 
 
 def test_db_kind_of_alignment():
@@ -222,51 +200,107 @@ def test_db_kind_of_alignment():
     ok(not identity.is_db_backed({"db_kind": ""}), "no db_kind -> not DB-backed")
 
 
-def test_build_data_blocks_per_position_db_kind():
-    # db_kind is `|`-aligned with db_names by POSITION: ONE type emits a normal DB AND a fail-safe DB.
-    pa = {"script_type": "PA", "name_in_db": "Node X",
-          "datablocks": "PROFINET_NODES_ALARM|00_Commissioning",
-          "functional_unit": "=S1", "location": "+SM69", "device": "-XNS1",
-          "_type": {"db_kind": "DB|F_DB",
-                    "db_names": ["PROFINET_NODES_ALARM", "00_Commissioning"], "io_comment": ""}}
-    dbs, _ = signals.build_data_blocks([pa], [])
-    eq(dbs["PROFINET_NODES_ALARM"]["prog_lang"], "DB", "position 0 = DB -> normal")
-    eq(dbs["00_Commissioning"]["prog_lang"], "F_DB", "position 1 = F_DB -> fail-safe")
-    ok("Node X" in [m["name"] for m in dbs["PROFINET_NODES_ALARM"]["members"]], "member in the normal DB")
-    ok("Node X" in [m["name"] for m in dbs["00_Commissioning"]["members"]], "member in the safe DB")
-
-
 def test_fdb_marker_canonicalized_and_unknown_warned():
-    # guardrail: a lowercase/padded db_kind meaning F_DB is written as the canonical 'F_DB' (TIA-recognized)
-    # + OPC-locked; a genuinely unrecognized db_kind is written verbatim WITH a warning.
-    rows = [
-        {"script_type": "X", "name_in_db": "M1", "datablocks": "SAFE_LC",
-         "_type": {"db_kind": "f_db ", "db_names": ["SAFE_LC"]}},        # lowercase + padded -> F_DB
-        {"script_type": "Y", "name_in_db": "M2", "datablocks": "WEIRD",
-         "_type": {"db_kind": "ARRAY_DB", "db_names": ["WEIRD"]}},        # unrecognized -> verbatim + warn
+    # the F_DB guardrail now lives in the registry path: a lowercase/padded db_programming_language meaning
+    # F_DB is EMITTED as the canonical 'F_DB' (TIA-recognized) + OPC-locked by _db_xml; a genuinely
+    # unrecognized value is written verbatim WITH a datablocks.generate warning.
+    from pipeline3.domain import datablocks
+    defs = [
+        {"db_name": "SAFE_LC", "db_type": "Global", "db_programming_language": "f_db ", "for_each": ""},
+        {"db_name": "WEIRD", "db_type": "Global", "db_programming_language": "ARRAY_DB", "for_each": ""},
     ]
-    dbs, warnings = signals.build_data_blocks(rows, [])
-    with tempfile.TemporaryDirectory() as d:
-        signals.write_data_blocks(dbs, d)
-        ddir = config.out_path(d, "blocks_import_dir")
-        safe = open(os.path.join(ddir, "SAFE_LC.xml"), encoding="utf-8-sig").read()
-        ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in safe, "lowercase 'f_db ' -> canonical F_DB")
-        ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in safe, "and OPC-locked")
-        weird = open(os.path.join(ddir, "WEIRD.xml"), encoding="utf-8-sig").read()
-        ok("<ProgrammingLanguage>ARRAY_DB</ProgrammingLanguage>" in weird, "unrecognized stays verbatim")
-    ok(any("ARRAY_DB" in w and "TIA may reject" in w for w in warnings), "unrecognized db_kind warned")
-    ok(not any("SAFE_LC" in w for w in warnings), "the canonicalized F_DB does not warn")
+    _g, _i, errs, warns = datablocks.generate([], defs, [], [])
+    eq(errs, [], "no hard error - the verbatim ProgrammingLanguage is only a warning")
+    safe = signals._db_xml("SAFE_LC", {"prog_lang": "f_db ", "members": []}, 1)
+    ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in safe, "lowercase 'f_db ' -> canonical F_DB")
+    ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in safe, "and OPC-locked")
+    weird = signals._db_xml("WEIRD", {"prog_lang": "ARRAY_DB", "members": []}, 1)
+    ok("<ProgrammingLanguage>ARRAY_DB</ProgrammingLanguage>" in weird, "unrecognized stays verbatim")
+    ok(any("ARRAY_DB" in w and "TIA may reject" in w for w in warns), "unrecognized db_programming_language warned")
+    ok(not any("SAFE_LC" in w for w in warns), "the canonicalized F_DB does not warn")
+
+
+def test_db_xml_config_attributes():
+    # the config-driven path: a UDInt member with chosen attributes + DB attrs; a legacy Bool member stays
+    # byte-identical (defaults reproduce the historical output).
+    legacy = {"prog_lang": "DB", "members": [{"name": "Old", "comment": "x"}]}      # no datatype -> Bool
+    cfg = {"prog_lang": "DB", "opc_ua": True, "webserver": True, "memory_layout": "Standard",
+           "only_load_memory": True, "write_protected": True,
+           "members": [{"name": "S1.CABINET001.STATE", "datatype": "UDInt", "retain": True,
+                        "start_value": "0", "comment": "cab 1", "ext_accessible": True, "ext_visible": True,
+                        "ext_writable": False, "setpoint": True}]}
+    import xml.etree.ElementTree as ET
+    lx = signals._db_xml("L", legacy, 1)
+    ok('<Member Name="Old" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">' in lx, "legacy member byte-stable")
+    ok("<Comment>" not in lx and "IsOnlyStoredInLoadMemory" not in lx, "legacy DB carries no new elements")
+    cx = signals._db_xml("DiagnosticTags", cfg, 2)
+    ok('<Member Name="S1.CABINET001.STATE" Datatype="UDInt" Remanence="Retain"' in cx, "UDInt + Retain")
+    ok('<BooleanAttribute Name="ExternalWritable" SystemDefined="true">false</BooleanAttribute>' in cx, "ext_writable=false")
+    ok('<BooleanAttribute Name="SetPoint" SystemDefined="true">true</BooleanAttribute>' in cx, "setpoint=true")
+    ok('<MultiLanguageText Lang="en-US">cab 1</MultiLanguageText>' in cx and "<StartValue>0</StartValue>" in cx, "comment + start value")
+    ok("<MemoryLayout>Standard</MemoryLayout>" in cx, "memory layout")
+    ok("<IsOnlyStoredInLoadMemory>true</IsOnlyStoredInLoadMemory>" in cx
+       and "<IsWriteProtectedInAS>true</IsWriteProtectedInAS>" in cx, "load-memory + write-protected emitted")
+    ET.fromstring(cx); ET.fromstring(lx)                                            # both well-formed
+
+
+def test_config_registry_from_shipped_csvs():
+    # the 8 ex-signal_types DBs come from the shipped datablock_*.csv: the right ProgrammingLanguage, seeds
+    # first, row-ordered members, the KQ pair both populated, and the ex-rule encoder member migrated to CSV 2.
+    from pipeline3.domain import datablocks
+    n_extra = {"index": "0001", "iol_FLD": "=S1+PC1-X1"}
+    rows = [
+        _db_row("E1/2", "Emergency Push Button [ =S1-S1 ]", "01_Pushbutton", "F_DB"),
+        _db_row("DI1/2", "Door Closed SAFE_STATE [ =S1-B1 ]", "07_DOOR", "F_DB"),
+        _db_row("DD", "Door Alarm [ =S1-B1 ]", "07_DOOR", "F_DB"),
+        _db_row("KQ", "Contactor FB [ =S1-Q1 ]", "03_FDBACK|03_FDBACK_RAW", "F_DB"),
+        {**_db_row("N1/2", "Safety Encoder 0001 Sensor 1 Healthy [ =S1+PC1-X1 ]", "04_SPEED", "F_DB"), **n_extra},
+        _db_row("PA", "n0001 1.1.1.1", "PROFINET_NODES_ALARM", "DB"),
+    ]
+    g, _i, errs, _gw = datablocks.generate(
+        rows, config.load_db_definitions(), config.load_db_elements(), config.load_db_types())
+    eq(errs, [], "the shipped datablock_*.csv validate")
+    eq(g["07_DOOR"]["prog_lang"], "F_DB", "07_DOOR is fail-safe")
+    eq(g["PROFINET_NODES_ALARM"]["prog_lang"], "DB", "the alarm DB is normal")
+    door = [m["name"] for m in g["07_DOOR"]["members"]]
+    eq(door[:3], signals.DB_CONSTANTS, "seed constants first")
+    ok("Door Closed SAFE_STATE [ =S1-B1 ]" in door and "Door Alarm [ =S1-B1 ]" in door, "DI + DD door members")
+    for db in ("03_FDBACK", "03_FDBACK_RAW"):
+        ok("Contactor FB [ =S1-Q1 ]" in [m["name"] for m in g[db]["members"]], f"KQ member -> {db}")
+    spd = [m["name"] for m in g["04_SPEED"]["members"]]
+    ok("Safety Encoder 0001 Sensor 1 Healthy [ =S1+PC1-X1 ]" in spd, "N1/2 name_in_db member")
+    ok("Safety Encoder 0001 Healthy [ =S1+PC1-X1 ]" in spd, "the ex-datablock_elements_rules member, now CSV 2")
+
+
+def test_fdb_opc_locked_regardless_of_config():
+    # SAFETY FLOOR: a fail-safe DB is OPC-locked in CODE - an opc_ua=true (or a blank cell defaulting true)
+    # cannot make it OPC-writable. A normal DB still follows opc_ua.
+    fdb_true = signals._db_xml("S", {"prog_lang": "F_DB", "opc_ua": True, "members": []}, 1)
+    ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in fdb_true, "F_DB + opc_ua=true -> still OPC-locked")
+    fdb_blank = signals._db_xml("S", {"prog_lang": "F_DB", "members": []}, 1)  # opc_ua key absent
+    ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in fdb_blank, "F_DB + no opc_ua -> OPC-locked")
+    normal_off = signals._db_xml("N", {"prog_lang": "DB", "opc_ua": False, "members": []}, 1)
+    ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in normal_off, "DB + opc_ua=false -> OPC off")
+    normal_on = signals._db_xml("N", {"prog_lang": "DB", "members": []}, 1)
+    ok("<DBAccessibleFromOPCUA>true</DBAccessibleFromOPCUA>" in normal_on, "DB defaults OPC on")
+    # the config loader also defaults a BLANK opc_ua to OFF for an F_DB (honest in-memory value) + warns on true
+    from pipeline3.domain import datablocks
+    _g, _i, _e, warns = datablocks.generate(
+        [], [{"db_name": "X", "db_type": "Global", "db_programming_language": "F_DB",
+              "for_each": "", "opc_ua": True}], [], [])
+    ok(any("opc_ua=true ignored" in w for w in warns), "an explicit opc_ua=true on an F_DB is warned")
 
 
 def test_constants_spelling():
     eq(signals.DB_CONSTANTS, ["Always FALSE", "Always TRUE", "No Operation"], "space, no underscore")
+    from pipeline3.domain import datablocks
+    eq(datablocks.DB_CONSTANTS, signals.DB_CONSTANTS, "the two DB_CONSTANTS copies must stay in lockstep")
 
 
 def test_write_safe_db_xml():
     # a fail-safe DB is a GlobalDB XML carrying ProgrammingLanguage=F_DB + DBAccessibleFromOPCUA=false
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("DI1/2", "Door Closed A", "07_DOOR", "F_DB", dev="-B1")]
-        dbs, _ = signals.build_data_blocks(rows, _DB_RULES)
+        dbs = {"07_DOOR": _db("F_DB", "Door Closed A", "Door Alarm [ =S1+SG1-B1 ]")}
         db_dir, count = signals.write_data_blocks(dbs, d)
         eq(count, 1)
         ok(os.path.exists(os.path.join(db_dir, "07_DOOR.xml")), "safe DB -> .xml")
@@ -279,9 +313,9 @@ def test_write_safe_db_xml():
         ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in xtxt, "F_DB fail-safe marker")
         ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in xtxt, "safe DB not OPC-UA accessible")
         ok("<Name>07_DOOR</Name>" in xtxt, "DB name")
-        ok('<Member Name="Door Closed A"' in xtxt, "type member emitted")
+        ok('<Member Name="Door Closed A"' in xtxt, "member emitted")
         ok('<Member Name="Always FALSE"' in xtxt and '<Member Name="Always TRUE"' in xtxt, "constants kept")
-        ok('<Member Name="Door Alarm [ =S1+SG1-B1 ]"' in xtxt, "rule-driven member present")
+        ok('<Member Name="Door Alarm [ =S1+SG1-B1 ]"' in xtxt, "second member present")
         ok("<MemoryLayout>Optimized</MemoryLayout>" in xtxt)
         ok(xtxt.rstrip().endswith("</Document>"), "well-formed XML tail")
         ET.fromstring(xtxt)  # parses as valid XML
@@ -291,8 +325,7 @@ def test_write_normal_db_source():
     # a NORMAL DB is now ALSO a GlobalDB XML - it differs from F_DB only by ProgrammingLanguage=DB and
     # DBAccessibleFromOPCUA=true (OPC-UA accessible); the .db external source is gone.
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("PA", "Node X", "PROFINET_NODES_ALARM", "DB")]
-        dbs, _ = signals.build_data_blocks(rows, [])
+        dbs = {"PROFINET_NODES_ALARM": _db("DB", "Node X")}
         db_dir, count = signals.write_data_blocks(dbs, d)
         eq(count, 1)
         ok(os.path.exists(os.path.join(db_dir, "PROFINET_NODES_ALARM.xml")), "normal DB -> .xml too")
@@ -310,8 +343,7 @@ def test_write_normal_db_source():
 
 def test_write_clears_db_and_xml_not_scl():
     with tempfile.TemporaryDirectory() as d:
-        rows = [_db_row("PA", "Node X", "PROFINET_NODES_ALARM", "DB")]
-        dbs, _ = signals.build_data_blocks(rows, [])
+        dbs = {"PROFINET_NODES_ALARM": _db("DB", "Node X")}
         db_dir, _ = signals.write_data_blocks(dbs, d)
         scl = os.path.join(db_dir, "Diagnostic_for_OPC.scl"); open(scl, "w").write("keep me")
         stale_db = os.path.join(db_dir, "old.db"); open(stale_db, "w").write("x")
@@ -322,14 +354,37 @@ def test_write_clears_db_and_xml_not_scl():
         ok(os.path.exists(scl), "the SCL (phase 620) is NOT swept")
 
 
-def test_generate_data_blocks_real_rules():
-    # uses the real datablock_elements_rules.csv via config.load_rules
+def test_generate_data_blocks_from_registry():
+    # the 520 entry drives off the config-driven registry (datablock_definitions/_elements/_types) - a DI1/2
+    # row lands in the shipped 07_DOOR F_DB rule (member {name_in_db}); no datablock_elements_rules involved.
     with tempfile.TemporaryDirectory() as d:
         rows = [_db_row("DI1/2", "Door Closed", "07_DOOR", "F_DB", dev="-B1")]
         res = signals.generate_data_blocks(rows, d)
+        eq(res["errors"], [])
         ok("07_DOOR" in res["dbs"]); ok("07_DOOR" in res["safe"])
         ok(res["count"] >= 1)
         ok(os.path.exists(os.path.join(res["dir"], "07_DOOR.xml")), "DB -> .xml")
+
+
+def test_generate_data_blocks_halts_on_undeclared_db():
+    # CSV 1 is authoritative: a signal naming a DB the registry doesn't declare HALTS 520 (writes nothing).
+    with tempfile.TemporaryDirectory() as d:
+        rows = [_db_row("DI1/2", "Door Closed", "07_DOOR|NOPE_DB", "F_DB", dev="-B1")]
+        res = signals.generate_data_blocks(rows, d)
+        ok(any("NOPE_DB" in e for e in res["errors"]), "undeclared DB flagged")
+        ok(not any("07_DOOR" in e for e in res["errors"]), "the declared DB is not flagged")
+        eq(res["count"], 0, "nothing written on a halt")
+        ok(not os.path.exists(os.path.join(res["dir"], "NOPE_DB.xml")))
+        ok(not os.path.exists(os.path.join(res["dir"], "07_DOOR.xml")))
+
+
+def test_every_signal_db_name_is_declared():
+    # no-false-positive guard: every db_name any signal type can emit IS declared as a Global in CSV 1, so the
+    # undeclared-DB halt never fires on a real run (locks the invariant against future signal_types/CSV1 drift).
+    sig_dbs = {n for t in config.load_signal_types().values() for n in (t.get("db_names") or []) if n}
+    declared = {d["db_name"] for d in config.load_db_definitions()
+                if (d.get("db_type") or "Global").strip().lower() == "global"}
+    eq(sorted(sig_dbs - declared), [], "every signal_types db_name is declared in datablock_definitions.csv")
 
 
 # --- phase wiring -------------------------------------------------------------------------- #
@@ -395,15 +450,18 @@ if __name__ == "__main__":
         ("write_plc_tags", test_write_plc_tags),
         ("generate_io_tags_combined", test_generate_io_tags_combined),
         ("clear_on_rerun", test_clear_on_rerun),
-        ("build_data_blocks", test_build_data_blocks),
         ("db_kind_of_alignment", test_db_kind_of_alignment),
-        ("build_data_blocks_per_position_db_kind", test_build_data_blocks_per_position_db_kind),
         ("fdb_marker_canonicalized_and_unknown_warned", test_fdb_marker_canonicalized_and_unknown_warned),
+        ("db_xml_config_attributes", test_db_xml_config_attributes),
+        ("fdb_opc_locked_regardless_of_config", test_fdb_opc_locked_regardless_of_config),
+        ("config_registry_from_shipped_csvs", test_config_registry_from_shipped_csvs),
         ("constants_spelling", test_constants_spelling),
         ("write_safe_db_xml", test_write_safe_db_xml),
         ("write_normal_db_source", test_write_normal_db_source),
         ("write_clears_db_and_xml_not_scl", test_write_clears_db_and_xml_not_scl),
-        ("generate_data_blocks_real_rules", test_generate_data_blocks_real_rules),
+        ("generate_data_blocks_from_registry", test_generate_data_blocks_from_registry),
+        ("generate_data_blocks_halts_on_undeclared_db", test_generate_data_blocks_halts_on_undeclared_db),
+        ("every_signal_db_name_is_declared", test_every_signal_db_name_is_declared),
         ("write_safe_db_xml_and_dedup", test_write_safe_db_xml_and_dedup),
         ("sweep_preserves_zone_cumulative_db", test_sweep_preserves_zone_cumulative_db),
         ("phase_registered", test_phase_registered),

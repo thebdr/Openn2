@@ -29,12 +29,17 @@ logic-rule column. The single database is the staged ctx.rows / IODatabase.csv.
 
 RECENT REFINEMENTS (this batch — data-independent gate green; RE-STAGE 300->500 + RE-FREEZE the golden
 after reviewing the 130/150 report changes in the GUI):
-  - DATA BLOCKS UNIFIED (520): EVERY DB is a SW.Blocks.GlobalDB XML; the type's `db_kind` is the verbatim
-    <ProgrammingLanguage> (`DB`/`F_DB`, `|`-aligned with db_names by position, F_DB-wins on conflict),
-    with <DBAccessibleFromOPCUA> = false for F_DB else true. The .db external-source path is GONE. F_DB is
-    canonicalized on write (any casing -> "F_DB" so TIA recognizes it); an unrecognized db_kind is written
-    verbatim + warned. (identity.db_kinds/db_kind_of/is_db_backed; signals._db_xml/build_data_blocks/
-    write_data_blocks; config keeps db_kind verbatim.)
+  - DATA BLOCKS — CENTRALIZED REGISTRY (520): EVERY DB is a SW.Blocks.GlobalDB XML declared in the
+    config-driven registry (config_project/input_docs/datablock_definitions.csv + datablock_elements.csv +
+    datablock_types.csv via pipeline3/domain/datablocks.py + dbtemplate.py). <ProgrammingLanguage> =
+    db_programming_language verbatim (`DB`/`F_DB`); <DBAccessibleFromOPCUA> = false for F_DB else true (the 6
+    F_DB DBs set opc_ua=false in CSV1). The legacy signals.build_data_blocks + the datablock_elements_rules
+    520 path are REMOVED — the 8 ex-signal_types DBs were migrated byte-identical (member={name_in_db}
+    for_each 'row where script_type in [...]', seed=true), plus new DiagnosticTags (per-cabinet UDInt + FB
+    instance families -> InstanceDBs.csv). generate_data_blocks HALTS if a signal names an undeclared DB.
+    F_DB is canonicalized in signals._db_xml; an unrecognized ProgrammingLanguage warns (datablocks.generate).
+    datablock_elements_rules.csv now serves ONLY phase-400 interface mirroring. (identity.db_kind_of still
+    computes the staged `datablocks` column; signals.DB_CONSTANTS kept for coverage + the 02_COM seed.)
   - INTERFACE ADDRESSES (400/500): insert_interface_sheets now SEEDS the `I/O Address Side 1` cache with
     the value computed in Python (interfaces._interface_address_caches mirrors the LET: {I|Q}{base+offset}
     [.bit], offset/bit chains resolved, columns bound by header), so 510 reads correct addresses WITHOUT

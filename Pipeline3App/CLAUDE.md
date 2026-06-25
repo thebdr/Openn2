@@ -347,23 +347,56 @@ phase 400 to have inserted the `IF_` sheets (absent ⇒ I/O-only, degrades grace
   table columns **`Signal Name Side 1`** (tag name) and **`I/O Address Side 1`** (the LET-formula's
   Excel-cached value, read via `data_only`; %-prefixed), `Data Type`→Bool/Word, `Description`→comment,
   **Path = the `IF_` sheet name**. A named interface row whose address didn't resolve is skipped+warned.
-- **520 Generate Data Blocks** → `blocks_import_dir/*` — members from TWO sources: (a) each row's
-  staged `name_in_db` into every DB in its `datablocks`; (b) **rule-driven** additions from
-  `datablock_elements_rules.csv` (any `required_types` script_type present ⇒ add the interpolated
-  `member` to `db_name`, per-row — the phase-400 follower model; `dev_type` not a filter). Every DB
-  is seeded with **`Always FALSE` / `Always TRUE`** (space, no underscore). A DATA_BLOCK can't repeat
-  a member name, so exact duplicates are dropped (kept once) + warned.
+- **520 Generate Data Blocks** → `blocks_import_dir/*` — the **config-driven registry is the SOLE source**
+  (`domain/datablocks.py`, below); the legacy `build_data_blocks`/`datablock_elements_rules` 520 path is
+  **removed**. The 8 ex-`signal_types` DBs (`07_DOOR`, `04_SPEED`, `01_Pushbutton`, `03_FDBACK`/`_RAW`,
+  `PROFINET_NODES_ALARM`/`WARNING`, `00_Commissioning`) are declared in `datablock_definitions.csv`
+  (`seed=true`, the `db_programming_language`/`opc_ua` per DB) with their members in `datablock_elements.csv`
+  — `member={name_in_db}` (the staged column) `for_each` `row where script_type in [...]` (so members stay in
+  IODatabase ROW order), plus the ex-`datablock_elements_rules` "Safety Encoder Failure" member on `04_SPEED`.
+  This was migrated **byte-identical to the old type/rule output** (`test_signals.test_config_registry_from_shipped_csvs`
+  guards the shipped CSVs' structure). `generate_data_blocks` also **HALTS** if any signal's staged `datablocks`
+  names a DB the registry doesn't declare (CSV 1 is authoritative). A `seed=true` DB is prepended with
+  **`Always FALSE`/`Always TRUE`/`No Operation`** (space, no underscore — `datablocks.DB_CONSTANTS`);
+  `if_elements` drops a DB with no REAL member (seeds alone don't count — `_nseed`). Duplicates dropped
+  (kept once) + warned. NOTE: `datablock_elements_rules.csv` still exists — it is now ONLY phase 400's
+  interface-mirroring follower source (`interfaces.py`), no longer a 520 input.
+- **Config-driven DBs** (`domain/datablocks.py` + `domain/dbtemplate.py`; three CSVs in `input_docs/`):
+  a centralized, validate-and-halt registry that creates DBs (and their FB instance families) from
+  IODatabase data — the 8 migrated DBs **plus** new ones like **`DiagnosticTags`** (per-cabinet `UDInt`
+  members + a `CabState`/`BoolToUDInt…` instance per member, named to match the 620 SCL's
+  `"DiagnosticTags"."S1.CABINET{idx}.<role>"` references that nothing previously created). **`datablock_definitions.csv`**
+  is the AUTHORITATIVE registry of every DB — `db_name` (literal or a PEP-3101 template for an **Instance
+  family**), `db_type` (`Global`|`Instance`), `db_programming_language` (`DB`/`F_DB`), `instance_of` (the FB),
+  `for_each` (the iteration DSL), `seed` (prepend the 3 constants), `create_when`, and the full TIA attribute
+  set (`memory_layout`/`opc_ua`/`webserver`/`only_load_memory`/`write_protected`/`retain_reserve`, defaults
+  all-permissive + user-owned). **`datablock_elements.csv`** = the Global-DB members (`member` template,
+  `for_each`, `datatype`, `start_value`, `retain`, `ext_*`, `setpoint`, `comment`). **`datablock_types.csv`** =
+  the valid types (Elementary + UDT) — an unknown datatype halts. Two grammars (`dbtemplate.py`): **value/name
+  templates** = Python format mini-language (`{cabinet:03d}`, numeric-coercing); **`for_each`** = a small
+  SQL-flavored DSL — `(blank)` (single literal) | `row [where P]` (per IODatabase row) | `<var> in
+  unique(<column>) [where P]` (per DISTINCT value, bound to `<var>`); `P` = `numeric(col)`/`col = "x"`/
+  `col != "x"`/`col in [..]`/`col ~ /re/` with `and`/`or`/`not`/`()`. **A `for_each` with commas (`in [..]`)
+  must be CSV-quoted**, doubling the inner `"`. ANY unknown type / undeclared `db_name` / bad template /
+  for_each syntax error / `only_load_memory`+`Optimized` ⇒ logged `[ERROR]` + the phase HALTS (write nothing);
+  a for_each naming a column present in NO row is a WARN (not a halt — a partial row set may omit it). `_db_xml`
+  emits the full per-DB + per-member attribute set; **a blank/absent key reproduces the historical bytes
+  exactly**. The instance families also flow to `InstanceDBs.csv` (the engine re-runs the SAME
+  `datablocks.generate`, so member names + instance names can't drift). The CSVs are **project-isolated** (a
+  project predating the feature has none ⇒ no-op; the Project Manager copies the whole `config_project/`).
+  `02_COM` (phase 800, `write_safe_db`) is unaffected — its members are the AREA-n builder cumulatives, not
+  a 520 source.
 - **Unified DB output** (key gotcha): **EVERY DB is a TIA Openness `SW.Blocks.GlobalDB` XML**
   `<name>.xml` (UTF-8 BOM, CRLF, no trailing newline; per-member external-access attrs;
-  `MemoryLayout=Optimized`). The ONLY difference between a normal and a fail-safe DB is
-  **`<ProgrammingLanguage>` = the type's `db_kind` copied VERBATIM** (`DB` or `F_DB`; `db_kind` is
-  `|`-aligned with `db_names` by position — a single value applies to every DB, so `PA` →
-  `PROFINET_NODES_ALARM` as `DB` + `00_Commissioning` as `F_DB`; on a mixed contribution **F_DB wins**).
-  **`<DBAccessibleFromOPCUA>` follows it**: `false` for `F_DB` (a fail-safe DB must not be OPC-writable —
-  an unexpected write can fault the CPU to STOP), `true` otherwise. The `.db` external-source path is
-  **gone** (`_db_text` removed); `build_data_blocks` carries `db['prog_lang']`, not a `safe` bool.
-  `blocks_import_dir` is still swept of prior `*.db`/`*.xml` on re-run (removing any pre-unification
-  `.db`; the phase-620 SCL is left intact).
+  `MemoryLayout=Optimized` default). The ONLY difference between a normal and a fail-safe DB is
+  **`<ProgrammingLanguage>` = the registry's `db_programming_language` VERBATIM** (`DB` or `F_DB`, declared
+  per DB in `datablock_definitions.csv`; `_db_xml` canonicalizes a padded/lowercase `f_db` → `F_DB`).
+  **`<DBAccessibleFromOPCUA>` is CODE-ENFORCED off for `F_DB`** (`_db_xml` hard-locks it — a fail-safe DB must
+  not be OPC-writable, an unexpected write can fault the CPU to STOP); a config `opc_ua=true` on an F_DB is
+  **ignored + warned** (`datablocks.generate`), and the loader defaults a blank `opc_ua` cell to OFF for F_DB.
+  A normal DB follows `opc_ua` (default `true`). The `.db` external-source path is **gone** (`_db_text`
+  removed); each `db` dict carries `db['prog_lang']`. `blocks_import_dir` is still swept of prior `*.db`/`*.xml`
+  on re-run (removing any pre-unification `.db`; the phase-620 SCL is left intact).
 
 ## Phase 600 — Diagnosis Mapping — DONE
 
@@ -681,10 +714,14 @@ rule column (override + absent + blank fallback); `test_registry.py` also covers
   capture + patch them back at the ZIP/XML level; and **re-create copied tables with clean columns**
   (no `dataDxfId`/`calculatedColumnFormula`) or Excel drops them ("Removed Records: Table").
 - **Data-block output is unified + safety-aware** (phase 520): EVERY DB is a **`SW.Blocks.GlobalDB`
-  Openness XML** (`<name>.xml`); the type's **`db_kind` is the verbatim `<ProgrammingLanguage>`** (`DB` /
-  `F_DB`, `|`-aligned with `db_names` by position, F_DB-wins on conflict), and `<DBAccessibleFromOPCUA>`
-  follows it (**`false` for `F_DB`** — protects the CPU from an OPC write faulting it to STOP — else
-  `true`). The old `.db` external-source path is gone. Files are UTF-8-BOM, CRLF.
+  Openness XML** (`<name>.xml`); `<ProgrammingLanguage>` is **`DB`/`F_DB` verbatim** and
+  `<DBAccessibleFromOPCUA>` follows it (**`false` for `F_DB`** — protects the CPU from an OPC write faulting
+  it to STOP — the F_DB OPC-lock is **code-enforced in `_db_xml`**, a config `opc_ua=true` on an F_DB is
+  ignored + warned — else `true`). The DBs are **all** declared in the **`datablock_definitions.csv` registry**
+  (`db_programming_language`/`opc_ua` per DB) — `build_data_blocks` is removed; `signal_types`
+  `db_kind`/`db_names` now only drive the staged `name_in_db`/`datablocks`/`plc_binding` (the registry's
+  `{name_in_db}` rule consumes them). A signal naming an undeclared DB **halts** 520. The old `.db`
+  external-source path is gone. Files are UTF-8-BOM, CRLF.
 - **Diagnosis logic rules** (`diagnosis_logic_rules.csv`, phase 610/620) are **OR / per-row**: the `|`
   in `required_types` is OR and the rule fires once per matching row (NOT Pipeline2's "ALL required,
   once per cabinet"). Matching is by **script_type** (exact); a pair_key like `DI`/`N` matches no

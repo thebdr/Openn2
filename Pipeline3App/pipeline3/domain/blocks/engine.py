@@ -15,7 +15,7 @@ import csv
 import os
 
 from pipeline3.core import config
-from pipeline3.domain import signals
+from pipeline3.domain import datablocks, signals
 from pipeline3.domain.blocks.database import Database
 from pipeline3.domain.blocks.table import Table
 from pipeline3.domain.blocks.registry import registry
@@ -124,16 +124,31 @@ def _instance_rows(tables) -> list:
     return out
 
 
-def write_instance_dbs(creation_dir: str, tables) -> tuple:
-    rows = _instance_rows(tables)
+def _config_instance_rows(rows) -> list:
+    """(name, fb) for the Instance-DB families declared in datablock_definitions.csv (the per-cabinet
+    DiagnosticTags FB instances etc.). Uses the SAME datablocks.generate as phase 520, so the names match
+    the DiagnosticTags members + the 620 SCL references. (A config error already halted phase 520.)"""
+    if not rows:
+        return []
+    _g, inst, errors, _w = datablocks.generate(
+        rows, config.load_db_definitions(), config.load_db_elements(), config.load_db_types())
+    return [] if errors else inst
+
+
+def write_instance_dbs(creation_dir: str, tables, rows=None) -> tuple:
+    pairs, seen, deduped = _instance_rows(tables) + _config_instance_rows(rows), set(), []
+    for name, fb in pairs:                                       # the builder cells + the config families
+        if name and name not in seen:
+            seen.add(name)
+            deduped.append((name, fb))
     path = os.path.join(creation_dir, "InstanceDBs.csv")
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["#", "Instance DBs created directly via CreateInstanceDB"])
         w.writerow(["%", "Name", "InstanceOf", "Number", "Folder"])
-        for name, fb in rows:
+        for name, fb in deduped:
             w.writerow(["@", name, fb, "", fb])
-    return path, len(rows)
+    return path, len(deduped)
 
 
 def generate_blocks(rows, out_root: str, emit=print, write_instances: bool = True) -> dict:
@@ -198,7 +213,7 @@ def generate_blocks(rows, out_root: str, emit=print, write_instances: bool = Tru
 
     inst_n, inst_path = 0, ""
     if write_instances:
-        inst_path, inst_n = write_instance_dbs(creation_dir, tables)
+        inst_path, inst_n = write_instance_dbs(creation_dir, tables, rows)
     for w in warnings:
         emit(f"  WARN {w}")
     emit(f"software blocks: {len(files)} CSV(s)"

@@ -29,6 +29,12 @@ def _data_blocks(ctx) -> PhaseResult:
     res = signals.generate_data_blocks(ctx.rows, ctx.out_root)
     for w in res["warnings"]:
         ctx.emit(f"  WARN {w}")
+    if res.get("errors"):                                       # a datablock-config error -> HALT (write nothing)
+        for e in res["errors"]:
+            ctx.emit(f"[ERROR] {e}")
+        ctx.emit(f"data blocks: {len(res['errors'])} config error(s) - nothing written; fix the "
+                 "datablock_definitions/_elements/_types CSVs")
+        return PhaseResult(ok=False, summary=f"{len(res['errors'])} datablock-config error(s)")
     ctx.emit(f"data blocks: {res['count']} DB(s) -> .xml "
              f"({len(res['safe'])} F_DB + {len(res['normal'])} DB) -> {res['dir']}")
     return PhaseResult(ok=True, artifacts={"blocks_import_dir": res["dir"]},
@@ -59,6 +65,7 @@ BUTTONS = [
 register(Phase(
     number=500, key="signals", name_key="ph_signals", run=run, requires=(300,),
     buttons=BUTTONS, sub_phases=SUB_PHASES,
-    inputs=("io_database", "signal_types.csv", "datablock_elements_rules.csv"),
+    inputs=("io_database", "signal_types.csv", "datablock_definitions.csv",
+            "datablock_elements.csv", "datablock_types.csv"),
     outputs=("io_tags_dir", "blocks_import_dir"),
 ))

@@ -11,13 +11,13 @@ TWO sources, both as plain text like a real TIA export:
     (Path = the sheet name). Interface tags need phase 400 to have run with insert_interface_sheets;
     absent IF_ sheets simply yield no interface tags.
 
-520 Generate Data Blocks -> blocks_import_dir: members from two sources (each row's staged
-name_in_db into its datablocks; plus datablock_elements_rules additions), seeded with Always
-FALSE/TRUE + a No Operation no-op (the builder pad). EVERY DB is written as a TIA Openness
-SW.Blocks.GlobalDB XML (<name>.xml); the ONLY difference between a normal and a fail-safe DB is
-<ProgrammingLanguage> = the type's db_kind VERBATIM ('DB' or 'F_DB', `|`-aligned with db_names by
-position), with DBAccessibleFromOPCUA following it (false for F_DB - a fail-safe DB must not be
-OPC-writable - else true).
+520 Generate Data Blocks -> blocks_import_dir: every DB comes from the config-driven REGISTRY
+(datablock_definitions/_elements/_types via domain.datablocks - the single source of which DBs exist,
+their members + full TIA attributes), a `seed=true` DB prepended with Always FALSE/TRUE + a No Operation
+no-op (the builder pad). EVERY DB is written as a TIA Openness SW.Blocks.GlobalDB XML (<name>.xml); the
+ONLY difference between a normal and a fail-safe DB is <ProgrammingLanguage> = the registry's
+db_programming_language VERBATIM ('DB' or 'F_DB'), with DBAccessibleFromOPCUA following it (false for
+F_DB - a fail-safe DB must not be OPC-writable - else true).
 
 Clean-room rebuild of Pipeline2's outputs.write_io_tags / build_io_tags (reference for INTENT only);
 the interface-tag source + the F_DB XML are new in Pipeline3.
@@ -30,7 +30,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter, range_boundaries
 
 from pipeline3.core import config
-from pipeline3.domain import identity
+from pipeline3.domain import datablocks, identity
 
 IF_PREFIX = "IF_"                       # the phase-400 inserted interface sheets (CLAUDE.md Phase 400)
 TAG_TABLE_FILE = "PLCTags.xlsx"
@@ -224,7 +224,6 @@ def generate_io_tags(rows, out_root, *, iolist_path=None) -> dict:
 # is the dedicated no-op member builders use to PAD a template's unused fixed slots, so an unused slot
 # never references "Always TRUE"/"Always FALSE" (whose definite TRUE/FALSE could be misread).
 DB_CONSTANTS = ["Always FALSE", "Always TRUE", "No Operation"]
-_DB_RULES_FILE = "datablock_elements_rules.csv"
 
 # The 02_COM zone-cumulative custom DB is OWNED by phase 800 (its members are the block builders'
 # 02_COM.{db_element} cumulatives, not signal rows), but it lives in blocks_import_dir beside the 520
@@ -235,77 +234,6 @@ COM_DB = "02_COM"
 def _safe(name) -> str:
     bad = '\\/:*?"<>[]|'
     return "".join("_" if ch in bad else ch for ch in str(name)).strip()
-
-
-def build_data_blocks(rows, db_rules) -> tuple[dict, list]:
-    """Group DB members into named data blocks from TWO sources, returns (dbs, warnings):
-      - type-based: each row's staged `name_in_db` is a member of every DB in its staged `datablocks`
-        (the type's db_element / db_names; comment = the type io_comment);
-      - rule-driven (datablock_elements_rules): each row whose script_type is in a rule's
-        `required_types` adds the rule's interpolated `member` to the rule's `db_name`.
-    A DB is created on first use and seeded with Always FALSE/TRUE. Each DB carries a `prog_lang` = its
-    `db_kind`, the verbatim `<ProgrammingLanguage>` (e.g. 'DB' or 'F_DB' - see write_data_blocks; EVERY
-    DB is now a GlobalDB XML, F_DB being the only fail-safe difference). db_kind is `|`-aligned with
-    db_names BY POSITION - a single kind applies to every DB, multiple kinds map one-to-one - so one type
-    may emit a normal DB and an F_DB (e.g. PA -> PROFINET_NODES_ALARM as `DB` + 00_Commissioning as
-    `F_DB`); on a mixed contribution F_DB wins. A DATA_BLOCK cannot carry two members of the same name, so
-    duplicates are dropped (kept once) and reported as a warning.
-    Returns dbs = {name: {'prog_lang': str, 'members': [{'name', 'comment'}]}}."""
-    dbs: dict = {}
-    seen: dict = {}                       # name -> set of member names already added
-    dup: dict = {}                        # (db, member) -> contribution count (>1 = collapsed)
-
-    def ensure(name):
-        if name not in dbs:
-            dbs[name] = {"prog_lang": "", "members": [{"name": c, "comment": ""} for c in DB_CONSTANTS]}
-            seen[name] = set(DB_CONSTANTS)
-        return dbs[name]
-
-    def add(name, member, comment, prog_lang):
-        g = ensure(name)
-        pl = (prog_lang or "").strip()                # strip to match the emit site (_db_xml) exactly,
-        if pl and (pl.upper() == "F_DB" or not g["prog_lang"]):   # so F_DB never loses the race to padding
-            g["prog_lang"] = pl                       # F_DB (fail-safe) wins; otherwise first non-empty
-        if not member:
-            return
-        if member in seen[name]:
-            dup[(name, member)] = dup.get((name, member), 1) + 1
-            return
-        seen[name].add(member)
-        g["members"].append({"name": member, "comment": comment})
-
-    # (a) type-based membership, from the staged identity columns. Each DB's safety is its OWN db_kind:
-    # db_kind is `|`-aligned with db_names by position (a single kind applies to every DB).
-    for r in rows or []:
-        member = str(r.get("name_in_db") or "").strip()
-        if not member:
-            continue
-        t = r.get("_type") or {}
-        comment = identity.tag_comment(r)
-        for db in [d.strip() for d in str(r.get("datablocks") or "").split("|") if d.strip()]:
-            add(db, member, comment, identity.db_kind_of(t, db))
-
-    # (b) rule-driven additions (any required_type present -> add the element to db_name)
-    for r in rows or []:
-        st = str(r.get("script_type") or "").strip()
-        if not st:
-            continue
-        t = r.get("_type") or {}
-        for rule in db_rules or []:
-            if st in rule["required_types"]:
-                member = identity.interp(rule["member"], r)
-                if member:
-                    add(rule["db_name"], member, "", identity.db_kind_of(t, rule["db_name"]))
-
-    warnings = [f"{name}: member {member!r} contributed {count} times - kept 1 "
-                f"(a DATA_BLOCK cannot repeat a member name)"
-                for (name, member), count in sorted(dup.items())]
-    for name, g in sorted(dbs.items()):                  # guardrail: an unrecognized <ProgrammingLanguage>
-        pl = (g.get("prog_lang") or "").strip()          # (a db_kind typo) is written verbatim - flag it.
-        if pl and pl != "DB" and pl.upper() != "F_DB":   # 'F_DB' is canonicalized on write, so it never warns
-            warnings.append(f"{name}: db_kind {pl!r} written verbatim as <ProgrammingLanguage> "
-                            f"(expected 'DB' or 'F_DB') - TIA may reject the import")
-    return dbs, warnings
 
 
 # --- every DB: the TIA Openness SW.Blocks.GlobalDB XML (<ProgrammingLanguage> = db_kind verbatim) ---- #
@@ -323,16 +251,21 @@ def _xml_text(value) -> str:
 
 def _db_xml(name, db, number) -> str:
     """ONE DB as a TIA Openness SW.Blocks.GlobalDB export (UTF-8 BOM added on write; CRLF; no trailing
-    newline - matching a real export). EVERY DB is emitted this way; the only difference between a normal
-    and a fail-safe DB is `<ProgrammingLanguage>` = the type's db_kind VERBATIM (e.g. 'DB' or 'F_DB').
-    DBAccessibleFromOPCUA follows: false for F_DB (a fail-safe DB must not be OPC-writable - an unexpected
-    write can fault the CPU to STOP), true otherwise. Each member is Bool / NonRetain / Public with the
-    system-default external-access attributes. AutoNumber lets TIA assign the real DB number on import
-    (the emitted Number is a deterministic placeholder)."""
+    newline - matching a real export). The DB-level and per-member attributes are config-driven (the
+    datablock_definitions / datablock_elements CSVs); an absent/blank key reproduces the historical default
+    EXACTLY, so the legacy type/rule DBs stay byte-identical. `<ProgrammingLanguage>` = db_kind verbatim
+    (`DB`/`F_DB`, canonicalized); `DBAccessibleFromOPCUA` defaults false for F_DB else true (overridable);
+    `IsOnlyStoredInLoadMemory`/`IsWriteProtectedInAS`/`IsRetainMemResEnabled` are emitted only when true.
+    A member's `datatype` comes canonical from the type registry; Comment/StartValue only for config members."""
     prog_lang = (db.get("prog_lang") or "DB").strip()
     if prog_lang.upper() == "F_DB":
         prog_lang = "F_DB"           # canonicalize the fail-safe marker so TIA always recognizes it
-    opc = "false" if prog_lang == "F_DB" else "true"
+    # SAFETY FLOOR (code-enforced, NOT left to config): a fail-safe DB is NEVER OPC-accessible - an OPC write
+    # to it can fault the CPU to STOP. A normal DB follows opc_ua (default true). datablocks.generate WARNs
+    # if a config explicitly set opc_ua=true on an F_DB; here we hard-lock it regardless.
+    opc = "false" if prog_lang == "F_DB" else ("true" if db.get("opc_ua", True) else "false")
+    web = "true" if db.get("webserver", True) else "false"
+    layout = (db.get("memory_layout") or "Optimized").strip() or "Optimized"
     lines = [
         '<?xml version="1.0" encoding="utf-8"?>',
         '<Document>',
@@ -341,29 +274,54 @@ def _db_xml(name, db, number) -> str:
         '    <AttributeList>',
         '      <AutoNumber>true</AutoNumber>',
         f'      <DBAccessibleFromOPCUA>{opc}</DBAccessibleFromOPCUA>',
-        '      <DBAccessibleFromWebserver>true</DBAccessibleFromWebserver>',
+        f'      <DBAccessibleFromWebserver>{web}</DBAccessibleFromWebserver>',
         '      <HeaderAuthor />',
         '      <HeaderFamily />',
         '      <HeaderName />',
         '      <HeaderVersion>0.1</HeaderVersion>',
+    ]
+    if db.get("only_load_memory"):
+        lines.append('      <IsOnlyStoredInLoadMemory>true</IsOnlyStoredInLoadMemory>')
+    if db.get("retain_reserve"):
+        lines.append('      <IsRetainMemResEnabled>true</IsRetainMemResEnabled>')
+    if db.get("write_protected"):
+        lines.append('      <IsWriteProtectedInAS>true</IsWriteProtectedInAS>')
+    lines += [
         f'      <Interface><Sections xmlns="{_XML_IFACE_NS}">',
         '  <Section Name="Static">',
     ]
     for m in db["members"]:
+        full = "datatype" in m                                  # a config member (vs a legacy Bool member)
+        dtype = _xml_attr(m["datatype"]) if full else "Bool"
+        rem = "Retain" if m.get("retain") else "NonRetain"
+        ea = "true" if m.get("ext_accessible", True) else "false"
+        ev = "true" if m.get("ext_visible", True) else "false"
+        ew = "true" if m.get("ext_writable", True) else "false"
+        sp = "true" if m.get("setpoint", False) else "false"
         lines += [
-            f'    <Member Name="{_xml_attr(m["name"])}" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">',
+            f'    <Member Name="{_xml_attr(m["name"])}" Datatype="{dtype}" Remanence="{rem}" Accessibility="Public">',
             '      <AttributeList>',
-            '        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>',
-            '        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>',
-            '        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>',
-            '        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>',
+            f'        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">{ea}</BooleanAttribute>',
+            f'        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">{ev}</BooleanAttribute>',
+            f'        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">{ew}</BooleanAttribute>',
+            f'        <BooleanAttribute Name="SetPoint" SystemDefined="true">{sp}</BooleanAttribute>',
             '      </AttributeList>',
-            '    </Member>',
         ]
+        if full and m.get("comment"):
+            lines += ['      <Comment>',
+                      f'        <MultiLanguageText Lang="en-US">{_xml_text(m["comment"])}</MultiLanguageText>',
+                      '      </Comment>']
+        if full and m.get("start_value"):
+            lines.append(f'      <StartValue>{_xml_text(m["start_value"])}</StartValue>')
+        lines.append('    </Member>')
     lines += [
         '  </Section>',
         '</Sections></Interface>',
-        '      <MemoryLayout>Optimized</MemoryLayout>',
+        f'      <MemoryLayout>{layout}</MemoryLayout>',
+    ]
+    if str(db.get("memory_reserve") or "").strip():
+        lines.append(f'      <MemoryReserve>{_xml_text(str(db["memory_reserve"]).strip())}</MemoryReserve>')
+    lines += [
         f'      <Name>{_xml_text(name)}</Name>',
         '      <Namespace />',
         f'      <Number>{number}</Number>',
@@ -434,13 +392,28 @@ def _is_fdb(d) -> bool:
 
 
 def generate_data_blocks(rows, out_root) -> dict:
-    """520 entry: build the data blocks (type-based + rule-driven) and write them - EVERY DB as a TIA
-    Openness SW.Blocks.GlobalDB XML, F_DB vs DB being just <ProgrammingLanguage>. Returns {'dir', 'count',
-    'dbs' (sorted names), 'safe' (the F_DB DBs), 'normal' (the rest), 'members' {name: count}, 'warnings'}."""
-    db_rules = config.load_rules(_DB_RULES_FILE)
-    dbs, warnings = build_data_blocks(rows, db_rules)
-    db_dir, count = write_data_blocks(dbs, out_root)
-    return {"dir": db_dir, "count": count, "dbs": sorted(dbs),
-            "safe": sorted(n for n, d in dbs.items() if _is_fdb(d)),
-            "normal": sorted(n for n, d in dbs.items() if not _is_fdb(d)),
-            "members": {n: len(d["members"]) for n, d in dbs.items()}, "warnings": warnings}
+    """520 entry: build every data block from the config-driven REGISTRY (datablock_definitions/_elements/
+    _types via `datablocks.generate`) and write them. The registry is the SINGLE source of which DBs exist +
+    their members + full attributes (the 8 ex-`signal_types` DBs, DiagnosticTags, …). EVERY DB is a TIA
+    Openness SW.Blocks.GlobalDB XML, F_DB vs DB being just <ProgrammingLanguage>. The phase HALTS (writes
+    NOTHING) on any config error (unknown type / undeclared element DB / bad template / for_each syntax) OR if
+    a signal's staged `datablocks` references a db_name the registry doesn't declare (CSV 1 is authoritative).
+    Returns {'dir','count','dbs','safe','normal','members','warnings','errors'}."""
+    defs = config.load_db_definitions()
+    gdbs, _inst, errors, warnings = datablocks.generate(
+        rows, defs, config.load_db_elements(), config.load_db_types())
+    db_dir = config.out_path(out_root, "blocks_import_dir")
+    declared = {d["db_name"] for d in defs if (d.get("db_type") or "Global").strip().lower() == "global"}
+    undeclared = sorted({db for r in (rows or [])                # CSV 1 is the single source of which DBs exist
+                         for db in (s.strip() for s in str(r.get("datablocks") or "").split("|"))
+                         if db and db not in declared})
+    errors = list(errors) + [f"{db}: a signal's datablocks references it but it is not declared in "
+                             f"datablock_definitions.csv (CSV 1 is the single source of DBs)" for db in undeclared]
+    if errors:
+        return {"dir": db_dir, "count": 0, "dbs": [], "safe": [], "normal": [], "members": {},
+                "warnings": list(warnings), "errors": errors}
+    _, count = write_data_blocks(gdbs, out_root)
+    return {"dir": db_dir, "count": count, "dbs": sorted(gdbs),
+            "safe": sorted(n for n, d in gdbs.items() if _is_fdb(d)),
+            "normal": sorted(n for n, d in gdbs.items() if not _is_fdb(d)),
+            "members": {n: len(d["members"]) for n, d in gdbs.items()}, "warnings": list(warnings), "errors": []}

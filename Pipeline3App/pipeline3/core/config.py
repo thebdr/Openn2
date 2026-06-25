@@ -383,7 +383,7 @@ def load_diagnosis_columns() -> list:
 
 def load_rules(name: str, base: str | None = None) -> list:
     """Generic rule table (name, required_types, dev_type, db_name, member, interface_tagname,
-    diag_desc). Used by both datablock_elements_rules.csv (DB element generation, phase 520) and
+    diag_desc). Used by datablock_elements_rules.csv (phase 400 interface mirroring, interfaces.py) and
     diagnosis_logic_rules.csv (List_Logic generation, phase 610). `required_types` is '|'-separated.
     `diag_desc` is the optional rule-supplied diagnosis description ({canonical} template) the 610
     List_Logic rows carry instead of the source signal's own diag_desc (blank -> keep the source's)."""
@@ -429,6 +429,89 @@ def load_interface_elements_rules(base: str | None = None) -> list:
             "interface_tagname": (r.get("interface_tagname") or "").strip(),
         })
     return rules
+
+
+def _b(value, default: bool) -> bool:
+    """as_bool, but a blank cell falls back to `default` (the DB-config bool columns)."""
+    s = str(value or "").strip()
+    return as_bool(s) if s else default
+
+
+def load_db_definitions(base: str | None = None) -> list:
+    """The AUTHORITATIVE DB registry (phase 520): every data block, Global or an Instance family. Columns:
+    db_name (literal or a PEP-3101 template for a family), db_type (Global|Instance), db_programming_language
+    (DB|F_DB), instance_of (FB, for Instance), for_each (iteration DSL), memory_layout (Optimized|Standard),
+    opc_ua/webserver/only_load_memory/write_protected/retain_reserve (bool), memory_reserve, create_when
+    (always|if_elements|never), comment. Missing file -> []."""
+    path = os.path.join(base or input_docs_dir(), "datablock_definitions.csv")
+    if not os.path.exists(path):
+        return []
+    out = []
+    for r in _read_csv("datablock_definitions.csv", base):
+        if not (r.get("db_name") or "").strip():
+            continue
+        pl = (r.get("db_programming_language") or "DB").strip() or "DB"
+        out.append({
+            "db_name": (r.get("db_name") or "").strip(),
+            "db_type": (r.get("db_type") or "Global").strip() or "Global",
+            "db_programming_language": pl,
+            "instance_of": (r.get("instance_of") or "").strip(),
+            "for_each": (r.get("for_each") or "").strip(),
+            "memory_layout": (r.get("memory_layout") or "Optimized").strip() or "Optimized",
+            "opc_ua": _b(r.get("opc_ua"), pl.upper() != "F_DB"),  # a blank cell defaults OFF for a fail-safe DB
+            "webserver": _b(r.get("webserver"), True),
+            "only_load_memory": _b(r.get("only_load_memory"), False),
+            "write_protected": _b(r.get("write_protected"), False),
+            "retain_reserve": _b(r.get("retain_reserve"), False),
+            "memory_reserve": (r.get("memory_reserve") or "").strip(),
+            "seed": _b(r.get("seed"), False),
+            "create_when": (r.get("create_when") or "if_elements").strip().lower() or "if_elements",
+            "comment": (r.get("comment") or "").strip(),
+        })
+    return out
+
+
+def load_db_elements(base: str | None = None) -> list:
+    """The Global-DB members (phase 520). Columns: db_name, member (PEP-3101 template), for_each (iteration
+    DSL), datatype, start_value, retain (bool), ext_accessible/ext_visible/ext_writable (bool), setpoint
+    (bool), comment. Missing file -> []."""
+    path = os.path.join(base or input_docs_dir(), "datablock_elements.csv")
+    if not os.path.exists(path):
+        return []
+    out = []
+    for r in _read_csv("datablock_elements.csv", base):
+        if not (r.get("db_name") or "").strip():
+            continue
+        out.append({
+            "db_name": (r.get("db_name") or "").strip(),
+            "member": (r.get("member") or "").strip(),
+            "for_each": (r.get("for_each") or "").strip(),
+            "datatype": (r.get("datatype") or "").strip() or "Bool",
+            "start_value": (r.get("start_value") or "").strip(),
+            "retain": _b(r.get("retain"), False),
+            "ext_accessible": _b(r.get("ext_accessible"), True),
+            "ext_visible": _b(r.get("ext_visible"), True),
+            "ext_writable": _b(r.get("ext_writable"), True),
+            "setpoint": _b(r.get("setpoint"), False),
+            "comment": (r.get("comment") or "").strip(),
+        })
+    return out
+
+
+def load_db_types(base: str | None = None) -> list:
+    """The valid member data types (phase 520 validation). Columns: name, kind (Elementary|UDT), comment.
+    Missing file -> []."""
+    path = os.path.join(base or input_docs_dir(), "datablock_types.csv")
+    if not os.path.exists(path):
+        return []
+    out = []
+    for r in _read_csv("datablock_types.csv", base):
+        if not (r.get("name") or "").strip():
+            continue
+        out.append({"name": (r.get("name") or "").strip(),
+                    "kind": (r.get("kind") or "Elementary").strip() or "Elementary",
+                    "comment": (r.get("comment") or "").strip()})
+    return out
 
 
 def load_signal_types() -> dict:
