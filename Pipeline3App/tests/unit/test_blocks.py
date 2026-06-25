@@ -139,6 +139,23 @@ def test_xml_emit_flgnet_exactly_sized():
     ok(refs and refs <= uids, "every wire UId resolves to a Part/Access")
 
 
+def test_xml_emit_flgnet_chunks_large_and():
+    # TIA caps an instruction at 100 inputs: a large AND splits into leaf ANDs of <= AND_CHUNK + one
+    # combiner AND of their outputs (the template's two-level topology). No AND may exceed the cap.
+    C = xml_emit.AND_CHUNK
+    inputs = [("01_Pushbutton", f"PB{i}") for i in range(C + 30)]     # 2 chunks: [C, 30]
+    flg = "\n".join(xml_emit._flgnet_lines(inputs, "02_COM", "AREA 1 PB", ""))
+    cards = [int(c) for c in re.findall(r"Card[^>]*>(\d+)<", flg)]
+    eq(cards, [C, 30, 2], "two leaf ANDs (<=AND_CHUNK) + a combiner AND of the 2 leaf outputs")
+    ok(all(c <= 100 for c in cards), "no AND exceeds TIA's 100-input cap")
+    ok(f'Name="in{C}"' in flg, "a full leaf carries AND_CHUNK pins")
+    eq(flg.count('Name="out"'), 3, "2 leaf outs + 1 combiner out drive the next stage / coil")
+    parts, wrs = flg.split("<Wires>")
+    uids = set(re.findall(r'UId="(\d+)"', parts))
+    refs = set(re.findall(r'(?:IdentCon|NameCon) UId="(\d+)"', wrs))
+    ok(refs <= uids, "every wire UId resolves to a Part/Access")
+
+
 def test_xml_emit_and_coil_fc_from_table():
     with tempfile.TemporaryDirectory() as d:
         tpl = os.path.join(d, "T.xml")
@@ -307,6 +324,7 @@ if __name__ == "__main__":
         ("engine_absolute_ref_and_instances", test_engine_absolute_ref_and_instances),
         ("engine_writes_com_db_with_constants", test_engine_writes_com_db_with_constants),
         ("xml_emit_flgnet_exactly_sized", test_xml_emit_flgnet_exactly_sized),
+        ("xml_emit_flgnet_chunks_large_and", test_xml_emit_flgnet_chunks_large_and),
         ("xml_emit_and_coil_fc_from_table", test_xml_emit_and_coil_fc_from_table),
         ("xml_emitted_block_skips_creation_csv", test_xml_emitted_block_skips_creation_csv),
         ("standard_sheet_mirrors_csv_and_reads_back", test_standard_sheet_mirrors_csv_and_reads_back),

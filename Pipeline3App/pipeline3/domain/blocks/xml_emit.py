@@ -7,9 +7,11 @@ shell-override sheet's), so this is source-agnostic ("from logic AND from the sh
 
 First emitter: `and_coil_fc` for **03_Zone Cumulative** - one `A`(AND)->`Coil` network per @ row, the
 AND of the row's `nameOfDB.<member>` inputs driving the `02_COM.<output>` coil. The FlgNet is modelled
-on the template's own network (verified): N input Access (UId 21..), one output Access, an `A` Part
-with `Card=N` wired `in1..inN`, a `Coil` wired `out->in` / output->`operand`; UIds restart at 21 per
-network, global object IDs run sequentially (TIA reassigns them on import).
+on the template's own network (verified): N input Access (UId 21..), one output Access, then the AND
+chain. TIA caps an instruction at 100 inputs, so for N > AND_CHUNK the inputs are split into LEAF ANDs
+of <= AND_CHUNK whose outputs feed ONE combiner AND -> the Coil (the template's two-level topology); for
+N <= AND_CHUNK it stays a single `A Card=N`. UIds restart at 21 per network, global object IDs run
+sequentially (TIA reassigns them on import).
 
 Output format MATCHES the exported template byte-conventions: **UTF-8 BOM + CRLF + indented multi-line**
 (a real Openness ML file - a double BOM or LF-only / single-line content fails the importer with
@@ -31,45 +33,80 @@ def _text(s) -> str:
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+# TIA rejects an instruction with >100 additional inputs ("The permitted number 100 of additional inputs
+# or outputs was exceeded"). So an AND of N inputs is split into LEAF ANDs of <= AND_CHUNK inputs whose
+# outputs are ANDed by ONE combiner AND -> the coil (the template's own topology; it chunks at 25).
+AND_CHUNK = 50
+
+
 def _flgnet_lines(inputs, out_db, out_member, ind) -> list:
     """The FlgNet inner lines (Parts + Wires) for AND(inputs) -> Coil(out_db.out_member), each line
-    prefixed with `ind`. `inputs` = [(db, member), ...] (N>=1). The caller wraps these with
-    <NetworkSource><FlgNet ...> ... </FlgNet></NetworkSource> (FlgNet adjacent to NetworkSource)."""
+    prefixed with `ind`. `inputs` = [(db, member), ...] (N>=1). Up to AND_CHUNK inputs -> a single `A`;
+    beyond that -> leaf ANDs of <= AND_CHUNK + one combiner AND of their outputs (TIA caps an instruction
+    at 100 inputs). UIds restart at 21 per network: inputs 21.., output 21+N, the leaf ANDs, the combiner
+    (when >1 leaf), the Coil; wires follow. The caller wraps these with <NetworkSource><FlgNet>...."""
     n = len(inputs)
-    out_uid, a_uid, coil_uid = 21 + n, 22 + n, 23 + n
+    in_uids = list(range(21, 21 + n))
+    out_uid = 21 + n
     L = [f"{ind}  <Parts>"]
-    for k, (db, member) in enumerate(inputs):                       # input Access: UId 21..20+N
-        L += [f'{ind}    <Access Scope="GlobalVariable" UId="{21 + k}">',
+    for uid, (db, member) in zip(in_uids, inputs):                  # input Access: UId 21..20+N
+        L += [f'{ind}    <Access Scope="GlobalVariable" UId="{uid}">',
               f"{ind}      <Symbol>",
               f'{ind}        <Component Name="{_attr(db)}" />',
               f'{ind}        <Component Name="{_attr(member)}" />',
               f"{ind}      </Symbol>",
               f"{ind}    </Access>"]
-    L += [f'{ind}    <Access Scope="GlobalVariable" UId="{out_uid}">',
+    L += [f'{ind}    <Access Scope="GlobalVariable" UId="{out_uid}">',  # output Access
           f"{ind}      <Symbol>",
           f'{ind}        <Component Name="{_attr(out_db)}" />',
           f'{ind}        <Component Name="{_attr(out_member)}" />',
           f"{ind}      </Symbol>",
-          f"{ind}    </Access>",
-          f'{ind}    <Part Name="A" UId="{a_uid}">',
-          f'{ind}      <TemplateValue Name="Card" Type="Cardinality">{n}</TemplateValue>',
-          f"{ind}    </Part>",
-          f'{ind}    <Part Name="Coil" UId="{coil_uid}" />',
+          f"{ind}    </Access>"]
+
+    chunks = [in_uids[i:i + AND_CHUNK] for i in range(0, n, AND_CHUNK)]   # leaf input groups
+    uid = out_uid + 1
+    leaf_uids = []
+    for ch in chunks:                                              # one leaf AND per chunk
+        leaf_uids.append(uid)
+        L += [f'{ind}    <Part Name="A" UId="{uid}">',
+              f'{ind}      <TemplateValue Name="Card" Type="Cardinality">{len(ch)}</TemplateValue>',
+              f"{ind}    </Part>"]
+        uid += 1
+    combiner_uid = None
+    if len(leaf_uids) > 1:                                         # combiner ANDs the leaf outputs
+        combiner_uid = uid
+        L += [f'{ind}    <Part Name="A" UId="{combiner_uid}">',
+              f'{ind}      <TemplateValue Name="Card" Type="Cardinality">{len(leaf_uids)}</TemplateValue>',
+              f"{ind}    </Part>"]
+        uid += 1
+    coil_uid = uid
+    L += [f'{ind}    <Part Name="Coil" UId="{coil_uid}" />',
           f"{ind}  </Parts>",
           f"{ind}  <Wires>"]
-    w = 24 + n
-    for k in range(n):                                              # input wires -> the A box pins in1..inN
-        L += [f'{ind}    <Wire UId="{w}">',
-              f'{ind}      <IdentCon UId="{21 + k}" />',
-              f'{ind}      <NameCon UId="{a_uid}" Name="in{k + 1}" />',
-              f"{ind}    </Wire>"]
-        w += 1
-    L += [f'{ind}    <Wire UId="{w}">',
-          f'{ind}      <NameCon UId="{a_uid}" Name="out" />',
+
+    w = coil_uid + 1
+    for li, ch in enumerate(chunks):                               # input wires -> each leaf's in1..ink
+        for pin, in_uid in enumerate(ch, start=1):
+            L += [f'{ind}    <Wire UId="{w}">',
+                  f'{ind}      <IdentCon UId="{in_uid}" />',
+                  f'{ind}      <NameCon UId="{leaf_uids[li]}" Name="in{pin}" />',
+                  f"{ind}    </Wire>"]
+            w += 1
+    final_uid = leaf_uids[0]
+    if combiner_uid is not None:
+        for ci, luid in enumerate(leaf_uids, start=1):             # leaf.out -> combiner.in1..inK
+            L += [f'{ind}    <Wire UId="{w}">',
+                  f'{ind}      <NameCon UId="{luid}" Name="out" />',
+                  f'{ind}      <NameCon UId="{combiner_uid}" Name="in{ci}" />',
+                  f"{ind}    </Wire>"]
+            w += 1
+        final_uid = combiner_uid
+    L += [f'{ind}    <Wire UId="{w}">',                            # final AND out -> coil in
+          f'{ind}      <NameCon UId="{final_uid}" Name="out" />',
           f'{ind}      <NameCon UId="{coil_uid}" Name="in" />',
           f"{ind}    </Wire>"]
     w += 1
-    L += [f'{ind}    <Wire UId="{w}">',
+    L += [f'{ind}    <Wire UId="{w}">',                            # output -> coil operand
           f'{ind}      <IdentCon UId="{out_uid}" />',
           f'{ind}      <NameCon UId="{coil_uid}" Name="operand" />',
           f"{ind}    </Wire>",
