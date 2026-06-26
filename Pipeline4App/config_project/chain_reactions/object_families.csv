@@ -1,0 +1,9 @@
+family,key,member_types,anchor,link,index_stride,bits,diag_block
+door,D,DI|DD|DR|DL|DQ|DO,DI1/2,fld,1,2,+SafetyDoors
+contactor,K,KI|KQ,KQ,series,1,1,
+emergency_pb,E,E1/2|E2/2,E1/2,channel,1,1,+EmergencyPushButtons
+breaker,B,B1/2|B2/2,B1/2,channel,1,1,+SafetyBreakers
+encoder,N,N1/2|N2/2,N1/2,channel,1,2,+SafetyEncoders
+reset,R,R*|R#,R*,none,1,0,
+emergency_area,Z,Z#,Z#,pattern,1,1,+EmergencyAreas
+fire_alarm,F,F1/2|F2/2,F1/2,channel,1,1,+FireAlarm

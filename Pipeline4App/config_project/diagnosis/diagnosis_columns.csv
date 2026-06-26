@@ -1,0 +1,20 @@
+header,expression
+Diag Cabinet,{diag_cabinet}
+Diag Bit,{diag_bit}
+DevType,{script_type}
+Index,{index}
+Type,{type_hw}
+Address,{bit}
+ID,{id_node}
+Desc L1,{desc_l1} {desc_l1b}
+Desc L2,{desc_l2} {desc_l2b}
+Diag Desc,{diag_desc}
+Functional unit,{functional_unit}
+Location,{location}
+Device,{device}
+Drawing name,{drawing}
+Sheet,{sheet}
+IP,{profinet_ip}
+PnName,{profinet_name}
+TsRef,{ts_ref}
+PLC_Binding,$PLC_Binding$
