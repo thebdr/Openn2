@@ -21,6 +21,7 @@ else:
 
 SHARED = os.path.normpath(os.path.join(APP_ROOT, os.pardir, "Shared"))
 TEMPLATES_DIR = os.path.join(SHARED, "Templates")
+INTERFACE_TEMPLATE = os.path.join(TEMPLATES_DIR, "MachineInterfaces", "TEMPLATE_INTERFACES_v0.0.xlsx")
 _BUILTIN_CONFIG_PROJECT = os.path.join(APP_ROOT, "config_project")
 _BUILTIN_DATABASE = os.path.join(SHARED, "Database")        # the SSOT folder (DESIGN 10.3)
 _BUILTIN_OUTPUT = os.path.join(SHARED, "OutputTree")        # the OPn BuilderData export surface
@@ -260,10 +261,66 @@ def resolve_type(types: dict, raw_type) -> dict | None:
     return None
 
 
+# Phase 400 interface mirroring: free bytes between the template's last used I/O Offset Byte and the start
+# of the mirrored "custom data" block (per direction).
+INTERFACE_CUSTOM_GAP = 8
+
+
 # --- phase-400 chain-reactions CSVs (chain_reactions/) ------------------------------------------- #
 def chain_reactions_dir() -> str:
     """The phase-400 chain-reaction CSVs (object_families / interface_elements / interface_tagnames)."""
     return os.path.join(config_project_dir(), "chain_reactions")
+
+
+def diagnosis_dir() -> str:
+    """The diagnosis config CSVs (diagnosis_columns / diagnosis_logic_rules)."""
+    return os.path.join(config_project_dir(), "diagnosis")
+
+
+def _split_required_types(value) -> list:
+    return [t.strip() for t in str(value or "").split("|") if t.strip()]
+
+
+def load_diagnosis_logic_rules() -> list:
+    """The trigger-driven follower rules (phase 400 mirroring + phase 610). Columns: name, required_types
+    ('|'-OR trigger script_types), dev_type, db_name, member (a `{canonical}` template), interface_tagname,
+    diag_desc. A rule fires once per row whose script_type is ANY of `required_types`."""
+    out = []
+    for r in read_config_csv(os.path.join(diagnosis_dir(), "diagnosis_logic_rules.csv")):
+        if not (r.get("name") or "").strip():
+            continue
+        out.append({
+            "name": (r.get("name") or "").strip(),
+            "required_types": _split_required_types(r.get("required_types")),
+            "dev_type": (r.get("dev_type") or "").strip(),
+            "db_name": (r.get("db_name") or "").strip(),
+            "member": (r.get("member") or "").strip(),
+            "interface_tagname": (r.get("interface_tagname") or "").strip(),
+            "diag_desc": (r.get("diag_desc") or "").strip(),
+        })
+    return out
+
+
+def load_interface_elements() -> list:
+    """The interface-element follower rules (phase 400): a mirrored signal of a matching script_type spawns
+    an extra coupler element. Columns: name, required_types ('|'-OR), dev_type, direction (I/Q - the ONLY
+    source that may add an INPUT row), data_type (BOOL/WORD), script_type (byte-grouping label; defaults to
+    name), member (mirror-name `{canonical}` template), interface_tagname."""
+    out = []
+    for r in read_config_csv(os.path.join(chain_reactions_dir(), "interface_elements.csv")):
+        if not (r.get("name") or "").strip():
+            continue
+        out.append({
+            "name": (r.get("name") or "").strip(),
+            "required_types": _split_required_types(r.get("required_types")),
+            "dev_type": (r.get("dev_type") or "").strip(),
+            "direction": "I" if (r.get("direction") or "").strip().upper() == "I" else "Q",
+            "data_type": "WORD" if (r.get("data_type") or "").strip().upper() == "WORD" else "BOOL",
+            "script_type": (r.get("script_type") or "").strip() or (r.get("name") or "").strip(),
+            "member": (r.get("member") or "").strip(),
+            "interface_tagname": (r.get("interface_tagname") or "").strip(),
+        })
+    return out
 
 
 def load_interface_tagnames() -> dict:

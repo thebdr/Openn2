@@ -52,7 +52,7 @@ Pipeline4App/
     io/    workbook.py
     domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
-  tests/unit/  (plain-python, _harness.py — 80 tests, the green gate)
+  tests/unit/  (plain-python, _harness.py — 85 tests, the green gate)
 ```
 
 ## The spine (`core/`)
@@ -140,7 +140,7 @@ consumers 400/600).
 - **Deferred to phase 800**: `instance_dbs` → `InstanceDBs.csv` (a `blocks_creation_dir` surface that MERGES
   520's config families with 800's builder instances — the `instance_dbs` table is ready for it).
 
-## Phase 400 — Interfaces — IN PROGRESS (400a done; 400b–e TODO)
+## Phase 400 — Interfaces — IN PROGRESS (400a + 400b done; 400c–e TODO)
 `domain/interfaces.py`. Builds one `IF_<instance>.xlsx` per IOC signal from the MachineInterfaces template,
 mirrors flagged signals into a byte-packed block, and (gated) inserts each as an `IF_` sheet into the I/O
 List. The mirrored signals + byte layout land in the **`interfaces`** SSOT table; the `IF_*.xlsx` are its
@@ -152,11 +152,22 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   `identity.interface_tagname` (PL4: `{tag_name}`→staged `name_in_tagtable`, `{db_element}`→520 `name_in_db`,
   keeping `{interface_name}`/`{interface_id}`); `interfaces.annotate_interface_tagnames` runs AFTER 520
   (DESIGN §9 `520 → 400`). **Parity: 0 mismatches** vs PL3 IODatabase `interface_tagname` (269 signals, 113 non-empty).
-- **400b–e TODO**: the `interfaces` table + mirroring (`interface_mapping`/`+DIAG`/the 3 follower rule CSVs —
-  `datablock_elements_rules`/`diagnosis_logic_rules`→Q, `interface_elements`→the only I source) + byte layout
-  (≥8-byte gap, group by script_type, BOOL→2-byte block / WORD→row); the `IF_*.xlsx` generation (openpyxl,
-  template copy/plug); the **`xlsx_edit`** surgical writer port; `insert_interface_sheets` + the address cache;
-  GUI 400 button. Parity vs `IF_SORTER-01.xlsx` / `IF_SORTER+DIAG-02.xlsx`.
+- **400b DONE — the `interfaces` + `interface_elements` tables** (the SSOT parent/child). `find_interfaces`
+  (per IOC row), `collect_mirror_set` (direct `interface_mapping` mirrors→Q; `diagnosis_logic_rules` followers→Q;
+  `interface_elements` followers→I/Q, the only **I** source; dedup on `(direction, script_type, mirror_name)`),
+  `allocate_bytes` (≥8-byte gap, group by script_type, BOOL→full 2-byte block / WORD→row), `template_last_used_byte`
+  (reads the template). `config.load_diagnosis_logic_rules` / `load_interface_elements` / `INTERFACE_CUSTOM_GAP` /
+  `INTERFACE_TEMPLATE`. PL4 NOTE: PL3's `datablock_elements_rules` was **consolidated into `diagnosis_logic_rules`**
+  (so 400 has 2 follower sources, not 3); `_mirror_name` = the stored `plc_binding`; the per-DI1/2 signal name now
+  resolves `{db_element}`→`name_in_db`. **Parity (SORTER-01)**: all **18 mirror elements match the reference exactly**
+  (category/direction/expression + offset/bit, keyed by `plc_binding`); the lone ref-extra `IF_ENCODER_SPEED` is
+  stale config (dropped). The frozen ref left `{db_element}` literal (old PL3 bug) — PL4's resolved names match PL3's
+  current `interface_tagname` (400a 0-mismatch).
+- **`+DIAG` auto-mirror DEFERRED**: needs the per-type `in_diag` (relocated with **ph600**). Until then a `+DIAG`
+  interface (SORTER+DIAG-02) gets only its `interface_mapping` mirrors. `collect_mirror_set` already has the guard.
+- **400c–e TODO**: the `IF_*.xlsx` generation (openpyxl: template copy → drop sheets → retitle → plug Base
+  Address/Node/Index → write the `interface_elements` rows incl. the BOOL-block padding); the **`xlsx_edit`** surgical
+  writer port; `insert_interface_sheets` + the address cache; the GUI 400 button. Parity vs the IF_ references.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button

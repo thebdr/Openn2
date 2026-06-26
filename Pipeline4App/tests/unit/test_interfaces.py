@@ -47,6 +47,65 @@ def test_annotate_writes_per_type_from_config():
     eq(rows[2]["interface_tagname"], "", "an IOC (no template) gets ''")
 
 
+# --- 400b: the mirror set + byte layout ---------------------------------------------------------- #
+def test_parse_instance_and_detect_diag():
+    eq(interfaces.parse_instance("SORTER-01"), ("SORTER", "01"))
+    eq(interfaces.parse_instance("SORTER+DIAG-02"), ("SORTER", "02"), "+DIAG stripped before parsing")
+    eq(interfaces._detect_diag("SORTER+DIAG-02"), True)
+    eq(interfaces._detect_diag("SORTER-01"), False)
+
+
+def test_index_membership_normalizes():
+    from _harness import ok
+    ok(interfaces._index_in("01", "01|02"))
+    ok(interfaces._index_in("1", "01|02"), "'1' matches '01' (numeric-normalized)")
+    ok(not interfaces._index_in("03", "01|02"))
+
+
+def test_find_interfaces_from_ioc_rows():
+    rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "10000", "id_node": "10",
+             "device": "-K1", "profinet_ip": "1.2.3.4", "source_sheet": "S", "source_row": 5},
+            {"script_type": "IOC", "index": "", "source_sheet": "S", "source_row": 6},
+            {"script_type": "DI1/2", "index": "x"}]
+    recs, warns = interfaces.find_interfaces(rows)
+    eq(len(recs), 1, "one IOC record (the blank-index IOC warned, the DI1/2 ignored)")
+    eq((recs[0]["machine_type"], recs[0]["index"], recs[0]["base"]), ("SORTER", "01", "10000"))
+    eq(len(warns), 1, "the blank-Index IOC is warned")
+
+
+def test_allocate_bytes_bool_block_and_word():
+    E = interfaces._Elem
+    bools = [E("X", "a"), E("X", "b"), E("X", "c")]                       # 3 BOOL, one group
+    interfaces.allocate_bytes(bools, {"Q": 1}, 8)                          # start = 1+1+8 = 10
+    eq([(e.offset_byte, e.bit) for e in bools], [(10, 0), (10, 1), (10, 2)], "BOOL low bits from byte 10")
+    word = [E("W", "w", data_type="WORD")]
+    interfaces.allocate_bytes(word, {"Q": -1}, 8)                          # start = -1+1+8 = 8
+    eq((word[0].offset_byte, word[0].bit), (8, None), "a WORD takes an even byte, no bit")
+
+
+def test_collect_mirror_set_direct_follower_iflrule_and_dedup():
+    rows = [{"script_type": "DI1/2", "interface_mapping": "01", "plc_binding": '"07_DOOR"."Door Closed [ X ]"',
+             "interface_tagname": "PNC_Q_{interface_name}-{interface_id}_door", "functional_unit": "S1",
+             "location": "+SG1", "device": "-B1", "type": {"tag_name": "Door [ {iol_FLD} ]"}, "iol_FLD": "S1-B1"}]
+    diag_rules = [{"name": "Safety Door Alarm", "required_types": ["DI1/2", "DI"], "db_name": "07_DOOR",
+                   "member": "Door Alarm [ {functional_unit}{location}{device} ]", "interface_tagname": "PNC_Q_{member}"}]
+    if_rules = [{"name": "Door Open Request", "required_types": ["DI1/2", "DI2/2"], "direction": "I",
+                 "data_type": "BOOL", "script_type": "IF_DOOR_CMD",
+                 "member": "Open Door Request [ {functional_unit}{location}{device} ]", "interface_tagname": "PNC_{direction}_{member}"}]
+    elems, warns = interfaces.collect_mirror_set(rows, index="01", is_diag=False,
+                                                 diag_rules=diag_rules, if_rules=if_rules)
+    eq(len(elems), 3, "the direct mirror + 1 diag follower + 1 interface-element follower")
+    eq((elems[0].direction, elems[0].mirror_name), ("Q", '"07_DOOR"."Door Closed [ X ]"'), "direct mirror Q")
+    eq((elems[1].source, elems[1].direction, elems[1].mirror_name),
+       ("follow", "Q", '"07_DOOR"."Door Alarm [ S1+SG1-B1 ]"'), "diag follower, TIA-qualified")
+    eq((elems[2].source, elems[2].direction, elems[2].mirror_name),
+       ("if_rule", "I", "Open Door Request [ S1+SG1-B1 ]"), "interface_elements follower is the only I source")
+    # dedup: a second identical row contributes nothing new
+    elems2, _ = interfaces.collect_mirror_set(rows + [dict(rows[0])], index="01", is_diag=False,
+                                              diag_rules=diag_rules, if_rules=if_rules)
+    eq(len(elems2), 3, "(direction, script_type, mirror_name) dedups duplicates")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("interfaces", [
@@ -55,4 +114,9 @@ if __name__ == "__main__":
         ("interface_tagname_db_element_from_name_in_db", test_interface_tagname_db_element_from_name_in_db),
         ("interface_tagname_row_tokens_and_empty_template", test_interface_tagname_row_tokens_and_empty_template),
         ("annotate_writes_per_type_from_config", test_annotate_writes_per_type_from_config),
+        ("parse_instance_and_detect_diag", test_parse_instance_and_detect_diag),
+        ("index_membership_normalizes", test_index_membership_normalizes),
+        ("find_interfaces_from_ioc_rows", test_find_interfaces_from_ioc_rows),
+        ("allocate_bytes_bool_block_and_word", test_allocate_bytes_bool_block_and_word),
+        ("collect_mirror_set_direct_follower_iflrule_and_dedup", test_collect_mirror_set_direct_follower_iflrule_and_dedup),
     ]))
