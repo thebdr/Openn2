@@ -1,0 +1,134 @@
+# Pipeline4App (PL4) — SSOT-database rebuild
+
+PL4 is a **clean-room rebuild of Pipeline3App (PL3)** around a **single source of truth (SSOT)
+database**. PL3 works and stays shipped; PL4 is built in parallel on branch **`pl4`** (off `tia181920`).
+The full design rationale is in **`DESIGN.md`** — read it first. This file is the live architecture +
+state; **`HANDOFF.md`** is the point-in-time "what's next".
+
+## The package + the lineages (PLn / OPn)
+- **PLn** = the Python pipeline: `Pipeline2App` → `Pipeline3App` → **`Pipeline4App`**. Emits TIA `BuilderData/`.
+- **OPn** = the C# TIA-Openness importer: `Open2App` → **`Openn3App`** → **`Openn4App`**. Reads `BuilderData/`.
+- **PL3 + OP3 both work today** (the stable, shipped pair + the reference). **v4 = PL4 + OP4**, co-developed.
+  The OP side is a separate Claude session; the contract brief for it is **`Shared/PL4_OP4_coordination.md`**.
+- (PL3's own CLAUDE.md still says "Open2App" — that's stale; it means OPn.)
+
+## Why (the thesis)
+PL3 stages a flat `IODatabase.csv` (`list[dict]`) and each phase writes private output files. That forces
+workarounds that exist only because cells are flat scalars: ~20 `|`-join/split sites, the "leftmost db
+name" hack, `_type` dropped-on-persist + re-attached, `plc_binding` re-derived every call, and the
+created data living only in export files. **PL4's principle (the user's directive): every datum the
+pipeline retrieves, infers, or creates is written into the database — every io signal, db_element,
+diagnosis element. The `BuilderData/` exports become byte-stable *projections* of the tables.** This is
+**not** a SQL engine — it is **CSV files with JSON cells** + an in-memory `Database` object: light,
+git-diffable, GUI-grid-able, no new dependency, but structured and comprehensive.
+
+## The parity strategy (how PL4 is verified)
+- **Internal tables** (the signals table, …) are a NEW format (JSON cells) → checked by **data-parity**:
+  stage the same source documents through PL3 and PL4, assert every PL4 field (decoded) == PL3's value.
+- **`BuilderData/` exports** are the OP contract → **byte-parity** while format-preserving (PL4 emits
+  PL3-identical bytes; OP3 can cross-import), shifting to **end-to-end equivalence** where PL4+OP4
+  deliberately improve the format (since OP4 is co-designed). Build format-preserving first; evolve the
+  contract per-phase, verified.
+
+## Architecture: one `Database`, many tables
+```
+Database
+ ├─ signals            one row per I/O signal (+ node/metadata)   ← the fact table (DONE)
+ ├─ db_members         every generated DB member (db_element)     ← 520 (TODO)
+ ├─ diagnosis_entries  every diagnosis element (unified io|logic) ← 600 (TODO)
+ ├─ plc_tags · interfaces · hardware_* · software_blocks · coverage · validation_issues   (TODO, per phase)
+```
+Each table persists to one **CSV-with-JSON-cells** file in the **top-level `Database/` folder**
+(`Shared/Database/` builtin, or `<project>/Database/`). Every created entity carries a content-hash
+**`uid`** and FKs to its source's uid; row order is preserved by insertion.
+
+## Package layout (current)
+```
+Pipeline4App/
+  DESIGN.md · CLAUDE.md · HANDOFF.md · launch_gui.py
+  config_project/                  (the restructured config — see "Config" below)
+  pipeline4/
+    core/  keys.py · table.py · database.py · config.py
+    io/    workbook.py
+    domain/ signals.py · identity.py · matrix.py · staging.py
+    gui/   app_main.py · phasebar.py · logview.py · theme.py
+  tests/unit/  (plain-python, _harness.py — 44 tests, the green gate)
+```
+
+## The spine (`core/`)
+- **`keys.uid(*parts)`** — the universal content hash: `sha1('|'.join, None→'')[:10]`. The STABLE
+  identifying fields only (excludes workbook/seq/level → survives a document revision). Generalizes PL3's
+  finding-uid.
+- **`table.Table(name, columns, json_columns, key_columns)`** — rows are dicts; **declared `json_columns`
+  are stored as real JSON in the cell** (`["07_DOOR"]`, a `type` object) and decoded on read; the rest are
+  plain text. **Deterministic encoding** (`sort_keys`, sorted extra-column tail, `allow_nan=False`) so
+  tables diff byte-stably. `add()` stamps a content-hash `uid` from `key_columns`. **Fail-loud**: a
+  structured value in a non-JSON column, a ragged/duplicate-header file, or a malformed JSON cell raises a
+  located error. `__iter__`/`__len__`/`extend`/`duplicate_uids()`. (Hardened by an adversarial review.)
+- **`database.Database(tables)`** — named tables; `save(dir)`/`load(dir)` one CSV per table.
+
+## Config (`core/config.py` + `config_project/`)
+- **Paths + project isolation**: `use_project()` points the loaders, the `Database/` folder, and the
+  `Output/` (BuilderData) tree at the project or the builtin `Shared/`. Sheet resolution (`resolve_sheet(s)`,
+  JS-regex). **`project_params.yaml` is the nested schema** (the reviewed proposal): document paths
+  (+ `*_previous_path`, reserved for the future ph100 change-tracing), `iolist_params` / `matrix_params`,
+  `validation_params` (phase 100, sub-grouped). `load_params` resolves the doc paths; **`get_param(params,
+  "a.b.c", default)`** is the safe dotted accessor (a present False/0/[] is returned, not the default).
+  `csv_delimiter`/`copy_inputs` are constants; `language` lives in app_config.
+- **Config CSVs** (read via `read_config_csv` over `core.table`'s codec, tolerant of hand edits):
+  `load_column_map(doc)`, `load_signal_types()` (the **stripped** type schema — identity + tag + ce_mandatory;
+  DB/diagnosis/interface attrs moved out), `resolve_type` (exact + `Z#` patterns).
+- **`config_project/` restructured** (per the CSV review):
+  - `input_docs/`: `column_map.csv`, `signal_types.csv` (18→10 cols).
+  - `datablocks/`: `datablock_definitions` · `datablock_elements` (**real per-type member templates** — the
+    single DB creation point, `member` + `for_each script_type`; relocated from `signal_types.db_element`) ·
+    `datablock_types`.
+  - `diagnosis/`: `diagnosis_columns` · `diagnosis_logic_rules` (the **unified trigger-driven DiagList +
+    `source` io|logic** + the per-type diag attrs land with the ph600 port).
+  - `chain_reactions/`: `object_families` · `interface_elements` (the follower/relationship rules).
+  - DROPPED: `iolist_columns` (dead), `iolist_permanent_parts` (→ `validation_params.iolist.permanent_parts`),
+    `datablock_elements_rules` (superseded). The device-types DB → `Shared/Database/`.
+
+## Phase 300 — Staging — IN PROGRESS (direct fields done, registry-derived pending)
+`domain/staging.py` + `identity.py` + `matrix.py`. **`stage()`** reads the configured I/O List through the
+one workbook reader (by column position per `column_map`), drops Skip-Reason + struck rows (per
+`strike_handling`), attaches the resolved `type` (object cell), runs **`matrix.annotate`** (C&E: `matrix_areas`
+/ `ce_*` / `numerazione_linea` / `areas_description` as **list cells**), derives the document-side identity
+(`iol_FLD`/`ce_FLD`/`combined_FLD`, `name_in_tagtable`/`tagtable`), builds the **`signals` table** (content-hash
+`uid` = `combined_FLD`+`script_type`+`source_cell`), and saves the Database. The GUI's **"300" button runs it**.
+- **Parity achieved**: the real I/O List stages to **269 signals == PL3's IODatabase**, **0 duplicate uids**,
+  and **0 mismatches** vs PL3 on `matrix_areas`, `combined_FLD`, `ce_functional_unit` (matched by `source_cell`).
+- **Identity reads the `type` cell** (PL4 persists the resolved type as an object; PL3 used the ephemeral `_type`).
+- **TODO to finish staging**: node address ranges (positional I/Q byte ranges); `IsSorterArea` (needs the
+  `sorter_areas: [1]` number→area-name match). The **registry-derived `name_in_db`/`datablocks`/`plc_binding`**
+  come with the 520 port (the registry generates `db_members`; `name_in_db` derives from it).
+
+## GUI — runnable shell (`gui/` + `launch_gui.py`)
+`python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
+bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
+EARLY (gui-less PL3 builds hid integration problems). **"300 Documents Staging" runs `stage()` for real**;
+the other buttons log "not implemented". The handler is wrapped so a not-yet-ready phase can't take the
+window down. (Phase registry-driven bar, the structured-record clickable log, the Files tab, threading →
+later.)
+
+## Testing
+Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
+**data-independent suite is the green gate** (currently **44**: keys/table/database, signals schema,
+sheets/workbook, params/config_loaders, staging identity+read). Data-dependent parity (staging vs PL3) is
+verified by a script against the real docs (not in the gate). Each phase is committed only with its gate +
+parity green.
+
+## Conventions & gotchas
+- **JSON cells are schema-declared** (a column is JSON by the table's `json_columns`, not by guessing). The
+  codec is deterministic (sorted keys) for byte-stable diffs. `None` ↔ empty cell; `[]` ↔ `[]`.
+- **Identity reads `row["type"]`** (the object cell), not PL3's `_type`.
+- **openpyxl makes a leading `=` a formula** → in test xlsx use non-`=` values (real IoLists store FU/Loc/Dev
+  as text, so `stage()` reads them fine).
+- **The `datablock_elements` real-template relocation changes member declaration order** (grouped-by-type vs
+  PL3's row-order). For `Optimized` DBs that's cosmetic (same members), and OP4 is co-designed → 520 parity is
+  functional/end-to-end, not byte-identical to PL3. (User accepted.)
+- **No legacy management** (DESIGN 10.6): PL4 reads the source documents fresh; it never ingests PL3
+  intermediates. Config is the JSON-cell skeleton, no `|`-list back-compat.
+- **Verbose/explicit naming preferred** (DESIGN 10.7); reuse a PL3 name only where it's the same concept.
+- Run/test from the `Pipeline4App` root. Commit messages end with
+  `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
