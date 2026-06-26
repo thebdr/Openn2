@@ -50,9 +50,9 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
     io/    workbook.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
-  tests/unit/  (plain-python, _harness.py — 85 tests, the green gate)
+  tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
 
 ## The spine (`core/`)
@@ -140,7 +140,7 @@ consumers 400/600).
 - **Deferred to phase 800**: `instance_dbs` → `InstanceDBs.csv` (a `blocks_creation_dir` surface that MERGES
   520's config families with 800's builder instances — the `instance_dbs` table is ready for it).
 
-## Phase 400 — Interfaces — IN PROGRESS (400a + 400b done; 400c–e TODO)
+## Phase 400 — Interfaces — IN PROGRESS (400a + 400b + 400c done; 400d–e TODO)
 `domain/interfaces.py`. Builds one `IF_<instance>.xlsx` per IOC signal from the MachineInterfaces template,
 mirrors flagged signals into a byte-packed block, and (gated) inserts each as an `IF_` sheet into the I/O
 List. The mirrored signals + byte layout land in the **`interfaces`** SSOT table; the `IF_*.xlsx` are its
@@ -165,9 +165,16 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   current `interface_tagname` (400a 0-mismatch).
 - **`+DIAG` auto-mirror DEFERRED**: needs the per-type `in_diag` (relocated with **ph600**). Until then a `+DIAG`
   interface (SORTER+DIAG-02) gets only its `interface_mapping` mirrors. `collect_mirror_set` already has the guard.
-- **400c–e TODO**: the `IF_*.xlsx` generation (openpyxl: template copy → drop sheets → retitle → plug Base
-  Address/Node/Index → write the `interface_elements` rows incl. the BOOL-block padding); the **`xlsx_edit`** surgical
-  writer port; `insert_interface_sheets` + the address cache; the GUI 400 button. Parity vs the IF_ references.
+- **400c DONE — the `IF_*.xlsx` projection** (`interface_xlsx.py`, openpyxl - PL3 does the same; these files are
+  documentation, not read back except via 400e): per `interfaces` row, copy the template → keep the chosen machine
+  sheet → retitle `IF_<instance>` → `_plug` Base Address/Node/Index (Side rows, by header) + replace `<index>` →
+  `_append_custom_rows` lays the `interface_elements` onto the data table WITH the BOOL-block padding (full 2-byte
+  block: real signals low, blank addressed rows + separator; WORD = row + separator) → save. Output `config.interfaces_dir()`.
+  The GUI **"400" button** runs stage → 520 → build_interfaces → project. **Verify (SORTER-01)**: all 18 mirror
+  elements written with **0 byte mismatches**, the 16-row BOOL blocks, sheet retitled, re-opens cleanly (real-Excel
+  validity is the user's check). 182 data rows vs the ref's 184 = the stale `IF_ENCODER_SPEED` WORD+separator PL4 omits.
+- **400d–e TODO**: the **`xlsx_edit`** surgical writer port (`pipeline4/io/xlsx_edit.py`, ~446 lines ZIP/regex);
+  `insert_interface_sheets` + the address cache (`_interface_address_caches`). Then 510 reads the inserted IF_ sheets.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button

@@ -53,6 +53,8 @@ class App:
         try:
             if number == 300:
                 self._run_staging()
+            elif number == 400:
+                self._run_interfaces()
             elif number == 500:
                 self._run_data_blocks()
             elif number == 0:
@@ -104,6 +106,29 @@ class App:
         count = datablock_xml.project(database)
         self.log.append("PASS", f"  projected {count} GlobalDB XML(s) -> {config.blocks_import_dir()}")
         self.log.append("INFO", "  510 I/O Tags: not ported yet")
+
+    def _run_interfaces(self):
+        """Phase 400 (wired through 400c): stage -> 520 -> the interfaces/interface_elements tables ->
+        the IF_*.xlsx projection. insert_interface_sheets (400e) + 510 tags are not ported yet."""
+        from pipeline4.core import config
+        from pipeline4.domain import staging, datablocks, interfaces, interface_xlsx
+        self.log.append("PHASE", "400 Interfaces Generation")
+        self.status.configure(text="interfaces…")
+        self.root.update_idletasks()
+        database = staging.stage()
+        database, errors, _w = datablocks.build(database)
+        if errors:
+            for e in errors:
+                self.log.append("FAIL", f"  520 (prereq): {e}")
+            return
+        database, warnings = interfaces.build_interfaces(database)
+        for w in warnings[:20]:
+            self.log.append("WARN", f"  {w}")
+        result = interface_xlsx.project(database)
+        n_if, n_el = len(database["interfaces"]), len(database["interface_elements"])
+        self.log.append("PASS", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "
+                                f"IF_*.xlsx in {config.interfaces_dir()}")
+        self.log.append("INFO", "  insert_interface_sheets (400e) + 510 I/O Tags: not ported yet")
 
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"

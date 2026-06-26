@@ -65,6 +65,12 @@ def blocks_import_dir() -> str:
     return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "SoftwareBlocks", "ImportReady")
 
 
+def interfaces_dir() -> str:
+    """The phase-400 `IF_*.xlsx` output - DOCUMENTATION/intermediate under ProjectDocumentation, NOT a
+    BuilderData import surface (510 reads the IF_ sheets inserted into the I/O List, not these files)."""
+    return os.path.join(output_root(), "ProjectDocumentation", "InformationDatabase", "Interfaces")
+
+
 # --- sheet-name resolution (regex / JS-literal, case-insensitive) -------------------------------- #
 def js_to_re(pattern: str) -> str:
     """Accept a JS-style regex literal ('/pattern/flags' or 'pattern/flags') and return the bare Python
