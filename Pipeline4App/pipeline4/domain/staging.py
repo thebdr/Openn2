@@ -15,7 +15,7 @@ import os
 
 from pipeline4.core import config
 from pipeline4.core.database import Database
-from pipeline4.domain import identity
+from pipeline4.domain import identity, matrix
 from pipeline4.domain.signals import signals_table
 from pipeline4.io import workbook
 
@@ -60,6 +60,8 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
     for view in views:
         rows.extend(_read_view(view, colmap, strike_exclude, signal_types))
     views[0].close()
+
+    matrix.annotate(params, rows)   # C&E enrichment: matrix_areas / ce_* / numerazione_linea / areas_description
 
     fu_col = next((m["column"] for m in colmap if m["canonical"] == "functional_unit"), "O")
     for row in rows:
