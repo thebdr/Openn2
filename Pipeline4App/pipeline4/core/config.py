@@ -7,6 +7,7 @@ whole app is project-isolated with no special-casing downstream.
 """
 from __future__ import annotations
 
+import csv
 import os
 import re
 import sys
@@ -154,3 +155,100 @@ def get_param(params: dict, dotted_key: str, default=None):
             return default
         node = node[part]
     return node
+
+
+# --- config CSVs (read via core.table's JSON-cell codec; tolerant of hand edits) ----------------- #
+def input_docs_dir() -> str:
+    return os.path.join(config_project_dir(), "input_docs")
+
+
+def _as_bool(value, default: bool = False) -> bool:
+    text = str(value if value is not None else "").strip().lower()
+    if text in ("true", "yes", "y", "1", "on"):
+        return True
+    if text in ("false", "no", "n", "0", "off", ""):
+        return False
+    return default
+
+
+def read_config_csv(path: str, json_columns=()) -> list:
+    """Read a config CSV to a list of dict rows. The declared `json_columns` are JSON-decoded with the
+    SAME codec as the SSOT tables (`core.table.decode_cell`), so a `|`-free list/object cell round-trips;
+    every other column stays a string. Blank rows are skipped (config files are hand-edited). Missing
+    file -> []."""
+    from pipeline4.core.table import decode_cell
+    if not os.path.exists(path):
+        return []
+    wanted = set(json_columns)
+    rows = []
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        for raw in csv.DictReader(handle):
+            if not any((v or "").strip() for v in raw.values() if isinstance(v, str)):
+                continue
+            rows.append({key: (decode_cell(value) if key in wanted else value)
+                         for key, value in raw.items()})
+    return rows
+
+
+def load_column_map(document: str) -> list:
+    """Column-map rows for one document (IoList / CE): {column, canonical, expected_header, required,
+    preliminary_check_exclude}. `preliminary_check_exclude` marks the pipeline-written columns (AA-AG)
+    that the phase-100 standalone validation ignores."""
+    return [{
+        "column": (r.get("column") or "").strip(),
+        "canonical": (r.get("canonical") or "").strip(),
+        "expected_header": (r.get("expected_header") or "").strip(),
+        "required": _as_bool(r.get("required")),
+        "preliminary_check_exclude": _as_bool(r.get("preliminary_check_exclude")),
+    } for r in read_config_csv(os.path.join(input_docs_dir(), "column_map.csv"))
+        if (r.get("document") or "").strip() == document]
+
+
+def load_signal_types() -> dict:
+    """type_id (upper) -> the type record (the stripped PL4 schema: identity + tag + ce_mandatory; the
+    DB / diagnosis / interface attributes now live in their own registries). A paired channel-2 type
+    inherits the sibling's tagtable_name (linked by pair_key)."""
+    types = {}
+    for r in read_config_csv(os.path.join(input_docs_dir(), "signal_types.csv")):
+        tid = (r.get("type_id") or "").strip()
+        if not tid:
+            continue
+        types[tid.upper()] = {
+            "type_id": tid,
+            "type_id_desc": (r.get("type_id_desc") or "").strip(),
+            "category": (r.get("category") or "").strip(),
+            "pair_key": (r.get("pair_key") or "").strip(),
+            "channel": (r.get("channel") or "").strip(),
+            "is_pattern": _as_bool(r.get("is_pattern")),
+            "tagtable_name": (r.get("tagtable_name") or "").strip(),
+            "tag_name": (r.get("tag_name") or "").strip(),
+            "io_comment": (r.get("io_comment") or "").strip(),
+            "ce_mandatory": (r.get("ce_mandatory") or "").strip().lower(),
+        }
+    inherited = {}
+    for t in types.values():
+        if t["pair_key"] and t["tagtable_name"]:
+            inherited.setdefault(t["pair_key"], t["tagtable_name"])
+    for t in types.values():
+        if not t["tagtable_name"] and t["pair_key"] in inherited:
+            t["tagtable_name"] = inherited[t["pair_key"]]
+    return types
+
+
+def resolve_type(types: dict, raw_type) -> dict | None:
+    """Resolve a raw script-type cell to a signal_types record, honoring pattern types (`Z#` matches
+    Z1, Z2, ...). Returns None when unknown/blank."""
+    clean = str(raw_type if raw_type is not None else "").strip()
+    if not clean:
+        return None
+    exact = types.get(clean.upper())
+    if exact:
+        return exact
+    for record in types.values():
+        if not record["is_pattern"]:
+            continue
+        prefix = record["type_id"].split("#")[0].upper()
+        rest = clean.upper()[len(prefix):] if clean.upper().startswith(prefix) else ""
+        if rest and rest.isdigit():
+            return record
+    return None
