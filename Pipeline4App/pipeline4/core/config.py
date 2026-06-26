@@ -104,3 +104,53 @@ def resolve_sheet(pattern, available):
     """The first sheet name matching `pattern`, or None (single-sheet contexts e.g. the C&E matrix)."""
     matched = resolve_sheets(pattern, available)
     return matched[0] if matched else None
+
+
+# --- project params (the nested project_params.yaml schema) -------------------------------------- #
+def _read_yaml(path: str) -> dict:
+    """Parse a YAML file to plain dicts/lists ({} if empty). Single-quoted values (the JS-style sheet
+    regexes) are taken literally - no escape processing - so a '\\d' survives."""
+    from ruamel.yaml import YAML
+    parser = YAML(typ="safe")
+    with open(path, encoding="utf-8") as handle:
+        return parser.load(handle) or {}
+
+
+def _resolve_path(base: str, value) -> str:
+    """A path relative to `base` -> absolute (normalized); an absolute or blank path is returned as-is."""
+    text = str(value or "").strip()
+    if not text or os.path.isabs(text):
+        return text
+    return os.path.normpath(os.path.join(base, text))
+
+
+def params_file() -> str:
+    """The active project params file (the builtin config_project/ or the open project's)."""
+    return os.path.join(config_project_dir(), "project_params.yaml")
+
+
+def load_params(path: str | None = None) -> dict:
+    """Load the project params (the nested schema: iolist_params / matrix_params / validation_params /
+    output). The four document paths (iolist/matrix + their *_previous - the latter reserved for the
+    future ph100 change-tracing) are resolved relative to the params file's directory. The output /
+    device_types_db / interface_template defaults are applied by their consumers as the phases port."""
+    path = path or params_file()
+    params = _read_yaml(path)
+    base = os.path.dirname(os.path.abspath(path))
+    for key in ("iolist_path", "iolist_previous_path", "matrix_path", "matrix_previous_path"):
+        if params.get(key):
+            params[key] = _resolve_path(base, params[key])
+    return params
+
+
+def get_param(params: dict, dotted_key: str, default=None):
+    """Safe nested access into the params tree. `get_param(params,
+    'validation_params.crosscheck.iol_in_matrix.mandatory_words', [])` returns the value, or `default`
+    when any level along the dotted path is missing or None. A present falsy value (False/0/[]) is
+    returned as-is, NOT replaced by the default."""
+    node = params
+    for part in dotted_key.split("."):
+        if not isinstance(node, dict) or node.get(part) is None:
+            return default
+        node = node[part]
+    return node
