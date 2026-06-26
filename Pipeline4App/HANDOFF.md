@@ -11,10 +11,12 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. The whole of phases 300 + 520 + 400a/b is done. **Latest commit `28aa9ff` is the head;
-  everything this session is UNPUSHED** — push when the user asks.
-- **Gate: 85 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Branch `pl4`**. Phases 300 + 520(a/b/c) + 400a/b/c done. **Latest commit `11cd5e7` is the head; everything
+  this session is UNPUSHED** — push when the user asks.
+- **Gate: 88 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
+- **400c landed** (`IF_*.xlsx` generation via openpyxl, GUI "400" button) — the IF_ files generate + verify.
+  **Resume at 400d** (the `xlsx_edit` surgical writer port) below.
 - The SSOT **`Database/`** now holds **6 tables**: `signals` (300) · `db_blocks`/`db_members`/`instance_dbs`
   (520) · `interfaces`/`interface_elements` (400b). It saves to `Shared/Database/` (untracked generated artifacts).
 
@@ -34,28 +36,22 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `name_in_db`/`datablocks`/`plc_binding` written back onto signals; `db_members`+`db_blocks` projected to
   `<DB>.xml` (BOM/CRLF, F_DB OPC-lock). Parity: 0 mismatches on the 3 signal fields (269); the 5 reference
   GlobalDB XMLs byte-equivalent (member order grouped-by-type — accepted). `InstanceDBs.csv` deferred to ph800.
-- **Phase 400 Interfaces 400a+400b — DONE.** `interface_tagname` (0 mismatches/269); the `interfaces` +
-  `interface_elements` SSOT tables — `find_interfaces`, `collect_mirror_set`, `allocate_bytes`. Parity: all 18
-  SORTER-01 mirror elements match the reference exactly (the lone ref-extra `IF_ENCODER_SPEED` is stale config).
+- **Phase 400 Interfaces 400a+400b+400c — DONE.** `interface_tagname` (0 mismatches/269); the `interfaces` +
+  `interface_elements` SSOT tables (`find_interfaces`/`collect_mirror_set`/`allocate_bytes`); the `IF_*.xlsx`
+  projection (`interface_xlsx.project`, openpyxl). Parity: all 18 SORTER-01 mirror elements match the reference
+  exactly + are WRITTEN with 0 byte mismatches (the lone ref-extra `IF_ENCODER_SPEED` is stale config). GUI "400".
 
 ## What's NEXT (in order) — finish phase 400
-1. **400c — `IF_*.xlsx` generation** (openpyxl, NO new infra): per IOC instance, `shutil.copyfile` the template
-   → drop all sheets but the chosen one (`choose_sheet`) → retitle to `IF_<instance>` → `_plug` Base Address/
-   Base Node/Index (Side rows, by header name) + replace `<index>` tokens → write the `interface_elements` rows
-   onto the data table **including the BOOL-block padding** (the projector computes the full 2-byte block: real
-   signals on low bits, blank addressed rows for the engineer + a separator; a WORD = 1 row + separator) → copy
-   the address LET formula from an existing row. Output → the interfaces dir (ProjectDocumentation, NOT BuilderData).
-   Port: PL3 `interfaces.generate`/`generate_one`/`_plug`/`_append_custom_rows`. Parity vs `IF_SORTER-01.xlsx`.
-2. **400d — the `xlsx_edit` surgical writer** (the heavy infra, user said include it): port PL3's
+1. **400d — the `xlsx_edit` surgical writer** (the heavy infra, user said include it): port PL3's
    `pipeline3/io/xlsx_edit.py` (~446 lines: `edit_workbook`/`set_cells`/`build_sheet_xml`/`append_to_sheet`/
    `freeze_arrays` + the formula-cache capture/patch helpers — pure ZIP+regex XML surgery, no openpyxl on write).
    It's load-bearing for `insert_interface_sheets` (and later the ph800 editable shells). Add `pipeline4/io/xlsx_edit.py`.
-3. **400e — `insert_interface_sheets`** (gated by `iolist_params.insert_interface_sheets: true`): losslessly
+2. **400e — `insert_interface_sheets`** (gated by `iolist_params.insert_interface_sheets: true`): losslessly
    splice each `IF_<instance>` sheet into the I/O List (capture formula caches → openpyxl copy sheets → patch
    caches + seed the interface address cache `_interface_address_caches` → atomic save + `freeze_arrays`). Port
-   PL3's `_capture_formula_caches`/`_patch_formula_cache`/`_copy_sheet`. Then wire the **GUI 400 button**
-   (the "500" pattern in `gui/app_main.py`). Its consumer is **510 I/O Tags** (reads the inserted `IF_` sheets).
-4. **The `+DIAG` auto-mirror** — needs the per-type **`in_diag`** (stripped from PL4 signal_types → ph600).
+   PL3's `_capture_formula_caches`/`_patch_formula_cache`/`_copy_sheet`. (The GUI "400" button already runs
+   stage → 520 → build_interfaces → project; fold the insertion in here.) Its consumer is **510 I/O Tags**.
+3. **The `+DIAG` auto-mirror** — needs the per-type **`in_diag`** (stripped from PL4 signal_types → ph600).
    `collect_mirror_set` already has the guard; relocate `in_diag` (with ph600, or as a small ph400 follow-up,
    verifying vs PL3 `signal_types`) then the SORTER+DIAG-02 auto-mirror lights up. Until then a `+DIAG` interface
    gets only its `interface_mapping` mirrors.
