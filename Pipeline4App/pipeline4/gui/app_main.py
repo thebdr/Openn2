@@ -8,6 +8,7 @@ nothing (`_on_phase` is wrapped so a future not-yet-ready handler can't take the
 """
 from __future__ import annotations
 
+import os
 import tkinter as tk
 import traceback
 from tkinter import ttk
@@ -50,14 +51,32 @@ class App:
 
     def _on_phase(self, number, label):
         try:
-            if number == 0:
+            if number == 300:
+                self._run_staging()
+            elif number == 0:
                 self.log.append("PHASE", "Run Pipeline (all phases)")
+                self.log.append("WARN", "  -> full run not wired yet")
             else:
                 self.log.append("PHASE", f"{number} {label}")
-            self.log.append("WARN", f"  -> phase {number or 'ALL'} not implemented yet")
+                self.log.append("WARN", f"  -> phase {number} not implemented yet")
             self.status.configure(text=f"clicked: {label}")
         except Exception:  # noqa: BLE001  - a not-yet-ready handler must never take the window down
             self.log.append("ERROR", f"handler for {label} crashed:\n{traceback.format_exc()}")
+
+    def _run_staging(self):
+        """Phase 300 (wired): read the configured I/O List -> the signals table -> Database/signals.csv.
+        Runs inline for now (a few seconds on a real workbook); a worker thread comes with the engine."""
+        from pipeline4.core import config
+        from pipeline4.domain import staging
+        self.log.append("PHASE", "300 Documents Staging")
+        self.status.configure(text="staging…")
+        self.root.update_idletasks()
+        database = staging.stage()
+        signals = database["signals"]
+        self.log.append("PASS", f"  staged {len(signals)} signals -> {os.path.join(config.database_dir(), 'signals.csv')}")
+        dupes = signals.duplicate_uids()
+        if dupes:
+            self.log.append("WARN", f"  {len(dupes)} duplicate signal uid(s) - the key needs a tiebreak")
 
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"
