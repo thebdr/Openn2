@@ -49,7 +49,7 @@ Pipeline4App/
   config_project/                  (the restructured config — see "Config" below)
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
-    io/    workbook.py
+    io/    workbook.py · xlsx_edit.py
     domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
@@ -140,7 +140,7 @@ consumers 400/600).
 - **Deferred to phase 800**: `instance_dbs` → `InstanceDBs.csv` (a `blocks_creation_dir` surface that MERGES
   520's config families with 800's builder instances — the `instance_dbs` table is ready for it).
 
-## Phase 400 — Interfaces — IN PROGRESS (400a + 400b + 400c done; 400d–e TODO)
+## Phase 400 — Interfaces — IN PROGRESS (400a + 400b + 400c + 400d done; 400e TODO)
 `domain/interfaces.py`. Builds one `IF_<instance>.xlsx` per IOC signal from the MachineInterfaces template,
 mirrors flagged signals into a byte-packed block, and (gated) inserts each as an `IF_` sheet into the I/O
 List. The mirrored signals + byte layout land in the **`interfaces`** SSOT table; the `IF_*.xlsx` are its
@@ -173,8 +173,18 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   The GUI **"400" button** runs stage → 520 → build_interfaces → project. **Verify (SORTER-01)**: all 18 mirror
   elements written with **0 byte mismatches**, the 16-row BOOL blocks, sheet retitled, re-opens cleanly (real-Excel
   validity is the user's check). 182 data rows vs the ref's 184 = the stale `IF_ENCODER_SPEED` WORD+separator PL4 omits.
-- **400d–e TODO**: the **`xlsx_edit`** surgical writer port (`pipeline4/io/xlsx_edit.py`, ~446 lines ZIP/regex);
-  `insert_interface_sheets` + the address cache (`_interface_address_caches`). Then 510 reads the inserted IF_ sheets.
+- **400d DONE — the `xlsx_edit` surgical writer** (`pipeline4/io/xlsx_edit.py`): faithful port of PL3's module
+  (pure stdlib ZIP + regex XML surgery, no openpyxl on write — it is architecture-independent, like `io/workbook.py`).
+  `set_cells` (per-sheet engine, with the ARRAY GUARD freezing a spill an edit lands in) · `edit_workbook` (the
+  zip-level orchestrator: surgical `cell_edits`, whole-sheet `new_sheets`/`delete_sheets`, byte-preserving
+  `append_rows`, always drops the stale `xl/calcChain.xml`; atomic temp + `os.replace`) · `build_sheet_xml`/
+  `build_row_xml`/`append_to_sheet` (fresh-grid + append, inline strings so a leading `=` stays TEXT) ·
+  `freeze_arrays` (the post-process the openpyxl-based 400e insert calls). Covered by `test_xlsx_edit.py`
+  (14 cases, ported verbatim — the array-freeze/no-overlap, style/neighbour preservation, column-sorted insert,
+  the grid/row builders, add-replace-delete + append round-trips through a real openpyxl-saved zip).
+- **400e TODO**: `insert_interface_sheets` + the address cache (`_interface_address_caches`): losslessly splice
+  each `IF_<instance>` sheet into the I/O List (capture formula caches → openpyxl copy sheets → patch caches +
+  seed the interface address cache → atomic save + `freeze_arrays`). Then 510 reads the inserted IF_ sheets.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
@@ -186,10 +196,11 @@ later.)
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **44**: keys/table/database, signals schema,
-sheets/workbook, params/config_loaders, staging identity+read). Data-dependent parity (staging vs PL3) is
-verified by a script against the real docs (not in the gate). Each phase is committed only with its gate +
-parity green.
+**data-independent suite is the green gate** (currently **102**: keys/table/database, signals schema,
+sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
+interface_xlsx, and the **`io/xlsx_edit` suite** (14, ported verbatim)). Data-dependent parity (staging vs
+PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
+gate + parity green.
 
 ## Conventions & gotchas
 - **JSON cells are schema-declared** (a column is JSON by the table's `json_columns`, not by guessing). The

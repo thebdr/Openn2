@@ -11,12 +11,12 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. Phases 300 + 520(a/b/c) + 400a/b/c done. **Latest commit `11cd5e7` is the head; everything
-  this session is UNPUSHED** — push when the user asks.
-- **Gate: 88 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Branch `pl4`**. Phases 300 + 520(a/b/c) + 400a/b/c/d done. **Latest commit `11cd5e7` is the head; everything
+  this session is UNPUSHED** — push when the user asks. **400d is implemented but UNCOMMITTED** (in the working tree).
+- **Gate: 102 tests green** (data-independent, was 88 + the 14-case `test_xlsx_edit.py`). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
-- **400c landed** (`IF_*.xlsx` generation via openpyxl, GUI "400" button) — the IF_ files generate + verify.
-  **Resume at 400d** (the `xlsx_edit` surgical writer port) below.
+- **400d landed** (`pipeline4/io/xlsx_edit.py` — the surgical ZIP/regex Excel writer, ported verbatim from PL3 +
+  the 14-test suite). **Resume at 400e** (`insert_interface_sheets`) below.
 - The SSOT **`Database/`** now holds **6 tables**: `signals` (300) · `db_blocks`/`db_members`/`instance_dbs`
   (520) · `interfaces`/`interface_elements` (400b). It saves to `Shared/Database/` (untracked generated artifacts).
 
@@ -42,10 +42,11 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   exactly + are WRITTEN with 0 byte mismatches (the lone ref-extra `IF_ENCODER_SPEED` is stale config). GUI "400".
 
 ## What's NEXT (in order) — finish phase 400
-1. **400d — the `xlsx_edit` surgical writer** (the heavy infra, user said include it): port PL3's
-   `pipeline3/io/xlsx_edit.py` (~446 lines: `edit_workbook`/`set_cells`/`build_sheet_xml`/`append_to_sheet`/
-   `freeze_arrays` + the formula-cache capture/patch helpers — pure ZIP+regex XML surgery, no openpyxl on write).
-   It's load-bearing for `insert_interface_sheets` (and later the ph800 editable shells). Add `pipeline4/io/xlsx_edit.py`.
+1. ~~**400d — the `xlsx_edit` surgical writer**~~ **DONE** (`pipeline4/io/xlsx_edit.py`, ported verbatim from PL3:
+   `set_cells`/`edit_workbook`/`build_sheet_xml`/`build_row_xml`/`append_to_sheet`/`freeze_arrays` + the array-guard
+   helpers — pure ZIP+regex XML surgery, no openpyxl on write). 14-test suite `test_xlsx_edit.py` green. NOTE the
+   **formula-cache capture/patch helpers** (`_capture_formula_caches`/`_patch_formula_cache`/`_copy_sheet`) are NOT
+   in `xlsx_edit` in PL3 either — they live in `domain/interfaces.py` (the openpyxl-insert path) and land with 400e.
 2. **400e — `insert_interface_sheets`** (gated by `iolist_params.insert_interface_sheets: true`): losslessly
    splice each `IF_<instance>` sheet into the I/O List (capture formula caches → openpyxl copy sheets → patch
    caches + seed the interface address cache `_interface_address_caches` → atomic save + `freeze_arrays`). Port
