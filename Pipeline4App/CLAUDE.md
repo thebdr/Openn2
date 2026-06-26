@@ -50,9 +50,9 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
     io/    workbook.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
-  tests/unit/  (plain-python, _harness.py — 75 tests, the green gate)
+  tests/unit/  (plain-python, _harness.py — 80 tests, the green gate)
 ```
 
 ## The spine (`core/`)
@@ -139,6 +139,24 @@ consumers 400/600).
   ORDER differs — accepted). The GUI **"500" button** runs stage → build → project (510 I/O Tags not yet ported).
 - **Deferred to phase 800**: `instance_dbs` → `InstanceDBs.csv` (a `blocks_creation_dir` surface that MERGES
   520's config families with 800's builder instances — the `instance_dbs` table is ready for it).
+
+## Phase 400 — Interfaces — IN PROGRESS (400a done; 400b–e TODO)
+`domain/interfaces.py`. Builds one `IF_<instance>.xlsx` per IOC signal from the MachineInterfaces template,
+mirrors flagged signals into a byte-packed block, and (gated) inserts each as an `IF_` sheet into the I/O
+List. The mirrored signals + byte layout land in the **`interfaces`** SSOT table; the `IF_*.xlsx` are its
+projection. **Decisions (user)**: include the `xlsx_edit` port + `insert_interface_sheets` in 400 (not
+deferred); the per-type `interface_tagname` templates live in a **new `chain_reactions/interface_tagnames.csv`**
+(not re-added to `signal_types`).
+- **400a DONE — `interface_tagname`** (the Signal Name Side 1 base): `chain_reactions/interface_tagnames.csv`
+  (relocated from PL3 `signal_types` col 18) + `config.load_interface_tagnames()`; `identity.interp_keep` +
+  `identity.interface_tagname` (PL4: `{tag_name}`→staged `name_in_tagtable`, `{db_element}`→520 `name_in_db`,
+  keeping `{interface_name}`/`{interface_id}`); `interfaces.annotate_interface_tagnames` runs AFTER 520
+  (DESIGN §9 `520 → 400`). **Parity: 0 mismatches** vs PL3 IODatabase `interface_tagname` (269 signals, 113 non-empty).
+- **400b–e TODO**: the `interfaces` table + mirroring (`interface_mapping`/`+DIAG`/the 3 follower rule CSVs —
+  `datablock_elements_rules`/`diagnosis_logic_rules`→Q, `interface_elements`→the only I source) + byte layout
+  (≥8-byte gap, group by script_type, BOOL→2-byte block / WORD→row); the `IF_*.xlsx` generation (openpyxl,
+  template copy/plug); the **`xlsx_edit`** surgical writer port; `insert_interface_sheets` + the address cache;
+  GUI 400 button. Parity vs `IF_SORTER-01.xlsx` / `IF_SORTER+DIAG-02.xlsx`.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button

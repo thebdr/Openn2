@@ -260,6 +260,24 @@ def resolve_type(types: dict, raw_type) -> dict | None:
     return None
 
 
+# --- phase-400 chain-reactions CSVs (chain_reactions/) ------------------------------------------- #
+def chain_reactions_dir() -> str:
+    """The phase-400 chain-reaction CSVs (object_families / interface_elements / interface_tagnames)."""
+    return os.path.join(config_project_dir(), "chain_reactions")
+
+
+def load_interface_tagnames() -> dict:
+    """type_id (upper) -> the interface_tagname template (Signal Name Side 1 base), relocated from PL3's
+    `signal_types.csv` col 18. Keeps `{interface_name}`/`{interface_id}` for the phase-400 generator; in
+    PL4 `{tag_name}`/`{db_element}` resolve to the staged `name_in_tagtable` / 520 `name_in_db`."""
+    out = {}
+    for r in read_config_csv(os.path.join(chain_reactions_dir(), "interface_tagnames.csv")):
+        tid = (r.get("type_id") or "").strip()
+        if tid:
+            out[tid.upper()] = (r.get("interface_tagname") or "").strip()
+    return out
+
+
 # --- phase-520 data-block registry CSVs (datablocks/) -------------------------------------------- #
 def datablocks_dir() -> str:
     """The phase-520 data-block registry CSVs (datablock_definitions / _elements / _types)."""

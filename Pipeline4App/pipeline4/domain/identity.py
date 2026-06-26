@@ -19,6 +19,32 @@ def interp(template, row) -> str:
     return _TOKEN.sub(lambda m: str(row.get(m.group(1), "") or ""), template or "").strip()
 
 
+def interp_keep(template, row) -> str:
+    """Like `interp`, but LEAVE a `{token}` intact when the row has no such key (a present-but-empty key
+    still substitutes to ''). Used to resolve the interface_tagname base at phase 400 while PRESERVING the
+    per-interface `{interface_name}`/`{interface_id}` tokens for the generator to fill."""
+    def sub(m):
+        key = m.group(1)
+        if key in row:
+            value = row.get(key)
+            return "" if value is None else str(value)
+        return m.group(0)
+    return _TOKEN.sub(sub, template or "").strip()
+
+
+def interface_tagname(row, template) -> str:
+    """The interface tag name (Signal Name Side 1 base) for a signal: the type's `interface_tagname`
+    `template` resolved against the row, KEEPING `{interface_name}`/`{interface_id}` for the generator.
+    In PL4 `{tag_name}` resolves to the staged `name_in_tagtable` and `{db_element}` to the 520-written
+    `name_in_db` (both relocated out of `signal_types`); '' when the type defines no template."""
+    if not template:
+        return ""
+    ctx = dict(row)
+    ctx["tag_name"] = str(row.get("name_in_tagtable") or "")
+    ctx["db_element"] = str(row.get("name_in_db") or "")
+    return interp_keep(template, ctx)
+
+
 def fld(row) -> str:
     """FUNCTIONAL UNIT + LOCATION + DEVICE, as written (the IoList device key). Staged as `iol_FLD`."""
     return (str(row.get("functional_unit") or "").strip()
