@@ -1,8 +1,12 @@
 """Phase 520 - domain.datablocks: the registry -> Global DBs / instance families + the write-back
-(domain.db_members tables). Pure + data-independent (synthetic registry + rows)."""
+(domain.db_members tables) + the GlobalDB-XML projection (domain.datablock_xml). Pure + data-independent."""
+import os
+import tempfile
+
 from _harness import run, eq, ok
-from pipeline4.domain import datablocks
-from pipeline4.domain.db_members import db_members_table, instance_dbs_table
+from pipeline4.core.database import Database
+from pipeline4.domain import datablocks, datablock_xml
+from pipeline4.domain.db_members import db_blocks_table, db_members_table, instance_dbs_table
 
 
 def _def(name, **kw):
@@ -161,6 +165,45 @@ def test_instance_dbs_table_keyed_by_name():
     eq(idb.duplicate_uids(), set())
 
 
+# --- 520c: the GlobalDB-XML projection ----------------------------------------------------------- #
+def test_db_xml_f_db_opc_lock_and_member():
+    db = {"prog_lang": "f_db", "opc_ua": True, "memory_layout": "Optimized",  # opc_ua True is IGNORED for F_DB
+          "members": [{"member": "Door [ X ]", "datatype": "Bool", "retain": False, "comment": "", "start_value": ""}]}
+    xml = datablock_xml.db_xml("07_DOOR", db, 1)
+    ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in xml, "an F_DB is code-locked OPC-off")
+    ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in xml, "f_db canonicalized to F_DB")
+    ok('<Member Name="Door [ X ]" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">' in xml)
+    ok('<BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>' in xml)
+
+
+def test_db_xml_normal_db_follows_opc():
+    db = {"prog_lang": "DB", "opc_ua": True, "memory_layout": "Optimized", "members": []}
+    ok("<DBAccessibleFromOPCUA>true</DBAccessibleFromOPCUA>" in datablock_xml.db_xml("D", db, 1))
+    db["opc_ua"] = False
+    ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in datablock_xml.db_xml("D", db, 1))
+
+
+def test_project_writes_only_its_own_dbs():
+    defs = [_def("07_DOOR", db_programming_language="F_DB", opc_ua=False, seed=True)]
+    els = [_el("07_DOOR", "Door Closed [ {combined_FLD} ]", 'row where script_type = "DI1/2"')]
+    rows = [dict(r) for r in _ROWS]
+    g, _i, _e, _w = datablocks.generate(rows, defs, els, _TYPES)
+    dbb, dbm = db_blocks_table(), db_members_table()
+    datablocks._fill_db_blocks(dbb, g)
+    datablocks._fill_db_members(dbm, g)
+    database = Database([dbb, dbm])
+    with tempfile.TemporaryDirectory() as d:
+        open(os.path.join(d, "02_COM.xml"), "w").close()       # a DB another phase owns -> untouched
+        count = datablock_xml.project(database, d)
+        eq(count, 1, "one GlobalDB written")
+        ok(os.path.exists(os.path.join(d, "02_COM.xml")), "a non-db_blocks file is left alone (no hardcoded keep)")
+        raw = open(os.path.join(d, "07_DOOR.xml"), "rb").read()
+        ok(raw.startswith(b"\xef\xbb\xbf"), "UTF-8 BOM")
+        ok(b"\r\n" in raw and not raw.endswith(b"\r\n"), "CRLF line endings, no trailing newline")
+        text = raw.decode("utf-8-sig")
+        ok("Always FALSE" in text and "Door Closed [ S1-D1 ]" in text, "seeds + member present")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("datablocks", [
@@ -175,4 +218,7 @@ if __name__ == "__main__":
         ("write_back_two_members_one_db_picks_primary", test_write_back_two_members_one_db_picks_primary),
         ("fill_db_members_table_and_source", test_fill_db_members_table_and_source),
         ("instance_dbs_table_keyed_by_name", test_instance_dbs_table_keyed_by_name),
+        ("db_xml_f_db_opc_lock_and_member", test_db_xml_f_db_opc_lock_and_member),
+        ("db_xml_normal_db_follows_opc", test_db_xml_normal_db_follows_opc),
+        ("project_writes_only_its_own_dbs", test_project_writes_only_its_own_dbs),
     ]))

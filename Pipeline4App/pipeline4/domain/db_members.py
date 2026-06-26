@@ -16,6 +16,24 @@ from pipeline4.core.table import Table
 # The boolean member columns - JSON so a saved/loaded db_members.csv round-trips them as real bools.
 DB_MEMBERS_BOOL_COLUMNS = ["retain", "ext_accessible", "ext_visible", "ext_writable", "setpoint"]
 
+# The boolean DB-level columns - same JSON treatment.
+DB_BLOCKS_BOOL_COLUMNS = ["opc_ua", "webserver", "only_load_memory", "write_protected", "retain_reserve"]
+
+
+def db_blocks_table() -> Table:
+    """The empty `db_blocks` table: one row per SURVIVING Global DB (those with real members - the
+    if_elements drop already applied) + its resolved TIA attributes. This is what makes the `<DB>.xml`
+    projection a PURE function of the Database (db_blocks + db_members -> XML), no config re-read.
+    `<Number>` is NOT stored - it is a placeholder assigned name-sorted at projection time. `uid` = content
+    hash of `db_name` (unique)."""
+    return Table(
+        "db_blocks",
+        columns=["uid", "db_name", "prog_lang", "memory_layout", "opc_ua", "webserver",
+                 "only_load_memory", "write_protected", "retain_reserve", "memory_reserve"],
+        json_columns=DB_BLOCKS_BOOL_COLUMNS,
+        key_columns=["db_name"],
+    )
+
 
 def db_members_table() -> Table:
     """The empty `db_members` table: `uid`, the member's DB + name + type + attributes, and `source`

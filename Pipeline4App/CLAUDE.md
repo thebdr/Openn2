@@ -50,9 +50,9 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
     io/    workbook.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
-  tests/unit/  (plain-python, _harness.py — 72 tests, the green gate)
+  tests/unit/  (plain-python, _harness.py — 75 tests, the green gate)
 ```
 
 ## The spine (`core/`)
@@ -106,10 +106,11 @@ one workbook reader (by column position per `column_map`), drops Skip-Reason + s
 - **Still pending**: `subnet_name` (from `profinet_ip`). The registry-derived `name_in_db`/`datablocks`/
   `plc_binding` are now WRITTEN BACK by phase 520 (below), not at staging.
 
-## Phase 520 — Data Blocks — 520a + 520b DONE (520c projection TODO)
-`domain/dbtemplate.py` + `domain/datablocks.py` + `domain/db_members.py`. The **SSOT model**: one registry
-evaluator (`datablocks.generate`) over the **signals** table → two tables (`db_members` every Global-DB
-member; `instance_dbs` the FB instance families) → (520c) projected to `<DB>.xml` + `InstanceDBs.csv`. The
+## Phase 520 — Data Blocks — DONE (520a/b/c; InstanceDBs.csv deferred to 800)
+`domain/dbtemplate.py` + `domain/datablocks.py` + `domain/db_members.py` + `domain/datablock_xml.py`. The
+**SSOT model**: one registry evaluator (`datablocks.generate`) over the **signals** table → three tables
+(`db_blocks` the surviving DBs + attrs; `db_members` every Global-DB member; `instance_dbs` the FB instance
+families) → projected to `<DB>.xml` (`datablock_xml.project`, from `db_blocks` + `db_members`). The
 **3 registry-derived signal fields** (`name_in_db`/`datablocks`/`plc_binding`) are **written back** onto the
 signals (decision: write-back after 520, the single evaluator — no drift; DESIGN §9 orders 520 before its
 consumers 400/600).
@@ -128,9 +129,16 @@ consumers 400/600).
   grouped-by-type vs PL3's interleaved row-order — accepted/functional, set-equal). The 4 DBs `DiagnosticTags`/
   `00_Commissioning`/`PROFINET_NODES_*` aren't in the frozen ImportReady (it predates them); the IODatabase
   write-back parity covers their PA/PW signals.
-- **TODO 520c**: the `_db_xml` GlobalDB projector (`db_members` grouped by `db_name` → `<DB>.xml`, BOM/CRLF,
-  per-member byte-stable) + `instance_dbs` → `InstanceDBs.csv` + the GUI 520 button. OPEN: where the per-DB
-  attributes (prog_lang/opc/memory) live for the projector (read the registry, or a small `db_blocks` table).
+- **520c projection** (`datablock_xml.py`): port of PL3's `_db_xml` reading the `db_blocks` + `db_members`
+  tables (a PURE projection — the chosen `db_blocks` table holds the per-DB attrs, no config re-read). Writes
+  `<db_name>.xml` to `config.blocks_import_dir()` (BOM/CRLF, no trailing newline), name-sorted `<Number>`
+  placeholder. It writes ONLY the DBs in `db_blocks` and leaves other files untouched (NO hardcoded keep-list
+  — `db_blocks` is the ownership record, so a phase-800-owned `02_COM.xml` survives by not being a 520 DB).
+  The F_DB OPC-lock is code-enforced here. **Parity**: all 5 reference GlobalDB XMLs (01_Pushbutton, 03_FDBACK, 03_FDBACK_RAW,
+  04_SPEED, 07_DOOR) are **byte-equivalent** (header + footer + every member fragment identical; only member
+  ORDER differs — accepted). The GUI **"500" button** runs stage → build → project (510 I/O Tags not yet ported).
+- **Deferred to phase 800**: `instance_dbs` → `InstanceDBs.csv` (a `blocks_creation_dir` surface that MERGES
+  520's config families with 800's builder instances — the `instance_dbs` table is ready for it).
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button

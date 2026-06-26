@@ -19,7 +19,7 @@ from __future__ import annotations
 from pipeline4.core import config
 from pipeline4.core.database import Database
 from pipeline4.domain import dbtemplate as T
-from pipeline4.domain.db_members import db_members_table, instance_dbs_table
+from pipeline4.domain.db_members import db_blocks_table, db_members_table, instance_dbs_table
 from pipeline4.domain.signals import signals_table
 
 DB_CONSTANTS = ["Always FALSE", "Always TRUE", "No Operation"]   # the DB seed (Bool); space, not underscore
@@ -227,6 +227,14 @@ def _fill_db_members(table, global_dbs) -> None:
                       ext_writable=m["ext_writable"], setpoint=m["setpoint"], source=m.get("source", ""))
 
 
+def _fill_db_blocks(table, global_dbs) -> None:
+    for db_name, g in global_dbs.items():
+        table.add(db_name=db_name, prog_lang=g["prog_lang"], memory_layout=g["memory_layout"],
+                  opc_ua=g["opc_ua"], webserver=g["webserver"], only_load_memory=g["only_load_memory"],
+                  write_protected=g["write_protected"], retain_reserve=g["retain_reserve"],
+                  memory_reserve=g["memory_reserve"])
+
+
 def build(database: Database | None = None) -> tuple:
     """Phase 520 (SSOT): evaluate the registry over the signals table -> the `db_members` + `instance_dbs`
     tables + the write-back. Loads the staged Database from the Database folder when none is passed; on a
@@ -241,13 +249,14 @@ def build(database: Database | None = None) -> tuple:
     if errors:
         return database, errors, warnings
 
-    dbm, idb = db_members_table(), instance_dbs_table()
+    dbb, dbm, idb = db_blocks_table(), db_members_table(), instance_dbs_table()
+    _fill_db_blocks(dbb, global_dbs)
     _fill_db_members(dbm, global_dbs)
     for name, fb in instance_dbs:
         idb.add(instance_name=name, fb=fb)
     write_back(rows, global_dbs)
 
-    for table in (dbm, idb):
+    for table in (dbb, dbm, idb):
         if table.name in database:
             database[table.name].rows = table.rows
         else:

@@ -53,6 +53,8 @@ class App:
         try:
             if number == 300:
                 self._run_staging()
+            elif number == 500:
+                self._run_data_blocks()
             elif number == 0:
                 self.log.append("PHASE", "Run Pipeline (all phases)")
                 self.log.append("WARN", "  -> full run not wired yet")
@@ -77,6 +79,31 @@ class App:
         dupes = signals.duplicate_uids()
         if dupes:
             self.log.append("WARN", f"  {len(dupes)} duplicate signal uid(s) - the key needs a tiebreak")
+
+    def _run_data_blocks(self):
+        """Phase 500 / 520 (wired): stage -> the registry generates the db_members + db_blocks + instance_dbs
+        tables (+ writes back name_in_db/datablocks/plc_binding) -> project the GlobalDB XML to BuilderData.
+        510 (I/O Tags) is not ported yet. Runs inline for now."""
+        from pipeline4.core import config
+        from pipeline4.domain import staging, datablocks, datablock_xml
+        self.log.append("PHASE", "500 Signals Mapping  (520 Data Blocks)")
+        self.status.configure(text="data blocks…")
+        self.root.update_idletasks()
+        database = staging.stage()
+        database, errors, warnings = datablocks.build(database)
+        for w in warnings:
+            self.log.append("WARN", f"  {w}")
+        if errors:
+            for e in errors:
+                self.log.append("FAIL", f"  {e}")
+            self.log.append("FAIL", "  520 halted on a config error - nothing written")
+            return
+        n_dbs, n_members = len(database["db_blocks"]), len(database["db_members"])
+        self.log.append("PASS", f"  {n_members} db_members across {n_dbs} DBs (+ {len(database['instance_dbs'])} "
+                                f"instance DBs) -> {os.path.join(config.database_dir(), 'db_members.csv')}")
+        count = datablock_xml.project(database)
+        self.log.append("PASS", f"  projected {count} GlobalDB XML(s) -> {config.blocks_import_dir()}")
+        self.log.append("INFO", "  510 I/O Tags: not ported yet")
 
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"

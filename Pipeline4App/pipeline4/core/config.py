@@ -58,6 +58,12 @@ def output_root() -> str:
     return os.path.join(_PROJECT_ROOT, "Output") if _PROJECT_ROOT else _BUILTIN_OUTPUT
 
 
+def blocks_import_dir() -> str:
+    """The phase-520 GlobalDB-XML BuilderData surface (`<DB>.xml`), under the output root - what OP4
+    imports. Byte-stable to PL3's `ImportReady/` (the 02_COM.xml there is phase-800-owned)."""
+    return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "SoftwareBlocks", "ImportReady")
+
+
 # --- sheet-name resolution (regex / JS-literal, case-insensitive) -------------------------------- #
 def js_to_re(pattern: str) -> str:
     """Accept a JS-style regex literal ('/pattern/flags' or 'pattern/flags') and return the bare Python
