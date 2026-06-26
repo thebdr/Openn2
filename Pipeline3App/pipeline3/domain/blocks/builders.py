@@ -120,23 +120,24 @@ def build_00_commissioning(db: Database) -> Table:
 def build_02_em_push_button(db: Database) -> Table:
     """One 00_Push-Button_Input FB instance per node: the node's emergency-stop INPUTS - both
     E1/2 emergency-push-buttons AND B1/2 safety-breakers (grouped by node, in address order),
-    chunked to the FB's 4 IN/OUT slots. The iterator (= each input's name_in_db, which now equals
-    its tag name after the FLD dedup) is padded to 4 with PAD. Bypass_ET200 is the node's
-    '<profinet_name> <profinet_ip>' (the same 00_Commissioning member as block 00)."""
-    SLOTS = 4   # the FB's IN_1..4 / OUT_1..4
+    chunked to the FB's 4 channels. The v1.1 template carries 8 !!ITERATOR_STRINGS$$ in document
+    order - the IN_1..4 bare-symbol quartet, then the 01_PushButton.<member> quartet - so the iterator
+    is the padded name_in_db quartet emitted TWICE (same values, padded identically). Bypass_ET200 is
+    the node's '<profinet_name> <profinet_ip>' (the same 00_Commissioning member as block 00)."""
+    SLOTS = 4   # the FB's 4 channels (IN_1..4 / 01_PushButton.<member>_1..4)
     t = Table("02_EM Push Button")
     for node, members in _group_by_node(db, "E1/2", "B1/2"):
         ident = f"{node['profinet_name']} {node['profinet_ip']}".strip()
         for i, chunk in enumerate(_chunked(members, SLOTS), start=1):
             inst = f"EMPB_{node['profinet_name']}_{i}"
             names = [m["name_in_db"] for m in chunk]
-            names += [PAD] * (SLOTS - len(names))            # pad the iterator to the 4 fixed slots
+            names += [PAD] * (SLOTS - len(names))            # pad the quartet to the 4 fixed slots
             t.add(
                 template_type="01",
                 **{"instanceOf-00_Push-Button_Input": inst},
                 **{"00_Commissioning.{db_element}": ident},
                 NetworkComment=f"{inst} {node['profinet_ip']}",
-                ITERATOR_STRINGS=names,
+                ITERATOR_STRINGS=names + names,              # 2 quartets: IN_1..4 then 01_PushButton.<member>
             )
     return t
 

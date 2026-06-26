@@ -71,8 +71,8 @@ def test_02_one_instance_per_node_padded_to_four():
     eq(r["instanceOf-00_Push-Button_Input"], "EMPB_n5-ms1_1")
     eq(r["00_Commissioning.{db_element}"], "n5-ms1 192.168.50.5", "Bypass = node '<pname> <ip>'")
     eq(r["NetworkComment"], "EMPB_n5-ms1_1 192.168.50.5")
-    eq(r["ITERATOR_STRINGS"], ["PB one", "PB two", "BRK one", PAD],
-       "E1/2 push buttons AND B1/2 safety breakers, in address order, padded to the 4 fixed slots")
+    eq(r["ITERATOR_STRINGS"], ["PB one", "PB two", "BRK one", PAD] * 2,
+       "two quartets: IN_1..4 then 01_PushButton.<member>, both the same padded name_in_db (v1.1)")
 
 
 def test_02_includes_safety_breakers():
@@ -80,7 +80,7 @@ def test_02_includes_safety_breakers():
     node = _pb_node("nbrk", "10.0.0.1", 0, 9)
     t = build_02_em_push_button(Database([node, _brk("I0.0", "BRK only")]))
     eq(len(t), 1, "a node with only a breaker (no push button) still gets an FB")
-    eq(t.rows[0]["ITERATOR_STRINGS"], ["BRK only", PAD, PAD, PAD], "the breaker is a member")
+    eq(t.rows[0]["ITERATOR_STRINGS"], ["BRK only", PAD, PAD, PAD] * 2, "the breaker is a member (both quartets)")
 
 
 def test_02_chunks_over_four_into_multiple_instances():
@@ -89,8 +89,8 @@ def test_02_chunks_over_four_into_multiple_instances():
     t = build_02_em_push_button(Database([node, *pbs]))
     eq(len(t), 2, "5 PBs -> 2 instances (4 + 1)")
     eq([r["instanceOf-00_Push-Button_Input"] for r in t.rows], ["EMPB_nbig_1", "EMPB_nbig_2"])
-    eq(len(t.rows[0]["ITERATOR_STRINGS"]), 4)
-    eq(t.rows[1]["ITERATOR_STRINGS"], ["PB4", PAD, PAD, PAD], "second chunk padded")
+    eq(len(t.rows[0]["ITERATOR_STRINGS"]), 8, "two quartets of 4")
+    eq(t.rows[1]["ITERATOR_STRINGS"], ["PB4", PAD, PAD, PAD] * 2, "second chunk padded, both quartets")
 
 
 def test_02_pad_is_no_operation():
