@@ -140,7 +140,7 @@ consumers 400/600).
 - **Deferred to phase 800**: `instance_dbs` → `InstanceDBs.csv` (a `blocks_creation_dir` surface that MERGES
   520's config families with 800's builder instances — the `instance_dbs` table is ready for it).
 
-## Phase 400 — Interfaces — IN PROGRESS (400a + 400b + 400c + 400d done; 400e TODO)
+## Phase 400 — Interfaces — DONE (400a + 400b + 400c + 400d + 400e)
 `domain/interfaces.py`. Builds one `IF_<instance>.xlsx` per IOC signal from the MachineInterfaces template,
 mirrors flagged signals into a byte-packed block, and (gated) inserts each as an `IF_` sheet into the I/O
 List. The mirrored signals + byte layout land in the **`interfaces`** SSOT table; the `IF_*.xlsx` are its
@@ -182,9 +182,23 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   `freeze_arrays` (the post-process the openpyxl-based 400e insert calls). Covered by `test_xlsx_edit.py`
   (14 cases, ported verbatim — the array-freeze/no-overlap, style/neighbour preservation, column-sorted insert,
   the grid/row builders, add-replace-delete + append round-trips through a real openpyxl-saved zip).
-- **400e TODO**: `insert_interface_sheets` + the address cache (`_interface_address_caches`): losslessly splice
-  each `IF_<instance>` sheet into the I/O List (capture formula caches → openpyxl copy sheets → patch caches +
-  seed the interface address cache → atomic save + `freeze_arrays`). Then 510 reads the inserted IF_ sheets.
+- **400e DONE — `insert_interface_sheets`** (in `interface_xlsx.py`, gated by `iolist_params.insert_interface_sheets`):
+  losslessly splice each projected `IF_<instance>.xlsx` into the I/O List as an `IF_<instance>` sheet (idempotent —
+  skips one already present; a timestamped `.bak` first). Clean-room port of PL3's insertion path: `_copy_sheet`
+  (re-creates each table with **clean id+name-only columns** — dropping the source's out-of-range `dataDxfId` +
+  stale `calculatedColumnFormula`, else Excel drops the table — and a per-instance table name) → openpyxl save →
+  `_capture_formula_caches`/`_patch_formula_cache` restore the I/O List's own formula caches (openpyxl drops them →
+  a `data_only` reader would see None for Profinet IP/name) → **seed the interface address cache**
+  (`_interface_address_caches`/`_io_address`/`_resolve_num` MIRROR the `I/O Address Side 1` LET in Python:
+  `{I|Q}{base+offset}[.bit]`, the offset/bit chains resolved, columns bound by header — so 510 reads correct
+  addresses without Excel while the LET survives for an engineer) → atomic ZIP rewrite → **`xlsx_edit.freeze_arrays`**
+  (400d) freezes any dynamic array openpyxl flattened in the untouched sheets. Reuses `xlsx_edit._sheet_name_to_part`
+  + `freeze_arrays` (no duplication). The GUI **"400" button** now runs stage → 520 → build → project → insert.
+  **Parity (real data, non-destructive scratch copy)**: the 2 IF_ sheets insert losslessly — all 7 source sheets
+  kept, a sample formula survives, all 15 Profinet IP cached values survive a `data_only` re-stage, and 151 + 71
+  `I/O Address Side 1` values are seeded + read back via `data_only`. Tests: `test_interface_xlsx.py` (+5 cases:
+  the LET mirror, the offset/bit chain resolver, the address-cache seed, the lossless+idempotent insert with the
+  table-dxf/calc strip + the array-freeze). 510 I/O Tags will read these inserted IF_ sheets.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
@@ -196,9 +210,10 @@ later.)
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **102**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **107**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
-interface_xlsx, and the **`io/xlsx_edit` suite** (14, ported verbatim)). Data-dependent parity (staging vs
+interface_xlsx (incl. the 400e insertion/seed/freeze), and the **`io/xlsx_edit` suite** (14, ported
+verbatim)). Data-dependent parity (staging vs
 PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
 gate + parity green.
 

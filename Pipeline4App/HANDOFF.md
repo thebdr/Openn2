@@ -11,12 +11,13 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. Phases 300 + 520(a/b/c) + 400a/b/c/d done. **Latest commit `11cd5e7` is the head; everything
-  this session is UNPUSHED** — push when the user asks. **400d is implemented but UNCOMMITTED** (in the working tree).
-- **Gate: 102 tests green** (data-independent, was 88 + the 14-case `test_xlsx_edit.py`). Run from `Pipeline4App/`:
-  `for t in tests/unit/test_*.py; do python "$t"; done`
-- **400d landed** (`pipeline4/io/xlsx_edit.py` — the surgical ZIP/regex Excel writer, ported verbatim from PL3 +
-  the 14-test suite). **Resume at 400e** (`insert_interface_sheets`) below.
+- **Branch `pl4`**. **Phase 400 is COMPLETE** (300 + 520(a/b/c) + 400a/b/c/d/e done). **Latest PUSHED/committed head
+  is `5bc4aca` (400d); everything else this session is UNPUSHED** — push when the user asks. **400e is implemented
+  but UNCOMMITTED** (in the working tree).
+- **Gate: 107 tests green** (data-independent, was 102 + the 5-case 400e block in `test_interface_xlsx.py`). Run
+  from `Pipeline4App/`: `for t in tests/unit/test_*.py; do python "$t"; done`
+- **400e landed** (`interface_xlsx.insert_interface_sheets` — the lossless IF_ insertion + Excel-independent
+  address-cache seed + `freeze_arrays`; GUI "400" runs it gated). **Resume at the next phase (510 or 600)** below.
 - The SSOT **`Database/`** now holds **6 tables**: `signals` (300) · `db_blocks`/`db_members`/`instance_dbs`
   (520) · `interfaces`/`interface_elements` (400b). It saves to `Shared/Database/` (untracked generated artifacts).
 
@@ -27,6 +28,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 3. `4483f0e` **520c** — `datablock_xml.project` (the GlobalDB-XML projector) + the `db_blocks` table + GUI "500"
 4. `2ba9462` **400a** — `interface_tagname` (per-type templates relocated → `chain_reactions/interface_tagnames.csv`)
 5. `28aa9ff` **400b** — the `interfaces` + `interface_elements` tables (mirror set + byte layout)
+6. `11cd5e7` **400c** — the `IF_*.xlsx` projection (`interface_xlsx.project`, openpyxl)
+7. `5bc4aca` **400d** — `pipeline4/io/xlsx_edit.py` (the surgical ZIP/regex writer) + the 14-test suite
+8. (UNCOMMITTED) **400e** — `insert_interface_sheets` (the lossless IF_ insertion + address-cache seed)
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -36,26 +40,21 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `name_in_db`/`datablocks`/`plc_binding` written back onto signals; `db_members`+`db_blocks` projected to
   `<DB>.xml` (BOM/CRLF, F_DB OPC-lock). Parity: 0 mismatches on the 3 signal fields (269); the 5 reference
   GlobalDB XMLs byte-equivalent (member order grouped-by-type — accepted). `InstanceDBs.csv` deferred to ph800.
-- **Phase 400 Interfaces 400a+400b+400c — DONE.** `interface_tagname` (0 mismatches/269); the `interfaces` +
+- **Phase 400 Interfaces — DONE (400a–e).** `interface_tagname` (0 mismatches/269); the `interfaces` +
   `interface_elements` SSOT tables (`find_interfaces`/`collect_mirror_set`/`allocate_bytes`); the `IF_*.xlsx`
-  projection (`interface_xlsx.project`, openpyxl). Parity: all 18 SORTER-01 mirror elements match the reference
-  exactly + are WRITTEN with 0 byte mismatches (the lone ref-extra `IF_ENCODER_SPEED` is stale config). GUI "400".
+  projection (`interface_xlsx.project`, openpyxl); the `xlsx_edit` surgical writer (400d); the lossless
+  `insert_interface_sheets` (400e). Parity: all 18 SORTER-01 mirror elements match the reference exactly + are
+  WRITTEN with 0 byte mismatches (the lone ref-extra `IF_ENCODER_SPEED` is stale config); the IF_ insertion is
+  lossless on the real I/O List (all 7 source sheets kept, formulas + Profinet IP caches survive, 151 + 71 address
+  values seeded for 510). GUI "400" runs stage → 520 → build → project → insert.
 
-## What's NEXT (in order) — finish phase 400
-1. ~~**400d — the `xlsx_edit` surgical writer**~~ **DONE** (`pipeline4/io/xlsx_edit.py`, ported verbatim from PL3:
-   `set_cells`/`edit_workbook`/`build_sheet_xml`/`build_row_xml`/`append_to_sheet`/`freeze_arrays` + the array-guard
-   helpers — pure ZIP+regex XML surgery, no openpyxl on write). 14-test suite `test_xlsx_edit.py` green. NOTE the
-   **formula-cache capture/patch helpers** (`_capture_formula_caches`/`_patch_formula_cache`/`_copy_sheet`) are NOT
-   in `xlsx_edit` in PL3 either — they live in `domain/interfaces.py` (the openpyxl-insert path) and land with 400e.
-2. **400e — `insert_interface_sheets`** (gated by `iolist_params.insert_interface_sheets: true`): losslessly
-   splice each `IF_<instance>` sheet into the I/O List (capture formula caches → openpyxl copy sheets → patch
-   caches + seed the interface address cache `_interface_address_caches` → atomic save + `freeze_arrays`). Port
-   PL3's `_capture_formula_caches`/`_patch_formula_cache`/`_copy_sheet`. (The GUI "400" button already runs
-   stage → 520 → build_interfaces → project; fold the insertion in here.) Its consumer is **510 I/O Tags**.
-3. **The `+DIAG` auto-mirror** — needs the per-type **`in_diag`** (stripped from PL4 signal_types → ph600).
-   `collect_mirror_set` already has the guard; relocate `in_diag` (with ph600, or as a small ph400 follow-up,
-   verifying vs PL3 `signal_types`) then the SORTER+DIAG-02 auto-mirror lights up. Until then a `+DIAG` interface
-   gets only its `interface_mapping` mirrors.
+## What's NEXT (in order)
+1. **The `+DIAG` auto-mirror** (the lone open phase-400 item) — needs the per-type **`in_diag`** (stripped from PL4
+   signal_types → ph600). `collect_mirror_set` already has the guard; relocate `in_diag` (with ph600, or as a small
+   ph400 follow-up, verifying vs PL3 `signal_types`) then the SORTER+DIAG-02 auto-mirror lights up. Until then a
+   `+DIAG` interface gets only its `interface_mapping` mirrors.
+2. **510 I/O Tags** — reads the now-inserted IF_ sheets (Signal Name Side 1 + the seeded I/O Address Side 1) +
+   the resolved I/O signals → `PLCTags.xlsx`. The 400e seed makes the interface addresses readable without Excel.
 
 ## Then the other phases (DESIGN §9 order `… 520 → 600 → 400 → 800 → 900 → 100`; 700/510 also open)
 510 I/O Tags (reads the inserted IF_ sheets) · 600 Diagnosis (the unified DiagList + **tristate** to IMPLEMENT;

@@ -108,8 +108,8 @@ class App:
         self.log.append("INFO", "  510 I/O Tags: not ported yet")
 
     def _run_interfaces(self):
-        """Phase 400 (wired through 400c): stage -> 520 -> the interfaces/interface_elements tables ->
-        the IF_*.xlsx projection. insert_interface_sheets (400e) + 510 tags are not ported yet."""
+        """Phase 400 (wired through 400e): stage -> 520 -> the interfaces/interface_elements tables ->
+        the IF_*.xlsx projection -> (gated) insert each as an IF_ sheet into the I/O List. 510 tags TODO."""
         from pipeline4.core import config
         from pipeline4.domain import staging, datablocks, interfaces, interface_xlsx
         self.log.append("PHASE", "400 Interfaces Generation")
@@ -128,7 +128,15 @@ class App:
         n_if, n_el = len(database["interfaces"]), len(database["interface_elements"])
         self.log.append("PASS", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "
                                 f"IF_*.xlsx in {config.interfaces_dir()}")
-        self.log.append("INFO", "  insert_interface_sheets (400e) + 510 I/O Tags: not ported yet")
+        params = config.load_params()
+        if config.get_param(params, "iolist_params.insert_interface_sheets", False):
+            self.status.configure(text="inserting IF_ sheets…")
+            self.root.update_idletasks()
+            for action in interface_xlsx.insert_interface_sheets(database, iolist_path=params.get("iolist_path")):
+                self.log.append("WARN" if action.startswith("[WARN]") else "INFO", f"  {action}")
+        else:
+            self.log.append("INFO", "  insert_interface_sheets: disabled (iolist_params.insert_interface_sheets)")
+        self.log.append("INFO", "  510 I/O Tags: not ported yet")
 
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"
