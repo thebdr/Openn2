@@ -82,6 +82,11 @@ def diagnosis_dir() -> str:
     return os.path.join(config_project_dir(), "diagnosis")
 
 
+def datablocks_dir() -> str:
+    """The phase-520 data-block registry CSVs (datablock_definitions/_elements/_types)."""
+    return os.path.join(config_project_dir(), "datablocks")
+
+
 def user_input_dir() -> str:
     return os.path.join(_PROJECT_ROOT, "user_input") if _PROJECT_ROOT else USER_INPUT
 
@@ -443,8 +448,8 @@ def load_db_definitions(base: str | None = None) -> list:
     (DB|F_DB), instance_of (FB, for Instance), for_each (iteration DSL), memory_layout (Optimized|Standard),
     opc_ua/webserver/only_load_memory/write_protected/retain_reserve (bool), memory_reserve, create_when
     (always|if_elements|never), comment. Missing file -> []."""
-    path = os.path.join(base or input_docs_dir(), "datablock_definitions.csv")
-    if not os.path.exists(path):
+    base = base or datablocks_dir()
+    if not os.path.exists(os.path.join(base, "datablock_definitions.csv")):
         return []
     out = []
     for r in _read_csv("datablock_definitions.csv", base):
@@ -475,8 +480,8 @@ def load_db_elements(base: str | None = None) -> list:
     """The Global-DB members (phase 520). Columns: db_name, member (PEP-3101 template), for_each (iteration
     DSL), datatype, start_value, retain (bool), ext_accessible/ext_visible/ext_writable (bool), setpoint
     (bool), comment. Missing file -> []."""
-    path = os.path.join(base or input_docs_dir(), "datablock_elements.csv")
-    if not os.path.exists(path):
+    base = base or datablocks_dir()
+    if not os.path.exists(os.path.join(base, "datablock_elements.csv")):
         return []
     out = []
     for r in _read_csv("datablock_elements.csv", base):
@@ -501,8 +506,8 @@ def load_db_elements(base: str | None = None) -> list:
 def load_db_types(base: str | None = None) -> list:
     """The valid member data types (phase 520 validation). Columns: name, kind (Elementary|UDT), comment.
     Missing file -> []."""
-    path = os.path.join(base or input_docs_dir(), "datablock_types.csv")
-    if not os.path.exists(path):
+    base = base or datablocks_dir()
+    if not os.path.exists(os.path.join(base, "datablock_types.csv")):
         return []
     out = []
     for r in _read_csv("datablock_types.csv", base):

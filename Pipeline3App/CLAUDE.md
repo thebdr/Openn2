@@ -361,7 +361,7 @@ phase 400 to have inserted the `IF_` sheets (absent ⇒ I/O-only, degrades grace
   `if_elements` drops a DB with no REAL member (seeds alone don't count — `_nseed`). Duplicates dropped
   (kept once) + warned. NOTE: `datablock_elements_rules.csv` still exists — it is now ONLY phase 400's
   interface-mirroring follower source (`interfaces.py`), no longer a 520 input.
-- **Config-driven DBs** (`domain/datablocks.py` + `domain/dbtemplate.py`; three CSVs in `input_docs/`):
+- **Config-driven DBs** (`domain/datablocks.py` + `domain/dbtemplate.py`; three CSVs in `config_project/datablocks/`):
   a centralized, validate-and-halt registry that creates DBs (and their FB instance families) from
   IODatabase data — the 8 migrated DBs **plus** new ones like **`DiagnosticTags`** (per-cabinet `UDInt`
   members + a `CabState`/`BoolToUDInt…` instance per member, named to match the 620 SCL's

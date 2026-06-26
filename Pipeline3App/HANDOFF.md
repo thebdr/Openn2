@@ -30,7 +30,7 @@ logic-rule column. The single database is the staged ctx.rows / IODatabase.csv.
 RECENT REFINEMENTS (this batch — data-independent gate green; RE-STAGE 300->500 + RE-FREEZE the golden
 after reviewing the 130/150 report changes in the GUI):
   - DATA BLOCKS — CENTRALIZED REGISTRY (520): EVERY DB is a SW.Blocks.GlobalDB XML declared in the
-    config-driven registry (config_project/input_docs/datablock_definitions.csv + datablock_elements.csv +
+    config-driven registry (config_project/datablocks/datablock_definitions.csv + datablock_elements.csv +
     datablock_types.csv via pipeline3/domain/datablocks.py + dbtemplate.py). <ProgrammingLanguage> =
     db_programming_language verbatim (`DB`/`F_DB`); <DBAccessibleFromOPCUA> = false for F_DB else true (the 6
     F_DB DBs set opc_ua=false in CSV1). The legacy signals.build_data_blocks + the datablock_elements_rules
