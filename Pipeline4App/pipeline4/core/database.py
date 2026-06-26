@@ -30,6 +30,14 @@ class Database:
     def table(self, name) -> Table:
         return self._tables[name]
 
+    def add_table(self, table) -> Table:
+        """Register a table a phase built (e.g. 520's `db_members` / `instance_dbs`) so `save` writes it
+        and later phases read it. Raises on a duplicate name (use `table(name).rows = ...` to refill)."""
+        if table.name in self._tables:
+            raise ValueError(f"duplicate table name {table.name!r}")
+        self._tables[table.name] = table
+        return table
+
     def __getitem__(self, name) -> Table:
         return self._tables[name]
 

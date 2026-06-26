@@ -50,9 +50,9 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
     io/    workbook.py
-    domain/ signals.py · identity.py · matrix.py · staging.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
-  tests/unit/  (plain-python, _harness.py — 44 tests, the green gate)
+  tests/unit/  (plain-python, _harness.py — 72 tests, the green gate)
 ```
 
 ## The spine (`core/`)
@@ -103,8 +103,34 @@ one workbook reader (by column position per `column_map`), drops Skip-Reason + s
 - **Direct fields DONE**: the positional node address ranges (`_add_node_address_ranges`: a node owns the rows
   beneath it in I/O-List order until the next node / sheet end → `I_/Q_startByte/endByte`) and `IsSorterArea`
   (`matrix_params.sorter_areas: [1]` number → `"AREA 1"` name → intersect the `matrix_areas` list cell).
-- **Still pending**: `subnet_name` (from `profinet_ip`); the **registry-derived `name_in_db`/`datablocks`/
-  `plc_binding`** come with the 520 port (the registry generates `db_members`; `name_in_db` derives from it).
+- **Still pending**: `subnet_name` (from `profinet_ip`). The registry-derived `name_in_db`/`datablocks`/
+  `plc_binding` are now WRITTEN BACK by phase 520 (below), not at staging.
+
+## Phase 520 — Data Blocks — 520a + 520b DONE (520c projection TODO)
+`domain/dbtemplate.py` + `domain/datablocks.py` + `domain/db_members.py`. The **SSOT model**: one registry
+evaluator (`datablocks.generate`) over the **signals** table → two tables (`db_members` every Global-DB
+member; `instance_dbs` the FB instance families) → (520c) projected to `<DB>.xml` + `InstanceDBs.csv`. The
+**3 registry-derived signal fields** (`name_in_db`/`datablocks`/`plc_binding`) are **written back** onto the
+signals (decision: write-back after 520, the single evaluator — no drift; DESIGN §9 orders 520 before its
+consumers 400/600).
+- **`dbtemplate.py`** (520a) — faithful port of PL3's `render` (PEP-3101 + numeric coercion) + the `for_each`
+  DSL (`row where P` / `<var> in unique(col) where P`; predicates `numeric()/=/!=/~/in[…]` + `and/or/not/()`).
+- **`datablocks.generate`** (520b) — port of PL3's validate-and-halt generator: seeds (`Always FALSE/TRUE`/
+  `No Operation`), the `if_elements` seed-only-drop, **F_DB OPC-lock** + `f_db`→`F_DB`, dedup, instance
+  families. PL4 additions per member: `source` (the producing signal `uid` / a `unique` bound value / `seed`),
+  + `source_row`/`seq` bookkeeping the write-back uses.
+- **`write_back`** — denormalizes membership onto each signal: `datablocks` (ordered DBs, element-row order),
+  `name_in_db` (its member in the LEFTMOST DB = earliest matching element row), `plc_binding`
+  (`"<leftmost db>"."<name_in_db>"`, else the tag, else ''). Only `row`-kind members attribute (not seeds /
+  `unique` aggregates).
+- **Parity (real data)**: vs PL3 IODatabase — **0 mismatches** on `name_in_db`/`datablocks`/`plc_binding`
+  across 269 signals; `db_members` **member SETS identical** to PL3's 5 reference GlobalDB XMLs (order is
+  grouped-by-type vs PL3's interleaved row-order — accepted/functional, set-equal). The 4 DBs `DiagnosticTags`/
+  `00_Commissioning`/`PROFINET_NODES_*` aren't in the frozen ImportReady (it predates them); the IODatabase
+  write-back parity covers their PA/PW signals.
+- **TODO 520c**: the `_db_xml` GlobalDB projector (`db_members` grouped by `db_name` → `<DB>.xml`, BOM/CRLF,
+  per-member byte-stable) + `instance_dbs` → `InstanceDBs.csv` + the GUI 520 button. OPEN: where the per-DB
+  attributes (prog_lang/opc/memory) live for the projector (read the registry, or a small `db_blocks` table).
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button

@@ -252,3 +252,84 @@ def resolve_type(types: dict, raw_type) -> dict | None:
         if rest and rest.isdigit():
             return record
     return None
+
+
+# --- phase-520 data-block registry CSVs (datablocks/) -------------------------------------------- #
+def datablocks_dir() -> str:
+    """The phase-520 data-block registry CSVs (datablock_definitions / _elements / _types)."""
+    return os.path.join(config_project_dir(), "datablocks")
+
+
+def _bool_default(value, default: bool) -> bool:
+    """`_as_bool`, but a BLANK cell falls back to `default` (the DB-config bool columns; PL3's `_b`).
+    PL4's `_as_bool` reads a blank as False, so the DB loaders need this to honor a column's real default."""
+    text = str(value if value is not None else "").strip()
+    return _as_bool(text) if text else default
+
+
+def load_db_definitions() -> list:
+    """The AUTHORITATIVE DB registry (phase 520): every data block, Global or an Instance family. Columns:
+    db_name (literal, or a PEP-3101 template for a family), db_type (Global|Instance), db_programming_language
+    (DB|F_DB), instance_of (the FB, for an Instance), for_each (the iteration DSL), memory_layout
+    (Optimized|Standard), opc_ua/webserver/only_load_memory/write_protected/retain_reserve (bool),
+    memory_reserve, seed (bool), create_when (always|if_elements|never), comment. Missing file -> []."""
+    out = []
+    for r in read_config_csv(os.path.join(datablocks_dir(), "datablock_definitions.csv")):
+        if not (r.get("db_name") or "").strip():
+            continue
+        pl = (r.get("db_programming_language") or "DB").strip() or "DB"
+        out.append({
+            "db_name": (r.get("db_name") or "").strip(),
+            "db_type": (r.get("db_type") or "Global").strip() or "Global",
+            "db_programming_language": pl,
+            "instance_of": (r.get("instance_of") or "").strip(),
+            "for_each": (r.get("for_each") or "").strip(),
+            "memory_layout": (r.get("memory_layout") or "Optimized").strip() or "Optimized",
+            "opc_ua": _bool_default(r.get("opc_ua"), pl.upper() != "F_DB"),  # blank defaults OFF for a fail-safe DB
+            "webserver": _bool_default(r.get("webserver"), True),
+            "only_load_memory": _bool_default(r.get("only_load_memory"), False),
+            "write_protected": _bool_default(r.get("write_protected"), False),
+            "retain_reserve": _bool_default(r.get("retain_reserve"), False),
+            "memory_reserve": (r.get("memory_reserve") or "").strip(),
+            "seed": _bool_default(r.get("seed"), False),
+            "create_when": (r.get("create_when") or "if_elements").strip().lower() or "if_elements",
+            "comment": (r.get("comment") or "").strip(),
+        })
+    return out
+
+
+def load_db_elements() -> list:
+    """The Global-DB members (phase 520). Columns: db_name, member (PEP-3101 template), for_each (the
+    iteration DSL), datatype, start_value, retain (bool), ext_accessible/ext_visible/ext_writable (bool),
+    setpoint (bool), comment. Missing file -> []."""
+    out = []
+    for r in read_config_csv(os.path.join(datablocks_dir(), "datablock_elements.csv")):
+        if not (r.get("db_name") or "").strip():
+            continue
+        out.append({
+            "db_name": (r.get("db_name") or "").strip(),
+            "member": (r.get("member") or "").strip(),
+            "for_each": (r.get("for_each") or "").strip(),
+            "datatype": (r.get("datatype") or "").strip() or "Bool",
+            "start_value": (r.get("start_value") or "").strip(),
+            "retain": _bool_default(r.get("retain"), False),
+            "ext_accessible": _bool_default(r.get("ext_accessible"), True),
+            "ext_visible": _bool_default(r.get("ext_visible"), True),
+            "ext_writable": _bool_default(r.get("ext_writable"), True),
+            "setpoint": _bool_default(r.get("setpoint"), False),
+            "comment": (r.get("comment") or "").strip(),
+        })
+    return out
+
+
+def load_db_types() -> list:
+    """The valid member data types (phase 520 validation). Columns: name, kind (Elementary|UDT), comment.
+    Missing file -> []."""
+    out = []
+    for r in read_config_csv(os.path.join(datablocks_dir(), "datablock_types.csv")):
+        if not (r.get("name") or "").strip():
+            continue
+        out.append({"name": (r.get("name") or "").strip(),
+                    "kind": (r.get("kind") or "Elementary").strip() or "Elementary",
+                    "comment": (r.get("comment") or "").strip()})
+    return out
