@@ -97,11 +97,14 @@ one workbook reader (by column position per `column_map`), drops Skip-Reason + s
 (`iol_FLD`/`ce_FLD`/`combined_FLD`, `name_in_tagtable`/`tagtable`), builds the **`signals` table** (content-hash
 `uid` = `combined_FLD`+`script_type`+`source_cell`), and saves the Database. The GUI's **"300" button runs it**.
 - **Parity achieved**: the real I/O List stages to **269 signals == PL3's IODatabase**, **0 duplicate uids**,
-  and **0 mismatches** vs PL3 on `matrix_areas`, `combined_FLD`, `ce_functional_unit` (matched by `source_cell`).
+  and **0 mismatches** vs PL3 on `matrix_areas`, `combined_FLD`, `ce_functional_unit`, `IsSorterArea`, and the
+  positional node ranges `I_/Q_startByte/endByte` (matched by `source_cell`).
 - **Identity reads the `type` cell** (PL4 persists the resolved type as an object; PL3 used the ephemeral `_type`).
-- **TODO to finish staging**: node address ranges (positional I/Q byte ranges); `IsSorterArea` (needs the
-  `sorter_areas: [1]` number→area-name match). The **registry-derived `name_in_db`/`datablocks`/`plc_binding`**
-  come with the 520 port (the registry generates `db_members`; `name_in_db` derives from it).
+- **Direct fields DONE**: the positional node address ranges (`_add_node_address_ranges`: a node owns the rows
+  beneath it in I/O-List order until the next node / sheet end → `I_/Q_startByte/endByte`) and `IsSorterArea`
+  (`matrix_params.sorter_areas: [1]` number → `"AREA 1"` name → intersect the `matrix_areas` list cell).
+- **Still pending**: `subnet_name` (from `profinet_ip`); the **registry-derived `name_in_db`/`datablocks`/
+  `plc_binding`** come with the 520 port (the registry generates `db_members`; `name_in_db` derives from it).
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button

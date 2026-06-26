@@ -69,6 +69,43 @@ def test_read_view_keeps_struck_when_not_excluding():
         v.close()
 
 
+def test_is_sorter_area_number_to_name():
+    names = staging._sorter_area_names({"matrix_params": {"sorter_areas": [1]}})
+    eq(names, {"AREA 1"}, "sorter number 1 -> area name 'AREA 1'")
+    eq(staging._is_sorter_area({"matrix_areas": ["AREA 1"]}, names), "yes", "matches its sorter area")
+    eq(staging._is_sorter_area({"matrix_areas": ["AREA 2", "AREA 1"]}, names), "yes", "yes when ANY area is a sorter")
+    eq(staging._is_sorter_area({"matrix_areas": ["AREA 3"]}, names), "", "a non-sorter area -> ''")
+    eq(staging._is_sorter_area({"matrix_areas": []}, names), "", "no areas -> ''")
+    eq(staging._is_sorter_area({}, names), "", "missing matrix_areas -> ''")
+    eq(staging._sorter_area_names({}), set(), "no sorter_areas configured -> no names")
+
+
+def test_node_address_ranges_positional():
+    rows = [
+        {"source_sheet": "S1", "profinet_name": "n1", "bit": ""},      # node head (owns no address of its own)
+        {"source_sheet": "S1", "bit": "I0.0"},
+        {"source_sheet": "S1", "bit": "I20.7"},
+        {"source_sheet": "S1", "bit": "Q0.0"},
+        {"source_sheet": "S1", "profinet_name": "n2", "bit": "Q5.0"},  # next head opens a new span + owns its own Q5
+        {"source_sheet": "S1", "bit": "I8.1"},
+        {"source_sheet": "S2", "bit": "I3.0"},                          # past the sheet boundary -> owned by no node
+    ]
+    staging._add_node_address_ranges(rows)
+    eq((rows[0]["I_startByte"], rows[0]["I_endByte"]), (0, 20), "n1 I range = min/max byte beneath it")
+    eq((rows[0]["Q_startByte"], rows[0]["Q_endByte"]), (0, 0), "n1 owns the Q0 row in its span too")
+    eq((rows[4]["I_startByte"], rows[4]["I_endByte"]), (8, 8), "n2 owns the I8 row beneath it on the same sheet")
+    eq((rows[4]["Q_startByte"], rows[4]["Q_endByte"]), (5, 5), "n2 owns its own Q5 bit")
+    eq(rows[1]["I_startByte"], "", "a non-node row NEVER carries a range")
+    eq(rows[6]["I_startByte"], "", "the sheet boundary ends n2's span -> the S2 row is unowned")
+
+
+def test_node_address_range_empty_when_no_addressed_rows():
+    rows = [{"source_sheet": "S", "profinet_name": "n", "bit": ""}]
+    staging._add_node_address_ranges(rows)
+    eq(rows[0]["I_startByte"], "", "a node owning no addressed row -> empty range (like PL3's 7 empty nodes)")
+    eq(rows[0]["Q_endByte"], "")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("staging", [
@@ -76,4 +113,7 @@ if __name__ == "__main__":
         ("combined_fld_appends_ce_when_different", test_combined_fld_appends_ce_when_different),
         ("read_view_drops_skip_and_struck", test_read_view_drops_skip_and_struck),
         ("read_view_keeps_struck_when_not_excluding", test_read_view_keeps_struck_when_not_excluding),
+        ("is_sorter_area_number_to_name", test_is_sorter_area_number_to_name),
+        ("node_address_ranges_positional", test_node_address_ranges_positional),
+        ("node_address_range_empty_when_no_addressed_rows", test_node_address_range_empty_when_no_addressed_rows),
     ]))
