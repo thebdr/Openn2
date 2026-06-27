@@ -22,6 +22,8 @@ else:
 SHARED = os.path.normpath(os.path.join(APP_ROOT, os.pardir, "Shared"))
 TEMPLATES_DIR = os.path.join(SHARED, "Templates")
 INTERFACE_TEMPLATE = os.path.join(TEMPLATES_DIR, "MachineInterfaces", "TEMPLATE_INTERFACES_v0.0.xlsx")
+DIAG_SCL_TEMPLATE = os.path.join(TEMPLATES_DIR, "Tia Portal Software Blocks",
+                                 "TEMPLATE--v1.0--06_Diagnostic for OPC.scl")
 _BUILTIN_CONFIG_PROJECT = os.path.join(APP_ROOT, "config_project")
 _BUILTIN_DATABASE = os.path.join(SHARED, "Database")        # the SSOT folder (DESIGN 10.3)
 _BUILTIN_OUTPUT = os.path.join(SHARED, "OutputTree")        # the OPn BuilderData export surface

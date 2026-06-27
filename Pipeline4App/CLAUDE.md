@@ -50,7 +50,7 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
     io/    workbook.py · xlsx_edit.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -238,7 +238,7 @@ sort+distinct-props, the skip+warn, the return contract).
   **+DIAG auto-mirror** tags on SORTER+DIAG-02 (the deferred `in_diag`/ph600 feature). Both are captured together at
   ph600 (pull the template-native rows + the `in_diag` set into `interface_elements`) — see the Phase 400 follow-up.
 
-## Phase 600 — Diagnosis — IN PROGRESS (600a + 600b + 600c done; 600d TODO)
+## Phase 600 — Diagnosis — DONE (600a + 600b + 600c + 600d)
 `domain/diagnosis_entries.py` (the table defs) + the per-type config relocation + the staging prereqs. The plan
 (from the 600 understand pass): a UNIFIED `diagnosis_entries` table (`source` = io|logic) → projected to
 `DiagList_IO.csv` + `DiagList_Logic.csv` (600c) + the OPC SCL (600d), with a parent `diagnosis_cabinets` table.
@@ -276,9 +276,19 @@ sort+distinct-props, the skip+warn, the return contract).
   520 build -> diagnosis.build -> diaglist_csv.project. **Parity (real data, scratch)**: both files are **FULL-ROW
   IDENTICAL** to the reference (DiagList_IO 73/73 + DiagList_Logic 6/6, 0 PL4-only / 0 ref-only; header match, CRLF,
   no BOM). Tests: `test_diagnosis.py` (+2: the two-file projection + the CRLF/no-BOM format). 13 total in the suite.
-- **600d TODO**: the OPC SCL projection (`diagnosis_scl`: FUNCTION/REGION/CabState/BoolToUDInt, the 01-04 variants +
-  **tristate** [the new per-type `type.tristate` flag], BOM/CRLF + FUNCTION rename) + wire it into the "600" button.
-  Then re-verify 510 PLCTags after the +DIAG unblock + add the template-native capture.
+- **600d DONE - the OPC SCL** (`domain/diagnosis_scl.py` `project()`): port of PL3's SCL section reading the
+  `diagnosis_entries` (channel values already stored) + `diagnosis_cabinets` (`template_type` -> the 01-04 variant).
+  `render_scl` parses the `06_Diagnostic for OPC.scl` template (`config.DIAG_SCL_TEMPLATE`) and emits one FUNCTION,
+  one REGION per cabinet (CabState + one BoolToUDInt per packed DWord: bit 0-31->DW1/32-63->DW2, ch = bit%32). UTF-8
+  BOM + CRLF; the FUNCTION is renamed (drop `TEMPLATE--vX.Y--`); output `config.blocks_import_dir()`. **TRISTATE
+  (user's decision): a cabinet is tristate when `template_type` in {2,4} OR it contains a signal whose type has
+  `tristate=yes`** (the per-type flag, an additional trigger; when it forces tristate on an odd template_type the
+  tail uses the tristate-counterpart variant 1->2/3->4). The GUI **"600" button** now runs 610 + 620. **Parity (real
+  data)**: the SCL is **BYTE-IDENTICAL to the reference** (22752 bytes, 438 lines, 1.0000 similarity, 0 diff lines;
+  32 REGIONs, 7 Tristate_DW). Tests: `test_diagnosis.py` (+4: render_scl variants/rename, the per-type tristate
+  trigger, the BOM/CRLF write, the synthetic-template project). 17 total in the suite.
+- **Still open (the interface-completeness follow-up)**: re-verify 510 PLCTags after the +DIAG unblock + add the
+  template-native capture (see the Phase 400 section). Then 700/800/900/100.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
@@ -290,10 +300,10 @@ later.)
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **128**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **132**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
 interface_xlsx (incl. the 400e insertion/seed/freeze), the **`io/xlsx_edit` suite** (14, ported verbatim),
-the **510 `io_tags` suite** (8), and the **600a/b/c `diagnosis` suite** (13)). Data-dependent parity (staging vs
+the **510 `io_tags` suite** (8), and the **600 `diagnosis` suite** (17)). Data-dependent parity (staging vs
 PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
 gate + parity green.
 

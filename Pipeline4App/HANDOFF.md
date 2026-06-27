@@ -11,13 +11,14 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **Phases 400 + 510 COMPLETE; 600a/b/c done** (300 + 520(a/b/c) + 400a–e + 510 + 600a/b/c).
-  **`origin/pl4` is up to date through `256aefe` (600b) — PUSHED. 600c is implemented but UNCOMMITTED** (working tree).
-- **Gate: 128 tests green** (data-independent, was 126 + 2 more in `test_diagnosis.py`). Run
+- **Branch `pl4`**. **Phases 400 + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–e + 510 + 600a/b/c/d).
+  **`origin/pl4` is at `256aefe` (600b) — PUSHED. `93a63f7` (600c) is committed locally; 600d is implemented but
+  UNCOMMITTED** (in this working tree, with these doc updates). Push when the user asks.
+- **Gate: 132 tests green** (data-independent, was 128 + 4 more in `test_diagnosis.py`). Run
   from `Pipeline4App/`: `for t in tests/unit/test_*.py; do python "$t"; done`
-- **600c landed** (`domain/diaglist_csv.py` `project()` → `DiagList_IO.csv` + `DiagList_Logic.csv`, filter
-  `diagnosis_entries` by `source`, comma/CRLF/no-BOM; `config.diaglist_dir()`; GUI "600" runs it). Parity: both files
-  **FULL-ROW IDENTICAL** to the reference (73/73 + 6/6, 0 PL4-only/0 ref-only). **Resume at 600d** (the OPC SCL) below.
+- **600d landed** (`domain/diagnosis_scl.py` → `Diagnostic_for_OPC.scl`; tristate = `template_type` in {2,4} OR a
+  per-type `tristate` signal; GUI "600" runs 610 + 620). Parity: the SCL is **BYTE-IDENTICAL to the reference**
+  (22752 bytes, 438 lines, 0 diff). **Resume at the interface-completeness follow-up / 700** below.
 - The SSOT **`Database/`** now holds **7 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
   `instance_dbs` (520) · `interfaces`/`interface_elements` (400b, +`io_address_side1`). Saves to `Shared/Database/`.
 
@@ -34,7 +35,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 9. `d558f45` **510** — `domain/io_tags.py` PLCTags.xlsx + `io_address_side1` stored on interface_elements at 400
 10. `599c14a` **600a** — `signal_diagnosis.csv` + staging diag fields + `diagnosis_cabinets` + the interp `:03d` fix
 11. `256aefe` **600b** — `domain/diagnosis.py` `build()` → the unified `diagnosis_entries` (io + logic)  [PUSHED head]
-12. (UNCOMMITTED) **600c** — `domain/diaglist_csv.py` → DiagList_IO.csv + DiagList_Logic.csv + GUI "600"
+12. `93a63f7` **600c** — `domain/diaglist_csv.py` → DiagList_IO.csv + DiagList_Logic.csv + GUI "600"
+13. (UNCOMMITTED) **600d** — `domain/diagnosis_scl.py` → Diagnostic_for_OPC.scl (byte-identical to the ref)
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -70,19 +72,18 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `diag_columns` snapshot → `DiagList_IO.csv` + `DiagList_Logic.csv` (comma, CRLF, no BOM; `config.diaglist_dir()`).
   GUI "600" runs stage → 520 → diagnosis.build → diaglist_csv.project. Parity: both files **FULL-ROW IDENTICAL** to
   the reference (73/73 + 6/6, 0 PL4-only / 0 ref-only; header + CRLF + no-BOM match).
+- **Phase 600d — DONE.** `domain/diagnosis_scl.py` `project()` -> `Diagnostic_for_OPC.scl` from `diagnosis_entries`
+  (stored channel values) + `diagnosis_cabinets` (`template_type` -> the 01-04 variant). **Tristate = `template_type`
+  in {2,4} OR a per-type `tristate` signal** (the user's flag; forcing it on an odd template_type uses the
+  tristate-counterpart variant 1->2/3->4). UTF-8 BOM + CRLF + FUNCTION rename; GUI "600" runs 610 + 620. Parity: the
+  SCL is **BYTE-IDENTICAL to the reference** (22752 bytes, 438 lines, 1.0000 similarity, 0 diff lines).
 
 ## What's NEXT (in order)
-1. **600d — the OPC SCL** (`domain/diagnosis_scl.py`): port PL3 `diagnosis.py:240-363` reading `diagnosis_entries`
-   (the channel values are already stored) + `diagnosis_cabinets` (`template_type` -> the 01-04 variant). Fill the
-   `06_Diagnostic for OPC.scl` template: one FUNCTION, one REGION per cabinet, a CabState call + one BoolToUDInt per
-   packed DWord (ALARM1/2, WARNING1/2; bit 0-31->DW1, 32-63->DW2, ch = bit%32); **tristate** (variants 02/04 pair an
-   alarm DWord with its warning DWord) — wire the new per-type `type.tristate` flag in here; UTF-8 BOM + CRLF +
-   FUNCTION rename (drop `TEMPLATE--vX.Y--`); output `config.blocks_import_dir()`. Wire into the GUI "600" button.
-2. **Interface-completeness (a) — template-native signals (still TODO)**: `build_interfaces` should ALSO pull the
+1. **Interface-completeness (a) — template-native signals (still TODO)**: `build_interfaces` should ALSO pull the
    MachineInterfaces template's shipped per-type interface rows (the SORTER sheet's 7: HEARTBEAT / POWER ENABLED /
    EMERGENCY RESET / SORTER- RUNNING / …, `<index>` resolved) into `interface_elements` (`source="template"`) — closes
    the −7-per-instance PLCTags gap. (Item (b) `+DIAG` is DONE via 600a.) Then re-verify 510 PLCTags vs the reference.
-3. Then the remaining phases (DESIGN §9): **700 Hardware** · **800 Software** · **900 Coverage** · **100 Validation**.
+2. Then the remaining phases (DESIGN §9): **700 Hardware** · **800 Software** · **900 Coverage** · **100 Validation**.
 
 ## Then the other phases (DESIGN §9 order `… 520 → 600 → 400 → 800 → 900 → 100`; 700 also open)
 600 Diagnosis (above) · 700 Hardware (Stations/Modules) · 800 Software (8 builders + `InstanceDBs.csv` + `02_COM`) ·

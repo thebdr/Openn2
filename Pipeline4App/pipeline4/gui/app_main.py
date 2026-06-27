@@ -151,11 +151,11 @@ class App:
             self.log.append("INFO", "  insert_interface_sheets: disabled (iolist_params.insert_interface_sheets)")
 
     def _run_diagnosis(self):
-        """Phase 600 (wired through 600c): stage -> 520 build (plc_binding) -> diagnosis.build (the unified
-        diagnosis_entries table) -> project DiagList_IO.csv + DiagList_Logic.csv. 620 OPC SCL TODO (600d)."""
+        """Phase 600 (wired): stage -> 520 build (plc_binding) -> diagnosis.build (the unified
+        diagnosis_entries table) -> 610 project DiagList_IO/Logic.csv -> 620 project the OPC SCL."""
         from pipeline4.core import config
-        from pipeline4.domain import staging, datablocks, diagnosis, diaglist_csv
-        self.log.append("PHASE", "600 Diagnosis Mapping  (610 DiagList)")
+        from pipeline4.domain import staging, datablocks, diagnosis, diaglist_csv, diagnosis_scl
+        self.log.append("PHASE", "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL)")
         self.status.configure(text="diagnosis…")
         self.root.update_idletasks()
         database = staging.stage()
@@ -172,9 +172,14 @@ class App:
                 self.log.append("FAIL", f"  600 halted: {e}")
             return
         res = diaglist_csv.project(database)
-        self.log.append("PASS", f"  DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> "
+        self.log.append("PASS", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> "
                                 f"{config.diaglist_dir()}")
-        self.log.append("INFO", "  620 OPC SCL: not ported yet (600d)")
+        scl = diagnosis_scl.project(database)
+        for w in scl["warnings"]:
+            self.log.append("WARN", f"  {w}")
+        if scl["path"]:
+            self.log.append("PASS", f"  620 OPC SCL: {scl['entries']} entries across {scl['cabinets']} "
+                                    f"cabinets -> {scl['path']}")
 
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"

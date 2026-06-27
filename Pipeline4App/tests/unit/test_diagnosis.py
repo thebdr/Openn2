@@ -240,6 +240,91 @@ def test_diaglist_crlf_no_bom():
         ok(raw[:3] != b"\xef\xbb\xbf", "no BOM")
 
 
+# =================================================================================================== #
+# Phase 600d - the OPC SCL projection (render_scl + tristate from template_type OR a per-type signal)
+# =================================================================================================== #
+from pipeline4.domain import diagnosis_scl
+
+_SCL_TEMPLATE = (
+    'FUNCTION "TEMPLATE--v1.0--06_Diagnostic for OPC" : Void\n'
+    "BEGIN\n"
+    "\tREGION !!NetworkComment$$\n"
+    '\t    "!!instanceOf-CabState$$"(STATE := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.STATE");\n'
+    "\t    // #Template 01 : NoTristate\n"
+    '\t    "!!instanceOf-BoolToUDInt$$"(IN_00 := false,\n'
+    "\t                                ML_00 := TRUE,\n"
+    "\t                                FL_00 := false,\n"
+    '\t                                Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.!!Alarm_Warning_DW$$");\n'
+    "\t    // #Template End\n"
+    "\t    // #Template 02 : Tristate\n"
+    '\t    "!!instanceOf-BoolToUDInt$$"(IN_00 := false,\n'
+    "\t                                ML_00 := TRUE,\n"
+    "\t                                FL_00 := false,\n"
+    '\t                                Alarm_DW := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.!!Alarm_DW$$",\n'
+    '\t                                Tristate_DW := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.!!Warning_DW$$");\n'
+    "\t    // #Template End\n"
+    "\tEND_REGION\n"
+    "END_FUNCTION\n"
+)
+
+
+def _entry(cabinet, bit, is_warning, in_="x", ml="TRUE", fl="false"):
+    return {"cabinet": cabinet, "bit": bit, "is_warning": is_warning, "in": in_, "ml": ml, "fl": fl}
+
+
+def test_render_scl_variants_and_rename():
+    blocks = {1: {"index": "001", "template_type": "1", "fld": "=S1+C1"},
+              2: {"index": "002", "template_type": "2", "fld": "=S1+C2"}}
+    entries = [_entry(1, 0, False, in_='"DB"."a1"'),                 # cab1 tt=1 -> non-tristate
+               _entry(2, 0, False, in_='"DB"."a2"'), _entry(2, 0, True, in_='"DB"."w2"')]  # cab2 tt=2 -> tristate
+    out = diagnosis_scl.render_scl(blocks, entries, _SCL_TEMPLATE)
+    ok('FUNCTION "06_Diagnostic for OPC"' in out, "FUNCTION renamed (TEMPLATE--vX.Y-- dropped)")
+    ok("REGION =S1+C1" in out and "REGION =S1+C2" in out, "one REGION per cabinet, NetworkComment = fld")
+    ok('"S1.CABINET001.STATE"' in out, "the CabState instance per cabinet")
+    ok('IN_00 := "DB"."a1"' in out, "the channel IN binding is plugged")
+    # cab1 non-tristate: an Alarm_Warning_DW call, no Tristate_DW
+    ok("S1.CABINET001.ALARM1" in out and "CABINET001" in out, "cab1 alarm DWord")
+    c1 = out[out.index("REGION =S1+C1"):out.index("REGION =S1+C2")]
+    ok("Tristate_DW" not in c1, "cab1 (tt=1) is NOT tristate")
+    # cab2 tristate: alarm paired with warning (Tristate_DW present)
+    c2 = out[out.index("REGION =S1+C2"):]
+    ok("Tristate_DW" in c2 and "S1.CABINET002.WARNING1" in c2, "cab2 (tt=2) pairs alarm+warning (tristate)")
+
+
+def test_render_scl_per_type_tristate_trigger():
+    blocks = {1: {"index": "001", "template_type": "1", "fld": "C1"}}    # template_type=1 (non-tristate)
+    entries = [_entry(1, 0, False), _entry(1, 0, True)]
+    plain = diagnosis_scl.render_scl(blocks, entries, _SCL_TEMPLATE)
+    ok("Tristate_DW" not in plain, "tt=1 + no per-type trigger -> non-tristate")
+    triggered = diagnosis_scl.render_scl(blocks, entries, _SCL_TEMPLATE, tristate_cabinets={1})
+    ok("Tristate_DW" in triggered, "the per-type tristate flag forces tristate even on a tt=1 cabinet")
+
+
+def test_scl_project_writes_bom_crlf():
+    db = _built_db()                                          # has diagnosis_entries (cab 1 + cab 2)
+    db["diagnosis_cabinets"].add(cabinet_id=2, index="002", fld="=S1+M1", template_type="2", swp="2")
+    with tempfile.TemporaryDirectory() as d:
+        res = diagnosis_scl.project(db, out_dir=d, template_path=None)  # real template (DIAG_SCL_TEMPLATE)
+        if res["path"] is None:                              # template absent in this checkout -> skip the file asserts
+            ok(res["warnings"], "a missing template degrades to a warning, no crash"); return
+        raw = open(res["path"], "rb").read()
+        ok(raw[:3] == b"\xef\xbb\xbf", "UTF-8 BOM")
+        ok(b"\r\n" in raw, "CRLF")
+        ok(res["entries"] >= 2 and res["cabinets"] >= 1, "entries + cabinets reported")
+
+
+def test_scl_project_synthetic_template():
+    db = _built_db()
+    db["diagnosis_cabinets"].add(cabinet_id=2, index="002", fld="=S1+M1", template_type="2", swp="2")
+    with tempfile.TemporaryDirectory() as d:
+        tpl = os.path.join(d, "scl.scl")
+        open(tpl, "w", encoding="utf-8").write(_SCL_TEMPLATE)
+        res = diagnosis_scl.project(db, out_dir=d, template_path=tpl)
+        text = open(res["path"], encoding="utf-8-sig").read()
+        ok('FUNCTION "06_Diagnostic for OPC"' in text, "rename applied end-to-end")
+        ok("Tristate_DW" in text, "the tt=2 cabinet 2 renders tristate")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("diagnosis", [
@@ -256,4 +341,8 @@ if __name__ == "__main__":
         ("build_unified_io_and_logic", test_build_unified_io_and_logic),
         ("diaglist_project", test_diaglist_project),
         ("diaglist_crlf_no_bom", test_diaglist_crlf_no_bom),
+        ("render_scl_variants_and_rename", test_render_scl_variants_and_rename),
+        ("render_scl_per_type_tristate_trigger", test_render_scl_per_type_tristate_trigger),
+        ("scl_project_writes_bom_crlf", test_scl_project_writes_bom_crlf),
+        ("scl_project_synthetic_template", test_scl_project_synthetic_template),
     ]))
