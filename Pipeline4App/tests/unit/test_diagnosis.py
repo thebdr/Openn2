@@ -99,6 +99,98 @@ def test_load_diagnosis_blocks_absent():
         eq(staging.load_diagnosis_blocks(""), {}, "no path -> {}")
 
 
+# =================================================================================================== #
+# Phase 600b - the builder (io_entries + the OR/per-row logic rules + ml/fl/node -> diagnosis_entries)
+# =================================================================================================== #
+from pipeline4.core.database import Database
+from pipeline4.domain import diagnosis
+from pipeline4.domain.signals import signals_table
+
+
+def test_ml_value():
+    eq(diagnosis.ml_value({"type": {"diag_logic": "mirror"}}), "TRUE", "mirror -> TRUE")
+    eq(diagnosis.ml_value({"type": {"diag_logic": "invert"}}), "FALSE", "invert -> FALSE")
+    eq(diagnosis.ml_value({"type": {}, "normal_condition": "1"}), "FALSE", "blank + a set normal_condition -> FALSE")
+    eq(diagnosis.ml_value({"type": {}, "normal_condition": ""}), "TRUE", "blank + empty -> TRUE")
+
+
+def test_node_of_and_fl_value():
+    node = {"profinet_name": "n10", "profinet_ip": "192.168.50.10", "bit": "I10.0",
+            "I_startByte": 10, "I_endByte": 12, "Q_startByte": "", "Q_endByte": ""}
+    inside = {"bit": "I11.3"}     # byte 11 in [10,12]
+    outside = {"bit": "I20.0"}
+    rows = [node, inside, outside]
+    eq(diagnosis.node_of(rows, inside), node, "an in-range signal resolves to the node")
+    ok(diagnosis.node_of(rows, outside) is None, "out-of-range -> no node")
+    eq(diagnosis.fl_value(rows, inside), '"PROFINET_NODES_ALARM"."n10 192.168.50.10"', "FL = the node alarm")
+    eq(diagnosis.fl_value(rows, node), "false", "a node never self-filters")
+    eq(diagnosis.fl_value(rows, outside), "false", "no node -> false")
+
+
+def _sig(**kw):
+    row = {"type": {}, "type_hw": "", "diag_cabinet": "", "diag_bit": "", "functional_unit": "",
+           "location": "", "device": "", "script_type": "", "plc_binding": ""}
+    row.update(kw)
+    return row
+
+
+def test_resolve_logic_or_next_free_bit_and_cabinet():
+    rules = [{"name": "Enc", "required_types": ["N1/2", "N2/2"], "dev_type": "A",
+              "db_name": "04_SPEED", "member": "M {index}", "diag_desc": ""}]
+    rows = [
+        # an in-diag alarm already at (cabinet 2, bit 0) -> seeds `used`
+        _sig(type={"in_diag": True}, type_hw="A", diag_cabinet="2", diag_bit="0"),
+        _sig(script_type="N1/2", diag_cabinet="2", index="01"),               # numeric cabinet -> 2, next bit 1
+        _sig(script_type="N2/2", functional_unit="=S1", location="+M1", device="-N",  # no cabinet; sibling FLD
+             index="02"),
+        _sig(script_type="DD"),                                               # not in required_types -> no match
+    ]
+    # a sibling sharing the N2/2 row's FLD that DOES carry a numeric cabinet (paired-channel co-location)
+    rows.append(_sig(type={"in_diag": True}, type_hw="A", functional_unit="=S1", location="+M1",
+                     device="-N", diag_cabinet="7", diag_bit="3"))
+    items = diagnosis.resolve_logic(rows, cabinets=[], rules=rules)
+    eq(len(items), 2, "OR fires once per matching N1/2 + N2/2 row; DD no-match")
+    by_st = {it["src"]["script_type"]: it for it in items}
+    eq((by_st["N1/2"]["cabinet"], by_st["N1/2"]["bit"]), (2, 1), "numeric cabinet 2, next free alarm bit (0 taken)")
+    eq(by_st["N2/2"]["cabinet"], 7, "no own cabinet -> the paired-channel sibling's (FLD =S1+M1-N -> 7)")
+    eq(by_st["N1/2"]["binding"], '"04_SPEED"."M 01"', "binding = db.member (member template resolved)")
+
+
+def test_resolve_logic_cabinet_from_blocks():
+    rules = [{"name": "Enc", "required_types": ["N1/2"], "dev_type": "A", "db_name": "04_SPEED",
+              "member": "M", "diag_desc": ""}]
+    rows = [_sig(script_type="N1/2", functional_unit="=S1", location="+Z1", device="-N")]  # no cabinet, no sibling
+    cabinets = [{"cabinet_id": "9", "fld": "=S1+Z1"}]      # FU+LOC matches the DiagnosisBlocks FullName
+    items = diagnosis.resolve_logic(rows, cabinets, rules)
+    eq(len(items), 1)
+    eq(items[0]["cabinet"], 9, "FU+LOC -> the diagnosis_cabinets FLD lookup")
+
+
+def test_build_unified_io_and_logic():
+    cols = signals_table(["functional_unit", "location", "device", "script_type", "bit",
+                          "diag_cabinet", "diag_bit", "type_hw", "index", "desc_l1", "combined_FLD", "iol_FLD"])
+    db = Database([cols, diagnosis_cabinets_table()])
+    db["signals"].add(script_type="A", type={"in_diag": True, "diag_logic": ""}, type_hw="A",
+                      diag_cabinet="1", diag_bit="5", bit="I1.0", desc_l1="ALARM",
+                      plc_binding='"Alarms_Warnings"."x"')
+    db["signals"].add(script_type="N1/2", type={"in_diag": True, "diag_logic": "invert"}, type_hw="N",
+                      diag_cabinet="2", diag_bit="0", index="01", functional_unit="=S1", location="+M1",
+                      combined_FLD="=S1+M1", iol_FLD="=S1+M1", plc_binding='"04_SPEED"."enc"')
+    db, errors, _w = diagnosis.build(db)
+    eq(errors, [])
+    entries = list(db["diagnosis_entries"])
+    io = [e for e in entries if e["source"] == "io"]
+    logic = [e for e in entries if e["source"] == "logic"]
+    eq(len(io), 2, "both in_diag signals -> io entries")
+    eq(len(logic), 1, "the Safety Encoder rule fires on the N1/2 row")
+    le = logic[0]
+    eq((le["rule_name"], int(le["cabinet"]), int(le["bit"])), ("Safety Encoder Failure", 2, 1),
+       "logic entry: cabinet 2 (the N1/2 cabinet), next free alarm bit 1 (0 taken by the io seed)")
+    a_io = next(e for e in io if e["source_signal"] and e["diag_columns"].get("DevType") == "A")
+    eq(a_io["diag_columns"]["Diag Cabinet"], "001", "the :03d format spec padded the Diag Cabinet cell")
+    eq(le["diag_columns"]["Diag Desc"], "SAFETY ENCODER FAILURE =S1+M1", "the rule diag_desc names the logic row")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("diagnosis", [
@@ -108,4 +200,9 @@ if __name__ == "__main__":
         ("table_defs", test_table_defs),
         ("load_diagnosis_blocks", test_load_diagnosis_blocks),
         ("load_diagnosis_blocks_absent", test_load_diagnosis_blocks_absent),
+        ("ml_value", test_ml_value),
+        ("node_of_and_fl_value", test_node_of_and_fl_value),
+        ("resolve_logic_or_next_free_bit_and_cabinet", test_resolve_logic_or_next_free_bit_and_cabinet),
+        ("resolve_logic_cabinet_from_blocks", test_resolve_logic_cabinet_from_blocks),
+        ("build_unified_io_and_logic", test_build_unified_io_and_logic),
     ]))

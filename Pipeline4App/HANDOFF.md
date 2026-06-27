@@ -11,15 +11,14 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **Phases 400 + 510 COMPLETE; 600a done** (300 + 520(a/b/c) + 400a–e + 510 + 600a). **Committed
-  head is `d558f45` (510); everything else this session is UNPUSHED** — push when the user asks. **600a is
-  implemented but UNCOMMITTED** (in the working tree).
-- **Gate: 121 tests green** (data-independent, was 115 + the 6-case `test_diagnosis.py`). Run
+- **Branch `pl4`**. **Phases 400 + 510 COMPLETE; 600a + 600b done** (300 + 520(a/b/c) + 400a–e + 510 + 600a/b).
+  **Committed head is `599c14a` (600a); everything else this session is UNPUSHED** — push when the user asks.
+  **600b is implemented but UNCOMMITTED** (in the working tree).
+- **Gate: 126 tests green** (data-independent, was 121 + 5 more in `test_diagnosis.py`). Run
   from `Pipeline4App/`: `for t in tests/unit/test_*.py; do python "$t"; done`
-- **600a landed** (the diagnosis config relocation → `signal_diagnosis.csv` + the staging foundation: `in_diag`/
-  `diag_logic`/`tristate`/`tristate_desc` onto the `type`, `diag_desc` resolved, the `diagnosis_cabinets` table,
-  the `interp` format-spec fix). It **lit up the 400 +DIAG auto-mirror** (SORTER+DIAG-02: 4 → 83). **Resume at 600b**
-  (the builder) below.
+- **600b landed** (`domain/diagnosis.py` `build()` → the unified `diagnosis_entries` table: `io_entries` + the
+  OR/per-row `resolve_logic` + `ml_value`/`fl_value`/`node_of`). Parity: **DiagList_IO 73/73 + DiagList_Logic 6/6,
+  0 field mismatches** vs the reference (by PLC_Binding). **Resume at 600c** (the DiagList CSV projections) below.
 - The SSOT **`Database/`** now holds **7 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
   `instance_dbs` (520) · `interfaces`/`interface_elements` (400b, +`io_address_side1`). Saves to `Shared/Database/`.
 
@@ -34,7 +33,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 7. `5bc4aca` **400d** — `pipeline4/io/xlsx_edit.py` (the surgical ZIP/regex writer) + the 14-test suite
 8. `8da7046` **400e** — `insert_interface_sheets` (the lossless IF_ insertion + address-cache seed)
 9. `d558f45` **510** — `domain/io_tags.py` PLCTags.xlsx + `io_address_side1` stored on interface_elements at 400
-10. (UNCOMMITTED) **600a** — `signal_diagnosis.csv` + staging diag fields + `diagnosis_cabinets` + the interp `:03d` fix
+10. `599c14a` **600a** — `signal_diagnosis.csv` + staging diag fields + `diagnosis_cabinets` + the interp `:03d` fix
+11. (UNCOMMITTED) **600b** — `domain/diagnosis.py` `build()` → the unified `diagnosis_entries` (io + logic)
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -61,16 +61,18 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   foundation (the type-merge, `diag_desc` resolved, the `diagnosis_cabinets` table, the `interp` `{:03d}` fix). Parity:
   `diag_desc` 0-mismatch/269 vs IODatabase; `diagnosis_cabinets` 0-mismatch vs PL3 `load_diagnostic_blocks`. **It lit
   up the 400 +DIAG auto-mirror** (SORTER+DIAG-02 4 → 83) — so interface-completeness item (b) below is now DONE.
+- **Phase 600b — DONE.** `domain/diagnosis.py` `build()` populates the unified `diagnosis_entries` (io + logic) from
+  `signals` + `diagnosis_cabinets` + `diagnosis_logic_rules` (`io_entries` + the OR/per-row `resolve_logic`; the SCL
+  channel values `in_binding`/`ml_value`/`fl_value`/`node_of`; + the frozen `diag_columns` snapshot). GOTCHA fixed: the
+  logic row's `diag_cabinet`/`diag_bit` are injected as STRINGS (interp's `value or ""` turns the falsy int `0` into
+  `''`). Parity: **DiagList_IO 73/73 + DiagList_Logic 6/6, 0 field mismatches** vs the reference (by PLC_Binding).
 
 ## What's NEXT (in order)
-1. **600b — the builder** (`domain/diagnosis.py` `build()` → `diagnosis_entries`): `io_entries` (the `type.in_diag`
-   signals) + `resolve_logic` (the OR/per-row `diagnosis_logic_rules`: cabinet resolution numeric→sibling→FLD, the
-   next-free-bit per alarm/warning family) + `ml_value`/`fl_value`/`node_of`; store the `diag_columns` snapshot + the
-   SCL channel values on each entry. Gate + parity vs a fresh PL3 `resolve_logic`.
-2. **600c — the two DiagList CSV projections** (`diaglist_csv.project`: filter `diagnosis_entries` by `source`, the 19
-   config columns, the `$PLC_Binding$` sentinel, comma/CRLF). 600d — the **OPC SCL** (`diagnosis_scl`: FUNCTION/REGION/
-   CabState/BoolToUDInt, the 01-04 variants + **tristate**, BOM/CRLF + FUNCTION rename). Wire the GUI "600" button.
-   PARITY NOTE: the frozen DiagList_IO `{diag_cabinet:03d}` padding is the CORRECT oracle — current PL3's bare-token
+1. **600c — the two DiagList CSV projections** (`diaglist_csv.project`: filter `diagnosis_entries` by `source`, write
+   the `diag_columns` snapshot → `DiagList_IO.csv` + `DiagList_Logic.csv`, comma/CRLF; output dir = a new
+   `config` accessor under ProjectDocumentation). 600d — the **OPC SCL** (`diagnosis_scl`: FUNCTION/REGION/CabState/
+   BoolToUDInt, the 01-04 variants + **tristate**, BOM/CRLF + FUNCTION rename) + the GUI "600" button.
+   PARITY NOTE: the frozen DiagList `{diag_cabinet:03d}` padding is the CORRECT oracle — current PL3's bare-token
    `interp` emits the literal `{diag_cabinet:03d}` (PL4 fixes it), so parity those columns vs the padded reference.
 3. **Interface-completeness (a) — template-native signals (still TODO)**: `build_interfaces` should ALSO pull the
    MachineInterfaces template's shipped per-type interface rows (the SORTER sheet's 7: HEARTBEAT / POWER ENABLED /

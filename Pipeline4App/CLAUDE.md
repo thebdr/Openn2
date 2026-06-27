@@ -50,7 +50,7 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
     io/    workbook.py · xlsx_edit.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -238,7 +238,7 @@ sort+distinct-props, the skip+warn, the return contract).
   **+DIAG auto-mirror** tags on SORTER+DIAG-02 (the deferred `in_diag`/ph600 feature). Both are captured together at
   ph600 (pull the template-native rows + the `in_diag` set into `interface_elements`) — see the Phase 400 follow-up.
 
-## Phase 600 — Diagnosis — IN PROGRESS (600a done; 600b/c/d TODO)
+## Phase 600 — Diagnosis — IN PROGRESS (600a + 600b done; 600c/d TODO)
 `domain/diagnosis_entries.py` (the table defs) + the per-type config relocation + the staging prereqs. The plan
 (from the 600 understand pass): a UNIFIED `diagnosis_entries` table (`source` = io|logic) → projected to
 `DiagList_IO.csv` + `DiagList_Logic.csv` (600c) + the OPC SCL (600d), with a parent `diagnosis_cabinets` table.
@@ -255,12 +255,23 @@ sort+distinct-props, the skip+warn, the return contract).
   are restored in `diagnosis_columns.csv`). **Side effect (intended): the phase-400 `+DIAG` auto-mirror lights up** -
   `collect_mirror_set`'s `type.in_diag` guard now fires, so SORTER+DIAG-02 grows 4 -> 83 mirror elements (the
   template-native gap still remains). **Parity**: `diag_desc` **0 mismatches/269** vs PL3 IODatabase; the
-  `diagnosis_cabinets` table **0 field mismatches** vs PL3's `load_diagnostic_blocks` (16 cabinets). Tests:
-  `test_diagnosis.py` (6). **NOTE staging now emits 2 tables** (`signals` + `diagnosis_cabinets`).
-- **600b/c/d TODO**: the builder (`io_entries` + the OR/per-row `diagnosis_logic_rules`, cabinet resolution,
-  next-free-bit, `ml_value`/`fl_value`/`node_of`) -> `diagnosis_entries`; the two DiagList CSV projections; the OPC
-  SCL projection (FUNCTION/REGION/CabState/BoolToUDInt, the 01-04 variants + **tristate**, BOM/CRLF + FUNCTION
-  rename). Then re-verify 510 PLCTags after the +DIAG unblock + add the template-native capture.
+  `diagnosis_cabinets` table **0 field mismatches** vs PL3's `load_diagnostic_blocks` (16 cabinets).
+  **NOTE staging now emits 2 tables** (`signals` + `diagnosis_cabinets`).
+- **600b DONE - the builder** (`domain/diagnosis.py` `build()`): populates the unified `diagnosis_entries` from
+  `signals` + `diagnosis_cabinets` + the `diagnosis_logic_rules`. Clean-room port of PL3's `build_diag_list_io`/
+  `_resolve_logic`/`ml_value`/`fl_value`/`node_of` reading the PL4 `type` object + the STORED `plc_binding` (no
+  re-derivation). Each entry: `source` (io|logic), `source_signal`, `rule_name`, `cabinet`/`bit`/`is_warning`, the
+  SCL channel values (`in_binding`/`ml_value`/`fl_value` computed HERE so the SCL projector is pure), + a frozen
+  `diag_columns` snapshot ({header->cell}, the `$PLC_Binding$` sentinel resolved, the `:03d`/`:02d` specs honored).
+  `resolve_logic` = the OR/per-row rules (cabinet: numeric `diag_cabinet` -> paired-channel sibling -> FU+LOC ->
+  `diagnosis_cabinets`; the next free bit per alarm/warning family). GOTCHA fixed: inject the logic row's
+  `diag_cabinet`/`diag_bit` as STRINGS (interp's `value or ""` turns the falsy int `0` into `''` -> a bit-0 row
+  rendered blank). **Parity (real data, vs the reference DiagLists by `PLC_Binding`)**: **DiagList_IO 73/73 and
+  DiagList_Logic 6/6 - 0 field mismatches** (logic_count == #N1/2 + #DI1/2 staged rows). Tests: `test_diagnosis.py`
+  (11 total; +5 for 600b: `ml_value`, `node_of`/`fl_value`, `resolve_logic` OR/next-free-bit/cabinet, the build).
+- **600c/d TODO**: the two DiagList CSV projections (`diaglist_csv.project`, filter `diagnosis_entries` by `source`);
+  the OPC SCL projection (`diagnosis_scl`: FUNCTION/REGION/CabState/BoolToUDInt, the 01-04 variants + **tristate**,
+  BOM/CRLF + FUNCTION rename) + the GUI "600" button. Then re-verify 510 PLCTags + add the template-native capture.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
@@ -272,10 +283,10 @@ later.)
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **121**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **126**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
 interface_xlsx (incl. the 400e insertion/seed/freeze), the **`io/xlsx_edit` suite** (14, ported verbatim),
-the **510 `io_tags` suite** (8), and the **600a `diagnosis` suite** (6)). Data-dependent parity (staging vs
+the **510 `io_tags` suite** (8), and the **600a/b `diagnosis` suite** (11)). Data-dependent parity (staging vs
 PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
 gate + parity green.
 
