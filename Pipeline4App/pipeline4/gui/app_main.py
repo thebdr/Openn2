@@ -62,6 +62,8 @@ class App:
                 self._run_diagnosis()
             elif number == 700:
                 self._run_hardware()
+            elif number == 800:
+                self._run_software()
             elif number == 0:
                 self.log.append("PHASE", "Run Pipeline (all phases)")
                 self.log.append("WARN", "  -> full run not wired yet")
@@ -198,6 +200,36 @@ class App:
         res = hardware_csv.project(database)
         self.log.append("PASS", f"  700: {res['stations']} station(s) + {res['modules']} module(s) -> "
                                 f"{config.hardware_dir()}")
+
+    def _run_software(self):
+        """Phase 800 (wired): stage -> 520 build (the write-back fields the builders read) -> 800 build
+        (the software_blocks/software_block_members tables) -> project (the CreationInfo CSVs + the 03 FC
+        XML, dropping 03's CSV) -> write the 02_COM safe-DB + InstanceDBs.csv. Software depends on 520."""
+        from pipeline4.core import config, run
+        from pipeline4.domain import staging, datablocks
+        from pipeline4.domain.blocks import engine
+        self.log.append("PHASE", "800 Software Generation  (820 Blocks + 830 Instances + 02_COM + 03 FC XML)")
+        self.status.configure(text="software…")
+        self.root.update_idletasks()
+        findings = []
+        database, f = staging.stage(); findings += f                 # 300 staging
+        if not run.has_blocking(f):
+            database, f = datablocks.build(database); findings += f   # 520 prereq -> write-back fields
+        if not run.gate(findings, self.log.append, label="800 (300 staging + 520 prereq)"):
+            return
+        if "db_blocks" not in database:                              # a prereq FAIL was downgraded, but 520 never ran
+            self.log.append("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
+            return
+        database, blk_findings = engine.build(database)              # 800 SSOT build (WARN-only, records+saves)
+        res = engine.project(database)                               # CreationInfo CSVs + 03 FC XML (CSV dropped)
+        com = engine.write_com_db(database)                          # the 02_COM safe-DB
+        inst = engine.write_instance_dbs(database)                   # InstanceDBs.csv
+        run.render(blk_findings + res["findings"], self.log.append)  # WARN-only -> render (output already written)
+        self.log.append("PASS", f"  820: {len(database['software_blocks'])} block(s) -> {res['count']} "
+                                f"CreationInfo CSV(s) + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
+        if com["path"]:
+            self.log.append("PASS", f"  02_COM safe-DB: {com['members']} member(s) -> {com['path']}")
+        self.log.append("PASS", f"  830 InstanceDBs: {inst['count']} instance DB(s) -> {inst['path']}")
 
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"

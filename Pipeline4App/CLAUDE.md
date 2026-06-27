@@ -53,7 +53,7 @@ Pipeline4App/
     core/  keys.py · table.py · database.py · config.py · severity.py · finding.py · treatments.py · run.py
     io/    workbook.py · xlsx_edit.py
     domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py · hardware_csv.py
-    domain/blocks/ (ph800) database.py · table.py · registry.py · templates.py · builders.py · engine.py
+    domain/blocks/ (ph800) database.py · table.py · registry.py · templates.py · builders.py · engine.py · xml_emit.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -371,7 +371,7 @@ GUI **"700" button** runs stage -> build -> project.
   (1145 bytes) + `Modules.csv` (1896 bytes) byte-identical to PL3's `_format2` over the same extract.** Test:
   `test_hardware.py::format2_projection` (no BOM, CRLF, the fmt2 tag + descriptive header + data rows).
 
-## Phase 800 — Software — IN PROGRESS (800a spine + simple builders + 800b complex builders DONE; 800c TODO)
+## Phase 800 — Software — DONE (800a spine + 800b complex builders + 800c XML/02_COM/InstanceDBs/GUI)
 `domain/blocks/` (package) - a clean-room port of PL3's `domain/blocks/`. The model: **`Database`** (read-only
 accessors over the `signals` rows) -> **builders** (hand-written Python, `@builds("name")`, one per template) ->
 **`Table`** (columns + rows; a list cell = the horizontal ITERATOR) -> the **engine** serializes to the `$/#/%/@`
@@ -407,15 +407,41 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
   PL3's builders+serializer** (modulo the `pipeline3`->`pipeline4` `#` line); all 5 new builders are **table-identical**
   to PL3's (03 verified at the table level - PL3 emits it as FC XML, 800c). Tests: `test_blocks.py` (+8: the 5 builders'
   grouping/variant/tier/list-cells/`source_row`-sort, `_area_descriptions`, `_of_variant`). 16 cases total.
-- **800c TODO:** the **03** direct-FC-XML emit (`xml_emit`, PL3 `domain/blocks/xml_emit.py`) + **02_COM** safe-DB
-  + **InstanceDBs.csv** (merge the 520 `instance_dbs` + the builder `instanceOf-*` cells) + the GUI "800" button
-  (stage -> 520 -> 800 build -> project).
+- **800c DONE - the 03 FC XML + 02_COM safe-DB + InstanceDBs.csv + the GUI button.**
+  - **`domain/blocks/xml_emit.py`** (verbatim port of PL3's): `and_coil_fc` emits **03_Zone Cumulative** as a ready
+    `SW.Blocks.FC` XML - one `A`(AND)->`Coil` FlgNet network per @ row (the row's `nameOfDB.<member>` inputs ->
+    the `02_COM.<element>` coil; UIds restart at 21 per network; >50 inputs split into leaf+combiner ANDs), the
+    template head reused verbatim swapping `<Name>`. UTF-8 BOM + CRLF + indented. `EMITTERS = {"03_Zone Cumulative"}`.
+    The PL4 `blocks.table.Table` has PL3's interface (rows are dicts, `ITERATOR_STRINGS` a list) so the emitter body
+    is unchanged.
+  - **`engine.project` wired** (`import_dir` param, default `blocks_import_dir()`): a block in `xml_emit.EMITTERS`
+    ships its FC XML to ImportReady and its CreationInfo **CSV is DROPPED** (a stale one removed) - OP4 imports the
+    XML, not a template-fill CSV. Returns `xml_files`; `count`/`files` are the CSVs only.
+  - **`engine.write_com_db`** - the **02_COM** custom safe-DB (a fail-safe F_DB GlobalDB XML): members =
+    `DB_CONSTANTS` (Always FALSE/TRUE/No Operation) + the distinct `02_COM.{db_element}` cumulatives across all
+    builder rows (`_com_members`), deduped. **Reuses `datablock_xml.db_xml`** (so the bytes + the F_DB OPC-lock match
+    the 520 DBs - no second XML emitter); written to `blocks_import_dir` (the 520 projector leaves it untouched -
+    not a `db_blocks` DB). No cumulatives -> nothing written.
+  - **`engine.write_instance_dbs`** - **InstanceDBs.csv** (the CreateInstanceDB surface): the builders'
+    `instanceOf-<FB>` cells FIRST (`_builder_instance_rows`, in block x column x seq order from
+    `software_block_members.values`), then the 520 config families (`_config_instance_rows` reads the
+    **`instance_dbs` SSOT table** - PL4 does NOT re-run `datablocks.generate` like PL3's `_config_instance_rows`),
+    deduped by Name (first-seen). Plain UTF-8 (NO BOM), csv.writer CRLF, `#`/`%`/`@` rows `Name/InstanceOf/Number/Folder`.
+  - **GUI "800" button** (`gui/app_main._run_software`): stage -> 520 build -> `engine.build` -> `engine.project`
+    (CSVs + 03 FC XML) -> `write_com_db` -> `write_instance_dbs`; accumulates staging+520 findings + `run.gate`
+    ONCE (the `db_blocks not in database` downgrade guard), `run.render`s the WARN-only build/project findings.
+  - **PARITY (over the same 269 520-enriched staged rows, vs PL3's real writers):** all three byte surfaces are
+    **BYTE-IDENTICAL** - 03 FC XML (38018 B), 02_COM.xml (9578 B, F_DB OPC-locked, 15 members), InstanceDBs.csv
+    (8569 B, 102 entries); the 03 CreationInfo CSV is dropped (so 7 CSVs remain, still byte-identical from 800b).
+    Tests: `test_blocks.py` (+6: the FC-XML emit/BOM/network-per-row, the 03 CSV-drop, the 02_COM members+F_DB,
+    the no-cumulatives no-write, the InstanceDBs merge+dedup+no-BOM). 22 cases total.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
 bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
-EARLY (gui-less PL3 builds hid integration problems). The **300 / 400 / 500 / 600 / 700 buttons run their phases for
-real** (each through `staging.stage` -> the phase build/project); the rest log "not implemented". The handler is
+EARLY (gui-less PL3 builds hid integration problems). The **300 / 400 / 500 / 600 / 700 / 800 buttons run their
+phases for real** (each through `staging.stage` -> the phase build/project; 800 = stage -> 520 -> `engine.build` ->
+`engine.project` + `write_com_db` + `write_instance_dbs`); the rest log "not implemented". The handler is
 wrapped so a not-yet-ready phase can't take the window down. Each real handler **accumulates the findings of its
 gated sub-phases (staging + 520) and calls `run.gate(findings, self.log.append, label=…)` ONCE** - render at
 effective severity + halt iff any effective FAIL; `run.has_blocking(f)` skips a dependent sub-phase when a prereq
@@ -469,7 +495,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **185**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **191**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
@@ -477,9 +503,10 @@ the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** 
 slug), the **600 `diagnosis` suite** (18, + the S5 `diag_scl_template_missing` slug), the **severity/findings core**
 (`test_severity`/`test_finding`/`test_treatments`/`test_run` = 20, incl. S4's `run.render`), the **700 `hardware`
 suite** (10: the helpers, the extract incl. auto-plug/PotentialGroup/by-type/default-cards, the missing-DTD
-FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projection), the **800a+800b `blocks` suite**
-(16: Table/Database list-cells, the $/#/%/@ serialization, the 00/06/07 simple builders, the 02/03/04/05/08 complex
-builders + `_area_descriptions`/`_of_variant`, the build->project round-trip)).
+FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projection), the **800a+b+c `blocks` suite**
+(22: Table/Database list-cells, the $/#/%/@ serialization, the 00/06/07 simple builders, the 02/03/04/05/08 complex
+builders + `_area_descriptions`/`_of_variant`, the build->project round-trip, the 800c FC-XML emit + 03 CSV-drop +
+02_COM safe-DB + InstanceDBs merge/dedup)).
 Data-dependent parity (staging/520/400/510/600/700/800 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/
 `interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `Stations.csv`/`Modules.csv` + the CreationInfo CSVs
 vs PL3 `_format2`/`write_creation_csv`) is verified by a script (not in the gate). Each phase is committed with its gate + parity green.

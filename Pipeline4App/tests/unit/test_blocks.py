@@ -6,10 +6,11 @@ import tempfile
 
 from _harness import run, eq, ok
 from pipeline4.core.database import Database as DB
-from pipeline4.domain.blocks import engine
+from pipeline4.domain.blocks import engine, xml_emit
 from pipeline4.domain.blocks.database import Database
 from pipeline4.domain.blocks.table import Table
 from pipeline4.domain.blocks import builders
+from pipeline4.domain.db_members import instance_dbs_table
 
 
 # --- Table + Database -------------------------------------------------------------------------- #
@@ -240,6 +241,138 @@ def test_project_reconstructs_from_tables():
         eq(lines[4], "@,01,n2,c", "rows projected in seq order, the ITERATOR spread preserved")
 
 
+# --- 800c: the 03 FC-XML emit (xml_emit) ------------------------------------------------------- #
+_FC_TEMPLATE = (
+    '<?xml version="1.0" encoding="utf-8"?>\r\n'
+    '<Document>\r\n'
+    '  <Engineering version="V18" />\r\n'
+    '  <SW.Blocks.FC ID="0">\r\n'
+    '    <AttributeList>\r\n'
+    '      <Name>TEMPLATE--v1.0--03_Zone Cumulative</Name>\r\n'
+    '      <Number>19</Number>\r\n'
+    '      <ProgrammingLanguage>F_FBD</ProgrammingLanguage>\r\n'
+    '    </AttributeList>\r\n'
+    '    <ObjectList>\r\n'
+    '    </ObjectList>\r\n'
+    '  </SW.Blocks.FC>\r\n'
+    '</Document>'
+)
+
+
+def _write_fc_template(d):
+    path = os.path.join(d, "TEMPLATE--v1.0--03_Zone Cumulative.xml")
+    with open(path, "w", encoding="utf-8-sig", newline="") as f:   # real templates carry a BOM
+        f.write(_FC_TEMPLATE)
+    return path
+
+
+def test_and_coil_fc_one_network_per_row():
+    with tempfile.TemporaryDirectory() as d:
+        tpl = _write_fc_template(d)
+        t = Table("03_Zone Cumulative")
+        t.add(template_type="01", nameOfDB="01_Pushbutton", NetworkComment="AREA 1 PB - Infeed",
+              **{"02_COM.{db_element}": "AREA 1 PB"}, ITERATOR_STRINGS=["PB_A", "PB_B"])
+        t.add(template_type="01", nameOfDB="03_FDBACK", NetworkComment="AREA 1 FDB",
+              **{"02_COM.{db_element}": "AREA 1 FDB"}, ITERATOR_STRINGS=[])   # no inputs -> skipped
+        xml = xml_emit.and_coil_fc(t, tpl, "03_Zone Cumulative")
+        ok("<Name>03_Zone Cumulative</Name>" in xml, "the <Name> is swapped to the block name")
+        eq(xml.count("<SW.Blocks.CompileUnit"), 1, "one network per @ row WITH inputs (empty row skipped)")
+        ok('<TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>' in xml, "A Card = the input count")
+        ok('<Component Name="01_Pushbutton" />' in xml and '<Component Name="PB_A" />' in xml, "input = nameOfDB.member")
+        ok('<Component Name="02_COM" />' in xml and '<Component Name="AREA 1 PB" />' in xml, "coil = 02_COM.<element>")
+        ok("\r\n" in xml and not xml.startswith("﻿"), "CRLF, no BOM in the body (BOM added on write)")
+
+
+def test_write_fc_xml_bom_and_path():
+    with tempfile.TemporaryDirectory() as d:
+        tpl = _write_fc_template(d)
+        out = os.path.join(d, "import")
+        t = Table("03_Zone Cumulative")
+        t.add(template_type="01", nameOfDB="01_Pushbutton", NetworkComment="c",
+              **{"02_COM.{db_element}": "AREA 1 PB"}, ITERATOR_STRINGS=["PB_A"])
+        path = xml_emit.write_fc_xml("03_Zone Cumulative", t, tpl, out)
+        eq(os.path.basename(path), "03_Zone Cumulative.xml")
+        raw = open(path, "rb").read()
+        ok(raw.startswith(b"\xef\xbb\xbf"), "the file carries a single UTF-8 BOM")
+        ok(b"\r\n" in raw, "CRLF line endings")
+        eq(xml_emit.write_fc_xml("00_Only for Commissioning", t, tpl, out), "", "a non-emitter block -> '' (no XML)")
+
+
+def test_project_03_emits_xml_and_drops_csv():
+    with tempfile.TemporaryDirectory() as d:
+        tpl = _write_fc_template(d)
+        creation, imp = os.path.join(d, "creation"), os.path.join(d, "import")
+        os.makedirs(creation)
+        stale = os.path.join(creation, "03_Zone Cumulative.csv")
+        open(stale, "w").write("stale")                              # a stale CSV from a pre-800c run
+        blk, mem = engine.software_blocks_table(), engine.software_block_members_table()
+        blk.add(name="03_Zone Cumulative", template_stem="TEMPLATE--v1.0--03_Zone Cumulative", template_ref=tpl,
+                keys=["TemplateType"], columns=["TemplateType", "nameOfDB", "02_COM.{db_element}", "NetworkComment", "ITERATOR_STRINGS"])
+        blk.add(name="00_X", template_stem="TEMPLATE--v1.0--00_X", template_ref="C:/tpl/00_X.xml",
+                keys=["TemplateType", "NetworkComment"], columns=["TemplateType", "NetworkComment"])
+        mem.add(block="03_Zone Cumulative", seq=0,
+                values={"TemplateType": "01", "nameOfDB": "01_Pushbutton", "02_COM.{db_element}": "AREA 1 PB",
+                        "NetworkComment": "c", "ITERATOR_STRINGS": ["PB_A", "PB_B"]})
+        mem.add(block="00_X", seq=0, values={"TemplateType": "01", "NetworkComment": "n1"})
+        res = engine.project(DB([blk, mem]), out_dir=creation, import_dir=imp)
+        eq((res["count"], len(res["xml_files"])), (1, 1), "00_X -> CSV, 03 -> XML (count = CSVs only)")
+        ok(not os.path.exists(stale), "the stale 03 CSV is removed")
+        ok(os.path.exists(os.path.join(imp, "03_Zone Cumulative.xml")), "03 FC XML written to import dir")
+        ok(os.path.exists(os.path.join(creation, "00_X.csv")), "00_X CSV still written")
+
+
+# --- 800c: the 02_COM safe-DB ------------------------------------------------------------------ #
+def test_write_com_db_members_and_fdb():
+    with tempfile.TemporaryDirectory() as d:
+        mem = engine.software_block_members_table()
+        mem.add(block="03_Zone Cumulative", seq=0, values={"02_COM.{db_element}": "AREA 1 PB"})
+        mem.add(block="03_Zone Cumulative", seq=1, values={"02_COM.{db_element}": "AREA 1 FDB"})
+        mem.add(block="03_Zone Cumulative", seq=2, values={"02_COM.{db_element}": "AREA 1 PB"})   # dup -> once
+        mem.add(block="04_ESTOP", seq=0, values={"02_COM.{matrix_area} PB": "AREA 1 PB"})         # different col -> not a member
+        res = engine.write_com_db(DB([mem]), out_dir=d)
+        eq(res["members"], 5, "3 seed constants + 2 distinct cumulatives")
+        xml = open(res["path"], encoding="utf-8-sig").read()
+        ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in xml, "the 02_COM DB is fail-safe F_DB")
+        ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in xml, "F_DB is OPC-locked")
+        for m in ("Always FALSE", "Always TRUE", "No Operation", "AREA 1 PB", "AREA 1 FDB"):
+            ok(f'<Member Name="{m}"' in xml, f"member {m!r} present")
+
+
+def test_write_com_db_no_cumulatives_writes_nothing():
+    with tempfile.TemporaryDirectory() as d:
+        mem = engine.software_block_members_table()
+        mem.add(block="07_Speed Control", seq=0, values={"instanceOf-01_Speed_Control_SLS": "SLS_SORTER_01"})
+        res = engine.write_com_db(DB([mem]), out_dir=d)
+        eq((res["path"], res["members"]), ("", 0), "no 02_COM cumulatives -> nothing written")
+        ok(not os.path.exists(os.path.join(d, "02_COM.xml")))
+
+
+# --- 800c: InstanceDBs.csv --------------------------------------------------------------------- #
+def test_write_instance_dbs_merge_and_dedup():
+    with tempfile.TemporaryDirectory() as d:
+        blk, mem, idb = engine.software_blocks_table(), engine.software_block_members_table(), instance_dbs_table()
+        blk.add(name="05_Output Feedback", template_stem="s", template_ref="r",
+                keys=["TemplateType"], columns=["TemplateType", "instanceOf-FDBACK"])
+        blk.add(name="07_Speed Control", template_stem="s", template_ref="r",
+                keys=["TemplateType"], columns=["TemplateType", "instanceOf-01_Speed_Control_SLS"])
+        mem.add(block="05_Output Feedback", seq=0, values={"instanceOf-FDBACK": "FDBACK_A"})
+        mem.add(block="05_Output Feedback", seq=1, values={"instanceOf-FDBACK": "FDBACK_B"})
+        mem.add(block="07_Speed Control", seq=0, values={"instanceOf-01_Speed_Control_SLS": "SLS_SORTER_01"})
+        idb.add(instance_name="DiagTags_1", fb="BoolToUDInt")            # a 520 config family
+        idb.add(instance_name="FDBACK_A", fb="FDBACK")                   # collides with a builder cell -> dropped
+        res = engine.write_instance_dbs(DB([blk, mem, idb]), out_dir=d)
+        eq(res["count"], 4, "FDBACK_A, FDBACK_B, SLS_SORTER_01, DiagTags_1 (the config dup dropped)")
+        lines = open(res["path"], encoding="utf-8").read().splitlines()
+        eq(lines[0], "#,Instance DBs created directly via CreateInstanceDB")
+        eq(lines[1], "%,Name,InstanceOf,Number,Folder")
+        eq(lines[2], "@,FDBACK_A,FDBACK,,FDBACK", "builder cells first, in block/column/seq order")
+        eq(lines[3], "@,FDBACK_B,FDBACK,,FDBACK")
+        eq(lines[4], "@,SLS_SORTER_01,01_Speed_Control_SLS,,01_Speed_Control_SLS")
+        eq(lines[5], "@,DiagTags_1,BoolToUDInt,,BoolToUDInt", "then the 520 config families (dup name dropped)")
+        raw = open(res["path"], "rb").read()
+        ok(not raw.startswith(b"\xef\xbb\xbf"), "InstanceDBs.csv is plain UTF-8 (no BOM)")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("blocks", [
@@ -259,4 +392,10 @@ if __name__ == "__main__":
         ("builder_05_output_feedback_pads_feedback_slots", test_builder_05_output_feedback_pads_feedback_slots),
         ("builder_08_gate_manager_sorters_and_doors", test_builder_08_gate_manager_sorters_and_doors),
         ("project_reconstructs_from_tables", test_project_reconstructs_from_tables),
+        ("and_coil_fc_one_network_per_row", test_and_coil_fc_one_network_per_row),
+        ("write_fc_xml_bom_and_path", test_write_fc_xml_bom_and_path),
+        ("project_03_emits_xml_and_drops_csv", test_project_03_emits_xml_and_drops_csv),
+        ("write_com_db_members_and_fdb", test_write_com_db_members_and_fdb),
+        ("write_com_db_no_cumulatives_writes_nothing", test_write_com_db_no_cumulatives_writes_nothing),
+        ("write_instance_dbs_merge_and_dedup", test_write_instance_dbs_merge_and_dedup),
     ]))
