@@ -176,8 +176,8 @@ def test_build_unified_io_and_logic():
     db["signals"].add(script_type="N1/2", type={"in_diag": True, "diag_logic": "invert"}, type_hw="N",
                       diag_cabinet="2", diag_bit="0", index="01", functional_unit="=S1", location="+M1",
                       combined_FLD="=S1+M1", iol_FLD="=S1+M1", plc_binding='"04_SPEED"."enc"')
-    db, errors, _w = diagnosis.build(db)
-    eq(errors, [])
+    db, findings = diagnosis.build(db)
+    eq(findings, [], "the builder emits no findings in the common path")
     entries = list(db["diagnosis_entries"])
     io = [e for e in entries if e["source"] == "io"]
     logic = [e for e in entries if e["source"] == "logic"]
@@ -208,7 +208,7 @@ def _built_db():
     db["signals"].add(script_type="N1/2", type={"in_diag": True, "diag_logic": "invert"}, type_hw="N",
                       diag_cabinet="2", diag_bit="0", index="01", functional_unit="=S1", location="+M1",
                       combined_FLD="=S1+M1", iol_FLD="=S1+M1", plc_binding='"04_SPEED"."enc"')
-    db, _e, _w = diagnosis.build(db)
+    db, _findings = diagnosis.build(db)
     return db
 
 
@@ -306,7 +306,8 @@ def test_scl_project_writes_bom_crlf():
     with tempfile.TemporaryDirectory() as d:
         res = diagnosis_scl.project(db, out_dir=d, template_path=None)  # real template (DIAG_SCL_TEMPLATE)
         if res["path"] is None:                              # template absent in this checkout -> skip the file asserts
-            ok(res["warnings"], "a missing template degrades to a warning, no crash"); return
+            ok(any(f.type == "diag_scl_template_missing" and f.severity == "WARN" for f in res["findings"]),
+               "a missing template degrades to a diag_scl_template_missing WARN, no crash"); return
         raw = open(res["path"], "rb").read()
         ok(raw[:3] == b"\xef\xbb\xbf", "UTF-8 BOM")
         ok(b"\r\n" in raw, "CRLF")
@@ -323,6 +324,17 @@ def test_scl_project_synthetic_template():
         text = open(res["path"], encoding="utf-8-sig").read()
         ok('FUNCTION "06_Diagnostic for OPC"' in text, "rename applied end-to-end")
         ok("Tristate_DW" in text, "the tt=2 cabinet 2 renders tristate")
+
+
+def test_scl_project_missing_template_finding():
+    """A non-existent template -> the diag_scl_template_missing WARN + path=None, no crash, no file."""
+    db = _built_db()
+    with tempfile.TemporaryDirectory() as d:
+        res = diagnosis_scl.project(db, out_dir=d, template_path=os.path.join(d, "nope.scl"))
+        eq(res["path"], None, "no file written when the template is absent")
+        eq(len(res["findings"]), 1, "one finding")
+        eq((res["findings"][0].phase, res["findings"][0].type, res["findings"][0].severity),
+           (620, "diag_scl_template_missing", "WARN"), "the SCL-template-missing report container")
 
 
 if __name__ == "__main__":
@@ -345,4 +357,5 @@ if __name__ == "__main__":
         ("render_scl_per_type_tristate_trigger", test_render_scl_per_type_tristate_trigger),
         ("scl_project_writes_bom_crlf", test_scl_project_writes_bom_crlf),
         ("scl_project_synthetic_template", test_scl_project_synthetic_template),
+        ("scl_project_missing_template_finding", test_scl_project_missing_template_finding),
     ]))

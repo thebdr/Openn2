@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from pipeline4.core import config
 from pipeline4.core.database import Database
+from pipeline4.core.finding import record
 from pipeline4.domain import identity
 from pipeline4.domain.diagnosis_entries import diagnosis_cabinets_table, diagnosis_entries_table
 from pipeline4.domain.signals import signals_table
@@ -161,7 +162,8 @@ def _render(columns, row, binding) -> dict:
 
 def build(database: Database | None = None) -> tuple:
     """600b: build the unified `diagnosis_entries` table from `signals` + `diagnosis_cabinets` + the
-    diagnosis_logic_rules. Saves the Database. Returns (database, errors, warnings)."""
+    diagnosis_logic_rules. Records the findings to `validation_issues` + saves. Returns (database, findings) -
+    the build emits none in the common path (the unified table is a pure function of the SSOT)."""
     if database is None:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap]),
@@ -170,7 +172,7 @@ def build(database: Database | None = None) -> tuple:
     cabinets = list(database["diagnosis_cabinets"]) if "diagnosis_cabinets" in database else []
     rules = config.load_diagnosis_logic_rules()
     columns = config.load_diagnosis_columns()
-    errors, warnings = [], []
+    findings = []
 
     etab = diagnosis_entries_table()
     for r in rows:                                            # (1) the in-diag signals
@@ -202,5 +204,6 @@ def build(database: Database | None = None) -> tuple:
         database[etab.name].rows = etab.rows
     else:
         database.add_table(etab)
+    record(database, findings)                      # persist the facts to the validation_issues table
     database.save(config.database_dir())
-    return database, errors, warnings
+    return database, findings

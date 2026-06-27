@@ -277,7 +277,13 @@ sort+distinct-props, the skip+warn, the return contract).
   **+DIAG auto-mirror** tags on SORTER+DIAG-02 (the deferred `in_diag`/ph600 feature). Both are captured together at
   ph600 (pull the template-native rows + the `in_diag` set into `interface_elements`) — see the Phase 400 follow-up.
 
-## Phase 600 — Diagnosis — DONE (600a + 600b + 600c + 600d)
+## Phase 600 — Diagnosis — DONE (600a + 600b + 600c + 600d; + severity S5)
+**Severity S5 (parity-locked):** `diagnosis.build` returns **`(database, findings)`** (was `(database, errors,
+warnings)` - the last legacy tuple; its errors/warnings were always EMPTY/vestigial), `finding.record`s + saves;
+`diaglist_csv.project` gains a `findings: []` key; `diagnosis_scl.project` renames its dict `warnings` → **`findings`**
+and emits the WARN slug **`diag_scl_template_missing`** (phase 620) on an absent SCL template. All three are WARN-only;
+the GUI `_run_diagnosis` consumes the build tuple + `run.render`s the combined 600/610/620 findings (no halt). PARITY:
+`diagnosis_entries` + DiagList_IO/Logic.csv + Diagnostic_for_OPC.scl byte-identical to pre-S5 (verified new-vs-HEAD).
 `domain/diagnosis_entries.py` (the table defs) + the per-type config relocation + the staging prereqs. The plan
 (from the 600 understand pass): a UNIFIED `diagnosis_entries` table (`source` = io|logic) → projected to
 `DiagList_IO.csv` + `DiagList_Logic.csv` (600c) + the OPC SCL (600d), with a parent `diagnosis_cabinets` table.
@@ -366,14 +372,15 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
     is `gate` minus the halt (shared `_render`) for WARN-only projection phases whose output is already written.
   Tests: `test_severity.py` (5) + `test_finding.py` (4) + `test_treatments.py` (5) + `test_run.py` (5).
   **Decision (user): persist `validation_issues` now + full model + retrofit 300/520/400/510/600, THEN 700.** S1
-  touched NO phase (parity trivially preserved). **S2 (520) + S3 (300) + S4 (400+510) are DONE** (see the phase
-  sections: `generate`/`stage`/`build`/`build_interfaces -> (..., findings)` + the `validation_issues` record + the
-  `run.has_blocking` no-write guard; GlobalDB XMLs + `signals.csv`/`diagnosis_cabinets.csv` + `interface_elements`
-  + PLCTags byte/content-identical to pre-retrofit). The 4 GUI handlers **accumulate staging + 520 findings and call
-  `run.gate` ONCE** per click (halt-capable), then **`run.render`** the WARN-only 400/510 projection findings
-  (`render` = gate minus the halt, for phases whose BuilderData is already written). NEXT: **S5 600** (`diag_scl_template_missing`
-  WARN; `diagnosis.build`/`diaglist_csv`/`diagnosis_scl` -> findings) -> S6 delete the legacy `(errors, warnings)`
-  lists -> phase 700.
+  touched NO phase (parity trivially preserved). **S2 (520) + S3 (300) + S4 (400+510) + S5 (600) are DONE** (see the
+  phase sections: `generate`/`stage`/`build`/`build_interfaces`/`diagnosis.build -> (..., findings)` + the
+  `validation_issues` record + the `run.has_blocking` no-write guard; GlobalDB XMLs + `signals.csv` +
+  `interface_elements` + PLCTags + `diagnosis_entries`/DiagList/SCL byte/content-identical to pre-retrofit). The 4
+  GUI handlers **accumulate staging + 520 findings and call `run.gate` ONCE** per click (halt-capable), then
+  **`run.render`** the WARN-only 400/510/600 projection findings (`render` = gate minus the halt, for phases whose
+  BuilderData is already written). With S5 the LAST legacy `(errors, warnings)` tuple (`diagnosis.build`) is gone.
+  NEXT: **S6** - the final sweep (verify zero legacy tuples remain anywhere + a full 5-phase byte-parity re-run) ->
+  phase 700.
   - **TRANSITIONAL NOTE (gate reconcile scope).** `run.gate` calls `treatments.reconcile`, which prunes/stales
     registry rows GLOBALLY (any uid not in the gated finding set). With multiple gated phases this can churn an
     OTHER phase's untreated registry rows across separate button clicks (e.g. clicking 300 vs 500). It is
@@ -383,15 +390,15 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **158**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **159**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
 the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** (8, + the S4 `iotag_no_address`
-slug), the **600 `diagnosis` suite** (17), the **severity/findings core** (`test_severity`/`test_finding`/
-`test_treatments`/`test_run` = 20, incl. S4's `run.render`)).
-Data-dependent parity (staging/520/400/510 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/`interface_elements`/
-PLCTags) is verified by a script
+slug), the **600 `diagnosis` suite** (18, + the S5 `diag_scl_template_missing` slug), the **severity/findings core**
+(`test_severity`/`test_finding`/`test_treatments`/`test_run` = 20, incl. S4's `run.render`)).
+Data-dependent parity (staging/520/400/510/600 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/`interface_elements`/
+PLCTags/`diagnosis_entries`/DiagList/SCL) is verified by a script
 against the real docs (not in the gate). Each phase is committed only with its gate + parity green.
 
 ## Conventions & gotchas

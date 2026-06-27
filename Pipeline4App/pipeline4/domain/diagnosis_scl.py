@@ -17,9 +17,16 @@ import re
 
 from pipeline4.core import config
 from pipeline4.core.database import Database
+from pipeline4.core.finding import Finding
 from pipeline4.domain.diagnosis import _int_or_none
 from pipeline4.domain.diagnosis_entries import diagnosis_cabinets_table, diagnosis_entries_table
 from pipeline4.domain.signals import signals_table
+
+
+def _f(type: str, severity: str, detail: str, location: str = "") -> Finding:
+    """A phase-620 Finding - the OPC-SCL projection report container (WARN-only: the SCL template absent)."""
+    return Finding(phase=620, type=type, severity=severity, detail=detail, location=location)
+
 
 DIAG_SCL_FILE = "Diagnostic_for_OPC.scl"
 ALARM_DWORDS = ["ALARM1", "ALARM2"]
@@ -174,8 +181,8 @@ def _blocks(database) -> dict:
 def project(database: Database | None = None, out_dir: str | None = None,
             template_path: str | None = None) -> dict:
     """Write Diagnostic_for_OPC.scl (UTF-8 BOM + CRLF) from `diagnosis_entries` + `diagnosis_cabinets` +
-    the signals' per-type tristate flag. Returns {'dir', 'path', 'cabinets', 'entries', 'warnings'};
-    a missing template -> a warning, no file."""
+    the signals' per-type tristate flag. Returns {'dir', 'path', 'cabinets', 'entries', 'findings'};
+    a missing template -> the `diag_scl_template_missing` WARN, no file (a pure projection - no record)."""
     if database is None:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap]),
@@ -185,7 +192,8 @@ def project(database: Database | None = None, out_dir: str | None = None,
     os.makedirs(out_dir, exist_ok=True)
     if not os.path.exists(template_path):
         return {"dir": out_dir, "path": None, "cabinets": 0, "entries": 0,
-                "warnings": [f"SCL template not found: {template_path}"]}
+                "findings": [_f("diag_scl_template_missing", "WARN",
+                                f"SCL template not found: {template_path}", template_path)]}
     entries = _scl_entries(database)
     text = render_scl(_blocks(database), entries, open(template_path, encoding="utf-8-sig").read(),
                       _tristate_cabinets(database))
@@ -193,4 +201,4 @@ def project(database: Database | None = None, out_dir: str | None = None,
     with open(path, "w", encoding="utf-8-sig", newline="\r\n") as fh:    # BOM + CRLF (the exported-template format)
         fh.write(text)
     return {"dir": out_dir, "path": path, "cabinets": len({e["cabinet"] for e in entries}),
-            "entries": len(entries), "warnings": []}
+            "entries": len(entries), "findings": []}

@@ -166,19 +166,12 @@ class App:
         if "db_blocks" not in database:                              # a prereq FAIL was downgraded, but 520 never ran
             self.log.append("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
-        database, errors, warnings = diagnosis.build(database)
-        for w in warnings[:20]:
-            self.log.append("WARN", f"  {w}")
-        if errors:
-            for e in errors:
-                self.log.append("FAIL", f"  600 halted: {e}")
-            return
-        res = diaglist_csv.project(database)
+        database, diag_findings = diagnosis.build(database)          # 600 builder (records, saves)
+        res = diaglist_csv.project(database)                         # 610 projection
+        scl = diagnosis_scl.project(database)                        # 620 projection
+        run.render(diag_findings + res["findings"] + scl["findings"], self.log.append)   # WARN-only -> render
         self.log.append("PASS", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> "
                                 f"{config.diaglist_dir()}")
-        scl = diagnosis_scl.project(database)
-        for w in scl["warnings"]:
-            self.log.append("WARN", f"  {w}")
         if scl["path"]:
             self.log.append("PASS", f"  620 OPC SCL: {scl['entries']} entries across {scl['cabinets']} "
                                     f"cabinets -> {scl['path']}")

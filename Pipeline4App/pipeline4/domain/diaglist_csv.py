@@ -29,7 +29,8 @@ def _write_csv(path: str, headers: list, rows: list) -> str:
 
 def project(database: Database | None = None, out_dir: str | None = None) -> dict:
     """Write DiagList_IO.csv (source=io) + DiagList_Logic.csv (source=logic) from `diagnosis_entries`.
-    Returns {'dir', 'io_count', 'logic_count', 'io_path', 'logic_path'}."""
+    Returns {'dir', 'io_count', 'logic_count', 'io_path', 'logic_path', 'findings'} - a pure projection,
+    `findings` is empty (the snapshot was rendered + validated at build)."""
     if database is None:
         database = Database([diagnosis_entries_table()]).load(config.database_dir())
     out_dir = out_dir or config.diaglist_dir()
@@ -39,4 +40,4 @@ def project(database: Database | None = None, out_dir: str | None = None) -> dic
     io_path = _write_csv(os.path.join(out_dir, "DiagList_IO.csv"), headers, io_rows)
     logic_path = _write_csv(os.path.join(out_dir, "DiagList_Logic.csv"), headers, logic_rows)
     return {"dir": out_dir, "io_count": len(io_rows), "logic_count": len(logic_rows),
-            "io_path": io_path, "logic_path": logic_path}
+            "io_path": io_path, "logic_path": logic_path, "findings": []}
