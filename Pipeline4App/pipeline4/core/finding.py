@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pipeline4.core import keys
+from pipeline4.core.model import Cmp, InfoBlock
 from pipeline4.core.table import Table
 
 
@@ -34,6 +35,12 @@ class Finding:
     location: str = ""       # "Sheet!Cell" OR a logical locator ("DB <name>", "IF_<inst>/<sig>")
     source_uid: str = ""     # FK to the producing entity's uid (a signal / interface_element) - audit only
     doc: str = ""            # workbook basename for a GUI link; NOT hashed (volatile)
+    # --- the rich validation-report payload (phase 100 only; None for every other phase) - NOT hashed,
+    # NOT persisted to validation_issues; consumed by io/render.py to reproduce PL3's aligned report line.
+    location2: str = ""      # a cross-check's 2nd link: the matched Sheet!Cell, OR a workbook label on a miss
+    doc2: str = ""           # workbook basename for `location2`
+    info: InfoBlock | None = None   # the middle column (bit/FLD/desc/drawing/type-index)
+    cmp: Cmp | None = None          # a cross-check comparison (the aligned `<addr> op <addr> | <fld> op <fld>`)
 
     @property
     def uid(self) -> str:

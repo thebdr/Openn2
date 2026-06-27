@@ -113,6 +113,16 @@ def coverage_dir() -> str:
 COVERAGE_REPORT_STEM = "io_project_coverage_report"   # the phase-900 report base name (+ .csv / .txt)
 
 
+def validation_report_dir() -> str:
+    """The phase-100 validation reports (`documents_validation_report`/`_errors`.{txt,html}) - DOCUMENTATION
+    under ProjectDocumentation/Reports (same tree as the coverage report; NOT a BuilderData surface)."""
+    return os.path.join(output_root(), "ProjectDocumentation", "Reports")
+
+
+VALIDATION_REPORT_STEM = "documents_validation_report"   # phase-100 complete report (+ .txt / .html)
+VALIDATION_ERRORS_STEM = "documents_validation_errors"   # phase-100 errors-only report (+ .txt / .html)
+
+
 # --- sheet-name resolution (regex / JS-literal, case-insensitive) -------------------------------- #
 def js_to_re(pattern: str) -> str:
     """Accept a JS-style regex literal ('/pattern/flags' or 'pattern/flags') and return the bare Python

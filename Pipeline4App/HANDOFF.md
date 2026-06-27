@@ -11,15 +11,16 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 + 700 + 800 COMPLETE; severity rollout S1–S6 COMPLETE;
-  PHASE 900 (Coverage/910) COMPLETE.** NEXT (the LAST phase): **100 (Validation)**.
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`e153843`** (phase 800c, pushed).
-  **The working tree holds the UNCOMMITTED phase-900 chunk** (NEW `domain/coverage.py` + NEW `tests/unit/
-  test_coverage.py` + `core/config.py` + `gui/app_main.py` + CLAUDE.md + HANDOFF.md) — implemented, gate green,
-  data-verified (ORPHAN=0, UNPLACED=0, tags match io_tags).
+- **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 + 700 + 800 + 900 COMPLETE; severity rollout S1–S6
+  COMPLETE.** **PHASE 100 (Validation) IN PROGRESS** — the LAST phase, chunked 100a/b/c/d; **100a (the reporting
+  spine) DONE**. NEXT: 100b (110+120 validators).
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`3726a01`** (phase 900, pushed).
+  **The working tree holds the UNCOMMITTED phase-100a chunk** (NEW `core/model.py` + `domain/validation/`
+  (__init__ + address.py) + `io/render.py` + NEW `tests/unit/test_validation_render.py` + `core/finding.py`
+  (extended) + `core/config.py` + CLAUDE.md + HANDOFF.md) — implemented, gate green.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 200 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 206 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -100,7 +101,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 25. `be017ad` **phase 800a** — `domain/blocks/` spine + engine + the 00/06/07 builders -> `software_blocks`/`software_block_members` -> CreationInfo CSVs; parity vs PL3 exact
 26. `30eead2` **phase 800b** — the 5 complex builders (02/03/04/05/08) in `builders.py` + 8 tests; 7 CreationInfo CSVs byte-identical to PL3 + all 5 builders table-identical (03 at table level, PL3 emits it as XML)
 27. `e153843` **phase 800c** — NEW `domain/blocks/xml_emit.py` (03 FC XML) + `engine.write_com_db`/`write_instance_dbs` + `engine.project` 03-CSV-drop + the GUI "800" button + 6 tests; all three byte surfaces (03 FC XML / 02_COM.xml / InstanceDBs.csv) byte-identical to PL3  **← origin/pl4 PUSHED head**
-28. *(uncommitted)* **phase 900** — NEW `domain/coverage.py` (the `coverage` SSOT table + ORPHAN/UNPLACED WARN findings) + `config.coverage_dir` + the GUI "900" button + 9 tests; reads the SSOT tables (user decision); real-data ORPHAN=0/UNPLACED=0, tags match io_tags exactly
+28. `3726a01` **phase 900** — NEW `domain/coverage.py` (the `coverage` SSOT table + ORPHAN/UNPLACED WARN findings) + `config.coverage_dir` + the GUI "900" button + 9 tests; reads the SSOT tables (user decision); real-data ORPHAN=0/UNPLACED=0, tags match io_tags exactly  **← origin/pl4 PUSHED head**
+29. *(uncommitted)* **phase 100a** — the validation reporting spine: NEW `core/model.py` (InfoBlock+Cmp) + `core/finding.py` extended (4 optional render fields) + `domain/validation/address.py` + `io/render.py` (rich txt+HTML, Cmp + dual-links) + `config.validation_report_dir` + 6 tests
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -186,8 +188,21 @@ diagnosis_entries/interface_elements/interfaces/hardware_*/software_block_member
 coverage.build + project). **VERIFICATION (real data; documentation, byte-parity NOT the bar): 269 rows, ORPHAN=0,
 UNPLACED=0, tags == io_tags exactly (202==202).** Tests +9 (`test_coverage.py`); gate 200. Verify:
 `scratchpad/verify_900.py`. **920 (TIA coverage) stays deferred.**
-**NEXT (the LAST phase): 100 (Validation)** — the document validators; reads `validation_issues`; `accept`
-[doc-mutating treatment] lands here.
+**PHASE 100 (Validation) IN PROGRESS — the LAST phase, chunked 100a/b/c/d. USER DECISIONS:** reproduce PL3's
+**rich txt+HTML reports** (the aligned line + cross-check Cmp + dual-workbook links); land **110+120+130+140 now,
+DEFER 150** (needs relocating `diag_container_check` + populating `diag_block_name` at staging → touches the
+locked 300 parity); **DROP `accept` entirely**. 110/120 read the RAW workbooks; 130/140 read the SSOT; the phase
+**never halts** (`run.render`); the EN `v_*` message text is ported verbatim into each finding `detail`.
+**100a DONE (uncommitted):** the reporting spine — `core/model.py` (InfoBlock+Cmp) + `core/finding.py` extended
+(4 OPTIONAL render fields `location2`/`doc2`/`info`/`cmp`, not hashed/persisted, Finding stays lean+hashable) +
+`domain/validation/address.py` (verbatim) + `io/render.py` (the rich report renderer, verbatim port of PL3's:
+banners, per-phase width auto-fit, the Cmp + dual-link, txt + no-wrap HTML) + `config.validation_report_dir()` +
+the two stems. Tests +6 (`test_validation_render.py`); gate 206. PARITY NOTE: PL4 `finding._norm` doesn't
+lowercase (PL3's does), so the 100 parity oracle compares finding TUPLES `(phase,type,norm(location),norm(detail))`
+with a matching norm on both sides, NOT raw uids (PL4's registry is project-local, so cross-PL3 uid parity is
+not needed). **NEXT: 100b** — port 110 (iolist) + 120 (matrix) reading the raw workbooks via `io/workbook`, with
+the verbatim EN message templates. Then **100c** (130/140 + `ce_refs`/indexes over the SSOT) · **100d** (the
+orchestrator + GUI "100" button + the 4 report files + golden/parity + docs). **150 + `accept` are out of scope.**
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +

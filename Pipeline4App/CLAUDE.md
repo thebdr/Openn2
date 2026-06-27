@@ -51,10 +51,11 @@ Pipeline4App/
   DESIGN.md · CLAUDE.md · HANDOFF.md · launch_gui.py
   config_project/                  (the restructured config — see "Config" below)
   pipeline4/
-    core/  keys.py · table.py · database.py · config.py · severity.py · finding.py · treatments.py · run.py
-    io/    workbook.py · xlsx_edit.py
+    core/  keys.py · table.py · database.py · config.py · severity.py · finding.py · treatments.py · run.py · model.py
+    io/    workbook.py · xlsx_edit.py · render.py
     domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py · hardware_csv.py · coverage.py
     domain/blocks/ (ph800) database.py · table.py · registry.py · templates.py · builders.py · engine.py · xml_emit.py
+    domain/validation/ (ph100) __init__.py · address.py  (+ iolist/matrix/crosscheck as built)
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -475,6 +476,33 @@ address = a raw module point) | `structural` (untyped, no address); only a `sign
   synthetic Database, render + build->project). **920 (TIA Project Coverage) stays deferred** (pending an OP4
   project export), matching PL3.
 
+## Phase 100 — Documents Validation — IN PROGRESS (100a reporting spine DONE; 100b/c/d TODO)
+`domain/validation/` - a clean-room port of PL3's `domain/validation/`, the LAST phase (PL3's first). Validates
+the hand-authored I/O List + Cause&Effect workbooks via 5 sub-phases: 110 standalone I/O List, 120 standalone
+C&E, 130 cross-check CEM->IOL, 140 cross-check IOL->CEM, 150 diagnosis-slot uniqueness. **User decisions:**
+reproduce **PL3's rich txt+HTML reports** (the aligned line + the cross-check Cmp + dual-workbook links); land
+**110+120+130+140 now, DEFER 150** (it needs relocating `diag_container_check` + populating `diag_block_name`
+at staging, touching the locked 300 parity); **DROP the `accept` doc-mutating treatment** entirely. 110/120 read
+the RAW workbooks (facts staging normalizes away); 130/140 read the SSOT. Findings flow through the existing
+Finding/treatment/severity spine; the phase **never halts** (`run.render`, not `gate`). The English `v_*` message
+text is ported verbatim into each finding's `detail`.
+- **100a DONE - the reporting spine.** `core/model.py` (the `InfoBlock` + `Cmp` render value-objects - the part
+  of PL3's `LogEntry` the rich report still needs). **`core/finding.py` extended** with 4 OPTIONAL render fields
+  (`location2`/`doc2`/`info`/`cmp`, default `""`/None) - non-validation phases leave them unset, so the universal
+  Finding stays lean + hashable + the uid unchanged (they are NOT hashed, NOT persisted to `validation_issues`).
+  `domain/validation/address.py` (verbatim - the dotted I/Q/O 2-or-4-part format check). **`io/render.py`** - the
+  report renderer over Findings (verbatim port of PL3's `io/render.py`): a banner per `severity==PHASE` finding,
+  the `[LEVEL] <phase>-<type>  <loc>  | bit|FLD|desc|drawing|type-idx  :: <detail>` line with per-(sub)phase
+  width auto-fit, the cross-check `<loc1> vs <loc2>` dual-link + the aligned `<addr> op <addr> | <fld> op <fld>`
+  Cmp, the errors-only filter (banners + INFO/WARN/ERROR/FAIL, drops PASS/SKIP/DEBUG), and the standalone
+  no-wrap HTML (the GUI-log-viewer look). `config.validation_report_dir()` (ProjectDocumentation/Reports) +
+  `VALIDATION_REPORT_STEM`/`VALIDATION_ERRORS_STEM`. Tests: `test_validation_render.py` (6: address + the
+  renderer's banner/line/InfoBlock/Cmp+dual-link/errors-filter/HTML). NOTE on parity: PL4's `finding._norm`
+  collapses whitespace but does NOT lowercase (PL3's does), so the phase-100 parity oracle compares finding
+  TUPLES `(phase, type, norm(location), norm(detail))` with a matching normalization, not raw uids.
+- **100b/c/d TODO:** 110+120 validators (read the raw workbooks, the verbatim EN messages) · 130/140 cross-checks
+  + the `ce_refs` reader/indexes · the orchestrator + the GUI "100" button + the 4 report files + the golden/parity.
+
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
 bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
@@ -535,7 +563,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **200**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **206**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
