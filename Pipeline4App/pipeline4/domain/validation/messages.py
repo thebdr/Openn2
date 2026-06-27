@@ -40,6 +40,27 @@ MESSAGES = {
     "area_addr_kind": "Input address {addr} on an AREA sheet (outputs only)",
     "dup_addr": "Duplicated address {addr} within the sheet (first seen at {first})",
     "ce_summary": "{refs} address reference(s) checked across {sheets} sheet(s)",
+    # --- 130 cross-check CEM -> IOL ---
+    "cem_ref_empty": "Reference carries no device designation",
+    "cem_addr_ok": "Address found in the I/O List with a matching FLD",
+    "cem_addr_fld": "Address found in the I/O List under a DIFFERENT FLD",
+    "cem_addr_none": "Address not found in the I/O List",
+    "cem_fld_ok": "FLD found in the I/O List at a matching address",
+    "cem_fld_addr": "FLD found in the I/O List at a DIFFERENT address",
+    "cem_fld_none": "FLD not found in the I/O List",
+    "cem_summary": "{refs} C&E reference(s) checked against the I/O List",
+    # --- 140 cross-check IOL -> CEM ---
+    "iol_cem_match": "Present in the Cause&Effect matrix; device and address match.",
+    "iol_cem_missing_mandatory": "Mandatory signal absent from the Cause&Effect matrix.",
+    "iol_cem_missing_safety": "Safety-related signal absent from the Cause&Effect matrix.",
+    "iol_cem_missing_plain": "Not found in the Cause&Effect matrix.",
+    "iol_cem_fld_only": "Present in the Cause&Effect matrix at a different address.",
+    "iol_cem_addr_only": "Address present in the Cause&Effect matrix under a different device.",
+    "iol_cem_skipped": "Skipped - matches excluded word '{word}'.",
+    "iol_cem_unclassified": "Untyped, not safety-related - not cross-checked.",
+    "iol_cem_not_required": "Type not required in the Cause&Effect matrix - not cross-checked.",
+    "iol_cem_summary": "{checked} I/O signal(s) checked against the Cause&Effect matrix",
+    "iol_cem_skip_summary": "{skipped} signal(s) skipped by the exclusion lists",
 }
 
 
