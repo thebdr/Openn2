@@ -37,7 +37,8 @@ Database
  ├─ db_members         every generated DB member (db_element)     ← 520 (TODO)
  ├─ diagnosis_entries  every diagnosis element (unified io|logic) ← 600 (DONE)
  ├─ hardware_stations · hardware_modules   the generatable heads + IoDevice cards   ← 700a (DONE)
- ├─ plc_tags · software_blocks · coverage · validation_issues   (per phase; validation_issues DONE)
+ ├─ software_blocks · software_block_members   the built blocks + their @ rows   ← 800a (DONE)
+ ├─ plc_tags · coverage · validation_issues   (per phase; validation_issues DONE)
 ```
 Each table persists to one **CSV-with-JSON-cells** file in the **top-level `Database/` folder**
 (`Shared/Database/` builtin, or `<project>/Database/`). Every created entity carries a content-hash
@@ -52,6 +53,7 @@ Pipeline4App/
     core/  keys.py · table.py · database.py · config.py · severity.py · finding.py · treatments.py · run.py
     io/    workbook.py · xlsx_edit.py
     domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py · hardware_csv.py
+    domain/blocks/ (ph800) database.py · table.py · registry.py · templates.py · builders.py · engine.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -369,6 +371,32 @@ GUI **"700" button** runs stage -> build -> project.
   (1145 bytes) + `Modules.csv` (1896 bytes) byte-identical to PL3's `_format2` over the same extract.** Test:
   `test_hardware.py::format2_projection` (no BOM, CRLF, the fmt2 tag + descriptive header + data rows).
 
+## Phase 800 — Software — IN PROGRESS (800a spine + simple builders DONE; 800b/c TODO)
+`domain/blocks/` (package) - a clean-room port of PL3's `domain/blocks/`. The model: **`Database`** (read-only
+accessors over the `signals` rows) -> **builders** (hand-written Python, `@builds("name")`, one per template) ->
+**`Table`** (columns + rows; a list cell = the horizontal ITERATOR) -> the **engine** serializes to the `$/#/%/@`
+**CreationInfo CSV** (the OP4 import surface). **Decision (user): the editable `.xlsm` shells are DEFERRED** (an
+operator-editing surface, NOT part of the OP4 contract); the CSVs are produced directly in `fill` mode. **Phase 800
+depends on 520** (the builders read the write-back fields `name_in_db`/`datablocks`/`plc_binding`).
+- **800a DONE - the spine + engine + simple builders.** `table.py` (Table, verbatim) · `registry.py` (`@builds`,
+  verbatim) · `database.py` (Database - ADAPTED: PL4's `datablocks`/`matrix_areas` are JSON **list** cells, so
+  `by_db`/`by_area`/`areas` read the lists via `_as_list`, no `|`-split) · `templates.py` (`scan_templates` over the
+  shipped `*.xml` for the `!!key$$` key inventory + `short_name`/`template_ref`/`COIL_COLUMN_BLOCKS` - the `.xlsm`
+  scan is deferred, only the template scan is ported) · `builders.py` (the helpers `_node_of`/`_group_by_node`/
+  `_chunked`/`PAD` + the 3 simple builders **00** Commissioning / **06** Feedback Error / **07** Speed Control,
+  verbatim) · `engine.py` (the serialization verbatim + `build`/`project`). **`build()`** runs every registered
+  builder -> the **`software_blocks`** (name/template/the `%` key inventory `["TemplateType"]+scan`/the Table
+  column ORDER) + **`software_block_members`** (one row per @ row, the `values` JSON cell = the row, a list value =
+  the ITERATOR) tables + `record` (`blk_builder_no_rows` WARN) + save. **`project()`** reconstructs each Table from
+  `software_blocks.columns` + the members' `values` -> the `$/#/%/@` CreationInfo CSV (the `%` header = the
+  template's full placeholder inventory). `config.BLOCK_TEMPLATES_DIR` + `config.blocks_creation_dir()`. **PARITY:
+  the 3 CreationInfo CSVs are BYTE-IDENTICAL to PL3's builders+serializer** over the same 520-enriched rows, modulo
+  the deliberate `pipeline3`->`pipeline4` `#` comment line. Tests: `test_blocks.py` (8: Table/Database list-cells,
+  the serialization, the 3 builders, the build->project round-trip).
+- **800b TODO:** the complex builders (**02** EM Push Button, **03** Zone Cumulative, **04** ESTOP, **05** Output
+  Feedback, **08** Gate Manager) + CSV parity each. **800c TODO:** the **03** direct-FC-XML emit + **02_COM** safe-DB
+  + **InstanceDBs.csv** (merge the 520 `instance_dbs` + the builder instances) + the GUI "800" button.
+
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
 bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
@@ -427,7 +455,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **169**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **177**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
@@ -435,10 +463,11 @@ the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** 
 slug), the **600 `diagnosis` suite** (18, + the S5 `diag_scl_template_missing` slug), the **severity/findings core**
 (`test_severity`/`test_finding`/`test_treatments`/`test_run` = 20, incl. S4's `run.render`), the **700 `hardware`
 suite** (10: the helpers, the extract incl. auto-plug/PotentialGroup/by-type/default-cards, the missing-DTD
-FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projection)).
-Data-dependent parity (staging/520/400/510/600/700 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/
-`interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `Stations.csv`/`Modules.csv` vs PL3 `_format2`)
-is verified by a script against the real docs (not in the gate). Each phase is committed only with its gate + parity green.
+FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projection), the **800a `blocks` suite**
+(8: Table/Database list-cells, the $/#/%/@ serialization, the 00/06/07 builders, the build->project round-trip)).
+Data-dependent parity (staging/520/400/510/600/700/800 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/
+`interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `Stations.csv`/`Modules.csv` + the CreationInfo CSVs
+vs PL3 `_format2`/`write_creation_csv`) is verified by a script (not in the gate). Each phase is committed with its gate + parity green.
 
 ## Conventions & gotchas
 - **JSON cells are schema-declared** (a column is JSON by the table's `json_columns`, not by guessing). The

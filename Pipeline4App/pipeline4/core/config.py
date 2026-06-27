@@ -22,8 +22,8 @@ else:
 SHARED = os.path.normpath(os.path.join(APP_ROOT, os.pardir, "Shared"))
 TEMPLATES_DIR = os.path.join(SHARED, "Templates")
 INTERFACE_TEMPLATE = os.path.join(TEMPLATES_DIR, "MachineInterfaces", "TEMPLATE_INTERFACES_v0.0.xlsx")
-DIAG_SCL_TEMPLATE = os.path.join(TEMPLATES_DIR, "Tia Portal Software Blocks",
-                                 "TEMPLATE--v1.0--06_Diagnostic for OPC.scl")
+BLOCK_TEMPLATES_DIR = os.path.join(TEMPLATES_DIR, "Tia Portal Software Blocks")   # ph800 block .xml templates
+DIAG_SCL_TEMPLATE = os.path.join(BLOCK_TEMPLATES_DIR, "TEMPLATE--v1.0--06_Diagnostic for OPC.scl")
 _BUILTIN_CONFIG_PROJECT = os.path.join(APP_ROOT, "config_project")
 _BUILTIN_DATABASE = os.path.join(SHARED, "Database")        # the SSOT folder (DESIGN 10.3)
 _BUILTIN_OUTPUT = os.path.join(SHARED, "OutputTree")        # the OPn BuilderData export surface
@@ -96,6 +96,12 @@ def hardware_dir() -> str:
     """The phase-700 Hardware BuilderData surface (`Stations.csv` + `Modules.csv`), under the output root
     - what OP4 imports. Matches PL3's OUTPUT_PATHS['hardware_dir'] (the OP-import contract path)."""
     return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "HardwareConfiguration")
+
+
+def blocks_creation_dir() -> str:
+    """The phase-800 Software CreationInfo BuilderData surface (the `$/#/%/@` template-fill CSVs +
+    `InstanceDBs.csv`), under the output root - what OP4 imports. Matches PL3's `blocks_creation_dir`."""
+    return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "SoftwareBlocks", "CreationInfo")
 
 
 # --- sheet-name resolution (regex / JS-literal, case-insensitive) -------------------------------- #
