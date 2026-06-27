@@ -101,6 +101,129 @@ def test_builder_07_speed_control_pairs_encoders():
     eq(t.rows[1]["04_SPEED.{db_element:ENC2/2}"], "", "no N2/2 for index 2 -> blank")
 
 
+# --- the complex builders (02/03/04/05/08) ----------------------------------------------------- #
+def test_builder_02_em_push_button_groups_inputs():
+    node = _node("n1", "1.2.3.4", i0="0", i1="20", q0="0", q1="20")
+    ins = ([{"script_type": "E1/2", "bit": f"I{b}.0", "name_in_db": f"PB{b}"} for b in range(3)]
+           + [{"script_type": "B1/2", "bit": "I3.0", "name_in_db": "BRK0"}])   # 4 inputs -> 1 quartet
+    t = builders.build_02_em_push_button(Database([node] + ins))
+    eq(len(t), 1, "4 inputs (E1/2 + B1/2) -> one chunk of 4")
+    eq(t.rows[0]["instanceOf-00_Push-Button_Input"], "EMPB_n1_1")
+    quartet = ["PB0", "PB1", "PB2", "BRK0"]
+    eq(t.rows[0]["ITERATOR_STRINGS"], quartet + quartet, "the padded quartet emitted twice")
+
+
+def test_area_descriptions_reads_list_cells():
+    rows = [{"matrix_areas": ["AREA 1", "AREA 2"], "areas_description": ["Infeed", "Outfeed"]},
+            {"matrix_areas": "AREA 3", "areas_description": "Sorter"}]            # tolerate legacy strings
+    eq(builders._area_descriptions(Database(rows)),
+       {"AREA 1": "Infeed", "AREA 2": "Outfeed", "AREA 3": "Sorter"}, "list + legacy-string cells, first-seen")
+
+
+def test_builder_03_zone_cumulative_per_area_group():
+    rows = [
+        {"script_type": "E1/2", "matrix_areas": ["AREA 1"], "areas_description": ["Infeed"],
+         "name_in_db": "PB_A", "datablocks": ["01_Pushbutton", "X"]},
+        {"script_type": "E1/2", "matrix_areas": ["AREA 1"], "areas_description": ["Infeed"],
+         "name_in_db": "PB_B", "datablocks": ["01_Pushbutton"]},
+        {"script_type": "KQ", "matrix_areas": ["AREA 1"], "areas_description": ["Infeed"],
+         "name_in_db": "FDB_A", "datablocks": ["03_FDBACK"]},
+    ]
+    t = builders.build_03_zone_cumulative(Database(rows))
+    eq(len(t), 2, "AREA 1 has PB + FDB groups (no breakers/doors)")
+    eq(t.rows[0]["nameOfDB"], "01_Pushbutton", "the leftmost DB from the list cell")
+    eq(t.rows[0]["02_COM.{db_element}"], "AREA 1 PB")
+    eq(t.rows[0]["NetworkComment"], "AREA 1 PB - Infeed", "element - description")
+    eq(t.rows[0]["ITERATOR_STRINGS"], ["PB_A", "PB_B"], "exact-sized member iterator, no padding")
+    eq(t.rows[1]["02_COM.{db_element}"], "AREA 1 FDB")
+
+
+def test_builder_04_estop_sorter_tier_and_generic():
+    rows = [
+        # a SORTER area with 3 doors -> tier cap 4 (TT01), padded to 4
+        {"script_type": "DI1/2", "matrix_areas": ["AREA 1"], "IsSorterArea": "yes", "name_in_db": f"DOOR{n}"}
+        for n in range(3)
+    ] + [
+        {"script_type": "B1/2", "matrix_areas": ["AREA 1"], "IsSorterArea": "yes", "name_in_db": "BRK1"},
+        # a GENERIC area, no doors -> TT06
+        {"script_type": "E1/2", "matrix_areas": ["AREA 2"], "name_in_db": "PB2"},
+    ]
+    t = builders.build_04_estop(Database(rows))
+    eq(len(t), 2, "one network per area")
+    s = next(r for r in t.rows if r["instanceOf-ESTOP1"] == "ESTOP_AREA 1")
+    eq(s["TemplateType"], "01", "3 doors -> the cap-4 tier")
+    eq(s["ITERATOR_STRINGS"], ["DOOR0", "DOOR1", "DOOR2", builders.PAD], "doors padded to the tier")
+    eq(s["01_PushButton.SafetyBreaker1"], "BRK1")
+    eq(s["01_PushButton.SafetyBreaker2"], "Always TRUE", "the missing 2nd breaker is AND-neutral")
+    eq(s["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "SORTER_01_ENCODER_HEALTHY", "sorter-only")
+    g = next(r for r in t.rows if r["instanceOf-ESTOP1"] == "ESTOP_AREA 2")
+    eq((g["TemplateType"], g["ITERATOR_STRINGS"]), ("06", []), "generic: TT06, no door slots")
+    eq(g["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "", "no encoder on a generic area")
+
+
+def test_of_variant_picks_smallest_cover():
+    eq(builders._of_variant(1, 1, 1)[3], 1, "exact 1/1/1 -> TT01")
+    eq(builders._of_variant(1, 3, 1)[3], 3, "fb=3 needs the cap-4 variant -> TT03")
+    eq(builders._of_variant(2, 1, 1)[3], 7, "oncond=2 -> TT07")
+    eq(builders._of_variant(9, 9, 9), None, "nothing covers it")
+
+
+def test_builder_05_output_feedback_source_row_orders_unit():
+    rows = [
+        {"script_type": "KQ", "index": "7", "source_row": "20", "name_in_db": "KQ_late",
+         "name_in_tagtable": "TAGQ2", "iol_FLD": "LATE", "device": "D2", "combined_FLD": "FLDx",
+         "numerazione_linea": "L1", "matrix_areas": ["AREA 1"]},
+        {"script_type": "KQ", "index": "7", "source_row": "5", "name_in_db": "KQ_early",
+         "name_in_tagtable": "TAGQ1", "iol_FLD": "EARLY", "device": "D1", "combined_FLD": "FLDx",
+         "numerazione_linea": "L1", "matrix_areas": ["AREA 1"]},
+        {"script_type": "KI", "index": "7", "source_row": "8", "name_in_tagtable": "TAGI1"},
+    ]
+    t = builders.build_05_output_feedback(Database(rows))
+    eq(len(t), 1, "one contactor unit (index 7)")
+    r = t.rows[0]
+    eq(r["03_FDBACK_RAW.{db_element}"], "KQ_early", "source_row sort -> the earliest KQ is kq0")
+    eq(r["instanceOf-FDBACK"], "FDBACK_EARLY_D2", "instanceOf = kq0 FLD + each extra KQ's device")
+    eq(r["tagName:Contactor1_Output"], "TAGQ1")
+    eq(r["tagName:Contactor1_QBadInput"], "QBAD_TAGQ1")
+    eq(r["NetworkComment"], "AREA 1 Contactor Output FLDx L1", "matrix_areas |-joined, whitespace collapsed")
+    eq(r["05_EM_STATE.{matrix_areas.1}"], "AREA 1 Q_Delayed")
+
+
+def test_builder_05_output_feedback_pads_feedback_slots():
+    rows = [
+        {"script_type": "KQ", "index": "9", "source_row": "1", "name_in_db": "KQ9",
+         "name_in_tagtable": "TQ", "iol_FLD": "F", "matrix_areas": ["AREA 1"]},
+        {"script_type": "KI", "index": "9", "source_row": "2", "name_in_tagtable": "TI"},
+    ]
+    t = builders.build_05_output_feedback(Database(rows))
+    r = t.rows[0]
+    eq(r["TemplateType"], "01", "1 oncond / 1 fb / 1 co -> TT01")
+    eq(r["tagName:Contactor1_FeedbackInput"], "TI", "the one real KI")
+
+
+def test_builder_08_gate_manager_sorters_and_doors():
+    node = _node("n1", "1.2.3.4", i0="0", i1="20", q0="0", q1="20")
+    rows = [
+        node,
+        {"script_type": "N1/2", "index": "1"},                         # a sorter -> one TT01 row
+        {"script_type": "DI1/2", "index": "5", "bit": "I1.0", "name_in_db": "D_in", "iol_FLD": "DOORA",
+         "name_in_tagtable": "TDI1", "IsSorterArea": "yes"},
+        {"script_type": "DR", "index": "5", "name_in_tagtable": "TDR"},  # reset exists
+        {"script_type": "DQ", "index": "5", "name_in_tagtable": "TDQ"},  # the door DQ -> one TT02 row
+    ]
+    t = builders.build_08_gate_manager(Database(rows))
+    tt01 = [r for r in t.rows if r["TemplateType"] == "01"]
+    tt02 = [r for r in t.rows if r["TemplateType"] == "02"]
+    eq((len(tt01), len(tt02)), (1, 1), "one sorter row + one door row")
+    eq(tt01[0]["SPEED_STATE_REC.SORTER_{index}_STOPPED"], "SORTER_01_STOPPED")
+    d = tt02[0]
+    eq(d["instanceOf-02_Safety_Door"], "SFDOOR_DOORA", "instanceOf from the DI anchor FLD")
+    eq(d["00_Commissioning.{db_element}"], "n1 1.2.3.4", "bypass = the DI's node")
+    eq(d["tagName:DoorClosedCh1"], "TDI1")
+    eq(d["tagName:DoorSolenoidUnlock"], "TDQ")
+    eq((d["choice:IsSorterDoor"], d["choice:DoorResetNecessary"]), ("Always TRUE", "Always TRUE"))
+
+
 # --- build -> project round-trip (the SSOT tables -> CSV) -------------------------------------- #
 def test_project_reconstructs_from_tables():
     blk, mem = engine.software_blocks_table(), engine.software_block_members_table()
@@ -127,5 +250,13 @@ if __name__ == "__main__":
         ("builder_00_commissioning", test_builder_00_commissioning),
         ("builder_06_feedback_error_chunks_to_8", test_builder_06_feedback_error_chunks_to_8),
         ("builder_07_speed_control_pairs_encoders", test_builder_07_speed_control_pairs_encoders),
+        ("builder_02_em_push_button_groups_inputs", test_builder_02_em_push_button_groups_inputs),
+        ("area_descriptions_reads_list_cells", test_area_descriptions_reads_list_cells),
+        ("builder_03_zone_cumulative_per_area_group", test_builder_03_zone_cumulative_per_area_group),
+        ("builder_04_estop_sorter_tier_and_generic", test_builder_04_estop_sorter_tier_and_generic),
+        ("of_variant_picks_smallest_cover", test_of_variant_picks_smallest_cover),
+        ("builder_05_output_feedback_source_row_orders_unit", test_builder_05_output_feedback_source_row_orders_unit),
+        ("builder_05_output_feedback_pads_feedback_slots", test_builder_05_output_feedback_pads_feedback_slots),
+        ("builder_08_gate_manager_sorters_and_doors", test_builder_08_gate_manager_sorters_and_doors),
         ("project_reconstructs_from_tables", test_project_reconstructs_from_tables),
     ]))

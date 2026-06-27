@@ -371,7 +371,7 @@ GUI **"700" button** runs stage -> build -> project.
   (1145 bytes) + `Modules.csv` (1896 bytes) byte-identical to PL3's `_format2` over the same extract.** Test:
   `test_hardware.py::format2_projection` (no BOM, CRLF, the fmt2 tag + descriptive header + data rows).
 
-## Phase 800 — Software — IN PROGRESS (800a spine + simple builders DONE; 800b/c TODO)
+## Phase 800 — Software — IN PROGRESS (800a spine + simple builders + 800b complex builders DONE; 800c TODO)
 `domain/blocks/` (package) - a clean-room port of PL3's `domain/blocks/`. The model: **`Database`** (read-only
 accessors over the `signals` rows) -> **builders** (hand-written Python, `@builds("name")`, one per template) ->
 **`Table`** (columns + rows; a list cell = the horizontal ITERATOR) -> the **engine** serializes to the `$/#/%/@`
@@ -393,9 +393,23 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
   the 3 CreationInfo CSVs are BYTE-IDENTICAL to PL3's builders+serializer** over the same 520-enriched rows, modulo
   the deliberate `pipeline3`->`pipeline4` `#` comment line. Tests: `test_blocks.py` (8: Table/Database list-cells,
   the serialization, the 3 builders, the build->project round-trip).
-- **800b TODO:** the complex builders (**02** EM Push Button, **03** Zone Cumulative, **04** ESTOP, **05** Output
-  Feedback, **08** Gate Manager) + CSV parity each. **800c TODO:** the **03** direct-FC-XML emit + **02_COM** safe-DB
-  + **InstanceDBs.csv** (merge the 520 `instance_dbs` + the builder instances) + the GUI "800" button.
+- **800b DONE - the complex builders.** Added to `builders.py` (verbatim from PL3 except the two PL4 adaptations):
+  **02** EM Push Button (E1/2 + B1/2 by node, chunked to 4, the padded quartet emitted twice) · **03** Zone Cumulative
+  (per AREA × signal group -> a 02_COM AND-coil; `ZONE_GROUPS`, `_area_descriptions`) · **04** ESTOP (per AREA; SORTER
+  door-capacity tier 01-05 vs GENERIC 06; `ESTOP_SORTER_TIERS`, `_sorter_areas`, `_area_nn`) · **05** Output Feedback
+  (per K-family `index` group; the 3-family capacity variant `OUTPUT_FEEDBACK_VARIANTS`/`_of_variant`) · **08** Gate
+  Manager (one TT01 per sorter + one TT02 per door DQ). The two adaptations vs PL3: the multi-valued cells
+  (`matrix_areas`/`areas_description`/`datablocks`) are read via **`_as_list`** (not `.split("|")`) - `matrix_areas`/
+  `datablocks` drop empties (PL3 does too), but `_area_descriptions` reads `areas_description` KEEPING empties to
+  preserve PL3's positional `descs[i]` indexing; and PL3's `_source_row` (05's unit sort key) is PL4's **`source_row`**.
+  05's NetworkComment `|`-joins the `matrix_areas` list (PL3 rendered the joined string). **PARITY (over the same 269
+  520-enriched staged rows):** the 7 CreationInfo CSVs PL3 also emits (00/02/04/05/06/07/08) are **byte-identical to
+  PL3's builders+serializer** (modulo the `pipeline3`->`pipeline4` `#` line); all 5 new builders are **table-identical**
+  to PL3's (03 verified at the table level - PL3 emits it as FC XML, 800c). Tests: `test_blocks.py` (+8: the 5 builders'
+  grouping/variant/tier/list-cells/`source_row`-sort, `_area_descriptions`, `_of_variant`). 16 cases total.
+- **800c TODO:** the **03** direct-FC-XML emit (`xml_emit`, PL3 `domain/blocks/xml_emit.py`) + **02_COM** safe-DB
+  + **InstanceDBs.csv** (merge the 520 `instance_dbs` + the builder `instanceOf-*` cells) + the GUI "800" button
+  (stage -> 520 -> 800 build -> project).
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
@@ -455,7 +469,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **177**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **185**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
@@ -463,8 +477,9 @@ the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** 
 slug), the **600 `diagnosis` suite** (18, + the S5 `diag_scl_template_missing` slug), the **severity/findings core**
 (`test_severity`/`test_finding`/`test_treatments`/`test_run` = 20, incl. S4's `run.render`), the **700 `hardware`
 suite** (10: the helpers, the extract incl. auto-plug/PotentialGroup/by-type/default-cards, the missing-DTD
-FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projection), the **800a `blocks` suite**
-(8: Table/Database list-cells, the $/#/%/@ serialization, the 00/06/07 builders, the build->project round-trip)).
+FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projection), the **800a+800b `blocks` suite**
+(16: Table/Database list-cells, the $/#/%/@ serialization, the 00/06/07 simple builders, the 02/03/04/05/08 complex
+builders + `_area_descriptions`/`_of_variant`, the build->project round-trip)).
 Data-dependent parity (staging/520/400/510/600/700/800 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/
 `interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `Stations.csv`/`Modules.csv` + the CreationInfo CSVs
 vs PL3 `_format2`/`write_creation_csv`) is verified by a script (not in the gate). Each phase is committed with its gate + parity green.

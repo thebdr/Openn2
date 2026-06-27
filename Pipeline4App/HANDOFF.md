@@ -12,13 +12,14 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 
 ## Where we are
 - **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 + 700 COMPLETE; severity rollout S1–S6 COMPLETE;
-  phase 800a (Software spine + simple builders) DONE.** NEXT: 800b/c · then 900 (Coverage) · 100 (Validation).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`76afb75`** (S1–S6 + phase 700 complete, all pushed).
-  **The working tree holds the UNCOMMITTED phase-800a chunk** (config.py + NEW domain/blocks/ package + NEW
-  test_blocks.py + CLAUDE.md + HANDOFF.md) — implemented, gate green, byte-parity verified, adversarial review running.
+  phase 800a (Software spine + simple builders) + 800b (the 5 complex builders) DONE.** NEXT: 800c · then 900
+  (Coverage) · 100 (Validation).
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`be017ad`** (phase 800a, pushed).
+  **The working tree holds the UNCOMMITTED phase-800b chunk** (`domain/blocks/builders.py` + `test_blocks.py` +
+  CLAUDE.md + HANDOFF.md) — implemented, gate green, byte/table-parity verified.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 177 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 185 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -94,9 +95,10 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 20. `5838f88` **severity S4** — retrofit 400+510 (`build_interfaces`/`io_tags.project` → findings) + `core/run.py:render`
 21. `7c2fa17` **severity S5** — retrofit 600 (`diagnosis.build`/`diaglist_csv`/`diagnosis_scl` → findings; the last legacy tuple gone)
 22. `7f84320` **severity S6** — rollout complete (full 5-phase byte-parity re-run = 0 diffs vs pre-rollout `95d3dfb`)  **← origin/pl4 PUSHED head**
-23. `ddad2fa` **phase 700a** — Hardware build: `config` DTD loader + `domain/hardware.py` (`hardware_stations`/`hardware_modules` + `build`); parity vs PL3 `extract` exact  **← origin/pl4 PUSHED head**
-24. `76afb75` **phase 700b** — `domain/hardware_csv.py` (format-2 `Stations.csv`/`Modules.csv`) + the GUI "700" button; CSVs byte-identical to PL3  **← origin/pl4 PUSHED head**
-25. *(uncommitted)* **phase 800a** — `domain/blocks/` spine + engine + the 00/06/07 builders -> `software_blocks`/`software_block_members` -> CreationInfo CSVs; parity vs PL3 exact
+23. `ddad2fa` **phase 700a** — Hardware build: `config` DTD loader + `domain/hardware.py` (`hardware_stations`/`hardware_modules` + `build`); parity vs PL3 `extract` exact
+24. `76afb75` **phase 700b** — `domain/hardware_csv.py` (format-2 `Stations.csv`/`Modules.csv`) + the GUI "700" button; CSVs byte-identical to PL3
+25. `be017ad` **phase 800a** — `domain/blocks/` spine + engine + the 00/06/07 builders -> `software_blocks`/`software_block_members` -> CreationInfo CSVs; parity vs PL3 exact  **← origin/pl4 PUSHED head**
+26. *(uncommitted)* **phase 800b** — the 5 complex builders (02/03/04/05/08) in `builders.py` + 8 tests; 7 CreationInfo CSVs byte-identical to PL3 + all 5 builders table-identical (03 at table level, PL3 emits it as XML)
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -158,16 +160,22 @@ FAIL / `hw_switch_not_in_dtd` WARN) + `domain/hardware_csv.py` (the format-2 `St
 + the GUI "700" button (stage -> build -> project). PARITY vs current PL3 `extract`/`_format2` over the same staged
 rows: **9 stations + 18 modules, 0 field mismatches; Stations.csv (1145B) + Modules.csv (1896B) byte-identical**.
 **PHASE 800 (Software) IN PROGRESS** — user-confirmed plan: DEFER the editable `.xlsm` shells (an operator surface,
-NOT the OP4 contract; CSVs built directly in `fill` mode); grouped 800a/b/c chunking. **800a DONE (uncommitted):**
+NOT the OP4 contract; CSVs built directly in `fill` mode); grouped 800a/b/c chunking. **800a DONE (`be017ad`):**
 `domain/blocks/` package (Database/Table/registry/templates/builders/engine), the 3 simple builders (00/06/07),
 `build` -> `software_blocks`/`software_block_members` tables + `project` -> the `$/#/%/@` CreationInfo CSVs;
 `config.BLOCK_TEMPLATES_DIR` + `blocks_creation_dir()`. **Phase 800 depends on 520** (the builders read
 `name_in_db`/`datablocks`/`plc_binding`). PARITY: the 3 CreationInfo CSVs byte-identical to PL3 (mod the
-`pipeline3`->`pipeline4` `#` line). **NEXT: 800b** — the complex builders (**02** EM Push Button, **03** Zone
-Cumulative, **04** ESTOP, **05** Output Feedback, **08** Gate Manager; see PL3 `domain/blocks/builders.py` - note
-`by_db`/`by_area` use PL4 list cells; 03/04 use `by_area`) + CSV parity each. **Then 800c** — the **03** direct-FC-XML
-emit (`xml_emit`, PL3 `domain/blocks/xml_emit.py`) + **02_COM** safe-DB + **InstanceDBs.csv** (merge 520 `instance_dbs`
-+ builder `instanceOf-*` cells) + the GUI "800" button (stage -> 520 -> 800 build -> project). Then **900 (Coverage)**
+`pipeline3`->`pipeline4` `#` line). **800b DONE (uncommitted):** the 5 complex builders (**02** EM Push Button,
+**03** Zone Cumulative, **04** ESTOP, **05** Output Feedback, **08** Gate Manager) added to `builders.py`, verbatim
+from PL3 except: the list cells (`matrix_areas`/`areas_description`/`datablocks`) read via **`_as_list`** (areas_desc
+keeps empties for the positional `_area_descriptions` indexing), and PL3's `_source_row` (05's sort key) is PL4's
+**`source_row`**; 05's NetworkComment `|`-joins the `matrix_areas` list. PARITY over the same 269 staged rows: the
+7 CreationInfo CSVs PL3 also emits (00/02/04/05/06/07/08) **byte-identical**, all 5 new builders **table-identical**
+(03 at table level - PL3 emits it as FC XML). Tests +8 (16 total in `test_blocks.py`); gate 185. Parity oracle:
+`scratchpad/parity_800b.py` (stages PL4 + 520, translates rows -> PL3 shape, runs PL3's real builders+serializer).
+**NEXT: 800c** — the **03** direct-FC-XML emit (`xml_emit`, PL3 `domain/blocks/xml_emit.py`) + **02_COM** safe-DB
++ **InstanceDBs.csv** (merge 520 `instance_dbs` + builder `instanceOf-*` cells) + the GUI "800" button (stage -> 520
+-> 800 build -> project). Then **900 (Coverage)**
 · **100 (Validation)** (100/900 read `validation_issues`; `accept` [doc-mutating treatment] lands with 100).
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
