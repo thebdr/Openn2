@@ -17,10 +17,10 @@ BUTTON_FILLS = {"run": "#e84393", "phase": "#f5f6fa", "action": "#dfe6e9",
 BUTTON_FG = {"run": "#ffffff", "phase": "#2d3436", "action": "#2d3436",
              "open": "#1e272e", "special": "#ffffff", "disabled": "#636e72"}
 
-# log level -> (foreground colour, bold?)
-LOG_COLORS = {"PHASE": ("#74b9ff", True), "ERROR": ("#ff6b6b", True), "FAIL": ("#ff6b6b", True),
+# log level -> (foreground colour, bold?). FAIL (halt) is bold red; ERROR a softer red; DEBUG muted.
+LOG_COLORS = {"PHASE": ("#74b9ff", True), "FAIL": ("#ff6b6b", True), "ERROR": ("#e17055", True),
               "WARN": ("#fdcb6e", False), "PASS": ("#55efc4", False), "INFO": ("#dfe6e9", False),
-              "SKIP": ("#b2bec3", False)}
+              "SKIP": ("#b2bec3", False), "DEBUG": ("#a29bfe", False)}
 
 DARK_BG = "#1e1e1e"
 DARK_FG = "#dfe6e9"

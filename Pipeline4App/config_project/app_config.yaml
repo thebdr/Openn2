@@ -1,0 +1,8 @@
+# PL4 app / GUI launch config - COSMETIC, tracked (NOT per-project run params; those live in
+# project_params.yaml). Read by config.load_app_ui and applied when the GUI window starts.
+
+user_interface:
+  # Which log levels the GUI shows. Entries may be single chars OR full names (read by FIRST CHAR):
+  #   F = FAIL   E = ERROR   W = WARN   I = INFO   S = SKIP   P = PASS   D = DEBUG
+  # PHASE section banners always show. (Omit a letter to hide that level.)
+  log_levels: [F, E, W, I, S, P, D]

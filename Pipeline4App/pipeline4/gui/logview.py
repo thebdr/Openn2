@@ -13,16 +13,20 @@ from pipeline4.gui import theme
 
 
 class LogView(scrolledtext.ScrolledText):
-    def __init__(self, parent):
+    def __init__(self, parent, shown_levels=None):
         super().__init__(parent, wrap="none", height=20, state="disabled", borderwidth=0,
                          bg=theme.DARK_BG, fg=theme.DARK_FG, insertbackground=theme.DARK_FG,
                          font=theme.MONO_FONT)
+        # the levels this pane displays (the set from config.load_app_ui); None -> every coloured level.
+        self.shown_levels = set(shown_levels) if shown_levels is not None else set(theme.LOG_COLORS)
         for level, (color, bold) in theme.LOG_COLORS.items():
             self.tag_configure(level, foreground=color,
                                font=(theme.MONO_FONT[0], theme.MONO_FONT[1], "bold" if bold else "normal"))
 
     def append(self, level: str, message: str) -> None:
         level = (level or "INFO").upper()
+        if level not in self.shown_levels:           # the app_config.yaml log-level display filter
+            return
         tag = level if level in theme.LOG_COLORS else "INFO"
         self.configure(state="normal")
         self.insert("end", f"{message}\n", tag)

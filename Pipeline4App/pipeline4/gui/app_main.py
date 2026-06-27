@@ -13,6 +13,7 @@ import tkinter as tk
 import traceback
 from tkinter import ttk
 
+from pipeline4.core import config
 from pipeline4.gui import theme
 from pipeline4.gui.logview import LogView
 from pipeline4.gui.phasebar import PhaseBar
@@ -39,7 +40,7 @@ class App:
         self.phasebar = PhaseBar(root, self._on_phase)
         self.phasebar.pack(side="top", fill="x", padx=8, pady=2)
 
-        self.log = LogView(root)
+        self.log = LogView(root, shown_levels=config.load_app_ui()["log_levels"])
         self.log.pack(side="top", fill="both", expand=True, padx=8, pady=6)
 
         self.status = ttk.Label(root, text="Ready", anchor="w", relief="sunken")

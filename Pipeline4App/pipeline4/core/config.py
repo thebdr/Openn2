@@ -157,6 +157,23 @@ def params_file() -> str:
     return os.path.join(config_project_dir(), "project_params.yaml")
 
 
+def app_config_file() -> str:
+    """The COSMETIC GUI launch config (app_config.yaml) - tracked, NOT per-project run params."""
+    return os.path.join(config_project_dir(), "app_config.yaml")
+
+
+def load_app_ui() -> dict:
+    """The `user_interface` block of app_config.yaml. `log_levels` -> the SET of log levels the GUI shows
+    (`severity.resolve_set`: single chars or full names, first-char parsed; the PHASE banner always
+    shown). Absent file/key -> `severity.default_shown()` (all finding levels except DEBUG)."""
+    from pipeline4.core import severity
+    path = app_config_file()
+    cfg = _read_yaml(path) if os.path.exists(path) else {}
+    ui = (cfg.get("user_interface") or {}) if isinstance(cfg, dict) else {}
+    raw = ui.get("log_levels")
+    return {"log_levels": severity.resolve_set(raw) if raw else severity.default_shown()}
+
+
 def load_params(path: str | None = None) -> dict:
     """Load the project params (the nested schema: iolist_params / matrix_params / validation_params /
     output). The four document paths (iolist/matrix + their *_previous - the latter reserved for the

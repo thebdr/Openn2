@@ -12,9 +12,18 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 
 ## Where we are
 - **Branch `pl4`**. **Phases 400 (a–f) + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–f + 510 + 600a/b/c/d).
-  **`origin/pl4` is at `40dde03` (600d) — PUSHED. 400f is implemented but UNCOMMITTED** (this working tree).
-- **Gate: 134 tests green** (data-independent). Run from `Pipeline4App/`:
+  **`origin/pl4` is PUSHED through `754dbd2`** (400f + the parity-resolution docs). **The severity-taxonomy +
+  GUI-log-filter chunk is implemented but UNCOMMITTED** (this working tree).
+- **Gate: 139 tests green** (data-independent, +5 `test_severity.py`). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
+- **SEVERITY model (user-directed, IN PROGRESS).** Decided taxonomy (`core/severity.py`): FAIL (halts) · ERROR
+  (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner; first-char-addressable.
+  DONE: the taxonomy + DEBUG + the GUI log-level display filter (`app_config.yaml user_interface.log_levels`, a
+  first-char list, default `[F,E,W,I,S,P,D]` — all 7; `config.load_app_ui`; `LogView(shown_levels)`). **STILL TO DO (the big
+  rollout, awaiting a scope decision)**: the `error_management.csv` treatment registry generalized to RECLASSIFY a
+  finding's effective severity per uid (incl. escalating to a halting FAIL); per-phase findings (each emits
+  uid+default-severity); the engine/GUI "halt iff any effective FAIL". 700's missing-DTD = default FAIL is the
+  first intended consumer.
 - **400f landed** (`interfaces.template_native_elements` → the template's shipped per-type interface signals into
   `interface_elements`; the IF_ projection skips `source="template"`). 510 PLCTags is now the complete interface
   tag set. **Interface parity vs current PL3 is EXACT** (see "Interface parity — RESOLVED" below): PL4's

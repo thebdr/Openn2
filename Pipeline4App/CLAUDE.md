@@ -48,7 +48,7 @@ Pipeline4App/
   DESIGN.md · CLAUDE.md · HANDOFF.md · launch_gui.py
   config_project/                  (the restructured config — see "Config" below)
   pipeline4/
-    core/  keys.py · table.py · database.py · config.py
+    core/  keys.py · table.py · database.py · config.py · severity.py
     io/    workbook.py · xlsx_edit.py
     domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
@@ -309,10 +309,20 @@ EARLY (gui-less PL3 builds hid integration problems). **"300 Documents Staging" 
 the other buttons log "not implemented". The handler is wrapped so a not-yet-ready phase can't take the
 window down. (Phase registry-driven bar, the structured-record clickable log, the Files tab, threading →
 later.)
+- **Severity taxonomy + the GUI log-level filter.** `core/severity.py` is the single source of the level set:
+  **FAIL** (halts), **ERROR** (skip the item, continue), **WARN**, **INFO**, **SKIP**, **PASS**, **DEBUG**
+  (dev-only, hidden by default) + the **PHASE** banner. Each level has a distinct first char (F E W I S P D), so
+  config lists can use single chars or full names interchangeably (`severity.resolve`/`resolve_set`). **`config_project/app_config.yaml`**
+  (NEW — a tracked, COSMETIC GUI launch config, NOT per-project run params) carries `user_interface.log_levels`
+  (default `[F, E, W, I, S, P, D]` — all 7 levels shown); `config.load_app_ui()` reads it → the shown-level set;
+  `LogView(shown_levels=…)` filters `append` (PHASE always shown). This is the FIRST piece of the planned severity
+  model — the `error_management.csv` treatment registry that RECLASSIFIES a finding's effective severity per uid
+  (incl. escalating to a halting FAIL) + the per-phase findings rollout are still to come (FAIL-vs-ERROR halt
+  semantics). Tests: `test_severity.py` (5).
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **134**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **139**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
 interface_xlsx (incl. the 400e insertion/seed/freeze), the **`io/xlsx_edit` suite** (14, ported verbatim),
 the **510 `io_tags` suite** (8), and the **600 `diagnosis` suite** (17); 134 total). Data-dependent parity (staging vs
