@@ -64,6 +64,8 @@ class App:
                 self._run_hardware()
             elif number == 800:
                 self._run_software()
+            elif number == 900:
+                self._run_reporting()
             elif number == 0:
                 self.log.append("PHASE", "Run Pipeline (all phases)")
                 self.log.append("WARN", "  -> full run not wired yet")
@@ -230,6 +232,40 @@ class App:
         if com["path"]:
             self.log.append("PASS", f"  02_COM safe-DB: {com['members']} member(s) -> {com['path']}")
         self.log.append("PASS", f"  830 InstanceDBs: {inst['count']} instance DB(s) -> {inst['path']}")
+
+    def _run_reporting(self):
+        """Phase 900 (wired): build the full SSOT (stage -> 520 -> 700, halt-capable; then the WARN-only
+        400/600/800) so every table exists, then coverage.build (the `coverage` table + ORPHAN/UNPLACED
+        WARN findings) -> coverage.project (the report files). Coverage reads the SSOT tables, never halts."""
+        from pipeline4.core import config, run
+        from pipeline4.domain import staging, datablocks, interfaces, diagnosis, hardware, coverage
+        from pipeline4.domain.blocks import engine
+        self.log.append("PHASE", "900 Reporting  (910 Pipeline Coverage)")
+        self.status.configure(text="coverage…")
+        self.root.update_idletasks()
+        findings = []
+        database, f = staging.stage(); findings += f                 # 300 staging
+        if not run.has_blocking(findings):
+            database, f = datablocks.build(database); findings += f   # 520 (halt-capable; the write-back)
+        if not run.has_blocking(findings):
+            database, f = hardware.build(database); findings += f     # 700 (halt-capable)
+        if not run.gate(findings, self.log.append, label="900 (300 + 520 + 700 prereqs)"):
+            return
+        if "db_blocks" not in database:                              # a prereq FAIL was downgraded, but 520 never ran
+            self.log.append("WARN", "  a blocking prereq was downgraded but yielded no data - nothing further")
+            return
+        # the WARN-only builders (their BuilderData is informational here) - render, never halt
+        proj = []
+        database, fi = interfaces.build_interfaces(database); proj += fi    # 400
+        database, fd = diagnosis.build(database); proj += fd                # 600
+        database, fb = engine.build(database); proj += fb                   # 800
+        database, fc = coverage.build(database); proj += fc                 # 900 (records ORPHAN/UNPLACED)
+        res = coverage.project(database)                                    # the report files
+        run.render(proj, self.log.append)
+        st = res["stats"]
+        self.log.append("PASS", f"  910 coverage: {st['rows']} rows (sig {st['kinds']['signal']}/"
+                                f"chan {st['kinds']['channel']}/struct {st['kinds']['structural']}), "
+                                f"{st['orphans']} ORPHAN, {st['unplaced']} UNPLACED -> {res['txt']}")
 
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"

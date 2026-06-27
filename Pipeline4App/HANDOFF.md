@@ -11,16 +11,15 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 + 700 COMPLETE; severity rollout S1–S6 COMPLETE;
-  PHASE 800 (Software) COMPLETE** (800a spine + 800b complex builders + 800c FC-XML/02_COM/InstanceDBs/GUI).
-  NEXT: **900 (Coverage)** · then **100 (Validation)**.
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`30eead2`** (phase 800b, pushed).
-  **The working tree holds the UNCOMMITTED phase-800c chunk** (NEW `domain/blocks/xml_emit.py` + `domain/blocks/
-  engine.py` + `gui/app_main.py` + `tests/unit/test_blocks.py` + CLAUDE.md + HANDOFF.md) — implemented, gate green,
-  all three byte surfaces parity-verified.
+- **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 + 700 + 800 COMPLETE; severity rollout S1–S6 COMPLETE;
+  PHASE 900 (Coverage/910) COMPLETE.** NEXT (the LAST phase): **100 (Validation)**.
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`e153843`** (phase 800c, pushed).
+  **The working tree holds the UNCOMMITTED phase-900 chunk** (NEW `domain/coverage.py` + NEW `tests/unit/
+  test_coverage.py` + `core/config.py` + `gui/app_main.py` + CLAUDE.md + HANDOFF.md) — implemented, gate green,
+  data-verified (ORPHAN=0, UNPLACED=0, tags match io_tags).
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 191 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 200 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -66,9 +65,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 - **NOTE — the OutputTree PlcTags/DiagList are NOT a valid parity oracle anymore**: a GUI run wrote PL4's output
   there (it's `config.io_tags_dir()`/`diaglist_dir()` with no project open). Use a FRESH PL3 run to scratch (see
   `scratchpad/oracle_pl3_510.py`) or the known values. The SCL ref (06-23) is intact.
-- The SSOT **`Database/`** now holds **13 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
+- The SSOT **`Database/`** now holds **14 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
   `instance_dbs` (520) · `interfaces`/`interface_elements` (400b) · `diagnosis_entries` (600) · `hardware_stations`/
-  `hardware_modules` (700a) · `software_blocks`/`software_block_members` (800a) · `validation_issues` (severity facts).
+  `hardware_modules` (700a) · `software_blocks`/`software_block_members` (800a) · `coverage` (900) · `validation_issues`.
   Saves to `Shared/Database/`. (`validation_issues` is now WRITTEN by 300 + 520 — S2/S3 record their findings; the
   remaining phases join as S4–S6 retrofit them. On clean data it is an empty table.)
 
@@ -99,8 +98,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 23. `ddad2fa` **phase 700a** — Hardware build: `config` DTD loader + `domain/hardware.py` (`hardware_stations`/`hardware_modules` + `build`); parity vs PL3 `extract` exact
 24. `76afb75` **phase 700b** — `domain/hardware_csv.py` (format-2 `Stations.csv`/`Modules.csv`) + the GUI "700" button; CSVs byte-identical to PL3
 25. `be017ad` **phase 800a** — `domain/blocks/` spine + engine + the 00/06/07 builders -> `software_blocks`/`software_block_members` -> CreationInfo CSVs; parity vs PL3 exact
-26. `30eead2` **phase 800b** — the 5 complex builders (02/03/04/05/08) in `builders.py` + 8 tests; 7 CreationInfo CSVs byte-identical to PL3 + all 5 builders table-identical (03 at table level, PL3 emits it as XML)  **← origin/pl4 PUSHED head**
-27. *(uncommitted)* **phase 800c** — NEW `domain/blocks/xml_emit.py` (03 FC XML) + `engine.write_com_db`/`write_instance_dbs` + `engine.project` 03-CSV-drop + the GUI "800" button + 6 tests; all three byte surfaces (03 FC XML / 02_COM.xml / InstanceDBs.csv) byte-identical to PL3
+26. `30eead2` **phase 800b** — the 5 complex builders (02/03/04/05/08) in `builders.py` + 8 tests; 7 CreationInfo CSVs byte-identical to PL3 + all 5 builders table-identical (03 at table level, PL3 emits it as XML)
+27. `e153843` **phase 800c** — NEW `domain/blocks/xml_emit.py` (03 FC XML) + `engine.write_com_db`/`write_instance_dbs` + `engine.project` 03-CSV-drop + the GUI "800" button + 6 tests; all three byte surfaces (03 FC XML / 02_COM.xml / InstanceDBs.csv) byte-identical to PL3  **← origin/pl4 PUSHED head**
+28. *(uncommitted)* **phase 900** — NEW `domain/coverage.py` (the `coverage` SSOT table + ORPHAN/UNPLACED WARN findings) + `config.coverage_dir` + the GUI "900" button + 9 tests; reads the SSOT tables (user decision); real-data ORPHAN=0/UNPLACED=0, tags match io_tags exactly
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -175,8 +175,19 @@ com -> instances). PARITY over the same 269 staged rows: **all three byte surfac
 (38018 B), 02_COM.xml (9578 B, F_DB OPC-locked, 15 members), InstanceDBs.csv (8569 B, 102 entries); the 7 non-03
 CreationInfo CSVs stay byte-identical. Tests +6 (22 total in `test_blocks.py`); gate 191. Parity oracle:
 `scratchpad/parity_800c.py` (+ `parity_800b.py` re-run as a regression).
-**NEXT: 900 (Coverage)** · then **100 (Validation)** (100/900 read `validation_issues`; `accept` [doc-mutating
-treatment] lands with 100).
+**PHASE 900 (Coverage/910) COMPLETE (uncommitted):** `domain/coverage.py` (port of PL3's) reading the **SSOT
+TABLES** (user decision - PL4 exports are byte-stable projections, so coverage over the tables == over the
+artifacts; the one gap = hand-filled interface Side-2, documented). The per-signal trace is **persisted as a
+`coverage` SSOT table** + ORPHAN/UNPLACED emitted as **WARN findings** into `validation_issues` (both user
+decisions), `run.render`ed. `collect_outputs(database)` builds the emitted sets from signals/db_members(+02_COM)/
+diagnosis_entries/interface_elements/interfaces/hardware_*/software_block_members; `attribute`/`find_unplaced`/
+`render_*` port near-verbatim (reads the `type` cell + stored `plc_binding`). `config.coverage_dir()`
+(ProjectDocumentation/Reports) + the GUI **"900" button** (`_run_reporting`: build the full SSOT then
+coverage.build + project). **VERIFICATION (real data; documentation, byte-parity NOT the bar): 269 rows, ORPHAN=0,
+UNPLACED=0, tags == io_tags exactly (202==202).** Tests +9 (`test_coverage.py`); gate 200. Verify:
+`scratchpad/verify_900.py`. **920 (TIA coverage) stays deferred.**
+**NEXT (the LAST phase): 100 (Validation)** — the document validators; reads `validation_issues`; `accept`
+[doc-mutating treatment] lands here.
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +

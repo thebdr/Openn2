@@ -104,6 +104,15 @@ def blocks_creation_dir() -> str:
     return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "SoftwareBlocks", "CreationInfo")
 
 
+def coverage_dir() -> str:
+    """The phase-900 coverage report output (`io_project_coverage_report.{csv,txt}`) - DOCUMENTATION under
+    ProjectDocumentation/Reports, NOT a BuilderData import surface (matches PL3's `Reports/` placement)."""
+    return os.path.join(output_root(), "ProjectDocumentation", "Reports")
+
+
+COVERAGE_REPORT_STEM = "io_project_coverage_report"   # the phase-900 report base name (+ .csv / .txt)
+
+
 # --- sheet-name resolution (regex / JS-literal, case-insensitive) -------------------------------- #
 def js_to_re(pattern: str) -> str:
     """Accept a JS-style regex literal ('/pattern/flags' or 'pattern/flags') and return the bare Python

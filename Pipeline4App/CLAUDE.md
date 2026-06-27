@@ -38,7 +38,8 @@ Database
  ├─ diagnosis_entries  every diagnosis element (unified io|logic) ← 600 (DONE)
  ├─ hardware_stations · hardware_modules   the generatable heads + IoDevice cards   ← 700a (DONE)
  ├─ software_blocks · software_block_members   the built blocks + their @ rows   ← 800a (DONE)
- ├─ plc_tags · coverage · validation_issues   (per phase; validation_issues DONE)
+ ├─ coverage   one row per staged signal (cross-stage placement + ORPHAN)   ← 900 (DONE)
+ ├─ validation_issues   the severity facts (per phase; DONE)
 ```
 Each table persists to one **CSV-with-JSON-cells** file in the **top-level `Database/` folder**
 (`Shared/Database/` builtin, or `<project>/Database/`). Every created entity carries a content-hash
@@ -52,7 +53,7 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py · severity.py · finding.py · treatments.py · run.py
     io/    workbook.py · xlsx_edit.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py · hardware_csv.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py · hardware_csv.py · coverage.py
     domain/blocks/ (ph800) database.py · table.py · registry.py · templates.py · builders.py · engine.py · xml_emit.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
@@ -436,12 +437,51 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
     Tests: `test_blocks.py` (+6: the FC-XML emit/BOM/network-per-row, the 03 CSV-drop, the 02_COM members+F_DB,
     the no-cumulatives no-write, the InstanceDBs merge+dedup+no-BOM). 22 cases total.
 
+## Phase 900 — Reporting (Coverage) — DONE (910; 920 deferred)
+`domain/coverage.py` - a clean-room port of PL3's `domain/coverage.py`, adapted to PL4's SSOT model. **910
+Pipeline Coverage Report** traces each staged signal across the six downstream stages (interfaces/io_tags/
+data_blocks/diagnosis/hardware/software) and flags two cross-check defects: **ORPHAN** (a staged SIGNAL whose
+identity lands in NO output) and **UNPLACED** (an output emits a `"<db>"."<member>"` reference whose DB the
+pipeline generates but whose member was never created). Row kinds `signal` | `channel` (untyped + an I/Q
+address = a raw module point) | `structural` (untyped, no address); only a `signal` can be ORPHAN.
+- **READ SOURCE (user decision): the SSOT TABLES, not the on-disk artifacts.** PL3 re-reads the produced
+  BuilderData files (its phases admit user edits); PL4 deferred the editable shells and every export is a
+  byte-stable PROJECTION of an SSOT table, so coverage over the tables == coverage over the artifacts by
+  construction - hermetic, no openpyxl/glob/XML re-parse, and UNPLACED is exact (`db_members` is the truth).
+  `collect_outputs(database)` reads: `tags` = io-signal `name_in_tagtable` (`identity.is_io_signal`) +
+  `interface_elements.signal_name` (== what 510 emits); `db_members` = the `db_members` table grouped by
+  `db_name` PLUS the 800-owned **02_COM** members (assembled from `software_block_members` 02_COM.{db_element}
+  cumulatives + `DB_CONSTANTS`); `diag_bindings` = `diagnosis_entries.in_binding` + the DiagList PLC_Binding
+  cell; `iface_exprs` = `interface_elements.expression`, `iface_instances` = `interfaces.instance`; `stations`
+  = `hardware_stations`/`hardware_modules` `station_name`; `sw_refs` = the `software_block_members.values`
+  @-cells (block id = name before `_`, ITERATOR cells spread, pads dropped - the 03 FC-XML refs come free since
+  its rows are in the table). The ONE fact not in a table is a hand-filled interface **Side-2** row (lives only
+  in the inserted IF_ sheet) - a documented gap.
+- **The per-signal trace is PERSISTED as a `coverage` SSOT table** (the PL4 thesis: every created datum is
+  written; the CSV is its projection). `binding` is the STORED `plc_binding` column (not re-derived); the
+  `type` object cell replaces PL3's `_type`. **ORPHAN/UNPLACED are emitted as WARN Findings**
+  (`cov_orphan_signal`/`cov_unplaced_member`) into `validation_issues` and `run.render`ed (informational - never
+  halts), matching the severity model. `build()` -> the `coverage` table + findings + save; `project()` ->
+  `ProjectDocumentation/Reports/io_project_coverage_report.{csv,txt}` (`config.coverage_dir()` + the verbatim
+  PL3 `render_csv`/`render_txt`). The GUI **"900" button** (`_run_reporting`) builds the full SSOT
+  (stage -> 520 -> 700 halt-capable; then the WARN-only 400/600/800) then coverage.build + project.
+- **VERIFICATION (real data - the report is documentation, byte-parity is NOT the bar; the bar is the same
+  findings):** over the 269 staged rows - 115 signals / 148 channels / 6 structural; per-stage coverage
+  hardware 261 / io_tags 98 / diagnosis 75 / interfaces 77 / data_blocks 37 / software 61; **ORPHAN = 0 and
+  UNPLACED = 0** (every signal lands somewhere, every emitted DB-member reference resolves), and coverage's
+  table-derived `tags` set is **identical to what `io_tags` emits** (202 == 202, the one drift risk). Tests:
+  `test_coverage.py` (9, hermetic: classification, the pure attribute placement + ORPHAN-only-for-signals, the
+  interface defines/mirror + hardware station/module attribution, find_unplaced, collect_outputs over a
+  synthetic Database, render + build->project). **920 (TIA Project Coverage) stays deferred** (pending an OP4
+  project export), matching PL3.
+
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
 bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
-EARLY (gui-less PL3 builds hid integration problems). The **300 / 400 / 500 / 600 / 700 / 800 buttons run their
+EARLY (gui-less PL3 builds hid integration problems). The **300 / 400 / 500 / 600 / 700 / 800 / 900 buttons run their
 phases for real** (each through `staging.stage` -> the phase build/project; 800 = stage -> 520 -> `engine.build` ->
-`engine.project` + `write_com_db` + `write_instance_dbs`); the rest log "not implemented". The handler is
+`engine.project` + `write_com_db` + `write_instance_dbs`; 900 = build the full SSOT -> `coverage.build` + `project`);
+the rest log "not implemented". The handler is
 wrapped so a not-yet-ready phase can't take the window down. Each real handler **accumulates the findings of its
 gated sub-phases (staging + 520) and calls `run.gate(findings, self.log.append, label=…)` ONCE** - render at
 effective severity + halt iff any effective FAIL; `run.has_blocking(f)` skips a dependent sub-phase when a prereq
@@ -495,7 +535,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **191**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **200**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
@@ -506,7 +546,9 @@ suite** (10: the helpers, the extract incl. auto-plug/PotentialGroup/by-type/def
 FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projection), the **800a+b+c `blocks` suite**
 (22: Table/Database list-cells, the $/#/%/@ serialization, the 00/06/07 simple builders, the 02/03/04/05/08 complex
 builders + `_area_descriptions`/`_of_variant`, the build->project round-trip, the 800c FC-XML emit + 03 CSV-drop +
-02_COM safe-DB + InstanceDBs merge/dedup)).
+02_COM safe-DB + InstanceDBs merge/dedup), and the **900 `coverage` suite** (9, hermetic: the signal/channel/
+structural classification, the pure attribute placement + ORPHAN-only-for-signals, the interface defines/mirror +
+hardware station/module attribution, find_unplaced, collect_outputs over a synthetic Database, render + build->project)).
 Data-dependent parity (staging/520/400/510/600/700/800 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/
 `interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `Stations.csv`/`Modules.csv` + the CreationInfo CSVs
 vs PL3 `_format2`/`write_creation_csv`) is verified by a script (not in the gate). Each phase is committed with its gate + parity green.
