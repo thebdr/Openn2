@@ -1,6 +1,6 @@
 header,expression
-Diag Cabinet,{diag_cabinet}
-Diag Bit,{diag_bit}
+Diag Cabinet,{diag_cabinet:03d}
+Diag Bit,{diag_bit:02d}
 DevType,{script_type}
 Index,{index}
 Type,{type_hw}

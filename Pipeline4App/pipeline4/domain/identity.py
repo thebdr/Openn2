@@ -10,13 +10,30 @@ from __future__ import annotations
 
 import re
 
-_TOKEN = re.compile(r"\{([A-Za-z0-9_]+)\}")
+_TOKEN = re.compile(r"\{([A-Za-z0-9_]+)(:[^}]+)?\}")
+
+
+def _format_value(value: str, spec) -> str:
+    """Apply an optional `:spec` to a (string) row value. A numeric spec (`:03d`/`:02d`/...) coerces the
+    value to int first (so `{diag_cabinet:03d}` on `'0'` -> `'000'`); a blank value stays blank (an empty
+    cabinet is not padded to `000`). Falls back to the raw value when the coercion/format fails."""
+    if not spec or value == "":
+        return value
+    fmt = spec[1:]                      # drop the leading ':'
+    try:
+        if fmt[-1:] in "dxXobn":
+            return format(int(float(value)), fmt)
+        return format(value, fmt)
+    except (ValueError, TypeError):
+        return value
 
 
 def interp(template, row) -> str:
     """Resolve a `{canonical}` template against the row; trim the outer whitespace (templates carry
-    intentional inner spacing)."""
-    return _TOKEN.sub(lambda m: str(row.get(m.group(1), "") or ""), template or "").strip()
+    intentional inner spacing). A token may carry a Python format spec (`{diag_cabinet:03d}`) - the
+    diagnosis columns rely on it (a bare-token resolver would emit the literal `{diag_cabinet:03d}`)."""
+    return _TOKEN.sub(lambda m: _format_value(str(row.get(m.group(1), "") or ""), m.group(2)),
+                      template or "").strip()
 
 
 def interp_keep(template, row) -> str:

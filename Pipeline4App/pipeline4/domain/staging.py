@@ -17,12 +17,69 @@ import os
 from pipeline4.core import config
 from pipeline4.core.database import Database
 from pipeline4.domain import identity, matrix
+from pipeline4.domain.diagnosis_entries import diagnosis_cabinets_table
 from pipeline4.domain.signals import signals_table
 from pipeline4.io import workbook
+
+_DIAGBLOCKS_SHEETS = frozenset({"diagnosisblocks", "diagnosticblocks"})   # current + legacy spelling
 
 
 def _skip_reason_present(value) -> bool:
     return str(value or "").strip() not in ("", "0", "0.0")
+
+
+def _norm(value) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _cabinet_id(value):
+    """int cabinet id from a cell that may be 1, '1', '1.0', '001', or blank; None when not numeric."""
+    s = _norm(value)
+    if s.endswith(".0"):
+        s = s[:-2]
+    return int(s) if s.lstrip("-").isdigit() else None
+
+
+def load_diagnosis_blocks(io_path: str) -> dict:
+    """{cabinet_id:int -> {index, fld, template_type, swp}} from the DiagnosisBlocks sheet, keyed by
+    ID_Local (= the row's diag_cabinet, the local cabinet); falls back to ID_SWP when ID_Local is absent.
+    `template_type` drives the SCL's 01-04 cabinet variant; `swp` is the ID_SWP. {} when the sheet/column
+    is missing. Clean-room port of PL3 `staging.load_diagnostic_blocks` - the parent of the
+    `diagnosis_cabinets` SSOT table (read here at staging so phase 600 is a pure table read)."""
+    if not io_path or not os.path.exists(io_path):
+        return {}
+    wb = workbook.open_workbook(io_path, data_only=True)
+    try:
+        sheet = next((s for s in wb.sheetnames if s.strip().lower() in _DIAGBLOCKS_SHEETS), None)
+        if sheet is None:
+            return {}
+        grid = list(wb[sheet].iter_rows(values_only=True))
+    finally:
+        wb.close()
+    if not grid:
+        return {}
+    header = [" ".join(_norm(c).split()).lower() for c in grid[0]]
+
+    def col(name):
+        key = " ".join(name.split()).lower()
+        return next((i for i, h in enumerate(header) if h == key), None)
+
+    c_local, c_swp, c_fld, c_tt = col("ID_Local"), col("ID_SWP"), col("FullName"), col("TemplateType")
+    c_key = c_local if c_local is not None else c_swp
+    if c_key is None:
+        return {}
+    out = {}
+    for r in grid[1:]:
+        cid = _cabinet_id(r[c_key]) if c_key < len(r) else None
+        if cid is None:
+            continue
+        out[cid] = {
+            "index": f"{cid:03d}",
+            "fld": _norm(r[c_fld]) if c_fld is not None and c_fld < len(r) else "",
+            "template_type": _norm(r[c_tt]) if c_tt is not None and c_tt < len(r) else "",
+            "swp": _norm(r[c_swp]) if (c_swp is not None and c_swp < len(r) and _norm(r[c_swp])) else f"{cid}",
+        }
+    return out
 
 
 def _read_view(view, colmap, strike_exclude, signal_types) -> list:
@@ -52,6 +109,17 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
                          ).strip().lower() == "exclude"
     sheet_pattern = config.get_param(params, "iolist_params.sheets")
 
+    # merge the per-type diagnosis attrs onto each type record BEFORE resolving (so the staged `type`
+    # object carries in_diag/diag_logic/tristate/tristate_desc - in_diag also lights up the phase-400
+    # +DIAG auto-mirror). diag_desc is a template, resolved per-row below.
+    signal_diag = config.load_signal_diagnosis()
+    for t in signal_types.values():
+        d = signal_diag.get(t["type_id"].upper(), {})
+        t["in_diag"] = d.get("in_diag", False)
+        t["diag_logic"] = d.get("diag_logic", "")
+        t["tristate"] = d.get("tristate", False)
+        t["tristate_desc"] = d.get("tristate_desc", "")
+
     views = workbook.open_sheets(io_path, sheet_pattern, header_row, doc_label=os.path.basename(io_path))
     matched = [v.name for v in views]
     if not matched:
@@ -73,6 +141,9 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
         row["ce_FLD"] = identity.ce_fld(row)
         row["combined_FLD"] = identity.combined_fld(row)
         row["IsSorterArea"] = _is_sorter_area(row, sorter_names)
+        diag_template = signal_diag.get(str((row.get("type") or {}).get("type_id", "")).upper(),
+                                        {}).get("diag_desc", "")
+        row["diag_desc"] = identity.interp(diag_template, row)   # the resolved per-type diagnosis text
         if identity.is_io_signal(row) and identity.tag_name(row):
             row["name_in_tagtable"] = identity.tag_name(row)
             row["tagtable"] = identity.tagtable(row)
@@ -150,6 +221,13 @@ def stage(params: dict | None = None) -> Database:
     for row in rows:
         table.add_row(row)
 
-    database = Database([table])
+    cabinets = load_diagnosis_blocks(io_path)         # the diagnosis_cabinets SSOT (DiagnosisBlocks sheet)
+    cab_table = diagnosis_cabinets_table()
+    for cid in sorted(cabinets):
+        c = cabinets[cid]
+        cab_table.add(cabinet_id=cid, index=c["index"], fld=c["fld"],
+                      template_type=c["template_type"], swp=c["swp"])
+
+    database = Database([table, cab_table])
     database.save(config.database_dir())
     return database

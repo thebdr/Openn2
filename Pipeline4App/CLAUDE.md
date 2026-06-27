@@ -50,7 +50,7 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
     io/    workbook.py · xlsx_edit.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -238,6 +238,30 @@ sort+distinct-props, the skip+warn, the return contract).
   **+DIAG auto-mirror** tags on SORTER+DIAG-02 (the deferred `in_diag`/ph600 feature). Both are captured together at
   ph600 (pull the template-native rows + the `in_diag` set into `interface_elements`) — see the Phase 400 follow-up.
 
+## Phase 600 — Diagnosis — IN PROGRESS (600a done; 600b/c/d TODO)
+`domain/diagnosis_entries.py` (the table defs) + the per-type config relocation + the staging prereqs. The plan
+(from the 600 understand pass): a UNIFIED `diagnosis_entries` table (`source` = io|logic) → projected to
+`DiagList_IO.csv` + `DiagList_Logic.csv` (600c) + the OPC SCL (600d), with a parent `diagnosis_cabinets` table.
+- **600a DONE — the config relocation + staging foundation.** The per-type diagnosis attrs PL4 stripped from
+  `signal_types.csv` are relocated to a NEW **`config_project/diagnosis/signal_diagnosis.csv`** keyed by `type_id`
+  (`in_diag`, `diag_logic`, `diag_desc`, **`tristate`** [a new explicit per-type enable flag - the user's addition],
+  `tristate_desc`), values verbatim from PL3. `config.load_signal_diagnosis()` + `load_diagnosis_columns()`.
+  **Staging** now merges `in_diag`/`diag_logic`/`tristate`/`tristate_desc` onto the resolved **`type` object** and
+  resolves **`diag_desc`** (the per-type template) onto the row; it also reads the DiagnosisBlocks sheet
+  (`staging.load_diagnosis_blocks`, port of PL3's `load_diagnostic_blocks`) into the **`diagnosis_cabinets`** SSOT
+  table (`cabinet_id`/`index`/`fld`/`template_type`/`swp`) - so 600 is a pure table read. **`identity.interp` now
+  honors a `{token:spec}` format spec** (`{diag_cabinet:03d}`->`000`; a blank value is NOT padded) - PL3's
+  bare-token resolver emitted the literal `{diag_cabinet:03d}`, so this is a deliberate FIX (the `:03d`/`:02d` specs
+  are restored in `diagnosis_columns.csv`). **Side effect (intended): the phase-400 `+DIAG` auto-mirror lights up** -
+  `collect_mirror_set`'s `type.in_diag` guard now fires, so SORTER+DIAG-02 grows 4 -> 83 mirror elements (the
+  template-native gap still remains). **Parity**: `diag_desc` **0 mismatches/269** vs PL3 IODatabase; the
+  `diagnosis_cabinets` table **0 field mismatches** vs PL3's `load_diagnostic_blocks` (16 cabinets). Tests:
+  `test_diagnosis.py` (6). **NOTE staging now emits 2 tables** (`signals` + `diagnosis_cabinets`).
+- **600b/c/d TODO**: the builder (`io_entries` + the OR/per-row `diagnosis_logic_rules`, cabinet resolution,
+  next-free-bit, `ml_value`/`fl_value`/`node_of`) -> `diagnosis_entries`; the two DiagList CSV projections; the OPC
+  SCL projection (FUNCTION/REGION/CabState/BoolToUDInt, the 01-04 variants + **tristate**, BOM/CRLF + FUNCTION
+  rename). Then re-verify 510 PLCTags after the +DIAG unblock + add the template-native capture.
+
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
 bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
@@ -248,10 +272,10 @@ later.)
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **115**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **121**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
 interface_xlsx (incl. the 400e insertion/seed/freeze), the **`io/xlsx_edit` suite** (14, ported verbatim),
-and the **510 `io_tags` suite** (8)). Data-dependent parity (staging vs
+the **510 `io_tags` suite** (8), and the **600a `diagnosis` suite** (6)). Data-dependent parity (staging vs
 PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
 gate + parity green.
 

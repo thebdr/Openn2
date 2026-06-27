@@ -313,6 +313,36 @@ def load_diagnosis_logic_rules() -> list:
     return out
 
 
+def load_signal_diagnosis() -> dict:
+    """type_id (upper) -> {in_diag:bool, diag_logic, diag_desc(template), tristate:bool, tristate_desc}.
+    The per-type diagnosis attributes relocated from PL3's `signal_types.csv` (cols in_diag/diag_logic/
+    diag_desc/tristate_desc), PLUS a new explicit per-type `tristate` enable flag (the user's addition).
+    Merged onto the staged `type` object (in_diag/diag_logic/tristate/tristate_desc) + resolved onto the
+    row (`diag_desc`). A type absent from the CSV defaults to in_diag=False (not a diagnosis signal)."""
+    out = {}
+    for r in read_config_csv(os.path.join(diagnosis_dir(), "signal_diagnosis.csv")):
+        tid = (r.get("type_id") or "").strip()
+        if not tid:
+            continue
+        out[tid.upper()] = {
+            "in_diag": _as_bool(r.get("in_diag")),
+            "diag_logic": (r.get("diag_logic") or "").strip(),
+            "diag_desc": (r.get("diag_desc") or "").strip(),
+            "tristate": _as_bool(r.get("tristate")),
+            "tristate_desc": (r.get("tristate_desc") or "").strip(),
+        }
+    return out
+
+
+def load_diagnosis_columns() -> list:
+    """The DiagList column model (phase 610): [{header, expression}] in order, where each expression is a
+    `{canonical}` template (the one sentinel `$PLC_Binding$` resolves to the signal's plc_binding). Drives
+    BOTH DiagList_IO.csv and DiagList_Logic.csv."""
+    return [{"header": (r.get("header") or "").strip(), "expression": (r.get("expression") or "")}
+            for r in read_config_csv(os.path.join(diagnosis_dir(), "diagnosis_columns.csv"))
+            if (r.get("header") or "").strip()]
+
+
 def load_interface_elements() -> list:
     """The interface-element follower rules (phase 400): a mirrored signal of a matching script_type spawns
     an extra coupler element. Columns: name, required_types ('|'-OR), dev_type, direction (I/Q - the ONLY
