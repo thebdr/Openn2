@@ -119,6 +119,26 @@ def test_generate_validation_halts():
     ok(_has(findings, "db_instance_needs_fb"), "an Instance family with no FB is a FAIL finding")
 
 
+def test_generate_remaining_slugs():
+    """The slugs the halt/dedup/opc tests don't reach: the prog-lang WARN, the matches-nothing WARN, and the
+    two render-FAIL paths (a bad format spec passes for_each compile but fails at member / instance-name render)."""
+    # db_unknown_prog_lang (WARN) - an unrecognized programming language is written verbatim
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("D", db_programming_language="LADDER", seed=False)], [], _TYPES)
+    ok(_has(findings, "db_unknown_prog_lang") and _no_fail(findings), "an unrecognized prog-lang is a WARN, not a FAIL")
+    # db_for_each_matches_nothing (WARN) - a for_each referencing a column present in no row
+    els = [_el("D", "M [ {combined_FLD} ]", 'row where ghost_col = "x"')]
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("D")], els, _TYPES)
+    ok(_has(findings, "db_for_each_matches_nothing"), "a for_each on an absent column is a WARN")
+    # db_member_render (FAIL) - {combined_FLD:03d} on a non-numeric value fails at member render (post-validate)
+    els = [_el("D", "{combined_FLD:03d}", 'row where script_type = "DI1/2"')]
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("D")], els, _TYPES)
+    ok(_has(findings, "db_member_render"), "a bad format spec at member render is a FAIL")
+    # db_instance_name_render (FAIL) - {cab:03d} on a non-numeric unique value fails at instance-name render
+    idefs = [_def("S{cab:03d}", db_type="Instance", instance_of="FB", for_each="cab in unique(diag_cabinet)")]
+    _g, _i, findings = datablocks.generate([{"diag_cabinet": "abc"}], idefs, [], _TYPES)
+    ok(_has(findings, "db_instance_name_render"), "a bad format spec at instance-name render is a FAIL")
+
+
 # --- write_back: name_in_db / datablocks / plc_binding ------------------------------------------- #
 def test_write_back_single_db_and_tag_fallback():
     defs = [_def("07_DOOR", seed=True)]
@@ -233,6 +253,7 @@ if __name__ == "__main__":
         ("generate_f_db_opc_warns", test_generate_f_db_opc_warns),
         ("generate_member_dedup", test_generate_member_dedup),
         ("generate_validation_halts", test_generate_validation_halts),
+        ("generate_remaining_slugs", test_generate_remaining_slugs),
         ("write_back_single_db_and_tag_fallback", test_write_back_single_db_and_tag_fallback),
         ("write_back_leftmost_db_order", test_write_back_leftmost_db_order),
         ("write_back_two_members_one_db_picks_primary", test_write_back_two_members_one_db_picks_primary),

@@ -7,6 +7,7 @@ from openpyxl.styles import Font
 
 from _harness import run, eq, ok
 from pipeline4.domain import identity, staging
+from pipeline4.domain.signals import signals_table
 from pipeline4.io import workbook
 
 
@@ -106,6 +107,34 @@ def test_node_address_range_empty_when_no_addressed_rows():
     eq(rows[0]["Q_endByte"], "")
 
 
+def test_dup_signal_uid_findings():
+    """The post-stage duplicate-uid check (moved from the GUI into stage) is a stg_dup_signal_uid WARN,
+    one per shared content-hash uid; the clean case emits nothing."""
+    cols = ["combined_FLD", "script_type", "source_cell"]      # the stable key -> the content-hash uid
+    t = signals_table(cols)
+    for _ in range(2):                                          # two rows share the key -> the SAME uid
+        t.add_row({"combined_FLD": "S1+SG1-B1", "script_type": "DI1/2", "source_cell": "NET!O2"})
+    t.add_row({"combined_FLD": "S2+SG2-B2", "script_type": "DI1/2", "source_cell": "NET!O3"})   # unique
+    fs = staging._dup_findings(t)
+    eq(len(fs), 1, "one WARN per shared uid (the unique row produces none)")
+    eq((fs[0].phase, fs[0].type, fs[0].severity), (300, "stg_dup_signal_uid", "WARN"), "the finding container")
+    ok(fs[0].location in t.duplicate_uids(), "the finding locates the shared uid")
+    eq(staging._dup_findings(signals_table(cols)), [], "no rows -> no findings (the clean path)")
+
+
+def test_load_io_list_no_match_returns_empty():
+    """When no sheet matches the pattern, load_io_list returns ([], []) - the predicate stage() turns into the
+    blocking stg_no_io_sheet FAIL (replacing the old raise SystemExit). The FAIL emission + no-write is verified
+    end-to-end by the data-dependent parity smoke; this pins the load-bearing no-match branch."""
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "io.xlsx")
+        wb = Workbook(); wb.active.title = "NotAnIoSheet"; wb.active["A1"] = "x"; wb.save(p)
+        params = {"iolist_params": {"sheets": "^__no_match__$", "header_row": 1}}
+        rows, matched = staging.load_io_list(params, {}, p)
+        eq(matched, [], "no sheet matched the pattern -> empty match list")
+        eq(rows, [], "no rows read")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("staging", [
@@ -116,4 +145,6 @@ if __name__ == "__main__":
         ("is_sorter_area_number_to_name", test_is_sorter_area_number_to_name),
         ("node_address_ranges_positional", test_node_address_ranges_positional),
         ("node_address_range_empty_when_no_addressed_rows", test_node_address_range_empty_when_no_addressed_rows),
+        ("dup_signal_uid_findings", test_dup_signal_uid_findings),
+        ("load_io_list_no_match_returns_empty", test_load_io_list_no_match_returns_empty),
     ]))

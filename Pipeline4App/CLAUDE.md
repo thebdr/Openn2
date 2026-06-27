@@ -105,6 +105,13 @@ one workbook reader (by column position per `column_map`), drops Skip-Reason + s
   (`matrix_params.sorter_areas: [1]` number → `"AREA 1"` name → intersect the `matrix_areas` list cell).
 - **Still pending**: `subnet_name` (from `profinet_ip`). The registry-derived `name_in_db`/`datablocks`/
   `plc_binding` are now WRITTEN BACK by phase 520 (below), not at staging.
+- **Severity S3 retrofit DONE** (parity-locked): `stage()` returns **`(database, findings)`** instead of a bare
+  `Database`. A missing I/O sheet emits the blocking **`stg_no_io_sheet`** FAIL (replacing the `raise SystemExit`;
+  `load_io_list` now returns `([], matched)`) and `stage` returns WITHOUT writing (`run.has_blocking` guard); a
+  duplicate signal uid emits **`stg_dup_signal_uid`** WARN (moved out of the GUI into `_dup_findings`, one per
+  shared uid). On success `stage` `finding.record`s into `validation_issues` + saves. **PARITY: `signals.csv` +
+  `diagnosis_cabinets.csv` byte-identical to pre-S3** (verified new-vs-HEAD; only `validation_issues.csv` is added,
+  empty on clean data). The 4 GUI handlers accumulate staging + 520 findings and call `run.gate` ONCE (see GUI note).
 
 ## Phase 520 — Data Blocks — DONE (520a/b/c; InstanceDBs.csv deferred to 800)
 `domain/dbtemplate.py` + `domain/datablocks.py` + `domain/db_members.py` + `domain/datablock_xml.py`. The
@@ -316,10 +323,15 @@ sort+distinct-props, the skip+warn, the return contract).
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
 bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
-EARLY (gui-less PL3 builds hid integration problems). **"300 Documents Staging" runs `stage()` for real**;
-the other buttons log "not implemented". The handler is wrapped so a not-yet-ready phase can't take the
-window down. (Phase registry-driven bar, the structured-record clickable log, the Files tab, threading →
-later.)
+EARLY (gui-less PL3 builds hid integration problems). The **300 / 400 / 500 / 600 buttons run their phases for
+real** (each through `staging.stage` -> the phase build/project); the rest log "not implemented". The handler is
+wrapped so a not-yet-ready phase can't take the window down. Each real handler **accumulates the findings of its
+gated sub-phases (staging + 520) and calls `run.gate(findings, self.log.append, label=…)` ONCE** - render at
+effective severity + halt iff any effective FAIL; `run.has_blocking(f)` skips a dependent sub-phase when a prereq
+already blocks. **Guard:** the skip decision is RAW-severity but the gate's continue is EFFECTIVE (a treatment can
+DOWNGRADE a prereq FAIL→WARN, so the gate continues while 520 was skipped) - each handler checks `"db_blocks" not
+in database` after the gate and returns gracefully (no KeyError on the never-built 520 table). (Phase
+registry-driven bar, the structured-record clickable log, the Files tab, threading → later.)
 - **Severity taxonomy + the GUI log-level filter.** `core/severity.py` is the single source of the level set:
   **FAIL** (halts), **ERROR** (skip the item, continue), **WARN**, **INFO**, **SKIP**, **PASS**, **DEBUG**
   (dev-only, hidden by default) + the **PHASE** banner. Each level has a distinct first char (F E W I S P D), so
@@ -342,20 +354,29 @@ later.)
     `has_blocking` is the build-side raw-FAIL guard (never write BuilderData on a raw FAIL).
   Tests: `test_severity.py` (5) + `test_finding.py` (4) + `test_treatments.py` (5) + `test_run.py` (5).
   **Decision (user): persist `validation_issues` now + full model + retrofit 300/520/400/510/600, THEN 700.** S1
-  touched NO phase (parity trivially preserved). **S2 (retrofit 520 - the only live FAIL-blocks-write path) is
-  DONE** (see the Phase 520 section: `generate -> list[Finding]`, `build -> (database, findings)` + the
-  `validation_issues` record + the `run.gate` handlers; GlobalDB XMLs byte-identical to pre-S2). NEXT: S3 300 ->
-  S4 400+510 -> S5 600 -> S6 delete the legacy `(errors, warnings)` lists -> phase 700.
+  touched NO phase (parity trivially preserved). **S2 (520) + S3 (300) are DONE** (see the Phase 520 + Phase 300
+  sections: `generate`/`stage`/`build -> (..., findings)` + the `validation_issues` record + the `run.has_blocking`
+  no-write guard; GlobalDB XMLs + `signals.csv`/`diagnosis_cabinets.csv` byte-identical to pre-retrofit). The 4 GUI
+  handlers now **accumulate staging + 520 findings and call `run.gate` ONCE** per click (`run.has_blocking(f)` skips
+  the dependent sub-phase on a blocking prereq). NEXT: S4 400+510 -> S5 600 -> S6 delete the legacy
+  `(errors, warnings)` lists -> phase 700.
+  - **TRANSITIONAL NOTE (gate reconcile scope).** `run.gate` calls `treatments.reconcile`, which prunes/stales
+    registry rows GLOBALLY (any uid not in the gated finding set). With multiple gated phases this can churn an
+    OTHER phase's untreated registry rows across separate button clicks (e.g. clicking 300 vs 500). It is
+    **invisible today** (clean data -> 0 findings -> empty registry) and treatments still APPLY regardless of the
+    cosmetic `stale` flag (`apply` ignores status). The proper fix - reconcile once per RUN over the union of all
+    findings - lands with the engine (post-S6); until then the per-handler single-gate keeps WITHIN-click churn out.
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **153**: keys/table/database, signals schema,
-sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
-interface_xlsx (incl. the 400e insertion/seed/freeze), the **`io/xlsx_edit` suite** (14, ported verbatim),
-the **510 `io_tags` suite** (8), the **600 `diagnosis` suite** (17), the **severity/findings core**
-(`test_severity`/`test_finding`/`test_treatments`/`test_run` = 19)). Data-dependent parity (staging vs
-PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
-gate + parity green.
+**data-independent suite is the green gate** (currently **156**: keys/table/database, signals schema,
+sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
+no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces + interface_xlsx
+(incl. the 400e insertion/seed/freeze),
+the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** (8), the **600 `diagnosis` suite**
+(17), the **severity/findings core** (`test_severity`/`test_finding`/`test_treatments`/`test_run` = 19)).
+Data-dependent parity (staging/520 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs) is verified by a script
+against the real docs (not in the gate). Each phase is committed only with its gate + parity green.
 
 ## Conventions & gotchas
 - **JSON cells are schema-declared** (a column is JSON by the table's `json_columns`, not by guessing). The

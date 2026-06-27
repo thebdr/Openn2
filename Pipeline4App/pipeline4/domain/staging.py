@@ -14,14 +14,29 @@ from __future__ import annotations
 
 import os
 
-from pipeline4.core import config
+from pipeline4.core import config, run
 from pipeline4.core.database import Database
+from pipeline4.core.finding import Finding, record
 from pipeline4.domain import identity, matrix
 from pipeline4.domain.diagnosis_entries import diagnosis_cabinets_table
 from pipeline4.domain.signals import signals_table
 from pipeline4.io import workbook
 
 _DIAGBLOCKS_SHEETS = frozenset({"diagnosisblocks", "diagnosticblocks"})   # current + legacy spelling
+
+
+def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "") -> Finding:
+    """A phase-300 Finding - staging's report container (the no-I/O-sheet FAIL + the duplicate-uid WARN)."""
+    return Finding(phase=300, type=type, severity=severity, detail=detail,
+                   location=location, source_uid=source_uid)
+
+
+def _dup_findings(table) -> list:
+    """One `stg_dup_signal_uid` WARN per signal uid shared by more than one row (the content-hash key needs a
+    tiebreak). Pure over the built `signals` table - replaces the GUI's post-stage duplicate_uids() check."""
+    return [_f("stg_dup_signal_uid", "WARN",
+               f"signal uid {dup} is shared by more than one row - the key needs a tiebreak", dup)
+            for dup in sorted(table.duplicate_uids())]
 
 
 def _skip_reason_present(value) -> bool:
@@ -123,7 +138,7 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
     views = workbook.open_sheets(io_path, sheet_pattern, header_row, doc_label=os.path.basename(io_path))
     matched = [v.name for v in views]
     if not matched:
-        raise SystemExit(f"no I/O sheet matched {sheet_pattern!r} in {io_path}")
+        return [], matched          # the caller (stage) emits the blocking stg_no_io_sheet FAIL
 
     rows = []
     for view in views:
@@ -208,26 +223,40 @@ def _add_node_address_ranges(rows) -> None:
     _flush(cur, ib, qb)
 
 
-def stage(params: dict | None = None) -> Database:
-    """Phase 300: read the configured I/O List into a Database holding the `signals` table, save it to
-    the Database folder, and return it. The single staging entry point."""
+def stage(params: dict | None = None) -> tuple:
+    """Phase 300: read the configured I/O List into a Database holding the `signals` table, record the
+    findings to `validation_issues`, save the Database, and return (database, findings). The single staging
+    entry point. A missing I/O sheet emits the blocking `stg_no_io_sheet` FAIL and returns WITHOUT writing
+    (`run.has_blocking` guard - the caller's `run.gate` logs + halts); a duplicate signal uid is a
+    `stg_dup_signal_uid` WARN."""
     params = params or config.load_params()
     signal_types = config.load_signal_types()
     io_path = params.get("iolist_path")
-    rows, _matched = load_io_list(params, signal_types, io_path)
-
     colmap = config.load_column_map("IoList")
+    findings = []
+
     table = signals_table([m["canonical"] for m in colmap])
+    cab_table = diagnosis_cabinets_table()
+    database = Database([table, cab_table])
+
+    rows, matched = load_io_list(params, signal_types, io_path)
+    if not matched:                                   # the required input is absent -> halt before anything
+        findings.append(_f("stg_no_io_sheet", "FAIL",
+                           f"no I/O sheet matched {config.get_param(params, 'iolist_params.sheets')!r} "
+                           f"in {io_path}", io_path or ""))
+        return database, findings                     # raw-FAIL guard: nothing written
+
     for row in rows:
         table.add_row(row)
 
+    findings += _dup_findings(table)                  # the GUI's post-stage dup check, now findings
+
     cabinets = load_diagnosis_blocks(io_path)         # the diagnosis_cabinets SSOT (DiagnosisBlocks sheet)
-    cab_table = diagnosis_cabinets_table()
     for cid in sorted(cabinets):
         c = cabinets[cid]
         cab_table.add(cabinet_id=cid, index=c["index"], fld=c["fld"],
                       template_type=c["template_type"], swp=c["swp"])
 
-    database = Database([table, cab_table])
+    record(database, findings)                        # persist the facts to the validation_issues table
     database.save(config.database_dir())
-    return database
+    return database, findings

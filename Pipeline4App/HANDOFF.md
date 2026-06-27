@@ -12,13 +12,13 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 
 ## Where we are
 - **Branch `pl4`**. **Phases 400 (a–f) + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–f + 510 + 600a/b/c/d).
-- **GIT STATE:** `origin/pl4` is PUSHED + synced through `37559f0` (severity S1). **The working tree now holds the
-  UNCOMMITTED S2 chunk** (datablocks.py + app_main.py + test_datablocks.py) — implemented, gate green, parity
-  verified, **awaiting the user's commit word** (then push). The severity taxonomy/GUI-filter (`5e291f8`) + S1
-  (`37559f0`) are committed.
+- **GIT STATE:** `origin/pl4` PUSHED + synced through `37559f0` (S1). **S2 is COMMITTED LOCALLY (`1dade77`, not yet
+  pushed).** **The working tree holds the UNCOMMITTED S3 chunk** (staging.py + app_main.py + test_staging.py +
+  CLAUDE.md + HANDOFF.md) — implemented, gate green, parity verified, **awaiting the user's commit word** (then push
+  both S2 + S3). The severity taxonomy/GUI-filter (`5e291f8`) + S1 (`37559f0`) are committed + pushed.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 153 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 156 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -28,15 +28,24 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `error_management.csv` registry generalized - a per-uid treatment names the target level, can escalate to FAIL;
   load/apply/effective_severity/should_halt/reconcile/write/set_treatment); `core/run.py:gate` (apply+render+halt
   iff effective FAIL) + `has_blocking` (raw-FAIL write guard); `config.user_input_dir()`. Tests: +19. S1 touched
-  NO phase (parity untouched); committed + pushed (`37559f0`). **S2 retrofit 520 DONE** (uncommitted): `generate`
-  -> `list[Finding]` (9 FAIL + 4 WARN slugs, message->detail, `DB <name>`/`element <m> -> DB <db>`->location);
-  `build` -> `(database, findings)` + `run.has_blocking` no-write guard + `finding.record` -> `validation_issues`
-  on success; the 3 GUI handlers (500 owner + 400/600 prereqs) call `run.gate(findings, self.log.append, label)`.
-  Gate 153 green; the 9 GlobalDB XMLs **byte-identical to pre-S2** (new-vs-HEAD diff = 0). **NEXT: S3 300**
-  (`stg_no_io_sheet` FAIL replacing `raise SystemExit`; `stg_dup_signal_uid` WARN; `stage() -> (database,
-  findings)`) → S4 400+510 → S5 600 → S6 delete the legacy `(errors, warnings)` lists. PARITY RULE: only the
-  report CONTAINER + the gate call change; the skip/write PREDICATES are untouched → 0-byte BuilderData diff per
-  chunk. Then phase 700.
+  NO phase (parity untouched); committed + pushed (`37559f0`). **S2 retrofit 520 DONE (`1dade77`)**: `generate`
+  -> `list[Finding]` (9 FAIL + 4 WARN slugs); `build` -> `(database, findings)` + `run.has_blocking` no-write guard
+  + `finding.record` -> `validation_issues`; GlobalDB XMLs byte-identical to pre-S2. **S3 retrofit 300 DONE
+  (uncommitted)**: `stage()` -> `(database, findings)`; `stg_no_io_sheet` FAIL replaces `raise SystemExit`
+  (`load_io_list` returns `([], matched)`, stage returns WITHOUT writing on the FAIL); `stg_dup_signal_uid` WARN via
+  `_dup_findings` (moved out of the GUI); `record` -> `validation_issues` + save on success. The 4 GUI handlers
+  **accumulate staging + 520 findings and call `run.gate` ONCE** (`run.has_blocking(f)` skips the dependent
+  sub-phase on a blocking prereq; a post-gate `"db_blocks" not in database` guard handles a DOWNGRADED prereq FAIL
+  that would otherwise KeyError - found by the adversarial review workflow). Gate 156 green; `signals.csv` +
+  `diagnosis_cabinets.csv` **byte-identical to pre-S3** (new-vs-HEAD). **NEXT: S4 400+510** (WARN-only, no FAILs:
+  400 `if_ioc_no_index`/`if_signal_not_mirrored`,
+  510 `iotag_no_address`; `build_interfaces -> (database, findings)`; `io_tags.project` swaps `warnings` for
+  `findings`) → S5 600 → S6 delete the legacy `(errors, warnings)` lists. PARITY RULE: only the report CONTAINER +
+  the gate call change; the skip/write PREDICATES are untouched → 0-byte BuilderData diff per chunk. Then phase 700.
+  - **TRANSITIONAL (gate reconcile scope):** `run.gate` -> `treatments.reconcile` prunes/stales registry rows
+    GLOBALLY; with multiple gated phases across separate clicks this can churn another phase's untreated rows.
+    Invisible today (clean data = 0 findings = empty registry); treatments still APPLY (`apply` ignores `stale`).
+    Proper fix = reconcile once per RUN over the union, lands with the engine (post-S6).
 - **400f landed** (`interfaces.template_native_elements` → the template's shipped per-type interface signals into
   `interface_elements`; the IF_ projection skips `source="template"`). 510 PLCTags is now the complete interface
   tag set. **Interface parity vs current PL3 is EXACT** (see "Interface parity — RESOLVED" below): PL4's
@@ -47,7 +56,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `scratchpad/oracle_pl3_510.py`) or the known values. The SCL ref (06-23) is intact.
 - The SSOT **`Database/`** now holds **8 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
   `instance_dbs` (520) · `interfaces`/`interface_elements` (400b, +`io_address_side1`) · `diagnosis_entries` (600).
-  Saves to `Shared/Database/`. (`validation_issues` joins as the severity rollout retrofits each phase — S2+.)
+  Saves to `Shared/Database/`. (`validation_issues` is now WRITTEN by 300 + 520 — S2/S3 record their findings; the
+  remaining phases join as S4–S6 retrofit them. On clean data it is an empty table.)
 
 ### Commits this session (oldest → newest)
 1. `407ed07` staging direct fields — positional node ranges (`I_/Q_startByte/endByte`) + `IsSorterArea`
@@ -68,6 +78,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 15. `754dbd2` doc — interface parity RESOLVED (oracle artifact)
 16. `5e291f8` severity taxonomy (+DEBUG) + the GUI log-level filter
 17. `37559f0` **severity S1** — `core/finding.py` + `core/treatments.py` + `core/run.py` + `user_input_dir`  **← origin/pl4 PUSHED head**
+18. `1dade77` **severity S2** — retrofit 520 (`generate`/`build` → findings + `validation_issues` record + `run.gate`)  **← local, not pushed**
+19. *(uncommitted)* **severity S3** — retrofit 300 (`stage` → findings, `stg_no_io_sheet`/`stg_dup_signal_uid`) + the 4 handlers accumulate-and-gate-once
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -123,8 +135,8 @@ PL4 has full interface parity with current PL3 (and is MORE correct on naming: P
 require PL3 to re-insert the IF_ sheets first; the `collect_mirror_set` equivalence is the conclusive check.)
 
 ## What's NEXT (in order)
-**S2 retrofit 520 is DONE (uncommitted)** — continue the severity rollout at **S3 retrofit 300** (below), then
-S4–S6, THEN phase 700.
+**S2 (520, `1dade77`) + S3 (300, uncommitted) are DONE** — continue the severity rollout at **S4 retrofit 400+510**
+(below), then S5–S6, THEN phase 700.
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +
@@ -134,14 +146,15 @@ keeps a **`run.has_blocking(findings)` raw-FAIL no-write guard** before writing 
 + the gate call — NEVER the skip/write PREDICATES → 0-byte BuilderData diff per chunk** (re-run each phase's scratch
 parity after). Slug convention `<area>_<condition>`. Findings to emit (from the design pass; default sev in caps):
 
-- **S2 — 520 `datablocks.py`** (the only live FAIL-blocks-write path; richest):
+- **S2 — 520 `datablocks.py`** ✅ DONE (`1dade77`) — the only live FAIL-blocks-write path; richest:
   FAIL — `db_for_each_invalid`, `db_only_load_optimized`, `db_instance_needs_fb`, `db_global_needs_literal`,
   `db_element_not_declared`, `db_unknown_datatype`, `db_element_for_each`, `db_member_render`,
   `db_instance_name_render`. WARN — `db_for_each_matches_nothing`, `db_unknown_prog_lang`, `db_fdb_opc_ignored`,
   `db_member_duplicate`. (`generate` returns findings; `build` keeps the no-write-on-raw-FAIL guard.)
-- **S3 — 300 `staging.py`**: `stg_no_io_sheet` (FAIL — replaces the `raise SystemExit`); `stg_dup_signal_uid`
-  (WARN — move the GUI's post-stage dup check into `stage`). `stage()` -> `(database, findings)`.
-- **S4 — 400 + 510** (WARN-only, no FAILs): 400 `if_ioc_no_index`, `if_signal_not_mirrored`; 510 `iotag_no_address`.
+- **S3 — 300 `staging.py`** ✅ DONE (uncommitted) — `stg_no_io_sheet` (FAIL — replaced the `raise SystemExit`;
+  `load_io_list` returns `([], matched)`); `stg_dup_signal_uid` (WARN — moved the GUI dup check into `_dup_findings`).
+  `stage()` -> `(database, findings)`. The 4 GUI handlers accumulate staging + 520 findings and gate ONCE.
+- **S4 — 400 + 510** (WARN-only, no FAILs) ← **NEXT**: 400 `if_ioc_no_index`, `if_signal_not_mirrored`; 510 `iotag_no_address`.
   `build_interfaces` -> `(database, findings)`; `io_tags.project` swaps its `warnings` key for `findings`.
 - **S5 — 600**: `diag_scl_template_missing` (WARN); `diagnosis.build`/`diaglist_csv`/`diagnosis_scl` -> findings
   (empty in the common path). 
@@ -177,7 +190,7 @@ frozen output disagrees, check whether it's config drift before assuming a regre
 is `Shared/OutputTree/ProjectDocumentation/InformationDatabase/IODatabase.csv`. Pattern:
 ```python
 from pipeline4.domain import staging, datablocks, interfaces
-db = staging.stage(); db,_f = datablocks.build(db); db,_w = interfaces.build_interfaces(db)   # 520 now -> (database, findings)
+db,_sf = staging.stage(); db,_f = datablocks.build(db); db,_w = interfaces.build_interfaces(db)   # 300/520 now -> (database, findings)
 pl4 = {r['source_cell']: r for r in db['signals'].rows if r.get('source_cell')}
 # load IODatabase.csv by source_cell; compare (PL4 list-cell vs PL3 '|'-split, scalars direct)
 ```

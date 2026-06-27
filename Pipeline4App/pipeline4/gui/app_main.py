@@ -73,17 +73,16 @@ class App:
     def _run_staging(self):
         """Phase 300 (wired): read the configured I/O List -> the signals table -> Database/signals.csv.
         Runs inline for now (a few seconds on a real workbook); a worker thread comes with the engine."""
-        from pipeline4.core import config
+        from pipeline4.core import config, run
         from pipeline4.domain import staging
         self.log.append("PHASE", "300 Documents Staging")
         self.status.configure(text="staging…")
         self.root.update_idletasks()
-        database = staging.stage()
+        database, findings = staging.stage()
+        if not run.gate(findings, self.log.append, label="300 Documents Staging"):
+            return
         signals = database["signals"]
         self.log.append("PASS", f"  staged {len(signals)} signals -> {os.path.join(config.database_dir(), 'signals.csv')}")
-        dupes = signals.duplicate_uids()
-        if dupes:
-            self.log.append("WARN", f"  {len(dupes)} duplicate signal uid(s) - the key needs a tiebreak")
 
     def _run_data_blocks(self):
         """Phase 500 (wired): stage -> 520 the registry generates db_members + db_blocks + instance_dbs
@@ -94,9 +93,14 @@ class App:
         self.log.append("PHASE", "500 Signals Mapping  (520 Data Blocks + 510 I/O Tags)")
         self.status.configure(text="data blocks…")
         self.root.update_idletasks()
-        database = staging.stage()
-        database, findings = datablocks.build(database)
-        if not run.gate(findings, self.log.append, label="520 Data Blocks"):
+        findings = []
+        database, f = staging.stage(); findings += f                 # 300 staging
+        if not run.has_blocking(f):
+            database, f = datablocks.build(database); findings += f   # 520 data blocks
+        if not run.gate(findings, self.log.append, label="500 (300 staging + 520 data blocks)"):
+            return
+        if "db_blocks" not in database:                              # a prereq FAIL was downgraded, but 520 never ran
+            self.log.append("WARN", "  520 produced no tables (a blocking prereq was downgraded but yielded no data) - nothing further")
             return
         n_dbs, n_members = len(database["db_blocks"]), len(database["db_members"])
         self.log.append("PASS", f"  {n_members} db_members across {n_dbs} DBs (+ {len(database['instance_dbs'])} "
@@ -124,9 +128,14 @@ class App:
         self.log.append("PHASE", "400 Interfaces Generation")
         self.status.configure(text="interfaces…")
         self.root.update_idletasks()
-        database = staging.stage()
-        database, findings = datablocks.build(database)
-        if not run.gate(findings, self.log.append, label="520 (prereq)"):
+        findings = []
+        database, f = staging.stage(); findings += f                 # 300 staging
+        if not run.has_blocking(f):
+            database, f = datablocks.build(database); findings += f   # 520 prereq
+        if not run.gate(findings, self.log.append, label="400 (300 staging + 520 prereq)"):
+            return
+        if "db_blocks" not in database:                              # a prereq FAIL was downgraded, but 520 never ran
+            self.log.append("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
         database, warnings = interfaces.build_interfaces(database)
         for w in warnings[:20]:
@@ -152,9 +161,14 @@ class App:
         self.log.append("PHASE", "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL)")
         self.status.configure(text="diagnosis…")
         self.root.update_idletasks()
-        database = staging.stage()
-        database, findings = datablocks.build(database)          # 520 prereq -> plc_binding write-back
-        if not run.gate(findings, self.log.append, label="520 (prereq)"):
+        findings = []
+        database, f = staging.stage(); findings += f                 # 300 staging
+        if not run.has_blocking(f):
+            database, f = datablocks.build(database); findings += f   # 520 prereq -> plc_binding write-back
+        if not run.gate(findings, self.log.append, label="600 (300 staging + 520 prereq)"):
+            return
+        if "db_blocks" not in database:                              # a prereq FAIL was downgraded, but 520 never ran
+            self.log.append("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
         database, errors, warnings = diagnosis.build(database)
         for w in warnings[:20]:
