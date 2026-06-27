@@ -55,7 +55,7 @@ Pipeline4App/
     io/    workbook.py · xlsx_edit.py · render.py
     domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py · hardware_csv.py · coverage.py
     domain/blocks/ (ph800) database.py · table.py · registry.py · templates.py · builders.py · engine.py · xml_emit.py
-    domain/validation/ (ph100) __init__.py · address.py  (+ iolist/matrix/crosscheck as built)
+    domain/validation/ (ph100) __init__.py · address.py · messages.py · model.py · iolist.py · matrix.py  (+ crosscheck as built)
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -476,7 +476,7 @@ address = a raw module point) | `structural` (untyped, no address); only a `sign
   synthetic Database, render + build->project). **920 (TIA Project Coverage) stays deferred** (pending an OP4
   project export), matching PL3.
 
-## Phase 100 — Documents Validation — IN PROGRESS (100a reporting spine DONE; 100b/c/d TODO)
+## Phase 100 — Documents Validation — IN PROGRESS (100a spine + 100b standalone validators DONE; 100c/d TODO)
 `domain/validation/` - a clean-room port of PL3's `domain/validation/`, the LAST phase (PL3's first). Validates
 the hand-authored I/O List + Cause&Effect workbooks via 5 sub-phases: 110 standalone I/O List, 120 standalone
 C&E, 130 cross-check CEM->IOL, 140 cross-check IOL->CEM, 150 diagnosis-slot uniqueness. **User decisions:**
@@ -500,8 +500,19 @@ text is ported verbatim into each finding's `detail`.
   renderer's banner/line/InfoBlock/Cmp+dual-link/errors-filter/HTML). NOTE on parity: PL4's `finding._norm`
   collapses whitespace but does NOT lowercase (PL3's does), so the phase-100 parity oracle compares finding
   TUPLES `(phase, type, norm(location), norm(detail))` with a matching normalization, not raw uids.
-- **100b/c/d TODO:** 110+120 validators (read the raw workbooks, the verbatim EN messages) · 130/140 cross-checks
-  + the `ce_refs` reader/indexes · the orchestrator + the GUI "100" button + the 4 report files + the golden/parity.
+- **100b DONE - the two standalone validators** (read the RAW workbooks via `io/workbook`). `messages.py` (the EN
+  `v_*` templates ported VERBATIM from PL3's i18n + `msg(slug, **fmt)`) · `model.py` (the `entry()` Finding factory
+  resolving the detail through `messages.msg`, + `key`/`addr`/`raw`/`fld_text`/`info_for_row` + the fuzzy
+  `levenshtein`/`first_match`/`matches_words` + `cmp_detail` for 130/140) · **`iolist.py` (110)** (verbatim port:
+  header glossary over the non-`preliminary_check_exclude` columns, IP-error/dup-IP/dup-FLD, G⊕F, address format,
+  permanent-part + TS-ref for A/W(/PA/PW), Profinet identity, node-count thresholds, a `row_ok` PASS per clean row;
+  takes the resolved `params`, reads via `get_param`) · **`matrix.py` (120)** (the CAUSE&EFFECT MATRIX inputs-only /
+  AREA outputs-only / no-dup-within-sheet checks; C&E absent -> one `ce_absent` SKIP). Tests:
+  `test_validation_standalone.py` (9, hermetic via a `StubView` + monkeypatched openers). **Real-data sanity (the
+  clean "Passing" fixtures):** 110 = 273 `row_ok` PASS / 8 INFO / 0 FAIL; 120 = 24 address refs checked / 0 FAIL
+  (no false positives) - the unit tests prove the checks FIRE on bad input.
+- **100c/d TODO:** 130/140 cross-checks + the `ce_refs` reader/indexes (read the SSOT) · the orchestrator + the GUI
+  "100" button + the 4 report files + the golden/parity.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
@@ -563,7 +574,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **206**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **215**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),

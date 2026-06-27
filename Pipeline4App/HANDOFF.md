@@ -12,15 +12,15 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 
 ## Where we are
 - **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 + 700 + 800 + 900 COMPLETE; severity rollout S1–S6
-  COMPLETE.** **PHASE 100 (Validation) IN PROGRESS** — the LAST phase, chunked 100a/b/c/d; **100a (the reporting
-  spine) DONE**. NEXT: 100b (110+120 validators).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`3726a01`** (phase 900, pushed).
-  **The working tree holds the UNCOMMITTED phase-100a chunk** (NEW `core/model.py` + `domain/validation/`
-  (__init__ + address.py) + `io/render.py` + NEW `tests/unit/test_validation_render.py` + `core/finding.py`
-  (extended) + `core/config.py` + CLAUDE.md + HANDOFF.md) — implemented, gate green.
+  COMPLETE.** **PHASE 100 (Validation) IN PROGRESS** — the LAST phase, chunked 100a/b/c/d; **100a (reporting
+  spine) + 100b (110+120 standalone validators) DONE**. NEXT: 100c (130/140 cross-checks + ce_refs).
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`a74db5e`** (phase 100a, pushed).
+  **The working tree holds the UNCOMMITTED phase-100b chunk** (NEW `domain/validation/` messages.py + model.py +
+  iolist.py + matrix.py + NEW `tests/unit/test_validation_standalone.py` + CLAUDE.md + HANDOFF.md) — implemented,
+  gate green, real-data sanity clean.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 206 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 215 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -102,7 +102,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 26. `30eead2` **phase 800b** — the 5 complex builders (02/03/04/05/08) in `builders.py` + 8 tests; 7 CreationInfo CSVs byte-identical to PL3 + all 5 builders table-identical (03 at table level, PL3 emits it as XML)
 27. `e153843` **phase 800c** — NEW `domain/blocks/xml_emit.py` (03 FC XML) + `engine.write_com_db`/`write_instance_dbs` + `engine.project` 03-CSV-drop + the GUI "800" button + 6 tests; all three byte surfaces (03 FC XML / 02_COM.xml / InstanceDBs.csv) byte-identical to PL3  **← origin/pl4 PUSHED head**
 28. `3726a01` **phase 900** — NEW `domain/coverage.py` (the `coverage` SSOT table + ORPHAN/UNPLACED WARN findings) + `config.coverage_dir` + the GUI "900" button + 9 tests; reads the SSOT tables (user decision); real-data ORPHAN=0/UNPLACED=0, tags match io_tags exactly  **← origin/pl4 PUSHED head**
-29. *(uncommitted)* **phase 100a** — the validation reporting spine: NEW `core/model.py` (InfoBlock+Cmp) + `core/finding.py` extended (4 optional render fields) + `domain/validation/address.py` + `io/render.py` (rich txt+HTML, Cmp + dual-links) + `config.validation_report_dir` + 6 tests
+29. `a74db5e` **phase 100a** — the validation reporting spine: NEW `core/model.py` (InfoBlock+Cmp) + `core/finding.py` extended (4 optional render fields) + `domain/validation/address.py` + `io/render.py` (rich txt+HTML, Cmp + dual-links) + `config.validation_report_dir` + 6 tests  **← origin/pl4 PUSHED head**
+30. *(uncommitted)* **phase 100b** — the 110 (I/O List) + 120 (C&E) standalone validators: NEW `domain/validation/` messages.py (verbatim EN templates) + model.py (the Finding factory + helpers) + iolist.py + matrix.py + 9 tests; real-data sanity clean (110 273 PASS/0 FAIL, 120 24 refs/0 FAIL)
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -200,9 +201,16 @@ banners, per-phase width auto-fit, the Cmp + dual-link, txt + no-wrap HTML) + `c
 the two stems. Tests +6 (`test_validation_render.py`); gate 206. PARITY NOTE: PL4 `finding._norm` doesn't
 lowercase (PL3's does), so the 100 parity oracle compares finding TUPLES `(phase,type,norm(location),norm(detail))`
 with a matching norm on both sides, NOT raw uids (PL4's registry is project-local, so cross-PL3 uid parity is
-not needed). **NEXT: 100b** — port 110 (iolist) + 120 (matrix) reading the raw workbooks via `io/workbook`, with
-the verbatim EN message templates. Then **100c** (130/140 + `ce_refs`/indexes over the SSOT) · **100d** (the
-orchestrator + GUI "100" button + the 4 report files + golden/parity + docs). **150 + `accept` are out of scope.**
+not needed). **100b DONE (uncommitted):** `domain/validation/` messages.py (EN `v_*` templates verbatim +
+`msg`) + model.py (the `entry()` Finding factory + key/addr/raw/fld_text/info_for_row + the fuzzy
+levenshtein/first_match + cmp_detail for 130/140) + **iolist.py (110)** + **matrix.py (120)** (verbatim ports
+reading the RAW workbooks via `io/workbook`, `params`/`get_param` instead of ctx). Tests +9
+(`test_validation_standalone.py`, hermetic via a StubView + monkeypatched openers); gate 215. Real-data sanity
+(clean Passing fixtures): 110 273 row_ok PASS / 0 FAIL, 120 24 refs / 0 FAIL (the unit tests prove the checks
+fire on bad input). **NEXT: 100c** — port 130/140 (crosscheck.py) + the `ce_refs` reader/indexes (read the SSOT
+signals + the C&E refs), the two-search-by-FLD-and-address algorithm + the 140 decision tree + the Cmp/dual-link.
+Then **100d** (the orchestrator + GUI "100" button + the 4 report files + golden/parity + docs). **150 + `accept`
+are out of scope.**
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +
