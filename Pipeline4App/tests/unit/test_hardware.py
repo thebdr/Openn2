@@ -1,8 +1,12 @@
 """Phase 700 (Hardware) build - the helpers, the single-pass extract (auto-plug skip, PotentialGroup,
 by-type channel params, default cards), the missing-DTD FAIL / switch WARN findings, and the table fill.
 Pure + data-independent (the build()/CSV projection are verified by the data-dependent parity script)."""
+import os
+import tempfile
+
 from _harness import run, eq, ok
-from pipeline4.domain import hardware
+from pipeline4.core.database import Database
+from pipeline4.domain import hardware, hardware_csv
 
 
 def _dtd_rec(model, dev_type="IoDeviceCard", comment="", params_by_type=None, io_addr="", parent=None):
@@ -138,6 +142,33 @@ def test_fill_tables_and_uids():
     eq((first["slot"], first["i_addr"], first["q_addr"]), ("1", "0", "0"), "slot/addr stored as text")
 
 
+# --- 700b: the format-2 projection --------------------------------------------------------------- #
+def _built_db():
+    stations, modules, _f = hardware.extract(_rows(), _dtd())
+    stab, mtab = hardware.hardware_stations_table(), hardware.hardware_modules_table()
+    hardware._fill_stations(stab, stations)
+    hardware._fill_modules(mtab, modules)
+    return Database([stab, mtab])
+
+
+def test_format2_projection():
+    with tempfile.TemporaryDirectory() as d:
+        res = hardware_csv.project(_built_db(), out_dir=d)
+        eq((res["stations"], res["modules"]), (2, 3))
+        eq(res["findings"], [], "a pure projection emits no findings")
+        sraw = open(res["stations_path"], "rb").read()
+        ok(not sraw.startswith(b"\xef\xbb\xbf"), "no BOM (matches the reference)")
+        ok(sraw.count(b"\n") > 0 and sraw.count(b"\n") == sraw.count(b"\r\n"), "CRLF only")
+        s = sraw.decode("utf-8")
+        ok(s.startswith("#!format=2,,,,,,,,\r\n"), "Stations format-2 tag")
+        ok("# Role,Station Name,Model Id,IP Address,PN Number (empty:last IP Octet)" in s, "descriptive header")
+        ok("Plc,n1,CPU1,192.168.50.1,,Subnet50,,=S1_IODevices" in s, "a station data row")
+        m = open(res["modules_path"], "rb").read().decode("utf-8")
+        ok(m.startswith("#!format=2,,,,,,,\r\n"), "Modules format-2 tag")
+        ok("n6,1,-C1,DI16,0,0,PotentialGroup=1 | Ch(0).Filter=1 | Ch(1).Filter=1,DI 16x24VDC" in m,
+           "a module data row (PotentialGroup + by-type channel params)")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("hardware", [
@@ -150,4 +181,5 @@ if __name__ == "__main__":
         ("station_io_addr_and_ag_override", test_station_io_addr_and_ag_override),
         ("missing_dtd_fail_and_switch_warning", test_missing_dtd_fail_and_switch_warning),
         ("fill_tables_and_uids", test_fill_tables_and_uids),
+        ("format2_projection", test_format2_projection),
     ]))

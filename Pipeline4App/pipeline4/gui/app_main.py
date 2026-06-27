@@ -60,6 +60,8 @@ class App:
                 self._run_data_blocks()
             elif number == 600:
                 self._run_diagnosis()
+            elif number == 700:
+                self._run_hardware()
             elif number == 0:
                 self.log.append("PHASE", "Run Pipeline (all phases)")
                 self.log.append("WARN", "  -> full run not wired yet")
@@ -175,6 +177,27 @@ class App:
         if scl["path"]:
             self.log.append("PASS", f"  620 OPC SCL: {scl['entries']} entries across {scl['cabinets']} "
                                     f"cabinets -> {scl['path']}")
+
+    def _run_hardware(self):
+        """Phase 700 (wired): stage -> hardware.build (the hardware_stations + hardware_modules tables) ->
+        hardware_csv.project (the format-2 Stations.csv + Modules.csv). Hardware needs only staging (300)."""
+        from pipeline4.core import config, run
+        from pipeline4.domain import staging, hardware, hardware_csv
+        self.log.append("PHASE", "700 Hardware Generation  (710 Stations + 720 Modules)")
+        self.status.configure(text="hardware…")
+        self.root.update_idletasks()
+        findings = []
+        database, f = staging.stage(); findings += f                 # 300 staging
+        if not run.has_blocking(f):
+            database, f = hardware.build(database); findings += f     # 700 hardware build (halt-capable)
+        if not run.gate(findings, self.log.append, label="700 (300 staging + hardware)"):
+            return
+        if "hardware_stations" not in database:                      # a blocking finding -> build wrote nothing
+            self.log.append("WARN", "  700 produced no tables (a blocking finding) - nothing further")
+            return
+        res = hardware_csv.project(database)
+        self.log.append("PASS", f"  700: {res['stations']} station(s) + {res['modules']} module(s) -> "
+                                f"{config.hardware_dir()}")
 
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"

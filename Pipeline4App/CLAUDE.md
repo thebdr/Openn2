@@ -51,7 +51,7 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py · severity.py · finding.py · treatments.py · run.py
     io/    workbook.py · xlsx_edit.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py · hardware_csv.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -336,11 +336,12 @@ the GUI `_run_diagnosis` consumes the build tuple + `run.render`s the combined 6
 - **Still open (the interface-completeness follow-up)**: re-verify 510 PLCTags after the +DIAG unblock + add the
   template-native capture (see the Phase 400 section). Then 800/900/100.
 
-## Phase 700 — Hardware — IN PROGRESS (700a build DONE; 700b CSV projection + GUI TODO)
-`domain/hardware.py` - a clean-room port of PL3's `hardware.extract` into PL4's SSOT model. A single ordered pass
-over the `signals` table populates **`hardware_stations`** (one row per generatable head - a PLC/PlcCardCm/IoDevice)
-+ **`hardware_modules`** (the IoDevice cards). The `HardwareConfiguration/Stations.csv` + `Modules.csv` BuilderData
-surface is a pure projection of these tables (700b, TODO).
+## Phase 700 — Hardware — DONE (700a build + 700b CSV projection)
+`domain/hardware.py` + `domain/hardware_csv.py` - a clean-room port of PL3's `hardware.extract` + format-2 writer
+into PL4's SSOT model. A single ordered pass over the `signals` table populates **`hardware_stations`** (one row per
+generatable head - a PLC/PlcCardCm/IoDevice) + **`hardware_modules`** (the IoDevice cards); the
+`HardwareConfiguration/Stations.csv` + `Modules.csv` BuilderData surface is a pure projection of these tables. The
+GUI **"700" button** runs stage -> build -> project.
 - **700a DONE - `build()` + the tables + config.** A head opens a station (`script_type` PLC->Plc, PlcCardCm->
   PlcCardCm, or Type col-R first letter P->IoDevice); the rows beneath it (until the next head) are its signals.
   Stations: name=`profinet_name`, Model Id=Part No (spaces stripped), Subnet from the IP, group=
@@ -359,13 +360,19 @@ surface is a pure projection of these tables (700b, TODO).
   0 FAIL (all non-switch devices are in the DTD, so the build always succeeds on the real data). Tests:
   `test_hardware.py` (9: helpers, the extract incl. auto-plug/PotentialGroup/by-type/default-cards, the missing-DTD
   FAIL/switch-WARN, the table fill + int->str of slot/addr).
-- **700b TODO:** `domain/hardware_csv.py` (the format-2 `Stations.csv` + `Modules.csv` projection - no BOM, CRLF,
-  `#!format=2` tag + descriptive `# header` comment) + the GUI "700" button (stage -> build -> project).
+- **700b DONE - the format-2 projection.** `domain/hardware_csv.py` `project()` reads the two tables and writes
+  `Stations.csv` + `Modules.csv` to `config.hardware_dir()` - **comma format-2, no BOM, CRLF**, a `#!format=2` tag +
+  a descriptive `# header` comment (OP4 reads by POSITION; the header is a comment). The snake_case table columns are
+  emitted in the format-2 column order (`_STATIONS_KEYS`/`_MODULES_KEYS`); `_format2` + the tag/header literals are
+  verbatim from PL3. Pure projection (`findings: []`, no record). The GUI `_run_hardware` runs stage -> `hardware.build`
+  (halt-capable, `run.gate`) -> `hardware_csv.project` (hardware needs only staging, NOT 520). **PARITY: `Stations.csv`
+  (1145 bytes) + `Modules.csv` (1896 bytes) byte-identical to PL3's `_format2` over the same extract.** Test:
+  `test_hardware.py::format2_projection` (no BOM, CRLF, the fmt2 tag + descriptive header + data rows).
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
 bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
-EARLY (gui-less PL3 builds hid integration problems). The **300 / 400 / 500 / 600 buttons run their phases for
+EARLY (gui-less PL3 builds hid integration problems). The **300 / 400 / 500 / 600 / 700 buttons run their phases for
 real** (each through `staging.stage` -> the phase build/project); the rest log "not implemented". The handler is
 wrapped so a not-yet-ready phase can't take the window down. Each real handler **accumulates the findings of its
 gated sub-phases (staging + 520) and calls `run.gate(findings, self.log.append, label=…)` ONCE** - render at
@@ -420,17 +427,17 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **168**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **169**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
 the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** (8, + the S4 `iotag_no_address`
 slug), the **600 `diagnosis` suite** (18, + the S5 `diag_scl_template_missing` slug), the **severity/findings core**
 (`test_severity`/`test_finding`/`test_treatments`/`test_run` = 20, incl. S4's `run.render`), the **700 `hardware`
-suite** (9: the helpers, the extract incl. auto-plug/PotentialGroup/by-type/default-cards, the missing-DTD
-FAIL/switch-WARN, the table fill + int->str of slot/addr)).
+suite** (10: the helpers, the extract incl. auto-plug/PotentialGroup/by-type/default-cards, the missing-DTD
+FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projection)).
 Data-dependent parity (staging/520/400/510/600/700 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/
-`interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `hardware_stations`/`hardware_modules` vs PL3 `extract`)
+`interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `Stations.csv`/`Modules.csv` vs PL3 `_format2`)
 is verified by a script against the real docs (not in the gate). Each phase is committed only with its gate + parity green.
 
 ## Conventions & gotchas

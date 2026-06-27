@@ -11,14 +11,15 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 COMPLETE; severity rollout S1–S6 COMPLETE; phase 700a
-  (Hardware build) DONE** (700b CSV projection + GUI next).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`7f84320`** (S1–S6 severity rollout COMPLETE, all pushed).
-  **The working tree holds the UNCOMMITTED phase-700a chunk** (config.py + NEW domain/hardware.py + NEW
-  test_hardware.py + CLAUDE.md + HANDOFF.md) — implemented, gate green, parity verified, adversarial review running.
+- **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 + 700 COMPLETE; severity rollout S1–S6 COMPLETE.**
+  NEXT phases: 800 (Software) · 900 (Coverage) · 100 (Validation).
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`ddad2fa`** (S1–S6 + phase 700a, all pushed).
+  **The working tree holds the UNCOMMITTED phase-700b chunk** (NEW domain/hardware_csv.py + app_main.py +
+  test_hardware.py + CLAUDE.md + HANDOFF.md) — implemented, gate green, byte-parity verified, adversarial review
+  running.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 168 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 169 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -94,7 +95,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 20. `5838f88` **severity S4** — retrofit 400+510 (`build_interfaces`/`io_tags.project` → findings) + `core/run.py:render`
 21. `7c2fa17` **severity S5** — retrofit 600 (`diagnosis.build`/`diaglist_csv`/`diagnosis_scl` → findings; the last legacy tuple gone)
 22. `7f84320` **severity S6** — rollout complete (full 5-phase byte-parity re-run = 0 diffs vs pre-rollout `95d3dfb`)  **← origin/pl4 PUSHED head**
-23. *(uncommitted)* **phase 700a** — Hardware build: `config` DTD loader + `domain/hardware.py` (`hardware_stations`/`hardware_modules` + `build`); parity vs PL3 `extract` exact
+23. `ddad2fa` **phase 700a** — Hardware build: `config` DTD loader + `domain/hardware.py` (`hardware_stations`/`hardware_modules` + `build`); parity vs PL3 `extract` exact  **← origin/pl4 PUSHED head**
+24. *(uncommitted)* **phase 700b** — `domain/hardware_csv.py` (format-2 `Stations.csv`/`Modules.csv`) + the GUI "700" button; CSVs byte-identical to PL3
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -150,16 +152,14 @@ PL4 has full interface parity with current PL3 (and is MORE correct on naming: P
 require PL3 to re-insert the IF_ sheets first; the `collect_mirror_set` equivalence is the conclusive check.)
 
 ## What's NEXT (in order)
-**The SEVERITY ROLLOUT (S1–S6) is COMPLETE.** **Phase 700a (Hardware build) is DONE (uncommitted):** `domain/hardware.py`
-ports PL3's `extract` into the `hardware_stations` + `hardware_modules` SSOT tables; `build() -> (database, findings)`
-with `hw_device_not_in_dtd` FAIL / `hw_switch_not_in_dtd` WARN + `run.has_blocking` guard + `record` + save;
-`config.load_device_types_db` / `parse_params_by_type` / `hardware_dir` / `DEVICE_TYPES_DB_DEFAULT` added. PARITY vs
-current PL3 `extract` over the same staged rows: **9 stations + 18 modules, 0 field mismatches** (2 switch WARN,
-0 FAIL). Gate 168 green.
-**NEXT: phase 700b** — `domain/hardware_csv.py`: the format-2 `Stations.csv` + `Modules.csv` projection of the two
-tables (no BOM, CRLF, `#!format=2` tag + a descriptive `# header` comment - matching PL3) + the GUI "700" button
-(stage -> build -> project, `run.gate`/`render`). PARITY: the CSVs byte-identical to PL3's `write_stations`/
-`write_modules` over the same extract. Then 800 (Software) · 900 (Coverage) · 100 (Validation).
+**The SEVERITY ROLLOUT (S1–S6) is COMPLETE; PHASE 700 (Hardware) is COMPLETE** (700a build `ddad2fa` + 700b
+projection uncommitted): `domain/hardware.py` (`hardware_stations`/`hardware_modules` + `build`, `hw_device_not_in_dtd`
+FAIL / `hw_switch_not_in_dtd` WARN) + `domain/hardware_csv.py` (the format-2 `Stations.csv`/`Modules.csv` projection)
++ the GUI "700" button (stage -> build -> project). PARITY vs current PL3 `extract`/`_format2` over the same staged
+rows: **9 stations + 18 modules, 0 field mismatches; Stations.csv (1145B) + Modules.csv (1896B) byte-identical**.
+**NEXT: phase 800 (Software)** — 8 builders + `InstanceDBs.csv` + `02_COM` (see DESIGN §9 + PL3's `domain/blocks/`).
+Then **900 (Coverage)** · **100 (Validation)** (100/900 read `validation_issues` as their backbone; `accept`
+[doc-mutating treatment] lands with 100).
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +
