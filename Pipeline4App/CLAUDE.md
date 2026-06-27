@@ -378,9 +378,12 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
   `interface_elements` + PLCTags + `diagnosis_entries`/DiagList/SCL byte/content-identical to pre-retrofit). The 4
   GUI handlers **accumulate staging + 520 findings and call `run.gate` ONCE** per click (halt-capable), then
   **`run.render`** the WARN-only 400/510/600 projection findings (`render` = gate minus the halt, for phases whose
-  BuilderData is already written). With S5 the LAST legacy `(errors, warnings)` tuple (`diagnosis.build`) is gone.
-  NEXT: **S6** - the final sweep (verify zero legacy tuples remain anywhere + a full 5-phase byte-parity re-run) ->
-  phase 700.
+  BuilderData is already written). **S6 (the final sweep) is DONE - the SEVERITY ROLLOUT IS COMPLETE**: zero legacy
+  `(errors, warnings)` tuples / `warnings`-key reads remain in `pipeline4/` (the cleanup landed incrementally across
+  S2-S5); the **full 5-phase byte-parity re-run** vs the pre-rollout baseline (`95d3dfb`) is **0 differences across
+  all 20 BuilderData + SSOT outputs** (9 GlobalDB XMLs + PLCTags + DiagList_IO/Logic + the OPC SCL + the 8 tables),
+  with only the new `validation_issues.csv` added. Every phase now reports through the Finding/treatment model; the
+  codebase is ready for **phase 700 (Hardware)**.
   - **TRANSITIONAL NOTE (gate reconcile scope).** `run.gate` calls `treatments.reconcile`, which prunes/stales
     registry rows GLOBALLY (any uid not in the gated finding set). With multiple gated phases this can churn an
     OTHER phase's untreated registry rows across separate button clicks (e.g. clicking 300 vs 500). It is

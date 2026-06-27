@@ -12,10 +12,10 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 
 ## Where we are
 - **Branch `pl4`**. **Phases 400 (a–f) + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–f + 510 + 600a/b/c/d).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`5838f88`** (S1 + S2 `1dade77` + S3 `7322470` + S4
-  `5838f88`, all pushed). **The working tree holds the UNCOMMITTED S5 chunk** (diagnosis.py + diaglist_csv.py +
-  diagnosis_scl.py + app_main.py + test_diagnosis + CLAUDE.md + HANDOFF.md) — implemented, gate green, parity
-  verified, adversarial review running. The severity taxonomy/GUI-filter (`5e291f8`) + S1–S4 are committed + pushed.
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`7c2fa17`** (S1 + S2 `1dade77` + S3 `7322470` + S4 `5838f88`
+  + S5 `7c2fa17`, all pushed). **The SEVERITY ROLLOUT IS COMPLETE.** The working tree holds the UNCOMMITTED S6
+  finalization (docs only — the code cleanup landed incrementally; CLAUDE.md + HANDOFF.md). The severity
+  taxonomy/GUI-filter (`5e291f8`) + S1–S5 are committed + pushed.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
 - **Gate: 159 tests green** (data-independent). Run from `Pipeline4App/`:
@@ -46,9 +46,12 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `diagnosis_scl.project` renames its dict `warnings`->`findings` + emits the WARN `diag_scl_template_missing`
   (phase 620) on an absent template. GUI `_run_diagnosis` consumes the build tuple + `run.render`s the 600/610/620
   findings (drops the dead if-errors block). Gate 159 green; `diagnosis_entries` + DiagList_IO/Logic.csv +
-  Diagnostic_for_OPC.scl **byte-identical to pre-S5** (new-vs-HEAD). **NEXT: S6** - the final sweep: confirm ZERO
-  legacy `(errors, warnings)` tuples / `warnings`-key reads remain in `pipeline4/` + a full 5-phase byte-parity
-  re-run; then ready for phase 700. PARITY RULE held every chunk (report CONTAINER + render call only; 0-byte diff).
+  Diagnostic_for_OPC.scl **byte-identical to pre-S5**. **S6 (the final sweep) DONE - ROLLOUT COMPLETE**: ZERO legacy
+  `(errors, warnings)` tuples / `warnings`-key reads remain in `pipeline4/` (cleanup landed incrementally); the
+  **full 5-phase byte-parity re-run** vs the pre-rollout baseline `95d3dfb` is **0 diffs across all 20 BuilderData +
+  SSOT outputs** (9 GlobalDB XMLs + PLCTags 214 rows + DiagList_IO/Logic + the OPC SCL + the 8 SSOT tables), only
+  `validation_issues.csv` added. **NEXT: phase 700 (Hardware)** - see "What's NEXT" below. PARITY RULE held every
+  chunk (report CONTAINER + render call only; 0-byte diff).
   - **TRANSITIONAL (gate reconcile scope):** `run.gate` -> `treatments.reconcile` prunes/stales registry rows
     GLOBALLY; with multiple gated phases across separate clicks this can churn another phase's untreated rows.
     Invisible today (clean data = 0 findings = empty registry); treatments still APPLY (`apply` ignores `stale`).
@@ -87,8 +90,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 17. `37559f0` **severity S1** — `core/finding.py` + `core/treatments.py` + `core/run.py` + `user_input_dir`  **← origin/pl4 PUSHED head**
 18. `1dade77` **severity S2** — retrofit 520 (`generate`/`build` → findings + `validation_issues` record + `run.gate`)
 19. `7322470` **severity S3** — retrofit 300 (`stage` → findings, `stg_no_io_sheet`/`stg_dup_signal_uid`) + accumulate-and-gate-once + the db_blocks guard
-20. `5838f88` **severity S4** — retrofit 400+510 (`build_interfaces`/`io_tags.project` → findings) + `core/run.py:render`  **← origin/pl4 PUSHED head**
-21. *(uncommitted)* **severity S5** — retrofit 600 (`diagnosis.build`/`diaglist_csv`/`diagnosis_scl` → findings; the last legacy tuple gone)
+20. `5838f88` **severity S4** — retrofit 400+510 (`build_interfaces`/`io_tags.project` → findings) + `core/run.py:render`
+21. `7c2fa17` **severity S5** — retrofit 600 (`diagnosis.build`/`diaglist_csv`/`diagnosis_scl` → findings; the last legacy tuple gone)  **← origin/pl4 PUSHED head**
+22. *(uncommitted)* **severity S6** — rollout complete (docs: full 5-phase byte-parity re-run = 0 diffs vs pre-rollout `95d3dfb`)
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -144,8 +148,12 @@ PL4 has full interface parity with current PL3 (and is MORE correct on naming: P
 require PL3 to re-insert the IF_ sheets first; the `collect_mirror_set` equivalence is the conclusive check.)
 
 ## What's NEXT (in order)
-**S2 (520, `1dade77`) + S3 (300, `7322470`) + S4 (400+510, `5838f88`) + S5 (600, uncommitted) are DONE** — finish
-the rollout with **S6** (the final sweep, below), THEN phase 700.
+**The SEVERITY ROLLOUT (S1–S6) is COMPLETE** — every phase reports through the Finding/treatment model, the full
+5-phase byte-parity re-run is 0 diffs vs the pre-rollout baseline, and zero legacy `(errors, warnings)` tuples
+remain. **NEXT: phase 700 (Hardware)** — its full design is already done (the `understand-700-hardware` workflow /
+the 700a-b-c plan below): `domain/hardware.py` + `hardware_csv.py`, the `hardware_stations`/`hardware_modules`
+tables, `config.load_device_types_db` + `hardware_dir`; missing-DTD head = **FAIL** (now via the severity model -
+emit a `hw_*` Finding + `run.gate`), switch = WARN; comma/no-BOM/CRLF format-2; parity vs current-PL3 `extract`.
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +
@@ -170,12 +178,13 @@ parity after). Slug convention `<area>_<condition>`. Findings to emit (from the 
 - **S5 — 600** ✅ DONE (uncommitted): `diag_scl_template_missing` (WARN, phase 620); `diagnosis.build` ->
   `(database, findings)` (the last legacy tuple, errors/warnings were always empty; now records + saves);
   `diaglist_csv.project` +`findings:[]`; `diagnosis_scl.project` dict `warnings`->`findings`. GUI `run.render`s them.
-- **S6 — cleanup/sweep** ← **NEXT**: most of it landed incrementally (each chunk removed its own `if errors:` /
-  `for w in warnings` block from `app_main.py` as it retrofitted). S6 = VERIFY the end state: grep `pipeline4/` for
-  any remaining `(errors, warnings)` tuple / `, warnings` unpack / `["warnings"]` read (should be ZERO - the review's
-  completeness lens checks this) + a full 5-phase byte-parity re-run (all phases in one pass) + tidy any stragglers.
-  Ends ready for 700. (Open: 100/900 will read `validation_issues` as their backbone; `accept` [doc-mutating
-  treatment] lands with 100.)
+- **S6 — cleanup/sweep** ✅ DONE: the cleanup landed incrementally (each chunk removed its own `if errors:` /
+  `for w in warnings` block from `app_main.py`). Verified end state: `pipeline4/` has ZERO remaining
+  `(errors, warnings)` tuple / `, warnings` unpack / `["warnings"]` read (only a historical comment in
+  `datablocks.py`). Full 5-phase byte-parity re-run (all phases, one pass, vs pre-rollout `95d3dfb`): **0 diffs
+  across 20 outputs** (9 GlobalDB XMLs + PLCTags 214 rows + DiagList_IO/Logic + the OPC SCL + 8 SSOT tables), only
+  `validation_issues.csv` added. **The codebase is ready for phase 700.** (Open: 100/900 will read `validation_issues`
+  as their backbone; `accept` [doc-mutating treatment] lands with 100.)
 
 ### Then the remaining phases (DESIGN §9)
 **700 Hardware** (Stations + Modules — **its full design is already done**: see the `understand-700-hardware` workflow
