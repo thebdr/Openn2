@@ -259,6 +259,52 @@ def template_input_format(template_path, sheet_name) -> str:
         wb.close()
 
 
+def template_native_elements(template_path, sheet, interface_id, base, isynt) -> list:
+    """The template's SHIPPED per-type interface signals: the rows already in the chosen sheet's data
+    table that carry a Signal Name Side 1 (e.g. SORTER's HEARTBEAT / POWER ENABLED / …). Returned as
+    `_Elem`s with `source="template"`, `<index>` resolved to `interface_id`, offset/bit taken from the
+    template (base-independent) and the address recomputed for THIS interface's base (the template's
+    cached I/O Address Side 1 is base-10000-stale). These belong in `interface_elements` so 510's PLCTags
+    is the complete interface tag set; the IF_ projection SKIPS them (they're already in the copied sheet).
+    Read data_only (cached offsets/bits). [] when the sheet/table/name column is absent."""
+    out = []
+    wb = load_workbook(template_path, data_only=True)
+    try:
+        if sheet not in wb.sheetnames:
+            return out
+        found = _find_data_table(wb[sheet])
+        if not found:
+            return out
+        ws = wb[sheet]
+        _name, _c1, r1, _c2, r2, hdr = found
+        nc = hdr.get("Signal Name Side 1")
+        if not nc:
+            return out
+
+        def cell(r, header):
+            col = hdr.get(header)
+            return ws.cell(r, col).value if col else None
+
+        for r in range(r1 + 1, r2 + 1):
+            raw_name = cell(r, "Signal Name Side 1")
+            if not raw_name or not str(raw_name).strip():
+                continue
+            signal_name = str(raw_name).replace("<index>", str(interface_id))
+            dsym = str(cell(r, "Direction </>") or "").strip()          # "<" / ">"
+            direction = _DIR_TO_IO.get(dsym, "Q")                       # the table stores I / Q
+            data_type = str(cell(r, "Data Type") or "BOOL").strip().upper()
+            offset, bit = _to_int(cell(r, "I/O Offset Byte")), _to_int(cell(r, "I/O Bit"))
+            expr = str(cell(r, "Expression Side 1") or "").strip()
+            out.append(_Elem(
+                script_type=str(cell(r, "Category") or "").strip(), mirror_name=expr or signal_name,
+                signal_name=signal_name, description=str(cell(r, "Description") or "").strip(),
+                data_type=data_type, direction=direction, source="template",
+                offset_byte=offset, bit=bit))
+    finally:
+        wb.close()
+    return out
+
+
 def _rule_tagname(rule, row, member, direction) -> str:
     """A rule element's interface tag name: the rule's interface_tagname template with {member} +
     {direction} bound (keeping {interface_name}/{interface_id}); falls back to the member."""
@@ -404,11 +450,14 @@ def build_interfaces(database: Database | None = None, template_path: str | None
         if sheet not in isynt_by_sheet:
             isynt_by_sheet[sheet] = template_input_format(template_path, sheet)
         isynt, base = isynt_by_sheet[sheet], _to_int(rec["base"])
+        # the template's SHIPPED native interface signals (offsets fixed by the template, NO allocation) +
+        # the mirror block (allocated above). Native first - they're the template's top rows.
+        native = template_native_elements(template_path, sheet, rec["index"], base, isynt)
         itab.add(instance=rec["instance"], machine_type=rec["machine_type"], interface_id=rec["index"],
                  is_diag=rec["is_diag"], base_address=rec["base"], base_node=rec["base_node"],
                  device=rec["device"], ip=rec["ip"], template_sheet=sheet, source=rec["source"])
         fill = {"interface_name": rec["machine_type"], "interface_id": rec["index"]}
-        for e in elems:
+        for e in native + elems:
             # the I/O Address Side 1 is computed + STORED in the SSOT here (DESIGN: every computed datum
             # lives in the database; phase 510 reads this column; 400e's IF_-sheet seed equals it).
             address = io_address_side1(isynt, base, e.direction, e.data_type, e.offset_byte, e.bit)

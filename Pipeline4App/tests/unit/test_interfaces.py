@@ -1,5 +1,12 @@
-"""Phase 400 (Interfaces). 400a: the per-signal interface_tagname (identity + annotate). Data-independent."""
-from _harness import run, eq
+"""Phase 400 (Interfaces). 400a: the per-signal interface_tagname (identity + annotate). 400f: the
+template-native interface-signal capture. Data-independent."""
+import os
+import tempfile
+
+from openpyxl import Workbook
+from openpyxl.worksheet.table import Table as XlTable
+
+from _harness import run, eq, ok
 from pipeline4.core.database import Database
 from pipeline4.domain import identity, interfaces
 from pipeline4.domain.signals import signals_table
@@ -106,6 +113,46 @@ def test_collect_mirror_set_direct_follower_iflrule_and_dedup():
     eq(len(elems2), 3, "(direction, script_type, mirror_name) dedups duplicates")
 
 
+def _native_template(path):
+    """A minimal MachineInterfaces-style sheet: a 'Category'-headed data table with two native rows that
+    carry a Signal Name Side 1 (one with <index>), offsets/bits, direction, and an Expression Side 1."""
+    wb = Workbook(); ws = wb.active; ws.title = "SORTER"
+    headers = ["Category", "Description", "Data Type", "Direction </>", "I/O Offset Byte", "I/O Bit",
+               "I/O Address Side 1", "Signal Name Side 1", "Expression Side 1"]      # A..I
+    for c, h in enumerate(headers, 1):
+        ws.cell(1, c, h)
+    # row2: an output BOOL native signal with <index> + an expression
+    ws.cell(2, 1, "WATCHDOG"); ws.cell(2, 3, "BOOL"); ws.cell(2, 4, ">"); ws.cell(2, 5, "0"); ws.cell(2, 6, "0")
+    ws.cell(2, 8, "PNC_Q_SORTER-<index> HEARTBEAT"); ws.cell(2, 9, '"Clock 1Hz"')
+    # row3: an input BOOL native signal, no expression
+    ws.cell(3, 1, "SORTER_STATE"); ws.cell(3, 3, "BOOL"); ws.cell(3, 4, "<"); ws.cell(3, 5, "0"); ws.cell(3, 6, "0")
+    ws.cell(3, 8, "PNC_I_SORTER-<index> RUNNING")
+    ws.add_table(XlTable(displayName="SORTER_SIGNALS", ref="A1:I3"))
+    wb.save(path)
+
+
+def test_template_native_elements():
+    with tempfile.TemporaryDirectory() as d:
+        tpl = os.path.join(d, "t.xlsx"); _native_template(tpl)
+        isynt = "I<base+offset>/.<bit>"
+        elems = interfaces.template_native_elements(tpl, "SORTER", "01", 10000, isynt)
+        eq(len(elems), 2, "the two native rows (with a Signal Name) are captured")
+        hb = next(e for e in elems if "HEARTBEAT" in e.signal_name)
+        eq(hb.signal_name, "PNC_Q_SORTER-01 HEARTBEAT", "<index> resolved to the interface_id")
+        eq(hb.source, "template")
+        eq(hb.direction, "Q", "'>' -> Q")
+        eq((hb.offset_byte, hb.bit), (0, 0))
+        eq(hb.mirror_name, '"Clock 1Hz"', "the Expression Side 1 is kept (the key value)")
+        run_ = next(e for e in elems if "RUNNING" in e.signal_name)
+        eq(run_.direction, "I", "'<' -> I")
+        eq(run_.mirror_name, "PNC_I_SORTER-01 RUNNING", "an empty expression falls back to the signal_name (unique key)")
+        # the stored address is computed for THIS base via io_address_side1
+        eq(interfaces.io_address_side1(isynt, 10000, hb.direction, hb.data_type, hb.offset_byte, hb.bit),
+           "Q10000.0", "HEARTBEAT address for base 10000")
+        eq(interfaces.io_address_side1(isynt, 20000, hb.direction, hb.data_type, hb.offset_byte, hb.bit),
+           "Q20000.0", "the SAME native row computes per-base (20000 -> Q20000.0)")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("interfaces", [
@@ -119,4 +166,5 @@ if __name__ == "__main__":
         ("find_interfaces_from_ioc_rows", test_find_interfaces_from_ioc_rows),
         ("allocate_bytes_bool_block_and_word", test_allocate_bytes_bool_block_and_word),
         ("collect_mirror_set_direct_follower_iflrule_and_dedup", test_collect_mirror_set_direct_follower_iflrule_and_dedup),
+        ("template_native_elements", test_template_native_elements),
     ]))

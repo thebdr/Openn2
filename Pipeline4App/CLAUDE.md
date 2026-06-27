@@ -140,7 +140,7 @@ consumers 400/600).
 - **Deferred to phase 800**: `instance_dbs` → `InstanceDBs.csv` (a `blocks_creation_dir` surface that MERGES
   520's config families with 800's builder instances — the `instance_dbs` table is ready for it).
 
-## Phase 400 — Interfaces — DONE (400a + 400b + 400c + 400d + 400e)
+## Phase 400 — Interfaces — DONE (400a + 400b + 400c + 400d + 400e + 400f)
 `domain/interfaces.py`. Builds one `IF_<instance>.xlsx` per IOC signal from the MachineInterfaces template,
 mirrors flagged signals into a byte-packed block, and (gated) inserts each as an `IF_` sheet into the I/O
 List. The mirrored signals + byte layout land in the **`interfaces`** SSOT table; the `IF_*.xlsx` are its
@@ -170,11 +170,20 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   the value 400e seeds into the inserted IF_ sheet, for all 22 SORTER custom-block elements (0 mismatch).
 - **`+DIAG` auto-mirror DEFERRED**: needs the per-type `in_diag` (relocated with **ph600**). Until then a `+DIAG`
   interface (SORTER+DIAG-02) gets only its `interface_mapping` mirrors. `collect_mirror_set` already has the guard.
-  **Interface-completeness follow-up (with ph600)**: `interface_elements` holds only the custom MIRROR block — the
-  MachineInterfaces template ALSO ships per-type **template-native** interface signals (the SORTER sheet's 7:
-  HEARTBEAT / POWER ENABLED / EMERGENCY RESET / SORTER- RUNNING / …) that PL3's 510 reads off the IF_ sheet. PL4's
-  SSOT-only 510 omits them (−7 per SORTER instance). Captured together with the `+DIAG` auto-mirror at ph600 (pull
-  the template-native rows + the `in_diag` set into `interface_elements`), so 400 is re-opened once.
+  The `+DIAG` auto-mirror was **lit up by 600a** (staging `in_diag` onto the `type`) — SORTER+DIAG-02 grew 4 → 83.
+- **400f DONE — template-native interface signals.** `interfaces.template_native_elements(template, sheet,
+  interface_id, base, isynt)` reads the MachineInterfaces template's SHIPPED per-type rows (the SORTER sheet's 7:
+  HEARTBEAT / POWER ENABLED / EMERGENCY RESET / SORTER- RUNNING / …) — `<index>` resolved to the interface_id, the
+  address RE-computed for this interface's base (the template's cached I/O Address Side 1 is base-10000-stale) — and
+  `build_interfaces` adds them to `interface_elements` as `source="template"` (offsets fixed by the template, NOT
+  allocated). The IF_ projection (`_append_custom_rows`) SKIPS `source="template"` (already in the copied sheet, no
+  doubling). So `interface_elements` is now the COMPLETE interface tag set (native + mirror) and 510's PLCTags
+  includes the native signals. **Parity (fresh-PL3 oracle, to scratch)**: IF_SORTER-01 **25 == PL3's 25** (the 14
+  native match PL3); PL4 PLCTags 213 vs PL3 208. The residual deltas are PL4 being **more correct** than current
+  PL3 (PL3 still emits a literal `{db_element}` + the stale `Encoder Speed`; PL4 resolves both) + two open items:
+  the **+5 `Contactor Output`** +DIAG mirrors (PL4 auto-mirrors in_diag KQ; PL3 doesn't) and **8 `Door Alarm`
+  followers at a +2-byte offset** (a 400b `allocate_bytes` nuance vs current PL3). Tests: `test_interfaces.py`
+  `template_native_elements` + `test_interface_xlsx.py` `append_custom_rows_skips_template_source`.
 - **400c DONE — the `IF_*.xlsx` projection** (`interface_xlsx.py`, openpyxl - PL3 does the same; these files are
   documentation, not read back except via 400e): per `interfaces` row, copy the template → keep the chosen machine
   sheet → retitle `IF_<instance>` → `_plug` Base Address/Node/Index (Side rows, by header) + replace `<index>` →
@@ -300,10 +309,10 @@ later.)
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **132**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **134**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
 interface_xlsx (incl. the 400e insertion/seed/freeze), the **`io/xlsx_edit` suite** (14, ported verbatim),
-the **510 `io_tags` suite** (8), and the **600 `diagnosis` suite** (17)). Data-dependent parity (staging vs
+the **510 `io_tags` suite** (8), and the **600 `diagnosis` suite** (17); 134 total). Data-dependent parity (staging vs
 PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
 gate + parity green.
 

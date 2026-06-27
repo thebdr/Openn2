@@ -167,6 +167,8 @@ def _append_custom_rows(ws, elements) -> None:
         if db:
             _put(r, "diag_bit", db)
 
+    # the template-native elements are already in the copied sheet - only the MIRROR block is appended here.
+    elements = [e for e in elements if e.get("source") != "template"]
     blocks = []                                            # group by direction (Q then I) then category
     for direction in ("Q", "I"):
         seen = {}

@@ -11,14 +11,17 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **Phases 400 + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–e + 510 + 600a/b/c/d).
-  **`origin/pl4` is at `256aefe` (600b) — PUSHED. `93a63f7` (600c) is committed locally; 600d is implemented but
-  UNCOMMITTED** (in this working tree, with these doc updates). Push when the user asks.
-- **Gate: 132 tests green** (data-independent, was 128 + 4 more in `test_diagnosis.py`). Run
-  from `Pipeline4App/`: `for t in tests/unit/test_*.py; do python "$t"; done`
-- **600d landed** (`domain/diagnosis_scl.py` → `Diagnostic_for_OPC.scl`; tristate = `template_type` in {2,4} OR a
-  per-type `tristate` signal; GUI "600" runs 610 + 620). Parity: the SCL is **BYTE-IDENTICAL to the reference**
-  (22752 bytes, 438 lines, 0 diff). **Resume at the interface-completeness follow-up / 700** below.
+- **Branch `pl4`**. **Phases 400 (a–f) + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–f + 510 + 600a/b/c/d).
+  **`origin/pl4` is at `40dde03` (600d) — PUSHED. 400f is implemented but UNCOMMITTED** (this working tree).
+- **Gate: 134 tests green** (data-independent). Run from `Pipeline4App/`:
+  `for t in tests/unit/test_*.py; do python "$t"; done`
+- **400f landed** (`interfaces.template_native_elements` → the template's shipped per-type interface signals into
+  `interface_elements`; the IF_ projection skips `source="template"`). 510 PLCTags is now the complete interface
+  tag set. **Verified vs a FRESH-PL3 oracle (to scratch)**: IF_SORTER-01 25 == PL3 25; PL4 213 vs PL3 208, the
+  residual being PL4-more-correct (resolves `{db_element}`/`Encoder Speed`) + 2 open deltas (below).
+- **NOTE — the OutputTree PlcTags/DiagList are NOT a valid parity oracle anymore**: a GUI run wrote PL4's output
+  there (it's `config.io_tags_dir()`/`diaglist_dir()` with no project open). Use a FRESH PL3 run to scratch (see
+  `scratchpad/oracle_pl3_510.py`) or the known values. The SCL ref (06-23) is intact.
 - The SSOT **`Database/`** now holds **7 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
   `instance_dbs` (520) · `interfaces`/`interface_elements` (400b, +`io_address_side1`). Saves to `Shared/Database/`.
 
@@ -34,9 +37,10 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 8. `8da7046` **400e** — `insert_interface_sheets` (the lossless IF_ insertion + address-cache seed)
 9. `d558f45` **510** — `domain/io_tags.py` PLCTags.xlsx + `io_address_side1` stored on interface_elements at 400
 10. `599c14a` **600a** — `signal_diagnosis.csv` + staging diag fields + `diagnosis_cabinets` + the interp `:03d` fix
-11. `256aefe` **600b** — `domain/diagnosis.py` `build()` → the unified `diagnosis_entries` (io + logic)  [PUSHED head]
+11. `256aefe` **600b** — `domain/diagnosis.py` `build()` → the unified `diagnosis_entries` (io + logic)
 12. `93a63f7` **600c** — `domain/diaglist_csv.py` → DiagList_IO.csv + DiagList_Logic.csv + GUI "600"
-13. (UNCOMMITTED) **600d** — `domain/diagnosis_scl.py` → Diagnostic_for_OPC.scl (byte-identical to the ref)
+13. `40dde03` **600d** — `domain/diagnosis_scl.py` → Diagnostic_for_OPC.scl (byte-identical to the ref)  [PUSHED head]
+14. (UNCOMMITTED) **400f** — `template_native_elements` → the template's native interface signals into the table
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -77,12 +81,21 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   in {2,4} OR a per-type `tristate` signal** (the user's flag; forcing it on an odd template_type uses the
   tristate-counterpart variant 1->2/3->4). UTF-8 BOM + CRLF + FUNCTION rename; GUI "600" runs 610 + 620. Parity: the
   SCL is **BYTE-IDENTICAL to the reference** (22752 bytes, 438 lines, 1.0000 similarity, 0 diff lines).
+- **Phase 400f — DONE.** `interfaces.template_native_elements` pulls the template's shipped per-type interface
+  signals into `interface_elements` (`source="template"`; `<index>` resolved, address per-base); the IF_ projection
+  skips them (no doubling). 510 PLCTags is now complete. Fresh-PL3 oracle: IF_SORTER-01 25==25; PL4 213 / PL3 208.
 
 ## What's NEXT (in order)
-1. **Interface-completeness (a) — template-native signals (still TODO)**: `build_interfaces` should ALSO pull the
-   MachineInterfaces template's shipped per-type interface rows (the SORTER sheet's 7: HEARTBEAT / POWER ENABLED /
-   EMERGENCY RESET / SORTER- RUNNING / …, `<index>` resolved) into `interface_elements` (`source="template"`) — closes
-   the −7-per-instance PLCTags gap. (Item (b) `+DIAG` is DONE via 600a.) Then re-verify 510 PLCTags vs the reference.
+1. **Two open 510-interface deltas vs fresh-PL3** (surfaced by `scratchpad/oracle_pl3_510.py`; both PRE-date 400f —
+   they're 400b/600a matters, not 400f bugs). DECIDE accept-or-fix (OP4 is co-designed → internal consistency may
+   suffice, like the 520 member-order acceptance):
+   (a) **8 `Door Alarm` followers at a +2-byte offset** (PL4 `%Q10024` vs PL3 `%Q10022`) — PL4's `allocate_bytes`/
+       `collect_mirror_set` emits one extra 2-byte block before the followers vs current PL3. The MORE concerning one
+       (it shifts mirror addresses OP4 imports). Investigate `allocate_bytes` grouping vs PL3's.
+   (b) **+5 `Contactor Output` +DIAG mirrors** on SORTER+DIAG-02 (PL4 auto-mirrors in_diag KQ; PL3 doesn't). Likely
+       PL4 being more complete; confirm the in_diag set matches PL3's intent.
+   (NB: PL4 is otherwise MORE correct than current PL3 — PL3 still emits a literal `{db_element}` + the stale
+   `Encoder Speed`; PL4 resolves both.)
 2. Then the remaining phases (DESIGN §9): **700 Hardware** · **800 Software** · **900 Coverage** · **100 Validation**.
 
 ## Then the other phases (DESIGN §9 order `… 520 → 600 → 400 → 800 → 900 → 100`; 700 also open)

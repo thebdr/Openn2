@@ -56,6 +56,20 @@ def test_append_custom_rows_bool_block_and_padding():
     eq(ws.tables["T"].ref, "A1:G18", "the table ref extends to the last written row")
 
 
+def test_append_custom_rows_skips_template_source():
+    # 400f: a source="template" element is already in the copied sheet -> the mirror append must SKIP it.
+    wb, ws = _synthetic_sheet()
+    elems = [{"category": "X", "direction": "Q", "data_type": "BOOL", "offset_byte": 10, "bit": 0,
+              "signal_name": "PNC_native", "expression": '"Clock"', "source": "template"},
+             {"category": "X", "direction": "Q", "data_type": "BOOL", "offset_byte": 10, "bit": 0,
+              "signal_name": "PNC_mirror", "expression": '"DB"."m"', "source": "mirror"}]
+    interface_xlsx._append_custom_rows(ws, elems)
+    s1 = _col(ws, "Signal Name Side 1")
+    written = [ws.cell(r, s1).value for r in range(3, ws.max_row + 1) if ws.cell(r, s1).value]
+    ok("PNC_mirror" in written, "the mirror element is appended")
+    ok("PNC_native" not in written, "the template-native element is NOT re-appended (already in the sheet)")
+
+
 def test_append_custom_rows_word_row_and_separator():
     wb, ws = _synthetic_sheet()
     elems = [{"category": "SPD", "direction": "Q", "data_type": "WORD", "offset_byte": 12, "bit": None,
@@ -204,6 +218,7 @@ if __name__ == "__main__":
     sys.exit(run("interface_xlsx", [
         ("coerce_int_and_safe_name", test_coerce_int_and_safe_name),
         ("append_custom_rows_bool_block_and_padding", test_append_custom_rows_bool_block_and_padding),
+        ("append_custom_rows_skips_template_source", test_append_custom_rows_skips_template_source),
         ("append_custom_rows_word_row_and_separator", test_append_custom_rows_word_row_and_separator),
         ("io_address_mirror", test_io_address_mirror),
         ("resolve_num_chain", test_resolve_num_chain),
