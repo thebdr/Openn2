@@ -179,10 +179,13 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   allocated). The IF_ projection (`_append_custom_rows`) SKIPS `source="template"` (already in the copied sheet, no
   doubling). So `interface_elements` is now the COMPLETE interface tag set (native + mirror) and 510's PLCTags
   includes the native signals. **Parity (fresh-PL3 oracle, to scratch)**: IF_SORTER-01 **25 == PL3's 25** (the 14
-  native match PL3); PL4 PLCTags 213 vs PL3 208. The residual deltas are PL4 being **more correct** than current
-  PL3 (PL3 still emits a literal `{db_element}` + the stale `Encoder Speed`; PL4 resolves both) + two open items:
-  the **+5 `Contactor Output`** +DIAG mirrors (PL4 auto-mirrors in_diag KQ; PL3 doesn't) and **8 `Door Alarm`
-  followers at a +2-byte offset** (a 400b `allocate_bytes` nuance vs current PL3). Tests: `test_interfaces.py`
+  native match PL3); PL4 PLCTags 213 vs PL3 208. **Interface mirror parity vs current PL3 is EXACT** — comparing at
+  the source (`collect_mirror_set` + `allocate_bytes`), PL4 == current-PL3 for both interfaces (SORTER-01 18/18,
+  SORTER+DIAG-02 83/83, 0 address-triple diffs, Door Alarm @ offset 24 in both). The PLCTags oracle's apparent
+  deltas (a +2-byte `Door Alarm` shift, +5 `Contactor` mirrors) were **stale inserted IF_ sheets** — PL3's
+  `generate_io_tags` READS the IF_ sheets already in the I/O List (offset 22, old +DIAG=78) rather than
+  regenerating them; NOT PL4 bugs. PL4 is also MORE correct than current PL3 on naming (PL3 still emits a literal
+  `{db_element}` + the stale `Encoder Speed`; PL4 resolves both). Tests: `test_interfaces.py`
   `template_native_elements` + `test_interface_xlsx.py` `append_custom_rows_skips_template_source`.
 - **400c DONE — the `IF_*.xlsx` projection** (`interface_xlsx.py`, openpyxl - PL3 does the same; these files are
   documentation, not read back except via 400e): per `interfaces` row, copy the template → keep the chosen machine

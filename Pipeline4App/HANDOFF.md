@@ -17,8 +17,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **400f landed** (`interfaces.template_native_elements` → the template's shipped per-type interface signals into
   `interface_elements`; the IF_ projection skips `source="template"`). 510 PLCTags is now the complete interface
-  tag set. **Verified vs a FRESH-PL3 oracle (to scratch)**: IF_SORTER-01 25 == PL3 25; PL4 213 vs PL3 208, the
-  residual being PL4-more-correct (resolves `{db_element}`/`Encoder Speed`) + 2 open deltas (below).
+  tag set. **Interface parity vs current PL3 is EXACT** (see "Interface parity — RESOLVED" below): PL4's
+  `collect_mirror_set`/`allocate_bytes` == current-PL3's, 0 differences. The PLCTags oracle's apparent deltas were
+  stale inserted IF_ sheets, not PL4 bugs.
 - **NOTE — the OutputTree PlcTags/DiagList are NOT a valid parity oracle anymore**: a GUI run wrote PL4's output
   there (it's `config.io_tags_dir()`/`diaglist_dir()` with no project open). Use a FRESH PL3 run to scratch (see
   `scratchpad/oracle_pl3_510.py`) or the known values. The SCL ref (06-23) is intact.
@@ -85,18 +86,20 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   signals into `interface_elements` (`source="template"`; `<index>` resolved, address per-base); the IF_ projection
   skips them (no doubling). 510 PLCTags is now complete. Fresh-PL3 oracle: IF_SORTER-01 25==25; PL4 213 / PL3 208.
 
+## Interface parity — RESOLVED (the "2 deltas" were oracle artifacts, NOT PL4 bugs)
+The fresh-PL3 PLCTags oracle (`scratchpad/oracle_pl3_510.py`) showed a +2-byte `Door Alarm` shift + a +5
+`Contactor Output` delta. **Root cause: PL3's `generate_io_tags` READS the stale IF_ sheets already inserted in
+the I/O List (offset 22, old +DIAG=78) — it does NOT regenerate them.** Compared at the SOURCE (`scratchpad/
+diff_mirror.py`): **PL4's `collect_mirror_set` + `allocate_bytes` == current-PL3's, EXACTLY** — SORTER-01 18/18
+and SORTER+DIAG-02 83/83 mirror elements, **0 address-triple differences**, Door Alarm @ offset 24 in BOTH. So
+PL4 has full interface parity with current PL3 (and is MORE correct on naming: PL3 still emits literal
+`{db_element}` + the stale `Encoder Speed`; PL4 resolves both). Nothing to fix. (A truly fresh PL3 oracle would
+require PL3 to re-insert the IF_ sheets first; the `collect_mirror_set` equivalence is the conclusive check.)
+
 ## What's NEXT (in order)
-1. **Two open 510-interface deltas vs fresh-PL3** (surfaced by `scratchpad/oracle_pl3_510.py`; both PRE-date 400f —
-   they're 400b/600a matters, not 400f bugs). DECIDE accept-or-fix (OP4 is co-designed → internal consistency may
-   suffice, like the 520 member-order acceptance):
-   (a) **8 `Door Alarm` followers at a +2-byte offset** (PL4 `%Q10024` vs PL3 `%Q10022`) — PL4's `allocate_bytes`/
-       `collect_mirror_set` emits one extra 2-byte block before the followers vs current PL3. The MORE concerning one
-       (it shifts mirror addresses OP4 imports). Investigate `allocate_bytes` grouping vs PL3's.
-   (b) **+5 `Contactor Output` +DIAG mirrors** on SORTER+DIAG-02 (PL4 auto-mirrors in_diag KQ; PL3 doesn't). Likely
-       PL4 being more complete; confirm the in_diag set matches PL3's intent.
-   (NB: PL4 is otherwise MORE correct than current PL3 — PL3 still emits a literal `{db_element}` + the stale
-   `Encoder Speed`; PL4 resolves both.)
-2. Then the remaining phases (DESIGN §9): **700 Hardware** · **800 Software** · **900 Coverage** · **100 Validation**.
+1. The remaining phases (DESIGN §9): **700 Hardware** (Stations + Modules) · **800 Software** (8 builders +
+   `InstanceDBs.csv` + `02_COM`) · **900 Coverage** · **100 Validation**. Each: port → write its table → project to
+   `BuilderData/` → parity → wire its GUI button.
 
 ## Then the other phases (DESIGN §9 order `… 520 → 600 → 400 → 800 → 900 → 100`; 700 also open)
 600 Diagnosis (above) · 700 Hardware (Stations/Modules) · 800 Software (8 builders + `InstanceDBs.csv` + `02_COM`) ·
