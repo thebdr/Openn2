@@ -12,18 +12,28 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 
 ## Where we are
 - **Branch `pl4`**. **Phases 400 (a–f) + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–f + 510 + 600a/b/c/d).
-  **`origin/pl4` is PUSHED through `754dbd2`** (400f + the parity-resolution docs). **The severity-taxonomy +
-  GUI-log-filter chunk is implemented but UNCOMMITTED** (this working tree).
-- **Gate: 139 tests green** (data-independent, +5 `test_severity.py`). Run from `Pipeline4App/`:
+- **GIT STATE (read carefully):** `origin/pl4` is **PUSHED through `754dbd2`**. ON TOP, locally:
+  1. **`5e291f8`** (committed, **UNPUSHED**) — the severity taxonomy + the GUI log-level filter.
+  2. **S1 (findings/treatment core) — UNCOMMITTED** in the working tree (`core/finding.py`, `core/treatments.py`,
+     `core/run.py`, `config.user_input_dir()`, `tests/unit/{test_finding,test_treatments,test_run}.py`, + the
+     CLAUDE.md/HANDOFF.md updates). Gate-green, no phase touched. **FIRST next-session action: commit S1, then push
+     `5e291f8`+S1** (the user wraps each verified chunk on their word).
+  - The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before
+    this session — NOT ours; leave them.
+- **Gate: 153 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
-- **SEVERITY model (user-directed, IN PROGRESS).** Decided taxonomy (`core/severity.py`): FAIL (halts) · ERROR
-  (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner; first-char-addressable.
-  DONE: the taxonomy + DEBUG + the GUI log-level display filter (`app_config.yaml user_interface.log_levels`, a
-  first-char list, default `[F,E,W,I,S,P,D]` — all 7; `config.load_app_ui`; `LogView(shown_levels)`). **STILL TO DO (the big
-  rollout, awaiting a scope decision)**: the `error_management.csv` treatment registry generalized to RECLASSIFY a
-  finding's effective severity per uid (incl. escalating to a halting FAIL); per-phase findings (each emits
-  uid+default-severity); the engine/GUI "halt iff any effective FAIL". 700's missing-DTD = default FAIL is the
-  first intended consumer.
+- **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
+  FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
+  first-char-addressable. The GUI filter (`app_config.yaml user_interface.log_levels`, default `[F,E,W,I,S,P,D]`)
+  is done. **S1 (the findings/treatment core) is DONE**: `core/finding.py` (frozen `Finding` + uid excluding
+  severity + `validation_issues_table` [persisted - user's choice] + `record`); `core/treatments.py` (the
+  `error_management.csv` registry generalized - a per-uid treatment names the target level, can escalate to FAIL;
+  load/apply/effective_severity/should_halt/reconcile/write/set_treatment); `core/run.py:gate` (apply+render+halt
+  iff effective FAIL) + `has_blocking` (raw-FAIL write guard); `config.user_input_dir()`. Tests: +19. S1 touched
+  NO phase (parity untouched). **NEXT: S2 retrofit 520** (generate/build -> `list[Finding]` + `finding.record` +
+  the two-layer no-write guard + `run.gate` in the handler; the only live FAIL-blocks-write path) → S3 300 → S4
+  400+510 → S5 600 → S6 delete the legacy `(errors, warnings)` lists. PARITY RULE: only the report CONTAINER +
+  the gate call change; the skip/write PREDICATES are untouched → 0-byte BuilderData diff per chunk. Then phase 700.
 - **400f landed** (`interfaces.template_native_elements` → the template's shipped per-type interface signals into
   `interface_elements`; the IF_ projection skips `source="template"`). 510 PLCTags is now the complete interface
   tag set. **Interface parity vs current PL3 is EXACT** (see "Interface parity — RESOLVED" below): PL4's
@@ -32,8 +42,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 - **NOTE — the OutputTree PlcTags/DiagList are NOT a valid parity oracle anymore**: a GUI run wrote PL4's output
   there (it's `config.io_tags_dir()`/`diaglist_dir()` with no project open). Use a FRESH PL3 run to scratch (see
   `scratchpad/oracle_pl3_510.py`) or the known values. The SCL ref (06-23) is intact.
-- The SSOT **`Database/`** now holds **7 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
-  `instance_dbs` (520) · `interfaces`/`interface_elements` (400b, +`io_address_side1`). Saves to `Shared/Database/`.
+- The SSOT **`Database/`** now holds **8 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
+  `instance_dbs` (520) · `interfaces`/`interface_elements` (400b, +`io_address_side1`) · `diagnosis_entries` (600).
+  Saves to `Shared/Database/`. (`validation_issues` joins as the severity rollout retrofits each phase — S2+.)
 
 ### Commits this session (oldest → newest)
 1. `407ed07` staging direct fields — positional node ranges (`I_/Q_startByte/endByte`) + `IsSorterArea`
@@ -49,8 +60,11 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 10. `599c14a` **600a** — `signal_diagnosis.csv` + staging diag fields + `diagnosis_cabinets` + the interp `:03d` fix
 11. `256aefe` **600b** — `domain/diagnosis.py` `build()` → the unified `diagnosis_entries` (io + logic)
 12. `93a63f7` **600c** — `domain/diaglist_csv.py` → DiagList_IO.csv + DiagList_Logic.csv + GUI "600"
-13. `40dde03` **600d** — `domain/diagnosis_scl.py` → Diagnostic_for_OPC.scl (byte-identical to the ref)  [PUSHED head]
-14. (UNCOMMITTED) **400f** — `template_native_elements` → the template's native interface signals into the table
+13. `40dde03` **600d** — `domain/diagnosis_scl.py` → Diagnostic_for_OPC.scl (byte-identical to the ref)
+14. `2cb6a91` **400f** — `template_native_elements` → the template's native interface signals into the table
+15. `754dbd2` doc — interface parity RESOLVED (oracle artifact)  **← origin/pl4 PUSHED head**
+16. `5e291f8` severity taxonomy (+DEBUG) + the GUI log-level filter  **(committed, UNPUSHED)**
+17. (UNCOMMITTED, working tree) **S1** — `core/finding.py` + `core/treatments.py` + `core/run.py` + `user_input_dir`
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -106,13 +120,38 @@ PL4 has full interface parity with current PL3 (and is MORE correct on naming: P
 require PL3 to re-insert the IF_ sheets first; the `collect_mirror_set` equivalence is the conclusive check.)
 
 ## What's NEXT (in order)
-1. The remaining phases (DESIGN §9): **700 Hardware** (Stations + Modules) · **800 Software** (8 builders +
-   `InstanceDBs.csv` + `02_COM`) · **900 Coverage** · **100 Validation**. Each: port → write its table → project to
-   `BuilderData/` → parity → wire its GUI button.
+**0. Commit S1 + push (`5e291f8` + S1).** Then the severity rollout (below), THEN phase 700.
 
-## Then the other phases (DESIGN §9 order `… 520 → 600 → 400 → 800 → 900 → 100`; 700 also open)
-600 Diagnosis (above) · 700 Hardware (Stations/Modules) · 800 Software (8 builders + `InstanceDBs.csv` + `02_COM`) ·
-900 Coverage · 100 Validation. Each: port → write its table → project to `BuilderData/` → parity → wire its GUI button.
+### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
+The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +
+calls **`finding.record(database, findings)`** (populates the `validation_issues` table, saved with the phase) +
+keeps a **`run.has_blocking(findings)` raw-FAIL no-write guard** before writing BuilderData; the GUI handler calls
+**`run.gate(findings, self.log.append, label=…)`** to render + halt. **PARITY RULE: change only the report CONTAINER
++ the gate call — NEVER the skip/write PREDICATES → 0-byte BuilderData diff per chunk** (re-run each phase's scratch
+parity after). Slug convention `<area>_<condition>`. Findings to emit (from the design pass; default sev in caps):
+
+- **S2 — 520 `datablocks.py`** (the only live FAIL-blocks-write path; richest):
+  FAIL — `db_for_each_invalid`, `db_only_load_optimized`, `db_instance_needs_fb`, `db_global_needs_literal`,
+  `db_element_not_declared`, `db_unknown_datatype`, `db_element_for_each`, `db_member_render`,
+  `db_instance_name_render`. WARN — `db_for_each_matches_nothing`, `db_unknown_prog_lang`, `db_fdb_opc_ignored`,
+  `db_member_duplicate`. (`generate` returns findings; `build` keeps the no-write-on-raw-FAIL guard.)
+- **S3 — 300 `staging.py`**: `stg_no_io_sheet` (FAIL — replaces the `raise SystemExit`); `stg_dup_signal_uid`
+  (WARN — move the GUI's post-stage dup check into `stage`). `stage()` -> `(database, findings)`.
+- **S4 — 400 + 510** (WARN-only, no FAILs): 400 `if_ioc_no_index`, `if_signal_not_mirrored`; 510 `iotag_no_address`.
+  `build_interfaces` -> `(database, findings)`; `io_tags.project` swaps its `warnings` key for `findings`.
+- **S5 — 600**: `diag_scl_template_missing` (WARN); `diagnosis.build`/`diaglist_csv`/`diagnosis_scl` -> findings
+  (empty in the common path). 
+- **S6 — cleanup**: delete the legacy `(errors, warnings)` tuples + the `if errors:` / `for w in warnings` blocks
+  from `app_main.py`; every handler consumes findings only. Full 5-phase byte-parity re-run. Ends ready for 700.
+  (Open: 100/900 will read `validation_issues` as their backbone; `accept` [doc-mutating treatment] lands with 100.)
+
+### Then the remaining phases (DESIGN §9)
+**700 Hardware** (Stations + Modules — **its full design is already done**: see the `understand-700-hardware` workflow
+output / the 700a-b-c plan: `domain/hardware.py` + `hardware_csv.py`, `hardware_stations`/`hardware_modules` tables,
+`config.load_device_types_db` + `hardware_dir`; missing-DTD head = **FAIL** per the severity model, switch = WARN;
+comma/no-BOM/CRLF format-2; parity vs current-PL3 `extract`, the frozen reference is DTD-drift-stale) ·
+**800 Software** (8 builders + `InstanceDBs.csv` + `02_COM`) · **900 Coverage** · **100 Validation**.
+Each: port → write its table → project to `BuilderData/` → parity → wire its GUI button.
 
 ## Locked decisions (don't relitigate)
 - **Keying**: content-hash `uid` excluding volatile bits. **DB on disk**: top-level `Shared/Database/` folder.

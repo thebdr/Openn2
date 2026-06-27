@@ -56,6 +56,12 @@ def database_dir() -> str:
     return os.path.join(_PROJECT_ROOT, "Database") if _PROJECT_ROOT else _BUILTIN_DATABASE
 
 
+def user_input_dir() -> str:
+    """The USER-LOCAL inputs (the treatment registry error_management.csv) - per project when one is open,
+    else the builtin config_project's. Co-located with the active config so each project owns its treatments."""
+    return os.path.join(config_project_dir(), "user_input")
+
+
 def output_root() -> str:
     """The BuilderData/ export root - what OPn imports."""
     return os.path.join(_PROJECT_ROOT, "Output") if _PROJECT_ROOT else _BUILTIN_OUTPUT

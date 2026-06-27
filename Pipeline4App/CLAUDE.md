@@ -48,7 +48,7 @@ Pipeline4App/
   DESIGN.md · CLAUDE.md · HANDOFF.md · launch_gui.py
   config_project/                  (the restructured config — see "Config" below)
   pipeline4/
-    core/  keys.py · table.py · database.py · config.py · severity.py
+    core/  keys.py · table.py · database.py · config.py · severity.py · finding.py · treatments.py · run.py
     io/    workbook.py · xlsx_edit.py
     domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
@@ -315,17 +315,32 @@ later.)
   config lists can use single chars or full names interchangeably (`severity.resolve`/`resolve_set`). **`config_project/app_config.yaml`**
   (NEW — a tracked, COSMETIC GUI launch config, NOT per-project run params) carries `user_interface.log_levels`
   (default `[F, E, W, I, S, P, D]` — all 7 levels shown); `config.load_app_ui()` reads it → the shown-level set;
-  `LogView(shown_levels=…)` filters `append` (PHASE always shown). This is the FIRST piece of the planned severity
-  model — the `error_management.csv` treatment registry that RECLASSIFIES a finding's effective severity per uid
-  (incl. escalating to a halting FAIL) + the per-phase findings rollout are still to come (FAIL-vs-ERROR halt
-  semantics). Tests: `test_severity.py` (5).
+  `LogView(shown_levels=…)` filters `append` (PHASE always shown). This is the first piece of the severity model.
+  **S1 (the findings/treatment core) is DONE too:**
+  - **`core/finding.py`** - a frozen `Finding(phase, type, severity, detail, location, source_uid, doc)`;
+    `uid = keys.uid(phase, type, norm(location), norm(detail))` EXCLUDING severity (so a treatment can change the
+    level without breaking the match). `validation_issues_table()` (the SSOT record of the FACTS, one row per
+    finding at its default severity - treatments live separately) + `record(database, findings)` (passes each
+    Finding's own uid so the row uid == the registry key).
+  - **`core/treatments.py`** - the `error_management.csv` registry (`config.user_input_dir()`), generalizing PL3's:
+    a per-uid treatment NAMES the target level (`fail`/`error`/`warn`/`skip`/`ignore`) so it can DOWNGRADE *or*
+    ESCALATE to a halting FAIL. `load`/`apply`/`effective_severity`/`should_halt`/`reconcile` (refresh current,
+    prune untreated-gone, mark treated-gone `stale`)/`write`/`set_treatment`. (`accept` deferred to ph100.)
+  - **`core/run.py:gate(findings, log_append, label)`** - the halt seam (no engine yet): apply the registry, render
+    each finding at its EFFECTIVE level, return CONTINUE; halt iff any effective level in `severity.HALTING`.
+    `has_blocking` is the build-side raw-FAIL guard (never write BuilderData on a raw FAIL).
+  Tests: `test_severity.py` (5) + `test_finding.py` (4) + `test_treatments.py` (5) + `test_run.py` (5).
+  **Decision (user): persist `validation_issues` now + full model + retrofit 300/520/400/510/600, THEN 700.** S1
+  touched NO phase (parity trivially preserved). NEXT: S2 retrofit 520 (the only live FAIL-blocks-write path) ->
+  S3 300 -> S4 400+510 -> S5 600 -> S6 delete the legacy `(errors, warnings)` lists.
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **139**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **153**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
 interface_xlsx (incl. the 400e insertion/seed/freeze), the **`io/xlsx_edit` suite** (14, ported verbatim),
-the **510 `io_tags` suite** (8), and the **600 `diagnosis` suite** (17); 134 total). Data-dependent parity (staging vs
+the **510 `io_tags` suite** (8), the **600 `diagnosis` suite** (17), the **severity/findings core**
+(`test_severity`/`test_finding`/`test_treatments`/`test_run` = 19)). Data-dependent parity (staging vs
 PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
 gate + parity green.
 
