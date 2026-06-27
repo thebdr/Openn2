@@ -191,6 +191,55 @@ def test_build_unified_io_and_logic():
     eq(le["diag_columns"]["Diag Desc"], "SAFETY ENCODER FAILURE =S1+M1", "the rule diag_desc names the logic row")
 
 
+# =================================================================================================== #
+# Phase 600c - the DiagList CSV projections (filter diagnosis_entries by source -> the two CSVs)
+# =================================================================================================== #
+import csv
+
+from pipeline4.domain import diaglist_csv
+
+
+def _built_db():
+    cols = signals_table(["functional_unit", "location", "device", "script_type", "bit",
+                          "diag_cabinet", "diag_bit", "type_hw", "index", "desc_l1", "combined_FLD", "iol_FLD"])
+    db = Database([cols, diagnosis_cabinets_table()])
+    db["signals"].add(script_type="A", type={"in_diag": True}, type_hw="A", diag_cabinet="1", diag_bit="5",
+                      bit="I1.0", desc_l1="ALARM", plc_binding='"Alarms_Warnings"."x"')
+    db["signals"].add(script_type="N1/2", type={"in_diag": True, "diag_logic": "invert"}, type_hw="N",
+                      diag_cabinet="2", diag_bit="0", index="01", functional_unit="=S1", location="+M1",
+                      combined_FLD="=S1+M1", iol_FLD="=S1+M1", plc_binding='"04_SPEED"."enc"')
+    db, _e, _w = diagnosis.build(db)
+    return db
+
+
+def test_diaglist_project():
+    db = _built_db()
+    with tempfile.TemporaryDirectory() as d:
+        res = diaglist_csv.project(db, out_dir=d)
+        eq((res["io_count"], res["logic_count"]), (2, 1), "io -> IO.csv, logic -> Logic.csv")
+        headers = [c["header"] for c in config.load_diagnosis_columns()]
+        with open(res["io_path"], newline="", encoding="utf-8") as fh:
+            io = list(csv.reader(fh))
+        eq(io[0], headers, "DiagList_IO header = the config columns in order")
+        eq(len(io), 3, "header + 2 io rows")
+        cab_i = headers.index("Diag Cabinet")
+        ok("001" in [r[cab_i] for r in io[1:]], "a padded Diag Cabinet (:03d) is present")
+        with open(res["logic_path"], newline="", encoding="utf-8") as fh:
+            logic = list(csv.reader(fh))
+        eq(len(logic), 2, "header + 1 logic row")
+        pb = headers.index("PLC_Binding")
+        eq(logic[1][pb], '"04_SPEED"."Safety Encoder 01 Healthy [ =S1+M1 ]"', "the rule binding in PLC_Binding")
+
+
+def test_diaglist_crlf_no_bom():
+    db = _built_db()
+    with tempfile.TemporaryDirectory() as d:
+        res = diaglist_csv.project(db, out_dir=d)
+        raw = open(res["io_path"], "rb").read()
+        ok(b"\r\n" in raw, "CRLF line endings (matches the reference)")
+        ok(raw[:3] != b"\xef\xbb\xbf", "no BOM")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("diagnosis", [
@@ -205,4 +254,6 @@ if __name__ == "__main__":
         ("resolve_logic_or_next_free_bit_and_cabinet", test_resolve_logic_or_next_free_bit_and_cabinet),
         ("resolve_logic_cabinet_from_blocks", test_resolve_logic_cabinet_from_blocks),
         ("build_unified_io_and_logic", test_build_unified_io_and_logic),
+        ("diaglist_project", test_diaglist_project),
+        ("diaglist_crlf_no_bom", test_diaglist_crlf_no_bom),
     ]))

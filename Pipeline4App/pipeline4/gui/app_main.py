@@ -57,6 +57,8 @@ class App:
                 self._run_interfaces()
             elif number == 500:
                 self._run_data_blocks()
+            elif number == 600:
+                self._run_diagnosis()
             elif number == 0:
                 self.log.append("PHASE", "Run Pipeline (all phases)")
                 self.log.append("WARN", "  -> full run not wired yet")
@@ -147,7 +149,32 @@ class App:
                 self.log.append("WARN" if action.startswith("[WARN]") else "INFO", f"  {action}")
         else:
             self.log.append("INFO", "  insert_interface_sheets: disabled (iolist_params.insert_interface_sheets)")
-        self.log.append("INFO", "  510 I/O Tags: not ported yet")
+
+    def _run_diagnosis(self):
+        """Phase 600 (wired through 600c): stage -> 520 build (plc_binding) -> diagnosis.build (the unified
+        diagnosis_entries table) -> project DiagList_IO.csv + DiagList_Logic.csv. 620 OPC SCL TODO (600d)."""
+        from pipeline4.core import config
+        from pipeline4.domain import staging, datablocks, diagnosis, diaglist_csv
+        self.log.append("PHASE", "600 Diagnosis Mapping  (610 DiagList)")
+        self.status.configure(text="diagnosis…")
+        self.root.update_idletasks()
+        database = staging.stage()
+        database, errors, _w = datablocks.build(database)        # 520 prereq -> plc_binding write-back
+        if errors:
+            for e in errors:
+                self.log.append("FAIL", f"  520 (prereq): {e}")
+            return
+        database, errors, warnings = diagnosis.build(database)
+        for w in warnings[:20]:
+            self.log.append("WARN", f"  {w}")
+        if errors:
+            for e in errors:
+                self.log.append("FAIL", f"  600 halted: {e}")
+            return
+        res = diaglist_csv.project(database)
+        self.log.append("PASS", f"  DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> "
+                                f"{config.diaglist_dir()}")
+        self.log.append("INFO", "  620 OPC SCL: not ported yet (600d)")
 
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"

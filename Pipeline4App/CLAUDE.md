@@ -50,7 +50,7 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
     io/    workbook.py · xlsx_edit.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -238,7 +238,7 @@ sort+distinct-props, the skip+warn, the return contract).
   **+DIAG auto-mirror** tags on SORTER+DIAG-02 (the deferred `in_diag`/ph600 feature). Both are captured together at
   ph600 (pull the template-native rows + the `in_diag` set into `interface_elements`) — see the Phase 400 follow-up.
 
-## Phase 600 — Diagnosis — IN PROGRESS (600a + 600b done; 600c/d TODO)
+## Phase 600 — Diagnosis — IN PROGRESS (600a + 600b + 600c done; 600d TODO)
 `domain/diagnosis_entries.py` (the table defs) + the per-type config relocation + the staging prereqs. The plan
 (from the 600 understand pass): a UNIFIED `diagnosis_entries` table (`source` = io|logic) → projected to
 `DiagList_IO.csv` + `DiagList_Logic.csv` (600c) + the OPC SCL (600d), with a parent `diagnosis_cabinets` table.
@@ -269,9 +269,16 @@ sort+distinct-props, the skip+warn, the return contract).
   rendered blank). **Parity (real data, vs the reference DiagLists by `PLC_Binding`)**: **DiagList_IO 73/73 and
   DiagList_Logic 6/6 - 0 field mismatches** (logic_count == #N1/2 + #DI1/2 staged rows). Tests: `test_diagnosis.py`
   (11 total; +5 for 600b: `ml_value`, `node_of`/`fl_value`, `resolve_logic` OR/next-free-bit/cabinet, the build).
-- **600c/d TODO**: the two DiagList CSV projections (`diaglist_csv.project`, filter `diagnosis_entries` by `source`);
-  the OPC SCL projection (`diagnosis_scl`: FUNCTION/REGION/CabState/BoolToUDInt, the 01-04 variants + **tristate**,
-  BOM/CRLF + FUNCTION rename) + the GUI "600" button. Then re-verify 510 PLCTags + add the template-native capture.
+- **600c DONE - the DiagList CSV projections** (`domain/diaglist_csv.py` `project()`): filter `diagnosis_entries`
+  by `source` and write each entry's frozen `diag_columns` snapshot under the config headers -> `DiagList_IO.csv`
+  (source=io) + `DiagList_Logic.csv` (source=logic), comma CSV, **CRLF, no BOM** (`csv.writer`, `config.diaglist_dir()`
+  under ProjectDocumentation - documentation, not a BuilderData surface). The GUI **"600" button** now runs stage ->
+  520 build -> diagnosis.build -> diaglist_csv.project. **Parity (real data, scratch)**: both files are **FULL-ROW
+  IDENTICAL** to the reference (DiagList_IO 73/73 + DiagList_Logic 6/6, 0 PL4-only / 0 ref-only; header match, CRLF,
+  no BOM). Tests: `test_diagnosis.py` (+2: the two-file projection + the CRLF/no-BOM format). 13 total in the suite.
+- **600d TODO**: the OPC SCL projection (`diagnosis_scl`: FUNCTION/REGION/CabState/BoolToUDInt, the 01-04 variants +
+  **tristate** [the new per-type `type.tristate` flag], BOM/CRLF + FUNCTION rename) + wire it into the "600" button.
+  Then re-verify 510 PLCTags after the +DIAG unblock + add the template-native capture.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
@@ -283,10 +290,10 @@ later.)
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **126**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **128**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
 interface_xlsx (incl. the 400e insertion/seed/freeze), the **`io/xlsx_edit` suite** (14, ported verbatim),
-the **510 `io_tags` suite** (8), and the **600a/b `diagnosis` suite** (11)). Data-dependent parity (staging vs
+the **510 `io_tags` suite** (8), and the **600a/b/c `diagnosis` suite** (13)). Data-dependent parity (staging vs
 PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
 gate + parity green.
 

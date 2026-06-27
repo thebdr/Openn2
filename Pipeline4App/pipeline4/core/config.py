@@ -77,6 +77,12 @@ def io_tags_dir() -> str:
     return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "PlcTags")
 
 
+def diaglist_dir() -> str:
+    """The phase-610 DiagList output (`DiagList_IO.csv` + `DiagList_Logic.csv`) - DOCUMENTATION under
+    ProjectDocumentation (NOT a BuilderData import surface; matches PL3's DiagnosisData path)."""
+    return os.path.join(output_root(), "ProjectDocumentation", "InformationDatabase", "DiagnosisData")
+
+
 # --- sheet-name resolution (regex / JS-literal, case-insensitive) -------------------------------- #
 def js_to_re(pattern: str) -> str:
     """Accept a JS-style regex literal ('/pattern/flags' or 'pattern/flags') and return the bare Python
