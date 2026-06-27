@@ -139,6 +139,17 @@ consumers 400/600).
   ORDER differs — accepted). The GUI **"500" button** runs stage → build → project (510 I/O Tags not yet ported).
 - **Deferred to phase 800**: `instance_dbs` → `InstanceDBs.csv` (a `blocks_creation_dir` surface that MERGES
   520's config families with 800's builder instances — the `instance_dbs` table is ready for it).
+- **Severity S2 retrofit DONE** (the report container swap, parity-locked): `generate` returns
+  **`list[Finding]`** (phase 520) instead of `(errors, warnings)` strings — 9 FAIL slugs (`db_for_each_invalid`,
+  `db_only_load_optimized`, `db_instance_needs_fb`, `db_global_needs_literal`, `db_element_not_declared`,
+  `db_unknown_datatype`, `db_element_for_each`, `db_member_render`, `db_instance_name_render`) + 4 WARN
+  (`db_for_each_matches_nothing`, `db_unknown_prog_lang`, `db_fdb_opc_ignored`, `db_member_duplicate`); the
+  human message → `detail`, the `DB <name>` / `element <m> -> DB <db>` prefix → `location` (so the uid is
+  stable). `build` returns **`(database, findings)`**, keeps the **`run.has_blocking` raw-FAIL no-write guard**,
+  and `finding.record`s the facts to the **`validation_issues`** table on success. The GUI handlers (500 owner +
+  400/600 prereqs) call **`run.gate(findings, self.log.append, label=…)`** to render + halt. **PARITY: the 9
+  GlobalDB XMLs are byte-identical to pre-S2** (verified new-vs-HEAD, 0 diffs); only the report container + the
+  log lines changed, never the skip/write predicates.
 
 ## Phase 400 — Interfaces — DONE (400a + 400b + 400c + 400d + 400e + 400f)
 `domain/interfaces.py`. Builds one `IF_<instance>.xlsx` per IOC signal from the MachineInterfaces template,
@@ -331,8 +342,10 @@ later.)
     `has_blocking` is the build-side raw-FAIL guard (never write BuilderData on a raw FAIL).
   Tests: `test_severity.py` (5) + `test_finding.py` (4) + `test_treatments.py` (5) + `test_run.py` (5).
   **Decision (user): persist `validation_issues` now + full model + retrofit 300/520/400/510/600, THEN 700.** S1
-  touched NO phase (parity trivially preserved). NEXT: S2 retrofit 520 (the only live FAIL-blocks-write path) ->
-  S3 300 -> S4 400+510 -> S5 600 -> S6 delete the legacy `(errors, warnings)` lists.
+  touched NO phase (parity trivially preserved). **S2 (retrofit 520 - the only live FAIL-blocks-write path) is
+  DONE** (see the Phase 520 section: `generate -> list[Finding]`, `build -> (database, findings)` + the
+  `validation_issues` record + the `run.gate` handlers; GlobalDB XMLs byte-identical to pre-S2). NEXT: S3 300 ->
+  S4 400+510 -> S5 600 -> S6 delete the legacy `(errors, warnings)` lists -> phase 700.
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The

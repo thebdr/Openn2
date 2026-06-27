@@ -89,19 +89,14 @@ class App:
         """Phase 500 (wired): stage -> 520 the registry generates db_members + db_blocks + instance_dbs
         (+ writes back name_in_db/datablocks/plc_binding) -> project the GlobalDB XML; then 510 builds the
         interface tables and projects the consolidated PLCTags.xlsx. Runs inline for now."""
-        from pipeline4.core import config
+        from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks, datablock_xml, interfaces, io_tags
         self.log.append("PHASE", "500 Signals Mapping  (520 Data Blocks + 510 I/O Tags)")
         self.status.configure(text="data blocks…")
         self.root.update_idletasks()
         database = staging.stage()
-        database, errors, warnings = datablocks.build(database)
-        for w in warnings:
-            self.log.append("WARN", f"  {w}")
-        if errors:
-            for e in errors:
-                self.log.append("FAIL", f"  {e}")
-            self.log.append("FAIL", "  520 halted on a config error - nothing written")
+        database, findings = datablocks.build(database)
+        if not run.gate(findings, self.log.append, label="520 Data Blocks"):
             return
         n_dbs, n_members = len(database["db_blocks"]), len(database["db_members"])
         self.log.append("PASS", f"  {n_members} db_members across {n_dbs} DBs (+ {len(database['instance_dbs'])} "
@@ -124,16 +119,14 @@ class App:
     def _run_interfaces(self):
         """Phase 400 (wired through 400e): stage -> 520 -> the interfaces/interface_elements tables ->
         the IF_*.xlsx projection -> (gated) insert each as an IF_ sheet into the I/O List. 510 tags TODO."""
-        from pipeline4.core import config
+        from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks, interfaces, interface_xlsx
         self.log.append("PHASE", "400 Interfaces Generation")
         self.status.configure(text="interfaces…")
         self.root.update_idletasks()
         database = staging.stage()
-        database, errors, _w = datablocks.build(database)
-        if errors:
-            for e in errors:
-                self.log.append("FAIL", f"  520 (prereq): {e}")
+        database, findings = datablocks.build(database)
+        if not run.gate(findings, self.log.append, label="520 (prereq)"):
             return
         database, warnings = interfaces.build_interfaces(database)
         for w in warnings[:20]:
@@ -154,16 +147,14 @@ class App:
     def _run_diagnosis(self):
         """Phase 600 (wired): stage -> 520 build (plc_binding) -> diagnosis.build (the unified
         diagnosis_entries table) -> 610 project DiagList_IO/Logic.csv -> 620 project the OPC SCL."""
-        from pipeline4.core import config
+        from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks, diagnosis, diaglist_csv, diagnosis_scl
         self.log.append("PHASE", "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL)")
         self.status.configure(text="diagnosis…")
         self.root.update_idletasks()
         database = staging.stage()
-        database, errors, _w = datablocks.build(database)        # 520 prereq -> plc_binding write-back
-        if errors:
-            for e in errors:
-                self.log.append("FAIL", f"  520 (prereq): {e}")
+        database, findings = datablocks.build(database)          # 520 prereq -> plc_binding write-back
+        if not run.gate(findings, self.log.append, label="520 (prereq)"):
             return
         database, errors, warnings = diagnosis.build(database)
         for w in warnings[:20]:

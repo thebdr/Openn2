@@ -12,8 +12,10 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 
 ## Where we are
 - **Branch `pl4`**. **Phases 400 (a–f) + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–f + 510 + 600a/b/c/d).
-- **GIT STATE:** `origin/pl4` is **PUSHED + fully synced through `37559f0`** (severity S1) — the working tree is
-  CLEAN for Pipeline4App. The severity taxonomy/GUI-filter (`5e291f8`) and S1 (`37559f0`) are both in.
+- **GIT STATE:** `origin/pl4` is PUSHED + synced through `37559f0` (severity S1). **The working tree now holds the
+  UNCOMMITTED S2 chunk** (datablocks.py + app_main.py + test_datablocks.py) — implemented, gate green, parity
+  verified, **awaiting the user's commit word** (then push). The severity taxonomy/GUI-filter (`5e291f8`) + S1
+  (`37559f0`) are committed.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
 - **Gate: 153 tests green** (data-independent). Run from `Pipeline4App/`:
@@ -26,10 +28,15 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `error_management.csv` registry generalized - a per-uid treatment names the target level, can escalate to FAIL;
   load/apply/effective_severity/should_halt/reconcile/write/set_treatment); `core/run.py:gate` (apply+render+halt
   iff effective FAIL) + `has_blocking` (raw-FAIL write guard); `config.user_input_dir()`. Tests: +19. S1 touched
-  NO phase (parity untouched); committed + pushed (`37559f0`). **NEXT: S2 retrofit 520** (generate/build -> `list[Finding]` + `finding.record` +
-  the two-layer no-write guard + `run.gate` in the handler; the only live FAIL-blocks-write path) → S3 300 → S4
-  400+510 → S5 600 → S6 delete the legacy `(errors, warnings)` lists. PARITY RULE: only the report CONTAINER +
-  the gate call change; the skip/write PREDICATES are untouched → 0-byte BuilderData diff per chunk. Then phase 700.
+  NO phase (parity untouched); committed + pushed (`37559f0`). **S2 retrofit 520 DONE** (uncommitted): `generate`
+  -> `list[Finding]` (9 FAIL + 4 WARN slugs, message->detail, `DB <name>`/`element <m> -> DB <db>`->location);
+  `build` -> `(database, findings)` + `run.has_blocking` no-write guard + `finding.record` -> `validation_issues`
+  on success; the 3 GUI handlers (500 owner + 400/600 prereqs) call `run.gate(findings, self.log.append, label)`.
+  Gate 153 green; the 9 GlobalDB XMLs **byte-identical to pre-S2** (new-vs-HEAD diff = 0). **NEXT: S3 300**
+  (`stg_no_io_sheet` FAIL replacing `raise SystemExit`; `stg_dup_signal_uid` WARN; `stage() -> (database,
+  findings)`) → S4 400+510 → S5 600 → S6 delete the legacy `(errors, warnings)` lists. PARITY RULE: only the
+  report CONTAINER + the gate call change; the skip/write PREDICATES are untouched → 0-byte BuilderData diff per
+  chunk. Then phase 700.
 - **400f landed** (`interfaces.template_native_elements` → the template's shipped per-type interface signals into
   `interface_elements`; the IF_ projection skips `source="template"`). 510 PLCTags is now the complete interface
   tag set. **Interface parity vs current PL3 is EXACT** (see "Interface parity — RESOLVED" below): PL4's
@@ -116,7 +123,8 @@ PL4 has full interface parity with current PL3 (and is MORE correct on naming: P
 require PL3 to re-insert the IF_ sheets first; the `collect_mirror_set` equivalence is the conclusive check.)
 
 ## What's NEXT (in order)
-Start the severity rollout (below) — **S2 retrofit 520** — then the rest of S3–S6, THEN phase 700.
+**S2 retrofit 520 is DONE (uncommitted)** — continue the severity rollout at **S3 retrofit 300** (below), then
+S4–S6, THEN phase 700.
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +
@@ -169,7 +177,7 @@ frozen output disagrees, check whether it's config drift before assuming a regre
 is `Shared/OutputTree/ProjectDocumentation/InformationDatabase/IODatabase.csv`. Pattern:
 ```python
 from pipeline4.domain import staging, datablocks, interfaces
-db = staging.stage(); db,_e,_w = datablocks.build(db); db,_w = interfaces.build_interfaces(db)
+db = staging.stage(); db,_f = datablocks.build(db); db,_w = interfaces.build_interfaces(db)   # 520 now -> (database, findings)
 pl4 = {r['source_cell']: r for r in db['signals'].rows if r.get('source_cell')}
 # load IODatabase.csv by source_cell; compare (PL4 list-cell vs PL3 '|'-split, scalars direct)
 ```

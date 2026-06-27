@@ -35,12 +35,20 @@ _ROWS = [
 ]
 
 
+def _has(findings, type) -> bool:
+    return any(f.type == type for f in findings)
+
+
+def _no_fail(findings) -> bool:
+    return not any(f.severity == "FAIL" for f in findings)
+
+
 # --- generate: shells, seeds, the if_elements drop ----------------------------------------------- #
 def test_generate_seeds_and_members():
     defs = [_def("07_DOOR", db_programming_language="F_DB", opc_ua=False, seed=True)]
     els = [_el("07_DOOR", "Door Closed [ {combined_FLD} ]", 'row where script_type = "DI1/2"')]
-    g, inst, errors, warnings = datablocks.generate(_ROWS, defs, els, _TYPES)
-    eq(errors, [], "a clean config -> no errors")
+    g, inst, findings = datablocks.generate(_ROWS, defs, els, _TYPES)
+    ok(_no_fail(findings), "a clean config -> no FAIL findings")
     names = [m["name"] for m in g["07_DOOR"]["members"]]
     eq(names, ["Always FALSE", "Always TRUE", "No Operation",
                "Door Closed [ S1-D1 ]", "Door Closed [ S2-D2 ]"], "seeds prepended, then a member per match")
@@ -49,8 +57,8 @@ def test_generate_seeds_and_members():
 
 def test_generate_drops_seed_only_db():
     defs = [_def("EMPTY", seed=True)]                    # seeded but no element rows -> dropped (if_elements)
-    g, _i, errors, _w = datablocks.generate(_ROWS, defs, [], _TYPES)
-    eq(errors, [])
+    g, _i, findings = datablocks.generate(_ROWS, defs, [], _TYPES)
+    ok(_no_fail(findings))
     ok("EMPTY" not in g, "a DB with only seeds (no real member) is dropped")
 
 
@@ -58,17 +66,17 @@ def test_generate_unique_instance_family():
     defs = [_def("S1.CAB{cabinet:03d}", db_type="Instance", instance_of="CabState",
                  for_each="cabinet in unique(diag_cabinet) where numeric(diag_cabinet)")]
     rows = [{"diag_cabinet": "1"}, {"diag_cabinet": "1"}, {"diag_cabinet": "2"}, {"diag_cabinet": ""}]
-    _g, inst, errors, _w = datablocks.generate(rows, defs, [], _TYPES)
-    eq(errors, [])
+    _g, inst, findings = datablocks.generate(rows, defs, [], _TYPES)
+    ok(_no_fail(findings))
     eq(inst, [("S1.CAB001", "CabState"), ("S1.CAB002", "CabState")], "one instance per distinct numeric cabinet")
 
 
 def test_generate_f_db_opc_warns():
     defs = [_def("SAFE", db_programming_language="F_DB", opc_ua=True, seed=True)]
     els = [_el("SAFE", "M [ {combined_FLD} ]", 'row where script_type = "DI1/2"')]
-    _g, _i, errors, warnings = datablocks.generate(_ROWS, defs, els, _TYPES)
-    eq(errors, [])
-    ok(any("opc_ua=true ignored" in w for w in warnings), "opc_ua=true on an F_DB is warned")
+    _g, _i, findings = datablocks.generate(_ROWS, defs, els, _TYPES)
+    ok(_no_fail(findings))
+    ok(_has(findings, "db_fdb_opc_ignored"), "opc_ua=true on an F_DB is a WARN finding")
 
 
 def test_generate_member_dedup():
@@ -76,27 +84,39 @@ def test_generate_member_dedup():
     els = [_el("D", "M [ {combined_FLD} ]", 'row where script_type = "DI1/2"')]
     rows = [{"uid": "a", "script_type": "DI1/2", "combined_FLD": "X"},
             {"uid": "b", "script_type": "DI1/2", "combined_FLD": "X"}]   # same rendered name
-    g, _i, errors, warnings = datablocks.generate(rows, defs, els, _TYPES)
-    eq(errors, [])
+    g, _i, findings = datablocks.generate(rows, defs, els, _TYPES)
+    ok(_no_fail(findings))
     eq([m["name"] for m in g["D"]["members"]], ["M [ X ]"], "a duplicate member name is kept once")
-    ok(any("more than once" in w for w in warnings), "the duplicate is warned")
+    ok(_has(findings, "db_member_duplicate"), "the duplicate is a WARN finding")
 
 
 # --- generate: validate-and-halt ----------------------------------------------------------------- #
 def test_generate_validation_halts():
     # element names a DB the registry doesn't declare
-    g, _i, errors, _w = datablocks.generate(_ROWS, [_def("KNOWN")], [_el("OTHER", "M", "")], _TYPES)
-    eq(g, {}, "any error -> empty dbs (halt)")
-    ok(any("not declared" in e for e in errors), "undeclared DB is an error")
+    g, _i, findings = datablocks.generate(_ROWS, [_def("KNOWN")], [_el("OTHER", "M", "")], _TYPES)
+    eq(g, {}, "any FAIL -> empty dbs (halt)")
+    ok(_has(findings, "db_element_not_declared"), "undeclared DB is a FAIL finding")
+    el = next(f for f in findings if f.type == "db_element_not_declared")
+    eq((el.phase, el.severity), (520, "FAIL"), "the finding container: phase 520, FAIL")
+    ok(el.location.startswith("element ") and "DB OTHER" in el.location, "the locator carries the element -> DB context")
     # unknown datatype
-    _g, _i, errors, _w = datablocks.generate(_ROWS, [_def("D")], [_el("D", "M", "", datatype="Nope")], _TYPES)
-    ok(any("unknown datatype" in e for e in errors))
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("D")], [_el("D", "M", "", datatype="Nope")], _TYPES)
+    ok(_has(findings, "db_unknown_datatype"))
     # only_load_memory + Optimized
-    _g, _i, errors, _w = datablocks.generate(_ROWS, [_def("D", only_load_memory=True, memory_layout="Optimized")], [], _TYPES)
-    ok(any("only_load_memory requires Standard" in e for e in errors))
-    # bad for_each
-    _g, _i, errors, _w = datablocks.generate(_ROWS, [_def("D")], [_el("D", "M", "row where @")], _TYPES)
-    ok(any("for_each" in e for e in errors))
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("D", only_load_memory=True, memory_layout="Optimized")], [], _TYPES)
+    ok(_has(findings, "db_only_load_optimized"))
+    # bad for_each (on the element)
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("D")], [_el("D", "M", "row where @")], _TYPES)
+    ok(_has(findings, "db_element_for_each"))
+    # bad for_each (on the definition) + a Global with a non-literal name
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("D", for_each="row where @")], [], _TYPES)
+    ok(_has(findings, "db_for_each_invalid"))
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("D", for_each='row where script_type = "DI1/2"')], [], _TYPES)
+    ok(_has(findings, "db_global_needs_literal"), "a Global DB with a for_each is a FAIL finding")
+    # db_type=Instance with no instance_of
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("S{index}", db_type="Instance", instance_of="",
+                                                        for_each='row where script_type = "DI1/2"')], [], _TYPES)
+    ok(_has(findings, "db_instance_needs_fb"), "an Instance family with no FB is a FAIL finding")
 
 
 # --- write_back: name_in_db / datablocks / plc_binding ------------------------------------------- #
@@ -104,7 +124,7 @@ def test_write_back_single_db_and_tag_fallback():
     defs = [_def("07_DOOR", seed=True)]
     els = [_el("07_DOOR", "Door Closed [ {combined_FLD} ]", 'row where script_type = "DI1/2"')]
     rows = [dict(r) for r in _ROWS]
-    g, _i, _e, _w = datablocks.generate(rows, defs, els, _TYPES)
+    g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     datablocks.write_back(rows, g)
     eq(rows[0]["name_in_db"], "Door Closed [ S1-D1 ]", "a DB member -> name_in_db")
     eq(rows[0]["datablocks"], ["07_DOOR"])
@@ -120,7 +140,7 @@ def test_write_back_leftmost_db_order():
     els = [_el("PROFINET_NODES_ALARM", "{combined_FLD}", 'row where script_type = "PA"'),
            _el("00_Commissioning", "{combined_FLD}", 'row where script_type = "PA"')]
     rows = [dict(r) for r in _ROWS]
-    g, _i, _e, _w = datablocks.generate(rows, defs, els, _TYPES)
+    g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     datablocks.write_back(rows, g)
     pa = rows[3]
     eq(pa["datablocks"], ["PROFINET_NODES_ALARM", "00_Commissioning"], "datablocks in element-row order")
@@ -134,7 +154,7 @@ def test_write_back_two_members_one_db_picks_primary():
     els = [_el("04_SPEED", "Sensor 1 Healthy [ {iol_FLD} ]", 'row where script_type = "DI1/2"'),
            _el("04_SPEED", "Healthy [ {iol_FLD} ]", 'row where script_type = "DI1/2"')]
     rows = [dict(_ROWS[0])]
-    g, _i, _e, _w = datablocks.generate(rows, defs, els, _TYPES)
+    g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     datablocks.write_back(rows, g)
     eq(rows[0]["name_in_db"], "Sensor 1 Healthy [ S1-D1 ]", "the earliest element row is the primary name_in_db")
     eq(rows[0]["datablocks"], ["04_SPEED"], "one DB even though two members")
@@ -145,7 +165,7 @@ def test_fill_db_members_table_and_source():
     defs = [_def("07_DOOR", seed=True)]
     els = [_el("07_DOOR", "Door Closed [ {combined_FLD} ]", 'row where script_type = "DI1/2"')]
     rows = [dict(r) for r in _ROWS]
-    g, _i, _e, _w = datablocks.generate(rows, defs, els, _TYPES)
+    g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     dbm = db_members_table()
     datablocks._fill_db_members(dbm, g)
     eq(len(dbm), 5, "3 seeds + 2 door members")
@@ -187,7 +207,7 @@ def test_project_writes_only_its_own_dbs():
     defs = [_def("07_DOOR", db_programming_language="F_DB", opc_ua=False, seed=True)]
     els = [_el("07_DOOR", "Door Closed [ {combined_FLD} ]", 'row where script_type = "DI1/2"')]
     rows = [dict(r) for r in _ROWS]
-    g, _i, _e, _w = datablocks.generate(rows, defs, els, _TYPES)
+    g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     dbb, dbm = db_blocks_table(), db_members_table()
     datablocks._fill_db_blocks(dbb, g)
     datablocks._fill_db_members(dbm, g)
