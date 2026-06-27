@@ -12,14 +12,10 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 
 ## Where we are
 - **Branch `pl4`**. **Phases 400 (a–f) + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–f + 510 + 600a/b/c/d).
-- **GIT STATE (read carefully):** `origin/pl4` is **PUSHED through `754dbd2`**. ON TOP, locally:
-  1. **`5e291f8`** (committed, **UNPUSHED**) — the severity taxonomy + the GUI log-level filter.
-  2. **S1 (findings/treatment core) — UNCOMMITTED** in the working tree (`core/finding.py`, `core/treatments.py`,
-     `core/run.py`, `config.user_input_dir()`, `tests/unit/{test_finding,test_treatments,test_run}.py`, + the
-     CLAUDE.md/HANDOFF.md updates). Gate-green, no phase touched. **FIRST next-session action: commit S1, then push
-     `5e291f8`+S1** (the user wraps each verified chunk on their word).
-  - The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before
-    this session — NOT ours; leave them.
+- **GIT STATE:** `origin/pl4` is **PUSHED + fully synced through `37559f0`** (severity S1) — the working tree is
+  CLEAN for Pipeline4App. The severity taxonomy/GUI-filter (`5e291f8`) and S1 (`37559f0`) are both in.
+  - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
+    session — NOT ours; leave them.
 - **Gate: 153 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
@@ -30,7 +26,7 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `error_management.csv` registry generalized - a per-uid treatment names the target level, can escalate to FAIL;
   load/apply/effective_severity/should_halt/reconcile/write/set_treatment); `core/run.py:gate` (apply+render+halt
   iff effective FAIL) + `has_blocking` (raw-FAIL write guard); `config.user_input_dir()`. Tests: +19. S1 touched
-  NO phase (parity untouched). **NEXT: S2 retrofit 520** (generate/build -> `list[Finding]` + `finding.record` +
+  NO phase (parity untouched); committed + pushed (`37559f0`). **NEXT: S2 retrofit 520** (generate/build -> `list[Finding]` + `finding.record` +
   the two-layer no-write guard + `run.gate` in the handler; the only live FAIL-blocks-write path) → S3 300 → S4
   400+510 → S5 600 → S6 delete the legacy `(errors, warnings)` lists. PARITY RULE: only the report CONTAINER +
   the gate call change; the skip/write PREDICATES are untouched → 0-byte BuilderData diff per chunk. Then phase 700.
@@ -62,9 +58,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 12. `93a63f7` **600c** — `domain/diaglist_csv.py` → DiagList_IO.csv + DiagList_Logic.csv + GUI "600"
 13. `40dde03` **600d** — `domain/diagnosis_scl.py` → Diagnostic_for_OPC.scl (byte-identical to the ref)
 14. `2cb6a91` **400f** — `template_native_elements` → the template's native interface signals into the table
-15. `754dbd2` doc — interface parity RESOLVED (oracle artifact)  **← origin/pl4 PUSHED head**
-16. `5e291f8` severity taxonomy (+DEBUG) + the GUI log-level filter  **(committed, UNPUSHED)**
-17. (UNCOMMITTED, working tree) **S1** — `core/finding.py` + `core/treatments.py` + `core/run.py` + `user_input_dir`
+15. `754dbd2` doc — interface parity RESOLVED (oracle artifact)
+16. `5e291f8` severity taxonomy (+DEBUG) + the GUI log-level filter
+17. `37559f0` **severity S1** — `core/finding.py` + `core/treatments.py` + `core/run.py` + `user_input_dir`  **← origin/pl4 PUSHED head**
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -120,7 +116,7 @@ PL4 has full interface parity with current PL3 (and is MORE correct on naming: P
 require PL3 to re-insert the IF_ sheets first; the `collect_mirror_set` equivalence is the conclusive check.)
 
 ## What's NEXT (in order)
-**0. Commit S1 + push (`5e291f8` + S1).** Then the severity rollout (below), THEN phase 700.
+Start the severity rollout (below) — **S2 retrofit 520** — then the rest of S3–S6, THEN phase 700.
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +
