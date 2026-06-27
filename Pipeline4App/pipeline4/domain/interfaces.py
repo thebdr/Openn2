@@ -68,8 +68,8 @@ def interface_elements_table() -> Table:
     return Table(
         "interface_elements",
         columns=["uid", "interface", "category", "description", "functional_unit", "location", "device",
-                 "data_type", "direction", "offset_byte", "bit", "signal_name", "expression",
-                 "diag_cabinet", "swp_cabinet", "diag_bit", "source", "source_signal"],
+                 "data_type", "direction", "offset_byte", "bit", "io_address_side1", "signal_name",
+                 "expression", "diag_cabinet", "swp_cabinet", "diag_bit", "source", "source_signal"],
         json_columns=[],
         key_columns=["interface", "direction", "category", "expression"],
     )
@@ -123,6 +123,28 @@ def _to_int(value):
             return int(float(s))
         except ValueError:
             return None
+
+
+def io_address_side1(isynt, base, direction, data_type, offset, bit) -> str:
+    """Mirror the IF_ sheet's `I/O Address Side 1` LET, in pure Python (Excel-independent): pick the I
+    (input '<') / Q (output '>') format (qSynt = SUBSTITUTE(iSynt,'I','Q')); for BOOL drop '/' +
+    substitute <bit>, else TEXTBEFORE('/'); then substitute <base+offset> with base+offset. '' when there
+    is no direction / the inputs are blank. `direction` accepts the SSOT '<'/'>' OR the table's 'I'/'Q'.
+    Stored on each interface_element at 400 (phase 510 reads the column); 400e's IF_ seed reuses it."""
+    d = str(direction or "").strip()
+    if d in ("<", "I"):
+        synt = str(isynt or "")
+    elif d in (">", "Q"):
+        synt = str(isynt or "").replace("I", "Q")
+    else:
+        return ""
+    if not synt or base is None or offset is None:
+        return ""
+    if str(data_type or "").strip().upper() == "BOOL":
+        synt = synt.replace("/", "").replace("<bit>", str(bit if bit is not None else 0))
+    else:
+        synt = synt.split("/", 1)[0]
+    return synt.replace("<base+offset>", str(base + offset))
 
 
 def _idx_key(value):
@@ -218,6 +240,23 @@ def template_last_used_byte(template_path, sheet_name) -> dict:
     finally:
         wb.close()
     return last
+
+
+def template_input_format(template_path, sheet_name) -> str:
+    """The sheet's `Input Format` (the LET's `$AI$2`, e.g. `I<base+offset>/.<bit>`) - the address syntax
+    skeleton `io_address_side1` substitutes into. Read fresh from the template (header row 1, value row 2)
+    so a customized template is honored; '' when the column/sheet is absent."""
+    wb = load_workbook(template_path, data_only=True)
+    try:
+        if sheet_name not in wb.sheetnames:
+            return ""
+        ws = wb[sheet_name]
+        for c in range(1, ws.max_column + 1):
+            if str(ws.cell(1, c).value or "").strip() == "Input Format":
+                return str(ws.cell(2, c).value or "")
+        return ""
+    finally:
+        wb.close()
 
 
 def _rule_tagname(rule, row, member, direction) -> str:
@@ -354,6 +393,7 @@ def build_interfaces(database: Database | None = None, template_path: str | None
     diag_rules, if_rules = config.load_diagnosis_logic_rules(), config.load_interface_elements()
     sheet_names = template_sheet_names(template_path)
 
+    isynt_by_sheet: dict = {}
     itab, etab = interfaces_table(), interface_elements_table()
     for rec in records:
         sheet = choose_sheet(sheet_names, rec["machine_type"])
@@ -361,14 +401,20 @@ def build_interfaces(database: Database | None = None, template_path: str | None
                                       diag_rules=diag_rules, if_rules=if_rules)
         warnings.extend(w)
         allocate_bytes(elems, template_last_used_byte(template_path, sheet), config.INTERFACE_CUSTOM_GAP)
+        if sheet not in isynt_by_sheet:
+            isynt_by_sheet[sheet] = template_input_format(template_path, sheet)
+        isynt, base = isynt_by_sheet[sheet], _to_int(rec["base"])
         itab.add(instance=rec["instance"], machine_type=rec["machine_type"], interface_id=rec["index"],
                  is_diag=rec["is_diag"], base_address=rec["base"], base_node=rec["base_node"],
                  device=rec["device"], ip=rec["ip"], template_sheet=sheet, source=rec["source"])
         fill = {"interface_name": rec["machine_type"], "interface_id": rec["index"]}
         for e in elems:
+            # the I/O Address Side 1 is computed + STORED in the SSOT here (DESIGN: every computed datum
+            # lives in the database; phase 510 reads this column; 400e's IF_-sheet seed equals it).
+            address = io_address_side1(isynt, base, e.direction, e.data_type, e.offset_byte, e.bit)
             etab.add(interface=rec["instance"], category=e.script_type, description=e.description,
                      functional_unit=e.fu, location=e.loc, device=e.dev, data_type=e.data_type,
-                     direction=e.direction, offset_byte=e.offset_byte, bit=e.bit,
+                     direction=e.direction, offset_byte=e.offset_byte, bit=e.bit, io_address_side1=address,
                      signal_name=identity.interp_keep(e.signal_name, fill), expression=e.mirror_name,
                      diag_cabinet=e.diag_cabinet, swp_cabinet=e.swp_cabinet, diag_bit=e.diag_bit,
                      source=e.source, source_signal=(e.src_row or {}).get("uid", ""))

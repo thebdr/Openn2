@@ -71,6 +71,12 @@ def interfaces_dir() -> str:
     return os.path.join(output_root(), "ProjectDocumentation", "InformationDatabase", "Interfaces")
 
 
+def io_tags_dir() -> str:
+    """The phase-510 I/O Tags BuilderData surface (`PLCTags.xlsx`), under the output root - what OP4
+    imports. The leaf is `PlcTags` to match PL3's OUTPUT_PATHS['io_tags_dir'] (the OP-import contract path)."""
+    return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "PlcTags")
+
+
 # --- sheet-name resolution (regex / JS-literal, case-insensitive) -------------------------------- #
 def js_to_re(pattern: str) -> str:
     """Accept a JS-style regex literal ('/pattern/flags' or 'pattern/flags') and return the bare Python

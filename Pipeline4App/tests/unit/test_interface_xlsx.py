@@ -8,7 +8,7 @@ from openpyxl.worksheet.table import Table as XlTable
 from openpyxl.worksheet.table import Table, TableColumn, TableStyleInfo, TableFormula
 
 from _harness import run, eq, ok
-from pipeline4.domain import interface_xlsx
+from pipeline4.domain import interface_xlsx, interfaces
 from pipeline4.io import xlsx_edit
 
 
@@ -71,7 +71,7 @@ def test_append_custom_rows_word_row_and_separator():
 # Phase 400e - the lossless IF_ sheet insertion + the Excel-independent address-cache seeding
 # =================================================================================================== #
 def test_io_address_mirror():
-    f = interface_xlsx._io_address
+    f = interfaces.io_address_side1
     isy = "I<base+offset>/.<bit>"
     eq(f(isy, 10000, ">", "BOOL", 0, 0), "Q10000.0", "BOOL output -> Q with bit")
     eq(f(isy, 10000, "<", "BOOL", 5, 3), "I10005.3", "BOOL input -> I, base+offset.bit")
@@ -79,6 +79,9 @@ def test_io_address_mirror():
     eq(f(isy, 10000, "", "BOOL", 0, 0), "", "no direction -> no address")
     eq(f(isy, None, ">", "BOOL", 0, 0), "", "no base -> no address")
     eq(f(isy, 10000, ">", "BOOL", None, 0), "", "no offset -> no address")
+    # the SSOT table stores direction as I/Q (not </>): io_address_side1 accepts both spellings
+    eq(f(isy, 10000, "Q", "BOOL", 0, 0), "Q10000.0", "table 'Q' == output '>'")
+    eq(f(isy, 10000, "I", "BOOL", 5, 3), "I10005.3", "table 'I' == input '<'")
 
 
 def test_resolve_num_chain():

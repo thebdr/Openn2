@@ -383,26 +383,6 @@ def _resolve_num(ws, ref: str, memo: dict):
     return val
 
 
-def _io_address(isynt, base, direction, data_type, offset, bit) -> str:
-    """Mirror the IF_ sheet's `I/O Address Side 1` LET: pick the I (input '<') / Q (output '>') format
-    (qSynt = SUBSTITUTE(iSynt,'I','Q')); for BOOL drop '/' + substitute <bit>, else TEXTBEFORE('/');
-    then substitute <base+offset> with base+offset. '' when there is no direction / the inputs are blank."""
-    d = str(direction or "").strip()
-    if d == "<":
-        synt = str(isynt or "")
-    elif d == ">":
-        synt = str(isynt or "").replace("I", "Q")
-    else:
-        return ""
-    if not synt or base is None or offset is None:
-        return ""
-    if str(data_type or "").strip().upper() == "BOOL":
-        synt = synt.replace("/", "").replace("<bit>", str(bit if bit is not None else 0))
-    else:
-        synt = synt.split("/", 1)[0]
-    return synt.replace("<base+offset>", str(base + offset))
-
-
 def _interface_address_caches(if_path) -> dict:
     """{cell ref -> ('str', address)} for an inserted IF_ sheet's `I/O Address Side 1` LET cells, each
     computed from the row's offset/bit/direction + the Side-1 base & format (the LET's $AH$2 / $AI$2) -
@@ -426,8 +406,9 @@ def _interface_address_caches(if_path) -> dict:
         for r in range(2, ws.max_row + 1):
             if ws.cell(r, hdr["I/O Address Side 1"]).data_type != "f":                # only the LET cells
                 continue
-            a = _io_address(isynt, base, ws.cell(r, c_dir).value, ws.cell(r, c_dt).value,
-                            _resolve_num(ws, f"{off_col}{r}", memo), _resolve_num(ws, f"{bit_col}{r}", memo))
+            a = interfaces.io_address_side1(isynt, base, ws.cell(r, c_dir).value, ws.cell(r, c_dt).value,
+                                            _resolve_num(ws, f"{off_col}{r}", memo),
+                                            _resolve_num(ws, f"{bit_col}{r}", memo))
             if a:
                 out[f"{addr_col}{r}"] = ("str", a)
         return out

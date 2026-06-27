@@ -11,15 +11,16 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **Phase 400 is COMPLETE** (300 + 520(a/b/c) + 400a/b/c/d/e done). **Latest PUSHED/committed head
-  is `5bc4aca` (400d); everything else this session is UNPUSHED** — push when the user asks. **400e is implemented
+- **Branch `pl4`**. **Phases 400 + 510 COMPLETE** (300 + 520(a/b/c) + 400a–e + 510 done). **Committed head is
+  `8da7046` (400e); everything else this session is UNPUSHED** — push when the user asks. **510 is implemented
   but UNCOMMITTED** (in the working tree).
-- **Gate: 107 tests green** (data-independent, was 102 + the 5-case 400e block in `test_interface_xlsx.py`). Run
+- **Gate: 115 tests green** (data-independent, was 107 + the 8-case `test_io_tags.py`). Run
   from `Pipeline4App/`: `for t in tests/unit/test_*.py; do python "$t"; done`
-- **400e landed** (`interface_xlsx.insert_interface_sheets` — the lossless IF_ insertion + Excel-independent
-  address-cache seed + `freeze_arrays`; GUI "400" runs it gated). **Resume at the next phase (510 or 600)** below.
+- **510 landed** (`domain/io_tags.py` — PLCTags.xlsx, a pure projection of `signals` + `interface_elements`; 400
+  now stores `io_address_side1` on each element so 510 needs no IF_-sheet read-back; GUI "500" runs it). **Resume
+  at phase 600 (Diagnosis)** — which also unblocks the interface-completeness follow-up (below).
 - The SSOT **`Database/`** now holds **6 tables**: `signals` (300) · `db_blocks`/`db_members`/`instance_dbs`
-  (520) · `interfaces`/`interface_elements` (400b). It saves to `Shared/Database/` (untracked generated artifacts).
+  (520) · `interfaces`/`interface_elements` (400b, +`io_address_side1`). It saves to `Shared/Database/` (untracked).
 
 ### Commits this session (oldest → newest)
 1. `407ed07` staging direct fields — positional node ranges (`I_/Q_startByte/endByte`) + `IsSorterArea`
@@ -30,7 +31,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 5. `28aa9ff` **400b** — the `interfaces` + `interface_elements` tables (mirror set + byte layout)
 6. `11cd5e7` **400c** — the `IF_*.xlsx` projection (`interface_xlsx.project`, openpyxl)
 7. `5bc4aca` **400d** — `pipeline4/io/xlsx_edit.py` (the surgical ZIP/regex writer) + the 14-test suite
-8. (UNCOMMITTED) **400e** — `insert_interface_sheets` (the lossless IF_ insertion + address-cache seed)
+8. `8da7046` **400e** — `insert_interface_sheets` (the lossless IF_ insertion + address-cache seed)
+9. (UNCOMMITTED) **510** — `domain/io_tags.py` PLCTags.xlsx + `io_address_side1` stored on interface_elements at 400
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -47,20 +49,28 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   WRITTEN with 0 byte mismatches (the lone ref-extra `IF_ENCODER_SPEED` is stale config); the IF_ insertion is
   lossless on the real I/O List (all 7 source sheets kept, formulas + Profinet IP caches survive, 151 + 71 address
   values seeded for 510). GUI "400" runs stage → 520 → build → project → insert.
+- **Phase 510 I/O Tags — DONE.** `domain/io_tags.py` projects `signals` + `interface_elements` → `PlcTags/PLCTags.xlsx`
+  (the OP4 import surface). Decision (user): interface tags read from the **SSOT** (`interface_elements.io_address_side1`,
+  stored at 400), NOT a read-back of the IF_ sheets. Parity vs the reference PLCTags.xlsx: **direct-I/O side EXACT
+  (98/98 across all 8 signal tag-tables)**; the interface side emits the mirror block (the two gaps are the tracked
+  completeness items below, not 510 bugs). GUI "500" runs stage → 520 → build_interfaces → io_tags.project.
 
 ## What's NEXT (in order)
-1. **The `+DIAG` auto-mirror** (the lone open phase-400 item) — needs the per-type **`in_diag`** (stripped from PL4
-   signal_types → ph600). `collect_mirror_set` already has the guard; relocate `in_diag` (with ph600, or as a small
-   ph400 follow-up, verifying vs PL3 `signal_types`) then the SORTER+DIAG-02 auto-mirror lights up. Until then a
-   `+DIAG` interface gets only its `interface_mapping` mirrors.
-2. **510 I/O Tags** — reads the now-inserted IF_ sheets (Signal Name Side 1 + the seeded I/O Address Side 1) +
-   the resolved I/O signals → `PLCTags.xlsx`. The 400e seed makes the interface addresses readable without Excel.
+1. **Phase 600 Diagnosis** (DESIGN §9 next) — the unified DiagList (`io|logic` source) + **tristate**; relocates the
+   per-type `in_diag`/`diag_logic`/`diag_desc`/`tristate_desc` out of PL3 `signal_types`. Port → write its table →
+   project `DiagList_*.csv` + the OPC SCL to `BuilderData/` → parity → wire the GUI "600" button.
+2. **Interface-completeness follow-up (do WITH ph600, re-opens 400 once)** — make `interface_elements` the COMPLETE
+   interface tag set so 510's PLCTags matches the reference's IF_ tables:
+   (a) **template-native signals** — `build_interfaces` should also pull the MachineInterfaces template's shipped
+       per-type interface signals (the SORTER sheet's 7: HEARTBEAT/POWER ENABLED/EMERGENCY RESET/SORTER- RUNNING/…,
+       `<index>` resolved) into `interface_elements` (`source="template"`). Closes the −7-per-instance gap.
+   (b) **`+DIAG` auto-mirror** — needs the per-type **`in_diag`** (relocated with ph600). `collect_mirror_set` already
+       has the guard; once `in_diag` exists, the SORTER+DIAG-02 auto-mirror lights up (the ~74-tag gap). Until both
+       land, a `+DIAG` interface gets only its `interface_mapping` mirrors + no native rows.
 
-## Then the other phases (DESIGN §9 order `… 520 → 600 → 400 → 800 → 900 → 100`; 700/510 also open)
-510 I/O Tags (reads the inserted IF_ sheets) · 600 Diagnosis (the unified DiagList + **tristate** to IMPLEMENT;
-relocates `in_diag`/`diag_logic`/`diag_desc`/`tristate_desc`) · 700 Hardware (Stations/Modules) · 800 Software
-(8 builders + `InstanceDBs.csv` + `02_COM`) · 900 Coverage · 100 Validation. Each: port → write its table →
-project to `BuilderData/` → parity → wire its GUI button.
+## Then the other phases (DESIGN §9 order `… 520 → 600 → 400 → 800 → 900 → 100`; 700 also open)
+600 Diagnosis (above) · 700 Hardware (Stations/Modules) · 800 Software (8 builders + `InstanceDBs.csv` + `02_COM`) ·
+900 Coverage · 100 Validation. Each: port → write its table → project to `BuilderData/` → parity → wire its GUI button.
 
 ## Locked decisions (don't relitigate)
 - **Keying**: content-hash `uid` excluding volatile bits. **DB on disk**: top-level `Shared/Database/` folder.

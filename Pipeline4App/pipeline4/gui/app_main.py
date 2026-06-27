@@ -83,12 +83,12 @@ class App:
             self.log.append("WARN", f"  {len(dupes)} duplicate signal uid(s) - the key needs a tiebreak")
 
     def _run_data_blocks(self):
-        """Phase 500 / 520 (wired): stage -> the registry generates the db_members + db_blocks + instance_dbs
-        tables (+ writes back name_in_db/datablocks/plc_binding) -> project the GlobalDB XML to BuilderData.
-        510 (I/O Tags) is not ported yet. Runs inline for now."""
+        """Phase 500 (wired): stage -> 520 the registry generates db_members + db_blocks + instance_dbs
+        (+ writes back name_in_db/datablocks/plc_binding) -> project the GlobalDB XML; then 510 builds the
+        interface tables and projects the consolidated PLCTags.xlsx. Runs inline for now."""
         from pipeline4.core import config
-        from pipeline4.domain import staging, datablocks, datablock_xml
-        self.log.append("PHASE", "500 Signals Mapping  (520 Data Blocks)")
+        from pipeline4.domain import staging, datablocks, datablock_xml, interfaces, io_tags
+        self.log.append("PHASE", "500 Signals Mapping  (520 Data Blocks + 510 I/O Tags)")
         self.status.configure(text="data blocks…")
         self.root.update_idletasks()
         database = staging.stage()
@@ -105,7 +105,18 @@ class App:
                                 f"instance DBs) -> {os.path.join(config.database_dir(), 'db_members.csv')}")
         count = datablock_xml.project(database)
         self.log.append("PASS", f"  projected {count} GlobalDB XML(s) -> {config.blocks_import_dir()}")
-        self.log.append("INFO", "  510 I/O Tags: not ported yet")
+        # 510 I/O Tags - build the interface tables (so interface tags are included) then project PLCTags.xlsx
+        self.status.configure(text="I/O tags…")
+        self.root.update_idletasks()
+        database, iface_warnings = interfaces.build_interfaces(database)
+        for w in iface_warnings[:20]:
+            self.log.append("WARN", f"  {w}")
+        res = io_tags.project(database)
+        for w in res["warnings"]:
+            self.log.append("WARN", f"  {w}")
+        self.log.append("PASS", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
+                                f"{res['iface_count']} interface) across {len(res['tables'])} tables -> "
+                                f"{config.io_tags_dir()}")
 
     def _run_interfaces(self):
         """Phase 400 (wired through 400e): stage -> 520 -> the interfaces/interface_elements tables ->

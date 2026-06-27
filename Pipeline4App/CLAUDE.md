@@ -50,7 +50,7 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py
     io/    workbook.py · xlsx_edit.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -163,8 +163,18 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   (category/direction/expression + offset/bit, keyed by `plc_binding`); the lone ref-extra `IF_ENCODER_SPEED` is
   stale config (dropped). The frozen ref left `{db_element}` literal (old PL3 bug) — PL4's resolved names match PL3's
   current `interface_tagname` (400a 0-mismatch).
+- **400 stores `io_address_side1` on each `interface_element`** (added for 510): `build_interfaces` computes the
+  `{I|Q}{base+offset}[.bit]` address in Python via `interfaces.io_address_side1` (the pure LET mirror, moved here
+  from `interface_xlsx` so both use it) + `template_input_format` (the `$AI$2` isynt, read per sheet), and WRITES it
+  into the table — so 510 is a pure projection of the SSOT (no IF_-sheet read-back). Verified: the stored value ==
+  the value 400e seeds into the inserted IF_ sheet, for all 22 SORTER custom-block elements (0 mismatch).
 - **`+DIAG` auto-mirror DEFERRED**: needs the per-type `in_diag` (relocated with **ph600**). Until then a `+DIAG`
   interface (SORTER+DIAG-02) gets only its `interface_mapping` mirrors. `collect_mirror_set` already has the guard.
+  **Interface-completeness follow-up (with ph600)**: `interface_elements` holds only the custom MIRROR block — the
+  MachineInterfaces template ALSO ships per-type **template-native** interface signals (the SORTER sheet's 7:
+  HEARTBEAT / POWER ENABLED / EMERGENCY RESET / SORTER- RUNNING / …) that PL3's 510 reads off the IF_ sheet. PL4's
+  SSOT-only 510 omits them (−7 per SORTER instance). Captured together with the `+DIAG` auto-mirror at ph600 (pull
+  the template-native rows + the `in_diag` set into `interface_elements`), so 400 is re-opened once.
 - **400c DONE — the `IF_*.xlsx` projection** (`interface_xlsx.py`, openpyxl - PL3 does the same; these files are
   documentation, not read back except via 400e): per `interfaces` row, copy the template → keep the chosen machine
   sheet → retitle `IF_<instance>` → `_plug` Base Address/Node/Index (Side rows, by header) + replace `<index>` →
@@ -198,7 +208,35 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   kept, a sample formula survives, all 15 Profinet IP cached values survive a `data_only` re-stage, and 151 + 71
   `I/O Address Side 1` values are seeded + read back via `data_only`. Tests: `test_interface_xlsx.py` (+5 cases:
   the LET mirror, the offset/bit chain resolver, the address-cache seed, the lossless+idempotent insert with the
-  table-dxf/calc strip + the array-freeze). 510 I/O Tags will read these inserted IF_ sheets.
+  table-dxf/calc strip + the array-freeze).
+
+## Phase 510 — I/O Tags — DONE (interface-completeness follow-up tracked)
+`domain/io_tags.py` + `config.io_tags_dir()`. A PURE projection of the `signals` + `interface_elements` SSOT tables
+to **`PlcTags/PLCTags.xlsx`** (the OP4 BuilderData import surface — leaf `PlcTags` to match PL3's contract path).
+Two tag sources mixed into one workbook, sorted by Path (= tag table), all values text:
+- **(a) resolved I/O signals** — one tag per `identity.is_io_signal` row with a non-empty `name_in_tagtable`:
+  Name=`name_in_tagtable`, Path=`tagtable`, Data Type=`Bool` (PL3 hard-codes Bool for direct I/O — a future non-Bool
+  needs a `signal_types` `data_type` col), Address=`%`-prefixed `bit`, Comment=`identity.tag_comment` (the type's
+  `io_comment` template resolved).
+- **(b) interface tags** — one per `interface_elements` row (NOT a read-back of the IF_ sheets — the user's SSOT
+  decision): Name=`signal_name`, Path=`IF_<instance>`, Data Type=`_tia_dtype(data_type)` (BOOL→Bool/WORD→Word),
+  Address=`%`+the STORED `io_address_side1`, Comment=`description`. A named element with no resolved address is
+  skipped+warned (mirrors PL3); the addresses come from the SSOT column 400 stores (verified == the 400e seed).
+Two sheets: **"PLC Tags"** (10 cols: Name/Path/Data Type/Logical Address/Comment/3×Hmi `True`/Typeobject ID/Version
+ID) + **"TagTable Properties"** (3 cols: Path/BelongsToUnit/Accessibility, one row per distinct Path). Output via
+`write_plc_tags` (a fresh openpyxl workbook; `_append_text_row` forces a leading `=`/`+`/`-` to text). `project`
+returns `{path, total, io_count, iface_count, tables, warnings}`. The GUI **"500" button** now runs stage → 520 build
+→ project XML → **build_interfaces → io_tags.project**. Clean-room port of PL3's `generate_io_tags`/`build_io_tags`/
+`interface_tags`/`write_plc_tags` (the read-the-IF_-sheets path replaced by the SSOT read). Tests: `test_io_tags.py`
+(8 cases, hermetic — the two sources, the dtype map + %-address, the text-forcing, the two-sheet structure, the
+sort+distinct-props, the skip+warn, the return contract).
+- **Parity (real data, non-destructive scratch copy vs the reference `PlcTags/PLCTags.xlsx`)**: headers identical;
+  the **direct-I/O side is EXACT — 98/98 across all 8 signal tag-tables** (Alarms_Warnings 34, SAFETY_Doors 24,
+  SAFETY_Contactors 18, …). The interface side emits the SSOT mirror block; two KNOWN gaps remain (both
+  interface-table completeness, not 510 bugs): **(1)** the ~14 **template-native** interface signals (the SORTER
+  template's 7 shipped signals × 2 instances — in the IF_ sheet, not in `interface_elements`); **(2)** the ~74
+  **+DIAG auto-mirror** tags on SORTER+DIAG-02 (the deferred `in_diag`/ph600 feature). Both are captured together at
+  ph600 (pull the template-native rows + the `in_diag` set into `interface_elements`) — see the Phase 400 follow-up.
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
@@ -210,10 +248,10 @@ later.)
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **107**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **115**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read, dbtemplate/datablocks, interfaces +
-interface_xlsx (incl. the 400e insertion/seed/freeze), and the **`io/xlsx_edit` suite** (14, ported
-verbatim)). Data-dependent parity (staging vs
+interface_xlsx (incl. the 400e insertion/seed/freeze), the **`io/xlsx_edit` suite** (14, ported verbatim),
+and the **510 `io_tags` suite** (8)). Data-dependent parity (staging vs
 PL3) is verified by a script against the real docs (not in the gate). Each phase is committed only with its
 gate + parity green.
 
