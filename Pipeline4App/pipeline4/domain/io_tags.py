@@ -20,8 +20,17 @@ from openpyxl import Workbook
 
 from pipeline4.core import config
 from pipeline4.core.database import Database
+from pipeline4.core.finding import Finding
 from pipeline4.domain import identity
 from pipeline4.domain.signals import signals_table
+
+
+def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "") -> Finding:
+    """A phase-510 Finding - the I/O-tag projection report container (WARN-only: a named interface element
+    with no resolved I/O address). Replaces the old warning strings."""
+    return Finding(phase=510, type=type, severity=severity, detail=detail,
+                   location=location, source_uid=source_uid)
+
 
 TAG_TABLE_FILE = "PLCTags.xlsx"
 TAG_COLUMNS = ["Name", "Path", "Data Type", "Logical Address", "Comment",
@@ -70,23 +79,24 @@ def io_signal_tags(database) -> list:
 def interface_tags(database) -> tuple:
     """One tag per `interface_elements` row (the SSOT mirror block) - NOT a read-back of the IF_ sheets.
     Path = the IF_<instance> sheet name (the tag-table convention OP4 also sees). Address = the STORED
-    `io_address_side1`, %-prefixed. A named element with no resolved address is skipped + warned (mirrors
-    PL3's per-row warn); a blank-named element is silently skipped. Returns (tags, warnings)."""
-    tags, warnings = [], []
+    `io_address_side1`, %-prefixed. A named element with no resolved address is a `iotag_no_address` WARN +
+    skipped (mirrors PL3's per-row warn); a blank-named element is silently skipped. Returns (tags, findings)."""
+    tags, findings = [], []
     if "interface_elements" not in database:
-        return tags, warnings
+        return tags, findings
     for e in database["interface_elements"]:
         name = str(e.get("signal_name") or "").strip()
         if not name:
             continue
         address = _logical_address(e.get("io_address_side1"))
         if not address:
-            warnings.append(f"{e.get('interface')}/{name}: no resolved I/O address - skipped")
+            findings.append(_f("iotag_no_address", "WARN", "no resolved I/O address - tag skipped",
+                               f"{e.get('interface')}/{name}", str(e.get("source_signal", ""))))
             continue
         tags.append({"name": name, "path": f"{IF_PREFIX}{e.get('interface')}",
                      "data_type": _tia_dtype(e.get("data_type")), "address": address,
                      "comment": str(e.get("description") or "")})
-    return tags, warnings
+    return tags, findings
 
 
 # --- the workbook writer ------------------------------------------------------------------------- #
@@ -133,14 +143,15 @@ def write_plc_tags(tags, out_dir) -> str:
 
 def project(database: Database | None = None, out_dir: str | None = None) -> dict:
     """Project the two SSOT sources to `out_dir`/PLCTags.xlsx (out_dir defaults to `config.io_tags_dir()`).
-    Returns {'path', 'total', 'io_count', 'iface_count', 'tables', 'warnings'}."""
+    Returns {'path', 'total', 'io_count', 'iface_count', 'tables', 'findings'} - `findings` is the WARN-only
+    `iotag_no_address` report (the caller renders/gates it; this is a pure projection, it does not record)."""
     if database is None:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
     out_dir = out_dir or config.io_tags_dir()
     io = io_signal_tags(database)
-    iface, warnings = interface_tags(database)
+    iface, findings = interface_tags(database)
     tags = io + iface
     path = write_plc_tags(tags, out_dir)
     return {"path": path, "total": len(tags), "io_count": len(io), "iface_count": len(iface),
-            "tables": sorted({t["path"] for t in tags}), "warnings": warnings}
+            "tables": sorted({t["path"] for t in tags}), "findings": findings}

@@ -20,11 +20,19 @@ from openpyxl.utils import range_boundaries
 
 from pipeline4.core import config
 from pipeline4.core.database import Database
+from pipeline4.core.finding import Finding, record
 from pipeline4.core.table import Table
 from pipeline4.domain import identity
 from pipeline4.domain.signals import signals_table
 
 TRIGGER_TYPE = "IOC"
+
+
+def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "") -> Finding:
+    """A phase-400 Finding - the interface-build report container (WARN-only: a no-Index IOC row, a signal
+    that could not be mirrored). Replaces the old warning strings."""
+    return Finding(phase=400, type=type, severity=severity, detail=detail,
+                   location=location, source_uid=source_uid)
 GENERIC_SHEET = "<GENERIC>"
 _DIAG_RE = re.compile(r"\+\s*DIAG", re.IGNORECASE)   # the +DIAG marker in an IOC Index
 _DIR_TO_IO = {"<": "I", ">": "Q"}
@@ -165,16 +173,17 @@ def _index_in(index, mapping) -> bool:
 
 
 def find_interfaces(rows) -> tuple:
-    """One record per IOC row of the staged signals. Returns (records, warnings); an IOC row with no
-    Index is warned + skipped."""
-    records, warnings = [], []
+    """One record per IOC row of the staged signals. Returns (records, findings); an IOC row with no
+    Index is a `if_ioc_no_index` WARN + skipped."""
+    records, findings = [], []
     for r in rows or []:
         if str(r.get("script_type", "") or "").strip().upper() != TRIGGER_TYPE:
             continue
         instance = str(r.get("index", "") or "").strip()
         loc = f"{r.get('source_sheet', '')}!{r.get('source_row', '')}"
         if not instance:
-            warnings.append(f"IOC row {loc} has no Index - skipped")
+            findings.append(_f("if_ioc_no_index", "WARN", "IOC row has no Index - skipped", loc,
+                               str(r.get("uid", ""))))
             continue
         machine_type, index = parse_instance(instance)
         records.append({
@@ -185,7 +194,7 @@ def find_interfaces(rows) -> tuple:
             "device": str(r.get("device", "") or "").strip(),
             "ip": str(r.get("profinet_ip", "") or "").strip(), "source": loc,
         })
-    return records, warnings
+    return records, findings
 
 
 def template_sheet_names(template_path) -> list:
@@ -315,13 +324,14 @@ def _rule_tagname(rule, row, member, direction) -> str:
 
 
 def collect_mirror_set(rows, *, index, is_diag, diag_rules, if_rules) -> tuple:
-    """Ordered list of _Elem to mirror onto interface `index`, plus warnings:
+    """Ordered list of _Elem to mirror onto interface `index`, plus findings (`if_signal_not_mirrored` WARN
+    per picked signal with no db_element/tag):
       (a) signals whose interface_mapping lists this index (or every in_diag signal when is_diag) -> Q;
       (c) their diagnosis_logic_rules followers -> Q (DB members, TIA-qualified);
       (d) their interface_elements followers -> the rule's direction (the only I source).
     Deduped on (direction, script_type, mirror_name). NOTE: the +DIAG in_diag auto-mirror needs the
     per-type `in_diag` (relocated with ph600) - until then a +DIAG interface only gets the (a) mappings."""
-    warnings, elems, seen = [], [], set()
+    findings, elems, seen = [], [], set()
 
     def _add(e):
         if not e.mirror_name:
@@ -345,9 +355,10 @@ def collect_mirror_set(rows, *, index, is_diag, diag_rules, if_rules) -> tuple:
             continue
         name = str(r.get("plc_binding", "") or "")          # _mirror_name = the stored plc_binding
         if not name:
-            warnings.append(f"{st} {identity.fld(r)} "
-                            f"({r.get('source_sheet', '')}!{r.get('source_row', '')}): "
-                            f"no db_element or tag - not mirrored")
+            findings.append(_f("if_signal_not_mirrored", "WARN",
+                               f"{st} {identity.fld(r)}: no db_element or tag - not mirrored",
+                               f"{r.get('source_sheet', '')}!{r.get('source_row', '')}",
+                               str(r.get("uid", ""))))
             continue
         e = _Elem(script_type=st, mirror_name=name,
                   signal_name=str(r.get("interface_tagname", "") or ""),
@@ -388,7 +399,7 @@ def collect_mirror_set(rows, *, index, is_diag, diag_rules, if_rules) -> tuple:
                            direction=rule["direction"], source="if_rule",
                            diag_cabinet=e.diag_cabinet, swp_cabinet=e.swp_cabinet,
                            diag_bit=e.diag_bit, src_row=r))
-    return elems, warnings
+    return elems, findings
 
 
 def allocate_bytes(elems, last, gap) -> None:
@@ -428,14 +439,15 @@ def allocate_bytes(elems, last, gap) -> None:
 def build_interfaces(database: Database | None = None, template_path: str | None = None) -> tuple:
     """400b: per IOC instance, collect its mirror set + lay out the bytes -> the `interfaces` +
     `interface_elements` tables. Runs `annotate_interface_tagnames` first (the Signal Name Side 1 base
-    needs name_in_db/name_in_tagtable). Saves the Database. Returns (database, warnings)."""
+    needs name_in_db/name_in_tagtable). Records the findings to `validation_issues` + saves the Database.
+    Returns (database, findings) - the WARN-only `if_ioc_no_index` / `if_signal_not_mirrored` report."""
     if database is None:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
     annotate_interface_tagnames(database)
     rows = list(database["signals"])
     template_path = template_path or config.INTERFACE_TEMPLATE
-    records, warnings = find_interfaces(rows)
+    records, findings = find_interfaces(rows)
     diag_rules, if_rules = config.load_diagnosis_logic_rules(), config.load_interface_elements()
     sheet_names = template_sheet_names(template_path)
 
@@ -443,9 +455,9 @@ def build_interfaces(database: Database | None = None, template_path: str | None
     itab, etab = interfaces_table(), interface_elements_table()
     for rec in records:
         sheet = choose_sheet(sheet_names, rec["machine_type"])
-        elems, w = collect_mirror_set(rows, index=rec["index"], is_diag=rec["is_diag"],
+        elems, f = collect_mirror_set(rows, index=rec["index"], is_diag=rec["is_diag"],
                                       diag_rules=diag_rules, if_rules=if_rules)
-        warnings.extend(w)
+        findings += f
         allocate_bytes(elems, template_last_used_byte(template_path, sheet), config.INTERFACE_CUSTOM_GAP)
         if sheet not in isynt_by_sheet:
             isynt_by_sheet[sheet] = template_input_format(template_path, sheet)
@@ -473,5 +485,6 @@ def build_interfaces(database: Database | None = None, template_path: str | None
             database[table.name].rows = table.rows
         else:
             database.add_table(table)
+    record(database, findings)                      # persist the facts to the validation_issues table
     database.save(config.database_dir())
-    return database, warnings
+    return database, findings

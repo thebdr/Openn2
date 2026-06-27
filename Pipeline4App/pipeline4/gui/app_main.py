@@ -110,12 +110,9 @@ class App:
         # 510 I/O Tags - build the interface tables (so interface tags are included) then project PLCTags.xlsx
         self.status.configure(text="I/O tags…")
         self.root.update_idletasks()
-        database, iface_warnings = interfaces.build_interfaces(database)
-        for w in iface_warnings[:20]:
-            self.log.append("WARN", f"  {w}")
-        res = io_tags.project(database)
-        for w in res["warnings"]:
-            self.log.append("WARN", f"  {w}")
+        database, iface_findings = interfaces.build_interfaces(database)   # 400 (WARN-only)
+        res = io_tags.project(database)                                    # 510 (WARN-only)
+        run.render(iface_findings + res["findings"], self.log.append)      # projections already written -> render, don't halt
         self.log.append("PASS", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
                                 f"{res['iface_count']} interface) across {len(res['tables'])} tables -> "
                                 f"{config.io_tags_dir()}")
@@ -137,9 +134,8 @@ class App:
         if "db_blocks" not in database:                              # a prereq FAIL was downgraded, but 520 never ran
             self.log.append("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
-        database, warnings = interfaces.build_interfaces(database)
-        for w in warnings[:20]:
-            self.log.append("WARN", f"  {w}")
+        database, iface_findings = interfaces.build_interfaces(database)   # 400 (WARN-only)
+        run.render(iface_findings, self.log.append)
         result = interface_xlsx.project(database)
         n_if, n_el = len(database["interfaces"]), len(database["interface_elements"])
         self.log.append("PASS", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "

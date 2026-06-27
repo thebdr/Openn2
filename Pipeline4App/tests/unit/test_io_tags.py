@@ -99,8 +99,9 @@ def test_source_b_word_and_unresolved():
     eq(res["iface_count"], 1, "the WORD tag is emitted; the address-less one is skipped")
     eq(rows[1][2], "Word", "WORD -> Word")
     eq(rows[1][3], "%Q10026", "WORD address has no bit")
-    ok(any("NOADDR" in w and "no resolved I/O address" in w for w in res["warnings"]),
-       "the unresolved-address element is warned")
+    ok(any(f.type == "iotag_no_address" and "NOADDR" in f.location and f.severity == "WARN"
+           for f in res["findings"]),
+       "the unresolved-address element is a iotag_no_address WARN finding")
 
 
 def test_text_forcing_and_sort_and_props():

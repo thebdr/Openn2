@@ -158,7 +158,12 @@ consumers 400/600).
   GlobalDB XMLs are byte-identical to pre-S2** (verified new-vs-HEAD, 0 diffs); only the report container + the
   log lines changed, never the skip/write predicates.
 
-## Phase 400 — Interfaces — DONE (400a + 400b + 400c + 400d + 400e + 400f)
+## Phase 400 — Interfaces — DONE (400a + 400b + 400c + 400d + 400e + 400f; + severity S4)
+**Severity S4 (parity-locked):** `find_interfaces` + `collect_mirror_set` return `(records/elems, findings)` (was
+warning strings) - WARN slugs **`if_ioc_no_index`** (an IOC row with no Index) + **`if_signal_not_mirrored`** (a
+picked signal with no db_element/tag). `build_interfaces` returns **`(database, findings)`**, `finding.record`s them
+to `validation_issues`, saves. WARN-only (no FAIL). The GUI **`run.render`s** them (not `gate` - the SSOT tables are
+already written). PARITY: `interfaces` + `interface_elements` byte-identical to pre-S4 (verified new-vs-HEAD).
 `domain/interfaces.py`. Builds one `IF_<instance>.xlsx` per IOC signal from the MachineInterfaces template,
 mirrors flagged signals into a byte-packed block, and (gated) inserts each as an `IF_` sheet into the I/O
 List. The mirrored signals + byte layout land in the **`interfaces`** SSOT table; the `IF_*.xlsx` are its
@@ -240,7 +245,11 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   the LET mirror, the offset/bit chain resolver, the address-cache seed, the lossless+idempotent insert with the
   table-dxf/calc strip + the array-freeze).
 
-## Phase 510 — I/O Tags — DONE (interface-completeness follow-up tracked)
+## Phase 510 — I/O Tags — DONE (interface-completeness follow-up tracked; + severity S4)
+**Severity S4 (parity-locked):** `interface_tags` returns `(tags, findings)` with the WARN slug **`iotag_no_address`**
+(a named interface element with no resolved I/O address - skipped); `project()`'s return dict renames `warnings` →
+**`findings`**. A PURE projection - it does NOT `record` (only the build steps do); the GUI **`run.render`s** the
+findings. PARITY: the PLCTags tag list is content-identical to pre-S4 (verified new-vs-HEAD, 213 tags).
 `domain/io_tags.py` + `config.io_tags_dir()`. A PURE projection of the `signals` + `interface_elements` SSOT tables
 to **`PlcTags/PLCTags.xlsx`** (the OP4 BuilderData import surface — leaf `PlcTags` to match PL3's contract path).
 Two tag sources mixed into one workbook, sorted by Path (= tag table), all values text:
@@ -330,7 +339,9 @@ gated sub-phases (staging + 520) and calls `run.gate(findings, self.log.append, 
 effective severity + halt iff any effective FAIL; `run.has_blocking(f)` skips a dependent sub-phase when a prereq
 already blocks. **Guard:** the skip decision is RAW-severity but the gate's continue is EFFECTIVE (a treatment can
 DOWNGRADE a prereq FAIL→WARN, so the gate continues while 520 was skipped) - each handler checks `"db_blocks" not
-in database` after the gate and returns gracefully (no KeyError on the never-built 520 table). (Phase
+in database` after the gate and returns gracefully (no KeyError on the never-built 520 table). The WARN-only
+PROJECTION phases (400/510) call **`run.render`** (gate minus the halt) instead - their BuilderData is already
+written, so an escalated WARN is shown but no misleading `nothing written` halt line is printed. (Phase
 registry-driven bar, the structured-record clickable log, the Files tab, threading → later.)
 - **Severity taxonomy + the GUI log-level filter.** `core/severity.py` is the single source of the level set:
   **FAIL** (halts), **ERROR** (skip the item, continue), **WARN**, **INFO**, **SKIP**, **PASS**, **DEBUG**
@@ -351,15 +362,18 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
     prune untreated-gone, mark treated-gone `stale`)/`write`/`set_treatment`. (`accept` deferred to ph100.)
   - **`core/run.py:gate(findings, log_append, label)`** - the halt seam (no engine yet): apply the registry, render
     each finding at its EFFECTIVE level, return CONTINUE; halt iff any effective level in `severity.HALTING`.
-    `has_blocking` is the build-side raw-FAIL guard (never write BuilderData on a raw FAIL).
+    `has_blocking` is the build-side raw-FAIL guard (never write BuilderData on a raw FAIL). **`run.render`** (S4)
+    is `gate` minus the halt (shared `_render`) for WARN-only projection phases whose output is already written.
   Tests: `test_severity.py` (5) + `test_finding.py` (4) + `test_treatments.py` (5) + `test_run.py` (5).
   **Decision (user): persist `validation_issues` now + full model + retrofit 300/520/400/510/600, THEN 700.** S1
-  touched NO phase (parity trivially preserved). **S2 (520) + S3 (300) are DONE** (see the Phase 520 + Phase 300
-  sections: `generate`/`stage`/`build -> (..., findings)` + the `validation_issues` record + the `run.has_blocking`
-  no-write guard; GlobalDB XMLs + `signals.csv`/`diagnosis_cabinets.csv` byte-identical to pre-retrofit). The 4 GUI
-  handlers now **accumulate staging + 520 findings and call `run.gate` ONCE** per click (`run.has_blocking(f)` skips
-  the dependent sub-phase on a blocking prereq). NEXT: S4 400+510 -> S5 600 -> S6 delete the legacy
-  `(errors, warnings)` lists -> phase 700.
+  touched NO phase (parity trivially preserved). **S2 (520) + S3 (300) + S4 (400+510) are DONE** (see the phase
+  sections: `generate`/`stage`/`build`/`build_interfaces -> (..., findings)` + the `validation_issues` record + the
+  `run.has_blocking` no-write guard; GlobalDB XMLs + `signals.csv`/`diagnosis_cabinets.csv` + `interface_elements`
+  + PLCTags byte/content-identical to pre-retrofit). The 4 GUI handlers **accumulate staging + 520 findings and call
+  `run.gate` ONCE** per click (halt-capable), then **`run.render`** the WARN-only 400/510 projection findings
+  (`render` = gate minus the halt, for phases whose BuilderData is already written). NEXT: **S5 600** (`diag_scl_template_missing`
+  WARN; `diagnosis.build`/`diaglist_csv`/`diagnosis_scl` -> findings) -> S6 delete the legacy `(errors, warnings)`
+  lists -> phase 700.
   - **TRANSITIONAL NOTE (gate reconcile scope).** `run.gate` calls `treatments.reconcile`, which prunes/stales
     registry rows GLOBALLY (any uid not in the gated finding set). With multiple gated phases this can churn an
     OTHER phase's untreated registry rows across separate button clicks (e.g. clicking 300 vs 500). It is
@@ -369,13 +383,15 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **156**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **158**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
-no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces + interface_xlsx
-(incl. the 400e insertion/seed/freeze),
-the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** (8), the **600 `diagnosis` suite**
-(17), the **severity/findings core** (`test_severity`/`test_finding`/`test_treatments`/`test_run` = 19)).
-Data-dependent parity (staging/520 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs) is verified by a script
+no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
+`if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
+the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** (8, + the S4 `iotag_no_address`
+slug), the **600 `diagnosis` suite** (17), the **severity/findings core** (`test_severity`/`test_finding`/
+`test_treatments`/`test_run` = 20, incl. S4's `run.render`)).
+Data-dependent parity (staging/520/400/510 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/`interface_elements`/
+PLCTags) is verified by a script
 against the real docs (not in the gate). Each phase is committed only with its gate + parity green.
 
 ## Conventions & gotchas

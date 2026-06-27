@@ -61,6 +61,19 @@ def test_has_blocking_raw_guard():
     ok(not run.has_blocking([Finding(phase=520, type="x", severity="WARN", detail="z")]), "WARN does not")
 
 
+def test_render_never_halts_no_halt_line():
+    # render is for WARN-only projection phases (400/510): apply treatments + render, but never a halt line
+    fs = [Finding(phase=400, type="if_signal_not_mirrored", severity="WARN", detail="not mirrored")]
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "em.csv")
+        apply_and_reconcile(fs, path)
+        set_treatment(fs[0].uid, "fail", path)                # even an ESCALATED finding does not halt render
+        lines, sink = _sink()
+        run.render(fs, sink, registry_path=path)
+        ok(any(l[0] == "FAIL" and "(was WARN)" in l[1] for l in lines), "rendered at the escalated level")
+        ok(not any("halted" in l[1] for l in lines), "render NEVER prints a halt line (output already written)")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run_suite("run", [
@@ -69,4 +82,5 @@ if __name__ == "__main__":
         ("gate_downgrade_unhalts", test_gate_downgrade_unhalts),
         ("gate_escalate_halts", test_gate_escalate_halts),
         ("has_blocking_raw_guard", test_has_blocking_raw_guard),
+        ("render_never_halts_no_halt_line", test_render_never_halts_no_halt_line),
     ]))

@@ -12,13 +12,13 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 
 ## Where we are
 - **Branch `pl4`**. **Phases 400 (a–f) + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–f + 510 + 600a/b/c/d).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through `37559f0` (S1). **S2 is COMMITTED LOCALLY (`1dade77`, not yet
-  pushed).** **The working tree holds the UNCOMMITTED S3 chunk** (staging.py + app_main.py + test_staging.py +
-  CLAUDE.md + HANDOFF.md) — implemented, gate green, parity verified, **awaiting the user's commit word** (then push
-  both S2 + S3). The severity taxonomy/GUI-filter (`5e291f8`) + S1 (`37559f0`) are committed + pushed.
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`7322470`** (S1 + S2 `1dade77` + S3 `7322470`, all pushed).
+  **The working tree holds the UNCOMMITTED S4 chunk** (interfaces.py + io_tags.py + run.py + app_main.py +
+  test_interfaces/test_io_tags/test_run + CLAUDE.md + HANDOFF.md) — implemented, gate green, parity verified,
+  adversarial review running. The severity taxonomy/GUI-filter (`5e291f8`) + S1/S2/S3 are committed + pushed.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 156 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 158 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -31,17 +31,19 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   NO phase (parity untouched); committed + pushed (`37559f0`). **S2 retrofit 520 DONE (`1dade77`)**: `generate`
   -> `list[Finding]` (9 FAIL + 4 WARN slugs); `build` -> `(database, findings)` + `run.has_blocking` no-write guard
   + `finding.record` -> `validation_issues`; GlobalDB XMLs byte-identical to pre-S2. **S3 retrofit 300 DONE
-  (uncommitted)**: `stage()` -> `(database, findings)`; `stg_no_io_sheet` FAIL replaces `raise SystemExit`
-  (`load_io_list` returns `([], matched)`, stage returns WITHOUT writing on the FAIL); `stg_dup_signal_uid` WARN via
-  `_dup_findings` (moved out of the GUI); `record` -> `validation_issues` + save on success. The 4 GUI handlers
-  **accumulate staging + 520 findings and call `run.gate` ONCE** (`run.has_blocking(f)` skips the dependent
-  sub-phase on a blocking prereq; a post-gate `"db_blocks" not in database` guard handles a DOWNGRADED prereq FAIL
-  that would otherwise KeyError - found by the adversarial review workflow). Gate 156 green; `signals.csv` +
-  `diagnosis_cabinets.csv` **byte-identical to pre-S3** (new-vs-HEAD). **NEXT: S4 400+510** (WARN-only, no FAILs:
-  400 `if_ioc_no_index`/`if_signal_not_mirrored`,
-  510 `iotag_no_address`; `build_interfaces -> (database, findings)`; `io_tags.project` swaps `warnings` for
-  `findings`) → S5 600 → S6 delete the legacy `(errors, warnings)` lists. PARITY RULE: only the report CONTAINER +
-  the gate call change; the skip/write PREDICATES are untouched → 0-byte BuilderData diff per chunk. Then phase 700.
+  (`7322470`)**: `stage()` -> `(database, findings)`; `stg_no_io_sheet` FAIL replaces `raise SystemExit`;
+  `stg_dup_signal_uid` WARN via `_dup_findings`; `record` + save. The handlers **accumulate staging + 520 findings
+  and `run.gate` ONCE** (`run.has_blocking(f)` skips the dependent sub-phase; a post-gate `"db_blocks" not in
+  database` guard handles a DOWNGRADED prereq FAIL that would otherwise KeyError - found by the review workflow).
+  **S4 retrofit 400+510 DONE (uncommitted)**: `find_interfaces`/`collect_mirror_set`/`build_interfaces` ->
+  `(…, findings)` (WARN `if_ioc_no_index`/`if_signal_not_mirrored`; `build_interfaces` records + saves);
+  `io_tags.interface_tags`/`project` -> findings (WARN `iotag_no_address`; project's dict key `warnings`->`findings`,
+  a pure projection - no record). **NEW `core/run.py:render`** = `gate` minus the halt (shared `_render`) for the
+  WARN-only PROJECTION phases (output already written -> no misleading `nothing written` line); the GUI 400/510 call
+  `run.render`. Gate 158 green; `interface_elements` + PLCTags **byte/content-identical to pre-S4** (new-vs-HEAD).
+  **NEXT: S5 600** (`diag_scl_template_missing` WARN; `diagnosis.build`/`diaglist_csv`/`diagnosis_scl` -> findings,
+  empty in the common path) → S6 delete the legacy `(errors, warnings)` lists. PARITY RULE: only the report
+  CONTAINER + the gate/render call change; the skip/write PREDICATES are untouched → 0-byte BuilderData diff. Then 700.
   - **TRANSITIONAL (gate reconcile scope):** `run.gate` -> `treatments.reconcile` prunes/stales registry rows
     GLOBALLY; with multiple gated phases across separate clicks this can churn another phase's untreated rows.
     Invisible today (clean data = 0 findings = empty registry); treatments still APPLY (`apply` ignores `stale`).
@@ -78,8 +80,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 15. `754dbd2` doc — interface parity RESOLVED (oracle artifact)
 16. `5e291f8` severity taxonomy (+DEBUG) + the GUI log-level filter
 17. `37559f0` **severity S1** — `core/finding.py` + `core/treatments.py` + `core/run.py` + `user_input_dir`  **← origin/pl4 PUSHED head**
-18. `1dade77` **severity S2** — retrofit 520 (`generate`/`build` → findings + `validation_issues` record + `run.gate`)  **← local, not pushed**
-19. *(uncommitted)* **severity S3** — retrofit 300 (`stage` → findings, `stg_no_io_sheet`/`stg_dup_signal_uid`) + the 4 handlers accumulate-and-gate-once
+18. `1dade77` **severity S2** — retrofit 520 (`generate`/`build` → findings + `validation_issues` record + `run.gate`)
+19. `7322470` **severity S3** — retrofit 300 (`stage` → findings, `stg_no_io_sheet`/`stg_dup_signal_uid`) + accumulate-and-gate-once + the db_blocks guard  **← origin/pl4 PUSHED head**
+20. *(uncommitted)* **severity S4** — retrofit 400+510 (`build_interfaces`/`io_tags.project` → findings) + `core/run.py:render`
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -135,8 +138,8 @@ PL4 has full interface parity with current PL3 (and is MORE correct on naming: P
 require PL3 to re-insert the IF_ sheets first; the `collect_mirror_set` equivalence is the conclusive check.)
 
 ## What's NEXT (in order)
-**S2 (520, `1dade77`) + S3 (300, uncommitted) are DONE** — continue the severity rollout at **S4 retrofit 400+510**
-(below), then S5–S6, THEN phase 700.
+**S2 (520, `1dade77`) + S3 (300, `7322470`) + S4 (400+510, uncommitted) are DONE** — continue the severity rollout
+at **S5 retrofit 600** (below), then S6, THEN phase 700.
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +
@@ -154,10 +157,13 @@ parity after). Slug convention `<area>_<condition>`. Findings to emit (from the 
 - **S3 — 300 `staging.py`** ✅ DONE (uncommitted) — `stg_no_io_sheet` (FAIL — replaced the `raise SystemExit`;
   `load_io_list` returns `([], matched)`); `stg_dup_signal_uid` (WARN — moved the GUI dup check into `_dup_findings`).
   `stage()` -> `(database, findings)`. The 4 GUI handlers accumulate staging + 520 findings and gate ONCE.
-- **S4 — 400 + 510** (WARN-only, no FAILs) ← **NEXT**: 400 `if_ioc_no_index`, `if_signal_not_mirrored`; 510 `iotag_no_address`.
-  `build_interfaces` -> `(database, findings)`; `io_tags.project` swaps its `warnings` key for `findings`.
-- **S5 — 600**: `diag_scl_template_missing` (WARN); `diagnosis.build`/`diaglist_csv`/`diagnosis_scl` -> findings
-  (empty in the common path). 
+- **S4 — 400 + 510** (WARN-only, no FAILs) ✅ DONE (uncommitted): 400 `if_ioc_no_index`, `if_signal_not_mirrored`;
+  510 `iotag_no_address`. `build_interfaces` -> `(database, findings)` (records + saves); `io_tags.project` swapped
+  its `warnings` key for `findings` (pure projection, no record). Added **`core/run.py:render`** (gate minus halt)
+  for the WARN-only projections; the GUI 400/510 call `run.render`.
+- **S5 — 600** ← **NEXT**: `diag_scl_template_missing` (WARN); `diagnosis.build`/`diaglist_csv`/`diagnosis_scl` ->
+  findings (empty in the common path). `diagnosis.build` currently returns `(database, errors, warnings)` - the only
+  remaining legacy tuple; the 3 projections return dicts. 
 - **S6 — cleanup**: delete the legacy `(errors, warnings)` tuples + the `if errors:` / `for w in warnings` blocks
   from `app_main.py`; every handler consumes findings only. Full 5-phase byte-parity re-run. Ends ready for 700.
   (Open: 100/900 will read `validation_issues` as their backbone; `accept` [doc-mutating treatment] lands with 100.)

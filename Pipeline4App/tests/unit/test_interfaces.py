@@ -74,10 +74,12 @@ def test_find_interfaces_from_ioc_rows():
              "device": "-K1", "profinet_ip": "1.2.3.4", "source_sheet": "S", "source_row": 5},
             {"script_type": "IOC", "index": "", "source_sheet": "S", "source_row": 6},
             {"script_type": "DI1/2", "index": "x"}]
-    recs, warns = interfaces.find_interfaces(rows)
+    recs, findings = interfaces.find_interfaces(rows)
     eq(len(recs), 1, "one IOC record (the blank-index IOC warned, the DI1/2 ignored)")
     eq((recs[0]["machine_type"], recs[0]["index"], recs[0]["base"]), ("SORTER", "01", "10000"))
-    eq(len(warns), 1, "the blank-Index IOC is warned")
+    eq(len(findings), 1, "the blank-Index IOC is a finding")
+    eq((findings[0].phase, findings[0].type, findings[0].severity), (400, "if_ioc_no_index", "WARN"),
+       "the no-index report container")
 
 
 def test_allocate_bytes_bool_block_and_word():
@@ -99,8 +101,8 @@ def test_collect_mirror_set_direct_follower_iflrule_and_dedup():
     if_rules = [{"name": "Door Open Request", "required_types": ["DI1/2", "DI2/2"], "direction": "I",
                  "data_type": "BOOL", "script_type": "IF_DOOR_CMD",
                  "member": "Open Door Request [ {functional_unit}{location}{device} ]", "interface_tagname": "PNC_{direction}_{member}"}]
-    elems, warns = interfaces.collect_mirror_set(rows, index="01", is_diag=False,
-                                                 diag_rules=diag_rules, if_rules=if_rules)
+    elems, _findings = interfaces.collect_mirror_set(rows, index="01", is_diag=False,
+                                                     diag_rules=diag_rules, if_rules=if_rules)
     eq(len(elems), 3, "the direct mirror + 1 diag follower + 1 interface-element follower")
     eq((elems[0].direction, elems[0].mirror_name), ("Q", '"07_DOOR"."Door Closed [ X ]"'), "direct mirror Q")
     eq((elems[1].source, elems[1].direction, elems[1].mirror_name),
@@ -111,6 +113,16 @@ def test_collect_mirror_set_direct_follower_iflrule_and_dedup():
     elems2, _ = interfaces.collect_mirror_set(rows + [dict(rows[0])], index="01", is_diag=False,
                                               diag_rules=diag_rules, if_rules=if_rules)
     eq(len(elems2), 3, "(direction, script_type, mirror_name) dedups duplicates")
+
+
+def test_collect_mirror_set_not_mirrored_finding():
+    """A picked signal with no plc_binding (no db_element/tag) is an if_signal_not_mirrored WARN, not mirrored."""
+    rows = [{"script_type": "DI1/2", "interface_mapping": "01", "plc_binding": "",
+             "functional_unit": "S1", "location": "+SG1", "device": "-B1", "source_sheet": "S", "source_row": 9}]
+    elems, findings = interfaces.collect_mirror_set(rows, index="01", is_diag=False, diag_rules=[], if_rules=[])
+    eq(elems, [], "no plc_binding -> nothing mirrored")
+    eq(len(findings), 1, "the un-mirrorable picked signal is a finding")
+    eq((findings[0].phase, findings[0].type, findings[0].severity), (400, "if_signal_not_mirrored", "WARN"))
 
 
 def _native_template(path):
@@ -166,5 +178,6 @@ if __name__ == "__main__":
         ("find_interfaces_from_ioc_rows", test_find_interfaces_from_ioc_rows),
         ("allocate_bytes_bool_block_and_word", test_allocate_bytes_bool_block_and_word),
         ("collect_mirror_set_direct_follower_iflrule_and_dedup", test_collect_mirror_set_direct_follower_iflrule_and_dedup),
+        ("collect_mirror_set_not_mirrored_finding", test_collect_mirror_set_not_mirrored_finding),
         ("template_native_elements", test_template_native_elements),
     ]))
