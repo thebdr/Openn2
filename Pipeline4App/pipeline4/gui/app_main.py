@@ -52,7 +52,9 @@ class App:
 
     def _on_phase(self, number, label):
         try:
-            if number == 300:
+            if number == 100:
+                self._run_validation()
+            elif number == 300:
                 self._run_staging()
             elif number == 400:
                 self._run_interfaces()
@@ -75,6 +77,24 @@ class App:
             self.status.configure(text=f"clicked: {label}")
         except Exception:  # noqa: BLE001  - a not-yet-ready handler must never take the window down
             self.log.append("ERROR", f"handler for {label} crashed:\n{traceback.format_exc()}")
+
+    def _run_validation(self):
+        """Phase 100 (wired): stage -> run the 4 validators (110 I/O List + 120 C&E + 130/140 cross-checks)
+        -> record the issues + write the 4 reports -> render the issues to the GUI log. Never halts (a
+        validation FAIL is reported, not blocking)."""
+        from pipeline4.core import config, run
+        from pipeline4.domain import staging
+        from pipeline4.domain.validation import phase as validation
+        self.log.append("PHASE", "100 Documents Validation  (110 I/O List + 120 C&E + 130/140 cross-checks)")
+        self.status.configure(text="validation…")
+        self.root.update_idletasks()
+        database, _sf = staging.stage()
+        res = validation.run_validation(database)
+        issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERROR", "WARN")]
+        run.render(issues, self.log.append)                       # reconcile + GUI render (the issues only; never halts)
+        c = res["counts"]
+        self.log.append("PASS", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERROR', 0)} ERROR, {c.get('WARN', 0)} WARN, "
+                                f"{c.get('PASS', 0)} PASS, {c.get('SKIP', 0)} SKIP -> {res['dir']}")
 
     def _run_staging(self):
         """Phase 300 (wired): read the configured I/O List -> the signals table -> Database/signals.csv.

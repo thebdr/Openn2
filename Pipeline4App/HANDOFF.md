@@ -11,16 +11,16 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 + 700 + 800 + 900 COMPLETE; severity rollout S1–S6
-  COMPLETE.** **PHASE 100 (Validation) IN PROGRESS** — the LAST phase, chunked 100a/b/c/d; **100a (spine) + 100b
-  (110+120 standalone) + 100c (130/140 cross-checks) DONE**. NEXT: 100d (orchestrator + GUI "100" + reports + parity).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`c0c4178`** (phase 100b, pushed).
-  **The working tree holds the UNCOMMITTED phase-100c chunk** (NEW `domain/validation/` ce_refs.py + crosscheck.py
-  + `messages.py` (cross-check slugs added) + NEW `tests/unit/test_validation_crosscheck.py` + CLAUDE.md +
-  HANDOFF.md) — implemented, gate green, real-data sanity clean.
+- **Branch `pl4`**. **THE REBUILD IS COMPLETE: ALL 9 PHASES DONE** — 300 + 520 + 400 + 510 + 600 + 700 + 800 + 900
+  + **100 (Validation)** + the severity rollout S1–S6. Every phase is parity-verified vs PL3 and every GUI button
+  runs for real. (Out of scope by user decision: validation **150** diagnosis-slot + the **`accept`** treatment.)
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`e2c0f66`** (phase 100c, pushed).
+  **The working tree holds the UNCOMMITTED phase-100d chunk** (the FINAL chunk: NEW `domain/validation/phase.py`
+  + NEW `tests/unit/test_validation_phase.py` + `gui/app_main.py` (the "100" button) + CLAUDE.md + HANDOFF.md) —
+  implemented, gate green, **PL3 parity EXACT (596/596 findings, 0 diffs)**.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 221 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 222 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -104,7 +104,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 28. `3726a01` **phase 900** — NEW `domain/coverage.py` (the `coverage` SSOT table + ORPHAN/UNPLACED WARN findings) + `config.coverage_dir` + the GUI "900" button + 9 tests; reads the SSOT tables (user decision); real-data ORPHAN=0/UNPLACED=0, tags match io_tags exactly  **← origin/pl4 PUSHED head**
 29. `a74db5e` **phase 100a** — the validation reporting spine: NEW `core/model.py` (InfoBlock+Cmp) + `core/finding.py` extended (4 optional render fields) + `domain/validation/address.py` + `io/render.py` (rich txt+HTML, Cmp + dual-links) + `config.validation_report_dir` + 6 tests  **← origin/pl4 PUSHED head**
 30. `c0c4178` **phase 100b** — the 110 (I/O List) + 120 (C&E) standalone validators: NEW `domain/validation/` messages.py (verbatim EN templates) + model.py (the Finding factory + helpers) + iolist.py + matrix.py + 9 tests; real-data sanity clean (110 273 PASS/0 FAIL, 120 24 refs/0 FAIL)  **← origin/pl4 PUSHED head**
-31. *(uncommitted)* **phase 100c** — the 130/140 cross-checks: NEW `domain/validation/ce_refs.py` (the io/ce indexes + the C&E refs reader) + `crosscheck.py` (the two-search 130 + the 140 decision tree, Cmp + dual-links) + the cross-check message slugs + 6 tests; real-data sanity clean (130 48 PASS/0 FAIL, 140 20 PASS/4 WARN/0 FAIL)
+31. `e2c0f66` **phase 100c** — the 130/140 cross-checks: NEW `domain/validation/ce_refs.py` (the io/ce indexes + the C&E refs reader) + `crosscheck.py` (the two-search 130 + the 140 decision tree, Cmp + dual-links) + the cross-check message slugs + 6 tests; real-data sanity clean (130 48 PASS/0 FAIL, 140 20 PASS/4 WARN/0 FAIL)  **← origin/pl4 PUSHED head**
+32. *(uncommitted)* **phase 100d** — the orchestrator + GUI + reports + PARITY (the rebuild's final chunk): NEW `domain/validation/phase.py` (`run_validation`: 110-140 -> record the issues -> the 4 reports) + the GUI "100" button + 1 test; **PL3 parity EXACT: 596/596 findings, 0 diffs** over the real docs (`scratchpad/parity_100.py`)
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -214,11 +215,21 @@ two independent searches by ADDRESS + by FLD -> cem_addr_*/cem_fld_*; 140 = the 
 iol_cem_* with the Cmp + dual-link; reads the `type` cell + `validation_params.crosscheck.*`) + the cross-check
 message slugs. Tests +6 (`test_validation_crosscheck.py`, hermetic via synthetic refs + a synthetic signals DB);
 gate 221. Real-data sanity (clean Passing): 130 48 PASS/0 FAIL, 140 20 PASS + 239 SKIP + 4 missing_plain WARN/0 FAIL.
-**NEXT: 100d** — the orchestrator (run 110-140 -> interleave per-sub banners -> `finding.record` into
-`validation_issues` -> apply treatments at EFFECTIVE severity -> `io/render.py` writes the 4 reports
-`documents_validation_report`/`_errors`.{txt,html}) + the GUI "100" button (`_run_validation`, `run.render` never
-halts) + the parity oracle (finding TUPLES vs PL3 over the same docs) + a frozen PL4 golden + the docs. **150 +
-`accept` are out of scope.**
+**100d DONE (uncommitted) — THE FINAL CHUNK:** `domain/validation/phase.py` `run_validation(database, params)`
+runs 110->120->130->140, records the treatable issues into `validation_issues` + saves, applies the registry
+READ-ONLY for the report's effective severity, interleaves per-(sub)phase banners, and writes the 4 reports
+(`documents_validation_report`/`_errors` x txt/html). The GUI **"100" button** (`_run_validation`: stage ->
+run_validation -> `run.render` the issues; never halts). Test +1 (`test_validation_phase.py`); gate 222. **PARITY
+EXACT: PL4 596 findings == PL3 596, 0 diffs** in the tuple `(phase, type, norm(location), norm(detail))` across all
+4 validators over the real docs (`scratchpad/parity_100.py`, PL3 fed PL4's staged rows). Real-data counts: 341
+PASS / 239 SKIP / 12 INFO / 4 WARN / 0 FAIL.
+
+## THE REBUILD IS COMPLETE
+All 9 phases (300/520/400/510/600/700/800/900/100) + the S1–S6 severity model are DONE, each parity-verified vs
+PL3; every GUI button runs for real. **Deferred by user decision** (not blockers): validation **150** (needs a
+staging change touching the locked 300 parity) + the **`accept`** doc-mutating treatment (dropped). Possible
+future polish: the GUI grid/files/threading; a CLI; the engine (a real phase registry + worker thread); the
+transitional gate-reconcile-once-per-run fix. See `DESIGN.md` for the locked decisions.
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +

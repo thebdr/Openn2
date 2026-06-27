@@ -55,7 +55,7 @@ Pipeline4App/
     io/    workbook.py · xlsx_edit.py · render.py
     domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py · hardware_csv.py · coverage.py
     domain/blocks/ (ph800) database.py · table.py · registry.py · templates.py · builders.py · engine.py · xml_emit.py
-    domain/validation/ (ph100) __init__.py · address.py · messages.py · model.py · iolist.py · matrix.py · ce_refs.py · crosscheck.py
+    domain/validation/ (ph100) __init__.py · address.py · messages.py · model.py · iolist.py · matrix.py · ce_refs.py · crosscheck.py · phase.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -476,7 +476,7 @@ address = a raw module point) | `structural` (untyped, no address); only a `sign
   synthetic Database, render + build->project). **920 (TIA Project Coverage) stays deferred** (pending an OP4
   project export), matching PL3.
 
-## Phase 100 — Documents Validation — IN PROGRESS (100a spine + 100b standalone + 100c cross-checks DONE; 100d TODO)
+## Phase 100 — Documents Validation — DONE (110/120/130/140; 150 + accept out of scope)
 `domain/validation/` - a clean-room port of PL3's `domain/validation/`, the LAST phase (PL3's first). Validates
 the hand-authored I/O List + Cause&Effect workbooks via 5 sub-phases: 110 standalone I/O List, 120 standalone
 C&E, 130 cross-check CEM->IOL, 140 cross-check IOL->CEM, 150 diagnosis-slot uniqueness. **User decisions:**
@@ -524,16 +524,30 @@ text is ported verbatim into each finding's `detail`.
   levenshtein_deviation}}`. Tests: `test_validation_crosscheck.py` (6, hermetic via synthetic refs + a synthetic
   `signals` DB). **Real-data sanity (clean Passing fixtures):** 130 = 48 PASS / 0 FAIL (every C&E ref matched);
   140 = 20 PASS + 239 SKIP + 4 `iol_cem_missing_plain` WARN / 0 FAIL (no false positives).
-- **100d TODO:** the orchestrator (110-140 -> record -> render) + the GUI "100" button + the 4 report files
-  (`documents_validation_report`/`_errors`.{txt,html}) + the golden/parity oracle.
+- **100d DONE - the orchestrator + GUI + reports + parity.** `domain/validation/phase.py` `run_validation`
+  (database, params): runs 110->120->130->140, **records only the treatable (FAIL/ERROR/WARN) findings** into
+  `validation_issues` (PASS/INFO/SKIP are report-only noise) + saves, applies the treatment registry READ-ONLY
+  for the report's EFFECTIVE severity, interleaves a per-(sub)phase banner, and writes the **4 report files**
+  (`documents_validation_report`/`_errors` x `.txt`/`.html`) to `config.validation_report_dir()`. NEVER halts.
+  The GUI **"100" button** (`_run_validation`: stage -> run_validation -> `run.render` the ISSUES to the GUI log
+  [reconcile + write the registry; never halts] -> a summary). Tests: `test_validation_phase.py` (1, hermetic:
+  the banner interleaving + the 4 files + treatable-only recording). **PARITY (the real bar - the report is
+  documentation, NOT byte-parity): the PL4 finding set == PL3's, EXACTLY.** Over the same real documents (the
+  Passing fixtures), PL4 produced **596 findings and PL3 produced 596, with 0 differences** in the tuple
+  `(phase, type, norm(location), norm(detail))` across all 4 validators (`scratchpad/parity_100.py`; PL3 is fed
+  PL4's staged rows so both validate the same data). Real-data counts: 341 PASS / 239 SKIP / 12 INFO / 4 WARN /
+  0 FAIL (a clean project).
+- **OUT OF SCOPE (user decisions):** **150** (diagnosis-slot uniqueness - needs relocating `diag_container_check`
+  + populating `diag_block_name` at staging, which would touch the locked 300 parity) + the **`accept`**
+  doc-mutating treatment (dropped).
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
 bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
-EARLY (gui-less PL3 builds hid integration problems). The **300 / 400 / 500 / 600 / 700 / 800 / 900 buttons run their
-phases for real** (each through `staging.stage` -> the phase build/project; 800 = stage -> 520 -> `engine.build` ->
-`engine.project` + `write_com_db` + `write_instance_dbs`; 900 = build the full SSOT -> `coverage.build` + `project`);
-the rest log "not implemented". The handler is
+EARLY (gui-less PL3 builds hid integration problems). **ALL phase buttons run their phases for real**
+(100/300/400/500/600/700/800/900, each through `staging.stage` -> the phase build/project; 800 = stage -> 520 ->
+`engine.build` -> `engine.project` + `write_com_db` + `write_instance_dbs`; 900 = build the full SSOT ->
+`coverage.build` + `project`; 100 = stage -> `validation.run_validation` -> `run.render` the issues). The handler is
 wrapped so a not-yet-ready phase can't take the window down. Each real handler **accumulates the findings of its
 gated sub-phases (staging + 520) and calls `run.gate(findings, self.log.append, label=…)` ONCE** - render at
 effective severity + halt iff any effective FAIL; `run.has_blocking(f)` skips a dependent sub-phase when a prereq
@@ -587,7 +601,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **221**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **222**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
@@ -600,7 +614,11 @@ FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projectio
 builders + `_area_descriptions`/`_of_variant`, the build->project round-trip, the 800c FC-XML emit + 03 CSV-drop +
 02_COM safe-DB + InstanceDBs merge/dedup), and the **900 `coverage` suite** (9, hermetic: the signal/channel/
 structural classification, the pure attribute placement + ORPHAN-only-for-signals, the interface defines/mirror +
-hardware station/module attribution, find_unplaced, collect_outputs over a synthetic Database, render + build->project)).
+hardware station/module attribution, find_unplaced, collect_outputs over a synthetic Database, render + build->project),
+and the **100 validation suites** (`test_validation_render` 6: address + the rich renderer banner/line/InfoBlock/
+Cmp+dual-link/errors-filter/HTML; `test_validation_standalone` 9: 110+120 via a StubView + monkeypatched openers;
+`test_validation_crosscheck` 6: the io/ce indexes + the 130 two-search + the 140 decision tree; `test_validation_phase`
+1: the orchestrator's banner interleaving + the 4 reports + treatable-only recording)).
 Data-dependent parity (staging/520/400/510/600/700/800 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/
 `interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `Stations.csv`/`Modules.csv` + the CreationInfo CSVs
 vs PL3 `_format2`/`write_creation_csv`) is verified by a script (not in the gate). Each phase is committed with its gate + parity green.
