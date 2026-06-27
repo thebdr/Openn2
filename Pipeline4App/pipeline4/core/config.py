@@ -27,6 +27,7 @@ DIAG_SCL_TEMPLATE = os.path.join(TEMPLATES_DIR, "Tia Portal Software Blocks",
 _BUILTIN_CONFIG_PROJECT = os.path.join(APP_ROOT, "config_project")
 _BUILTIN_DATABASE = os.path.join(SHARED, "Database")        # the SSOT folder (DESIGN 10.3)
 _BUILTIN_OUTPUT = os.path.join(SHARED, "OutputTree")        # the OPn BuilderData export surface
+DEVICE_TYPES_DB_DEFAULT = os.path.join(SHARED, "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")  # ph700 DTD
 
 # The ACTIVE project root (None = the builtin app config + Shared/). Project open/close calls
 # use_project() so the config loaders, the Database folder, and the Output tree all follow the project.
@@ -89,6 +90,12 @@ def diaglist_dir() -> str:
     """The phase-610 DiagList output (`DiagList_IO.csv` + `DiagList_Logic.csv`) - DOCUMENTATION under
     ProjectDocumentation (NOT a BuilderData import surface; matches PL3's DiagnosisData path)."""
     return os.path.join(output_root(), "ProjectDocumentation", "InformationDatabase", "DiagnosisData")
+
+
+def hardware_dir() -> str:
+    """The phase-700 Hardware BuilderData surface (`Stations.csv` + `Modules.csv`), under the output root
+    - what OP4 imports. Matches PL3's OUTPUT_PATHS['hardware_dir'] (the OP-import contract path)."""
+    return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "HardwareConfiguration")
 
 
 # --- sheet-name resolution (regex / JS-literal, case-insensitive) -------------------------------- #
@@ -372,6 +379,48 @@ def load_diagnosis_columns() -> list:
     return [{"header": (r.get("header") or "").strip(), "expression": (r.get("expression") or "")}
             for r in read_config_csv(os.path.join(diagnosis_dir(), "diagnosis_columns.csv"))
             if (r.get("header") or "").strip()]
+
+
+def parse_params_by_type(blob: str) -> dict:
+    """'<B1/2>p=1 | q=0<B1/2><DI1/2>r=0<DI1/2>' -> {'B1/2': 'p=1 | q=0', 'DI1/2': 'r=0'} (DTD col-6, the
+    per-signal-type module parameter blocks; phase 700)."""
+    out = {}
+    for st, block in re.findall(r"<([^>]+)>(.*?)<\1>", blob or ""):
+        out[st.strip().upper()] = block.strip()
+    return out
+
+
+def load_device_types_db(params: dict | None = None) -> dict:
+    """The global DeviceTypesDatabase (phase 700; delim-sniffed, manually maintained). Returns
+    {by_id: {ID_upper -> rec}, default_cards: {parent_upper -> [card_id, ...]}}. A `<PARENT>:SUFFIX`
+    identifier is a default card of PARENT. Columns: model_id, dev_type, order, comment, params (col-5,
+    Open2App-applied - NEVER written), params_by_type (col-6), io_addr_params (col-7)."""
+    path = (params or {}).get("device_types_db") or DEVICE_TYPES_DB_DEFAULT
+    by_id, default_cards = {}, {}
+    with open(path, encoding="utf-8-sig") as f:
+        text = f.read()
+    first = next((ln for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("#")), "")
+    delim = ";" if first.count(";") > first.count(",") else ","
+    for c in csv.reader(text.splitlines(), delimiter=delim):
+        if not c or not c[0].strip() or c[0].lstrip().startswith("#"):
+            continue
+        ident = c[0].strip()
+        rec = {
+            "model_id": ident,
+            "dev_type": c[1].strip() if len(c) > 1 else "",
+            "order": c[2].strip() if len(c) > 2 else "",
+            "comment": c[3].strip() if len(c) > 3 else "",
+            "params": c[4].strip() if len(c) > 4 else "",
+            "params_by_type": parse_params_by_type(c[5] if len(c) > 5 else ""),
+            "io_addr_params": c[6].strip() if len(c) > 6 else "",
+            "parent": None,
+        }
+        m = re.match(r"^<(.+?)>:(.+)$", ident)
+        if m:
+            rec["parent"] = m.group(1).strip()
+            default_cards.setdefault(m.group(1).strip().upper(), []).append(ident)
+        by_id[ident.upper()] = rec
+    return {"by_id": by_id, "default_cards": default_cards}
 
 
 def load_interface_elements() -> list:

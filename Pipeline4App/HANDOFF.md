@@ -11,14 +11,14 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **Phases 400 (a–f) + 510 + 600 COMPLETE** (300 + 520(a/b/c) + 400a–f + 510 + 600a/b/c/d).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`7c2fa17`** (S1 + S2 `1dade77` + S3 `7322470` + S4 `5838f88`
-  + S5 `7c2fa17`, all pushed). **The SEVERITY ROLLOUT IS COMPLETE.** The working tree holds the UNCOMMITTED S6
-  finalization (docs only — the code cleanup landed incrementally; CLAUDE.md + HANDOFF.md). The severity
-  taxonomy/GUI-filter (`5e291f8`) + S1–S5 are committed + pushed.
+- **Branch `pl4`**. **Phases 300 + 520 + 400 + 510 + 600 COMPLETE; severity rollout S1–S6 COMPLETE; phase 700a
+  (Hardware build) DONE** (700b CSV projection + GUI next).
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`7f84320`** (S1–S6 severity rollout COMPLETE, all pushed).
+  **The working tree holds the UNCOMMITTED phase-700a chunk** (config.py + NEW domain/hardware.py + NEW
+  test_hardware.py + CLAUDE.md + HANDOFF.md) — implemented, gate green, parity verified, adversarial review running.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 159 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 168 tests green** (data-independent). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -64,8 +64,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 - **NOTE — the OutputTree PlcTags/DiagList are NOT a valid parity oracle anymore**: a GUI run wrote PL4's output
   there (it's `config.io_tags_dir()`/`diaglist_dir()` with no project open). Use a FRESH PL3 run to scratch (see
   `scratchpad/oracle_pl3_510.py`) or the known values. The SCL ref (06-23) is intact.
-- The SSOT **`Database/`** now holds **8 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
-  `instance_dbs` (520) · `interfaces`/`interface_elements` (400b, +`io_address_side1`) · `diagnosis_entries` (600).
+- The SSOT **`Database/`** now holds **11 tables**: `signals` + `diagnosis_cabinets` (300) · `db_blocks`/`db_members`/
+  `instance_dbs` (520) · `interfaces`/`interface_elements` (400b) · `diagnosis_entries` (600) · `hardware_stations`/
+  `hardware_modules` (700a) · `validation_issues` (the severity rollout's facts table).
   Saves to `Shared/Database/`. (`validation_issues` is now WRITTEN by 300 + 520 — S2/S3 record their findings; the
   remaining phases join as S4–S6 retrofit them. On clean data it is an empty table.)
 
@@ -91,8 +92,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 18. `1dade77` **severity S2** — retrofit 520 (`generate`/`build` → findings + `validation_issues` record + `run.gate`)
 19. `7322470` **severity S3** — retrofit 300 (`stage` → findings, `stg_no_io_sheet`/`stg_dup_signal_uid`) + accumulate-and-gate-once + the db_blocks guard
 20. `5838f88` **severity S4** — retrofit 400+510 (`build_interfaces`/`io_tags.project` → findings) + `core/run.py:render`
-21. `7c2fa17` **severity S5** — retrofit 600 (`diagnosis.build`/`diaglist_csv`/`diagnosis_scl` → findings; the last legacy tuple gone)  **← origin/pl4 PUSHED head**
-22. *(uncommitted)* **severity S6** — rollout complete (docs: full 5-phase byte-parity re-run = 0 diffs vs pre-rollout `95d3dfb`)
+21. `7c2fa17` **severity S5** — retrofit 600 (`diagnosis.build`/`diaglist_csv`/`diagnosis_scl` → findings; the last legacy tuple gone)
+22. `7f84320` **severity S6** — rollout complete (full 5-phase byte-parity re-run = 0 diffs vs pre-rollout `95d3dfb`)  **← origin/pl4 PUSHED head**
+23. *(uncommitted)* **phase 700a** — Hardware build: `config` DTD loader + `domain/hardware.py` (`hardware_stations`/`hardware_modules` + `build`); parity vs PL3 `extract` exact
 
 ## What's DONE (verified, parity vs PL3)
 - **Phase 300 Staging** — the full `signals` table. Direct fields complete: C&E enrichment, FLDs, tags,
@@ -148,12 +150,16 @@ PL4 has full interface parity with current PL3 (and is MORE correct on naming: P
 require PL3 to re-insert the IF_ sheets first; the `collect_mirror_set` equivalence is the conclusive check.)
 
 ## What's NEXT (in order)
-**The SEVERITY ROLLOUT (S1–S6) is COMPLETE** — every phase reports through the Finding/treatment model, the full
-5-phase byte-parity re-run is 0 diffs vs the pre-rollout baseline, and zero legacy `(errors, warnings)` tuples
-remain. **NEXT: phase 700 (Hardware)** — its full design is already done (the `understand-700-hardware` workflow /
-the 700a-b-c plan below): `domain/hardware.py` + `hardware_csv.py`, the `hardware_stations`/`hardware_modules`
-tables, `config.load_device_types_db` + `hardware_dir`; missing-DTD head = **FAIL** (now via the severity model -
-emit a `hw_*` Finding + `run.gate`), switch = WARN; comma/no-BOM/CRLF format-2; parity vs current-PL3 `extract`.
+**The SEVERITY ROLLOUT (S1–S6) is COMPLETE.** **Phase 700a (Hardware build) is DONE (uncommitted):** `domain/hardware.py`
+ports PL3's `extract` into the `hardware_stations` + `hardware_modules` SSOT tables; `build() -> (database, findings)`
+with `hw_device_not_in_dtd` FAIL / `hw_switch_not_in_dtd` WARN + `run.has_blocking` guard + `record` + save;
+`config.load_device_types_db` / `parse_params_by_type` / `hardware_dir` / `DEVICE_TYPES_DB_DEFAULT` added. PARITY vs
+current PL3 `extract` over the same staged rows: **9 stations + 18 modules, 0 field mismatches** (2 switch WARN,
+0 FAIL). Gate 168 green.
+**NEXT: phase 700b** — `domain/hardware_csv.py`: the format-2 `Stations.csv` + `Modules.csv` projection of the two
+tables (no BOM, CRLF, `#!format=2` tag + a descriptive `# header` comment - matching PL3) + the GUI "700" button
+(stage -> build -> project, `run.gate`/`render`). PARITY: the CSVs byte-identical to PL3's `write_stations`/
+`write_modules` over the same extract. Then 800 (Software) · 900 (Coverage) · 100 (Validation).
 
 ### Severity rollout — the S2–S6 retrofit map (user chose: full model + retrofit, THEN 700)
 The mechanics per phase: `build`/`project` returns **`list[Finding]`** (drop the `(errors, warnings)` strings) +

@@ -35,8 +35,9 @@ git-diffable, GUI-grid-able, no new dependency, but structured and comprehensive
 Database
  ├─ signals            one row per I/O signal (+ node/metadata)   ← the fact table (DONE)
  ├─ db_members         every generated DB member (db_element)     ← 520 (TODO)
- ├─ diagnosis_entries  every diagnosis element (unified io|logic) ← 600 (TODO)
- ├─ plc_tags · interfaces · hardware_* · software_blocks · coverage · validation_issues   (TODO, per phase)
+ ├─ diagnosis_entries  every diagnosis element (unified io|logic) ← 600 (DONE)
+ ├─ hardware_stations · hardware_modules   the generatable heads + IoDevice cards   ← 700a (DONE)
+ ├─ plc_tags · software_blocks · coverage · validation_issues   (per phase; validation_issues DONE)
 ```
 Each table persists to one **CSV-with-JSON-cells** file in the **top-level `Database/` folder**
 (`Shared/Database/` builtin, or `<project>/Database/`). Every created entity carries a content-hash
@@ -50,7 +51,7 @@ Pipeline4App/
   pipeline4/
     core/  keys.py · table.py · database.py · config.py · severity.py · finding.py · treatments.py · run.py
     io/    workbook.py · xlsx_edit.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py
+    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py
     gui/   app_main.py · phasebar.py · logview.py · theme.py
   tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
 ```
@@ -333,7 +334,33 @@ the GUI `_run_diagnosis` consumes the build tuple + `run.render`s the combined 6
   32 REGIONs, 7 Tristate_DW). Tests: `test_diagnosis.py` (+4: render_scl variants/rename, the per-type tristate
   trigger, the BOM/CRLF write, the synthetic-template project). 17 total in the suite.
 - **Still open (the interface-completeness follow-up)**: re-verify 510 PLCTags after the +DIAG unblock + add the
-  template-native capture (see the Phase 400 section). Then 700/800/900/100.
+  template-native capture (see the Phase 400 section). Then 800/900/100.
+
+## Phase 700 — Hardware — IN PROGRESS (700a build DONE; 700b CSV projection + GUI TODO)
+`domain/hardware.py` - a clean-room port of PL3's `hardware.extract` into PL4's SSOT model. A single ordered pass
+over the `signals` table populates **`hardware_stations`** (one row per generatable head - a PLC/PlcCardCm/IoDevice)
++ **`hardware_modules`** (the IoDevice cards). The `HardwareConfiguration/Stations.csv` + `Modules.csv` BuilderData
+surface is a pure projection of these tables (700b, TODO).
+- **700a DONE - `build()` + the tables + config.** A head opens a station (`script_type` PLC->Plc, PlcCardCm->
+  PlcCardCm, or Type col-R first letter P->IoDevice); the rows beneath it (until the next head) are its signals.
+  Stations: name=`profinet_name`, Model Id=Part No (spaces stripped), Subnet from the IP, group=
+  `<functional_unit>_IODevices`, Custom Parameters = the DTD col-7 `%I%`/`%Q%`+N address template then col-AG
+  (override). Modules (IoDevice only): cards grouped by Slot (a Slot == the device's own tag is the TIA-auto-plugged
+  card, skipped); I/Q Addr = the card start byte; Custom Parameters = `PotentialGroup=1` on the first card + the DTD
+  col-6 by-signal-type `Ch(#)`->channel blocks then col-AG; default cards (DTD `<PARENT>:SUFFIX`) add one row per
+  station of PARENT. **Severity model:** a head whose Part No isn't in the DeviceTypesDatabase -> **`hw_device_not_in_dtd`
+  FAIL** (halts + no write; operator-downgradable) / **`hw_switch_not_in_dtd` WARN** (a switch, "SWITCH" in the
+  description). `build` returns `(database, findings)` + `run.has_blocking` guard + `record` + save. **Config:**
+  `config.load_device_types_db` (delim-sniffed; `by_id` + `default_cards`; cols model_id/dev_type/order/comment/
+  params/params_by_type/io_addr_params - col-5 `params` is OP4-applied, NEVER written) + `parse_params_by_type` +
+  `hardware_dir()` + `DEVICE_TYPES_DB_DEFAULT` (`Shared/HardwareConfigBuilderData/DeviceTypesDatabase.csv`).
+  **PARITY (vs current PL3 `extract` over the same staged rows - the frozen reference is DTD-drift-stale):
+  9 stations + 18 modules, 0 field mismatches** across every station/module field; 2 `hw_switch_not_in_dtd` WARN,
+  0 FAIL (all non-switch devices are in the DTD, so the build always succeeds on the real data). Tests:
+  `test_hardware.py` (9: helpers, the extract incl. auto-plug/PotentialGroup/by-type/default-cards, the missing-DTD
+  FAIL/switch-WARN, the table fill + int->str of slot/addr).
+- **700b TODO:** `domain/hardware_csv.py` (the format-2 `Stations.csv` + `Modules.csv` projection - no BOM, CRLF,
+  `#!format=2` tag + descriptive `# header` comment) + the GUI "700" button (stage -> build -> project).
 
 ## GUI — runnable shell (`gui/` + `launch_gui.py`)
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
@@ -393,16 +420,18 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **159**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **168**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
 the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** (8, + the S4 `iotag_no_address`
 slug), the **600 `diagnosis` suite** (18, + the S5 `diag_scl_template_missing` slug), the **severity/findings core**
-(`test_severity`/`test_finding`/`test_treatments`/`test_run` = 20, incl. S4's `run.render`)).
-Data-dependent parity (staging/520/400/510/600 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/`interface_elements`/
-PLCTags/`diagnosis_entries`/DiagList/SCL) is verified by a script
-against the real docs (not in the gate). Each phase is committed only with its gate + parity green.
+(`test_severity`/`test_finding`/`test_treatments`/`test_run` = 20, incl. S4's `run.render`), the **700 `hardware`
+suite** (9: the helpers, the extract incl. auto-plug/PotentialGroup/by-type/default-cards, the missing-DTD
+FAIL/switch-WARN, the table fill + int->str of slot/addr)).
+Data-dependent parity (staging/520/400/510/600/700 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/
+`interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `hardware_stations`/`hardware_modules` vs PL3 `extract`)
+is verified by a script against the real docs (not in the gate). Each phase is committed only with its gate + parity green.
 
 ## Conventions & gotchas
 - **JSON cells are schema-declared** (a column is JSON by the table's `json_columns`, not by guessing). The
