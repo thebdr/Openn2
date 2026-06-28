@@ -367,6 +367,27 @@ def load_column_map(document: str) -> list:
         if (r.get("document") or "").strip() == document]
 
 
+def _load_rules(filename: str) -> list:
+    """Load a priority-ordered ruleset CSV (ph200 classification): rows of {priority, when, type/gate, ...}
+    sorted ascending by `priority` (first-match-wins). Cells stay raw strings - the `when`/`type` cells are
+    expressions evaluated by `core.rule_expr`. Missing file -> []."""
+    rows = read_config_csv(os.path.join(input_docs_dir(), filename))
+    rows.sort(key=lambda r: int((r.get("priority") or "0").strip() or 0))
+    return rows
+
+
+def load_gate_rules() -> list:
+    """The In/Out/Node gate ruleset (`gate_rules.csv`): rows {priority, when, gate} - first match sets the
+    row's gate (the ph200 §6 classification partitions by it)."""
+    return _load_rules("gate_rules.csv")
+
+
+def load_script_type_rules() -> list:
+    """The script-type classification ruleset (`script_type_rules.csv`): rows {priority, gate, when, type} -
+    first matching rule (within the row's gate, or `any`) yields the script_type (ph200 §6 / sub-phase 210)."""
+    return _load_rules("script_type_rules.csv")
+
+
 def load_signal_types() -> dict:
     """type_id (upper) -> the type record (the stripped PL4 schema: identity + tag + ce_mandatory; the
     DB / diagnosis / interface attributes now live in their own registries). A paired channel-2 type
