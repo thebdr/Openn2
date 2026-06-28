@@ -34,6 +34,7 @@ class App:
         self.root = root
         self.mode = "dark"
         self._busy = False
+        self._run_halted = False              # set by _gate on a blocking FAIL -> Run-all stops the chain
         self._q: queue.Queue = queue.Queue()
         root.title(APP_TITLE)
         root.geometry("1180x720")
@@ -104,11 +105,16 @@ class App:
         if self._busy:
             self.log.append("WARN", "  a phase is already running - wait for it to finish")
             return
-        self._set_busy(True)
+        # Run-all (0) drives a DETERMINATE progressbar (one step per phase); a single phase bounces.
+        if number == 0:
+            self._set_busy(True, determinate=True, total=len(phases.run_order()))
+        else:
+            self._set_busy(True)
         threading.Thread(target=self._worker, args=(number, label), daemon=True).start()
 
     def _worker(self, number, label):
         """Runs OFF the main thread: dispatch to the phase handler (or Run-all); never touch Tk here."""
+        self._run_halted = False
         try:
             if number == 0:
                 self._run_all()
@@ -126,11 +132,29 @@ class App:
             self._q.put(("done",))
 
     def _run_all(self):
-        """Run every runnable phase in dependency order (each handler is self-contained / re-stages; M4
-        will optimize to a stage-once shared database)."""
-        self._emit("PHASE", "Run Pipeline (all phases)")
-        for number in phases.run_order():
-            getattr(self, phases.by_number(number).handler)()
+        """Run every runnable phase in dependency order, with live per-phase progress + halt-on-FAIL: a
+        phase whose gate halts on a blocking finding sets `self._run_halted`, and the chain stops there
+        (the remaining phases are skipped). Each handler is self-contained / re-stages its own
+        prerequisites - a future engine optimizes this to a stage-once shared database."""
+        order = phases.run_order()
+        self._emit("PHASE", f"Run Pipeline ({len(order)} phases)")
+        for i, number in enumerate(order, 1):
+            phase = phases.by_number(number)
+            self._status(f"[{i}/{len(order)}] {number} {phase.title}…")
+            self._emit("INFO", f"[{i}/{len(order)}] running {number} {phase.title}")
+            try:
+                getattr(self, phase.handler)()
+            except Exception:  # noqa: BLE001 - attribute the crash to THIS phase, stop the chain like a halt
+                self._emit("ERROR", f"  {number} {phase.title} crashed:\n{traceback.format_exc()}")
+                self._emit("FAIL", f"  Run Pipeline aborted at {number} {phase.title} - "
+                                   f"{len(order) - i} remaining phase(s) skipped")
+                self._q.put(("progress_step",))
+                return
+            self._q.put(("progress_step",))
+            if self._run_halted:
+                self._emit("FAIL", f"  Run Pipeline halted at {number} {phase.title} - "
+                                   f"{len(order) - i} remaining phase(s) skipped")
+                return
         self._emit("PASS", "  Run Pipeline complete")
 
     def _drain(self):
@@ -145,6 +169,11 @@ class App:
                     self.log.append_records(event[1])
                 elif kind == "status":
                     self.status.configure(text=event[1])
+                elif kind == "progress_step":     # a Run-all per-phase tick (determinate bar)
+                    try:
+                        self.progress.configure(value=float(self.progress["value"]) + 1)
+                    except tk.TclError:
+                        pass
                 elif kind == "done":
                     self._set_busy(False)
                     self.status.configure(text="Ready")
@@ -154,13 +183,17 @@ class App:
             pass
         self.root.after(50, self._drain)
 
-    def _set_busy(self, busy: bool):
+    def _set_busy(self, busy: bool, *, determinate: bool = False, total: int = 0):
         self._busy = busy
         self.phasebar.set_enabled(not busy)
-        if busy:
+        if busy and determinate:              # Run-all: a real 0..N bar stepped per completed phase
+            self.progress.configure(mode="determinate", maximum=max(1, total), value=0)
+        elif busy:                            # single phase: an indeterminate bounce
+            self.progress.configure(mode="indeterminate")
             self.progress.start(12)
-        else:
+        else:                                 # idle: stop + reset to the indeterminate default
             self.progress.stop()
+            self.progress.configure(mode="indeterminate", value=0)
 
     # --- the GUI gate/render seam (structured, clickable records) -------------------------------- #
     def _gate(self, findings, *, label: str) -> bool:
@@ -171,6 +204,7 @@ class App:
         self._q.put(("records", recs))
         if treatments.should_halt(applied):
             self._emit("FAIL", f"  {label} halted on a blocking finding - nothing written")
+            self._run_halted = True           # Run-all reads this to stop the remaining chain
             return False
         return True
 

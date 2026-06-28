@@ -541,7 +541,7 @@ text is ported verbatim into each finding's `detail`.
   + populating `diag_block_name` at staging, which would touch the locked 300 parity) + the **`accept`**
   doc-mutating treatment (dropped).
 
-## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0+M1+M2+M3 DONE; see `GUI_PLAN.md`)
+## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0+M1+M2+M3+M4 DONE; see `GUI_PLAN.md`)
 The backend is complete; the GUI port (replicate PL3 + add SSOT-native features) is the active effort - the
 plan + locked decisions are in **`GUI_PLAN.md`**. **M0 (foundations) DONE:** a **lightweight phase registry**
 (`gui/phases.py` - the single source of the phase order: number/title/kind/subs/requires/handler +
@@ -562,9 +562,17 @@ clickable log) DONE:** `LogView` is a Frame+Text (v/h scroll) with `append_recor
 line's `[LEVEL]` errlink → right-click Treat, a **Levels ▾ dropdown** (per-level checkboxes; FAIL/ERROR forced
 + greyed; toggles LIVE via per-level elide; persists the combination to `app_config.yaml` via
 `config.save_app_log_levels`); the GUI `_gate`/`_render` (replacing `run.gate`/`run.render` in the handlers)
-render EFFECTIVE-severity findings to structured records via `findings_view.apply_and_records`. NEXT: M4
-Run-all+dropdowns · M5 Files · M6 Project · M0b chrome. Tests: `test_gui_phases.py` + `test_gui_findings.py` +
-`test_gui_dbquery.py` + `test_gui_levels.py`. The GUI itself is a manual `python launch_gui.py` check.
+render EFFECTIVE-severity findings to structured records via `findings_view.apply_and_records`. **M4
+(Run-all + sub-phase chevron dropdowns) DONE:** the phase bar (`phasebar.py`) is now a port of PL3's
+**2-row registry-driven grid** - the pink Run master (spans both rows), per-phase **header** (row 0, runs
+the phase) + a grey **▼ chevron** (row 1) opening an anchored, click-away/Escape/blur-poll **`_Dropdown`**
+listing the phase's `subs`. A handler is monolithic (620 SCL still needs stage→520→build), so a **sub-step
+button runs its PARENT phase** (the dropdown is the visual map; independent sub-phase runs wait on the
+engine). **Run-all** (`_run_all`) drives a **determinate** progressbar (a `progress_step` per completed
+phase; single phases bounce), emits a `[k/N] <num> <title>` marker per phase, and **halts the chain on a
+blocking FAIL** (`_gate` sets `self._run_halted`). NEXT: M5 Files · M6 Project · M0b chrome. Tests:
+`test_gui_phases.py` + `test_gui_findings.py` + `test_gui_dbquery.py` + `test_gui_levels.py` +
+`test_gui_phasebar.py` (the pure `_wrap`). The GUI itself is a manual `python launch_gui.py` check.
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the registry-driven
 **phase-button bar** (Run + the 8 phases, ButtonsLayout colours), a colour-coded **log viewer** (in a notebook),
 and a status bar + busy progressbar. Wired in EARLY (gui-less PL3 builds hid integration problems). **ALL phase

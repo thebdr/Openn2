@@ -11,11 +11,12 @@ from __future__ import annotations
 from tkinter import ttk
 
 # Classic-tk-button fills (mirrors PL3's ButtonsLayout): run=pink, phase/action=white, open=light-blue,
-# special=orange, disabled=grey - with a readable foreground for each.
+# special=orange, chevron=mid-grey (the sub-phase dropdown opener), disabled=grey - with a readable
+# foreground for each.
 BUTTON_FILLS = {"run": "#e84393", "phase": "#f5f6fa", "action": "#dfe6e9",
-                "open": "#74b9ff", "special": "#e67e22", "disabled": "#b2bec3"}
+                "open": "#74b9ff", "special": "#e67e22", "chevron": "#636e72", "disabled": "#b2bec3"}
 BUTTON_FG = {"run": "#ffffff", "phase": "#2d3436", "action": "#2d3436",
-             "open": "#1e272e", "special": "#ffffff", "disabled": "#636e72"}
+             "open": "#1e272e", "special": "#ffffff", "chevron": "#f5f6fa", "disabled": "#636e72"}
 
 # log level -> (foreground colour, bold?). FAIL (halt) is bold red; ERROR a softer red; DEBUG muted.
 LOG_COLORS = {"PHASE": ("#74b9ff", True), "FAIL": ("#ff6b6b", True), "ERROR": ("#e17055", True),

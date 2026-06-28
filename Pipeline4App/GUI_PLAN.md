@@ -82,8 +82,25 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   [double-click a table → `SELECT * FROM`], a SQL editor [Ctrl+Enter], a results grid, a samples combobox, a
   Refresh that reloads + auto-refresh after a run). Read-only over an in-memory copy (the CSVs are never
   touched). Tests: `test_gui_dbquery.py` (4). Real `Database/` loads all 14 tables into the explorer.
-- **M4 — Run-all + sub-phase dropdowns** *(NEW: live progress)*: the registry drives a dependency-ordered
-  Run-all on the worker (live per-phase progress + halt-on-FAIL); chevrons list each phase's sub-steps.
+- **M4 — Run-all + sub-phase dropdowns. DONE** *(NEW: live progress)*: the phase bar is now a faithful
+  port of PL3's **2-row registry-driven grid** — the pink Run master (spans both rows) · `➡` separators ·
+  per-phase **header** (row 0, runs the phase) + a grey **▼ chevron** (row 1) that opens an anchored,
+  click-away / Escape-close / blur-poll **`_Dropdown`** popup listing that phase's `subs`. PL4 NOTE: a
+  handler is monolithic (620 SCL still needs stage→520→build), so a **sub-step button RUNS ITS PARENT
+  PHASE** like the header — the dropdown is the visual MAP of a phase; independent per-sub-phase runs wait
+  on the engine. **Run-all** (`_run_all`) now drives a **determinate** progressbar (one `progress_step`
+  per completed phase; a single phase still bounces indeterminately), emits a `[k/N] <num> <title>`
+  per-phase marker, and **halts the chain on a blocking FAIL** (`_gate` sets `self._run_halted`; the
+  remaining phases are skipped + logged). `theme` gained a `chevron` fill. Stage-once Run-all optimization
+  stays DEFERRED (explicitly optional; each handler self-stages). Tests: `test_gui_phasebar.py` (3, the
+  pure `_wrap`); verified by py_compile + a headless construction smoke (9 header/run buttons, 8 chevrons,
+  the 600 dropdown fires the parent phase + closes, the determinate Run-all bar). The live dropdown/bar
+  are the manual `launch_gui.py` check. **Adversarially reviewed pre-commit** (a 5-dimension workflow);
+  3 confirmed findings HARDENED: (1) `_Dropdown.close` now removes ONLY its own `<Button-1>` handler from
+  the global 'all' bindtag (`_remove_global_binding`) instead of `unbind_all` wiping every global hook;
+  (2) the first blur-poll `after` id is captured so a fast close cancels it; (3) `_run_all` wraps each
+  per-phase call so a handler CRASH is attributed to the named phase + stops the chain with the same
+  "N remaining skipped" accounting a gate-halt gets (no bare traceback that hides the lost phases).
 - **M5 — Files tab**: the 3-section tree (config / user-editable / output) + a CSV grid **through the codec**
   + object editor (yaml/json/xml) + xlsx read-only viewer + external-edit. (The SSOT-aware grid from M3 can
   subsume the generic CSV grid.)
