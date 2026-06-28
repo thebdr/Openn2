@@ -19,14 +19,18 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   **M0 (worker thread + registry + notebook + Run-all) · M1 (structured clickable log) · M2 (Findings panel) ·
   M3 (Database Explorer, in-memory SQLite) are DONE.** NEXT: M4 (Run-all + sub-phase dropdowns) · M5 (Files) ·
   M6 (Project Manager) · M0b (chrome: fonts/dark-titlebar/re-theme).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`47addb9`** (GUI M3). **The working tree holds the
-  UNCOMMITTED GUI M1 chunk** (`gui/excel.py` + `gui/logview.py` rewrite + `gui/findings_view.py` +
-  `gui/app_main.py` + tests + docs) — gate green.
-  - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
-    session — NOT ours; leave them.
-- **Gate: 236 tests green** (data-independent; GUI registry + findings + dbquery). Run from `Pipeline4App/`:
-  `for t in tests/unit/test_*.py; do python "$t"; done`
-- **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`fbac770`** (GUI M1). **Working tree is CLEAN** — the
+  only untracked path is `config_project/user_input/` (the runtime treatment registry, gitignored-ish; leave it).
+  - The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before
+    this session — NOT ours; leave them.
+- **Gate: 236 tests green** (data-independent). Run from `Pipeline4App/`:
+  `for t in tests/unit/test_*.py; do python "$t"; done`. The GUI is a manual `python launch_gui.py` check (no
+  headless GUI tests; each GUI milestone unit-tests its pure logic + a construction smoke).
+- **START THE NEXT SESSION HERE → `GUI_PLAN.md`** (the live GUI tracker). M0/M1/M2/M3 done; **NEXT = M4
+  (Run-all + sub-phase chevron dropdowns; optionally optimize Run-all to stage ONCE into a shared database
+  instead of each handler re-staging).** Then M5 (Files tab) · M6 (Project Manager) · M0b (chrome:
+  fonts/dark-titlebar/re-theme). The backend `## phase 200 (Fill)` section below is the other open backend item.
+- **SEVERITY model (COMPLETE — historical detail; the rollout S1–S6 is done).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
   first-char-addressable. The GUI filter (`app_config.yaml user_interface.log_levels`, default `[F,E,W,I,S,P,D]`)
   is done. **S1 (the findings/treatment core) is DONE**: `core/finding.py` (frozen `Finding` + uid excluding
@@ -56,8 +60,7 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `(errors, warnings)` tuples / `warnings`-key reads remain in `pipeline4/` (cleanup landed incrementally); the
   **full 5-phase byte-parity re-run** vs the pre-rollout baseline `95d3dfb` is **0 diffs across all 20 BuilderData +
   SSOT outputs** (9 GlobalDB XMLs + PLCTags 214 rows + DiagList_IO/Logic + the OPC SCL + the 8 SSOT tables), only
-  `validation_issues.csv` added. **NEXT: phase 700 (Hardware)** - see "What's NEXT" below. PARITY RULE held every
-  chunk (report CONTAINER + render call only; 0-byte diff).
+  `validation_issues.csv` added. PARITY RULE held every chunk (report CONTAINER + render call only; 0-byte diff).
   - **TRANSITIONAL (gate reconcile scope):** `run.gate` -> `treatments.reconcile` prunes/stales registry rows
     GLOBALLY; with multiple gated phases across separate clicks this can churn another phase's untreated rows.
     Invisible today (clean data = 0 findings = empty registry); treatments still APPLY (`apply` ignores `stale`).
