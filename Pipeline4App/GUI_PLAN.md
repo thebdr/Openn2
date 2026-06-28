@@ -57,8 +57,11 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   **M0b partly DONE:** `gui/fonts.py` (port of PL3's - registers the bundled `assets/fonts/MonaspaceNeon-Var.ttf`
   privately via `AddFontResourceEx(FR_PRIVATE)`, resolves `Monaspace Neon Var`, Consolas fallback) +
   `theme.apply_theme` now makes it the **app-wide UI font at `APP_FONT_SIZE=13`** (the named Tk fonts +
-  `theme.MONO_FONT`; chrome + phase bar + log). STILL DEFERRED to M0b: `darktitle.py` (dark Windows title bar)
-  + a full light/dark `LogView` re-theme. Test: `test_gui_fonts.py`.
+  `theme.MONO_FONT`; chrome + phase bar + log). **M0b chrome remainder DONE (STEP 1):** `gui/darktitle.py`
+  (the Windows immersive dark title bar via `DwmSetWindowAttribute` + `SetWindowPos` FRAMECHANGED, applied
+  LAST in `__init__`/`_toggle_theme` so it doesn't flush sv-ttk against a half-built window) + a full light/
+  dark re-theme (`theme.bg_for`/`fg_for`/`log_colors_for`/`phasebar_bg` + `set_theme(mode)` on LogView /
+  PhaseBar / DatabaseExplorer / FilesPanel, all driven by `_toggle_theme`). Test: `test_gui_fonts.py`.
 - **M1 — Structured clickable log. DONE** (PL3 parity). `LogView` rewritten as a Frame+Text with v/h
   scrollbars + `append_records` (over `io.render.render_records`): banners, level-coloured lines, **clickable
   `Sheet!Cell` spans** → `gui/excel.py` (verbatim COM port; reuse an open Excel, graceful `os.startfile`
@@ -126,9 +129,19 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   dropdown 5-buttons-with-2-greyed + width-match, `only=` dispatch); and a **real-data run of every `only=`
   branch** (310/520/510/610/620/710/820/830/110/130 all PASS, 0 errors). Reviewed pre-commit (5-dimension
   workflow).
-- **M5 — Files tab**: the 3-section tree (config / user-editable / output) + a CSV grid **through the codec**
-  + object editor (yaml/json/xml) + xlsx read-only viewer + external-edit. (The SSOT-aware grid from M3 can
-  subsume the generic CSV grid.)
+- **M5 — Files tab. DONE** *(view-only, decision #3)*: `gui/files_view.py` (the Tk-free logic, tested:
+  `allowed`/`viewer_kind` ext dispatch, `populate` [the pruned/sorted file tree], `file_sections` [the 3
+  sections under the active config/project], `sniff_delim`/`read_csv_rows`, `read_xlsx`) + `gui/files_panel.py`
+  (the `FilesPanel` tab: a 3-section tree [Project configuration / User editable files / Generated output] on
+  the left, a read-only viewer on the right - a `.csv` opens in a ttk.Treeview grid, an `.xlsx`/`.xlsm` in a
+  grid + sheet picker [openpyxl `data_only`, capped 3000x80], a `.yaml`/`.json`/`.xml`/`.scl`/text file in a
+  monospace text pane; every viewer carries a path strip + **Open externally** / **Open folder**) + `gui/
+  extedit.py` (port of PL3's: LibreOffice-then-OS-default open + `reveal` the folder). ttk-only (NO tksheet /
+  ruamel deps - the rich object editor + in-app grid editing wait on the codec-write path). Wired into
+  `app_main` (the Files tab after Log; `_file_sections` re-resolved from `config.load_params()`, refreshed
+  after each run + on a theme toggle [`set_theme` re-themes the text pane]). Tests: `test_gui_files.py` (7).
+  GUI-verified on screen: the 3-section tree over the real project, the CSV grid (`db_blocks.csv`), the YAML
+  text pane (`app_config.yaml`), and the light/dark toggle following through.
 - **M6 — Project Manager**: port `project/project.py` + `state.py` (folder projects, persisted root, recent,
   auto-reopen) + the toolbar cluster. `config.use_project()` already routes the loaders/Database/Output.
 - **i18n (EN/IT) — DONE (STEP 1, first-class, NOT polish).** The POINT of i18n here is the operator-facing

@@ -20,8 +20,9 @@ import traceback
 from tkinter import ttk
 
 from pipeline4.core import config, i18n, severity, treatments
-from pipeline4.gui import excel, findings_view, phases, theme
+from pipeline4.gui import excel, files_view, findings_view, phases, theme
 from pipeline4.gui.db_explorer import DatabaseExplorer
+from pipeline4.gui.files_panel import FilesPanel
 from pipeline4.gui.findings_panel import FindingsPanel
 from pipeline4.gui.logview import LogView
 from pipeline4.gui.phasebar import PhaseBar
@@ -90,6 +91,11 @@ class App:
                            on_link=self._on_link, on_errtreat=self._on_errtreat)
         self.log.pack(side="top", fill="both", expand=True)
         self.notebook.add(self._log_tab, text=i18n.tr("tab_log", self.lang))
+        self._files_tab = ttk.Frame(self.notebook)
+        self.files = FilesPanel(self._files_tab, sections=self._file_sections(),
+                                on_status=lambda m: self.status.configure(text=m), mode=self.mode)
+        self.files.pack(side="top", fill="both", expand=True)
+        self.notebook.add(self._files_tab, text=i18n.tr("tab_files", self.lang))
         self._findings_tab = ttk.Frame(self.notebook)
         self.findings = FindingsPanel(self._findings_tab)
         self.findings.pack(side="top", fill="both", expand=True)
@@ -252,6 +258,15 @@ class App:
         except Exception as exc:  # noqa: BLE001
             self.log.append("WARN", f"  could not open {target}: {exc}")
 
+    def _file_sections(self):
+        """The 3 Files-tree sections under the ACTIVE config/project (re-resolved each refresh so a future
+        project switch is picked up). Falls back to the config-only sections if the project params can't load."""
+        try:
+            params = config.load_params()
+        except Exception:  # noqa: BLE001  - a missing/broken project_params must not break the Files tab
+            params = {}
+        return files_view.file_sections(params)
+
     def _drain(self):
         """Main thread: apply the queued log/status/done events to the widgets, then reschedule."""
         try:
@@ -274,6 +289,7 @@ class App:
                     self.status.configure(text=i18n.tr("st_ready", self.lang))
                     self.findings.refresh()          # surface the run's findings in the panel
                     self.explorer.refresh()          # reload the SSOT tables the run (re)wrote
+                    self.files.refresh()             # the run (re)wrote output files - re-scan the tree
         except queue.Empty:
             pass
         self.root.after(50, self._drain)
@@ -618,6 +634,7 @@ class App:
         self.log.set_theme(self.mode)                        # log bg/fg + level tag colours
         self.phasebar.set_theme(self.mode)                   # bar bg + separators + spacers
         self.explorer.set_theme(self.mode)                   # SQL editor bg/fg + highlight tags
+        self.files.set_theme(self.mode)                      # Files text viewer bg/fg
         darktitle.apply(self.root, self.mode == "dark")      # Windows title bar (widgets already exist)
         self.log.append("INFO", f"theme -> {self.mode}")
 

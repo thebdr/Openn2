@@ -99,6 +99,7 @@ STRINGS: dict = {
     "tb_font":      {"en": "Font", "it": "Carattere"},
     "tb_lang":      {"en": "Lang", "it": "Lingua"},
     "tab_log":      {"en": "Log", "it": "Log"},
+    "tab_files":    {"en": "Files", "it": "File"},
     "tab_findings": {"en": "Findings", "it": "Esiti"},
     "tab_explorer": {"en": "Database Explorer", "it": "Esplora Database"},
     "st_ready":     {"en": "Ready", "it": "Pronto"},
