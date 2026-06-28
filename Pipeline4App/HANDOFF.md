@@ -31,13 +31,15 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   / 320 Stage C&E Matrix, byte-identical signals.csv) · **STEP 3** M5 Files · M6 Project Manager · M0b chrome
   (fonts/dark-titlebar/re-theme) · **STEP 4** ph200 Fill (CSV-driven, AFTER the GUI; confirm its 4 open
   decisions first).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`d0ab114`** (GUI M4 + the oracle rework). **STEP 1
-  i18n is implemented but UNCOMMITTED** (commit on the user's word). M4 base at `243b695`, M0–M3 at
-  `d623509`/`3ec6996`/`47addb9`/`fbac770`. The only untracked PL4 path is `config_project/user_input/` (the
-  runtime treatment registry, gitignored-ish; leave it). M4 + the rework were each adversarially reviewed
-  pre-commit (5-dimension workflows); the confirmed findings are hardened (see `GUI_PLAN.md` M4 — incl. the
-  oracle slot-320 title fix). The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App
-  config, Shared) — NOT ours; leave them.
+- **GIT STATE:** local **`pl4`** is at **`7473ace`** — **STEP 1 i18n + Monaspace font + dark/light theme
+  compatibility COMMITTED** (the toolbar/notebook/status/title-bar now all follow the theme toggle). The
+  startup-light-ttk fix: `darktitle.apply` runs LAST in `__init__` / in `_toggle_theme`, NOT inside
+  `apply_theme` — its `update_idletasks()` was flushing sv-ttk's theme against a half-built window, leaving
+  the ttk widgets light; verified on screen (startup-dark + light↔dark round-trip switch coherently).
+  **NOT pushed** — `origin/pl4` is at **`3df8f99`** (1 commit behind; push on the user's word). M4 base at
+  `243b695`, M0–M3 at `d623509`/`3ec6996`/`47addb9`/`fbac770`. `config_project/user_input/*.csv` (the runtime
+  treatment registry) is now gitignored (matching PL3). The repo root also carries unrelated pre-existing
+  edits (Openn3App, Pipeline3App config, Shared) — NOT ours; leave them.
 - **Gate: 36 test FILES green** (data-independent; `test_i18n.py` + `test_validation_i18n.py` + `test_app_config.py`
   + `test_gui_fonts.py` added at STEP 1; STEP 1 also added the **always-plural** cosmetic [no `(s)`/`/i` hedge],
   a **log-viewer Font dropdown** 10/12/14 [`LogView.set_font_size`, persisted], and the **app-wide Monaspace Neon
