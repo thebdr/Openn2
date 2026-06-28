@@ -541,7 +541,7 @@ text is ported verbatim into each finding's `detail`.
   + populating `diag_block_name` at staging, which would touch the locked 300 parity) + the **`accept`**
   doc-mutating treatment (dropped).
 
-## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0 + M2 + M3 DONE; see `GUI_PLAN.md`)
+## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0+M1+M2+M3 DONE; see `GUI_PLAN.md`)
 The backend is complete; the GUI port (replicate PL3 + add SSOT-native features) is the active effort - the
 plan + locked decisions are in **`GUI_PLAN.md`**. **M0 (foundations) DONE:** a **lightweight phase registry**
 (`gui/phases.py` - the single source of the phase order: number/title/kind/subs/requires/handler +
@@ -556,9 +556,15 @@ The pure join/treat logic is `gui/findings_view.py` (tested); `gui/findings_pane
 (Database Explorer) DONE:** a SQL console tab over the SSOT - `gui/dbquery.py` (`build_memory_db` loads
 `Database/*.csv` into in-memory SQLite, JSON cells queryable via `json_extract()`; `run_query`; `SAMPLE_QUERIES`
 - SELECT*/json_extract/GROUP BY/cross-table JOINs) + `gui/db_explorer.py` (schema sidebar, SQL editor
-[Ctrl+Enter], results grid, samples combo, Refresh). Read-only over an in-memory copy. NEXT: M1 structured
-clickable log · M4 Run-all+dropdowns · M5 Files · M6 Project · M0b chrome. Tests: `test_gui_phases.py` +
-`test_gui_findings.py` + `test_gui_dbquery.py`. The GUI itself is a manual `python launch_gui.py` check.
+[Ctrl+Enter], results grid, samples combo, Refresh). Read-only over an in-memory copy. **M1 (structured
+clickable log) DONE:** `LogView` is a Frame+Text (v/h scroll) with `append_records` over `io.render.render_records`
+- clickable `Sheet!Cell` spans → open Excel at the cell (`gui/excel.py`, COM, graceful fallback), a treatable
+line's `[LEVEL]` errlink → right-click Treat, a **Levels ▾ dropdown** (per-level checkboxes; FAIL/ERROR forced
++ greyed; toggles LIVE via per-level elide; persists the combination to `app_config.yaml` via
+`config.save_app_log_levels`); the GUI `_gate`/`_render` (replacing `run.gate`/`run.render` in the handlers)
+render EFFECTIVE-severity findings to structured records via `findings_view.apply_and_records`. NEXT: M4
+Run-all+dropdowns · M5 Files · M6 Project · M0b chrome. Tests: `test_gui_phases.py` + `test_gui_findings.py` +
+`test_gui_dbquery.py` + `test_gui_levels.py`. The GUI itself is a manual `python launch_gui.py` check.
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the registry-driven
 **phase-button bar** (Run + the 8 phases, ButtonsLayout colours), a colour-coded **log viewer** (in a notebook),
 and a status bar + busy progressbar. Wired in EARLY (gui-less PL3 builds hid integration problems). **ALL phase
@@ -619,7 +625,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **233**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **236**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),

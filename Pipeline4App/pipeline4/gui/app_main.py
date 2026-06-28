@@ -19,8 +19,8 @@ import tkinter as tk
 import traceback
 from tkinter import ttk
 
-from pipeline4.core import config
-from pipeline4.gui import phases, theme
+from pipeline4.core import config, severity, treatments
+from pipeline4.gui import excel, findings_view, phases, theme
 from pipeline4.gui.db_explorer import DatabaseExplorer
 from pipeline4.gui.findings_panel import FindingsPanel
 from pipeline4.gui.logview import LogView
@@ -44,6 +44,18 @@ class App:
         ttk.Label(toolbar, text="PIPELINE4", font=("Consolas", 13, "bold")).pack(side="left", padx=(2, 14))
         ttk.Button(toolbar, text="Theme", command=self._toggle_theme).pack(side="left", padx=2)
         ttk.Button(toolbar, text="Clear Log", command=self._clear).pack(side="left", padx=2)
+        self._level_vars = {}                     # the Levels dropdown: a checkbutton per severity level
+        levels_mb = ttk.Menubutton(toolbar, text="Levels ▾")
+        levels_menu = tk.Menu(levels_mb, tearoff=0)
+        shown0 = config.load_app_ui()["log_levels"]
+        for level in severity.LEVELS:             # FAIL, ERROR, WARN, INFO, SKIP, PASS, DEBUG
+            forced = level in ("FAIL", "ERROR")   # always shown, greyed out (can't be disabled)
+            var = tk.BooleanVar(value=forced or level in shown0)
+            self._level_vars[level] = var
+            levels_menu.add_checkbutton(label=level, variable=var, command=self._on_levels_changed,
+                                        state="disabled" if forced else "normal")
+        levels_mb.configure(menu=levels_menu)
+        levels_mb.pack(side="left", padx=6)
         self._backend_label = ttk.Label(toolbar, text=f"theme: {backend}")
         self._backend_label.pack(side="right", padx=2)
 
@@ -59,7 +71,8 @@ class App:
         # the Log notebook (Findings / Database Explorer / Files tabs join here in later milestones).
         self.notebook = ttk.Notebook(root)
         log_tab = ttk.Frame(self.notebook)
-        self.log = LogView(log_tab, shown_levels=config.load_app_ui()["log_levels"])
+        self.log = LogView(log_tab, shown_levels=config.load_app_ui()["log_levels"],
+                           on_link=self._on_link, on_errtreat=self._on_errtreat)
         self.log.pack(side="top", fill="both", expand=True)
         self.notebook.add(log_tab, text="Log")
         findings_tab = ttk.Frame(self.notebook)
@@ -128,6 +141,8 @@ class App:
                 kind = event[0]
                 if kind == "log":
                     self.log.append(event[1], event[2])
+                elif kind == "records":
+                    self.log.append_records(event[1])
                 elif kind == "status":
                     self.status.configure(text=event[1])
                 elif kind == "done":
@@ -147,6 +162,45 @@ class App:
         else:
             self.progress.stop()
 
+    # --- the GUI gate/render seam (structured, clickable records) -------------------------------- #
+    def _gate(self, findings, *, label: str) -> bool:
+        """Apply the registry, post the EFFECTIVE-severity findings as structured records to the log, and
+        return CONTINUE (False = halt on a blocking effective severity). The records render on the worker
+        (pure) and are drained into the clickable LogView on the main thread."""
+        applied, recs = findings_view.apply_and_records(findings)
+        self._q.put(("records", recs))
+        if treatments.should_halt(applied):
+            self._emit("FAIL", f"  {label} halted on a blocking finding - nothing written")
+            return False
+        return True
+
+    def _render(self, findings) -> None:
+        """Apply the registry + post the EFFECTIVE-severity findings as structured records (never halts)."""
+        _applied, recs = findings_view.apply_and_records(findings)
+        self._q.put(("records", recs))
+
+    # --- log link callbacks (main thread) ------------------------------------------------------- #
+    def _resolve_doc(self, basename: str) -> str:
+        params = config.load_params()
+        for path in (params.get("iolist_path"), params.get("matrix_path")):
+            if path and os.path.basename(path) == basename:
+                return path
+        return ""
+
+    def _on_link(self, doc, sheet, cell) -> None:
+        """A clicked Sheet!Cell log link -> open the workbook in Excel at that cell (off-thread; COM)."""
+        path = self._resolve_doc(doc)
+        if not path:
+            self.log.append("WARN", f"  cannot locate workbook '{doc}'")
+            return
+        threading.Thread(target=lambda: excel.goto(path, sheet, cell), daemon=True).start()
+
+    def _on_errtreat(self, uid, level) -> None:
+        """A right-click treat on a finding line -> set the treatment + refresh the Findings panel."""
+        treatments.set_treatment(uid, level)
+        self.findings.refresh()
+        self.log.append("INFO", f"  treated {uid} -> {level or 'cleared'} (effective on the next run)")
+
     # --- the phase handlers (run on the worker thread; emit via self._emit / self._status) ------- #
     def _run_validation(self):
         """Phase 100: stage -> the 4 validators -> record the issues + write the 4 reports -> render the
@@ -159,7 +213,7 @@ class App:
         database, _sf = staging.stage()
         res = validation.run_validation(database)
         issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERROR", "WARN")]
-        run.render(issues, self._emit)
+        self._render(issues)
         c = res["counts"]
         self._emit("PASS", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERROR', 0)} ERROR, {c.get('WARN', 0)} WARN, "
                            f"{c.get('PASS', 0)} PASS, {c.get('SKIP', 0)} SKIP -> {res['dir']}")
@@ -171,7 +225,7 @@ class App:
         self._emit("PHASE", "300 Documents Staging")
         self._status("staging…")
         database, findings = staging.stage()
-        if not run.gate(findings, self._emit, label="300 Documents Staging"):
+        if not self._gate(findings, label="300 Documents Staging"):
             return
         signals = database["signals"]
         self._emit("PASS", f"  staged {len(signals)} signals -> {os.path.join(config.database_dir(), 'signals.csv')}")
@@ -187,7 +241,7 @@ class App:
         database, f = staging.stage(); findings += f
         if not run.has_blocking(f):
             database, f = datablocks.build(database); findings += f
-        if not run.gate(findings, self._emit, label="500 (300 staging + 520 data blocks)"):
+        if not self._gate(findings, label="500 (300 staging + 520 data blocks)"):
             return
         if "db_blocks" not in database:
             self._emit("WARN", "  520 produced no tables (a blocking prereq was downgraded but yielded no data) - nothing further")
@@ -200,7 +254,7 @@ class App:
         self._status("I/O tags…")
         database, iface_findings = interfaces.build_interfaces(database)
         res = io_tags.project(database)
-        run.render(iface_findings + res["findings"], self._emit)
+        self._render(iface_findings + res["findings"])
         self._emit("PASS", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
                            f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {config.io_tags_dir()}")
 
@@ -215,13 +269,13 @@ class App:
         database, f = staging.stage(); findings += f
         if not run.has_blocking(f):
             database, f = datablocks.build(database); findings += f
-        if not run.gate(findings, self._emit, label="400 (300 staging + 520 prereq)"):
+        if not self._gate(findings, label="400 (300 staging + 520 prereq)"):
             return
         if "db_blocks" not in database:
             self._emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
         database, iface_findings = interfaces.build_interfaces(database)
-        run.render(iface_findings, self._emit)
+        self._render(iface_findings)
         result = interface_xlsx.project(database)
         n_if, n_el = len(database["interfaces"]), len(database["interface_elements"])
         self._emit("PASS", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "
@@ -244,7 +298,7 @@ class App:
         database, f = staging.stage(); findings += f
         if not run.has_blocking(f):
             database, f = datablocks.build(database); findings += f
-        if not run.gate(findings, self._emit, label="600 (300 staging + 520 prereq)"):
+        if not self._gate(findings, label="600 (300 staging + 520 prereq)"):
             return
         if "db_blocks" not in database:
             self._emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
@@ -252,7 +306,7 @@ class App:
         database, diag_findings = diagnosis.build(database)
         res = diaglist_csv.project(database)
         scl = diagnosis_scl.project(database)
-        run.render(diag_findings + res["findings"] + scl["findings"], self._emit)
+        self._render(diag_findings + res["findings"] + scl["findings"])
         self._emit("PASS", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> {config.diaglist_dir()}")
         if scl["path"]:
             self._emit("PASS", f"  620 OPC SCL: {scl['entries']} entries across {scl['cabinets']} cabinets -> {scl['path']}")
@@ -267,7 +321,7 @@ class App:
         database, f = staging.stage(); findings += f
         if not run.has_blocking(f):
             database, f = hardware.build(database); findings += f
-        if not run.gate(findings, self._emit, label="700 (300 staging + hardware)"):
+        if not self._gate(findings, label="700 (300 staging + hardware)"):
             return
         if "hardware_stations" not in database:
             self._emit("WARN", "  700 produced no tables (a blocking finding) - nothing further")
@@ -287,7 +341,7 @@ class App:
         database, f = staging.stage(); findings += f
         if not run.has_blocking(f):
             database, f = datablocks.build(database); findings += f
-        if not run.gate(findings, self._emit, label="800 (300 staging + 520 prereq)"):
+        if not self._gate(findings, label="800 (300 staging + 520 prereq)"):
             return
         if "db_blocks" not in database:
             self._emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
@@ -296,7 +350,7 @@ class App:
         res = engine.project(database)
         com = engine.write_com_db(database)
         inst = engine.write_instance_dbs(database)
-        run.render(blk_findings + res["findings"], self._emit)
+        self._render(blk_findings + res["findings"])
         self._emit("PASS", f"  820: {len(database['software_blocks'])} block(s) -> {res['count']} "
                            f"CreationInfo CSV(s) + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
         if com["path"]:
@@ -317,7 +371,7 @@ class App:
             database, f = datablocks.build(database); findings += f
         if not run.has_blocking(findings):
             database, f = hardware.build(database); findings += f
-        if not run.gate(findings, self._emit, label="900 (300 + 520 + 700 prereqs)"):
+        if not self._gate(findings, label="900 (300 + 520 + 700 prereqs)"):
             return
         if "db_blocks" not in database:
             self._emit("WARN", "  a blocking prereq was downgraded but yielded no data - nothing further")
@@ -328,13 +382,20 @@ class App:
         database, fb = engine.build(database); proj += fb
         database, fc = coverage.build(database); proj += fc
         res = coverage.project(database)
-        run.render(proj, self._emit)
+        self._render(proj)
         st = res["stats"]
         self._emit("PASS", f"  910 coverage: {st['rows']} rows (sig {st['kinds']['signal']}/"
                            f"chan {st['kinds']['channel']}/struct {st['kinds']['structural']}), "
                            f"{st['orphans']} ORPHAN, {st['unplaced']} UNPLACED -> {res['txt']}")
 
     # --- chrome ---------------------------------------------------------------------------------- #
+    def _on_levels_changed(self) -> None:
+        """A Levels-dropdown toggle: apply the shown set live + persist it to app_config.yaml (FAIL/ERROR
+        are always included)."""
+        levels = {level for level, var in self._level_vars.items() if var.get()}
+        self.log.set_shown_levels(levels)
+        config.save_app_log_levels(levels)
+
     def _toggle_theme(self):
         self.mode = "light" if self.mode == "dark" else "dark"
         backend = theme.apply_theme(self.root, self.mode)

@@ -8,7 +8,10 @@ which only updates an existing row, so a freshly-shown finding can be treated im
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 from pipeline4.core import treatments
+from pipeline4.io import render
 
 
 def panel_rows(issues, registry: dict) -> list:
@@ -43,6 +46,16 @@ def filter_rows(rows, phase: str = "", severity: str = "") -> list:
             continue
         out.append(r)
     return out
+
+
+def apply_and_records(findings, path: str | None = None) -> tuple:
+    """Apply the treatment registry to `findings` (reconcile + write), then render the EFFECTIVE-severity
+    findings to structured records for the log. Returns `(applied, records)` - `applied` is the
+    `[(finding, effective_severity)]` (so the caller can check `treatments.should_halt`), `records` is the
+    `io.render.render_records` list (banners + clickable link spans). Used by the GUI's gate/render seam."""
+    applied = treatments.apply_and_reconcile(findings, path)
+    effective = [replace(finding, severity=eff) for finding, eff in applied]
+    return applied, render.render_records(effective)
 
 
 def apply_treatment(uid: str, level: str, finding_row: dict, path: str | None = None) -> None:

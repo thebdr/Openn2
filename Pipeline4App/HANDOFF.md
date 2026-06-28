@@ -11,16 +11,20 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **THE REBUILD IS COMPLETE: ALL 9 PHASES DONE** — 300 + 520 + 400 + 510 + 600 + 700 + 800 + 900
-  + **100 (Validation)** + the severity rollout S1–S6. Every phase is parity-verified vs PL3 and every GUI button
-  runs for real. (Out of scope by user decision: validation **150** diagnosis-slot + the **`accept`** treatment.)
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`e2c0f66`** (phase 100c, pushed).
-  **The working tree holds the UNCOMMITTED phase-100d chunk** (the FINAL chunk: NEW `domain/validation/phase.py`
-  + NEW `tests/unit/test_validation_phase.py` + `gui/app_main.py` (the "100" button) + CLAUDE.md + HANDOFF.md) —
-  implemented, gate green, **PL3 parity EXACT (596/596 findings, 0 diffs)**.
+- **Branch `pl4`**. **THE BACKEND REBUILD IS COMPLETE: ALL 9 PHASES DONE** — 300 + 520 + 400 + 510 + 600 + 700 +
+  800 + 900 + **100 (Validation)** + the severity rollout S1–S6. Every phase is parity-verified vs PL3 and every
+  GUI button runs for real. (Out of scope by user decision: validation **150** diagnosis-slot + the **`accept`**
+  treatment. Known gap to rebuild configurable: **phase 200 Fill** — see its section below.)
+- **THE GUI PORT IS THE ACTIVE EFFORT** — the live tracker + locked decisions are in **`GUI_PLAN.md`**.
+  **M0 (worker thread + registry + notebook + Run-all) · M1 (structured clickable log) · M2 (Findings panel) ·
+  M3 (Database Explorer, in-memory SQLite) are DONE.** NEXT: M4 (Run-all + sub-phase dropdowns) · M5 (Files) ·
+  M6 (Project Manager) · M0b (chrome: fonts/dark-titlebar/re-theme).
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`47addb9`** (GUI M3). **The working tree holds the
+  UNCOMMITTED GUI M1 chunk** (`gui/excel.py` + `gui/logview.py` rewrite + `gui/findings_view.py` +
+  `gui/app_main.py` + tests + docs) — gate green.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 233 tests green** (data-independent; GUI registry + findings + dbquery). Run from `Pipeline4App/`:
+- **Gate: 236 tests green** (data-independent; GUI registry + findings + dbquery). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -258,9 +262,10 @@ in `Pipeline4App/GUI_PLAN.md`** (replicate PL3's GUI + add the SSOT-native Findi
 `gui/phases.py` registry + the worker thread/queue-drain pump + a basic Run-all + the notebook scaffold (single
 -phase runs no longer freeze the window). **M2 (Findings panel) DONE (uncommitted):** a Treeview tab over
 `validation_issues` ⋈ the treatment registry with right-click 1-click treatments. **M3 (Database Explorer)
-DONE (uncommitted):** a SQL console tab over the SSOT (in-memory SQLite, `json_extract` + cross-table JOINs +
-sample queries; loads all 14 tables). **NEXT: M1** (the structured clickable log) — then M4 Run-all+dropdowns,
-M5 Files, M6 Project, M0b chrome. **Deferred by user decision** (not blockers): validation **150** (needs a
+DONE:** a SQL console tab over the SSOT (in-memory SQLite, `json_extract` + cross-table JOINs + sample queries;
+loads all 14 tables). **M1 (structured clickable log) DONE (uncommitted):** the LogView consumes
+`render_records` - clickable Sheet!Cell → Excel, errlink → treat, Show-PASS/SKIP. **NEXT: M4** (Run-all +
+sub-phase dropdowns) — then M5 Files, M6 Project, M0b chrome. (The detailed GUI tracker is `GUI_PLAN.md`.) **Deferred by user decision** (not blockers): validation **150** (needs a
 staging change touching the locked 300 parity) + the **`accept`** doc-mutating treatment (dropped). Possible
 future polish: the GUI grid/files/threading; a CLI; the engine (a real phase registry + worker thread); the
 transitional gate-reconcile-once-per-run fix. See `DESIGN.md` for the locked decisions.

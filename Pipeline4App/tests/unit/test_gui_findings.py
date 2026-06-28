@@ -51,10 +51,35 @@ def test_apply_treatment_create_and_update():
             config.use_builtin()
 
 
+def test_apply_and_records():
+    from pipeline4.core.finding import Finding
+    with tempfile.TemporaryDirectory() as d:
+        config.use_project(d)
+        try:
+            findings = [Finding(phase=110, type="addr_format", severity="FAIL", detail="bad", location="IO!G5"),
+                        Finding(phase=110, type="row_ok", severity="PASS", detail="ok", location="IO!O5")]
+            applied, recs = findings_view.apply_and_records(findings)
+            eq([eff for _f, eff in applied], ["FAIL", "PASS"], "effective severities (no treatments)")
+            line_recs = [r for r in recs if r.kind == "line"]
+            eq(len(line_recs), 2, "a record per finding")
+            eq(line_recs[0].level, "FAIL")
+            eq(line_recs[0].uid, findings[0].uid, "the FAIL record carries the finding uid (for the errlink)")
+            # render_records does NOT synthesize banners (the handler emits the PHASE banner as a plain line);
+            # only severity==PHASE findings render as banners, and plain findings carry none.
+            eq([r.kind for r in recs], ["line", "line"], "plain findings -> line records only, no banner")
+            # a treatment now downgrades the rendered level
+            findings_view.apply_treatment(findings[0].uid, "warn", {"phase": 110, "type": "addr_format"})
+            applied2, _r = findings_view.apply_and_records(findings)
+            eq(applied2[0][1], "WARN", "the registry downgrade is reflected in the records' effective severity")
+        finally:
+            config.use_builtin()
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_findings", [
         ("panel_rows_effective_severity", test_panel_rows_effective_severity),
         ("filter_rows", test_filter_rows),
         ("apply_treatment_create_and_update", test_apply_treatment_create_and_update),
+        ("apply_and_records", test_apply_and_records),
     ]))

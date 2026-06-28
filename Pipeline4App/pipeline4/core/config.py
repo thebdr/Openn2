@@ -212,6 +212,28 @@ def load_app_ui() -> dict:
     return {"log_levels": severity.resolve_set(raw) if raw else severity.default_shown()}
 
 
+def save_app_log_levels(levels) -> None:
+    """Persist the GUI's shown log levels to `app_config.yaml` `user_interface.log_levels` as first-char
+    codes in canonical severity order (FAIL/ERROR are always included - they cannot be hidden). Round-trips
+    the file so its comments survive. `levels` is a set/iterable of canonical level names (severity.LEVELS)."""
+    from ruamel.yaml import YAML
+    from ruamel.yaml.comments import CommentedSeq
+    from pipeline4.core import severity
+    shown = set(levels) | severity.HALTING | {"ERROR"}
+    codes = CommentedSeq(level[0] for level in severity.LEVELS if level in shown)
+    codes.fa.set_flow_style()                       # keep the [F, E, W, ...] one-line form
+    path = app_config_file()
+    yaml = YAML()                                   # round-trip mode - preserves comments
+    data = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            data = yaml.load(handle) or {}
+    data.setdefault("user_interface", {})["log_levels"] = codes
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        yaml.dump(data, handle)
+
+
 def load_params(path: str | None = None) -> dict:
     """Load the project params (the nested schema: iolist_params / matrix_params / validation_params /
     output). The four document paths (iolist/matrix + their *_previous - the latter reserved for the

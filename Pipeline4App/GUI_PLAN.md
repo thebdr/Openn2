@@ -53,10 +53,18 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   a headless construction smoke (9 buttons, 1 tab, drain wired); the live worker-run is the manual launch check.
   **DEFERRED to M0b** (chrome, independent verbatim ports): `fonts.py` (the Monaspace TTF) + `darktitle.py` +
   the `theme`/`LogView` re-theme.
-- **M1 — Structured clickable log** (PL3 parity; backend mostly done): `LogView.append_records` over
-  `render.render_records`, `Sheet!Cell` → Excel-at-cell (`gui/excel.py` COM port), `[FAIL]` errlink →
-  `treatments.set_treatment`, the Show-PASS/SKIP toggle. The validation handler feeds
-  `render.render_records(findings)` to `append_records`.
+- **M1 — Structured clickable log. DONE** (PL3 parity). `LogView` rewritten as a Frame+Text with v/h
+  scrollbars + `append_records` (over `io.render.render_records`): banners, level-coloured lines, **clickable
+  `Sheet!Cell` spans** → `gui/excel.py` (verbatim COM port; reuse an open Excel, graceful `os.startfile`
+  fallback) on `on_link`, and a treatable line's `[LEVEL]` is an **errlink** → right-click Treat
+  (fail/error/warn/skip/ignore/clear). A **Levels ▾ dropdown** (a checkbox per severity level; FAIL+ERROR
+  always shown + greyed/disabled) toggles visibility LIVE via per-level elide and **persists the combination to
+  `app_config.yaml`** (`config.save_app_log_levels`, comment-preserving round-trip). The GUI's
+  `_gate`/`_render` (replacing `run.gate`/`run.render` in the handlers) produce structured records via
+  `findings_view.apply_and_records` (apply the registry → render the EFFECTIVE-severity findings) posted
+  through the worker queue → the clickable log. `_on_link` resolves the doc basename → the configured workbook
+  → `excel.goto` (off-thread); `_on_errtreat` → `set_treatment` + refresh the Findings panel. Tests:
+  `apply_and_records` (+1).
 - **M2 — Findings panel. DONE** *(NEW)*: `gui/findings_view.py` (the pure join: `panel_rows` =
   `validation_issues` ⋈ the registry with the EFFECTIVE severity per uid, `filter_rows`, `apply_treatment` =
   create-or-update the registry row — more forgiving than `set_treatment` so a freshly-shown finding treats
