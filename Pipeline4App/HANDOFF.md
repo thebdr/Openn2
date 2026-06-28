@@ -21,12 +21,12 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   then REWORKED to the operator oracle `ButtonsLayout.xlsx`: full greyed-deferred button set + sub-buttons
   that RUN THEIR SUB-PHASE via `handler(only=n)` + wired Open buttons + equal-width/width-matched bar)
   are DONE.** NEXT: M5 (Files) · M6 (Project Manager) · M0b (chrome: fonts/dark-titlebar/re-theme).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`243b695`** (GUI M4; M0–M3 at
-  `d623509`/`3ec6996`/`47addb9`/`fbac770`). **Working tree is CLEAN** for PL4 — the only untracked PL4 path
-  is `config_project/user_input/` (the runtime treatment registry, gitignored-ish; leave it). M4 was
-  adversarially reviewed pre-commit (5-dimension workflow) and the 3 confirmed findings hardened (see
-  `GUI_PLAN.md` M4). The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App
-  config, Shared) — NOT ours; leave them.
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`d0ab114`** (GUI M4 + the oracle rework; M4 base at
+  `243b695`, M0–M3 at `d623509`/`3ec6996`/`47addb9`/`fbac770`). **Working tree is CLEAN** for PL4 — the only
+  untracked PL4 path is `config_project/user_input/` (the runtime treatment registry, gitignored-ish; leave
+  it). M4 + the rework were each adversarially reviewed pre-commit (5-dimension workflows); the confirmed
+  findings are hardened (see `GUI_PLAN.md` M4 — incl. the oracle slot-320 title fix). The repo root also
+  carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) — NOT ours; leave them.
   - The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before
     this session — NOT ours; leave them.
 - **Gate: 32 test FILES green** (data-independent; `test_gui_phasebar.py` added at M4). Run from `Pipeline4App/`:
