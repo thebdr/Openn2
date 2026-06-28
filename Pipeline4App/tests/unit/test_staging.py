@@ -122,6 +122,46 @@ def test_dup_signal_uid_findings():
     eq(staging._dup_findings(signals_table(cols)), [], "no rows -> no findings (the clean path)")
 
 
+def test_finalize_identity_ce_overwrite():
+    """_finalize_identity is idempotent + C&E-overwriting: the no-C&E pass yields combined_FLD == iol_FLD
+    and IsSorterArea '', and a SECOND pass once the matrix fields are present lifts combined_FLD to include
+    the C&E side + sets IsSorterArea. This idempotence is what makes the 310/320 split byte-exact."""
+    params = {"matrix_params": {"sorter_areas": [1]}}
+    row = {"functional_unit": "S1", "location": "+SG1", "device": "-B1",
+           "script_type": "DI1/2", "bit": "I0.0", "type": {"category": "Safety"},
+           "source_sheet": "NET", "source_row": 2}
+    staging._finalize_identity(params, [row])                       # the 310 pass: no C&E yet
+    eq(row["iol_FLD"], "S1+SG1-B1")
+    eq(row["combined_FLD"], "S1+SG1-B1", "no C&E -> combined == iol")
+    eq(row["IsSorterArea"], "", "no matrix areas -> not a sorter area")
+    eq(row["source_cell"], "NET!O2", "source_cell derived from the node sheet+row")
+    row["ce_functional_unit"] = "S1"; row["ce_location"] = "+CE"; row["ce_device"] = "-B1"
+    row["matrix_areas"] = ["AREA 1"]                                # the 320 pass: matrix.annotate has run
+    staging._finalize_identity(params, [row])
+    eq(row["combined_FLD"], "S1+SG1-B1 S1+CE-B1", "the C&E side is appended once it differs")
+    eq(row["IsSorterArea"], "yes", "AREA 1 is a configured sorter area")
+
+
+def test_annotate_cematrix_records_and_restamps():
+    """annotate_cematrix enriches the staged signals in place, re-stamps each uid from the (now C&E)
+    combined_FLD, and records the duplicate-uid findings to validation_issues. With no C&E document the
+    combined_FLD is unchanged (uid stable) and a shared key still surfaces one stg_dup_signal_uid WARN."""
+    from pipeline4.core.database import Database
+    from pipeline4.domain.diagnosis_entries import diagnosis_cabinets_table
+    table = signals_table(["functional_unit", "location", "device", "script_type", "bit"])
+    for _ in range(2):                                             # two rows share the stable key -> one uid
+        table.add_row({"functional_unit": "S1", "location": "+SG1", "device": "-B1", "script_type": "DI1/2",
+                       "bit": "I0.0", "type": {"category": "Safety"}, "source_cell": "NET!O2"})
+    table.add_row({"functional_unit": "S2", "location": "+SG2", "device": "-B2", "script_type": "DI1/2",
+                   "bit": "I0.1", "type": {"category": "Safety"}, "source_cell": "NET!O3"})
+    db = Database([table, diagnosis_cabinets_table()])
+    _db, findings = staging.annotate_cematrix(db, {"matrix_params": {}}, save=False)   # no matrix_path -> empty C&E
+    eq(len(findings), 1, "the shared-key rows surface one stg_dup_signal_uid WARN")
+    eq(findings[0].type, "stg_dup_signal_uid", "the dup finding container")
+    ok("validation_issues" in db, "the findings are recorded to validation_issues")
+    eq(db["signals"].rows[0]["combined_FLD"], "S1+SG1-B1", "no C&E doc -> combined_FLD == iol_FLD (uid stable)")
+
+
 def test_load_io_list_no_match_returns_empty():
     """When no sheet matches the pattern, load_io_list returns ([], []) - the predicate stage() turns into the
     blocking stg_no_io_sheet FAIL (replacing the old raise SystemExit). The FAIL emission + no-write is verified
@@ -146,5 +186,7 @@ if __name__ == "__main__":
         ("node_address_ranges_positional", test_node_address_ranges_positional),
         ("node_address_range_empty_when_no_addressed_rows", test_node_address_range_empty_when_no_addressed_rows),
         ("dup_signal_uid_findings", test_dup_signal_uid_findings),
+        ("finalize_identity_ce_overwrite", test_finalize_identity_ce_overwrite),
+        ("annotate_cematrix_records_and_restamps", test_annotate_cematrix_records_and_restamps),
         ("load_io_list_no_match_returns_empty", test_load_io_list_no_match_returns_empty),
     ]))

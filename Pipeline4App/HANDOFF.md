@@ -27,10 +27,11 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   IT from PL3], a finding's detail built in the AMBIENT `messages.active_lang(lang)` so the validation log +
   `.txt`/`.html` reports localize [PL3-faithful: uid hashes the localized detail]; plus the chrome via
   `core/i18n.py` + registry `name_key`/`label_key` + the Lang toggle, persisted) are DONE.** NEXT (the
-  planning side-chat order): **STEP 2** (300 staging granularity — split 310 Stage I/O List
-  / 320 Stage C&E Matrix, byte-identical signals.csv) · **STEP 3** M5 Files · M6 Project Manager · M0b chrome
-  (fonts/dark-titlebar/re-theme) · **STEP 4** ph200 Fill (CSV-driven, AFTER the GUI; confirm its 4 open
-  decisions first).
+  planning side-chat order): **STEP 2 DONE** (300 staging granularity — `staging.stage()` split into
+  `stage_iolist()` [oracle 310 Stage I/O List] + `annotate_cematrix()` [oracle 320 Stage C&E Matrix], the GUI
+  300 dropdown wired [310 -> partial, 320/header -> full], byte-identical `signals.csv`). NEXT: **STEP 3** M5
+  Files · M6 Project Manager · M0b chrome (fonts/dark-titlebar/re-theme) · **STEP 4** ph200 Fill (CSV-driven,
+  AFTER the GUI; confirm its 4 open decisions first).
 - **GIT STATE:** local **`pl4`** is at **`7473ace`** — **STEP 1 i18n + Monaspace font + dark/light theme
   compatibility COMMITTED** (the toolbar/notebook/status/title-bar now all follow the theme toggle). The
   startup-light-ttk fix: `darktitle.apply` runs LAST in `__init__` / in `_toggle_theme`, NOT inside
@@ -46,10 +47,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   Var font at size 13** [`gui/fonts.py` + `theme.apply_theme`; M0b fonts done]). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`. The GUI is a manual `python launch_gui.py` check (no
   headless GUI tests; each GUI milestone unit-tests its pure logic + a construction smoke).
-- **START THE NEXT SESSION HERE → `GUI_PLAN.md`** (the live GUI tracker). M0–M4 + STEP 1 i18n done; **NEXT =
-  STEP 2** (300 staging granularity — split `staging.stage()` into `stage_iolist()` + `annotate_cematrix()`
-  so 310/320 each do real work; 320 auto-runs 310; byte-identical `signals.csv`/`diagnosis_cabinets.csv` vs
-  the pre-split stage — a refactor, verify parity). Then **STEP 3** M5 Files (the 3-section tree + a CSV grid
+- **START THE NEXT SESSION HERE → `GUI_PLAN.md`** (the live GUI tracker). M0–M4 + STEP 1 i18n + STEP 2 (the
+  310/320 staging split: `stage_iolist` + `annotate_cematrix`, byte-identical `signals.csv`, GUI-verified)
+  done; **NEXT = STEP 3** M5 Files (the 3-section tree + a CSV grid
   through the codec + object editor + xlsx viewer + external-edit; PL3's `gui/files.py`/`grid.py`/
   `objedit.py`/`xlsxview.py`/`extedit.py` are the near-drop-in source) · M6 (Project Manager) · M0b
   (chrome: fonts/dark-titlebar/re-theme). The Run-all **stage-once** optimization stays deferred (optional).

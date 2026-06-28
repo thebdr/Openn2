@@ -9,6 +9,11 @@ Now also: the C&E enrichment (`matrix.annotate`), the POSITIONAL node address ra
 (`I_/Q_startByte/endByte`), and `IsSorterArea`. Still deferred to their phases (then the full real-data
 parity vs PL3 closes): the registry-derived names (`name_in_db` / `datablocks` / `plc_binding`),
 `subnet_name`, and the diagnosis / interface identity.
+
+Staging is split into two independently runnable legs (the oracle 310 / 320 buttons): `stage_iolist`
+reads the I/O List into the `signals` table WITHOUT the C&E (so `combined_FLD` == `iol_FLD`), and
+`annotate_cematrix` layers the Cause&Effect data on top, re-stamping the uid. `stage` runs both and is
+byte-identical to the former monolith; every downstream phase still just calls `stage`.
 """
 from __future__ import annotations
 
@@ -17,6 +22,7 @@ import os
 from pipeline4.core import config, run
 from pipeline4.core.database import Database
 from pipeline4.core.finding import Finding, record
+from pipeline4.core.keys import uid as content_uid
 from pipeline4.domain import identity, matrix
 from pipeline4.domain.diagnosis_entries import diagnosis_cabinets_table
 from pipeline4.domain.signals import signals_table
@@ -116,8 +122,10 @@ def _read_view(view, colmap, strike_exclude, signal_types) -> list:
     return rows
 
 
-def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
-    """Read the matched IoList sheets of `io_path` into staged signal rows. Returns (rows, matched_sheets)."""
+def _read_iolist(params: dict, signal_types: dict, io_path: str) -> tuple:
+    """Read the matched IoList sheets into RAW staged rows (the canonical columns + source provenance + the
+    resolved `type`), WITHOUT the C&E enrichment or the derived identity. Returns (rows, matched_sheets).
+    This is the read-only leg shared by `stage_iolist` (310) and `load_io_list`."""
     colmap = config.load_column_map("IoList")
     header_row = int(config.get_param(params, "iolist_params.header_row", 1) or 1)
     strike_exclude = str(config.get_param(params, "validation_params.global.strike_handling", "exclude")
@@ -126,7 +134,7 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
 
     # merge the per-type diagnosis attrs onto each type record BEFORE resolving (so the staged `type`
     # object carries in_diag/diag_logic/tristate/tristate_desc - in_diag also lights up the phase-400
-    # +DIAG auto-mirror). diag_desc is a template, resolved per-row below.
+    # +DIAG auto-mirror). diag_desc is a template, resolved in _finalize_identity.
     signal_diag = config.load_signal_diagnosis()
     for t in signal_types.values():
         d = signal_diag.get(t["type_id"].upper(), {})
@@ -138,15 +146,27 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
     views = workbook.open_sheets(io_path, sheet_pattern, header_row, doc_label=os.path.basename(io_path))
     matched = [v.name for v in views]
     if not matched:
-        return [], matched          # the caller (stage) emits the blocking stg_no_io_sheet FAIL
+        return [], matched          # the caller emits the blocking stg_no_io_sheet FAIL
 
     rows = []
     for view in views:
         rows.extend(_read_view(view, colmap, strike_exclude, signal_types))
     views[0].close()
+    return rows, matched
 
-    matrix.annotate(params, rows)   # C&E enrichment: matrix_areas / ce_* / numerazione_linea / areas_description
 
+def _finalize_identity(params: dict, rows: list) -> None:
+    """Derive each row's staging identity from its CURRENT fields: the I/O-List FLD + the PLC tag
+    name/table + the positional node ranges, AND the C&E-dependent `ce_FLD`/`combined_FLD`/`IsSorterArea`/
+    `diag_desc` (which read the `ce_*`/`matrix_areas` fields that `matrix.annotate` writes).
+
+    Idempotent and order-free, which is what makes the 310/320 split byte-exact: run it after the read
+    (the C&E fields absent -> `ce_FLD` '' -> `combined_FLD` == `iol_FLD`, `IsSorterArea` '') and AGAIN after
+    `matrix.annotate` (the C&E values now present overwrite the I/O-only ones) and you land on exactly the
+    monolithic result. `combined_FLD` is part of the signals uid key, so the caller re-stamps the uid after
+    the C&E pass."""
+    colmap = config.load_column_map("IoList")
+    signal_diag = config.load_signal_diagnosis()
     fu_col = next((m["column"] for m in colmap if m["canonical"] == "functional_unit"), "O")
     sorter_names = _sorter_area_names(params)
     for row in rows:
@@ -166,6 +186,17 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
             row["name_in_tagtable"] = ""
             row["tagtable"] = ""
     _add_node_address_ranges(rows)   # positional I/Q byte ranges: a node owns the rows beneath it
+
+
+def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
+    """Read the matched IoList sheets into FULLY enriched staged rows (read -> C&E annotate -> identity).
+    Returns (rows, matched_sheets). Retained as the combined read (and the no-match guard); `stage` itself
+    uses the `stage_iolist` / `annotate_cematrix` split, which reuses these same helpers."""
+    rows, matched = _read_iolist(params, signal_types, io_path)
+    if not matched:
+        return rows, matched        # the caller (stage) emits the blocking stg_no_io_sheet FAIL
+    matrix.annotate(params, rows)   # C&E enrichment: matrix_areas / ce_* / numerazione_linea / areas_description
+    _finalize_identity(params, rows)
     return rows, matched
 
 
@@ -223,40 +254,73 @@ def _add_node_address_ranges(rows) -> None:
     _flush(cur, ib, qb)
 
 
-def stage(params: dict | None = None) -> tuple:
-    """Phase 300: read the configured I/O List into a Database holding the `signals` table, record the
-    findings to `validation_issues`, save the Database, and return (database, findings). The single staging
-    entry point. A missing I/O sheet emits the blocking `stg_no_io_sheet` FAIL and returns WITHOUT writing
-    (`run.has_blocking` guard - the caller's `run.gate` logs + halts); a duplicate signal uid is a
-    `stg_dup_signal_uid` WARN."""
-    params = params or config.load_params()
-    signal_types = config.load_signal_types()
-    io_path = params.get("iolist_path")
-    colmap = config.load_column_map("IoList")
-    findings = []
-
-    table = signals_table([m["canonical"] for m in colmap])
-    cab_table = diagnosis_cabinets_table()
-    database = Database([table, cab_table])
-
-    rows, matched = load_io_list(params, signal_types, io_path)
-    if not matched:                                   # the required input is absent -> halt before anything
-        findings.append(_f("stg_no_io_sheet", "FAIL",
-                           f"no I/O sheet matched {config.get_param(params, 'iolist_params.sheets')!r} "
-                           f"in {io_path}", io_path or ""))
-        return database, findings                     # raw-FAIL guard: nothing written
-
-    for row in rows:
-        table.add_row(row)
-
-    findings += _dup_findings(table)                  # the GUI's post-stage dup check, now findings
-
-    cabinets = load_diagnosis_blocks(io_path)         # the diagnosis_cabinets SSOT (DiagnosisBlocks sheet)
+def _load_cabinets(io_path: str, cab_table) -> None:
+    """Fill the `diagnosis_cabinets` table from the DiagnosisBlocks sheet (an I/O-List-side read, so it
+    belongs to 310 / `stage_iolist`, not the C&E pass)."""
+    cabinets = load_diagnosis_blocks(io_path)
     for cid in sorted(cabinets):
         c = cabinets[cid]
         cab_table.add(cabinet_id=cid, index=c["index"], fld=c["fld"],
                       template_type=c["template_type"], swp=c["swp"])
 
+
+def stage_iolist(params: dict | None = None, save: bool = True) -> tuple:
+    """Phase 310 - Stage I/O List: read the I/O List into the `signals` table WITHOUT the C&E enrichment
+    (no matrix_areas / ce_* / numerazione_linea -> `combined_FLD` == `iol_FLD`, `IsSorterArea` ''), plus the
+    `diagnosis_cabinets` table; save the Database and return (database, findings). A missing I/O sheet emits
+    the blocking `stg_no_io_sheet` FAIL and returns WITHOUT writing (raw-FAIL guard). `annotate_cematrix`
+    (320) layers the C&E on top; `stage_iolist` then `annotate_cematrix` == the full `stage`. `save=False`
+    lets `stage` build in memory and write once after the C&E pass."""
+    params = params or config.load_params()
+    signal_types = config.load_signal_types()
+    io_path = params.get("iolist_path")
+    colmap = config.load_column_map("IoList")
+
+    table = signals_table([m["canonical"] for m in colmap])
+    cab_table = diagnosis_cabinets_table()
+    database = Database([table, cab_table])
+
+    rows, matched = _read_iolist(params, signal_types, io_path)
+    if not matched:                                   # the required input is absent -> halt before anything
+        return database, [_f("stg_no_io_sheet", "FAIL",
+                             f"no I/O sheet matched {config.get_param(params, 'iolist_params.sheets')!r} "
+                             f"in {io_path}", io_path or "")]   # raw-FAIL guard: nothing written
+
+    _finalize_identity(params, rows)                  # the I/O-List identity (C&E fields still absent)
+    for row in rows:
+        table.add_row(row)
+    _load_cabinets(io_path, cab_table)
+    if save:
+        database.save(config.database_dir())
+    return database, []
+
+
+def annotate_cematrix(database, params: dict | None = None, save: bool = True) -> tuple:
+    """Phase 320 - Stage C&E Matrix: enrich the already-staged `signals` (built by `stage_iolist`) with the
+    Cause&Effect data (`matrix_areas` / `ce_*` / `numerazione_linea` / `areas_description`) and the fields
+    that depend on it (`ce_FLD` / `combined_FLD` / `IsSorterArea` / `diag_desc`); RE-STAMP each row's uid
+    from the now-C&E `combined_FLD` (the uid key), record the `stg_dup_signal_uid` findings, save, and
+    return (database, findings)."""
+    params = params or config.load_params()
+    table = database["signals"]
+    matrix.annotate(params, table.rows)               # C&E enrichment, in place on the staged rows
+    _finalize_identity(params, table.rows)            # recompute the C&E-dependent identity (the rest idempotent)
+    for row in table.rows:                            # combined_FLD (the uid key) changed -> re-stamp
+        row["uid"] = content_uid(*(row.get(key) for key in table.key_columns))
+    findings = _dup_findings(table)                   # the post-stage dup check, on the final uids
     record(database, findings)                        # persist the facts to the validation_issues table
-    database.save(config.database_dir())
+    if save:
+        database.save(config.database_dir())
     return database, findings
+
+
+def stage(params: dict | None = None) -> tuple:
+    """Phase 300: the full staging - `stage_iolist` (310) then `annotate_cematrix` (320) - returning
+    (database, findings) with `signals` + `diagnosis_cabinets` + `validation_issues` saved. The single
+    staging entry point every downstream phase calls; BYTE-IDENTICAL to the pre-split monolith. A missing
+    I/O sheet halts after 310 WITHOUT writing (the `run.has_blocking` guard)."""
+    params = params or config.load_params()
+    database, findings = stage_iolist(params, save=False)
+    if run.has_blocking(findings):                    # no I/O sheet -> halt before the C&E pass, nothing written
+        return database, findings
+    return annotate_cematrix(database, params, save=True)

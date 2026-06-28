@@ -49,7 +49,7 @@ def test_kinds_and_enablement():
     opens = {s.number for p in phases.PHASES for s in p.subs if s.kind == "open"}
     eq(opens, {160, 170, 180, 190, 330, 420, 530, 540, 630, 640, 730, 840, 850, 930}, "the open buttons")
     disabled = {s.number for p in phases.PHASES for s in p.subs if not s.enabled}
-    eq(disabled, {150, 155, 156, 320, 430, 810, 840, 920}, "the deferred/unported (greyed) buttons")
+    eq(disabled, {150, 155, 156, 430, 810, 840, 920}, "the deferred/unported (greyed) buttons (320 wired at STEP 2)")
     specials = {s.number for p in phases.PHASES for s in p.subs if s.kind == "special"}
     eq(specials, {155, 156, 430}, "the special (Clean / custom-interface) buttons")
     for n in (160, 330, 530, 930):                       # a sampling of wired opens

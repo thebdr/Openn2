@@ -369,17 +369,27 @@ class App:
                            f"(log only; the 100 header writes the reports)")
 
     def _run_staging(self, only=None):
-        """Phase 300: read the configured I/O List -> the signals table -> Database/signals.csv. PL4's
-        staging IS the IO-Database write (oracle 320 is greyed), so 310 == the whole phase."""
+        """Phase 300: stage the configured I/O List -> the signals table -> Database/signals.csv. The oracle
+        splits it: 310 Stage I/O List (`stage_iolist` - I/O List only, no C&E) / 320 Stage C&E Matrix (the
+        full staging = I/O List + the Cause&Effect enrichment). 300/320 are byte-identical to the monolith."""
         from pipeline4.core import config
         from pipeline4.domain import staging
-        self._emit("PHASE", "310 Stage I/O List" if only == 310 else "300 Documents Staging")
         self._status("staging…")
-        database, findings = staging.stage()
-        if not self._gate(findings, label="300 Documents Staging"):
+        if only == 310:
+            self._emit("PHASE", f"310 {i18n.tr('pb_stage_iolist', self.lang)}")
+            database, findings = staging.stage_iolist()
+            label = "310 Stage I/O List"
+        else:
+            key = "pb_stage_cematrix" if only == 320 else "ph_staging"
+            self._emit("PHASE", f"{only or 300} {i18n.tr(key, self.lang)}")
+            database, findings = staging.stage()
+            label = f"{only or 300} staging"
+        if not self._gate(findings, label=label):
             return
         signals = database["signals"]
-        self._emit("PASS", f"  staged {len(signals)} signals -> {os.path.join(config.database_dir(), 'signals.csv')}")
+        suffix = "  (I/O List only - run 320 for the C&E)" if only == 310 else ""
+        self._emit("PASS", f"  staged {len(signals)} signals{suffix} "
+                           f"-> {os.path.join(config.database_dir(), 'signals.csv')}")
 
     def _run_data_blocks(self, only=None):
         """Phase 500. only=520: stage -> 520 (db_members/db_blocks/instance_dbs + write-back) -> the GlobalDB

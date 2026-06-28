@@ -57,8 +57,8 @@ PHASES = (
         Sub(190, "pb_open_val_logs", kind="open", opens="validation_logs"),
     )),
     Phase(300, "ph_staging", handler="_run_staging", subs=(
-        Sub(310, "pb_stage_iolist"),
-        Sub(320, "pb_stage_cematrix", enabled=False),                    # greyed until STEP 2 wires the C&E-staging split
+        Sub(310, "pb_stage_iolist"),                                     # stage_iolist: I/O List only (no C&E)
+        Sub(320, "pb_stage_cematrix"),                                   # stage: I/O List + C&E (the full staging)
         Sub(330, "pb_open_io_database", kind="open", opens="database"),
     )),
     Phase(400, "ph_interfaces", handler="_run_interfaces", requires=(300, 520), subs=(

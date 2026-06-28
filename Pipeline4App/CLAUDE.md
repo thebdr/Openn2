@@ -117,6 +117,20 @@ one workbook reader (by column position per `column_map`), drops Skip-Reason + s
   shared uid). On success `stage` `finding.record`s into `validation_issues` + saves. **PARITY: `signals.csv` +
   `diagnosis_cabinets.csv` byte-identical to pre-S3** (verified new-vs-HEAD; only `validation_issues.csv` is added,
   empty on clean data). The 4 GUI handlers accumulate staging + 520 findings and call `run.gate` ONCE (see GUI note).
+- **STEP 2 - the 310/320 split DONE** (parity-locked): `stage()` is now `stage_iolist()` (oracle **310 Stage
+  I/O List**) then `annotate_cematrix()` (oracle **320 Stage C&E Matrix**), composed in memory. `stage_iolist`
+  reads the I/O List into the `signals` table WITHOUT the C&E (no `matrix.annotate` -> `ce_*`/`matrix_areas`
+  absent -> `combined_FLD` == `iol_FLD`, `IsSorterArea` '') + the `diagnosis_cabinets` table; `annotate_cematrix`
+  runs `matrix.annotate` on the staged rows, recomputes the C&E-dependent identity, **re-stamps each uid** from
+  the now-C&E `combined_FLD` (the uid key), records the `stg_dup_signal_uid` findings, saves. Shared helpers
+  `_read_iolist` (read-only) + `_finalize_identity` (IDEMPOTENT: the no-C&E pass and the post-`annotate` pass
+  converge -> the split is byte-exact); `load_io_list` retained as their composition for the no-match guard +
+  the tests. The GUI 300 dropdown wires **310 -> `stage_iolist`** (partial, no C&E) and **320 / the 300 header
+  -> `stage`** (full); `phases.py` un-greys 320. PL4 reinterprets the oracle's 320 (PL3 = "Generate IO Database",
+  moot under PL4's auto-save) as the C&E-staging leg. **PARITY: `stage()` byte-identical to the pre-split monolith**
+  - `signals.csv` (130802 B) + `diagnosis_cabinets.csv` + `validation_issues.csv` 0 diffs (verified new-vs-stash).
+  Tests: `test_staging.py` (+`finalize_identity_ce_overwrite` [the idempotent/overwrite contract] +
+  `annotate_cematrix_records_and_restamps`); GUI verified on screen (310 then 320 over real data, 269 signals).
 
 ## Phase 520 — Data Blocks — DONE (520a/b/c; InstanceDBs.csv deferred to 800)
 `domain/dbtemplate.py` + `domain/datablocks.py` + `domain/db_members.py` + `domain/datablock_xml.py`. The
