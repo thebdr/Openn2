@@ -36,28 +36,30 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `config.use_project`) · **M0b chrome remainder** (darktitle + the full light/dark re-theme - landed in
   STEP 1). NEXT: **STEP 4** ph200 Documents Fill Out (CSV-driven, the LAST backend effort; confirm its 4 open
   decisions first).
-- **GIT STATE:** local **`pl4`** is at **`c08d4d1`** and **PUSHED** — `origin/pl4` synced through it. Recent
-  milestones: **`c08d4d1`** GUI M6 Project Manager (STEP 3 complete) · **`a5b8cb6`** M5 Files tab · **`5da675c`**
-  STEP 2 (the 310/320 staging split) · **`7473ace`** STEP 1 (i18n + Monaspace font + dark/light theme
-  compatibility). Standing directive: **push on every major milestone** (Claude decides what
-  counts), so origin tracks the latest milestone without asking. M4 base at `243b695`, M0–M3 at
+- **GIT STATE:** local **`pl4`** is at **`2ba6990`** and **PUSHED** — `origin/pl4` synced through it. Recent
+  milestones: **`2ba6990`** STEP 4 / ph200 **210 operable** (CSV-driven script-type fill) · **`0f3061a`** 210a
+  (the classification engine, parity 273/0) · **`c08d4d1`** STEP 3 (M5 Files + M6 Project Manager) · **`5da675c`**
+  STEP 2 (the 310/320 staging split) · **`7473ace`** STEP 1 (i18n + font + dark/light theme). Standing
+  directive: **push on every major milestone** (Claude decides what counts), so origin tracks the latest
+  milestone without asking. M4 base at `243b695`, M0–M3 at
   `d623509`/`3ec6996`/`47addb9`/`fbac770`. `config_project/user_input/*.csv`
   (the runtime treatment registry) is gitignored (matching PL3). The repo root also carries unrelated pre-existing
   edits (Openn3App, Pipeline3App config, Shared) — NOT ours; leave them.
-- **Gate: 38 test FILES green** (data-independent; `test_project.py` added at M6; `test_gui_files.py` added at M5; `test_i18n.py` +
+- **Gate: 41 test FILES green** (data-independent; `test_rule_expr.py` + `test_fillout_classify.py` + `test_fillout_fill.py` added at STEP 4 / ph200 210; `test_project.py` added at M6; `test_gui_files.py` added at M5; `test_i18n.py` +
   `test_validation_i18n.py` + `test_app_config.py` + `test_gui_fonts.py` added at STEP 1; STEP 1 also added the **always-plural** cosmetic [no `(s)`/`/i` hedge],
   a **log-viewer Font dropdown** 10/12/14 [`LogView.set_font_size`, persisted], and the **app-wide Monaspace Neon
   Var font at size 13** [`gui/fonts.py` + `theme.apply_theme`; M0b fonts done]). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`. The GUI is a manual `python launch_gui.py` check (no
   headless GUI tests; each GUI milestone unit-tests its pure logic + a construction smoke).
 - **START THE NEXT SESSION HERE → `GUI_PLAN.md`** (the live GUI tracker). **M0–M6 + STEP 1 i18n + STEP 2 +
-  STEP 3 done** — the GUI port is feature-complete bar polish (M7): M5 Files tab + M6 Project Manager
-  (`pipeline4/project/`: state+project, a toolbar [Project ▾] + title indicator + auto-reopen, routed by
-  `config.use_project`) + M0b chrome remainder all landed. **NEXT = STEP 4** ph200 Documents Fill Out — the
-  LAST backend effort (PL4 currently requires a PRE-FILLED I/O List; ph200 computes script_type/index/diag).
-  Confirm its 4 open decisions before building. The Run-all **stage-once** optimization stays deferred
-  (optional); **M7 polish** (theme/size persistence, log-to-file) is the remaining GUI tail. See the
-  `## phase 200 (Fill)` section below.
+  STEP 3 done; STEP 4 (ph200) IN PROGRESS.** GUI port is feature-complete bar polish (M7). **STEP 4 / ph200
+  Documents Fill Out** (CSV-rule-driven; the spec + decisions + grammar are in **`PH200_SPEC.md`**, the living
+  contract): **210 (Fill Script Type) DONE + operable** - `core/rule_expr.py` (reusable expression engine) +
+  `config_project/input_docs/gate_rules.csv` + `script_type_rules.csv` + `domain/fillout/` (classify + reader
+  + fill); parity 273/0 vs PL3, doc-only in-place fill (backup + no-op delete, Mode-1/2). **NEXT = ph200 220**
+  (§7 index = OBJECT GROUPING) then 230/240 (§8 diag). Each: re-confirm PL3 mechanics in PH200_SPEC, build,
+  parity-check, then add to the fill + re-include ph200 in Run-all. **Process: each major phase gets a spec
+  review before coding** (the user reviews my understanding; see PH200_SPEC). Then **M7 polish** (the GUI tail).
 - **SEVERITY model (COMPLETE — historical detail; the rollout S1–S6 is done).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
   first-char-addressable. The GUI filter (`app_config.yaml user_interface.log_levels`, default `[F,E,W,I,S,P,D]`)
