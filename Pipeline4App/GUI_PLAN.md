@@ -142,8 +142,17 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   after each run + on a theme toggle [`set_theme` re-themes the text pane]). Tests: `test_gui_files.py` (7).
   GUI-verified on screen: the 3-section tree over the real project, the CSV grid (`db_blocks.csv`), the YAML
   text pane (`app_config.yaml`), and the light/dark toggle following through.
-- **M6 — Project Manager**: port `project/project.py` + `state.py` (folder projects, persisted root, recent,
-  auto-reopen) + the toolbar cluster. `config.use_project()` already routes the loaders/Database/Output.
+- **M6 — Project Manager. DONE** *(STEP 3 complete)*: `pipeline4/project/` (clean-room port of PL3's,
+  tested) - `state.py` (`%LOCALAPPDATA%/Pipeline4/state.json`: projects_root + recent + last_opened, storing
+  project ROOT folders) + `project.py` (`is_project` [a folder with config_project/project_params.yaml],
+  `open_project` [validate -> `config.use_project` + push_recent], `close_project` [`use_builtin` + clear
+  last], `new_project` [scaffold: copy the builtin config_project + Database/+Output/, then open],
+  `auto_reopen` [re-point at last_opened on launch]). Wired into `app_main`: a toolbar **Project ▾**
+  menubutton (New / Open / Recent ▸ [postcommand-rebuilt, marks the active] / Set projects root / Close,
+  Close disabled on builtin), `auto_reopen()` at launch, an active-project **title indicator**
+  (`...  -  <name>` / `builtin (Shared)`), and `_apply_project_switch` (retitle + reload Files/Explorer/
+  Findings against the new config/Database). i18n `tb_project`/`pm_*` keys (EN/IT). Tests: `test_project.py`
+  (6). GUI-verified on screen: the Project ▾ menu + the builtin title marker.
 - **i18n (EN/IT) — DONE (STEP 1, first-class, NOT polish).** The POINT of i18n here is the operator-facing
   **validation LOGS + reports** (an Italian operator must read the findings in Italian), with the chrome a
   secondary benefit.

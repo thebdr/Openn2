@@ -26,6 +26,7 @@ from pipeline4.gui.files_panel import FilesPanel
 from pipeline4.gui.findings_panel import FindingsPanel
 from pipeline4.gui.logview import LogView
 from pipeline4.gui.phasebar import PhaseBar
+from pipeline4.project import project, state
 
 APP_TITLE = "Pipeline4 - SSOT database build"
 
@@ -40,13 +41,18 @@ class App:
         app_ui = config.load_app_ui()
         self.lang = app_ui["language"]        # en | it (live-toggled by the Lang button, persisted)
         shown0 = app_ui["log_levels"]
-        root.title(APP_TITLE)
+        self._project = project.auto_reopen()  # re-point config at the last-opened project (None = builtin)
+        self._set_title()
         root.geometry("1180x720")
         backend = theme.apply_theme(root, self.mode)
 
         toolbar = ttk.Frame(root)
         toolbar.pack(side="top", fill="x", padx=8, pady=(8, 4))
         ttk.Label(toolbar, text="PIPELINE4", font=(theme.MONO_FONT[0], 14, "bold")).pack(side="left", padx=(2, 14))
+        self._tb_project = ttk.Menubutton(toolbar, text=i18n.tr("tb_project", self.lang) + " ▾")
+        self._project_menu = tk.Menu(self._tb_project, tearoff=0, postcommand=self._refresh_project_menu)
+        self._tb_project.configure(menu=self._project_menu)
+        self._tb_project.pack(side="left", padx=(0, 10))
         self._tb_theme = ttk.Button(toolbar, text=i18n.tr("tb_theme", self.lang), command=self._toggle_theme)
         self._tb_theme.pack(side="left", padx=2)
         self._tb_clear = ttk.Button(toolbar, text=i18n.tr("tb_clear_log", self.lang), command=self._clear)
@@ -257,6 +263,86 @@ class App:
             self.log.append("INFO", f"  opened {target}")
         except Exception as exc:  # noqa: BLE001
             self.log.append("WARN", f"  could not open {target}: {exc}")
+
+    # --- the Project Manager (M6) --------------------------------------------------------------- #
+    def _set_title(self):
+        name = project.project_name(self._project) if self._project else i18n.tr("pm_builtin", self.lang)
+        self.root.title(f"{APP_TITLE}  -  {name}")
+
+    def _refresh_project_menu(self):
+        """Rebuild the Project ▾ menu each time it opens (so Recent + the active marker stay current)."""
+        menu = self._project_menu
+        menu.delete(0, "end")
+        menu.add_command(label=i18n.tr("pm_new", self.lang) + "…", command=self._project_new)
+        menu.add_command(label=i18n.tr("pm_open", self.lang) + "…", command=self._project_open)
+        recents = state.recent_projects()
+        recent_menu = tk.Menu(menu, tearoff=0)
+        for root in recents:
+            mark = "• " if self._project and os.path.abspath(root) == os.path.abspath(self._project) else "   "
+            recent_menu.add_command(label=f"{mark}{project.project_name(root)}  ({root})",
+                                    command=lambda r=root: self._project_switch_to(r))
+        if not recents:
+            recent_menu.add_command(label=i18n.tr("pm_no_recent", self.lang), state="disabled")
+        menu.add_cascade(label=i18n.tr("pm_recent", self.lang), menu=recent_menu)
+        menu.add_command(label=i18n.tr("pm_set_root", self.lang) + "…", command=self._project_set_root)
+        menu.add_separator()
+        menu.add_command(label=i18n.tr("pm_close", self.lang), command=self._project_close,
+                         state="normal" if self._project else "disabled")
+
+    def _apply_project_switch(self, root):
+        """Re-point everything at the now-active project `root` (None = builtin): retitle + reload the
+        Files tree, the Database explorer, and the Findings panel against the new config/Database."""
+        self._project = root
+        self._set_title()
+        self.files.set_sections(self._file_sections())
+        self.explorer.refresh()
+        self.findings.refresh()
+        where = project.project_name(root) if root else i18n.tr("pm_builtin", self.lang)
+        self.log.append("PHASE", f"project -> {where}")
+
+    def _project_switch_to(self, root):
+        try:
+            self._apply_project_switch(project.open_project(root))
+        except (FileNotFoundError, OSError) as error:
+            self.log.append("ERROR", f"  could not open project {root}: {error}")
+
+    def _project_open(self):
+        from tkinter import filedialog
+        chosen = filedialog.askdirectory(parent=self.root, title=i18n.tr("pm_open", self.lang),
+                                         initialdir=state.projects_root())
+        if not chosen:
+            return
+        if not project.is_project(chosen):
+            self.log.append("ERROR", f"  not a project folder (no config_project/project_params.yaml): {chosen}")
+            return
+        self._project_switch_to(chosen)
+
+    def _project_new(self):
+        from tkinter import filedialog, simpledialog
+        parent = filedialog.askdirectory(parent=self.root, title=i18n.tr("pm_new_parent", self.lang),
+                                         initialdir=state.projects_root())
+        if not parent:
+            return
+        name = simpledialog.askstring(i18n.tr("pm_new", self.lang), i18n.tr("pm_new_name", self.lang),
+                                      parent=self.root)
+        if not name or not name.strip():
+            return
+        try:
+            self._apply_project_switch(project.new_project(parent, name.strip()))
+        except (FileExistsError, OSError) as error:
+            self.log.append("ERROR", f"  could not create project: {error}")
+
+    def _project_set_root(self):
+        from tkinter import filedialog
+        chosen = filedialog.askdirectory(parent=self.root, title=i18n.tr("pm_set_root", self.lang),
+                                         initialdir=state.projects_root())
+        if chosen:
+            state.set_projects_root(chosen)
+            self.log.append("INFO", f"  projects root -> {chosen}")
+
+    def _project_close(self):
+        project.close_project()
+        self._apply_project_switch(None)
 
     def _file_sections(self):
         """The 3 Files-tree sections under the ACTIVE config/project (re-resolved each refresh so a future
@@ -622,9 +708,12 @@ class App:
         self._levels_mb.configure(text=i18n.tr("tb_levels", self.lang) + " ▾")
         self._tb_font_label.configure(text=i18n.tr("tb_font", self.lang))
         self._tb_lang.configure(text=f"{i18n.tr('tb_lang', self.lang)}: {self.lang.upper()}")
+        self._tb_project.configure(text=i18n.tr("tb_project", self.lang) + " ▾")
         self.notebook.tab(self._log_tab, text=i18n.tr("tab_log", self.lang))
+        self.notebook.tab(self._files_tab, text=i18n.tr("tab_files", self.lang))
         self.notebook.tab(self._findings_tab, text=i18n.tr("tab_findings", self.lang))
         self.notebook.tab(self._explorer_tab, text=i18n.tr("tab_explorer", self.lang))
+        self._set_title()                                    # re-localize the builtin/project title marker
 
     def _toggle_theme(self):
         from pipeline4.gui import darktitle

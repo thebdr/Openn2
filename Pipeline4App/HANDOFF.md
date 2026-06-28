@@ -29,12 +29,13 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `core/i18n.py` + registry `name_key`/`label_key` + the Lang toggle, persisted) are DONE.** NEXT (the
   planning side-chat order): **STEP 2 DONE** (300 staging granularity — `staging.stage()` split into
   `stage_iolist()` [oracle 310 Stage I/O List] + `annotate_cematrix()` [oracle 320 Stage C&E Matrix], the GUI
-  300 dropdown wired [310 -> partial, 320/header -> full], byte-identical `signals.csv`). **STEP 3 IN PROGRESS**:
-  **M5 Files tab DONE** (view-only: the 3-section tree + CSV/xlsx grid + text pane + Open-externally, ttk-only,
-  `gui/files_view`+`files_panel`+`extedit`) and **M0b chrome remainder DONE** (darktitle + the full light/dark
-  re-theme - landed in STEP 1). NEXT: **STEP 3 / M6 Project Manager** (`config.use_project` + a toolbar
-  [Project ▾]: folder projects, persisted root, recent, auto-reopen) · **STEP 4** ph200 Fill (CSV-driven,
-  AFTER the GUI; confirm its 4 open decisions first).
+  300 dropdown wired [310 -> partial, 320/header -> full], byte-identical `signals.csv`). **STEP 3 DONE**:
+  **M5 Files tab** (view-only: the 3-section tree + CSV/xlsx grid + text pane + Open-externally, ttk-only,
+  `gui/files_view`+`files_panel`+`extedit`) · **M6 Project Manager** (`pipeline4/project/` state+project, a
+  toolbar [Project ▾] New/Open/Recent/Set-root/Close + title indicator + auto-reopen; routed by
+  `config.use_project`) · **M0b chrome remainder** (darktitle + the full light/dark re-theme - landed in
+  STEP 1). NEXT: **STEP 4** ph200 Documents Fill Out (CSV-driven, the LAST backend effort; confirm its 4 open
+  decisions first).
 - **GIT STATE:** local **`pl4`** is at **`a5b8cb6`** and **PUSHED** — `origin/pl4` synced through it. Recent
   milestones: **`a5b8cb6`** GUI M5 Files tab (+ M0b chrome remainder marked done) · **`5da675c`** STEP 2 (the
   310/320 staging split) · **`7473ace`** STEP 1 (i18n + Monaspace font + dark/light theme compatibility incl.
@@ -43,20 +44,20 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `d623509`/`3ec6996`/`47addb9`/`fbac770`. `config_project/user_input/*.csv`
   (the runtime treatment registry) is gitignored (matching PL3). The repo root also carries unrelated pre-existing
   edits (Openn3App, Pipeline3App config, Shared) — NOT ours; leave them.
-- **Gate: 37 test FILES green** (data-independent; `test_gui_files.py` added at M5; `test_i18n.py` +
+- **Gate: 38 test FILES green** (data-independent; `test_project.py` added at M6; `test_gui_files.py` added at M5; `test_i18n.py` +
   `test_validation_i18n.py` + `test_app_config.py` + `test_gui_fonts.py` added at STEP 1; STEP 1 also added the **always-plural** cosmetic [no `(s)`/`/i` hedge],
   a **log-viewer Font dropdown** 10/12/14 [`LogView.set_font_size`, persisted], and the **app-wide Monaspace Neon
   Var font at size 13** [`gui/fonts.py` + `theme.apply_theme`; M0b fonts done]). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`. The GUI is a manual `python launch_gui.py` check (no
   headless GUI tests; each GUI milestone unit-tests its pure logic + a construction smoke).
-- **START THE NEXT SESSION HERE → `GUI_PLAN.md`** (the live GUI tracker). M0–M5 + STEP 1 i18n + STEP 2 (the
-  310/320 staging split) done; **M5 Files tab DONE** (view-only: 3-section tree + CSV/xlsx grid + text pane +
-  Open-externally, ttk-only - `gui/files_view`+`files_panel`+`extedit`, GUI-verified) and **M0b chrome
-  remainder DONE** (darktitle + the light/dark re-theme, in STEP 1). **NEXT = STEP 3 / M6 Project Manager**
-  (port PL3's `project/project.py` + `state.py`: folder projects, persisted root, recent, auto-reopen + a
-  toolbar [Project ▾] cluster; `config.use_project()` already routes the loaders/Database/Output). The Run-all
-  **stage-once** optimization stays deferred (optional). The backend `## phase 200 (Fill)` section below is the
-  other open backend item (STEP 4).
+- **START THE NEXT SESSION HERE → `GUI_PLAN.md`** (the live GUI tracker). **M0–M6 + STEP 1 i18n + STEP 2 +
+  STEP 3 done** — the GUI port is feature-complete bar polish (M7): M5 Files tab + M6 Project Manager
+  (`pipeline4/project/`: state+project, a toolbar [Project ▾] + title indicator + auto-reopen, routed by
+  `config.use_project`) + M0b chrome remainder all landed. **NEXT = STEP 4** ph200 Documents Fill Out — the
+  LAST backend effort (PL4 currently requires a PRE-FILLED I/O List; ph200 computes script_type/index/diag).
+  Confirm its 4 open decisions before building. The Run-all **stage-once** optimization stays deferred
+  (optional); **M7 polish** (theme/size persistence, log-to-file) is the remaining GUI tail. See the
+  `## phase 200 (Fill)` section below.
 - **SEVERITY model (COMPLETE — historical detail; the rollout S1–S6 is done).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
   first-char-addressable. The GUI filter (`app_config.yaml user_interface.log_levels`, default `[F,E,W,I,S,P,D]`)

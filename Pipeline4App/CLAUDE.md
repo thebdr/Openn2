@@ -555,16 +555,22 @@ text is ported verbatim into each finding's `detail`.
   + populating `diag_block_name` at staging, which would touch the locked 300 parity) + the **`accept`**
   doc-mutating treatment (dropped).
 
-## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0–M5 + STEP 1 i18n + STEP 2 DONE; see `GUI_PLAN.md`)
-**M5 — Files tab DONE** (view-only): a notebook **Files** tab (`gui/files_panel.py` + the Tk-free
+## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0–M6 + STEP 1 i18n + STEP 2 + STEP 3 DONE; see `GUI_PLAN.md`)
+**STEP 3 DONE (M5 Files + M6 Project Manager + M0b chrome remainder).**
+**M5 — Files tab** (view-only): a notebook **Files** tab (`gui/files_panel.py` + the Tk-free
 `gui/files_view.py`, tested) - a 3-section tree (Project configuration / User editable files / Generated
 output, resolved from the active config/project) with read-only viewers: `.csv` -> a Treeview grid, `.xlsx`
 -> a grid + sheet picker (openpyxl `data_only`, capped), text/yaml/json/xml -> a monospace pane; each with a
 path strip + **Open externally** / **Open folder** (`gui/extedit.py`, port of PL3's LibreOffice/OS-default
-open + reveal). ttk-only (no tksheet/ruamel dep; in-app editing waits on the codec-write path). **M0b chrome
-remainder DONE** (in STEP 1): `gui/darktitle.py` + the full light/dark re-theme (`set_theme` on LogView/
-PhaseBar/DatabaseExplorer/FilesPanel). NEXT: **M6 Project Manager** (`config.use_project` + a toolbar
-[Project ▾]) · then STEP 4 ph200.
+open + reveal). ttk-only (no tksheet/ruamel dep; in-app editing waits on the codec-write path).
+**M6 — Project Manager**: `pipeline4/project/` (`state.py` = `%LOCALAPPDATA%/Pipeline4/state.json` recent/
+last/root; `project.py` = `is_project`/`open_project`/`close_project`/`new_project`/`auto_reopen` over a
+project ROOT folder routed by `config.use_project`) + a toolbar **Project ▾** menubutton (New/Open/Recent/
+Set root/Close) + an active-project **title indicator** + auto-reopen on launch + `_apply_project_switch`
+(reload Files/Explorer/Findings against the new config/Database). Tests: `test_project.py` (6).
+**M0b chrome remainder** (in STEP 1): `gui/darktitle.py` + the full light/dark re-theme (`set_theme` on
+LogView/PhaseBar/DatabaseExplorer/FilesPanel). NEXT: **STEP 4** ph200 (Documents Fill Out) - the last
+backend effort.
 **Backend status: 8 of the 9 generative phases are built (300/520/400/510/600/700/800/900/100); ph200
 (Documents Fill Out) is NOT built — PL4 reads script_type/index/diag, it does not compute them, so it
 currently requires a PRE-FILLED I/O List. ph200 is the last backend effort (STEP 4).** The GUI port
