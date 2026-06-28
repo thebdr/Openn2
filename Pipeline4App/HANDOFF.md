@@ -20,7 +20,7 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   implemented, gate green, **PL3 parity EXACT (596/596 findings, 0 diffs)**.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 222 tests green** (data-independent). Run from `Pipeline4App/`:
+- **Gate: 226 tests green** (data-independent; +4 GUI registry). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -224,11 +224,40 @@ EXACT: PL4 596 findings == PL3 596, 0 diffs** in the tuple `(phase, type, norm(l
 4 validators over the real docs (`scratchpad/parity_100.py`, PL3 fed PL4's staged rows). Real-data counts: 341
 PASS / 239 SKIP / 12 INFO / 4 WARN / 0 FAIL.
 
+## NEXT BACKEND SESSION — phase 200 (Fill / classification), built CONFIGURABLE (user-flagged)
+**Gap:** PL4 never built **phase 200** (PL3's `domain/iolist_diag/` populator). PL4 reads the source I/O List
+fresh and ASSUMES it arrives pre-filled (`script_type`/`index`/`diag_cabinet`/`diag_bit` present); if a raw doc
+isn't pre-classified, staging has nothing to read. PL3 COMPUTES those in code: `script_type.py` (the §6
+In/Out/Node type ladder — **hard-coded conditions**, the pain point), `index_assign.py` (§7 per-family
+contiguous index), `diag_alloc.py` (§8 cabinet/bit, idempotent + stable IDs), `blocks.py` (the DiagnosisBlocks
+sheet), written surgically in place via `io/xlsx_edit` (which PL4 already has).
+**The opportunity (user's directive):** the hard-coded classification makes adding/changing a type hard — make
+it **CSV-DRIVEN**. A rules CSV (condition → resulting script_type) replaces the §6 ladder so a new type is a
+config edit, not code.
+**Decisions for that session (don't pre-bake):**
+1. **CSV home:** a dedicated `config_project/input_docs/script_type_rules.csv` vs extend `signal_types.csv`
+   (the user is open to either). A dedicated rules CSV keeps the type SCHEMA (signal_types) separate from the
+   CLASSIFICATION rules — likely cleaner, but confirm.
+2. **The rule grammar (the crux):** how to express a condition over the raw IoList columns (In/Out/Node, the
+   description keywords, the ENC/FA/RES/Z/R special cases). Candidate: reuse the existing predicate DSL from
+   `dbtemplate.py` (`numeric()`/`=`/`!=`/`~/re/`/`in[…]` + `and`/`or`/`not`/`()`) — already ported, tested, and
+   familiar — evaluated top-down (first matching rule wins), like the §6 ladder.
+3. **Write target:** mutate the source I/O List in place (PL3's way, via `io/xlsx_edit`) vs compute the fields
+   into the **SSOT `signals` table at staging** (PL4-idiomatic — every datum in the DB, no doc mutation). The
+   SSOT route fits PL4's thesis; the user may also want the filled doc as an operator artifact. Likely: compute
+   into the SSOT, with an OPTIONAL surgical write-back as a projection.
+4. **Scope:** classification first (script_type) vs the full ph200 (also `index` + diag cabinet/bit allocation).
+   index/diag are the larger, stateful parts (PL3's idempotent stable-ID allocation).
+**Parity oracle:** PL3's populator over the same raw doc → compare the computed script_type/index/diag per row.
+
 ## THE REBUILD IS COMPLETE — NEXT EFFORT: the GUI port (see `GUI_PLAN.md`)
 All 9 phases (300/520/400/510/600/700/800/900/100) + the S1–S6 severity model are DONE, each parity-verified vs
-PL3; every GUI button runs for real. **The next effort is the GUI port — the plan + locked decisions are in
-`Pipeline4App/GUI_PLAN.md`** (replicate PL3's GUI + add the SSOT-native Findings panel, Database Explorer
-[in-memory SQLite], and Run-all/live-progress; NEW features first; start from M0 = the worker thread). **Deferred by user decision** (not blockers): validation **150** (needs a
+PL3; every GUI button runs for real. **The active effort is now the GUI port — the plan + locked decisions are
+in `Pipeline4App/GUI_PLAN.md`** (replicate PL3's GUI + add the SSOT-native Findings panel, Database Explorer
+[in-memory SQLite], and Run-all/live-progress; NEW features first). **M0 (foundations) DONE (uncommitted):** the
+`gui/phases.py` registry + the worker thread/queue-drain pump + a basic Run-all + the notebook scaffold (single
+-phase runs no longer freeze the window). **NEXT: M2** (the Findings panel) — then M3 Explorer, M1 log, M4
+Run-all+dropdowns, M5 Files, M6 Project, M0b chrome. **Deferred by user decision** (not blockers): validation **150** (needs a
 staging change touching the locked 300 parity) + the **`accept`** doc-mutating treatment (dropped). Possible
 future polish: the GUI grid/files/threading; a CLI; the engine (a real phase registry + worker thread); the
 transitional gate-reconcile-once-per-run fix. See `DESIGN.md` for the locked decisions.

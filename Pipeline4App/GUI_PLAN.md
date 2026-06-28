@@ -41,12 +41,18 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
 `fonts`/`darktitle`) + `project/` (`project.py`/`state.py`) are the near-drop-in source for the parity ports.
 
 ## Milestones (each gate-green + committed on the user's word)
-- **M0 — Foundations.** The **worker thread + queue pump** (today phases run INLINE and freeze the window —
-  the #1 fix + the basis for live progress; `run.gate`/`render` already take a `log_append` callback → post
-  to a `queue.Queue`, drain via `root.after`, add a `ttk.Progressbar` + a `_busy` guard). The
-  `Log|Files|Database|Findings` notebook scaffold. Port `fonts.py` (bundle the Monaspace TTF under
-  `Pipeline4App/assets/fonts/`) + `darktitle.py` (verbatim) + make `theme`/`LogView` re-themeable. The
-  **lightweight phase registry** (`gui/registry.py` or `core/`).
+- **M0 — Foundations. DONE** (the worker thread + registry + notebook + Run-all). `gui/phases.py` (the
+  lightweight registry: number/title/kind/subs/requires/handler + `RUNNABLE`/`run_order`/`by_number` - the
+  single source the bar + dispatch + Run-all consume; no Fill phase). The **worker thread + queue/drain pump**:
+  `_on_phase` spawns a daemon thread per click, the handler emits via `self._emit`/`self._status` (thread-safe
+  enqueue) instead of touching Tk, `_drain` (`root.after(50)`) applies log/status/done on the main thread, a
+  `ttk.Progressbar` + a `_busy` guard grey the bar during a run (single-phase runs no longer freeze the
+  window). A basic **Run-all** (registry `run_order`, each handler self-contained / re-stages - M4 optimizes to
+  a stage-once shared DB). The **`ttk.Notebook`** scaffold (the Log tab; Findings/Explorer/Files tabs slot in
+  later). `phasebar` is registry-driven + `set_enabled`. Tests: `test_gui_phases.py` (4). Verified: py_compile +
+  a headless construction smoke (9 buttons, 1 tab, drain wired); the live worker-run is the manual launch check.
+  **DEFERRED to M0b** (chrome, independent verbatim ports): `fonts.py` (the Monaspace TTF) + `darktitle.py` +
+  the `theme`/`LogView` re-theme.
 - **M1 — Structured clickable log** (PL3 parity; backend mostly done): `LogView.append_records` over
   `render.render_records`, `Sheet!Cell` → Excel-at-cell (`gui/excel.py` COM port), `[FAIL]` errlink →
   `treatments.set_treatment`, the Show-PASS/SKIP toggle. The validation handler feeds

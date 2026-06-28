@@ -541,10 +541,22 @@ text is ported verbatim into each finding's `detail`.
   + populating `diag_block_name` at staging, which would touch the locked 300 parity) + the **`accept`**
   doc-mutating treatment (dropped).
 
-## GUI — runnable shell (`gui/` + `launch_gui.py`)
-`python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the **phase-button
-bar** (Run + the 9 phases, ButtonsLayout colours), a colour-coded **log viewer**, and a status bar. Wired in
-EARLY (gui-less PL3 builds hid integration problems). **ALL phase buttons run their phases for real**
+## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0 DONE; see `GUI_PLAN.md`)
+The backend is complete; the GUI port (replicate PL3 + add SSOT-native features) is the active effort - the
+plan + locked decisions are in **`GUI_PLAN.md`**. **M0 (foundations) DONE:** a **lightweight phase registry**
+(`gui/phases.py` - the single source of the phase order: number/title/kind/subs/requires/handler +
+`RUNNABLE`/`run_order`; no Fill phase), a **worker thread + queue/drain pump** (each phase runs off the Tk main
+thread - the handler emits via `self._emit`/`self._status` enqueue, `_drain` applies on the main thread, a
+`ttk.Progressbar` + `_busy` guard; single-phase runs no longer freeze the window), a basic **Run-all** (registry
+`run_order`, each handler self-contained - M4 optimizes to a stage-once shared DB), and a **`ttk.Notebook`**
+(Log tab; Findings/Database-Explorer/Files tabs land in later milestones). NEXT: M2 Findings panel · M3 Database
+Explorer (in-memory SQLite) · M1 structured clickable log · M4 Run-all+dropdowns · M5 Files · M6 Project · M0b
+chrome (fonts/dark-titlebar/re-theme). Tests: `test_gui_phases.py` (the registry). The GUI itself is a manual
+`python launch_gui.py` check (no headless GUI tests).
+`python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the registry-driven
+**phase-button bar** (Run + the 8 phases, ButtonsLayout colours), a colour-coded **log viewer** (in a notebook),
+and a status bar + busy progressbar. Wired in EARLY (gui-less PL3 builds hid integration problems). **ALL phase
+buttons run their phases for real** (on the worker thread)
 (100/300/400/500/600/700/800/900, each through `staging.stage` -> the phase build/project; 800 = stage -> 520 ->
 `engine.build` -> `engine.project` + `write_com_db` + `write_instance_dbs`; 900 = build the full SSOT ->
 `coverage.build` + `project`; 100 = stage -> `validation.run_validation` -> `run.render` the issues). The handler is
@@ -601,7 +613,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **222**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **226**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
