@@ -67,10 +67,13 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   NOTE: `validation_issues` reflects the LAST run's findings (each phase re-stages + rebuilds the table), so
   the panel shows that run's set; treatments persist by uid across runs. A cumulative cross-phase view waits on
   the engine's per-run union-reconcile.
-- **M3 — Database Explorer** *(NEW, headline)*: the SQLite-backed SQL tab — schema sidebar (14 tables), a SQL
-  editor, Run → results grid, saved/sample queries (e.g. *signals in no DB*, *findings by phase*, *per-DB
-  member count*, *interface_elements ⋈ signal*). Read-only over an in-memory copy; `json_extract()` for JSON
-  cells. A "refresh" reloads `Shared/Database/`.
+- **M3 — Database Explorer. DONE** *(NEW, headline)*: `gui/dbquery.py` (the engine, tested:
+  `build_memory_db(db_dir)` loads every `Database/*.csv` into `:memory:` SQLite [one TEXT-column table each,
+  JSON cells as their JSON string → `json_extract()` works], `run_query` → (columns, rows), `SAMPLE_QUERIES`
+  showcasing SELECT */json_extract/GROUP BY/JOIN) + `gui/db_explorer.py` (the tab: a schema sidebar
+  [double-click a table → `SELECT * FROM`], a SQL editor [Ctrl+Enter], a results grid, a samples combobox, a
+  Refresh that reloads + auto-refresh after a run). Read-only over an in-memory copy (the CSVs are never
+  touched). Tests: `test_gui_dbquery.py` (4). Real `Database/` loads all 14 tables into the explorer.
 - **M4 — Run-all + sub-phase dropdowns** *(NEW: live progress)*: the registry drives a dependency-ordered
   Run-all on the worker (live per-phase progress + halt-on-FAIL); chevrons list each phase's sub-steps.
 - **M5 — Files tab**: the 3-section tree (config / user-editable / output) + a CSV grid **through the codec**
