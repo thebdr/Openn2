@@ -541,7 +541,7 @@ text is ported verbatim into each finding's `detail`.
   + populating `diag_block_name` at staging, which would touch the locked 300 parity) + the **`accept`**
   doc-mutating treatment (dropped).
 
-## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0 DONE; see `GUI_PLAN.md`)
+## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0 + M2 DONE; see `GUI_PLAN.md`)
 The backend is complete; the GUI port (replicate PL3 + add SSOT-native features) is the active effort - the
 plan + locked decisions are in **`GUI_PLAN.md`**. **M0 (foundations) DONE:** a **lightweight phase registry**
 (`gui/phases.py` - the single source of the phase order: number/title/kind/subs/requires/handler +
@@ -549,10 +549,13 @@ plan + locked decisions are in **`GUI_PLAN.md`**. **M0 (foundations) DONE:** a *
 thread - the handler emits via `self._emit`/`self._status` enqueue, `_drain` applies on the main thread, a
 `ttk.Progressbar` + `_busy` guard; single-phase runs no longer freeze the window), a basic **Run-all** (registry
 `run_order`, each handler self-contained - M4 optimizes to a stage-once shared DB), and a **`ttk.Notebook`**
-(Log tab; Findings/Database-Explorer/Files tabs land in later milestones). NEXT: M2 Findings panel · M3 Database
-Explorer (in-memory SQLite) · M1 structured clickable log · M4 Run-all+dropdowns · M5 Files · M6 Project · M0b
-chrome (fonts/dark-titlebar/re-theme). Tests: `test_gui_phases.py` (the registry). The GUI itself is a manual
-`python launch_gui.py` check (no headless GUI tests).
+(Log tab). **M2 (Findings panel) DONE:** a `ttk.Treeview` tab over `validation_issues` ⋈ the treatment registry
+(phase/type/default+**effective** severity/location/detail; phase + severity filters; right-click → treat
+fail/error/warn/skip/ignore/clear → writes `error_management.csv` → re-render; auto-refresh after each run).
+The pure join/treat logic is `gui/findings_view.py` (tested); `gui/findings_panel.py` is the Tk view. NEXT:
+M3 Database Explorer (in-memory SQLite) · M1 structured clickable log · M4 Run-all+dropdowns · M5 Files · M6
+Project · M0b chrome (fonts/dark-titlebar/re-theme). Tests: `test_gui_phases.py` + `test_gui_findings.py`. The
+GUI itself is a manual `python launch_gui.py` check (no headless GUI tests).
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the registry-driven
 **phase-button bar** (Run + the 8 phases, ButtonsLayout colours), a colour-coded **log viewer** (in a notebook),
 and a status bar + busy progressbar. Wired in EARLY (gui-less PL3 builds hid integration problems). **ALL phase
@@ -613,7 +616,7 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **226**: keys/table/database, signals schema,
+**data-independent suite is the green gate** (currently **229**: keys/table/database, signals schema,
 sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
 no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
 `if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),

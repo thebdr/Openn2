@@ -57,9 +57,16 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   `render.render_records`, `Sheet!Cell` → Excel-at-cell (`gui/excel.py` COM port), `[FAIL]` errlink →
   `treatments.set_treatment`, the Show-PASS/SKIP toggle. The validation handler feeds
   `render.render_records(findings)` to `append_records`.
-- **M2 — Findings panel** *(NEW)*: a Treeview over `validation_issues` ⋈ `error_management.csv` (phase/type/
-  severity/**effective**/location/detail), filter by phase+severity, right-click → treat (fail/error/warn/
-  skip/ignore via `set_treatment`) → re-apply. PL4-native (PL3 only had treat-in-log).
+- **M2 — Findings panel. DONE** *(NEW)*: `gui/findings_view.py` (the pure join: `panel_rows` =
+  `validation_issues` ⋈ the registry with the EFFECTIVE severity per uid, `filter_rows`, `apply_treatment` =
+  create-or-update the registry row — more forgiving than `set_treatment` so a freshly-shown finding treats
+  immediately) + `gui/findings_panel.py` (a `ttk.Treeview` tab: phase/type/severity/**effective**/treatment/
+  location/detail, phase + effective-severity filter combos, severity-coloured rows, **right-click → Treat as
+  FAIL/ERROR/WARN/SKIP/IGNORE / Clear** → writes `error_management.csv` → re-render; `refresh()` reloads the
+  table + registry, auto-called after each run via the drain's `done`). Tests: `test_gui_findings.py` (3).
+  NOTE: `validation_issues` reflects the LAST run's findings (each phase re-stages + rebuilds the table), so
+  the panel shows that run's set; treatments persist by uid across runs. A cumulative cross-phase view waits on
+  the engine's per-run union-reconcile.
 - **M3 — Database Explorer** *(NEW, headline)*: the SQLite-backed SQL tab — schema sidebar (14 tables), a SQL
   editor, Run → results grid, saved/sample queries (e.g. *signals in no DB*, *findings by phase*, *per-DB
   member count*, *interface_elements ⋈ signal*). Read-only over an in-memory copy; `json_extract()` for JSON

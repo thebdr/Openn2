@@ -20,7 +20,7 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   implemented, gate green, **PL3 parity EXACT (596/596 findings, 0 diffs)**.
   - The repo root carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before this
     session — NOT ours; leave them.
-- **Gate: 226 tests green** (data-independent; +4 GUI registry). Run from `Pipeline4App/`:
+- **Gate: 229 tests green** (data-independent; GUI registry + findings). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`
 - **SEVERITY model (user-directed, IN PROGRESS — full rollout chosen, THEN 700).** Taxonomy (`core/severity.py`):
   FAIL (halts) · ERROR (skip item, continue) · WARN · INFO · SKIP · PASS · DEBUG (dev-only) + PHASE banner;
@@ -256,8 +256,9 @@ PL3; every GUI button runs for real. **The active effort is now the GUI port —
 in `Pipeline4App/GUI_PLAN.md`** (replicate PL3's GUI + add the SSOT-native Findings panel, Database Explorer
 [in-memory SQLite], and Run-all/live-progress; NEW features first). **M0 (foundations) DONE (uncommitted):** the
 `gui/phases.py` registry + the worker thread/queue-drain pump + a basic Run-all + the notebook scaffold (single
--phase runs no longer freeze the window). **NEXT: M2** (the Findings panel) — then M3 Explorer, M1 log, M4
-Run-all+dropdowns, M5 Files, M6 Project, M0b chrome. **Deferred by user decision** (not blockers): validation **150** (needs a
+-phase runs no longer freeze the window). **M2 (Findings panel) DONE (uncommitted):** a Treeview tab over
+`validation_issues` ⋈ the treatment registry with right-click 1-click treatments. **NEXT: M3** (the Database
+Explorer — in-memory SQLite) — then M1 log, M4 Run-all+dropdowns, M5 Files, M6 Project, M0b chrome. **Deferred by user decision** (not blockers): validation **150** (needs a
 staging change touching the locked 300 parity) + the **`accept`** doc-mutating treatment (dropped). Possible
 future polish: the GUI grid/files/threading; a CLI; the engine (a real phase registry + worker thread); the
 transitional gate-reconcile-once-per-run fix. See `DESIGN.md` for the locked decisions.

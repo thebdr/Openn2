@@ -21,6 +21,7 @@ from tkinter import ttk
 
 from pipeline4.core import config
 from pipeline4.gui import phases, theme
+from pipeline4.gui.findings_panel import FindingsPanel
 from pipeline4.gui.logview import LogView
 from pipeline4.gui.phasebar import PhaseBar
 
@@ -60,6 +61,10 @@ class App:
         self.log = LogView(log_tab, shown_levels=config.load_app_ui()["log_levels"])
         self.log.pack(side="top", fill="both", expand=True)
         self.notebook.add(log_tab, text="Log")
+        findings_tab = ttk.Frame(self.notebook)
+        self.findings = FindingsPanel(findings_tab)
+        self.findings.pack(side="top", fill="both", expand=True)
+        self.notebook.add(findings_tab, text="Findings")
         self.notebook.pack(side="top", fill="both", expand=True, padx=8, pady=6)
 
         self.log.append("PHASE", "Pipeline4 - SSOT database build")
@@ -123,6 +128,7 @@ class App:
                 elif kind == "done":
                     self._set_busy(False)
                     self.status.configure(text="Ready")
+                    self.findings.refresh()          # surface the run's findings in the panel
         except queue.Empty:
             pass
         self.root.after(50, self._drain)
