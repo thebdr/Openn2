@@ -19,10 +19,12 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   **M0 (worker thread + registry + notebook + Run-all) · M1 (structured clickable log) · M2 (Findings panel) ·
   M3 (Database Explorer, in-memory SQLite) · M4 (Run-all live progress/halt + sub-phase chevron dropdowns)
   are DONE.** NEXT: M5 (Files) · M6 (Project Manager) · M0b (chrome: fonts/dark-titlebar/re-theme).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`3aeae08`** (GUI M1 + HANDOFF refresh; M2/M3 are also
-  pushed at `3ec6996`/`47addb9`). **GUI M4 is implemented but UNCOMMITTED** (the `pipeline4/gui/` + the 4 docs);
-  commit on the user's word. The only untracked PL4 path is `config_project/user_input/` (the runtime
-  treatment registry, gitignored-ish; leave it).
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`243b695`** (GUI M4; M0–M3 at
+  `d623509`/`3ec6996`/`47addb9`/`fbac770`). **Working tree is CLEAN** for PL4 — the only untracked PL4 path
+  is `config_project/user_input/` (the runtime treatment registry, gitignored-ish; leave it). M4 was
+  adversarially reviewed pre-commit (5-dimension workflow) and the 3 confirmed findings hardened (see
+  `GUI_PLAN.md` M4). The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App
+  config, Shared) — NOT ours; leave them.
   - The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before
     this session — NOT ours; leave them.
 - **Gate: 32 test FILES green** (data-independent; `test_gui_phasebar.py` added at M4). Run from `Pipeline4App/`:
