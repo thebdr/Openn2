@@ -470,6 +470,23 @@ class App:
         self._emit("PASS", f"  {only}: {len(issues)} issues + {n_pass} PASS "
                            f"(log only; the 100 header writes the reports)")
 
+    def _run_fill(self, only=None):
+        """Phase 200 - Documents Fill Out. 210 (built): classify + fill the source I/O List's Script Type
+        (AB) / Suggested Type (AC) IN PLACE (surgical, timestamped backup deleted on a no-op). 220/240 are
+        greyed until built. ph200 writes the DOC only; staging reads the filled doc. An unresolved row
+        (`<input required>`) is a blocking finding (the `_UnresolvedIndex` sheet lists them)."""
+        from pipeline4.domain.fillout import fill
+        self._status("fill…")
+        key = "pb_fill_script_type" if only == 210 else "ph_fill"
+        label = f"{only or 200} {i18n.tr(key, self.lang)}"
+        self._emit("PHASE", label)
+        res = fill.fill_script_type()
+        if not self._gate(res["findings"], label=label):
+            return
+        backup = f"  (backup {os.path.basename(res['backup'])})" if res["backup"] else "  (no change)"
+        self._emit("PASS", f"  filled {res['filled']} script type(s); {res['mismatch']} kept (Mode-2); "
+                           f"{res['unresolved']} unresolved -> {os.path.basename(res['output_path'])}{backup}")
+
     def _run_staging(self, only=None):
         """Phase 300: stage the configured I/O List -> the signals table -> Database/signals.csv. The oracle
         splits it: 310 Stage I/O List (`stage_iolist` - I/O List only, no C&E) / 320 Stage C&E Matrix (the

@@ -56,6 +56,13 @@ PHASES = (
         Sub(180, "pb_open_ce", kind="open", opens="matrix"),
         Sub(190, "pb_open_val_logs", kind="open", opens="validation_logs"),
     )),
+    Phase(200, "ph_fill", handler="_run_fill", subs=(
+        Sub(210, "pb_fill_script_type"),                                 # CSV-rule classification (built)
+        Sub(220, "pb_fill_index", enabled=False),                       # §7 index - built next
+        Sub(230, "pb_fill_diag_cabinet", enabled=False),                # §8 diag cabinet - later
+        Sub(240, "pb_fill_diag_bit", enabled=False),                    # §8 diag bit - later
+        Sub(250, "pb_open_iolist", kind="open", opens="iolist"),
+    )),
     Phase(300, "ph_staging", handler="_run_staging", subs=(
         Sub(310, "pb_stage_iolist"),                                     # stage_iolist: I/O List only (no C&E)
         Sub(320, "pb_stage_cematrix"),                                   # stage: I/O List + C&E (the full staging)
@@ -124,6 +131,8 @@ def run_order() -> list:
     self-contained (re-stages its own prerequisites), so order drives the log narrative, not correctness."""
     nums = [p.number for p in RUNNABLE]
     tail = [n for n in (900, 100) if n in nums]
-    head = [n for n in nums if n not in tail]
+    # ph200 (Fill) is excluded from Run-all for now: only 210 (script_type) is built, so a Run-all fill
+    # would write a PARTIAL doc. It runs as its own button. Re-add here once 220/230/240 land.
+    head = [n for n in nums if n not in tail and n != 200]
     head.sort(key=lambda n: (n != 300, n))          # 300 first, then ascending
     return head + tail

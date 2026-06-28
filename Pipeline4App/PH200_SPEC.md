@@ -162,6 +162,16 @@ per row + the cabinet set. Each sub-phase committed with its gate + this parity 
   `config.load_gate_rules`/`load_script_type_rules` + `domain/fillout/classify.py` (+ `reader.py`). Gate
   green (`test_rule_expr` 8, `test_fillout_classify` 5). **PARITY: 273 rows, 0 mismatches vs PL3's
   `script_type.suggested_type`** on the real doc.
-- **210b — NEXT:** the surgical AB/AC write-back into the source doc (via `io/xlsx_edit`, backup + no-op
-  delete, Mode-1/Mode-2, `_UnresolvedIndex`, the blocking finding on `<input required>`) + the GUI phase-200
-  registry entry + `_run_fill` handler. Then 220 (§7 index) · 230/240 (§8 diag).
+- **210b — fill write-back + GUI DONE (210 operable).** `domain/fillout/fill.py` - `fill_script_type`:
+  per row compute the type, write AC always + AB Mode-1 (blank/sentinel only), preserve AB Mode-2 (a human
+  value) + a `fill_type_mismatch` WARN audit; surgical write via `io/xlsx_edit` (output-col headers if blank,
+  the `_UnresolvedIndex` sheet with cell hyperlinks); timestamped backup, DELETED on a value-identical no-op;
+  an unresolved row (`<input required>`, not skipped) -> a blocking `fill_unresolved` finding. **Doc only, no
+  DB write.** GUI: phase 200 added to the registry (210 enabled; 220/230/240 greyed; 250 Open I/O List) +
+  `_run_fill` handler (gated/halt-capable); excluded from Run-all until the full fill lands. Tests:
+  `test_fillout_fill` (2: Mode-1/2 + unresolved + `_UnresolvedIndex`; idempotent no-op drops the backup);
+  `test_gui_phases` updated. **Real-data smoke (non-destructive scratch copy):** filled=0 / mismatch=8 (the
+  doc's 8 hand-overrides vs the ladder - PL3 flags the same) / unresolved=0; a re-run is a no-op. GUI-verified
+  on screen (the 200 dropdown: 210 enabled, 220-240 greyed, 250 open).
+- **NEXT:** 220 (§7 index = object grouping) · 230/240 (§8 diag cabinet/bit). Each: re-confirm the PL3
+  mechanics, build, parity-check, add to the fill + the Run-all once complete.

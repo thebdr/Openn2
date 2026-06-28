@@ -9,29 +9,30 @@ from pipeline4.gui import phases
 def test_registry_shape():
     nums = [p.number for p in phases.PHASES]
     eq(nums[0], 0, "Run-all (0) is first")
-    ok(200 not in nums, "PL4 has no Fill phase (200)")
-    eq([n for n in nums if n], [100, 300, 400, 500, 600, 700, 800, 900], "the 8 PL4 phases, ascending")
+    ok(200 in nums, "phase 200 (Fill) is present (added at STEP 4)")
+    eq([n for n in nums if n], [100, 200, 300, 400, 500, 600, 700, 800, 900], "the 9 PL4 phases, ascending")
 
 
 def test_runnable():
     runnable = [p.number for p in phases.RUNNABLE]
     ok(0 not in runnable, "Run-all is not a runnable phase")
     ok(all(phases.by_number(n).handler for n in runnable), "every RUNNABLE phase names a handler")
-    eq(set(runnable), {100, 300, 400, 500, 600, 700, 800, 900})
+    eq(set(runnable), {100, 200, 300, 400, 500, 600, 700, 800, 900})
 
 
 def test_run_order():
     order = phases.run_order()
     eq(order[0], 300, "staging runs first")
     eq(order[-2:], [900, 100], "reporting + validation run last")
-    eq(set(order), {100, 300, 400, 500, 600, 700, 800, 900}, "every runnable phase")
+    eq(set(order), {100, 300, 400, 500, 600, 700, 800, 900}, "ph200 fill is excluded from Run-all (partial)")
     eq(len(order), len(set(order)), "no duplicates")
 
 
 def test_subs_match_oracle():
-    # The exact sub-button numbers per phase (ButtonsLayout.xlsx, phase 200 dropped).
+    # The exact sub-button numbers per phase (ButtonsLayout.xlsx; phase 200 added at STEP 4).
     expected = {
         100: [110, 120, 130, 140, 150, 155, 156, 160, 170, 180, 190],
+        200: [210, 220, 230, 240, 250],
         300: [310, 320, 330],
         400: [410, 420, 430],
         500: [510, 520, 530, 540],
@@ -47,9 +48,10 @@ def test_subs_match_oracle():
 def test_kinds_and_enablement():
     # open buttons carry an `opens` key; the deferred/unported ones are greyed (enabled=False).
     opens = {s.number for p in phases.PHASES for s in p.subs if s.kind == "open"}
-    eq(opens, {160, 170, 180, 190, 330, 420, 530, 540, 630, 640, 730, 840, 850, 930}, "the open buttons")
+    eq(opens, {160, 170, 180, 190, 250, 330, 420, 530, 540, 630, 640, 730, 840, 850, 930}, "the open buttons")
     disabled = {s.number for p in phases.PHASES for s in p.subs if not s.enabled}
-    eq(disabled, {150, 155, 156, 430, 810, 840, 920}, "the deferred/unported (greyed) buttons (320 wired at STEP 2)")
+    eq(disabled, {150, 155, 156, 220, 230, 240, 430, 810, 840, 920},
+       "the deferred/unported (greyed) buttons (ph200 220/230/240 built one at a time)")
     specials = {s.number for p in phases.PHASES for s in p.subs if s.kind == "special"}
     eq(specials, {155, 156, 430}, "the special (Clean / custom-interface) buttons")
     for n in (160, 330, 530, 930):                       # a sampling of wired opens
