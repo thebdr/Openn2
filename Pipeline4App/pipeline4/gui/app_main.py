@@ -60,7 +60,7 @@ class App:
         self._backend_label = ttk.Label(toolbar, text=f"theme: {backend}")
         self._backend_label.pack(side="right", padx=2)
 
-        self.phasebar = PhaseBar(root, self._on_phase)
+        self.phasebar = PhaseBar(root, self._on_phase, self._sub_command)
         self.phasebar.pack(side="top", fill="x", padx=8, pady=2)
 
         # the status bar + the busy progressbar live at the bottom (progress just above the status line).
@@ -157,6 +157,81 @@ class App:
                 return
         self._emit("PASS", "  Run Pipeline complete")
 
+    # --- sub-phase + open dispatch (the chevron dropdown buttons) -------------------------------- #
+    def _sub_command(self, phase, sub):
+        """Resolve a dropdown sub-button to its command for the PhaseBar (None = disabled/greyed). An
+        action runs THAT sub-phase (`handler(only=number)`); an `open` startfiles its target."""
+        if not sub.enabled:
+            return None
+        if sub.kind == "open":
+            return lambda key=sub.opens: self._on_open(key)
+        if sub.kind == "action":
+            return lambda n=sub.number: self._on_sub(n)
+        return None                               # a "special" (Clean) - not ported -> disabled
+
+    def _on_sub(self, number):
+        """A dropdown action click (main thread): run ONE sub-phase on a worker thread. The owning phase
+        handler builds the prerequisites, then runs only this sub-phase (`only=number`)."""
+        if self._busy:
+            self.log.append("WARN", "  a phase is already running - wait for it to finish")
+            return
+        self._set_busy(True)
+        threading.Thread(target=self._sub_worker, args=(number,), daemon=True).start()
+
+    def _sub_worker(self, number):
+        """Runs OFF the main thread: dispatch a sub-phase to its parent handler with `only=number`."""
+        self._run_halted = False
+        try:
+            phase = phases.phase_of_sub(number)
+            handler = getattr(self, phase.handler, None) if (phase and phase.handler) else None
+            if handler is None:
+                self._emit("WARN", f"  sub-phase {number} is not runnable")
+            else:
+                handler(only=number)
+        except Exception:  # noqa: BLE001 - a handler crash must never take the window down
+            self._emit("ERROR", f"sub-phase {number} crashed:\n{traceback.format_exc()}")
+        finally:
+            self._q.put(("done",))
+
+    def _open_target(self, key: str) -> str:
+        """Resolve an `open` sub-button key to a filesystem path (folder or file)."""
+        params = config.load_params()
+        return {
+            "database": config.database_dir(),
+            "error_mgmt": os.path.join(config.user_input_dir(), "error_management.csv"),
+            "iolist": params.get("iolist_path", ""),
+            "matrix": params.get("matrix_path", ""),
+            "validation_logs": config.validation_report_dir(),
+            "interfaces": config.interfaces_dir(),
+            "io_tags": config.io_tags_dir(),
+            "blocks_import": config.blocks_import_dir(),
+            "blocks_creation": config.blocks_creation_dir(),
+            "diaglist": config.diaglist_dir(),
+            "diag_config": config.diagnosis_dir(),
+            "hardware": config.hardware_dir(),
+            "coverage": config.coverage_dir(),
+        }.get(key, "")
+
+    def _on_open(self, key: str):
+        """An `open` sub-button (main thread): open its folder/file with the OS handler."""
+        try:                                      # resolving a target reads params - a missing/malformed
+            target = self._open_target(key)       # project file must not escape the Tk callback (future M6)
+        except Exception as exc:  # noqa: BLE001
+            self.log.append("WARN", f"  could not resolve open target {key}: {exc}")
+            return
+        if not target or not os.path.exists(target):
+            self.log.append("WARN", f"  nothing to open yet: {key} ({target or 'unset'})")
+            return
+        opener = getattr(os, "startfile", None)   # Windows; degrades gracefully elsewhere
+        if opener is None:
+            self.log.append("WARN", f"  open is Windows-only here: {target}")
+            return
+        try:
+            opener(target)
+            self.log.append("INFO", f"  opened {target}")
+        except Exception as exc:  # noqa: BLE001
+            self.log.append("WARN", f"  could not open {target}: {exc}")
+
     def _drain(self):
         """Main thread: apply the queued log/status/done events to the widgets, then reschedule."""
         try:
@@ -236,27 +311,50 @@ class App:
         self.log.append("INFO", f"  treated {uid} -> {level or 'cleared'} (effective on the next run)")
 
     # --- the phase handlers (run on the worker thread; emit via self._emit / self._status) ------- #
-    def _run_validation(self):
-        """Phase 100: stage -> the 4 validators -> record the issues + write the 4 reports -> render the
-        issues to the log. Never halts (a validation FAIL is reported, not blocking)."""
-        from pipeline4.core import config, run
+    def _run_validation(self, only=None):
+        """Phase 100. only=None: stage -> the 4 validators -> record the issues + write the 4 reports.
+        only=110/120/130/140: run just that validator and render to the log (the header writes the
+        reports). Never halts (a validation FAIL is reported, not blocking)."""
+        from pipeline4.core import config
         from pipeline4.domain import staging
-        from pipeline4.domain.validation import phase as validation
-        self._emit("PHASE", "100 Documents Validation  (110 I/O List + 120 C&E + 130/140 cross-checks)")
+        from pipeline4.domain.validation import crosscheck, iolist, matrix, phase as validation
+        titles = {110: "Validate I/O List", 120: "Validate C&E Matrix",
+                  130: "Cross-Check CEM->IOL", 140: "Cross-Check IOL->CEM"}
+        if only is None:
+            self._emit("PHASE", "100 Documents Validation  (110 + 120 + 130 + 140)")
+            self._status("validation…")
+            database, _sf = staging.stage()
+            res = validation.run_validation(database)
+            issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERROR", "WARN")]
+            self._render(issues)
+            c = res["counts"]
+            self._emit("PASS", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERROR', 0)} ERROR, "
+                               f"{c.get('WARN', 0)} WARN, {c.get('PASS', 0)} PASS, {c.get('SKIP', 0)} SKIP "
+                               f"-> {res['dir']}")
+            return
+        self._emit("PHASE", f"{only} {titles[only]}")
         self._status("validation…")
-        database, _sf = staging.stage()
-        res = validation.run_validation(database)
-        issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERROR", "WARN")]
+        params = config.load_params()
+        if only == 110:
+            findings = iolist.run_iolist(params)
+        elif only == 120:
+            findings = matrix.run_ce_matrix(params)
+        else:                                  # 130 / 140 read the staged signals
+            database, _sf = staging.stage(params)
+            runner = crosscheck.run_xcheck_cem_iol if only == 130 else crosscheck.run_xcheck_iol_cem
+            findings = runner(database, params)
+        issues = [f for f in findings if f.severity in ("FAIL", "ERROR", "WARN")]
         self._render(issues)
-        c = res["counts"]
-        self._emit("PASS", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERROR', 0)} ERROR, {c.get('WARN', 0)} WARN, "
-                           f"{c.get('PASS', 0)} PASS, {c.get('SKIP', 0)} SKIP -> {res['dir']}")
+        n_pass = sum(1 for f in findings if f.severity == "PASS")
+        self._emit("PASS", f"  {only}: {len(issues)} issue(s) + {n_pass} PASS "
+                           f"(log only; the 100 header writes the reports)")
 
-    def _run_staging(self):
-        """Phase 300: read the configured I/O List -> the signals table -> Database/signals.csv."""
-        from pipeline4.core import config, run
+    def _run_staging(self, only=None):
+        """Phase 300: read the configured I/O List -> the signals table -> Database/signals.csv. PL4's
+        staging IS the IO-Database write (oracle 320 is greyed), so 310 == the whole phase."""
+        from pipeline4.core import config
         from pipeline4.domain import staging
-        self._emit("PHASE", "300 Documents Staging")
+        self._emit("PHASE", "310 Stage I/O List" if only == 310 else "300 Documents Staging")
         self._status("staging…")
         database, findings = staging.stage()
         if not self._gate(findings, label="300 Documents Staging"):
@@ -264,12 +362,15 @@ class App:
         signals = database["signals"]
         self._emit("PASS", f"  staged {len(signals)} signals -> {os.path.join(config.database_dir(), 'signals.csv')}")
 
-    def _run_data_blocks(self):
-        """Phase 500: stage -> 520 (db_members/db_blocks/instance_dbs + the write-back) -> the GlobalDB XML;
-        then 510 builds the interface tables and projects PLCTags.xlsx."""
+    def _run_data_blocks(self, only=None):
+        """Phase 500. only=520: stage -> 520 (db_members/db_blocks/instance_dbs + write-back) -> the GlobalDB
+        XML. only=510: + build the interface tables and project PLCTags.xlsx. only=None: both. (510 needs the
+        520 write-back, so 520 is always built; it's only PROJECTED when 520/None is requested.)"""
         from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks, datablock_xml, interfaces, io_tags
-        self._emit("PHASE", "500 Signals Mapping  (520 Data Blocks + 510 I/O Tags)")
+        label = {510: "510 Generate I/O Tags", 520: "520 Generate Data Blocks"}.get(
+            only, "500 Signals Mapping  (520 Data Blocks + 510 I/O Tags)")
+        self._emit("PHASE", label)
         self._status("data blocks…")
         findings = []
         database, f = staging.stage(); findings += f
@@ -280,24 +381,26 @@ class App:
         if "db_blocks" not in database:
             self._emit("WARN", "  520 produced no tables (a blocking prereq was downgraded but yielded no data) - nothing further")
             return
-        n_dbs, n_members = len(database["db_blocks"]), len(database["db_members"])
-        self._emit("PASS", f"  {n_members} db_members across {n_dbs} DBs (+ {len(database['instance_dbs'])} "
-                           f"instance DBs) -> {os.path.join(config.database_dir(), 'db_members.csv')}")
-        count = datablock_xml.project(database)
-        self._emit("PASS", f"  projected {count} GlobalDB XML(s) -> {config.blocks_import_dir()}")
-        self._status("I/O tags…")
-        database, iface_findings = interfaces.build_interfaces(database)
-        res = io_tags.project(database)
-        self._render(iface_findings + res["findings"])
-        self._emit("PASS", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
-                           f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {config.io_tags_dir()}")
+        if only in (None, 520):
+            n_dbs, n_members = len(database["db_blocks"]), len(database["db_members"])
+            self._emit("PASS", f"  {n_members} db_members across {n_dbs} DBs (+ {len(database['instance_dbs'])} "
+                               f"instance DBs) -> {os.path.join(config.database_dir(), 'db_members.csv')}")
+            count = datablock_xml.project(database)
+            self._emit("PASS", f"  projected {count} GlobalDB XML(s) -> {config.blocks_import_dir()}")
+        if only in (None, 510):
+            self._status("I/O tags…")
+            database, iface_findings = interfaces.build_interfaces(database)
+            res = io_tags.project(database)
+            self._render(iface_findings + res["findings"])
+            self._emit("PASS", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
+                               f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {config.io_tags_dir()}")
 
-    def _run_interfaces(self):
+    def _run_interfaces(self, only=None):
         """Phase 400: stage -> 520 -> the interfaces/interface_elements tables -> the IF_*.xlsx projection
-        -> (gated) insert each as an IF_ sheet into the I/O List."""
+        -> (gated) insert each as an IF_ sheet into the I/O List. (410 == the whole phase.)"""
         from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks, interfaces, interface_xlsx
-        self._emit("PHASE", "400 Interfaces Generation")
+        self._emit("PHASE", "410 Generate Interfaces" if only == 410 else "400 Interfaces Generation")
         self._status("interfaces…")
         findings = []
         database, f = staging.stage(); findings += f
@@ -322,11 +425,15 @@ class App:
         else:
             self._emit("INFO", "  insert_interface_sheets: disabled (iolist_params.insert_interface_sheets)")
 
-    def _run_diagnosis(self):
-        """Phase 600: stage -> 520 build -> diagnosis.build -> 610 DiagList_IO/Logic.csv -> 620 the OPC SCL."""
+    def _run_diagnosis(self, only=None):
+        """Phase 600: stage -> 520 build -> diagnosis.build, then project 610 DiagList_IO/Logic.csv and/or
+        620 the OPC SCL. only=610/620 projects just that surface; None does both. (Both need diagnosis.build,
+        so it always runs.)"""
         from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks, diagnosis, diaglist_csv, diagnosis_scl
-        self._emit("PHASE", "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL)")
+        label = {610: "610 Generate Diag List", 620: "620 Generate Diag Software Blocks"}.get(
+            only, "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL)")
+        self._emit("PHASE", label)
         self._status("diagnosis…")
         findings = []
         database, f = staging.stage(); findings += f
@@ -338,18 +445,25 @@ class App:
             self._emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
         database, diag_findings = diagnosis.build(database)
-        res = diaglist_csv.project(database)
-        scl = diagnosis_scl.project(database)
-        self._render(diag_findings + res["findings"] + scl["findings"])
-        self._emit("PASS", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> {config.diaglist_dir()}")
-        if scl["path"]:
+        rendered, res, scl = list(diag_findings), None, None
+        if only in (None, 610):
+            res = diaglist_csv.project(database); rendered += res["findings"]
+        if only in (None, 620):
+            scl = diagnosis_scl.project(database); rendered += scl["findings"]
+        self._render(rendered)
+        if res is not None:
+            self._emit("PASS", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> {config.diaglist_dir()}")
+        if scl is not None and scl["path"]:
             self._emit("PASS", f"  620 OPC SCL: {scl['entries']} entries across {scl['cabinets']} cabinets -> {scl['path']}")
 
-    def _run_hardware(self):
-        """Phase 700: stage -> hardware.build -> hardware_csv.project (format-2 Stations.csv + Modules.csv)."""
+    def _run_hardware(self, only=None):
+        """Phase 700: stage -> hardware.build -> hardware_csv.project (format-2 Stations.csv + Modules.csv).
+        710/720 share one extract and each writes BOTH CSVs (like PL3), so only= just changes the label."""
         from pipeline4.core import config, run
         from pipeline4.domain import staging, hardware, hardware_csv
-        self._emit("PHASE", "700 Hardware Generation  (710 Stations + 720 Modules)")
+        label = {710: "710 Generate Stations", 720: "720 Generate Modules"}.get(
+            only, "700 Hardware Generation  (710 Stations + 720 Modules)")
+        self._emit("PHASE", label)
         self._status("hardware…")
         findings = []
         database, f = staging.stage(); findings += f
@@ -363,13 +477,16 @@ class App:
         res = hardware_csv.project(database)
         self._emit("PASS", f"  700: {res['stations']} station(s) + {res['modules']} module(s) -> {config.hardware_dir()}")
 
-    def _run_software(self):
-        """Phase 800: stage -> 520 -> 800 build -> project (CreationInfo CSVs + the 03 FC XML) ->
-        write the 02_COM safe-DB + InstanceDBs.csv."""
+    def _run_software(self, only=None):
+        """Phase 800: stage -> 520 -> engine.build. only=820 projects the CreationInfo CSVs + the 03 FC XML +
+        the 02_COM safe-DB; only=830 writes InstanceDBs.csv; None does both. (engine.build always runs - both
+        surfaces project from it.)"""
         from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks
         from pipeline4.domain.blocks import engine
-        self._emit("PHASE", "800 Software Generation  (820 Blocks + 830 Instances + 02_COM + 03 FC XML)")
+        label = {820: "820 Generate Blocks", 830: "830 Generate Instances"}.get(
+            only, "800 Software Generation  (820 Blocks + 830 Instances + 02_COM + 03 FC XML)")
+        self._emit("PHASE", label)
         self._status("software…")
         findings = []
         database, f = staging.stage(); findings += f
@@ -381,23 +498,29 @@ class App:
             self._emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
         database, blk_findings = engine.build(database)
-        res = engine.project(database)
-        com = engine.write_com_db(database)
-        inst = engine.write_instance_dbs(database)
-        self._render(blk_findings + res["findings"])
-        self._emit("PASS", f"  820: {len(database['software_blocks'])} block(s) -> {res['count']} "
-                           f"CreationInfo CSV(s) + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
-        if com["path"]:
+        rendered, res, com, inst = list(blk_findings), None, None, None
+        if only in (None, 820):
+            res = engine.project(database); rendered += res["findings"]
+            com = engine.write_com_db(database)
+        if only in (None, 830):
+            inst = engine.write_instance_dbs(database)
+        self._render(rendered)
+        if res is not None:
+            self._emit("PASS", f"  820: {len(database['software_blocks'])} block(s) -> {res['count']} "
+                               f"CreationInfo CSV(s) + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
+        if com is not None and com["path"]:
             self._emit("PASS", f"  02_COM safe-DB: {com['members']} member(s) -> {com['path']}")
-        self._emit("PASS", f"  830 InstanceDBs: {inst['count']} instance DB(s) -> {inst['path']}")
+        if inst is not None:
+            self._emit("PASS", f"  830 InstanceDBs: {inst['count']} instance DB(s) -> {inst['path']}")
 
-    def _run_reporting(self):
+    def _run_reporting(self, only=None):
         """Phase 900: build the full SSOT (stage -> 520 -> 700; then the WARN-only 400/600/800) then
-        coverage.build (the coverage table + ORPHAN/UNPLACED findings) -> coverage.project (the reports)."""
+        coverage.build (the coverage table + ORPHAN/UNPLACED findings) -> coverage.project (the reports).
+        (910 == the whole phase.)"""
         from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks, interfaces, diagnosis, hardware, coverage
         from pipeline4.domain.blocks import engine
-        self._emit("PHASE", "900 Reporting  (910 Pipeline Coverage)")
+        self._emit("PHASE", "910 Generate Pipeline Coverage Report" if only == 910 else "900 Reporting  (910 Pipeline Coverage)")
         self._status("coverage…")
         findings = []
         database, f = staging.stage(); findings += f

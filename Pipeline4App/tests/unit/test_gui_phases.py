@@ -1,5 +1,6 @@
-"""GUI M0 - the phase registry (gui/phases.py): the single source of the phase order the bar + Run-all
-consume. Pure + data-independent (the GUI itself is a manual `python launch_gui.py` check)."""
+"""GUI - the phase registry (gui/phases.py): the single source of the phase order + the sub-button set
+transcribed from the operator oracle ButtonsLayout.xlsx. Pure + data-independent (the GUI itself is a
+manual `python launch_gui.py` check)."""
 from _harness import run, eq, ok
 from pipeline4.gui import phases
 
@@ -26,10 +27,49 @@ def test_run_order():
     eq(len(order), len(set(order)), "no duplicates")
 
 
+def test_subs_match_oracle():
+    # The exact sub-button numbers per phase (ButtonsLayout.xlsx, phase 200 dropped).
+    expected = {
+        100: [110, 120, 130, 140, 150, 155, 156, 160, 170, 180, 190],
+        300: [310, 320, 330],
+        400: [410, 420, 430],
+        500: [510, 520, 530, 540],
+        600: [610, 620, 630, 640],
+        700: [710, 720, 730],
+        800: [810, 820, 830, 840, 850],
+        900: [910, 920, 930],
+    }
+    for num, subs in expected.items():
+        eq([s.number for s in phases.by_number(num).subs], subs, f"phase {num} sub numbers")
+
+
+def test_kinds_and_enablement():
+    # open buttons carry an `opens` key; the deferred/unported ones are greyed (enabled=False).
+    opens = {s.number for p in phases.PHASES for s in p.subs if s.kind == "open"}
+    eq(opens, {160, 170, 180, 190, 330, 420, 530, 540, 630, 640, 730, 840, 850, 930}, "the open buttons")
+    disabled = {s.number for p in phases.PHASES for s in p.subs if not s.enabled}
+    eq(disabled, {150, 155, 156, 320, 430, 810, 840, 920}, "the deferred/unported (greyed) buttons")
+    specials = {s.number for p in phases.PHASES for s in p.subs if s.kind == "special"}
+    eq(specials, {155, 156, 430}, "the special (Clean / custom-interface) buttons")
+    for n in (160, 330, 530, 930):                       # a sampling of wired opens
+        ok(phases.sub_by_number(n).opens, f"open button {n} names a target")
+    # oracle titles that are easy to mis-transcribe (verified against ButtonsLayout.xlsx)
+    eq(phases.sub_by_number(320).title, "Stage C&E Matrix", "slot 320 is the oracle's Stage C&E Matrix")
+    eq(phases.sub_by_number(330).title, "Open IO Database", "slot 330 is Open IO Database")
+
+
+def test_phase_of_sub():
+    eq(phases.phase_of_sub(620).number, 600, "620 belongs to phase 600")
+    eq(phases.phase_of_sub(110).number, 100, "110 belongs to phase 100")
+    eq(phases.phase_of_sub(850).number, 800, "850 belongs to phase 800")
+    eq(phases.phase_of_sub(999), None, "an unknown sub -> None")
+    eq(phases.sub_by_number(510).title, "Generate I/O Tags")
+
+
 def test_by_number():
     eq(phases.by_number(800).handler, "_run_software")
     eq(phases.by_number(900).handler, "_run_reporting")
-    eq(len(phases.by_number(100).subs), 4, "phase 100 carries its 4 sub-phases")
+    eq(len(phases.by_number(100).subs), 11, "phase 100 carries its 11 oracle sub-buttons")
     eq(phases.by_number(999), None, "an unknown number -> None")
 
 
@@ -39,5 +79,8 @@ if __name__ == "__main__":
         ("registry_shape", test_registry_shape),
         ("runnable", test_runnable),
         ("run_order", test_run_order),
+        ("subs_match_oracle", test_subs_match_oracle),
+        ("kinds_and_enablement", test_kinds_and_enablement),
+        ("phase_of_sub", test_phase_of_sub),
         ("by_number", test_by_number),
     ]))

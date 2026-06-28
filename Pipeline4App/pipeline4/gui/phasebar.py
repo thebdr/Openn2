@@ -1,28 +1,28 @@
 """The phase-button bar: a 2-row grid of classic `tk.Button`s (so they can take the ButtonsLayout fill
-colours - themed ttk buttons can't take a custom background).
+colours - themed ttk buttons can't take a custom background), driven by the phase REGISTRY
+(`gui/phases.py`, transcribed from the operator oracle `ButtonsLayout.xlsx`).
 
-Built from the phase REGISTRY (`gui/phases.py`) - the single source of the phase order/labels (no
-re-encoding). Layout (mirrors PL3): the pink "Run Pipeline" master on the left (spans both rows), then a
-row of phase HEADERS (row 0, each RUNS its phase) separated by ➡, with a grey ▼ CHEVRON beneath each
-(row 1) that opens an anchored, scrollable, click-away dropdown of that phase's SUB-STEPS (M4).
+Layout (mirrors PL3 / the oracle): the pink "Run Pipeline" master on the left (spans both rows), then a
+row of EQUAL-WIDTH phase HEADERS (row 0, each RUNS its phase) separated by ➡, with a grey ▼ CHEVRON
+beneath each (row 1) that opens an anchored, click-away `_Dropdown` of that phase's SUB-BUTTONS. The
+dropdown's width MATCHES the header/chevron column above it; its buttons are coloured by kind
+(action=white · open=light-blue · special=orange · disabled=grey) and a thin divider separates the
+action steps from the open/special steps.
 
-PL4 NOTE: a phase handler is monolithic (it runs all of the phase's sub-phases - e.g. 620 SCL still needs
-stage -> 520 -> build), so a sub-step button RUNS ITS PARENT PHASE, like the header. The dropdown is the
-visual MAP of what a phase does; independent per-sub-phase runs wait on the engine. `set_enabled(False)`
-greys every button (the worker-thread busy guard) and closes any open dropdown.
+The bar is UI-only: the App supplies `on_phase(number, title)` (run a whole phase / Run-all) and
+`resolve_sub(phase, sub) -> command|None` (a sub-button's command; None = greyed/disabled).
 """
 from __future__ import annotations
 
-import os
 import tkinter as tk
 from tkinter import ttk
 
 from pipeline4.gui import phases, theme
 
-_CHEVRON = "▼"           # opens a phase's sub-step dropdown
+_CHEVRON = "▼"           # opens a phase's sub-button dropdown
 _SEP = "➡"               # between phase headers
-_HEADER_WRAP = 14        # header label word-wrap width (chars)
-_SUB_WRAP = 22           # dropdown sub-step label word-wrap width (chars)
+_BTN_WIDTH = 16          # header / run / sub-button width in chars (EQUAL width); labels word-wrap to fit
+_WRAP = 16               # label word-wrap width (chars)
 
 
 def _wrap(text: str, width: int) -> str:
@@ -39,14 +39,15 @@ def _wrap(text: str, width: int) -> str:
     return "\n".join(lines)
 
 
-def _button(parent, label, kind, command, *, bold=False):
+def _button(parent, label, kind, command, *, bold=False, width=_BTN_WIDTH):
     """A coloured classic tk.Button for the phase bar / dropdown (disabled when command is None)."""
+    fill_kind = kind if command is not None else "disabled"
     weight = "bold" if bold else "normal"
     b = tk.Button(
-        parent, text=label, command=command,
-        bg=theme.BUTTON_FILLS[kind], fg=theme.BUTTON_FG[kind],
-        activebackground=theme.BUTTON_FILLS[kind], activeforeground=theme.BUTTON_FG[kind],
-        relief="flat", borderwidth=0, padx=10, pady=6, cursor="hand2",
+        parent, text=label, command=command, width=width,
+        bg=theme.BUTTON_FILLS[fill_kind], fg=theme.BUTTON_FG[fill_kind],
+        activebackground=theme.BUTTON_FILLS[fill_kind], activeforeground=theme.BUTTON_FG[fill_kind],
+        relief="flat", borderwidth=0, padx=6, pady=6, cursor="hand2",
         font=(theme.MONO_FONT[0], theme.MONO_FONT[1], weight),
     )
     if command is None:
@@ -56,8 +57,7 @@ def _button(parent, label, kind, command, *, bold=False):
 
 def _remove_global_binding(widget, sequence, funcid) -> None:
     """Remove ONLY `funcid` from the global 'all' bindtag for `sequence`. Tk's `unbind_all` takes no
-    funcid - it wipes EVERY handler on the tag - so use it directly would clobber any other global
-    `<Button-1>` binding the app adds later. This filters the bound script down to the other handlers
+    funcid - it wipes EVERY handler on the tag - so this filters the bound script down to the others
     (mirrors what `Misc.unbind(seq, funcid)` does, but against the 'all' tag)."""
     if not funcid:
         return
@@ -75,6 +75,7 @@ def _foreground_is_other_app() -> bool:
     (alt-tab / clicking another application). Best-effort: returns False without pywin32 / off Windows,
     so the popup just keeps its click-away behaviour there."""
     try:
+        import os
         import win32gui
         import win32process
         fg = win32gui.GetForegroundWindow()
@@ -84,8 +85,8 @@ def _foreground_is_other_app() -> bool:
 
 
 class _Dropdown(tk.Toplevel):
-    """An anchored, click-away-to-close popup of a phase's sub-step buttons (a port of PL3's `_Dropdown`,
-    trimmed: PL4 sub-lists are <=4 short items, so no scroll canvas is needed)."""
+    """An anchored, click-away-to-close popup of a phase's sub-buttons. Its width matches the anchor
+    (the chevron/header column above it); a thin divider separates the action steps from open/special."""
 
     def __init__(self, root, anchor, specs, ignore, on_close):
         super().__init__(root)
@@ -106,24 +107,32 @@ class _Dropdown(tk.Toplevel):
         border.pack(fill="both", expand=True)
         inner = tk.Frame(border, bg=theme.DARK_BG)
         inner.pack(fill="both", expand=True)
-        for i, (label, command) in enumerate(specs):
-            b = _button(inner, _wrap(label, _SUB_WRAP), "action",
-                        command=(lambda c=command: self._fire(c)))
-            b.pack(fill="x", pady=(0 if i == 0 else 1, 0))
+        col_chars = max(1, _BTN_WIDTH)
+        prev_section = None
+        for spec in specs:                    # spec = (label, kind, command, section)
+            label, kind, command, section = spec
+            if prev_section is not None and section != prev_section:
+                tk.Frame(inner, bg=theme.BUTTON_FILLS["chevron"], height=1).pack(fill="x", pady=2)
+            b = _button(inner, _wrap(label, _WRAP), kind, command, width=col_chars)
+            b.pack(fill="x", pady=(0, 1))
+            prev_section = section
 
         self.update_idletasks()
         x = anchor.winfo_rootx()
         y = anchor.winfo_rooty() + anchor.winfo_height()
-        x = max(0, min(x, self.winfo_screenwidth() - self.winfo_reqwidth() - 4))
-        self.geometry(f"+{x}+{y}")
+        # MATCH the dropdown width to the column above it (the chevron == the header column width).
+        width = max(anchor.winfo_width(), 1)
+        height = inner.winfo_reqheight() + 2
+        x = max(0, min(x, self.winfo_screenwidth() - width - 4))
+        self.geometry(f"{width}x{height}+{x}+{y}")
         self.deiconify()
         self.lift()
 
         self.bind("<Escape>", lambda e: self.close())
         self._btn_funcid = root.bind_all("<Button-1>", self._maybe_close, "+")
         # also close when the app loses focus to another application (alt-tab / clicking another app),
-        # which the click-away handler can't see - POLL the OS foreground window (an overrideredirect
-        # topmost popup doesn't get a reliable <Deactivate>). Keep the id so a fast close can cancel it.
+        # which the click-away handler can't see - POLL the OS foreground window. Keep the id so a fast
+        # close can cancel it.
         self._poll = root.after(120, self._blur_poll)
 
     def _blur_poll(self):
@@ -133,11 +142,6 @@ class _Dropdown(tk.Toplevel):
             self.close()
             return
         self._poll = self._owner.after(150, self._blur_poll)
-
-    def _fire(self, command):
-        self.close()
-        if command:
-            command()
 
     def _maybe_close(self, event):
         if self._closed or event.widget in self._ignore:
@@ -164,13 +168,21 @@ class _Dropdown(tk.Toplevel):
         self.destroy()
 
 
-class PhaseBar(tk.Frame):
-    """The 2-row phase-button bar (header + chevron), driven by the registry. `on_click(number, label)`
-    runs a phase (a sub-step runs its parent phase)."""
+def _section(sub) -> str:
+    """The dropdown section a sub-button belongs to (action steps vs the open/special tail) - the divider
+    boundary, mirroring the oracle's `↓` cascade -> `—` divider transition."""
+    return "action" if sub.kind == "action" else "aux"
 
-    def __init__(self, parent, on_click):
+
+class PhaseBar(tk.Frame):
+    """The 2-row, equal-width phase-button bar (header + chevron) driven by the registry.
+    `on_phase(number, title)` runs a whole phase (or Run-all for number 0); `resolve_sub(phase, sub)`
+    returns a sub-button's command (None = disabled/greyed)."""
+
+    def __init__(self, parent, on_phase, resolve_sub):
         super().__init__(parent, bg=theme.DARK_BG)
-        self._on_click = on_click
+        self._on_phase = on_phase
+        self._resolve_sub = resolve_sub
         self._buttons: list = []              # the run master + phase headers (greyed during a run)
         self._chevrons: list = []
         self._open: _Dropdown | None = None
@@ -181,8 +193,8 @@ class PhaseBar(tk.Frame):
         phase_seen = 0
         for phase in phases.PHASES:
             if phase.number == 0:             # the pink Run master, spanning both rows on the left
-                run = _button(self, _wrap(phase.title, _HEADER_WRAP), "run",
-                              lambda n=0, lbl=phase.title: on_click(n, lbl), bold=True)
+                run = _button(self, _wrap(phase.title, _WRAP), "run",
+                              lambda n=0, lbl=phase.title: on_phase(n, lbl), bold=True)
                 run.grid(row=0, column=col, rowspan=2, sticky="nsew", padx=(2, 8), pady=3)
                 self._buttons.append(run)
                 col += 1
@@ -191,8 +203,8 @@ class PhaseBar(tk.Frame):
                 ttk.Label(self, text=_SEP, background=theme.DARK_BG, foreground=theme.DARK_FG,
                           font=(theme.MONO_FONT[0], 13)).grid(row=0, column=col, padx=1)
                 col += 1
-            header = _button(self, _wrap(f"{phase.number}  {phase.title}", _HEADER_WRAP), "phase",
-                             lambda n=phase.number, lbl=phase.title: on_click(n, lbl), bold=True)
+            header = _button(self, _wrap(f"{phase.number}  {phase.title}", _WRAP), "phase",
+                             lambda n=phase.number, lbl=phase.title: on_phase(n, lbl), bold=True)
             header.grid(row=0, column=col, sticky="nsew", padx=1, pady=(3, 0))
             self._buttons.append(header)
             if phase.subs:
@@ -211,11 +223,20 @@ class PhaseBar(tk.Frame):
         self.close()
         if reopen_same:
             return
-        specs = [(f"{num}  {lbl}", lambda n=phase.number, plbl=phase.title: self._on_click(n, plbl))
-                 for (num, lbl) in phase.subs]
+        specs = []
+        for sub in phase.subs:
+            command = self._resolve_sub(phase, sub)
+            specs.append((f"{sub.number}  {sub.title}", sub.kind, command, _section(sub)))
+        # wrap each command so firing it also closes the dropdown
+        specs = [(label, kind, (None if cmd is None else (lambda c=cmd: self._fire_through(c))), section)
+                 for (label, kind, cmd, section) in specs]
         root = self.winfo_toplevel()
         self._open = _Dropdown(root, chevron, specs, ignore=self._chevrons, on_close=self._cleared)
         self._open_chevron = chevron
+
+    def _fire_through(self, command):
+        self.close()
+        command()
 
     def _cleared(self, dd):
         if self._open is dd:

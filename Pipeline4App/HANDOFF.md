@@ -17,7 +17,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   treatment. Known gap to rebuild configurable: **phase 200 Fill** — see its section below.)
 - **THE GUI PORT IS THE ACTIVE EFFORT** — the live tracker + locked decisions are in **`GUI_PLAN.md`**.
   **M0 (worker thread + registry + notebook + Run-all) · M1 (structured clickable log) · M2 (Findings panel) ·
-  M3 (Database Explorer, in-memory SQLite) · M4 (Run-all live progress/halt + sub-phase chevron dropdowns)
+  M3 (Database Explorer, in-memory SQLite) · M4 (Run-all live progress/halt + sub-phase chevron dropdowns,
+  then REWORKED to the operator oracle `ButtonsLayout.xlsx`: full greyed-deferred button set + sub-buttons
+  that RUN THEIR SUB-PHASE via `handler(only=n)` + wired Open buttons + equal-width/width-matched bar)
   are DONE.** NEXT: M5 (Files) · M6 (Project Manager) · M0b (chrome: fonts/dark-titlebar/re-theme).
 - **GIT STATE:** `origin/pl4` PUSHED + synced through **`243b695`** (GUI M4; M0–M3 at
   `d623509`/`3ec6996`/`47addb9`/`fbac770`). **Working tree is CLEAN** for PL4 — the only untracked PL4 path

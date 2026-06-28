@@ -101,6 +101,25 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   (2) the first blur-poll `after` id is captured so a fast close cancels it; (3) `_run_all` wraps each
   per-phase call so a handler CRASH is attributed to the named phase + stops the chain with the same
   "N remaining skipped" accounting a gate-halt gets (no bare traceback that hides the lost phases).
+- **M4 REWORK (user feedback). DONE**: the bar/registry now follow the **operator ORACLE
+  `Pipeline3App/assets/ButtonsLayout.xlsx`** (the canonical button map). (a) **`gui/phases.py` rebuilt from the
+  oracle** — every phase carries its FULL sub-button set (`Sub(number,title,kind,enabled,opens)`): action /
+  open / special, in oracle order, minus phase 200 (no Fill). Deferred/unported buttons (150, 155/156 Clean,
+  320, 430, 810, 840, 920) are kept **VISIBLE but greyed** (`enabled=False`) for 1:1 oracle fidelity (user
+  decision). (b) **Sub-buttons RUN THEIR SUB-PHASE, not the whole phase** (PL3's model) — each handler now
+  takes `only=None|<sub#>`; the App's `_sub_command`/`_on_sub`/`_sub_worker` dispatch an action sub to
+  `phase_of_sub(n).handler(only=n)`, which builds the prerequisites then runs ONLY that sub-phase's projection
+  (e.g. `only=510` still builds 520 since I/O Tags needs the write-back; `only=520` skips the I/O-Tags leg).
+  Validation 110/120/130/140 each run their own validator (`run_iolist`/`run_ce_matrix`/`run_xcheck_*`);
+  hardware 710/720 share one extract (each writes both CSVs, like PL3). (c) **Open buttons wired** —
+  `_on_open`/`_open_target` `os.startfile` the resolved folder/file (13 wired keys). (d) **Layout** — all
+  header/run buttons are **EQUAL width** (`width=_BTN_WIDTH=16`) and the **dropdown width MATCHES the column
+  above** (`geometry width = anchor.winfo_width()`); a thin divider separates the action steps from the
+  open/special tail; disabled subs render greyed. Verified: gate **32 files** (`test_gui_phases.py` rebuilt to
+  the oracle, +`subs_match_oracle`/`kinds_and_enablement`/`phase_of_sub`); a headless smoke (equal widths,
+  dropdown 5-buttons-with-2-greyed + width-match, `only=` dispatch); and a **real-data run of every `only=`
+  branch** (310/520/510/610/620/710/820/830/110/130 all PASS, 0 errors). Reviewed pre-commit (5-dimension
+  workflow).
 - **M5 — Files tab**: the 3-section tree (config / user-editable / output) + a CSV grid **through the codec**
   + object editor (yaml/json/xml) + xlsx read-only viewer + external-edit. (The SSOT-aware grid from M3 can
   subsume the generic CSV grid.)

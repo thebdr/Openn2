@@ -563,16 +563,24 @@ line's `[LEVEL]` errlink → right-click Treat, a **Levels ▾ dropdown** (per-l
 + greyed; toggles LIVE via per-level elide; persists the combination to `app_config.yaml` via
 `config.save_app_log_levels`); the GUI `_gate`/`_render` (replacing `run.gate`/`run.render` in the handlers)
 render EFFECTIVE-severity findings to structured records via `findings_view.apply_and_records`. **M4
-(Run-all + sub-phase chevron dropdowns) DONE:** the phase bar (`phasebar.py`) is now a port of PL3's
-**2-row registry-driven grid** - the pink Run master (spans both rows), per-phase **header** (row 0, runs
-the phase) + a grey **▼ chevron** (row 1) opening an anchored, click-away/Escape/blur-poll **`_Dropdown`**
-listing the phase's `subs`. A handler is monolithic (620 SCL still needs stage→520→build), so a **sub-step
-button runs its PARENT phase** (the dropdown is the visual map; independent sub-phase runs wait on the
-engine). **Run-all** (`_run_all`) drives a **determinate** progressbar (a `progress_step` per completed
-phase; single phases bounce), emits a `[k/N] <num> <title>` marker per phase, and **halts the chain on a
-blocking FAIL** (`_gate` sets `self._run_halted`). NEXT: M5 Files · M6 Project · M0b chrome. Tests:
-`test_gui_phases.py` + `test_gui_findings.py` + `test_gui_dbquery.py` + `test_gui_levels.py` +
-`test_gui_phasebar.py` (the pure `_wrap`). The GUI itself is a manual `python launch_gui.py` check.
+(Run-all + sub-phase chevron dropdowns) DONE:** the phase bar (`phasebar.py`) is a 2-row registry-driven
+grid - the pink Run master (spans both rows), per-phase **header** (row 0, runs the whole phase) + a grey
+**▼ chevron** (row 1) opening an anchored, click-away/Escape/blur-poll **`_Dropdown`**. **Run-all**
+(`_run_all`) drives a **determinate** progressbar (a `progress_step` per completed phase; single phases
+bounce), emits a `[k/N]` marker per phase, and **halts the chain on a blocking FAIL** (`_gate` sets
+`self._run_halted`; a handler crash is attributed to the named phase + stops the chain). **M4 REWORK (user
+feedback):** the registry + bar now follow the operator **ORACLE `Pipeline3App/assets/ButtonsLayout.xlsx`**.
+`gui/phases.py` carries each phase's FULL sub-button set (`Sub(number,title,kind,enabled,opens)`: action /
+open / special, minus phase 200); deferred/unported buttons (150, 155/156, 320, 430, 810, 840, 920) are
+kept VISIBLE but **greyed** (`enabled=False`) for oracle fidelity. **Sub-buttons RUN THEIR SUB-PHASE**
+(PL3's model): each handler takes `only=None|<sub#>`; `_sub_command`/`_on_sub`/`_sub_worker` dispatch an
+action sub to `phase_of_sub(n).handler(only=n)`, which builds the prerequisites then runs ONLY that
+sub-phase (`only=510` still builds 520; `only=520` skips the I/O-Tags leg). **Open buttons** are wired
+(`_on_open`/`_open_target` -> `os.startfile`). Layout: all header/run buttons are **EQUAL width** and the
+**dropdown width MATCHES the column above**. NEXT: M5 Files · M6 Project · M0b chrome. Tests:
+`test_gui_phases.py` (rebuilt to the oracle) + `test_gui_findings.py` + `test_gui_dbquery.py` +
+`test_gui_levels.py` + `test_gui_phasebar.py`; verified by a real-data run of every `only=` branch. The
+GUI itself is a manual `python launch_gui.py` check.
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the registry-driven
 **phase-button bar** (Run + the 8 phases, ButtonsLayout colours), a colour-coded **log viewer** (in a notebook),
 and a status bar + busy progressbar. Wired in EARLY (gui-less PL3 builds hid integration problems). **ALL phase
