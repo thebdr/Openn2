@@ -224,9 +224,11 @@ EXACT: PL4 596 findings == PL3 596, 0 diffs** in the tuple `(phase, type, norm(l
 4 validators over the real docs (`scratchpad/parity_100.py`, PL3 fed PL4's staged rows). Real-data counts: 341
 PASS / 239 SKIP / 12 INFO / 4 WARN / 0 FAIL.
 
-## THE REBUILD IS COMPLETE
+## THE REBUILD IS COMPLETE — NEXT EFFORT: the GUI port (see `GUI_PLAN.md`)
 All 9 phases (300/520/400/510/600/700/800/900/100) + the S1–S6 severity model are DONE, each parity-verified vs
-PL3; every GUI button runs for real. **Deferred by user decision** (not blockers): validation **150** (needs a
+PL3; every GUI button runs for real. **The next effort is the GUI port — the plan + locked decisions are in
+`Pipeline4App/GUI_PLAN.md`** (replicate PL3's GUI + add the SSOT-native Findings panel, Database Explorer
+[in-memory SQLite], and Run-all/live-progress; NEW features first; start from M0 = the worker thread). **Deferred by user decision** (not blockers): validation **150** (needs a
 staging change touching the locked 300 parity) + the **`accept`** doc-mutating treatment (dropped). Possible
 future polish: the GUI grid/files/threading; a CLI; the engine (a real phase registry + worker thread); the
 transitional gate-reconcile-once-per-run fix. See `DESIGN.md` for the locked decisions.

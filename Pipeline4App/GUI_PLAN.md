@@ -1,0 +1,85 @@
+# PL4 — GUI PORT PLAN
+
+The PL4 **backend rebuild is COMPLETE** (all 9 phases + the S1–S6 severity model, each parity-verified vs
+PL3; `HANDOFF.md` has the backend state). This is the plan for the **GUI port**: replicate PL3's operator GUI
+**and** add the SSOT-native features PL3 could never have. Same toolkit as PL3 (Tkinter + sv-ttk + Monaspace).
+
+## Locked decisions (user, 2026-06-28)
+1. **Sequence: NEW features first** — foundations (worker thread) → Findings panel → Database Explorer →
+   structured log → Run-all → Files tab → Project Manager → polish.
+2. **Database Explorer = in-memory SQLite** (stdlib `sqlite3`, no new deps): load the SSOT tables into
+   `:memory:`, a real SQL box with cross-table JOINs (on `uid`/`source_signal`/`db_name`) + `json_extract()`
+   for the JSON cells. A read-only query console (the on-disk CSVs are untouched) + saved/sample queries.
+3. **SSOT table grids = VIEW-ONLY first** (editing risks the byte-stable JSON-cell parity; add later through
+   the `table.read_csv`/`write_csv` codec if needed).
+4. **A lightweight PL4 phase registry** drives the bar + the chevron sub-phases + the dependency-ordered
+   Run-all (one source of phase no/title/sub-phases/deps/handler — avoids re-encoding the phase order twice).
+
+## Target shape
+A notebook on the shared shell:
+```
+toolbar: brand · [Project ▾] · Run-all · ◐theme · lang · log-to-file
+phase bar: Run + 100·300·400·500·600·700·800·900  (each a chevron ▾ of its sub-phases)
+[ Log | Files | Database Explorer | Findings ]   + status bar + progressbar
+```
+
+## What PL4 already provides (this is a PORT, not a rewrite)
+- The runnable `gui/` shell: `app_main.App` (each `_run_*` stages → runs a phase → renders findings via
+  `run.gate`/`run.render(findings, log_append)`), `phasebar.PhaseBar` (coloured tk.Buttons), `LogView`
+  (per-level tags + the `app_config` log-level filter), `theme.apply_theme` (sv-ttk + graceful fallback).
+- **`io/render.py` already emits `render_records` → `RenderRec(kind, level, text, links, uid)` with
+  `LinkSpan(start,end,doc)`** — the SAME structured shape PL3's clickable log consumes (the M1 backend is done).
+- The Finding/treatment/severity spine: `core/finding.py` (`validation_issues_table`/`record`, the rich
+  `location2/doc2/info/cmp` payload), `core/treatments.py` (`load`/`apply`/`effective_severity`/
+  **`set_treatment`** = the 1-click hook), `core/run.py` (`gate`/`render`/`has_blocking`).
+- The 14 SSOT tables on disk under `Shared/Database/` via `core/table.py` (declared columns/json_columns/
+  key_columns, the deterministic byte-stable codec, fail-loud `read_csv`, `effective_columns`) + `database.py`.
+- The report projections: `io/render.py` (`render_text`/`render_html`/`reports`/`html_reports`) +
+  `coverage.render_txt`/`render_csv`.
+
+PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview`/`extedit`/`excel`/`theme`/
+`fonts`/`darktitle`) + `project/` (`project.py`/`state.py`) are the near-drop-in source for the parity ports.
+
+## Milestones (each gate-green + committed on the user's word)
+- **M0 — Foundations.** The **worker thread + queue pump** (today phases run INLINE and freeze the window —
+  the #1 fix + the basis for live progress; `run.gate`/`render` already take a `log_append` callback → post
+  to a `queue.Queue`, drain via `root.after`, add a `ttk.Progressbar` + a `_busy` guard). The
+  `Log|Files|Database|Findings` notebook scaffold. Port `fonts.py` (bundle the Monaspace TTF under
+  `Pipeline4App/assets/fonts/`) + `darktitle.py` (verbatim) + make `theme`/`LogView` re-themeable. The
+  **lightweight phase registry** (`gui/registry.py` or `core/`).
+- **M1 — Structured clickable log** (PL3 parity; backend mostly done): `LogView.append_records` over
+  `render.render_records`, `Sheet!Cell` → Excel-at-cell (`gui/excel.py` COM port), `[FAIL]` errlink →
+  `treatments.set_treatment`, the Show-PASS/SKIP toggle. The validation handler feeds
+  `render.render_records(findings)` to `append_records`.
+- **M2 — Findings panel** *(NEW)*: a Treeview over `validation_issues` ⋈ `error_management.csv` (phase/type/
+  severity/**effective**/location/detail), filter by phase+severity, right-click → treat (fail/error/warn/
+  skip/ignore via `set_treatment`) → re-apply. PL4-native (PL3 only had treat-in-log).
+- **M3 — Database Explorer** *(NEW, headline)*: the SQLite-backed SQL tab — schema sidebar (14 tables), a SQL
+  editor, Run → results grid, saved/sample queries (e.g. *signals in no DB*, *findings by phase*, *per-DB
+  member count*, *interface_elements ⋈ signal*). Read-only over an in-memory copy; `json_extract()` for JSON
+  cells. A "refresh" reloads `Shared/Database/`.
+- **M4 — Run-all + sub-phase dropdowns** *(NEW: live progress)*: the registry drives a dependency-ordered
+  Run-all on the worker (live per-phase progress + halt-on-FAIL); chevrons list each phase's sub-steps.
+- **M5 — Files tab**: the 3-section tree (config / user-editable / output) + a CSV grid **through the codec**
+  + object editor (yaml/json/xml) + xlsx read-only viewer + external-edit. (The SSOT-aware grid from M3 can
+  subsume the generic CSV grid.)
+- **M6 — Project Manager**: port `project/project.py` + `state.py` (folder projects, persisted root, recent,
+  auto-reopen) + the toolbar cluster. `config.use_project()` already routes the loaders/Database/Output.
+- **M7 — Polish**: theme/size persistence (`app_config.yaml` already read by `load_app_ui`), log-to-file,
+  EN/IT (optional, low priority — needs a `core/i18n.py`).
+
+## Risks / gotchas
+- **JSON cells corrupt under a naive grid edit** — any table edit MUST go through `table.read_csv`/`write_csv`
+  (fail-loud + deterministic codec), never a blind cell write. (Why M3/M5 grids are view-only first.)
+- **Worker-thread seam** (the highest-risk port): the halt decision + `treatments.reconcile` run on the
+  worker, but every Tk widget touch (the log render) must marshal back via the queue/`root.after` — getting
+  this wrong reintroduces cross-thread Tk crashes the inline shell currently avoids.
+- **Excel-COM cell-jump** is Windows/Excel + pywin32 specific; the clickable link degrades gracefully without it.
+- **Treatment reconcile churn** across separate clicks (the CLAUDE.md TRANSITIONAL NOTE) — a per-run
+  union-reconcile is the proper fix and lands with the engine; the Findings panel uses `set_treatment` (a
+  targeted write) to avoid global churn.
+- **No phase registry yet** — M0 ports a small one so the bar/Run-all/sub-phases share one source.
+
+## Out of scope (carried from the backend, user decisions)
+Validation **150** (diagnosis-slot — needs a staging change touching the locked 300 parity) + the **`accept`**
+doc-mutating treatment.
