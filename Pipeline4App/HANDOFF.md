@@ -38,8 +38,9 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   font + dark/light theme compatibility - the toolbar/notebook/status/title-bar all follow the theme toggle; the
   startup-light-ttk fix moved `darktitle.apply` to LAST in `__init__`/`_toggle_theme`, not inside `apply_theme`,
   so its `update_idletasks()` no longer flushes sv-ttk against a half-built window) + **`c5d5912`** the STEP 1
-  git-state refresh. **NOT pushed** — `origin/pl4` is at **`3df8f99`** (3 commits behind; push on the user's
-  word). M4 base at `243b695`, M0–M3 at `d623509`/`3ec6996`/`47addb9`/`fbac770`. `config_project/user_input/*.csv`
+  git-state refresh. **PUSHED** — `origin/pl4` synced through **`e96761c`** (STEP 1 + STEP 2). Standing
+  directive: **push on every major milestone** (Claude decides what counts), so origin tracks the latest
+  milestone without asking. M4 base at `243b695`, M0–M3 at `d623509`/`3ec6996`/`47addb9`/`fbac770`. `config_project/user_input/*.csv`
   (the runtime treatment registry) is gitignored (matching PL3). The repo root also carries unrelated pre-existing
   edits (Openn3App, Pipeline3App config, Shared) — NOT ours; leave them.
 - **Gate: 36 test FILES green** (data-independent; `test_i18n.py` + `test_validation_i18n.py` + `test_app_config.py`
