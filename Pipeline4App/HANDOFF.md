@@ -35,15 +35,12 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   re-theme - landed in STEP 1). NEXT: **STEP 3 / M6 Project Manager** (`config.use_project` + a toolbar
   [Project ▾]: folder projects, persisted root, recent, auto-reopen) · **STEP 4** ph200 Fill (CSV-driven,
   AFTER the GUI; confirm its 4 open decisions first).
-- **GIT STATE:** local **`pl4`** is at **`5da675c`** — **STEP 2 COMMITTED** (the 310/320 staging split:
-  `stage_iolist` + `annotate_cematrix`, `stage` = their composition, byte-identical `signals.csv`; the GUI 300
-  dropdown wired + 320 un-greyed; GUI-verified on screen). Preceded by **`7473ace`** STEP 1 (i18n + Monaspace
-  font + dark/light theme compatibility - the toolbar/notebook/status/title-bar all follow the theme toggle; the
-  startup-light-ttk fix moved `darktitle.apply` to LAST in `__init__`/`_toggle_theme`, not inside `apply_theme`,
-  so its `update_idletasks()` no longer flushes sv-ttk against a half-built window) + **`c5d5912`** the STEP 1
-  git-state refresh. **PUSHED** — `origin/pl4` synced through **`e96761c`** (STEP 1 + STEP 2). Standing
-  directive: **push on every major milestone** (Claude decides what counts), so origin tracks the latest
-  milestone without asking. M4 base at `243b695`, M0–M3 at `d623509`/`3ec6996`/`47addb9`/`fbac770`. `config_project/user_input/*.csv`
+- **GIT STATE:** local **`pl4`** is at **`a5b8cb6`** and **PUSHED** — `origin/pl4` synced through it. Recent
+  milestones: **`a5b8cb6`** GUI M5 Files tab (+ M0b chrome remainder marked done) · **`5da675c`** STEP 2 (the
+  310/320 staging split) · **`7473ace`** STEP 1 (i18n + Monaspace font + dark/light theme compatibility incl.
+  the startup-light-ttk fix). Standing directive: **push on every major milestone** (Claude decides what
+  counts), so origin tracks the latest milestone without asking. M4 base at `243b695`, M0–M3 at
+  `d623509`/`3ec6996`/`47addb9`/`fbac770`. `config_project/user_input/*.csv`
   (the runtime treatment registry) is gitignored (matching PL3). The repo root also carries unrelated pre-existing
   edits (Openn3App, Pipeline3App config, Shared) — NOT ours; leave them.
 - **Gate: 37 test FILES green** (data-independent; `test_gui_files.py` added at M5; `test_i18n.py` +
