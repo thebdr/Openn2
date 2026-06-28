@@ -13,34 +13,40 @@ from __future__ import annotations
 import os
 from dataclasses import replace
 
-from pipeline4.core import config, severity, treatments
+from pipeline4.core import config, i18n, severity, treatments
 from pipeline4.core.finding import Finding, record
 from pipeline4.io import render
 from pipeline4.domain import staging
-from pipeline4.domain.validation import crosscheck, iolist, matrix
+from pipeline4.domain.validation import crosscheck, iolist, matrix, messages
 
-_TITLES = {110: "Validate I/O List", 120: "Validate C&E Matrix",
-           130: "Cross-Check CEM->IOL", 140: "Cross-Check IOL->CEM"}
+# the sub-phase banner label KEYS (the registry's pb_* keys; resolved per language at render time)
+_BANNER_KEYS = {110: "pb_validate_iolist", 120: "pb_validate_ce",
+                130: "pb_xcheck_cem_iol", 140: "pb_xcheck_iol_cem"}
 _TREATABLE = ("FAIL", "ERROR", "WARN")
 
 
-def _banner(num: int) -> Finding:
-    return Finding(phase=num, type="", severity=severity.BANNER, detail=f"{num} {_TITLES[num]}")
+def _banner(num: int, lang: str = "en") -> Finding:
+    return Finding(phase=num, type="", severity=severity.BANNER,
+                   detail=f"{num} {i18n.tr(_BANNER_KEYS[num], lang)}")
 
 
-def run_validation(database=None, params: dict | None = None, out_dir: str | None = None) -> dict:
+def run_validation(database=None, params: dict | None = None, out_dir: str | None = None,
+                   lang: str = "en") -> dict:
     """Run phase 100 over the configured documents. `database` (the staged `signals`, for 130/140) is staged
-    when None; 110/120 read the raw workbooks from `params`. Records the treatable findings + saves, writes
-    the 4 reports. Returns {'findings','applied','paths','counts','dir'}."""
+    when None; 110/120 read the raw workbooks from `params`. The finding detail + the banners + the report
+    chrome are built in `lang` (the operator's language - this IS the point of i18n; default `en` keeps the
+    parity oracle English). Records the treatable findings + saves, writes the 4 reports. Returns
+    {'findings','applied','paths','counts','dir'}."""
     params = params or config.load_params()
     if database is None:
         database, _staging_findings = staging.stage(params)
 
-    findings = []
-    findings += iolist.run_iolist(params)                          # 110 (raw I/O List)
-    findings += matrix.run_ce_matrix(params)                       # 120 (raw C&E)
-    findings += crosscheck.run_xcheck_cem_iol(database, params)    # 130 (CEM -> IOL, SSOT)
-    findings += crosscheck.run_xcheck_iol_cem(database, params)    # 140 (IOL -> CEM, SSOT)
+    with messages.active_lang(lang):                                # findings build their detail in `lang`
+        findings = []
+        findings += iolist.run_iolist(params)                      # 110 (raw I/O List)
+        findings += matrix.run_ce_matrix(params)                   # 120 (raw C&E)
+        findings += crosscheck.run_xcheck_cem_iol(database, params)  # 130 (CEM -> IOL, SSOT)
+        findings += crosscheck.run_xcheck_iol_cem(database, params)  # 140 (IOL -> CEM, SSOT)
 
     # record only the ISSUES (FAIL/ERROR/WARN) into validation_issues - PASS/INFO/SKIP are report-only noise.
     record(database, [f for f in findings if f.severity in _TREATABLE])
@@ -53,13 +59,13 @@ def run_validation(database=None, params: dict | None = None, out_dir: str | Non
     items, last = [], None
     for f, eff in applied:
         if f.phase != last:
-            items.append(_banner(f.phase))
+            items.append(_banner(f.phase, lang))
             last = f.phase
         items.append(replace(f, severity=eff))
 
     out_dir = out_dir or config.validation_report_dir()
     os.makedirs(out_dir, exist_ok=True)
-    txt, html = render.reports(items), render.html_reports(items)
+    txt, html = render.reports(items), render.html_reports(items, lang)
     paths = {}
     for kind, stem in (("complete", config.VALIDATION_REPORT_STEM), ("errors", config.VALIDATION_ERRORS_STEM)):
         for ext, body in ((".txt", txt[kind]), (".html", html[kind])):

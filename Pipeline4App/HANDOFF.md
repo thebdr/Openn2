@@ -11,31 +11,45 @@ when domain judgement is needed (it's the user's; you implement). A question is 
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ## Where we are
-- **Branch `pl4`**. **THE BACKEND REBUILD IS COMPLETE: ALL 9 PHASES DONE** — 300 + 520 + 400 + 510 + 600 + 700 +
-  800 + 900 + **100 (Validation)** + the severity rollout S1–S6. Every phase is parity-verified vs PL3 and every
-  GUI button runs for real. (Out of scope by user decision: validation **150** diagnosis-slot + the **`accept`**
-  treatment. Known gap to rebuild configurable: **phase 200 Fill** — see its section below.)
+- **Branch `pl4`**. **8 OF THE 9 GENERATIVE PHASES ARE BUILT** — 300 + 520 + 400 + 510 + 600 + 700 + 800 + 900 +
+  **100 (Validation)** + the severity rollout S1–S6, each parity-verified vs PL3; every built GUI button runs
+  for real. **ph200 (Documents Fill Out) is NOT built** — the pipeline's 2nd phase that turns a RAW I/O List
+  into a classified one (§6 script_type, §7 index, §8 diag cabinet/bit, DiagnosisBlocks). PL4 staging READS
+  those fields; it does not COMPUTE them, so **PL4 currently requires a PRE-FILLED I/O List**. Building ph200
+  (CSV-driven) is **STEP 4** — see its section below. (Also out of scope by user decision: validation **150**
+  diagnosis-slot + the **`accept`** treatment.)
 - **THE GUI PORT IS THE ACTIVE EFFORT** — the live tracker + locked decisions are in **`GUI_PLAN.md`**.
   **M0 (worker thread + registry + notebook + Run-all) · M1 (structured clickable log) · M2 (Findings panel) ·
   M3 (Database Explorer, in-memory SQLite) · M4 (Run-all live progress/halt + sub-phase chevron dropdowns,
-  then REWORKED to the operator oracle `ButtonsLayout.xlsx`: full greyed-deferred button set + sub-buttons
-  that RUN THEIR SUB-PHASE via `handler(only=n)` + wired Open buttons + equal-width/width-matched bar)
-  are DONE.** NEXT: M5 (Files) · M6 (Project Manager) · M0b (chrome: fonts/dark-titlebar/re-theme).
-- **GIT STATE:** `origin/pl4` PUSHED + synced through **`d0ab114`** (GUI M4 + the oracle rework; M4 base at
-  `243b695`, M0–M3 at `d623509`/`3ec6996`/`47addb9`/`fbac770`). **Working tree is CLEAN** for PL4 — the only
-  untracked PL4 path is `config_project/user_input/` (the runtime treatment registry, gitignored-ish; leave
-  it). M4 + the rework were each adversarially reviewed pre-commit (5-dimension workflows); the confirmed
-  findings are hardened (see `GUI_PLAN.md` M4 — incl. the oracle slot-320 title fix). The repo root also
-  carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) — NOT ours; leave them.
-  - The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App config, Shared) from before
-    this session — NOT ours; leave them.
-- **Gate: 32 test FILES green** (data-independent; `test_gui_phasebar.py` added at M4). Run from `Pipeline4App/`:
+  REWORKED to the operator oracle `ButtonsLayout.xlsx`: full greyed-deferred button set + sub-buttons that RUN
+  THEIR SUB-PHASE via `handler(only=n)` + wired Open buttons + equal-width/width-matched bar) · STEP 1 i18n
+  (EN/IT, first-class - **the POINT is the LOGS**: `domain/validation/messages.py` bilingual [EN verbatim +
+  IT from PL3], a finding's detail built in the AMBIENT `messages.active_lang(lang)` so the validation log +
+  `.txt`/`.html` reports localize [PL3-faithful: uid hashes the localized detail]; plus the chrome via
+  `core/i18n.py` + registry `name_key`/`label_key` + the Lang toggle, persisted) are DONE.** NEXT (the
+  planning side-chat order): **STEP 2** (300 staging granularity — split 310 Stage I/O List
+  / 320 Stage C&E Matrix, byte-identical signals.csv) · **STEP 3** M5 Files · M6 Project Manager · M0b chrome
+  (fonts/dark-titlebar/re-theme) · **STEP 4** ph200 Fill (CSV-driven, AFTER the GUI; confirm its 4 open
+  decisions first).
+- **GIT STATE:** `origin/pl4` PUSHED + synced through **`d0ab114`** (GUI M4 + the oracle rework). **STEP 1
+  i18n is implemented but UNCOMMITTED** (commit on the user's word). M4 base at `243b695`, M0–M3 at
+  `d623509`/`3ec6996`/`47addb9`/`fbac770`. The only untracked PL4 path is `config_project/user_input/` (the
+  runtime treatment registry, gitignored-ish; leave it). M4 + the rework were each adversarially reviewed
+  pre-commit (5-dimension workflows); the confirmed findings are hardened (see `GUI_PLAN.md` M4 — incl. the
+  oracle slot-320 title fix). The repo root also carries unrelated pre-existing edits (Openn3App, Pipeline3App
+  config, Shared) — NOT ours; leave them.
+- **Gate: 36 test FILES green** (data-independent; `test_i18n.py` + `test_validation_i18n.py` + `test_app_config.py`
+  + `test_gui_fonts.py` added at STEP 1; STEP 1 also added the **always-plural** cosmetic [no `(s)`/`/i` hedge],
+  a **log-viewer Font dropdown** 10/12/14 [`LogView.set_font_size`, persisted], and the **app-wide Monaspace Neon
+  Var font at size 13** [`gui/fonts.py` + `theme.apply_theme`; M0b fonts done]). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`. The GUI is a manual `python launch_gui.py` check (no
   headless GUI tests; each GUI milestone unit-tests its pure logic + a construction smoke).
-- **START THE NEXT SESSION HERE → `GUI_PLAN.md`** (the live GUI tracker). M0/M1/M2/M3/M4 done; **NEXT = M5
-  (Files tab)** — the 3-section tree (config / user-editable / output) + a CSV grid through the codec +
-  object editor (yaml/json/xml) + xlsx read-only viewer + external-edit (PL3's `gui/files.py`/`grid.py`/
-  `objedit.py`/`xlsxview.py`/`extedit.py` are the near-drop-in source). Then M6 (Project Manager) · M0b
+- **START THE NEXT SESSION HERE → `GUI_PLAN.md`** (the live GUI tracker). M0–M4 + STEP 1 i18n done; **NEXT =
+  STEP 2** (300 staging granularity — split `staging.stage()` into `stage_iolist()` + `annotate_cematrix()`
+  so 310/320 each do real work; 320 auto-runs 310; byte-identical `signals.csv`/`diagnosis_cabinets.csv` vs
+  the pre-split stage — a refactor, verify parity). Then **STEP 3** M5 Files (the 3-section tree + a CSV grid
+  through the codec + object editor + xlsx viewer + external-edit; PL3's `gui/files.py`/`grid.py`/
+  `objedit.py`/`xlsxview.py`/`extedit.py` are the near-drop-in source) · M6 (Project Manager) · M0b
   (chrome: fonts/dark-titlebar/re-theme). The Run-all **stage-once** optimization stays deferred (optional).
   The backend `## phase 200 (Fill)` section below is the other open backend item.
 - **SEVERITY model (COMPLETE — historical detail; the rollout S1–S6 is done).** Taxonomy (`core/severity.py`):
@@ -265,11 +279,13 @@ config edit, not code.
    index/diag are the larger, stateful parts (PL3's idempotent stable-ID allocation).
 **Parity oracle:** PL3's populator over the same raw doc → compare the computed script_type/index/diag per row.
 
-## THE REBUILD IS COMPLETE — NEXT EFFORT: the GUI port (see `GUI_PLAN.md`)
-All 9 phases (300/520/400/510/600/700/800/900/100) + the S1–S6 severity model are DONE, each parity-verified vs
-PL3; every GUI button runs for real. **The active effort is now the GUI port — the plan + locked decisions are
-in `Pipeline4App/GUI_PLAN.md`** (replicate PL3's GUI + add the SSOT-native Findings panel, Database Explorer
-[in-memory SQLite], and Run-all/live-progress; NEW features first). **M0 (foundations) DONE (uncommitted):** the
+## 8 OF 9 GENERATIVE PHASES BUILT (ph200 Fill NOT built) — ACTIVE EFFORT: the GUI port (see `GUI_PLAN.md`)
+The 8 generative phases (300/520/400/510/600/700/800/900/100) + the S1–S6 severity model are DONE, each
+parity-verified vs PL3; every built GUI button runs for real. **ph200 (Documents Fill Out) is NOT built** — PL4
+requires a pre-filled I/O List until STEP 4 builds it (CSV-driven; see the `phase 200` section above). **The
+active effort is the GUI port — the plan + locked decisions are in `Pipeline4App/GUI_PLAN.md`** (replicate PL3's
+GUI + add the SSOT-native Findings panel, Database Explorer [in-memory SQLite], and Run-all/live-progress; NEW
+features first; **EN/IT i18n is a first-class shipped feature — STEP 1, DONE**). **M0 (foundations) DONE (uncommitted):** the
 `gui/phases.py` registry + the worker thread/queue-drain pump + a basic Run-all + the notebook scaffold (single
 -phase runs no longer freeze the window). **M2 (Findings panel) DONE (uncommitted):** a Treeview tab over
 `validation_issues` ⋈ the treatment registry with right-click 1-click treatments. **M3 (Database Explorer)

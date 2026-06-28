@@ -200,16 +200,72 @@ def app_config_file() -> str:
     return os.path.join(config_project_dir(), "app_config.yaml")
 
 
+APP_FONT_SIZES = (10, 12, 14)             # the log-viewer Font dropdown choices
+_DEFAULT_FONT_SIZE = 10
+
+
+def _resolve_font_size(value) -> int:
+    """Coerce a stored font-size value to one of APP_FONT_SIZES (default 10 on anything else)."""
+    try:
+        size = int(value)
+    except (TypeError, ValueError):
+        return _DEFAULT_FONT_SIZE
+    return size if size in APP_FONT_SIZES else _DEFAULT_FONT_SIZE
+
+
 def load_app_ui() -> dict:
     """The `user_interface` block of app_config.yaml. `log_levels` -> the SET of log levels the GUI shows
     (`severity.resolve_set`: single chars or full names, first-char parsed; the PHASE banner always
-    shown). Absent file/key -> `severity.default_shown()` (all finding levels except DEBUG)."""
-    from pipeline4.core import severity
+    shown). `language` -> the GUI language code (`en`/`it`, default `en`). `font_size` -> the log-viewer
+    font size (one of APP_FONT_SIZES, default 10). Absent file/key -> `severity.default_shown()` (all
+    finding levels except DEBUG) + `en` + 10."""
+    from pipeline4.core import severity, i18n
     path = app_config_file()
     cfg = _read_yaml(path) if os.path.exists(path) else {}
     ui = (cfg.get("user_interface") or {}) if isinstance(cfg, dict) else {}
     raw = ui.get("log_levels")
-    return {"log_levels": severity.resolve_set(raw) if raw else severity.default_shown()}
+    return {"log_levels": severity.resolve_set(raw) if raw else severity.default_shown(),
+            "language": i18n.normalize(ui.get("language")),
+            "font_size": _resolve_font_size(ui.get("font_size"))}
+
+
+def save_app_font_size(size) -> None:
+    """Persist the log-viewer font size to `app_config.yaml` `user_interface.font_size` (one of
+    APP_FONT_SIZES). Round-trips the file so its comments survive."""
+    from ruamel.yaml import YAML
+    path = app_config_file()
+    yaml = YAML()                                   # round-trip mode - preserves comments
+    data = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            data = yaml.load(handle) or {}
+    ui = data.get("user_interface")
+    if not isinstance(ui, dict):                    # an absent OR empty (`user_interface:`) block -> {}
+        ui = data["user_interface"] = {}
+    ui["font_size"] = _resolve_font_size(size)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        yaml.dump(data, handle)
+
+
+def save_app_language(lang: str) -> None:
+    """Persist the GUI language to `app_config.yaml` `user_interface.language` (`en`/`it`). Round-trips the
+    file so its comments survive."""
+    from ruamel.yaml import YAML
+    from pipeline4.core import i18n
+    path = app_config_file()
+    yaml = YAML()                                   # round-trip mode - preserves comments
+    data = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            data = yaml.load(handle) or {}
+    ui = data.get("user_interface")
+    if not isinstance(ui, dict):                    # an absent OR empty (`user_interface:`) block -> {}
+        ui = data["user_interface"] = {}
+    ui["language"] = i18n.normalize(lang)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        yaml.dump(data, handle)
 
 
 def save_app_log_levels(levels) -> None:
@@ -228,7 +284,10 @@ def save_app_log_levels(levels) -> None:
     if os.path.exists(path):
         with open(path, encoding="utf-8") as handle:
             data = yaml.load(handle) or {}
-    data.setdefault("user_interface", {})["log_levels"] = codes
+    ui = data.get("user_interface")
+    if not isinstance(ui, dict):                    # an absent OR empty (`user_interface:`) block -> {}
+        ui = data["user_interface"] = {}
+    ui["log_levels"] = codes
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         yaml.dump(data, handle)

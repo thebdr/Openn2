@@ -152,7 +152,7 @@ class Table:
             reader = csv.reader(handle)
             header = next(reader, [])
             if len(set(header)) != len(header):
-                raise ValueError(f"{self.name}: duplicate column name(s) in header {header}")
+                raise ValueError(f"{self.name}: duplicate column names in header {header}")
             self.rows = []
             for index, raw in enumerate(reader):
                 if len(raw) != len(header):

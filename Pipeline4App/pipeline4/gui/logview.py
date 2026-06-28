@@ -16,23 +16,27 @@ from tkinter import ttk
 from pipeline4.gui import theme
 from pipeline4.io.render import banner_lines
 
-_ACCENT = theme.LOG_COLORS["PHASE"][0]            # the clickable-link colour
+_ACCENT_DARK = theme.LOG_COLORS["PHASE"][0]        # clickable-link colour in dark mode
+_ACCENT = _ACCENT_DARK                            # module-level default (dark)
 _TREATABLE = ("FAIL", "ERROR", "WARN")
 _ALWAYS_SHOWN = ("PHASE", "FAIL", "ERROR")        # never hideable from the GUI (banners + the failures)
 
 
 class LogView(ttk.Frame):
-    def __init__(self, parent, shown_levels=None, on_link=None, on_errtreat=None, **kw):
+    def __init__(self, parent, shown_levels=None, on_link=None, on_errtreat=None, font_size=None, **kw):
         super().__init__(parent, **kw)
         self.shown_levels = set(shown_levels) if shown_levels is not None else set(theme.LOG_COLORS)
         self.on_link = on_link                    # on_link(doc, sheet, cell)
         self.on_errtreat = on_errtreat            # on_errtreat(uid, level)
         self._links = 0
         self._errs = 0
+        self._family = theme.MONO_FONT[0]         # the log font family + a live-resizable size (Font dropdown)
+        self._size = int(font_size or theme.MONO_FONT[1])
+        self._accent = _ACCENT_DARK               # updated by set_theme() on a mode toggle
 
         self.text = tk.Text(self, wrap="none", relief="flat", borderwidth=0, state="disabled",
                             background=theme.DARK_BG, foreground=theme.DARK_FG,
-                            insertbackground=theme.DARK_FG, font=theme.MONO_FONT, padx=8, pady=6)
+                            insertbackground=theme.DARK_FG, font=(self._family, self._size), padx=8, pady=6)
         vs = ttk.Scrollbar(self, orient="vertical", command=self.text.yview)
         hs = ttk.Scrollbar(self, orient="horizontal", command=self.text.xview)
         self.text.configure(yscrollcommand=vs.set, xscrollcommand=hs.set)
@@ -44,7 +48,7 @@ class LogView(ttk.Frame):
 
         for level, (color, bold) in theme.LOG_COLORS.items():
             self.text.tag_configure(level, foreground=color,
-                                    font=(theme.MONO_FONT[0], theme.MONO_FONT[1], "bold" if bold else "normal"))
+                                    font=(self._family, self._size, "bold" if bold else "normal"))
         self.text.tag_configure("errlink", underline=True)
         self.text.tag_bind("errlink", "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
         self.text.tag_bind("errlink", "<Leave>", lambda _e: self.text.configure(cursor=""))
@@ -56,9 +60,17 @@ class LogView(ttk.Frame):
         level = (level or "INFO").upper()
         tag = level if level in theme.LOG_COLORS else "INFO"
         self.text.configure(state="normal")
+        if level == "PHASE":
+            self._phase_gap()
         self.text.insert("end", f"{message}\n", tag)
         self.text.see("end")
         self.text.configure(state="disabled")
+
+    def _phase_gap(self) -> None:
+        """Two blank lines (2 CRLF) before a blue PHASE banner/title, so each phase block gets breathing
+        room. Skipped at the very top of the log (no leading gap)."""
+        if self.text.compare("end-1c", ">", "1.0"):
+            self.text.insert("end", "\n\n")
 
     def append_records(self, records) -> None:
         """Append structured records (`io.render.render_records`): banners, level-coloured finding lines,
@@ -66,7 +78,8 @@ class LogView(ttk.Frame):
         self.text.configure(state="normal")
         for rec in records:
             if rec.kind == "banner":
-                for line in banner_lines(rec.text):
+                self._phase_gap()                       # 2 CRLF before the blue title
+                for line in banner_lines(rec.text)[1:]:  # drop banner_lines' own leading blank; the gap owns it
                     self.text.insert("end", line + "\n", "PHASE")
                 continue
             start = self.text.index("end-1c")
@@ -84,6 +97,27 @@ class LogView(ttk.Frame):
         self.shown_levels = set(levels) | set(_ALWAYS_SHOWN)
         self._apply_elide()
 
+    def set_theme(self, mode: str) -> None:
+        """Re-theme the log pane for a light/dark mode switch: background, foreground, all level tag
+        colours, and the link accent colour. New content after this call uses the new palette; existing
+        content keeps its old colours (the Text is not re-rendered)."""
+        self._accent = theme.LOG_COLORS_LIGHT["PHASE"][0] if mode != "dark" else _ACCENT_DARK
+        bg = theme.bg_for(mode)
+        fg = theme.fg_for(mode)
+        self.text.configure(background=bg, foreground=fg, insertbackground=fg)
+        for level, (color, bold) in theme.log_colors_for(mode).items():
+            self.text.tag_configure(level, foreground=color,
+                                    font=(self._family, self._size, "bold" if bold else "normal"))
+
+    def set_font_size(self, size: int) -> None:
+        """Resize the log font live (the Text body + every level tag, preserving each tag's bold). The
+        dynamic link/errlink tags carry no font, so they inherit the new size. The host persists the choice
+        to app_config.yaml."""
+        self._size = int(size)
+        self.text.configure(font=(self._family, self._size))
+        for level, (_color, bold) in theme.LOG_COLORS.items():
+            self.text.tag_configure(level, font=(self._family, self._size, "bold" if bold else "normal"))
+
     def _apply_elide(self) -> None:
         for level in theme.LOG_COLORS:
             self.text.tag_configure(level, elide=(level not in self.shown_levels and level not in _ALWAYS_SHOWN))
@@ -97,7 +131,7 @@ class LogView(ttk.Frame):
         tag = f"link{self._links}"
         self._links += 1
         self.text.tag_add(tag, s, e)
-        self.text.tag_configure(tag, foreground=_ACCENT, underline=True)
+        self.text.tag_configure(tag, foreground=self._accent, underline=True)
         self.text.tag_bind(tag, "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
         self.text.tag_bind(tag, "<Leave>", lambda _e: self.text.configure(cursor=""))
         self.text.tag_bind(tag, "<Button-1>",

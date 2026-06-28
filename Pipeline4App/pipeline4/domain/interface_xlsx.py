@@ -457,7 +457,7 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
             seeded = _interface_address_caches(if_path)
             if seeded:
                 to_patch.setdefault(title, {}).update(seeded)
-                actions.append(f"{title}: seeded {len(seeded)} I/O Address Side 1 value(s) (Excel-independent)")
+                actions.append(f"{title}: seeded {len(seeded)} I/O Address Side 1 values (Excel-independent)")
         repl = {}
         for nm, cc in to_patch.items():
             part = tparts.get(nm)

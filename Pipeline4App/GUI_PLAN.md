@@ -1,8 +1,11 @@
 # PL4 — GUI PORT PLAN
 
-The PL4 **backend rebuild is COMPLETE** (all 9 phases + the S1–S6 severity model, each parity-verified vs
-PL3; `HANDOFF.md` has the backend state). This is the plan for the **GUI port**: replicate PL3's operator GUI
-**and** add the SSOT-native features PL3 could never have. Same toolkit as PL3 (Tkinter + sv-ttk + Monaspace).
+The PL4 backend has **8 of the 9 generative phases built** (300/520/400/510/600/700/800/900/100 + the S1–S6
+severity model, each parity-verified vs PL3) — **ph200 (Documents Fill Out) is NOT built**, so PL4 currently
+requires a **PRE-FILLED I/O List** (it READS script_type/index/diag, it does not COMPUTE them); ph200 is the
+last backend effort (STEP 4). `HANDOFF.md` has the backend state. This is the plan for the **GUI port**:
+replicate PL3's operator GUI **and** add the SSOT-native features PL3 could never have, with **EN/IT i18n a
+first-class shipped feature** (STEP 1, DONE). Same toolkit as PL3 (Tkinter + sv-ttk + Monaspace).
 
 ## Locked decisions (user, 2026-06-28)
 1. **Sequence: NEW features first** — foundations (worker thread) → Findings panel → Database Explorer →
@@ -51,8 +54,11 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   a stage-once shared DB). The **`ttk.Notebook`** scaffold (the Log tab; Findings/Explorer/Files tabs slot in
   later). `phasebar` is registry-driven + `set_enabled`. Tests: `test_gui_phases.py` (4). Verified: py_compile +
   a headless construction smoke (9 buttons, 1 tab, drain wired); the live worker-run is the manual launch check.
-  **DEFERRED to M0b** (chrome, independent verbatim ports): `fonts.py` (the Monaspace TTF) + `darktitle.py` +
-  the `theme`/`LogView` re-theme.
+  **M0b partly DONE:** `gui/fonts.py` (port of PL3's - registers the bundled `assets/fonts/MonaspaceNeon-Var.ttf`
+  privately via `AddFontResourceEx(FR_PRIVATE)`, resolves `Monaspace Neon Var`, Consolas fallback) +
+  `theme.apply_theme` now makes it the **app-wide UI font at `APP_FONT_SIZE=13`** (the named Tk fonts +
+  `theme.MONO_FONT`; chrome + phase bar + log). STILL DEFERRED to M0b: `darktitle.py` (dark Windows title bar)
+  + a full light/dark `LogView` re-theme. Test: `test_gui_fonts.py`.
 - **M1 — Structured clickable log. DONE** (PL3 parity). `LogView` rewritten as a Frame+Text with v/h
   scrollbars + `append_records` (over `io.render.render_records`): banners, level-coloured lines, **clickable
   `Sheet!Cell` spans** → `gui/excel.py` (verbatim COM port; reuse an open Excel, graceful `os.startfile`
@@ -125,8 +131,30 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
   subsume the generic CSV grid.)
 - **M6 — Project Manager**: port `project/project.py` + `state.py` (folder projects, persisted root, recent,
   auto-reopen) + the toolbar cluster. `config.use_project()` already routes the loaders/Database/Output.
-- **M7 — Polish**: theme/size persistence (`app_config.yaml` already read by `load_app_ui`), log-to-file,
-  EN/IT (optional, low priority — needs a `core/i18n.py`).
+- **i18n (EN/IT) — DONE (STEP 1, first-class, NOT polish).** The POINT of i18n here is the operator-facing
+  **validation LOGS + reports** (an Italian operator must read the findings in Italian), with the chrome a
+  secondary benefit.
+  - **The LOGS (the core):** `domain/validation/messages.py` is now **bilingual** (the 50 `v_*` slugs, EN
+    verbatim [byte-identical, parity-verified] + IT from PL3). A finding's `detail` is built in the ACTIVE
+    language - PL3's `tr("v_<type>", ctx.lang)` model, ported as an **ambient** `messages.active_lang(lang)`
+    (PL4 has no ctx; the GUI runs one phase at a time so the ambient is single-threaded; default `en` keeps
+    the parity oracle English). So the 53 builder call sites + `io/render.py` are UNTOUCHED - the rendered
+    log line + the `.txt`/`.html` reports come out localized. `phase.run_validation(…, lang)` wraps the 4
+    validators in `active_lang`, localizes the sub-phase banners (`_BANNER_KEYS` -> the registry `pb_*`
+    keys), and `render.html_reports(items, lang)` localizes the report title + summary (`rpt_*` keys). The
+    GUI `_run_validation` threads `self.lang` (the `only=None` full run + an `active_lang` wrap for an
+    individual `only=110/120/130/140` validator). **PL3-faithful: the `uid` hashes the localized detail**,
+    so treatments key per operating language (an operator works in one language). Verified on real data: the
+    EN/IT banners + WARN finding text differ correctly; EN byte-identical to pre-i18n.
+  - **The CHROME:** `core/i18n.py` (`tr(key, lang, **fmt)`) + `gui/phases.py` `name_key`/`label_key` (no
+    English literals) + `phasebar.PhaseBar(lang=…)`/`set_lang()` + the toolbar **Lang EN/IT** button
+    (live-retranslates the bar + toolbar + tabs + status; persists to `app_config.yaml` via
+    `config.load_app_ui()["language"]` + `save_app_language`).
+  - **Stays EN** (a noted boundary, PL3-consistent): the GENERATOR run-log data-lines (`staged 269 signals`,
+    `projected 9 XMLs`) + the non-100 phase banners. Tests: `test_validation_i18n.py` (6) + `test_i18n.py`
+    (5) + `test_gui_phases.py` (`labels_resolve_in_both_languages`); a headless EN<->IT chrome toggle smoke +
+    a real-data EN-vs-IT report check.
+- **M7 — Polish**: theme/size persistence (`app_config.yaml` already read by `load_app_ui`), log-to-file.
 
 ## Risks / gotchas
 - **JSON cells corrupt under a naive grid edit** — any table edit MUST go through `table.read_csv`/`write_csv`

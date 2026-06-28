@@ -17,12 +17,13 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from pipeline4.core import i18n
 from pipeline4.gui import phases, theme
 
 _CHEVRON = "▼"           # opens a phase's sub-button dropdown
 _SEP = "➡"               # between phase headers
-_BTN_WIDTH = 16          # header / run / sub-button width in chars (EQUAL width); labels word-wrap to fit
-_WRAP = 16               # label word-wrap width (chars)
+_BTN_WIDTH = 13          # header / run / sub-button width in chars (EQUAL width); labels word-wrap to fit
+_WRAP = 13               # label word-wrap width (chars)
 
 
 def _wrap(text: str, width: int) -> str:
@@ -39,7 +40,7 @@ def _wrap(text: str, width: int) -> str:
     return "\n".join(lines)
 
 
-def _button(parent, label, kind, command, *, bold=False, width=_BTN_WIDTH):
+def _button(parent, label, kind, command, *, bold=False, width=_BTN_WIDTH, pady=6):
     """A coloured classic tk.Button for the phase bar / dropdown (disabled when command is None)."""
     fill_kind = kind if command is not None else "disabled"
     weight = "bold" if bold else "normal"
@@ -47,7 +48,7 @@ def _button(parent, label, kind, command, *, bold=False, width=_BTN_WIDTH):
         parent, text=label, command=command, width=width,
         bg=theme.BUTTON_FILLS[fill_kind], fg=theme.BUTTON_FG[fill_kind],
         activebackground=theme.BUTTON_FILLS[fill_kind], activeforeground=theme.BUTTON_FG[fill_kind],
-        relief="flat", borderwidth=0, padx=6, pady=6, cursor="hand2",
+        relief="flat", borderwidth=0, padx=6, pady=pady, cursor="hand2",
         font=(theme.MONO_FONT[0], theme.MONO_FONT[1], weight),
     )
     if command is None:
@@ -88,7 +89,7 @@ class _Dropdown(tk.Toplevel):
     """An anchored, click-away-to-close popup of a phase's sub-buttons. Its width matches the anchor
     (the chevron/header column above it); a thin divider separates the action steps from open/special."""
 
-    def __init__(self, root, anchor, specs, ignore, on_close):
+    def __init__(self, root, anchor, specs, ignore, on_close, mode="dark"):
         super().__init__(root)
         self.withdraw()                       # build off-screen, show only once positioned
         self._owner = root                    # never name this `_root` - it shadows a tk method
@@ -105,7 +106,7 @@ class _Dropdown(tk.Toplevel):
 
         border = tk.Frame(self, bg=theme.BUTTON_FILLS["chevron"], padx=1, pady=1)
         border.pack(fill="both", expand=True)
-        inner = tk.Frame(border, bg=theme.DARK_BG)
+        inner = tk.Frame(border, bg=theme.bg_for(mode))
         inner.pack(fill="both", expand=True)
         col_chars = max(1, _BTN_WIDTH)
         prev_section = None
@@ -179,12 +180,17 @@ class PhaseBar(tk.Frame):
     `on_phase(number, title)` runs a whole phase (or Run-all for number 0); `resolve_sub(phase, sub)`
     returns a sub-button's command (None = disabled/greyed)."""
 
-    def __init__(self, parent, on_phase, resolve_sub):
-        super().__init__(parent, bg=theme.DARK_BG)
+    def __init__(self, parent, on_phase, resolve_sub, lang="en", mode="dark"):
+        super().__init__(parent, bg=theme.phasebar_bg(mode))
         self._on_phase = on_phase
         self._resolve_sub = resolve_sub
+        self._lang = i18n.normalize(lang)
+        self._mode = mode
         self._buttons: list = []              # the run master + phase headers (greyed during a run)
+        self._headers: list = []              # (button, phase) pairs to re-translate on a lang toggle
         self._chevrons: list = []
+        self._separators: list = []           # tk.Label ➡ separators between phase columns
+        self._spacers: list = []              # tk.Frame placeholders for phases with no sub-buttons
         self._open: _Dropdown | None = None
         self._open_chevron = None
         self.bind("<Destroy>", lambda e: self.close() if e.widget is self else None)
@@ -193,28 +199,34 @@ class PhaseBar(tk.Frame):
         phase_seen = 0
         for phase in phases.PHASES:
             if phase.number == 0:             # the pink Run master, spanning both rows on the left
-                run = _button(self, _wrap(phase.title, _WRAP), "run",
-                              lambda n=0, lbl=phase.title: on_phase(n, lbl), bold=True)
+                run = _button(self, _wrap(i18n.tr(phase.name_key, self._lang), _WRAP), "run",
+                              lambda n=0, k=phase.name_key: on_phase(n, i18n.tr(k, self._lang)), bold=True)
                 run.grid(row=0, column=col, rowspan=2, sticky="nsew", padx=(2, 8), pady=3)
                 self._buttons.append(run)
+                self._headers.append((run, phase))
                 col += 1
                 continue
             if phase_seen > 0:                # a ➡ only BETWEEN phases (not after Run / before the first)
-                ttk.Label(self, text=_SEP, background=theme.DARK_BG, foreground=theme.DARK_FG,
-                          font=(theme.MONO_FONT[0], 13)).grid(row=0, column=col, padx=1)
+                sep = tk.Label(self, text=_SEP, bg=theme.phasebar_bg(self._mode),
+                               fg=theme.fg_for(self._mode), font=(theme.MONO_FONT[0], 13))
+                sep.grid(row=0, column=col, padx=1)
+                self._separators.append(sep)
                 col += 1
-            header = _button(self, _wrap(f"{phase.number}  {phase.title}", _WRAP), "phase",
-                             lambda n=phase.number, lbl=phase.title: on_phase(n, lbl), bold=True)
+            header = _button(self, _wrap(f"{phase.number}  {i18n.tr(phase.name_key, self._lang)}", _WRAP), "phase",
+                             lambda n=phase.number, k=phase.name_key: on_phase(n, i18n.tr(k, self._lang)), bold=True)
             header.grid(row=0, column=col, sticky="nsew", padx=1, pady=(3, 0))
             self._buttons.append(header)
+            self._headers.append((header, phase))
             if phase.subs:
-                chev = _button(self, _CHEVRON, "chevron", None)
+                chev = _button(self, _CHEVRON, "chevron", None, pady=1)
                 chev.configure(command=lambda p=phase, c=chev: self._toggle(p, c),
                                state="normal", cursor="hand2")
                 chev.grid(row=1, column=col, sticky="nsew", padx=1, pady=(0, 3))
                 self._chevrons.append(chev)
             else:                             # display-only phase (no sub-steps) - a thin spacer row
-                tk.Frame(self, bg=theme.DARK_BG, height=4).grid(row=1, column=col, sticky="nsew")
+                sp = tk.Frame(self, bg=theme.phasebar_bg(self._mode), height=4)
+                sp.grid(row=1, column=col, sticky="nsew")
+                self._spacers.append(sp)
             phase_seen += 1
             col += 1
 
@@ -226,12 +238,14 @@ class PhaseBar(tk.Frame):
         specs = []
         for sub in phase.subs:
             command = self._resolve_sub(phase, sub)
-            specs.append((f"{sub.number}  {sub.title}", sub.kind, command, _section(sub)))
+            label = f"{sub.number}  {i18n.tr(sub.label_key, self._lang)}"
+            specs.append((label, sub.kind, command, _section(sub)))
         # wrap each command so firing it also closes the dropdown
         specs = [(label, kind, (None if cmd is None else (lambda c=cmd: self._fire_through(c))), section)
                  for (label, kind, cmd, section) in specs]
         root = self.winfo_toplevel()
-        self._open = _Dropdown(root, chevron, specs, ignore=self._chevrons, on_close=self._cleared)
+        self._open = _Dropdown(root, chevron, specs, ignore=self._chevrons, on_close=self._cleared,
+                               mode=self._mode)
         self._open_chevron = chevron
 
     def _fire_through(self, command):
@@ -258,3 +272,29 @@ class PhaseBar(tk.Frame):
             chevron.configure(state=state)
         if not enabled:
             self.close()
+
+    def set_lang(self, lang: str) -> None:
+        """Re-translate the bar in place for a new language (the run master + the phase headers; the chevron
+        dropdowns re-resolve from `self._lang` each time they open)."""
+        self._lang = i18n.normalize(lang)
+        self.close()                          # a stale-language dropdown must not linger
+        for button, phase in self._headers:
+            if phase.number == 0:
+                text = _wrap(i18n.tr(phase.name_key, self._lang), _WRAP)
+            else:
+                text = _wrap(f"{phase.number}  {i18n.tr(phase.name_key, self._lang)}", _WRAP)
+            button.configure(text=text)
+
+    def set_theme(self, mode: str) -> None:
+        """Re-theme the bar for a light/dark mode switch: update the frame background, the ➡ separators,
+        and the spacer frames. Phase buttons keep their oracle fills (they work in both modes). Closes any
+        open dropdown so it reopens fresh-themed on the next chevron click."""
+        self._mode = mode
+        pb_bg = theme.phasebar_bg(mode)
+        pb_fg = theme.fg_for(mode)
+        self.configure(bg=pb_bg)
+        for sep in self._separators:
+            sep.configure(bg=pb_bg, fg=pb_fg)
+        for sp in self._spacers:
+            sp.configure(bg=pb_bg)
+        self.close()

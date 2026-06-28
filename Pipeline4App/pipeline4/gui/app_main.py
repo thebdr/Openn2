@@ -19,7 +19,7 @@ import tkinter as tk
 import traceback
 from tkinter import ttk
 
-from pipeline4.core import config, severity, treatments
+from pipeline4.core import config, i18n, severity, treatments
 from pipeline4.gui import excel, findings_view, phases, theme
 from pipeline4.gui.db_explorer import DatabaseExplorer
 from pipeline4.gui.findings_panel import FindingsPanel
@@ -36,59 +36,78 @@ class App:
         self._busy = False
         self._run_halted = False              # set by _gate on a blocking FAIL -> Run-all stops the chain
         self._q: queue.Queue = queue.Queue()
+        app_ui = config.load_app_ui()
+        self.lang = app_ui["language"]        # en | it (live-toggled by the Lang button, persisted)
+        shown0 = app_ui["log_levels"]
         root.title(APP_TITLE)
         root.geometry("1180x720")
         backend = theme.apply_theme(root, self.mode)
 
         toolbar = ttk.Frame(root)
         toolbar.pack(side="top", fill="x", padx=8, pady=(8, 4))
-        ttk.Label(toolbar, text="PIPELINE4", font=("Consolas", 13, "bold")).pack(side="left", padx=(2, 14))
-        ttk.Button(toolbar, text="Theme", command=self._toggle_theme).pack(side="left", padx=2)
-        ttk.Button(toolbar, text="Clear Log", command=self._clear).pack(side="left", padx=2)
+        ttk.Label(toolbar, text="PIPELINE4", font=(theme.MONO_FONT[0], 14, "bold")).pack(side="left", padx=(2, 14))
+        self._tb_theme = ttk.Button(toolbar, text=i18n.tr("tb_theme", self.lang), command=self._toggle_theme)
+        self._tb_theme.pack(side="left", padx=2)
+        self._tb_clear = ttk.Button(toolbar, text=i18n.tr("tb_clear_log", self.lang), command=self._clear)
+        self._tb_clear.pack(side="left", padx=2)
         self._level_vars = {}                     # the Levels dropdown: a checkbutton per severity level
-        levels_mb = ttk.Menubutton(toolbar, text="Levels ▾")
-        levels_menu = tk.Menu(levels_mb, tearoff=0)
-        shown0 = config.load_app_ui()["log_levels"]
+        self._levels_mb = ttk.Menubutton(toolbar, text=i18n.tr("tb_levels", self.lang) + " ▾")
+        levels_menu = tk.Menu(self._levels_mb, tearoff=0)
         for level in severity.LEVELS:             # FAIL, ERROR, WARN, INFO, SKIP, PASS, DEBUG
             forced = level in ("FAIL", "ERROR")   # always shown, greyed out (can't be disabled)
             var = tk.BooleanVar(value=forced or level in shown0)
             self._level_vars[level] = var
             levels_menu.add_checkbutton(label=level, variable=var, command=self._on_levels_changed,
                                         state="disabled" if forced else "normal")
-        levels_mb.configure(menu=levels_menu)
-        levels_mb.pack(side="left", padx=6)
+        self._levels_mb.configure(menu=levels_menu)
+        self._levels_mb.pack(side="left", padx=6)
+        self._tb_lang = ttk.Button(toolbar, text=f"{i18n.tr('tb_lang', self.lang)}: {self.lang.upper()}",
+                                   command=self._toggle_lang)
+        self._tb_lang.pack(side="left", padx=2)
+        self._tb_font_label = ttk.Label(toolbar, text=i18n.tr("tb_font", self.lang))
+        self._tb_font_label.pack(side="left", padx=(10, 2))
+        self._font_combo = ttk.Combobox(toolbar, width=3, state="readonly",
+                                        values=[str(s) for s in config.APP_FONT_SIZES])
+        self._font_combo.set(str(app_ui["font_size"]))
+        self._font_combo.bind("<<ComboboxSelected>>", self._on_font_size)
+        self._font_combo.pack(side="left", padx=2)
         self._backend_label = ttk.Label(toolbar, text=f"theme: {backend}")
         self._backend_label.pack(side="right", padx=2)
 
-        self.phasebar = PhaseBar(root, self._on_phase, self._sub_command)
+        self.phasebar = PhaseBar(root, self._on_phase, self._sub_command, lang=self.lang)
         self.phasebar.pack(side="top", fill="x", padx=8, pady=2)
 
         # the status bar + the busy progressbar live at the bottom (progress just above the status line).
-        self.status = ttk.Label(root, text="Ready", anchor="w", relief="sunken")
+        self.status = ttk.Label(root, text=i18n.tr("st_ready", self.lang), anchor="w", relief="sunken")
         self.status.pack(side="bottom", fill="x")
         self.progress = ttk.Progressbar(root, mode="indeterminate")
         self.progress.pack(side="bottom", fill="x")
 
         # the Log notebook (Findings / Database Explorer / Files tabs join here in later milestones).
         self.notebook = ttk.Notebook(root)
-        log_tab = ttk.Frame(self.notebook)
-        self.log = LogView(log_tab, shown_levels=config.load_app_ui()["log_levels"],
+        self._log_tab = ttk.Frame(self.notebook)
+        self.log = LogView(self._log_tab, shown_levels=shown0, font_size=app_ui["font_size"],
                            on_link=self._on_link, on_errtreat=self._on_errtreat)
         self.log.pack(side="top", fill="both", expand=True)
-        self.notebook.add(log_tab, text="Log")
-        findings_tab = ttk.Frame(self.notebook)
-        self.findings = FindingsPanel(findings_tab)
+        self.notebook.add(self._log_tab, text=i18n.tr("tab_log", self.lang))
+        self._findings_tab = ttk.Frame(self.notebook)
+        self.findings = FindingsPanel(self._findings_tab)
         self.findings.pack(side="top", fill="both", expand=True)
-        self.notebook.add(findings_tab, text="Findings")
-        explorer_tab = ttk.Frame(self.notebook)
-        self.explorer = DatabaseExplorer(explorer_tab)
+        self.notebook.add(self._findings_tab, text=i18n.tr("tab_findings", self.lang))
+        self._explorer_tab = ttk.Frame(self.notebook)
+        self.explorer = DatabaseExplorer(self._explorer_tab)
         self.explorer.pack(side="top", fill="both", expand=True)
-        self.notebook.add(explorer_tab, text="Database Explorer")
+        self.notebook.add(self._explorer_tab, text=i18n.tr("tab_explorer", self.lang))
         self.notebook.pack(side="top", fill="both", expand=True, padx=8, pady=6)
 
         self.log.append("PHASE", "Pipeline4 - SSOT database build")
         self.log.append("INFO", f"theme backend: {backend}")
         self.log.append("INFO", "Click a phase to run it (on a worker thread), or Run Pipeline for all.")
+
+        # the Windows dark/light title bar - applied LAST, after every widget exists, so darktitle's
+        # update_idletasks() doesn't flush sv-ttk's theming against a half-built window (PL3 order).
+        from pipeline4.gui import darktitle
+        darktitle.apply(self.root, self.mode == "dark")
 
         self.root.after(50, self._drain)
 
@@ -103,7 +122,7 @@ class App:
     def _on_phase(self, number, label):
         """A phase-bar click (main thread): start the phase on a worker thread (one at a time)."""
         if self._busy:
-            self.log.append("WARN", "  a phase is already running - wait for it to finish")
+            self.log.append("WARN", "  " + i18n.tr("st_running", self.lang))
             return
         # Run-all (0) drives a DETERMINATE progressbar (one step per phase); a single phase bounces.
         if number == 0:
@@ -140,20 +159,21 @@ class App:
         self._emit("PHASE", f"Run Pipeline ({len(order)} phases)")
         for i, number in enumerate(order, 1):
             phase = phases.by_number(number)
-            self._status(f"[{i}/{len(order)}] {number} {phase.title}…")
-            self._emit("INFO", f"[{i}/{len(order)}] running {number} {phase.title}")
+            name = i18n.tr(phase.name_key, self.lang)
+            self._status(f"[{i}/{len(order)}] {number} {name}…")
+            self._emit("INFO", f"[{i}/{len(order)}] running {number} {name}")
             try:
                 getattr(self, phase.handler)()
             except Exception:  # noqa: BLE001 - attribute the crash to THIS phase, stop the chain like a halt
-                self._emit("ERROR", f"  {number} {phase.title} crashed:\n{traceback.format_exc()}")
-                self._emit("FAIL", f"  Run Pipeline aborted at {number} {phase.title} - "
-                                   f"{len(order) - i} remaining phase(s) skipped")
+                self._emit("ERROR", f"  {number} {name} crashed:\n{traceback.format_exc()}")
+                self._emit("FAIL", f"  Run Pipeline aborted at {number} {name} - "
+                                   f"{len(order) - i} remaining phases skipped")
                 self._q.put(("progress_step",))
                 return
             self._q.put(("progress_step",))
             if self._run_halted:
-                self._emit("FAIL", f"  Run Pipeline halted at {number} {phase.title} - "
-                                   f"{len(order) - i} remaining phase(s) skipped")
+                self._emit("FAIL", f"  Run Pipeline halted at {number} {name} - "
+                                   f"{len(order) - i} remaining phases skipped")
                 return
         self._emit("PASS", "  Run Pipeline complete")
 
@@ -173,7 +193,7 @@ class App:
         """A dropdown action click (main thread): run ONE sub-phase on a worker thread. The owning phase
         handler builds the prerequisites, then runs only this sub-phase (`only=number`)."""
         if self._busy:
-            self.log.append("WARN", "  a phase is already running - wait for it to finish")
+            self.log.append("WARN", "  " + i18n.tr("st_running", self.lang))
             return
         self._set_busy(True)
         threading.Thread(target=self._sub_worker, args=(number,), daemon=True).start()
@@ -251,7 +271,7 @@ class App:
                         pass
                 elif kind == "done":
                     self._set_busy(False)
-                    self.status.configure(text="Ready")
+                    self.status.configure(text=i18n.tr("st_ready", self.lang))
                     self.findings.refresh()          # surface the run's findings in the panel
                     self.explorer.refresh()          # reload the SSOT tables the run (re)wrote
         except queue.Empty:
@@ -317,14 +337,12 @@ class App:
         reports). Never halts (a validation FAIL is reported, not blocking)."""
         from pipeline4.core import config
         from pipeline4.domain import staging
-        from pipeline4.domain.validation import crosscheck, iolist, matrix, phase as validation
-        titles = {110: "Validate I/O List", 120: "Validate C&E Matrix",
-                  130: "Cross-Check CEM->IOL", 140: "Cross-Check IOL->CEM"}
+        from pipeline4.domain.validation import crosscheck, iolist, matrix, messages, phase as validation
         if only is None:
-            self._emit("PHASE", "100 Documents Validation  (110 + 120 + 130 + 140)")
+            self._emit("PHASE", f"100 {i18n.tr('ph_validation', self.lang)}  (110 + 120 + 130 + 140)")
             self._status("validation…")
             database, _sf = staging.stage()
-            res = validation.run_validation(database)
+            res = validation.run_validation(database, lang=self.lang)
             issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERROR", "WARN")]
             self._render(issues)
             c = res["counts"]
@@ -332,21 +350,22 @@ class App:
                                f"{c.get('WARN', 0)} WARN, {c.get('PASS', 0)} PASS, {c.get('SKIP', 0)} SKIP "
                                f"-> {res['dir']}")
             return
-        self._emit("PHASE", f"{only} {titles[only]}")
+        self._emit("PHASE", f"{only} {i18n.tr(phases.sub_by_number(only).label_key, self.lang)}")
         self._status("validation…")
         params = config.load_params()
-        if only == 110:
-            findings = iolist.run_iolist(params)
-        elif only == 120:
-            findings = matrix.run_ce_matrix(params)
-        else:                                  # 130 / 140 read the staged signals
-            database, _sf = staging.stage(params)
-            runner = crosscheck.run_xcheck_cem_iol if only == 130 else crosscheck.run_xcheck_iol_cem
-            findings = runner(database, params)
+        with messages.active_lang(self.lang):     # build the finding detail in the operator's language
+            if only == 110:
+                findings = iolist.run_iolist(params)
+            elif only == 120:
+                findings = matrix.run_ce_matrix(params)
+            else:                                  # 130 / 140 read the staged signals
+                database, _sf = staging.stage(params)
+                runner = crosscheck.run_xcheck_cem_iol if only == 130 else crosscheck.run_xcheck_iol_cem
+                findings = runner(database, params)
         issues = [f for f in findings if f.severity in ("FAIL", "ERROR", "WARN")]
         self._render(issues)
         n_pass = sum(1 for f in findings if f.severity == "PASS")
-        self._emit("PASS", f"  {only}: {len(issues)} issue(s) + {n_pass} PASS "
+        self._emit("PASS", f"  {only}: {len(issues)} issues + {n_pass} PASS "
                            f"(log only; the 100 header writes the reports)")
 
     def _run_staging(self, only=None):
@@ -386,7 +405,7 @@ class App:
             self._emit("PASS", f"  {n_members} db_members across {n_dbs} DBs (+ {len(database['instance_dbs'])} "
                                f"instance DBs) -> {os.path.join(config.database_dir(), 'db_members.csv')}")
             count = datablock_xml.project(database)
-            self._emit("PASS", f"  projected {count} GlobalDB XML(s) -> {config.blocks_import_dir()}")
+            self._emit("PASS", f"  projected {count} GlobalDB XMLs -> {config.blocks_import_dir()}")
         if only in (None, 510):
             self._status("I/O tags…")
             database, iface_findings = interfaces.build_interfaces(database)
@@ -475,7 +494,7 @@ class App:
             self._emit("WARN", "  700 produced no tables (a blocking finding) - nothing further")
             return
         res = hardware_csv.project(database)
-        self._emit("PASS", f"  700: {res['stations']} station(s) + {res['modules']} module(s) -> {config.hardware_dir()}")
+        self._emit("PASS", f"  700: {res['stations']} stations + {res['modules']} modules -> {config.hardware_dir()}")
 
     def _run_software(self, only=None):
         """Phase 800: stage -> 520 -> engine.build. only=820 projects the CreationInfo CSVs + the 03 FC XML +
@@ -506,12 +525,12 @@ class App:
             inst = engine.write_instance_dbs(database)
         self._render(rendered)
         if res is not None:
-            self._emit("PASS", f"  820: {len(database['software_blocks'])} block(s) -> {res['count']} "
-                               f"CreationInfo CSV(s) + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
+            self._emit("PASS", f"  820: {len(database['software_blocks'])} blocks -> {res['count']} "
+                               f"CreationInfo CSVs + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
         if com is not None and com["path"]:
-            self._emit("PASS", f"  02_COM safe-DB: {com['members']} member(s) -> {com['path']}")
+            self._emit("PASS", f"  02_COM safe-DB: {com['members']} members -> {com['path']}")
         if inst is not None:
-            self._emit("PASS", f"  830 InstanceDBs: {inst['count']} instance DB(s) -> {inst['path']}")
+            self._emit("PASS", f"  830 InstanceDBs: {inst['count']} instance DBs -> {inst['path']}")
 
     def _run_reporting(self, only=None):
         """Phase 900: build the full SSOT (stage -> 520 -> 700; then the WARN-only 400/600/800) then
@@ -553,10 +572,43 @@ class App:
         self.log.set_shown_levels(levels)
         config.save_app_log_levels(levels)
 
+    def _toggle_lang(self):
+        """Flip EN<->IT: persist, re-translate the bar + the toolbar/tabs/status chrome live."""
+        self.lang = "it" if self.lang == "en" else "en"
+        config.save_app_language(self.lang)
+        self.phasebar.set_lang(self.lang)
+        self._retranslate_chrome()
+        self.status.configure(text=i18n.tr("st_language", self.lang, code=self.lang))
+
+    def _on_font_size(self, _event=None):
+        """The Font dropdown: resize the log viewer live + persist the choice to app_config.yaml."""
+        try:
+            size = int(self._font_combo.get())
+        except (TypeError, ValueError):
+            return
+        self.log.set_font_size(size)
+        config.save_app_font_size(size)
+
+    def _retranslate_chrome(self):
+        """Re-label the persistent chrome (toolbar buttons + notebook tabs) for the current language."""
+        self._tb_theme.configure(text=i18n.tr("tb_theme", self.lang))
+        self._tb_clear.configure(text=i18n.tr("tb_clear_log", self.lang))
+        self._levels_mb.configure(text=i18n.tr("tb_levels", self.lang) + " ▾")
+        self._tb_font_label.configure(text=i18n.tr("tb_font", self.lang))
+        self._tb_lang.configure(text=f"{i18n.tr('tb_lang', self.lang)}: {self.lang.upper()}")
+        self.notebook.tab(self._log_tab, text=i18n.tr("tab_log", self.lang))
+        self.notebook.tab(self._findings_tab, text=i18n.tr("tab_findings", self.lang))
+        self.notebook.tab(self._explorer_tab, text=i18n.tr("tab_explorer", self.lang))
+
     def _toggle_theme(self):
+        from pipeline4.gui import darktitle
         self.mode = "light" if self.mode == "dark" else "dark"
-        backend = theme.apply_theme(self.root, self.mode)
+        backend = theme.apply_theme(self.root, self.mode)   # sv-ttk + font
         self._backend_label.configure(text=f"theme: {backend}")
+        self.log.set_theme(self.mode)                        # log bg/fg + level tag colours
+        self.phasebar.set_theme(self.mode)                   # bar bg + separators + spacers
+        self.explorer.set_theme(self.mode)                   # SQL editor bg/fg + highlight tags
+        darktitle.apply(self.root, self.mode == "dark")      # Windows title bar (widgets already exist)
         self.log.append("INFO", f"theme -> {self.mode}")
 
     def _clear(self):

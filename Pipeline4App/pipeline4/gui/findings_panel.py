@@ -91,7 +91,7 @@ class FindingsPanel(ttk.Frame):
             iid = self.tree.insert("", "end", tags=(r["effective"],), values=(
                 r["phase"], r["type"], r["severity"], r["effective"], r["treatment"], r["location"], r["detail"]))
             self._rows[iid] = r
-        self._count.configure(text=f"{len(rows)} finding(s)" + (f" of {len(self._all)}" if len(rows) != len(self._all) else ""))
+        self._count.configure(text=f"{len(rows)} findings" + (f" of {len(self._all)}" if len(rows) != len(self._all) else ""))
 
     def _popup(self, event) -> None:
         iid = self.tree.identify_row(event.y)

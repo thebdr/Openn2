@@ -22,6 +22,7 @@ Shared/OutputTree/
 
 # Per-user phase-100 treatment registry / suppressions (auto-managed, user-local)
 Pipeline3App/user_input/*.csv
+Pipeline4App/config_project/user_input/*.csv
 
 # NuGet restore output
 Openn2App/packages/

@@ -2,6 +2,7 @@
 transcribed from the operator oracle ButtonsLayout.xlsx. Pure + data-independent (the GUI itself is a
 manual `python launch_gui.py` check)."""
 from _harness import run, eq, ok
+from pipeline4.core import i18n
 from pipeline4.gui import phases
 
 
@@ -53,9 +54,22 @@ def test_kinds_and_enablement():
     eq(specials, {155, 156, 430}, "the special (Clean / custom-interface) buttons")
     for n in (160, 330, 530, 930):                       # a sampling of wired opens
         ok(phases.sub_by_number(n).opens, f"open button {n} names a target")
-    # oracle titles that are easy to mis-transcribe (verified against ButtonsLayout.xlsx)
-    eq(phases.sub_by_number(320).title, "Stage C&E Matrix", "slot 320 is the oracle's Stage C&E Matrix")
-    eq(phases.sub_by_number(330).title, "Open IO Database", "slot 330 is Open IO Database")
+    # oracle titles that are easy to mis-transcribe (label_key -> EN via i18n, vs ButtonsLayout.xlsx)
+    eq(phases.sub_by_number(320).label_key, "pb_stage_cematrix", "320 carries the C&E-matrix key")
+    eq(i18n.tr(phases.sub_by_number(320).label_key), "Stage C&E Matrix", "320 EN = the oracle's Stage C&E Matrix")
+    eq(i18n.tr(phases.sub_by_number(330).label_key), "Open IO Database", "330 EN = Open IO Database")
+
+
+def test_labels_resolve_in_both_languages():
+    # every phase name_key + every sub label_key must resolve to a NON-key string in EN and IT
+    # (i.e. it exists in the i18n table - tr falls back to the key on a miss).
+    keys = [p.name_key for p in phases.PHASES]
+    keys += [s.label_key for p in phases.PHASES for s in p.subs]
+    for key in keys:
+        for lang in ("en", "it"):
+            text = i18n.tr(key, lang)
+            ok(text and text != key, f"{key} resolves in {lang} (got {text!r})")
+    eq(i18n.tr("ph_staging", "it"), "Staging Documenti", "an IT header resolves")
 
 
 def test_phase_of_sub():
@@ -63,7 +77,7 @@ def test_phase_of_sub():
     eq(phases.phase_of_sub(110).number, 100, "110 belongs to phase 100")
     eq(phases.phase_of_sub(850).number, 800, "850 belongs to phase 800")
     eq(phases.phase_of_sub(999), None, "an unknown sub -> None")
-    eq(phases.sub_by_number(510).title, "Generate I/O Tags")
+    eq(i18n.tr(phases.sub_by_number(510).label_key), "Generate I/O Tags")
 
 
 def test_by_number():
@@ -81,6 +95,7 @@ if __name__ == "__main__":
         ("run_order", test_run_order),
         ("subs_match_oracle", test_subs_match_oracle),
         ("kinds_and_enablement", test_kinds_and_enablement),
+        ("labels_resolve_in_both_languages", test_labels_resolve_in_both_languages),
         ("phase_of_sub", test_phase_of_sub),
         ("by_number", test_by_number),
     ]))

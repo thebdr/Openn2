@@ -541,8 +541,11 @@ text is ported verbatim into each finding's `detail`.
   + populating `diag_block_name` at staging, which would touch the locked 300 parity) + the **`accept`**
   doc-mutating treatment (dropped).
 
-## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0+M1+M2+M3+M4 DONE; see `GUI_PLAN.md`)
-The backend is complete; the GUI port (replicate PL3 + add SSOT-native features) is the active effort - the
+## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0–M4 + STEP 1 i18n DONE; see `GUI_PLAN.md`)
+**Backend status: 8 of the 9 generative phases are built (300/520/400/510/600/700/800/900/100); ph200
+(Documents Fill Out) is NOT built — PL4 reads script_type/index/diag, it does not compute them, so it
+currently requires a PRE-FILLED I/O List. ph200 is the last backend effort (STEP 4).** The GUI port
+(replicate PL3 + add SSOT-native features) is the active effort - the
 plan + locked decisions are in **`GUI_PLAN.md`**. **M0 (foundations) DONE:** a **lightweight phase registry**
 (`gui/phases.py` - the single source of the phase order: number/title/kind/subs/requires/handler +
 `RUNNABLE`/`run_order`; no Fill phase), a **worker thread + queue/drain pump** (each phase runs off the Tk main
@@ -570,17 +573,40 @@ grid - the pink Run master (spans both rows), per-phase **header** (row 0, runs 
 bounce), emits a `[k/N]` marker per phase, and **halts the chain on a blocking FAIL** (`_gate` sets
 `self._run_halted`; a handler crash is attributed to the named phase + stops the chain). **M4 REWORK (user
 feedback):** the registry + bar now follow the operator **ORACLE `Pipeline3App/assets/ButtonsLayout.xlsx`**.
-`gui/phases.py` carries each phase's FULL sub-button set (`Sub(number,title,kind,enabled,opens)`: action /
+`gui/phases.py` carries each phase's FULL sub-button set (`Sub(number,label_key,kind,enabled,opens)`: action /
 open / special, minus phase 200); deferred/unported buttons (150, 155/156, 320, 430, 810, 840, 920) are
 kept VISIBLE but **greyed** (`enabled=False`) for oracle fidelity. **Sub-buttons RUN THEIR SUB-PHASE**
 (PL3's model): each handler takes `only=None|<sub#>`; `_sub_command`/`_on_sub`/`_sub_worker` dispatch an
 action sub to `phase_of_sub(n).handler(only=n)`, which builds the prerequisites then runs ONLY that
 sub-phase (`only=510` still builds 520; `only=520` skips the I/O-Tags leg). **Open buttons** are wired
 (`_on_open`/`_open_target` -> `os.startfile`). Layout: all header/run buttons are **EQUAL width** and the
-**dropdown width MATCHES the column above**. NEXT: M5 Files · M6 Project · M0b chrome. Tests:
-`test_gui_phases.py` (rebuilt to the oracle) + `test_gui_findings.py` + `test_gui_dbquery.py` +
-`test_gui_levels.py` + `test_gui_phasebar.py`; verified by a real-data run of every `only=` branch. The
-GUI itself is a manual `python launch_gui.py` check.
+**dropdown width MATCHES the column above**. **STEP 1 i18n (EN/IT, first-class) - the POINT is the LOGS:** the operator-facing **validation findings +
+reports** are localized (an Italian operator reads IT findings); the chrome is secondary.
+**LOGS:** `domain/validation/messages.py` is bilingual (the 50 `v_*` slugs, EN verbatim/parity-byte-identical +
+IT from PL3); a finding's `detail` is built in the ACTIVE language via the AMBIENT `messages.active_lang(lang)`
+(PL3's `ctx.lang` analog; single-threaded since the GUI runs one phase at a time; default `en` keeps the parity
+oracle EN) - so the 53 builder call sites + `io/render.py` are untouched and the log line + `.txt`/`.html`
+reports come out localized. `phase.run_validation(…, lang)` wraps the validators in `active_lang`, localizes the
+sub-phase banners (`_BANNER_KEYS` -> registry `pb_*` keys) + the report chrome (`render.html_reports(items,
+lang)`, `rpt_*` keys); the GUI `_run_validation` threads `self.lang`. **PL3-faithful: the `uid` hashes the
+localized detail** (treatments key per operating language). **CHROME:** `core/i18n.py` (`tr(key, lang, **fmt)`) +
+`phases.py` `name_key`/`label_key` + `phasebar.PhaseBar(lang=…)`/`set_lang()` + the toolbar **Lang EN/IT** button
+(`_toggle_lang`/`_retranslate_chrome`, persisted to `app_config.yaml` via `config.load_app_ui()["language"]` +
+`save_app_language`) + a **Font-size dropdown** (10/12/14) that live-resizes the log viewer
+(`LogView.set_font_size` reconfigures the Text body + every level tag, preserving bold; `config.APP_FONT_SIZES`
+/ `save_app_font_size`, persisted). **App-wide font (M0b fonts DONE):** `gui/fonts.py` (port of PL3's) registers
+the bundled `assets/fonts/MonaspaceNeon-Var.ttf` privately (`AddFontResourceEx(FR_PRIVATE)`, resolves as
+`Monaspace Neon Var`, graceful `Consolas` fallback); `theme.apply_theme` points the named Tk fonts
+(`TkDefaultFont`/`TkTextFont`/…) + `theme.MONO_FONT` at it at `theme.APP_FONT_SIZE=13` - so the whole UI (chrome
++ phase bar + log) is Monaspace Neon Var 13 (the log size overridable via the Font dropdown). **COSMETIC: always-plural** - the validation messages + run-log lines drop
+the `(s)`/`/i` singular-or-plural hedge (always plural, even at 0/1; the one deliberate deviation from PL3's
+verbatim text, on the 5 INFO summary slugs - guarded by `test_validation_i18n.always_plural_no_hedge`).
+**Stays EN** (PL3-consistent): the generator run-log data-lines + the non-100 phase
+banners. NEXT (planning order): STEP 2 (300 staging granularity) · STEP 3 M5 Files / M6 Project / M0b chrome ·
+STEP 4 ph200 Fill. Tests: `test_validation_i18n.py` + `test_i18n.py` + `test_gui_phases.py` (rebuilt to the
+oracle, +`labels_resolve_in_both_languages`) + `test_gui_findings.py` + `test_gui_dbquery.py` +
+`test_gui_levels.py` + `test_gui_phasebar.py`; verified by a real-data run of every `only=` branch + an EN<->IT
+toggle smoke + a real-data EN-vs-IT validation report. The GUI itself is a manual `python launch_gui.py` check.
 `python launch_gui.py` opens a sv-ttk dark window (graceful fallback) with a toolbar, the registry-driven
 **phase-button bar** (Run + the 8 phases, ButtonsLayout colours), a colour-coded **log viewer** (in a notebook),
 and a status bar + busy progressbar. Wired in EARLY (gui-less PL3 builds hid integration problems). **ALL phase

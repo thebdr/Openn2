@@ -181,13 +181,17 @@ def _line_html(rec) -> str:
     return "".join(out)
 
 
-def render_html(findings, errors_only: bool = False, *, title: str = "Documents Validation") -> str:
+def render_html(findings, errors_only: bool = False, *, title: str | None = None, lang: str = "en") -> str:
     """The validation log as a standalone HTML document replicating the in-app log viewer: per-phase-aligned
     text (from render_records), the dark palette + level colours, lines that do NOT wrap (`white-space:pre`
-    + horizontal scroll). Banners render as their 3 banner_lines; location cells carry the link styling."""
+    + horizontal scroll). Banners render as their 3 banner_lines; location cells carry the link styling. The
+    finding LINES are already localized (built in the active language); only the title + summary chrome here
+    is resolved in `lang`."""
+    from pipeline4.core import i18n
+    title = title if title is not None else i18n.tr("ph_validation", lang)
     recs = render_records(findings, errors_only=errors_only)
     c = {lv: sum(1 for f in findings if f.severity == lv) for lv in ("PASS", "FAIL", "WARN", "SKIP")}
-    summary = f"{c['PASS']} passed, {c['FAIL']} failed, {c['WARN']} warning(s), {c['SKIP']} skipped"
+    summary = i18n.tr("rpt_summary", lang, p=c["PASS"], f=c["FAIL"], w=c["WARN"], s=c["SKIP"])
     body = []
     for r in recs:
         if r.kind == "banner":
@@ -195,14 +199,14 @@ def render_html(findings, errors_only: bool = False, *, title: str = "Documents 
                 body.append(f'<div class="line section">{_esc(bl)}</div>')
         else:
             body.append(f'<div class="line {_LEVEL_CLASS.get(r.level, "info")}">{_line_html(r)}</div>')
-    head = _esc(title) + (" - errors only" if errors_only else "")
-    return ("<!DOCTYPE html>\n<html lang='en'><head><meta charset='utf-8'>"
+    head = _esc(title) + (f" - {i18n.tr('rpt_errors_only', lang)}" if errors_only else "")
+    return (f"<!DOCTYPE html>\n<html lang='{i18n.normalize(lang)}'><head><meta charset='utf-8'>"
             f"<title>{_esc(title)}</title><style>{_HTML_CSS}</style></head><body>"
             f"<h1>{head}</h1><p class='summary'>{_esc(summary)}</p>\n"
             "<div class='log'>\n" + "\n".join(body) + "\n</div></body></html>\n")
 
 
-def html_reports(findings) -> dict:
+def html_reports(findings, lang: str = "en") -> dict:
     """Both HTML report bodies (the GUI-viewer look, no-wrap): {'complete': …, 'errors': …}."""
-    return {"complete": render_html(findings, errors_only=False),
-            "errors": render_html(findings, errors_only=True)}
+    return {"complete": render_html(findings, errors_only=False, lang=lang),
+            "errors": render_html(findings, errors_only=True, lang=lang)}

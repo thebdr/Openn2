@@ -2,6 +2,11 @@
 # project_params.yaml). Read by config.load_app_ui and applied when the GUI window starts.
 
 user_interface:
+  # GUI language for the chrome (phase bar, toolbar, tabs, status): en | it. Toggled live by the Lang
+  # button and persisted here. Unknown -> en.
+  language: en
+  # Log-viewer font size (the Font dropdown): one of 10 | 12 | 14. Default 10.
+  font_size: 10
   # Which log levels the GUI shows. Entries may be single chars OR full names (read by FIRST CHAR):
   #   F = FAIL   E = ERROR   W = WARN   I = INFO   S = SKIP   P = PASS   D = DEBUG
   # PHASE section banners always show. (Omit a letter to hide that level.)
