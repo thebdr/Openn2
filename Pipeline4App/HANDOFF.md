@@ -36,10 +36,10 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `config.use_project`) · **M0b chrome remainder** (darktitle + the full light/dark re-theme - landed in
   STEP 1). NEXT: **STEP 4** ph200 Documents Fill Out (CSV-driven, the LAST backend effort; confirm its 4 open
   decisions first).
-- **GIT STATE:** local **`pl4`** is at **`a5b8cb6`** and **PUSHED** — `origin/pl4` synced through it. Recent
-  milestones: **`a5b8cb6`** GUI M5 Files tab (+ M0b chrome remainder marked done) · **`5da675c`** STEP 2 (the
-  310/320 staging split) · **`7473ace`** STEP 1 (i18n + Monaspace font + dark/light theme compatibility incl.
-  the startup-light-ttk fix). Standing directive: **push on every major milestone** (Claude decides what
+- **GIT STATE:** local **`pl4`** is at **`c08d4d1`** and **PUSHED** — `origin/pl4` synced through it. Recent
+  milestones: **`c08d4d1`** GUI M6 Project Manager (STEP 3 complete) · **`a5b8cb6`** M5 Files tab · **`5da675c`**
+  STEP 2 (the 310/320 staging split) · **`7473ace`** STEP 1 (i18n + Monaspace font + dark/light theme
+  compatibility). Standing directive: **push on every major milestone** (Claude decides what
   counts), so origin tracks the latest milestone without asking. M4 base at `243b695`, M0–M3 at
   `d623509`/`3ec6996`/`47addb9`/`fbac770`. `config_project/user_input/*.csv`
   (the runtime treatment registry) is gitignored (matching PL3). The repo root also carries unrelated pre-existing
