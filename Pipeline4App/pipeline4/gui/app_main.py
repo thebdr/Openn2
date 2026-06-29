@@ -471,21 +471,25 @@ class App:
                            f"(log only; the 100 header writes the reports)")
 
     def _run_fill(self, only=None):
-        """Phase 200 - Documents Fill Out. 210 (built): classify + fill the source I/O List's Script Type
-        (AB) / Suggested Type (AC) IN PLACE (surgical, timestamped backup deleted on a no-op). 220/240 are
-        greyed until built. ph200 writes the DOC only; staging reads the filled doc. An unresolved row
-        (`<input required>`) is a blocking finding (the `_UnresolvedIndex` sheet lists them)."""
+        """Phase 200 - Documents Fill Out. The integrated fill: 210 classify (AB Script Type / AC Suggested
+        Type), 220 §7 Index (AD), 230/240 §8 Diag Cabinet/Bit (AE/AF) + the DiagnosisBlocks sheet - written
+        IN PLACE (surgical, timestamped backup deleted on a value-identical no-op). The phase-200 header runs
+        all four; a sub-phase button runs just its leg (230/240 are paired). ph200 writes the DOC only;
+        staging re-reads the filled doc (the SSOT). An unresolved row (`<input required>`) is a blocking
+        finding (the `_UnresolvedIndex` sheet lists them)."""
         from pipeline4.domain.fillout import fill
         self._status("fill…")
-        key = "pb_fill_script_type" if only == 210 else "ph_fill"
-        label = f"{only or 200} {i18n.tr(key, self.lang)}"
+        keys = {210: "pb_fill_script_type", 220: "pb_fill_index",
+                230: "pb_fill_diag_cabinet", 240: "pb_fill_diag_bit"}
+        label = f"{only or 200} {i18n.tr(keys.get(only, 'ph_fill'), self.lang)}"
         self._emit("PHASE", label)
-        res = fill.fill_script_type()
+        res = fill.fill_out(only=only)
         if not self._gate(res["findings"], label=label):
             return
         backup = f"  (backup {os.path.basename(res['backup'])})" if res["backup"] else "  (no change)"
-        self._emit("PASS", f"  filled {res['filled']} script type(s); {res['mismatch']} kept (Mode-2); "
-                           f"{res['unresolved']} unresolved -> {os.path.basename(res['output_path'])}{backup}")
+        self._emit("PASS", f"  filled {res['filled']} script type(s), {res['index']} index, {res['diag']} "
+                           f"diag; {res['mismatch']} kept (Mode-2); {res['unresolved']} unresolved -> "
+                           f"{os.path.basename(res['output_path'])}{backup}")
 
     def _run_staging(self, only=None):
         """Phase 300: stage the configured I/O List -> the signals table -> Database/signals.csv. The oracle

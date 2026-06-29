@@ -147,9 +147,17 @@ byte-transparent — alongside is the safe choice.
   branches oracle-covered by real data; `test_fillout_diag` 8/8; full gate **348/348**; verifier verdict sound (one
   note: the Type-2 cap-overflow multi-instance split is test-covered only — no real family overflows cap=63).
 - **ph200 COMPUTATION ports COMPLETE** (210 classify · 220 index · 230/240 diag), all idempotent-parity-clean.
-- **NEXT (the integration + M-E5):** wire the integrated **stage→fill→re-stage** run order — 210 `script_type` +
-  220 `index` + 230/240 `diag_cabinet`/`diag_bit` + the `DiagnosisBlocks` sheet write back to the doc together,
-  staging re-runs if the doc changed. Then **M-E5** (converge `dbtemplate`/`identity` onto `core/expr`, byte-gated per site).
+- **INTEGRATION (stage→fill→re-stage) — DONE + verified (2026-06-29).** `fill_out(params, only)` in
+  `pipeline4/domain/fillout/fill.py`: stage #1 → compute 210 (classify, Mode-1/2 + **re-resolve the `type` in memory**
+  with the diag attrs merged so 220/230/240 see `in_diag`) → 220 (`assign_indices`) → 230/240 (`diag_alloc` over the
+  `diagnosis_cabinets` existing-map) → surgical write-back AB/AC/AD/AE/AF by `source_sheet/source_row` + the
+  `DiagnosisBlocks` sheet (new `diag_blocks.py` — faithful port of PL3 `blocks.py`: identity append-only + derived
+  recomputed) → re-stage. GUI `_run_fill` calls `fill_out`; 220/230/240 un-greyed. **Verified NON-DESTRUCTIVELY on a
+  scratch copy of the real I/O List: stage→fill→re-stage is idempotent — 0 mismatches / 269 uids; all data sheets
+  (AB-AF) + DiagnosisBlocks + IF_ sheets byte-VALUE-identical (only a stale `_UnresolvedIndex` is correctly rebuilt);
+  the original doc md5+mtime UNCHANGED.** `test_fillout_integration` 6/6; full gate **354/354**; verifier verdict sound.
+- **ph200 is now OPERABLE END-TO-END.** Remaining: **M-E5** (converge `dbtemplate`/`identity` onto `core/expr`,
+  byte-gated per site — the plan's LATER/opportunistic cleanup; the engine is fully proven on ph200).
 
 ## Resolved decisions
 1. **Pipeline order** → **stage → fill → re-stage(if changed) → validate → generate → report** (the hard rule).

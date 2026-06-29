@@ -58,9 +58,9 @@ PHASES = (
     )),
     Phase(200, "ph_fill", handler="_run_fill", subs=(
         Sub(210, "pb_fill_script_type"),                                 # CSV-rule classification (built)
-        Sub(220, "pb_fill_index", enabled=False),                       # §7 index - built next
-        Sub(230, "pb_fill_diag_cabinet", enabled=False),                # §8 diag cabinet - later
-        Sub(240, "pb_fill_diag_bit", enabled=False),                    # §8 diag bit - later
+        Sub(220, "pb_fill_index"),                                       # §7 index (built)
+        Sub(230, "pb_fill_diag_cabinet"),                               # §8 diag cabinet (built)
+        Sub(240, "pb_fill_diag_bit"),                                   # §8 diag bit (built)
         Sub(250, "pb_open_iolist", kind="open", opens="iolist"),
     )),
     Phase(300, "ph_staging", handler="_run_staging", subs=(
