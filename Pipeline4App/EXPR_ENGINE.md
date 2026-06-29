@@ -3,8 +3,25 @@
 Status (2026-06-29): **TOP PRIORITY — ALL OTHER PHASE DEVELOPMENT IS PAUSED** until this engine is built
 AND retrofitted everywhere (ph200 classification, dbtemplate/520, identity templates, the diagnosis /
 interface template + lookup sites). The user elevated the ph200 rule grammar into a first-class, reusable
-"mini spreadsheet-formula engine" wired across the pipeline. **Build-vs-adopt is researched (below); picking
-the engine is the next decision — RESUME HERE.**
+"mini spreadsheet-formula engine" wired across the pipeline.
+
+### DECISION RESOLVED (2026-06-29): **go_custom** — extend `core/rule_expr.py` → `core/expr` (NOT CEL)
+A time-boxed **CEL/celpy 0.5.0 spike** on the 4 hardest real rules (§6 push-button join+slice, §6 reset-area
+conditional, diagnosis `ml_value` nested-case, diagnosis `fl_value` host-lookup) settled it ON EVIDENCE
+(`let` was dropped per the user — CEL evaluated on its native surface). Result: **all 4 ARE expressible in
+native CEL and every test case passes when actually run**, but `config_author_readable` = **false on 4/4**
+(an independent adversarial judge concurred on each). Why custom wins:
+- CEL's only real edge ("find help online") covers ONLY the operator/ternary core — the *trivial* half. The
+  load-bearing half (`extract`/`isdigit`/`present`/`node_of`/`where`/`lookup`) is a CUSTOM host function in
+  BOTH worlds, and `rule_expr.py` already implements it (parity-green **273/0** on the real ph200 rules).
+- CEL's native gaps contradict the decided grammar: **no `let`/`cel.bind`** at all; **no string slicing**
+  (yet the grammar wants `extract(...,-1:)`); **missing-map-key access THROWS** (grammar wants silent `""`);
+  `.matches` is **case-sensitive** (grammar wants implicit IGNORECASE).
+- Dependency cost: `cel-python` pulls **8 transitive deps** incl. a native `google-re2` wheel + `pendulum`,
+  on a **Beta** 0.5.0 lib — against PL4's explicit "light, no new dependency" value.
+- `thin_custom_layer_over_CEL` is dominated (pays the full CEL tax AND still needs the custom parser layer).
+**Next: a reviewed BUILD PLAN (`EXPR_BUILD_PLAN.md`) — feature order + parity gates — before any code.**
+(Spike harnesses: `scratchpad/cel_R1..R4.py`; the workflow run synthesized the verdict with high confidence.)
 
 ### Build vs adopt — research conclusion (deep-research, 2026-06-29; full cited report in the session task output)
 - **No off-the-shelf DSL is a clean fit, and `let()` is native to NONE of them.**
@@ -26,12 +43,13 @@ the engine is the next decision — RESUME HERE.**
 - **Custom (this doc)** — exact fit incl. `let` + unified predicate/template, but ZERO external docs/community
   (the opposite of the user's stated "users find help online" priority).
 
-### PENDING DECISION (the resume point)
-Pick the engine: **(1)** a time-boxed **CEL/celpy spike** on our 4 hardest real rules (§6 `join`+slice, the
-`ml_value` nested case, an `fl_value` `node_of` host-lookup, a `let`-via-`cel.bind`) → standardize on CEL if
-it reads cleanly + runs on our data; **(2)** the **hybrid** simpleeval+Liquid; **(3)** **custom**. Recommended:
-the CEL spike (decides on evidence). Then build/adopt → **retrofit everywhere + re-verify every parity** →
-only THEN resume the paused work (ph200 220 §7 index / 230-240 §8 diag, then M7 GUI polish).
+### DECISION (resolved — see the status block above): **go_custom**
+The CEL spike was run and decided it on evidence (CEL functional but `config_author_readable`=false on 4/4;
+8-dep Beta tax; native gaps vs the decided grammar). The hybrid was rejected up front (two syntaxes, no `let`,
+awkward lookups). **Build path: extend `core/rule_expr.py` into `core/expr`** (keep its tokenizer + thunk
+compiler + the host funcs it already has), add the decided grammar, re-verify parity, retrofit, THEN resume
+the paused work (ph200 220 §7 index / 230-240 §8 diag, then M7 GUI polish). The sequenced, parity-gated build
+plan lives in **`EXPR_BUILD_PLAN.md`** (under review before any code).
 
 ### Final grammar decisions reached in discussion (apply to whichever engine, or shape the custom one)
 - Fields = **`$canonical`**, validated against the SCOPE's schema (post stage-before-fill that's the `signals`

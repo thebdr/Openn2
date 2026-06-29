@@ -1,0 +1,240 @@
+r"""The unified expression engine (core/expr): test / evaluate / render over the M-E1 grammar.
+
+Covers the whole superset + the parity-critical cases vs rule_expr (extract -1: / :1, IGNORECASE at both
+~ and extract, scope validation, dotted silent-empty, let bind-once, if/coalesce, the three render modes,
+the format-spec coercion, the sentinel verbatim, clean(), and the data funcs over a synthetic tables dict).
+"""
+from _harness import run, eq, ok, raises
+from pipeline4.core import expr
+from pipeline4.core import rule_expr as rx
+from pipeline4.core.expr import Scope, ExprError
+
+
+# --- operators (rule_expr parity, $-fielded) ----------------------------------------------------- #
+def test_regex_and_equality():
+    ctx = {"desc": "EMERGENCY PUSH-BUTTON PRESSED", "type_hw": "DI", "addr": "I0.0"}
+    ok(expr.test("$desc ~ /EMERGENCY PUSH.BUTTON PRES/", ctx), "ci regex search with . wildcard")
+    eq(expr.test("$desc ~ /fire alarm/", ctx), False, "no match -> False")
+    ok(expr.test('$type_hw = "DI"', ctx), "string equality")
+    ok(expr.test('$type_hw != "XX"', ctx), "string inequality")
+    ok(expr.test("$addr ~ /i/", ctx), "case-insensitive single letter")
+
+
+def test_numeric_and_funcs():
+    ok(expr.test("$id_node > 0", {"id_node": "3"}), "numeric > with coercion")
+    eq(expr.test("$id_node > 0", {"id_node": ""}), False, "non-numeric -> comparison False")
+    ok(expr.test("len($desc) > 3", {"desc": "ABCD"}), "len() > N")
+    eq(expr.test("len($desc) > 3", {"desc": "AB"}), False, "len() short")
+    ok(expr.test("numeric($x)", {"x": "12"}), "numeric() true")
+    eq(expr.test("numeric($x)", {"x": "ab"}), False, "numeric() false")
+    ok(expr.test("present($type_hw)", {"type_hw": "DI"}), "present() true")
+    ok(expr.test("blank($type_hw)", {"type_hw": "   "}), "blank() true on whitespace")
+    ok(expr.test("isdigit($x)", {"x": "12"}), "isdigit true")
+    eq(expr.test("isdigit($x)", {"x": "1a"}), False, "isdigit false")
+
+
+def test_boolean_composition():
+    ctx = {"desc": "DOOR OPEN CH 1", "d2": "CH 1"}
+    ok(expr.test("$desc ~ /DOOR.*OPEN/ and $d2 ~ /CH/", ctx), "and")
+    ok(expr.test("$desc ~ /nope/ or $d2 ~ /CH/", ctx), "or")
+    ok(expr.test("not $desc ~ /nope/", ctx), "not")
+    ok(expr.test("($desc ~ /DOOR/ or $desc ~ /x/) and $d2 ~ /CH/", ctx), "parens")
+
+
+def test_in_list():
+    ok(expr.test('$script_type in ["KQ","KI"]', {"script_type": "KI"}), "in list membership")
+    eq(expr.test('$script_type in ["KQ","KI"]', {"script_type": "DD"}), False, "not in list")
+
+
+# --- extract: capture-first + slice + rule_expr PARITY ------------------------------------------- #
+def test_extract_parity_with_rule_expr():
+    # rule_expr's last == whole[-1]; expr's -1: slices the whole match (no group)
+    for d2, pat in [("FOO CH7 BAR", "CH."), ("ENCODER CELL 4", r"CELL.\d"), ("EMERG RESET AREA 3", "AREA .")]:
+        rxlast = rx.render("{extract(d2,/%s/,last)}" % pat, {"d2": d2})
+        exlast = expr.evaluate("extract($d2, /%s/, -1:)" % pat, {"d2": d2})
+        eq(exlast, rxlast, "expr -1: == rule_expr last on /%s/" % pat)
+    eq(expr.evaluate("extract($d2, /CH./, -1:)", {"d2": "FOO CH7 BAR"}), "7", "last char")
+    eq(expr.evaluate("extract($d2, /CH./, :1)", {"d2": "FOO CH7 BAR"}), "C", ":1 == first char")
+    eq(expr.evaluate("extract($d2, /NOPE/, -1:)", {"d2": "xyz"}), "", "no match -> empty")
+
+
+def test_extract_capture_first():
+    eq(expr.evaluate("extract($f, /CH(\\d+)/)", {"f": "CH123"}), "123", "capture group(1) by default")
+    eq(expr.evaluate("extract($f, /CH(\\d+)/, -1:)", {"f": "CH123"}), "3", "slice applies to the capture")
+    eq(expr.evaluate("extract($f, /CH(\\d+)/, :2)", {"f": "CH123"}), "12", ":2 of the capture")
+    eq(expr.evaluate("extract($f, /CH./, 1)", {"f": "xCHq"}), "H", "no group -> index 1 of group(0) 'CHq'")
+    eq(expr.evaluate("extract($f, /CH(.)(.)/)", {"f": "CHab"}), "a", "capture-first uses group(1) only")
+
+
+def test_ignorecase_both():
+    eq(expr.test("$d ~ /door/", {"d": "DOOR OPEN"}), True, "~ is IGNORECASE")
+    eq(expr.evaluate("extract($d, /door(.)/)", {"d": "DOORX"}), "X", "extract is IGNORECASE")
+
+
+# --- $field refs + scope + dotted ---------------------------------------------------------------- #
+def test_field_basics_and_bareword():
+    eq(expr.evaluate("$name", {"name": "abc"}), "abc", "$field ref")
+    eq(expr.evaluate("$missing", {}), "", "missing field -> '' (permissive)")
+    raises(ExprError, lambda: expr.evaluate("bareword", {}))
+    raises(ExprError, lambda: expr.evaluate("foo(x)", {}))            # unknown func
+
+
+def test_scope_validation():
+    sc = Scope(["a", "b"])
+    eq(expr.evaluate("$a", {"a": "1"}, scope=sc), "1", "known field passes")
+    raises(ExprError, lambda: expr.evaluate("$x", {}, scope=sc))      # unknown -> compile error
+    eq(expr.evaluate("$x", {}, scope=None), "", "scope=None -> silent ''")
+
+
+def test_dotted_object_access():
+    ctx = {"obj": {"key": "V", "sub": {"deep": "D"}}}
+    eq(expr.evaluate("$obj.key", ctx), "V", "dotted into a dict cell")
+    eq(expr.evaluate("$obj.sub.deep", ctx), "D", "two-level drill")
+    eq(expr.evaluate("$obj.nokey", ctx), "", "missing sub-key -> '' (silent, no throw)")
+    eq(expr.evaluate("$obj.key.x", ctx), "", "drill into a non-dict -> ''")
+    # dotted under scope: only the TOP-LEVEL name is validated
+    eq(expr.evaluate("$obj.key", ctx, scope=Scope(["obj"])), "V", "scope validates the top name only")
+
+
+# --- concat / join / startswith / clean ---------------------------------------------------------- #
+def test_string_funcs():
+    eq(expr.evaluate('concat($a, "-", $b)', {"a": "x", "b": "y"}), "x-y", "concat")
+    eq(expr.evaluate('join("/", $a, $b, $c)', {"a": "1", "b": "2", "c": "3"}), "1/2/3", "join")
+    ok(expr.test('startswith($f, "PRE")', {"f": "PREFIX"}), "startswith true")
+    eq(expr.test('startswith($f, "PRE")', {"f": "nope"}), False, "startswith false")
+
+
+def test_clean():
+    eq(expr.evaluate("clean($f)", {"f": "a\x00b\tc   d\n"}), "a b c d", "control chars + ws collapse + strip")
+    eq(expr.evaluate("clean($f)", {"f": "  hi   there  "}), "hi there", "ws collapse")
+
+
+# --- if / coalesce ------------------------------------------------------------------------------- #
+def test_if_and_coalesce():
+    eq(expr.evaluate('if($c, "Y", "N")', {"c": "1"}), "Y", "if true branch")
+    eq(expr.evaluate('if($c, "Y", "N")', {"c": ""}), "N", "if false branch (empty)")
+    # truthy semantics (rule_expr parity): a non-empty STRING is truthy, so "0" -> Y (it's a string, not 0)
+    eq(expr.evaluate('if($c, "Y", "N")', {"c": "0"}), "Y", 'string "0" is non-empty -> truthy')
+    eq(expr.evaluate("if(len($c) > 0, $c, \"none\")", {"c": ""}), "none", "numeric cond -> false branch")
+    eq(expr.evaluate("coalesce($a, $b, $c)", {"a": "", "b": "", "c": "z"}), "z", "first non-empty")
+    eq(expr.evaluate('coalesce($a, "0")', {"a": ""}), "0", '"0" is non-empty -> kept')
+    eq(expr.evaluate("coalesce($a, $b)", {"a": "", "b": ""}), "", "all empty -> ''")
+
+
+# --- let: sequential bind-once, shadowing, nesting ----------------------------------------------- #
+def test_let():
+    eq(expr.evaluate("let(a := $x ; $a)", {"x": "v"}), "v", "single bind")
+    eq(expr.evaluate('let(a := $x, b := concat($a, "!") ; $b)', {"x": "hi"}), "hi!", "later sees earlier")
+    eq(expr.evaluate("let(x := $x ; $x)", {"x": "raw"}), "raw", "bind shadows ctx (bind-once of the orig)")
+    eq(expr.evaluate("let(a := $x ; let(b := concat($a, $a) ; $b))", {"x": "z"}), "zz", "nested let")
+    # scope: a let-bound name is valid in the body even under a strict scope
+    eq(expr.evaluate("let(a := $x ; $a)", {"x": "v"}, scope=Scope(["x"])), "v", "let-bound name admitted")
+    raises(ExprError, lambda: expr.evaluate("let(a := $x ; $a)", {"x": "v"}, scope=Scope(["q"])))  # $x unknown
+
+
+# --- render: holes / empty / format-spec --------------------------------------------------------- #
+def test_render_basic():
+    eq(expr.render("E{extract($d2,/CH./,-1:)}/2", {"d2": "FOO CH7 BAR"}), "E7/2", "extract hole + literal")
+    eq(expr.render("{$t}", {"t": "PLC"}), "PLC", "field hole")
+    eq(expr.render("KQ", {}), "KQ", "literal, no holes")
+    eq(expr.render("{}", {}), "", "empty hole -> ''")
+    eq(expr.render("{ }", {}), "", "blank hole -> ''")
+    eq(expr.render("a{$x}b{$y}c", {"x": "1", "y": "2"}), "a1b2c", "multi-field + verbatim text")
+
+
+def test_render_format_spec():
+    eq(expr.render("{$n:03d}", {"n": "0"}), "000", "spec on '0' -> 000")
+    eq(expr.render("{$n:03d}", {"n": 0}), "000", "spec on int 0 -> 000")
+    eq(expr.render("{$n:03d}", {"n": ""}), "", "blank stays blank")
+    eq(expr.render("{$n:03d}", {"n": "5"}), "005", "spec on '5'")
+    eq(expr.render("{$f:.2f}", {"f": "1.5"}), "1.50", "float spec")
+    eq(expr.render("{$f:.2f}", {"f": ""}), "", "blank float stays blank")
+
+
+def test_render_missing_modes():
+    eq(expr.render("{$x}", {}, mode="empty"), "", "empty: missing -> ''")
+    eq(expr.render("{$x}", {}, mode="keep"), "{$x}", "keep: missing -> literal token")
+    eq(expr.render("{$x}", {"x": ""}, mode="keep"), "", "keep: present-but-empty -> ''")
+    raises(ExprError, lambda: expr.render("{$x}", {}, mode="strict"))
+    eq(expr.render("{$x}", {"x": "ok"}, mode="strict"), "ok", "strict: present -> value")
+
+
+def test_render_sentinel_verbatim():
+    eq(expr.render("<input required>", {}), "<input required>", "sentinel verbatim (no holes)")
+    eq(expr.render("plain text", {}), "plain text", "plain literal")
+
+
+# --- data funcs over a synthetic tables dict ----------------------------------------------------- #
+def _db():
+    return {"_db": {
+        "signals": [
+            {"name": "A", "type": "DI", "bit": "I0.0"},
+            {"name": "B", "type": "DI", "bit": "I1.0"},
+            {"name": "C", "type": "DO", "bit": "Q0.0"},
+        ],
+        "nodes": [
+            {"node": "N1", "start_byte": "0", "end_byte": "7"},
+            {"node": "N2", "start_byte": "8", "end_byte": "15"},
+        ],
+    }}
+
+
+def test_data_funcs():
+    ctx = _db()
+    rows = expr.evaluate('where(signals, $type = "DI")', ctx)
+    eq([r["name"] for r in rows], ["A", "B"], "where filters by per-row predicate")
+    eq(expr.evaluate('first(signals, $type = "DO")', ctx)["name"], "C", "first match")
+    eq(expr.evaluate('first(signals, $type = "ZZ")', ctx), {}, "first none -> {}")
+    eq(expr.evaluate('lookup(signals, name, "B", bit)', ctx), "I1.0", "lookup")
+    eq(expr.evaluate('lookup(signals, name, "ZZ", bit)', ctx), "", "lookup miss -> ''")
+    eq(expr.evaluate("unique(type, signals)", ctx), ["DI", "DO"], "unique distinct first-seen")
+    eq(expr.evaluate("count(signals)", ctx), 3.0, "count all")
+    eq(expr.evaluate('count(signals, $type = "DI")', ctx), 2.0, "count filtered")
+
+
+def test_node_of():
+    ctx = _db()
+    eq(expr.evaluate('node_of("I12.3", nodes)', ctx)["node"], "N2", "node owns byte 12 -> N2")
+    eq(expr.evaluate('node_of("I3.0", nodes)', ctx)["node"], "N1", "byte 3 -> N1")
+    eq(expr.evaluate('node_of("I99.0", nodes)', ctx), {}, "out of range -> {}")
+
+
+# --- errors ------------------------------------------------------------------------------------- #
+def test_errors_located():
+    for bad in ("$d ~ notaregex", "len(", "foo($x)", "$d = ", "extract($d,/re/", "$d +"):
+        raises(ExprError, lambda b=bad: expr.test(b, {"d": "x"}))
+
+
+def test_cache_shares():
+    # same text+scope id -> cached; different scope objects compile independently
+    sc = Scope(["a"])
+    eq(expr.evaluate("$a", {"a": "1"}, scope=sc), "1", "first")
+    eq(expr.evaluate("$a", {"a": "2"}, scope=sc), "2", "cached re-eval, fresh ctx")
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(run("expr", [
+        ("regex_and_equality", test_regex_and_equality),
+        ("numeric_and_funcs", test_numeric_and_funcs),
+        ("boolean_composition", test_boolean_composition),
+        ("in_list", test_in_list),
+        ("extract_parity_with_rule_expr", test_extract_parity_with_rule_expr),
+        ("extract_capture_first", test_extract_capture_first),
+        ("ignorecase_both", test_ignorecase_both),
+        ("field_basics_and_bareword", test_field_basics_and_bareword),
+        ("scope_validation", test_scope_validation),
+        ("dotted_object_access", test_dotted_object_access),
+        ("string_funcs", test_string_funcs),
+        ("clean", test_clean),
+        ("if_and_coalesce", test_if_and_coalesce),
+        ("let", test_let),
+        ("render_basic", test_render_basic),
+        ("render_format_spec", test_render_format_spec),
+        ("render_missing_modes", test_render_missing_modes),
+        ("render_sentinel_verbatim", test_render_sentinel_verbatim),
+        ("data_funcs", test_data_funcs),
+        ("node_of", test_node_of),
+        ("errors_located", test_errors_located),
+        ("cache_shares", test_cache_shares),
+    ]))
