@@ -137,10 +137,19 @@ byte-transparent — alongside is the safe choice.
   (oracle-clean; PL3's `iorow.row` is too); `is_indexable` relies on the staging "skip rows already dropped" invariant.
   220 is a stateful host pass (the engine isn't the right tool for the multi-pass allocation) — config is
   `object_families.csv`; matches the plan's "named stateful host passes."
-- **NEXT (M-E4 + the integrated flow):** ph200 230/240 (diag cabinet/bit) port, then wire the integrated
-  stage→fill→re-stage run order where 210 script_type + 220 index + 230/240 diag write back to the doc together.
-  (210 classifies over raw OR staged rows — same columns — so the physical reorder is run-order plumbing, gated by
-  the same idempotent-parity bar, not a new correctness gate.)
+- **M-E4 (ph200 230/240 diag cabinet/bit) — DONE + verified (2026-06-29).** Faithful clean-room port of PL3's
+  `diag_alloc.allocate` into `pipeline4/domain/fillout/diag_alloc.py` over the staged signals + the
+  `diagnosis_cabinets` existing-map: node cabinets (non-P up from `diag_bit_min`, P down from `diag_bit_max`),
+  lone-PA/PW → `+FieldIODevices` inference + downward fill, Type-2 `_TYPE2_ORDER` family blocks via `_family_offset`
+  (N/D/Z/E-B-F), stable `_id_for`, seeded idempotent bit allocation. Added `diag_bit_min: 0`/`diag_bit_max: 62` to
+  `project_params.yaml` (locked decision 5). **Idempotent parity 0 mismatches / 73 in_diag rows; from-scratch
+  reproduced all 16 cabinets EXACTLY (0 cabinet-id diffs, grouping + bits match, 0 collisions).** All `_family_offset`
+  branches oracle-covered by real data; `test_fillout_diag` 8/8; full gate **348/348**; verifier verdict sound (one
+  note: the Type-2 cap-overflow multi-instance split is test-covered only — no real family overflows cap=63).
+- **ph200 COMPUTATION ports COMPLETE** (210 classify · 220 index · 230/240 diag), all idempotent-parity-clean.
+- **NEXT (the integration + M-E5):** wire the integrated **stage→fill→re-stage** run order — 210 `script_type` +
+  220 `index` + 230/240 `diag_cabinet`/`diag_bit` + the `DiagnosisBlocks` sheet write back to the doc together,
+  staging re-runs if the doc changed. Then **M-E5** (converge `dbtemplate`/`identity` onto `core/expr`, byte-gated per site).
 
 ## Resolved decisions
 1. **Pipeline order** → **stage → fill → re-stage(if changed) → validate → generate → report** (the hard rule).

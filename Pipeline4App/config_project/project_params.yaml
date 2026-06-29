@@ -13,6 +13,8 @@ iolist_params:
   header_row: 1
   insert_interface_sheets: true                           # the interface sheets created as output are added to the workbook
   diag_bits_range: [0, 62]                                # valid diagnosis bit range (inclusive)
+  diag_bit_min: 0                                          # ph200 §8 diagnosis allocation: lowest bit (node non-P up from here)
+  diag_bit_max: 62                                         # ph200 §8 diagnosis allocation: highest bit (node P down from here)
 
 matrix_params:
   sorter_areas: [1]                                       # the Sorter area numbers (matched against the C&E areas)
