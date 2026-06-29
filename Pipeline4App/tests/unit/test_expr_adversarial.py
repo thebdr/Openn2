@@ -176,9 +176,11 @@ def test_render_missing_modes_precise():
 
 
 def test_render_non_simple_hole_modes():
-    # a non-simple hole (a function call) is NOT subject to the simple-field missing check; it evaluates.
-    # under keep, concat of a missing field still evaluates to '' (permissive engine), not the literal
-    eq(expr.render("{concat($x, $y)}", {}, mode="keep"), "", "keep: non-simple hole evaluates")
+    # M-E5 strict-fidelity fix: keep/strict now check EVERY top-level $field in a hole, incl. ones nested
+    # in a function call - so a missing field in {concat($x, $y)} is caught (keep -> the literal token).
+    eq(expr.render("{concat($x, $y)}", {}, mode="keep"), "{concat($x, $y)}", "keep: missing field in func hole -> literal")
+    eq(expr.render("{concat($x, $y)}", {"x": "a", "y": "b"}, mode="keep"), "ab", "keep: all present -> evaluates")
+    eq(expr.render("{concat($x, $y)}", {}, mode="empty"), "", "empty mode still evaluates a func hole to ''")
 
 
 def test_render_literal_braces_and_empty():

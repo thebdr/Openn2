@@ -171,6 +171,13 @@ def test_render_missing_modes():
     eq(expr.render("{$x}", {"x": ""}, mode="keep"), "", "keep: present-but-empty -> ''")
     raises(ExprError, lambda: expr.render("{$x}", {}, mode="strict"))
     eq(expr.render("{$x}", {"x": "ok"}, mode="strict"), "ok", "strict: present -> value")
+    # a missing field NESTED in a function-call hole is also caught (the M-E5 strict-fidelity fix)
+    raises(ExprError, lambda: expr.render("{concat($a, $missing)}", {"a": "x"}, mode="strict"))
+    eq(expr.render("{concat($a, $missing)}", {"a": "x"}, mode="keep"), "{concat($a, $missing)}",
+       "keep: a missing field in a function hole leaves the whole token")
+    eq(expr.render("{concat($a, $b)}", {"a": "x", "b": "y"}, mode="strict"), "xy",
+       "strict: all fields present in a function hole -> evaluates")
+    eq(expr.render("{clean($d)}", {"d": "  z  "}, mode="strict"), "z", "strict: a present field under a func -> value")
 
 
 def test_render_sentinel_verbatim():

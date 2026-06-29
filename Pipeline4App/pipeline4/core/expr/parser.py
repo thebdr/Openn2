@@ -458,3 +458,15 @@ def _binder(pred_fn):
 def compile_expr(text: str, scope: Scope | None):
     """Tokenize + parse `text` into a thunk fn(ctx) -> value. Raises a located ExprError."""
     return _Parser(_tokenize(text), text, scope).parse()
+
+
+def referenced_fields(text: str) -> set:
+    """The set of TOP-LEVEL `$field` names referenced anywhere in `text` (a tokenizer scan, no parse) -
+    including those nested inside function-call args. Used by render's keep/strict modes to decide
+    missing-ness over the WHOLE hole, not just a bare `$field` hole. A malformed token -> {} (the
+    compile step reports the real error)."""
+    try:
+        toks = _tokenize(text)
+    except ExprError:
+        return set()
+    return {val[1:].split(".", 1)[0] for kind, val in toks if kind == "field"}

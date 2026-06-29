@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 
 from .errors import ExprError
+from .parser import referenced_fields
 from .runtime import format_spec, s
 from .scope import Scope
 
@@ -23,10 +24,6 @@ from .scope import Scope
 # (which can't contain a bare ':' outside a string here) doesn't confuse the spec. The expr part is
 # compiled by the engine; the spec part is a Python format spec.
 _HOLE = re.compile(r"\{([^{}]*)\}")
-
-# A simple-field hole = exactly `$name` (dotted or not), optionally with a spec - used by "keep"/"strict"
-# to decide missing-ness by the TOP-LEVEL field name without evaluating.
-_SIMPLE_FIELD = re.compile(r"\A\s*\$([A-Za-z_]\w*)(?:\.[A-Za-z_]\w*)*\s*(?::([^{}]*))?\Z")
 
 
 def _split_spec(body: str):
@@ -79,16 +76,16 @@ def render(template: str, ctx: dict, scope: Scope | None = None, mode: str = "em
         if not body.strip():
             return ""                                       # {} or { } -> ""
 
-        # keep / strict: decide missing-ness by the top-level field name (no eval) for a SIMPLE $field hole
-        simple = _SIMPLE_FIELD.match(body)
-        if simple and mode in ("keep", "strict"):
-            top = simple.group(1)
-            if top not in ctx:
+        expr_text, spec = _split_spec(body)
+        # keep / strict: decide missing-ness over EVERY top-level $field in the hole (incl. ones nested in
+        # function-call args), not just a bare `$field` hole - so a missing field in {concat($x)} is caught.
+        if mode in ("keep", "strict"):
+            missing = [f for f in referenced_fields(expr_text) if f not in ctx]
+            if missing:
                 if mode == "keep":
                     return m.group(0)                       # leave {token} intact
-                raise ExprError(f"render(strict): missing field ${top} in {template!r}")
+                raise ExprError(f"render(strict): missing field ${missing[0]} in {template!r}")
 
-        expr_text, spec = _split_spec(body)
         value = _compile(expr_text.strip(), scope)(ctx)
         if spec is not None:
             return format_spec(value, spec)
