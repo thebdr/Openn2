@@ -139,6 +139,36 @@ def test_index_unresolved_is_reported():
         ok(any(r[1] == "AD" for r in body), "the unresolved entry points at the AD (index) column")
 
 
+def test_range_component_suffix_and_shared_index():
+    # a 2-channel contactor: the KQ output is the RANGE device -K66701..2; its feedbacks are INDEPENDENT rows
+    # -K66701/-K66702. The fill suffixes the feedbacks KI -> KI1/2 / KI2/2 (the channel from the range) and
+    # groups all three under ONE index (the independent components inherit the range anchor's index).
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "io.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = _SHEET
+        ws["F2"] = "5"; ws["R2"] = "PLC"; ws["K2"] = "MAIN PLC NODE"; ws["O2"] = "=S1"
+        # KQ output, range device, Out gate (Q address)
+        ws["G3"] = "Q0.0"; ws["K3"] = "SAFETY RELAY ENABLE DRIVE"
+        ws["O3"] = "=S1"; ws["P3"] = "+DL1.CC1"; ws["Q3"] = "-K66701..2"
+        # two KI feedbacks, independent component devices, In gate (I address), consecutive rows
+        ws["G4"] = "I0.0"; ws["K4"] = "FEEDBACK OF SAFETY RELAY"
+        ws["O4"] = "=S1"; ws["P4"] = "+DL1.CC1"; ws["Q4"] = "-K66701"
+        ws["G5"] = "I0.1"; ws["K5"] = "FEEDBACK OF SAFETY RELAY"
+        ws["O5"] = "=S1"; ws["P5"] = "+DL1.CC1"; ws["Q5"] = "-K66702"
+        wb.save(p)
+        fill.fill_out(_params(p))
+        ws2 = load_workbook(p)[_SHEET]
+        eq(str(ws2["AB3"].value or "").strip(), "KQ", "the range KQ output keeps its base type")
+        eq(str(ws2["AB4"].value or "").strip(), "KI1/2", "independent component 1 -> KI1/2")
+        eq(str(ws2["AB5"].value or "").strip(), "KI2/2", "independent component 2 -> KI2/2")
+        ad3 = str(ws2["AD3"].value or "").strip()
+        ok(ad3, "the KQ anchor got an index")
+        eq(str(ws2["AD4"].value or "").strip(), ad3, "KI1/2 shares the KQ index (one object)")
+        eq(str(ws2["AD5"].value or "").strip(), ad3, "KI2/2 shares the KQ index")
+
+
 def test_diag_blocks_append_only_reuses_existing_id():
     # diag_blocks.read_existing reuses a present cabinet's ID_Local; block_rows appends only new cabinets.
     wb = Workbook()
@@ -166,5 +196,6 @@ if __name__ == "__main__":
         ("retyping_after_210_feeds_220_230", test_retyping_after_210_feeds_220_230),
         ("only_arg_restricts_writeback", test_only_arg_restricts_writeback),
         ("index_unresolved_is_reported", test_index_unresolved_is_reported),
+        ("range_component_suffix_and_shared_index", test_range_component_suffix_and_shared_index),
         ("diag_blocks_append_only_reuses_existing_id", test_diag_blocks_append_only_reuses_existing_id),
     ]))

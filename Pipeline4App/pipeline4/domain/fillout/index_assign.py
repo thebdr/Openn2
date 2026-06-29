@@ -22,8 +22,28 @@ from collections import defaultdict
 from pipeline4.domain.fillout.families import (
     family_for, LINK_CHANNEL, LINK_SERIES, LINK_FLD, LINK_PATTERN, LINK_NONE,
 )
+from pipeline4.domain.fillout.ranges import expand_range_fld
 
 INPUT_REQUIRED = "<input required>"
+
+
+def _register_anchor(anchor_map: dict, fld: str, index: str) -> None:
+    """Register an anchor's index under its FLD AND each range-expanded component FLD, so a member authored
+    as the range OR as an independent component matches it (the exact FLD wins; expansion fills the rest)."""
+    for f in expand_range_fld(fld):
+        anchor_map.setdefault(f, index)
+    anchor_map[fld] = index
+
+
+def _anchor_lookup(anchor_map: dict, fld: str):
+    """An anchor index for `fld`: the exact FLD first, then (bidirectional) any range-expanded component of
+    `fld` - so an independent member finds a range anchor AND a range member finds an independent anchor."""
+    if fld in anchor_map:
+        return anchor_map[fld]
+    for comp in expand_range_fld(fld):
+        if comp in anchor_map:
+            return anchor_map[comp]
+    return None
 
 # roles
 STANDALONE, ANCHOR, CHANNEL_2, RESET, PATTERN = "standalone", "anchor", "channel_2", "reset", "pattern"
@@ -145,7 +165,7 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
         if role in (ANCHOR, STANDALONE, RESET):
             res.index = _take(counters, _counter_key(res), res.ex_index)
             if role == ANCHOR:
-                fld_anchor[res.family.key][res.fld] = res.index
+                _register_anchor(fld_anchor[res.family.key], res.fld, res.index)
         elif role == PATTERN:
             key = res.family.key
             if key not in pattern_idx:
@@ -160,13 +180,13 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
     for res in indexable:
         role = role_of(res)
         if role == CHANNEL_2:
-            got = fld_anchor.get(res.family.key, {}).get(res.fld)
+            got = _anchor_lookup(fld_anchor.get(res.family.key, {}), res.fld)
             if got:
                 res.index = got
             else:
                 _unresolved(res, "channel_fld_mismatch", error=True)
         elif role == FLD_INHERIT:
-            got = fld_anchor.get("D", {}).get(res.fld)
+            got = _anchor_lookup(fld_anchor.get("D", {}), res.fld)
             if got:
                 res.index = got
             else:
@@ -190,7 +210,7 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
         st = (res.script_type or "").upper()
         total = st.split("/")[-1] if "/" in st else ""
         if role == SERIES_PRIMARY:
-            current = fld_anchor.get("K", {}).get(res.fld)
+            current = _anchor_lookup(fld_anchor.get("K", {}), res.fld)
             current_total = total
             prev_row = res.row
             if current:

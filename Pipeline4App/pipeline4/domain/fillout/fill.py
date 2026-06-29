@@ -162,23 +162,34 @@ def _compute_fill(params: dict, only) -> tuple:
         for canon in ("script_type", "index", "diag_cabinet", "diag_bit"):
             row[f"_orig_{canon}"] = row.get(canon, "")
 
-    # 210 - classify: set script_type (Mode-1 only when AB is blank/<input required>; Mode-2 preserves a
-    # human AB + a fill_type_mismatch WARN) and the always-on suggested = computed; RE-RESOLVE the type so
-    # 220/230/240 see it.
+    # 210 - classify. (a) the base rule output per row (keyed by uid). (b) the channel suffix for any row that
+    # is an INDEPENDENT component of a device RANGE (`-K66701` of `-K66701..2` -> base `KI` becomes `KI1/2`; an
+    # unknown derived type -> the marked `<KI1/5>` + a FAIL). (c) per row: Mode-1 (blank AB) writes the (marked)
+    # computed, Mode-2 (human AB) preserves it + a fill_type_mismatch WARN vs the computed; RE-RESOLVE the type
+    # so 220/230/240 see it.
     findings, mismatch = [], 0
+    base_type = {row["uid"]: classify.classify(row, gate_rules, type_rules) for row in rows}
+    suffixed, invalid = classify.channel_suffixes(rows, families, signal_types, base_type)
+    for row, cand in invalid:
+        findings.append(_f("fill_unknown_channel_type", "FAIL",
+                           f"the derived channel type {cand!r} has no signal_types entry - add it to "
+                           f"signal_types.csv or fix the device range",
+                           f"{row.get('source_sheet')}!{row.get('source_row')}"))
     for row in rows:
-        computed = classify.classify(row, gate_rules, type_rules)
-        row["suggested_computed"] = computed                        # AC: always the computed value
-        ex_ab = str(row.get("script_type") or "").strip()
+        full = suffixed.get(row["uid"], base_type[row["uid"]])      # marked (e.g. <KI1/5>) or plain
+        plain = classify.unmark(full)
+        row["suggested_computed"] = plain                           # AC: always the plain computed value
+        ex_ab = str(row.get("_orig_script_type") or "").strip()
         if ex_ab and ex_ab != INPUT_REQUIRED:                       # Mode-2: keep the human value
-            if computed and computed not in (ex_ab, INPUT_REQUIRED):
+            row["script_type"] = ex_ab
+            if plain and plain not in (ex_ab, INPUT_REQUIRED):
                 mismatch += 1
                 findings.append(_f("fill_type_mismatch", "WARN",
-                                   f"kept the existing script type {ex_ab!r}; the rules computed {computed!r}",
+                                   f"kept the existing script type {ex_ab!r}; the rules computed {plain!r}",
                                    f"{row.get('source_sheet')}!{row.get('source_row')}"))
-        elif computed:                                              # Mode-1: take the computed value
-            row["script_type"] = computed
-        row["type"] = config.resolve_type(signal_types, row.get("script_type"))
+        elif full:                                                  # Mode-1: take the (marked) computed value
+            row["script_type"] = full
+        row["type"] = config.resolve_type(signal_types, classify.unmark(row.get("script_type")))
 
     # 220 - index assignment over the (re-typed) rows.
     idx = index_assign.assign_indices(rows, families)
@@ -259,16 +270,20 @@ def fill_out(params: dict | None = None, only=None) -> dict:
             if ac and computed:
                 cell_edits[sheet][f"{ac}{rownum}"] = computed
             st = str(row.get("script_type") or "").strip()
+            marked = st.startswith("<") and st.endswith(">")       # <input required> OR a <KI1/5> unknown type
             if ab and computed and _blank(row.get("_orig_script_type")):
                 # AB was originally blank/<input required> -> Mode-1 write; a preserved human AB is left alone
                 cell_edits[sheet][f"{ab}{rownum}"] = row["script_type"]
-                if st and st != INPUT_REQUIRED:
+                if st and not marked:
                     filled += 1
-            if st == INPUT_REQUIRED and not _skipped(row):
-                unresolved.append((row, ab, "the description matched no script-type rule"))
-                findings.append(_f("fill_unresolved", "FAIL",
-                                   "the description matched no script-type rule - fill it in the source I/O List",
-                                   f"{sheet}!{ab}{rownum}"))
+            if marked and not _skipped(row):                       # an unresolved AB cell -> report it
+                if st == INPUT_REQUIRED:
+                    unresolved.append((row, ab, "the description matched no script-type rule"))
+                    findings.append(_f("fill_unresolved", "FAIL",
+                                       "the description matched no script-type rule - fill it in the source I/O List",
+                                       f"{sheet}!{ab}{rownum}"))
+                else:                                              # <KI1/5> - the FAIL was logged in _compute_fill
+                    unresolved.append((row, ab, f"unknown channel type {classify.unmark(st)} - add it to signal_types"))
         # 220 - AD index (blank-only); an ungroupable row -> <input required> is UNRESOLVED (reported)
         if 220 in legs and ad:
             ix = str(row.get("index") or "").strip()
