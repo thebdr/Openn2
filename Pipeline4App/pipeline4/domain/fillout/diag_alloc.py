@@ -33,6 +33,15 @@ from dataclasses import dataclass
 from pipeline4.core import config
 from pipeline4.domain.fillout.families import family_for
 
+
+def diag_bit_range(params) -> tuple:
+    """The (min, max) diagnosis bit range from `iolist_params.diag_bits_range` ([min, max], inclusive;
+    default (0, 62)). The single source - node non-P bits grow UP from min, P bits DOWN from max."""
+    rng = config.get_param(params, "iolist_params.diag_bits_range", None)
+    if isinstance(rng, (list, tuple)) and len(rng) == 2:
+        return int(rng[0]), int(rng[1])
+    return 0, 62
+
 _FIELD = "+FieldIODevices"
 _TYPE2_ORDER = [
     _FIELD, "+SafetyDoors", "+SafetyEncoders", "+SafetyBreakers",
@@ -109,8 +118,7 @@ def _family_offset(r: _Res) -> int:
 def allocate(rows: list, families: list, params: dict, existing: dict | None = None) -> tuple:
     """Compute (blocks, placements) for the staged signal rows. `existing` maps an existing cabinet's
     full_name -> int(cabinet_id) (stable-id idempotency); each row's ex_diag_* seed the bit allocation."""
-    min_b = int(config.get_param(params, "iolist_params.diag_bit_min", 0) or 0)
-    max_b = int(config.get_param(params, "iolist_params.diag_bit_max", 62) or 62)
+    min_b, max_b = diag_bit_range(params)
     cap = max_b - min_b + 1
 
     results = [_Res(r, families) for r in rows]

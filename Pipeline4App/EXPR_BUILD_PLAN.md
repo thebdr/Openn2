@@ -141,8 +141,9 @@ byte-transparent — alongside is the safe choice.
   `diag_alloc.allocate` into `pipeline4/domain/fillout/diag_alloc.py` over the staged signals + the
   `diagnosis_cabinets` existing-map: node cabinets (non-P up from `diag_bit_min`, P down from `diag_bit_max`),
   lone-PA/PW → `+FieldIODevices` inference + downward fill, Type-2 `_TYPE2_ORDER` family blocks via `_family_offset`
-  (N/D/Z/E-B-F), stable `_id_for`, seeded idempotent bit allocation. Added `diag_bit_min: 0`/`diag_bit_max: 62` to
-  `project_params.yaml` (locked decision 5). **Idempotent parity 0 mismatches / 73 in_diag rows; from-scratch
+  (N/D/Z/E-B-F), stable `_id_for`, seeded idempotent bit allocation. Reads the bit range from the existing
+  `iolist_params.diag_bits_range` `[0, 62]` via `diag_alloc.diag_bit_range()` (the single source — the
+  initially-added redundant `diag_bit_min`/`diag_bit_max` scalars were removed per user review). **Idempotent parity 0 mismatches / 73 in_diag rows; from-scratch
   reproduced all 16 cabinets EXACTLY (0 cabinet-id diffs, grouping + bits match, 0 collisions).** All `_family_offset`
   branches oracle-covered by real data; `test_fillout_diag` 8/8; full gate **348/348**; verifier verdict sound (one
   note: the Type-2 cap-overflow multi-instance split is test-covered only — no real family overflows cap=63).

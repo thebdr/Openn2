@@ -12,9 +12,7 @@ iolist_params:
   sheets: '^NET SAFETY \d{1,3}|^r\d+\.s\d+\.c\d+/gmi'     # a single sheet name, a list of names or a regular expression
   header_row: 1
   insert_interface_sheets: true                           # the interface sheets created as output are added to the workbook
-  diag_bits_range: [0, 62]                                # valid diagnosis bit range (inclusive)
-  diag_bit_min: 0                                          # ph200 §8 diagnosis allocation: lowest bit (node non-P up from here)
-  diag_bit_max: 62                                         # ph200 §8 diagnosis allocation: highest bit (node P down from here)
+  diag_bits_range: [0, 62]                                # valid diagnosis bit range (inclusive); ph200 §8 diag allocation reads this (node non-P up from min / P down from max)
 
 matrix_params:
   sorter_areas: [1]                                       # the Sorter area numbers (matched against the C&E areas)
@@ -41,7 +39,7 @@ validation_params:
     print_all: false                  # log every PASS/SKIP, not just FAIL/WARN
 
   iolist:
-    permanent_parts:                  # canonical safety phrases an A/W/PA/PW permanent-part description must match (ph110)
+    permanent_parts:                  # canonical phrases an A/W/PA/PW permanent-part description must match (ph110)
       - EXTERNALLY INDUCED EMERGENCY
       - EMERGENCY PUSH BUTTON PRESSED
       - EMERGENCY STOP WITH PULL CORD

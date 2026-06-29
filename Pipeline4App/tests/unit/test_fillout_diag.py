@@ -10,7 +10,7 @@ from _harness import run, eq, ok
 from pipeline4.domain.fillout import diag_alloc
 from pipeline4.domain.fillout.families import ObjectFamily
 
-_PARAMS = {"iolist_params": {"diag_bit_min": 0, "diag_bit_max": 62}}
+_PARAMS = {"iolist_params": {"diag_bits_range": [0, 62]}}
 
 # the shipped object_families (the subset the tests exercise)
 _FAMS = [

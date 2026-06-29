@@ -224,8 +224,7 @@ def fill_out(params: dict | None = None, only=None) -> dict:
     legs = _legs(only)
     colmap = config.load_column_map("IoList")
     header_row = int(config.get_param(params, "iolist_params.header_row", 1) or 1)
-    min_b = int(config.get_param(params, "iolist_params.diag_bit_min", 0) or 0)
-    max_b = int(config.get_param(params, "iolist_params.diag_bit_max", 62) or 62)
+    min_b, max_b = diag_alloc.diag_bit_range(params)
 
     rows, blocks, place, findings, mismatch = _compute_fill(params, only)
 

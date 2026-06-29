@@ -32,7 +32,7 @@ def _raw_iolist(path):
 
 def _params(path):
     return {"iolist_path": path,
-            "iolist_params": {"sheets": _SHEET, "header_row": 1, "diag_bit_min": 0, "diag_bit_max": 62}}
+            "iolist_params": {"sheets": _SHEET, "header_row": 1, "diag_bits_range": [0, 62]}}
 
 
 def test_full_fill_writes_index_and_diag_cells():
