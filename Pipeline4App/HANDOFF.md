@@ -51,7 +51,14 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   Var font at size 13** [`gui/fonts.py` + `theme.apply_theme`; M0b fonts done]). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`. The GUI is a manual `python launch_gui.py` check (no
   headless GUI tests; each GUI milestone unit-tests its pure logic + a construction smoke).
-- **START THE NEXT SESSION HERE → `GUI_PLAN.md`** (the live GUI tracker). **M0–M6 + STEP 1 i18n + STEP 2 +
+- **START THE NEXT SESSION HERE → `EXPR_ENGINE.md`. ALL PHASE DEV PAUSED (user, 2026-06-29):** the unified
+  **mini-expression engine is THE priority** — build it AND retrofit everywhere (ph200, dbtemplate/520,
+  identity, diagnosis/interface templates) before any phase resumes. Build-vs-adopt is researched (CEL/celpy
+  spike vs simpleeval+Liquid hybrid vs thin custom; no off-the-shelf fit, `let()` native to none); the design +
+  final grammar decisions + PENDING engine choice are in **`EXPR_ENGINE.md`**. Decided: ph200 reorders to
+  stage→fill; `$canonical` fields; rule-driven gate. ph200 **210 stays operable** on the OLD `rule_expr`
+  grammar meanwhile. WAITING behind the engine: ph200 220/230/240 + M7 GUI polish. (Historical status below.)
+- **(historical) GUI/ph200 status →** `GUI_PLAN.md` (the live GUI tracker). **M0–M6 + STEP 1 i18n + STEP 2 +
   STEP 3 done; STEP 4 (ph200) IN PROGRESS.** GUI port is feature-complete bar polish (M7). **STEP 4 / ph200
   Documents Fill Out** (CSV-rule-driven; the spec + decisions + grammar are in **`PH200_SPEC.md`**, the living
   contract): **210 (Fill Script Type) DONE + operable** - `core/rule_expr.py` (reusable expression engine) +
