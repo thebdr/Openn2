@@ -126,9 +126,21 @@ byte-transparent — alongside is the safe choice.
   `clean()`-vs-strip divergence on the `type_hw` RESULT (rules 10/30) — fixed: results use `strip()` (trim-only),
   matches use `clean()`. Confirmed: the staged `signals` already carries all 64 columns (34 `column_map` + 30
   derived) — no staging-schema change needed; the stale stub was the earlier confusion.
-- **NEXT (M-E2 remainder):** wire the physical stage→fill→re-stage run order (`fill` reads the staged `signals`,
-  writes `script_type` back to the doc, re-stage if changed) — 210 classifies correctly over raw OR staged rows
-  (same canonical columns), so this is run-order plumbing, not a correctness gate. Then M-E3 (220).
+- **M-E3 (ph200 220 index = object grouping) — DONE + verified (2026-06-29).** Faithful clean-room port of PL3's
+  3-pass `assign_indices` into `pipeline4/domain/fillout/index_assign.py` + `families.py` (`load_object_families`
+  + longest-prefix `family_for`) over the staged signals (adapter: `type.channel`/`type.category`, `fld`=FU+Loc+Dev,
+  `source_row` for K-series contiguity, `index` for idempotency). **Operative parity (idempotent re-run over the
+  pre-filled doc) = 0 mismatches / 267 rows; from-scratch = 0 real mismatches / 113** (the 12 DL/DR/DQ
+  `<input required>` are a genuine PL3 property — manual door members whose FLD matches no DI anchor; PL3 emits the
+  same sentinel from scratch, and idempotent re-run preserves the operator's index). `test_fillout_index` 11/11;
+  full gate **340/340**; verifier verdict sound. Known (faithful-to-PL3) notes: K-series `source_row` is per-sheet
+  (oracle-clean; PL3's `iorow.row` is too); `is_indexable` relies on the staging "skip rows already dropped" invariant.
+  220 is a stateful host pass (the engine isn't the right tool for the multi-pass allocation) — config is
+  `object_families.csv`; matches the plan's "named stateful host passes."
+- **NEXT (M-E4 + the integrated flow):** ph200 230/240 (diag cabinet/bit) port, then wire the integrated
+  stage→fill→re-stage run order where 210 script_type + 220 index + 230/240 diag write back to the doc together.
+  (210 classifies over raw OR staged rows — same columns — so the physical reorder is run-order plumbing, gated by
+  the same idempotent-parity bar, not a new correctness gate.)
 
 ## Resolved decisions
 1. **Pipeline order** → **stage → fill → re-stage(if changed) → validate → generate → report** (the hard rule).
