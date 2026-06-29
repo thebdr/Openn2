@@ -571,9 +571,12 @@ Set root/Close) + an active-project **title indicator** + auto-reopen on launch 
 **M0b chrome remainder** (in STEP 1): `gui/darktitle.py` + the full light/dark re-theme (`set_theme` on
 LogView/PhaseBar/DatabaseExplorer/FilesPanel). NEXT: **STEP 4** ph200 (Documents Fill Out) - the last
 backend effort.
-**Backend status: 8 of the 9 generative phases are built (300/520/400/510/600/700/800/900/100); ph200
-(Documents Fill Out) is NOT built — PL4 reads script_type/index/diag, it does not compute them, so it
-currently requires a PRE-FILLED I/O List. ph200 is the last backend effort (STEP 4).** The GUI port
+**Backend status: ALL backend phases are built — 300/520/400/510/600/700/800/900/100 + ph200 (Documents Fill
+Out).** ph200 (`domain/fillout/`) computes script_type (210, on `core/expr`) / index (220) / diag cabinet+bit
+(230/240) over the staged signals and writes them back to the doc via the canonical **stage→fill→re-stage**
+flow (`fill.fill_out`); the unified expression engine `core/expr` (which `rule_expr` was retired onto) is built
++ retrofitted everywhere — see **`EXPR_ENGINE.md`** + **`EXPR_BUILD_PLAN.md`** + **`PH200_SPEC.md`** (incl. the
+device-tag RANGE notation + channel `n/N` suffix, and the manual orange "Risky Index Fill" button). The GUI port
 (replicate PL3 + add SSOT-native features) is the active effort - the
 plan + locked decisions are in **`GUI_PLAN.md`**. **M0 (foundations) DONE:** a **lightweight phase registry**
 (`gui/phases.py` - the single source of the phase order: number/title/kind/subs/requires/handler +

@@ -13,7 +13,8 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
 ## LATEST (2026-06-29) — the unified expression engine + ph200 are COMPLETE; the pause is LIFTED
 The "PAUSE all phase development until the unified mini-expression engine is built + retrofitted" priority
 is **RESOLVED**. The authority docs are **`EXPR_ENGINE.md`** (status: COMPLETE) + **`EXPR_BUILD_PLAN.md`**
-(the sequenced, parity-gated build record). What landed (8 commits, all green + pushed; HEAD `9d31cc9`):
+(the sequenced, parity-gated build record). What landed — the expr-engine arc (8 commits) through `9d31cc9`,
+then 5 ph200 enhancement commits through **HEAD `3ad85a2`** (all green + pushed):
 - **`core/expr/`** — a custom **DB-references-only** expression engine (`$column` fields validated against a
   `Scope`; `clean()`/`strip()`/`concat`/`join`/capture-first `extract`/`if`/`coalesce`/`let`; `render` with
   format-specs + 3 missing-key modes; data funcs; single-quote strings). Chosen over CEL on **spike evidence**
@@ -26,13 +27,28 @@ is **RESOLVED**. The authority docs are **`EXPR_ENGINE.md`** (status: COMPLETE) 
   (re-stage idempotent on a non-destructive scratch copy; the real doc untouched). M-E5 converged
   `identity.interp` + `dbtemplate.render` onto `core/expr.render` — **byte-diff 0** on the locked 520/600 outputs.
   (Left as-is, documented: `dbtemplate.compile_for_each` iteration + `identity.interp_keep`.)
-- **Gate: 45 test FILES / 356 tests green** (added `test_expr`/`test_expr_adversarial`/`test_fillout_index`/
-  `test_fillout_diag`/`test_fillout_integration`; `test_rule_expr` removed with the retirement).
+- **ph200 ENHANCEMENTS (post-completion, user-driven; commits `14426c2`/`8841d51`/`42c9fe3`/`3ad85a2`):**
+  - `diag_alloc` reads the existing `iolist_params.diag_bits_range` `[0,62]` (dropped the redundant
+    `diag_bit_min`/`diag_bit_max` the M-E4 port had added) — `diag_alloc.diag_bit_range()` is the single source.
+  - **`_UnresolvedIndex` now covers the 220 INDEX leg too** (was 210-only): a 220 ungroupable row (`<input
+    required>` AD) is reported + listed + a blocking finding (`fill.fill_out`).
+  - **Device-tag RANGE notation + channel `n/N` suffix** (`domain/fillout/ranges.py` + `classify.channel_suffixes`
+    + range-aware `index_assign`): a multi-channel family authored as the range `-K66701..2` OR as independent
+    components `-K66701`/`-K66702` now both group (bidirectional FLD expansion → the components inherit the range
+    anchor's index), and an independent component gets `<n>/<N>` appended to its base type (`KI`→`KI1/2`); a derived
+    type absent from `signal_types` (e.g. `KI1/5`) is written marked `<KI1/5>` + a FAIL + `_UnresolvedIndex`.
+  - **Manual "Risky Index Fill"** (`fill.risky_index_fill` + `risky_assignments`): an **orange `special` button**
+    (`phases.py` Sub 245, NOT in the pipeline/Run-all) that, over an already-filled doc, fills each `<input
+    required>` index by matching it to an existing family object index in the same IO node (`diagnosis.node_of`,
+    the positional address range) per script_type by ROW ORDER (fill-what-lines-up). Filled cells are written RED
+    (`xlsx_edit.RedText`, an inline rich-text run — surgical, no styles.xml) + a `_RiskyIndex` review sheet.
+- **Gate: 46 test FILES / 366 tests green** (added `test_expr`/`test_expr_adversarial`/`test_fillout_index`/
+  `test_fillout_diag`/`test_fillout_integration`/`test_fillout_ranges`; `test_rule_expr` removed with the retirement).
 - **NEXT** (the previously-paused tail, now unblocked): **M7 GUI polish** (theme/size persistence, log-to-file —
-  see `GUI_PLAN.md`); a **manual GUI smoke** of the ph200 200-button (210/220/230/240 now un-greyed) over a
-  blank-ish doc; and the **interface-completeness follow-ups** (re-verify 510 PLCTags after the +DIAG unblock +
-  the template-native capture — see CLAUDE.md Phase 400/510). The stale per-line claims below are superseded by
-  this block.
+  see `GUI_PLAN.md`); a **manual GUI smoke** of the ph200 200-button (210/220/230/240 + the orange **245 Risky
+  Index Fill**) over a doc; and the **interface-completeness follow-ups** (re-verify 510 PLCTags after the +DIAG
+  unblock + the template-native capture — see CLAUDE.md Phase 400/510). The stale per-line claims below are
+  superseded by this block.
 
 ## Where we are
 - **Branch `pl4`**. **ALL 9 GENERATIVE PHASES + ph200 ARE BUILT** — 300 + 520 + 400 + 510 + 600 + 700 + 800 + 900 +
@@ -60,8 +76,10 @@ is **RESOLVED**. The authority docs are **`EXPR_ENGINE.md`** (status: COMPLETE) 
   `config.use_project`) · **M0b chrome remainder** (darktitle + the full light/dark re-theme - landed in
   STEP 1). NEXT: **STEP 4** ph200 Documents Fill Out (CSV-driven, the LAST backend effort; confirm its 4 open
   decisions first).
-- **GIT STATE:** local **`pl4`** is at **`9d31cc9`** and **PUSHED** — `origin/pl4` synced through it. Recent
-  milestones (the expr-engine arc, newest first): **`9d31cc9`** EXPR_ENGINE doc complete · **`cff30ed`** M-E5 render
+- **GIT STATE:** local **`pl4`** is at **`3ad85a2`** and **PUSHED** — `origin/pl4` synced through it. Recent
+  milestones (newest first): **`3ad85a2`** ph200 Risky Index Fill (orange button) · **`42c9fe3`** ph200 range
+  notation + channel n/N suffix · **`8841d51`** _UnresolvedIndex covers the 220 index leg · **`14426c2`** diag
+  reads diag_bits_range · **`a4d28d8`** HANDOFF refresh · **`9d31cc9`** EXPR_ENGINE doc complete · **`cff30ed`** M-E5 render
   convergence · **`9799531`** M-E5 strict-render fix · **`d8444af`** ph200 stage→fill→re-stage integration ·
   **`a314b14`** ph200 230/240 diag · **`8deda92`** ph200 220 index · **`ee555c8`** ph200 210 (engine port) ·
   **`ef4fb86`** core/expr engine. Before that: **`2ba6990`** STEP 4 / ph200 **210 operable** (old grammar) · **`0f3061a`** 210a

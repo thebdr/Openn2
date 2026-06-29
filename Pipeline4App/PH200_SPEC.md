@@ -173,5 +173,32 @@ per row + the cabinet set. Each sub-phase committed with its gate + this parity 
   `test_gui_phases` updated. **Real-data smoke (non-destructive scratch copy):** filled=0 / mismatch=8 (the
   doc's 8 hand-overrides vs the ladder - PL3 flags the same) / unresolved=0; a re-run is a no-op. GUI-verified
   on screen (the 200 dropdown: 210 enabled, 220-240 greyed, 250 open).
-- **NEXT:** 220 (§7 index = object grouping) · 230/240 (§8 diag cabinet/bit). Each: re-confirm the PL3
-  mechanics, build, parity-check, add to the fill + the Run-all once complete.
+- **ph200 COMPLETE (2026-06-29).** NOTE: the engine + grammar were rebuilt on the unified `core/expr` (see
+  `EXPR_ENGINE.md`/`EXPR_BUILD_PLAN.md` — `rule_expr` is retired; rules now use `$column` DB-refs + `clean()`/
+  `join()` + Python slices). The §6/§7/§8 algorithms below still hold; the changes:
+  - **220 (§7 index)** — `domain/fillout/index_assign.py` + `families.py` (faithful PL3 `assign_indices` port over
+    the staged signals). Idempotent parity 0/267; from-scratch 0 real mismatches/113 (the 12 DL/DR/DQ manual
+    members are a genuine PL3 property).
+  - **230/240 (§8 diag)** — `domain/fillout/diag_alloc.py` (+ `diag_blocks.py` for the DiagnosisBlocks sheet).
+    Idempotent parity 0/73, all 16 cabinets reproduced. Reads `iolist_params.diag_bits_range` `[0,62]`.
+  - **The integrated fill** — `fill.fill_out` wires **stage → fill → re-stage**: 210 classify + re-type → 220
+    index → 230/240 diag → write AB/AC/AD/AE/AF + DiagnosisBlocks back to the doc → re-stage. Idempotent 0/269 on
+    a scratch copy; the real doc untouched. The 200 header runs all four; sub-buttons run their leg.
+  - **`_UnresolvedIndex`** covers BOTH script_type (210, AB) and index (220, AD) `<input required>` cells.
+- **§7 EXTENSION — device-tag RANGE notation + channel `n/N` suffix** (`domain/fillout/ranges.py` +
+  `classify.channel_suffixes` + range-aware `index_assign`). A multi-channel family member (e.g. a contactor
+  feedback) authored as the RANGE form `-K66701..2` OR as INDEPENDENT components `-K66701`/`-K66702` now both group:
+  every `..` FLD expands (trailing digit, L→R) into its component FLDs; a range anchor registers under its
+  components and lookups expand bidirectionally, so the independent components inherit the range anchor's index.
+  An independent component additionally gets the channel `<n>/<N>` appended to its BASE script_type (`KI`→`KI1/2`;
+  position L→R, N = component count); the range row keeps its base type; a derived type with no `signal_types`
+  entry (e.g. `KI1/5`) is written MARKED `<KI1/5>` (AB) / plain (AC) + a `fill_unknown_channel_type` FAIL +
+  `_UnresolvedIndex`. Applies to every `object_families` family; idempotent + self-healing.
+- **MANUAL "Risky Index Fill"** (NOT in the pipeline — an orange GUI `special` button, `phases.py` Sub 245 →
+  `app_main._run_risky_index` → `fill.risky_index_fill`). Over an already-filled doc: each `<input required>` index
+  is filled by matching it to an existing family OBJECT index in the same IO node (`diagnosis.node_of` = the
+  positional `I/Q_startByte..endByte` containment) per script_type by ROW ORDER, up to the object count (leftover
+  stays unresolved — never invents an index). The filled cells are written RED (`xlsx_edit.RedText`, an inline
+  rich-text run — surgical) + a `_RiskyIndex` review sheet (links + a REVIEW note). 'Risky' = a row-order heuristic.
+- Tests: `test_fillout_index`/`test_fillout_diag`/`test_fillout_integration`/`test_fillout_ranges` (+ the engine
+  suites). Full data-independent gate **366**.
