@@ -24,6 +24,7 @@ from pipeline4.gui import excel, files_view, findings_view, phases, theme
 from pipeline4.gui.db_explorer import DatabaseExplorer
 from pipeline4.gui.files_panel import FilesPanel
 from pipeline4.gui.findings_panel import FindingsPanel
+from pipeline4.gui.documents_panel import DocumentsPanel
 from pipeline4.gui.logview import LogView
 from pipeline4.gui.phasebar import PhaseBar
 from pipeline4.project import project, state
@@ -102,6 +103,11 @@ class App:
                                 on_status=lambda m: self.status.configure(text=m), mode=self.mode)
         self.files.pack(side="top", fill="both", expand=True)
         self.notebook.add(self._files_tab, text=i18n.tr("tab_files", self.lang))
+        self._documents_tab = ttk.Frame(self.notebook)
+        self.documents = DocumentsPanel(self._documents_tab, lang=self.lang,
+                                        on_status=lambda m: self.status.configure(text=m))
+        self.documents.pack(side="top", fill="both", expand=True)
+        self.notebook.add(self._documents_tab, text=i18n.tr("tab_documents", self.lang))
         self._findings_tab = ttk.Frame(self.notebook)
         self.findings = FindingsPanel(self._findings_tab)
         self.findings.pack(side="top", fill="both", expand=True)
@@ -331,6 +337,7 @@ class App:
         self._project = root
         self._set_title()
         self.files.set_sections(self._file_sections())
+        self.documents.refresh()                         # the 4 input-doc paths follow the active project
         self.explorer.refresh()
         self.findings.refresh()
         where = project.project_name(root) if root else i18n.tr("pm_builtin", self.lang)
@@ -793,8 +800,10 @@ class App:
         self._tb_project.configure(text=i18n.tr("tb_project", self.lang) + " ▾")
         self.notebook.tab(self._log_tab, text=i18n.tr("tab_log", self.lang))
         self.notebook.tab(self._files_tab, text=i18n.tr("tab_files", self.lang))
+        self.notebook.tab(self._documents_tab, text=i18n.tr("tab_documents", self.lang))
         self.notebook.tab(self._findings_tab, text=i18n.tr("tab_findings", self.lang))
         self.notebook.tab(self._explorer_tab, text=i18n.tr("tab_explorer", self.lang))
+        self.documents.set_lang(self.lang)                   # the picker labels + Browse/Clear buttons
         self._set_title()                                    # re-localize the builtin/project title marker
 
     def _toggle_theme(self):
@@ -806,6 +815,7 @@ class App:
         self.phasebar.set_theme(self.mode)                   # bar bg + separators + spacers
         self.explorer.set_theme(self.mode)                   # SQL editor bg/fg + highlight tags
         self.files.set_theme(self.mode)                      # Files text viewer bg/fg
+        self.documents.set_theme(self.mode)                  # Documents tab (all ttk - no-op, for symmetry)
         darktitle.apply(self.root, self.mode == "dark")      # Windows title bar (widgets already exist)
         self.log.append("INFO", f"theme -> {self.mode}")
 

@@ -303,6 +303,38 @@ def save_app_log_levels(levels) -> None:
         yaml.dump(data, handle)
 
 
+# The four input-document paths the Documents tab edits (in project_params.yaml).
+DOCUMENT_KEYS = ("iolist_path", "iolist_previous_path", "matrix_path", "matrix_previous_path")
+
+
+def load_document_paths() -> dict:
+    """The 4 input-document paths as STORED (raw, unresolved) in the active project_params.yaml - the
+    Documents-tab picker shows these. A missing file/key -> ''."""
+    path = params_file()
+    data = _read_yaml(path) if os.path.exists(path) else {}
+    if not isinstance(data, dict):
+        data = {}
+    return {key: str(data.get(key) or "") for key in DOCUMENT_KEYS}
+
+
+def save_document_path(key: str, value) -> None:
+    """Set ONE input-document path in the active project_params.yaml (round-tripping comments). A blank
+    `value` clears it (stored as ''). An unknown key is a no-op."""
+    if key not in DOCUMENT_KEYS:
+        return
+    from ruamel.yaml import YAML
+    path = params_file()
+    yaml = YAML()                                   # round-trip mode - preserves comments
+    data = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            data = yaml.load(handle) or {}
+    data[key] = str(value or "")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        yaml.dump(data, handle)
+
+
 def load_params(path: str | None = None) -> dict:
     """Load the project params (the nested schema: iolist_params / matrix_params / validation_params /
     output). The four document paths (iolist/matrix + their *_previous - the latter reserved for the

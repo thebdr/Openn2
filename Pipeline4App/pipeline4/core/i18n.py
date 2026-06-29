@@ -114,10 +114,27 @@ STRINGS: dict = {
     "tab_files":    {"en": "Files", "it": "File"},
     "tab_findings": {"en": "Findings", "it": "Esiti"},
     "tab_explorer": {"en": "Database Explorer", "it": "Esplora Database"},
+    "tab_documents": {"en": "Documents", "it": "Documenti"},
     "st_ready":     {"en": "Ready", "it": "Pronto"},
     "st_language":  {"en": "language: {code}", "it": "lingua: {code}"},
     "st_running":   {"en": "a phase is already running - wait for it to finish",
                      "it": "una fase è già in esecuzione - attendere il termine"},
+
+    # --- Documents tab (the 4 input-document file pickers) --------------------------------- #
+    "doc_intro":       {"en": "The project's input documents. Set the current revision and the prior "
+                              "revision (the prior feeds the ph100 before/after report).",
+                        "it": "I documenti di input del progetto. Imposta la revisione corrente e quella "
+                              "precedente (la precedente alimenta il report prima/dopo della fase 100)."},
+    "doc_iolist":      {"en": "I/O List (current)", "it": "I/O List (corrente)"},
+    "doc_iolist_prev": {"en": "I/O List (previous)", "it": "I/O List (precedente)"},
+    "doc_matrix":      {"en": "C&E Matrix (current)", "it": "Matrice C&E (corrente)"},
+    "doc_matrix_prev": {"en": "C&E Matrix (previous)", "it": "Matrice C&E (precedente)"},
+    "doc_browse":      {"en": "Browse…", "it": "Sfoglia…"},
+    "doc_clear":       {"en": "Clear", "it": "Cancella"},
+    "doc_not_set":     {"en": "(not set)", "it": "(non impostato)"},
+    "doc_picker_title": {"en": "Select the document", "it": "Seleziona il documento"},
+    "doc_set":         {"en": "set {doc}", "it": "{doc} impostato"},
+    "doc_cleared":     {"en": "cleared {doc}", "it": "{doc} cancellato"},
 
     # --- validation report chrome (the .html title + summary; the finding lines localize at build) --- #
     "rpt_errors_only": {"en": "errors only", "it": "solo errori"},

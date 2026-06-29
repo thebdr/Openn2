@@ -597,6 +597,11 @@ output, resolved from the active config/project) with read-only viewers: `.csv` 
 -> a grid + sheet picker (openpyxl `data_only`, capped), text/yaml/json/xml -> a monospace pane; each with a
 path strip + **Open externally** / **Open folder** (`gui/extedit.py`, port of PL3's LibreOffice/OS-default
 open + reveal). ttk-only (no tksheet/ruamel dep; in-app editing waits on the codec-write path).
+**Documents tab** (`gui/documents_panel.py`): the 4 input-document file pickers - current + previous I/O
+List, current + previous C&E Matrix (the `*_previous_path` feed the ph100 before/after report). Each row has
+a **Browse…** picker + a **Clear** button; a change is persisted IMMEDIATELY to the active
+`project_params.yaml` (round-trip, comments preserved) via `config.save_document_path` /
+`load_document_paths` (`DOCUMENT_KEYS`); follows a project switch (`refresh()`). Tests: `test_documents.py` (3).
 **M6 — Project Manager**: `pipeline4/project/` (`state.py` = `%LOCALAPPDATA%/Pipeline4/state.json` recent/
 last/root; `project.py` = `is_project`/`open_project`/`close_project`/`new_project`/`auto_reopen` over a
 project ROOT folder routed by `config.use_project`) + a toolbar **Project ▾** menubutton (New/Open/Recent/
