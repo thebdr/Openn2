@@ -1,8 +1,15 @@
 # PL4 Expr — a unified mini-formula engine (DESIGN PROPOSAL — not yet built)
 
-Status (2026-06-29): **TOP PRIORITY — ALL OTHER PHASE DEVELOPMENT IS PAUSED** until this engine is built
-AND retrofitted everywhere (ph200 classification, dbtemplate/520, identity templates, the diagnosis /
-interface template + lookup sites). The user elevated the ph200 rule grammar into a first-class, reusable
+Status (2026-06-29): **COMPLETE — the pause is lifted.** The unified engine (`core/expr`) is built and
+retrofitted: all of ph200 (210 classify / 220 index / 230-240 diag) runs on it, the canonical stage→fill→
+re-stage flow is operable end-to-end, and the duplicate render engines (`identity.interp` + `dbtemplate.render`)
+are converged onto `core/expr.render` (byte-verified: 0 diffs on the locked 520/600 outputs). 8 commits, all
+green + pushed (ef4fb86 engine · ee555c8 210 · 8deda92 220 · a314b14 230/240 · d8444af integration · 9799531 +
+cff30ed convergence). The sequenced build record is in **`EXPR_BUILD_PLAN.md`**. Phase development can resume.
+(`dbtemplate.compile_for_each` iteration + `identity.interp_keep` are intentionally left as-is — see the plan.)
+
+---
+ORIGINAL framing (now satisfied): the user elevated the ph200 rule grammar into a first-class, reusable
 "mini spreadsheet-formula engine" wired across the pipeline.
 
 ### DECISION RESOLVED (2026-06-29): **go_custom** — extend `core/rule_expr.py` → `core/expr` (NOT CEL)
