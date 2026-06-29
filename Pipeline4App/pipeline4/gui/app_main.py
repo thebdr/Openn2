@@ -472,7 +472,9 @@ class App:
     def _run_validation(self, only=None):
         """Phase 100. only=None: stage -> the 4 validators -> record the issues + write the 4 reports.
         only=110/120/130/140: run just that validator and render to the log (the header writes the
-        reports). Never halts (a validation FAIL is reported, not blocking)."""
+        reports). only=145: the standalone before/after quality report. Never halts."""
+        if only == 145:
+            return self._run_change_report()
         from pipeline4.core import config
         from pipeline4.domain import staging
         from pipeline4.domain.validation import crosscheck, iolist, matrix, messages, phase as validation
@@ -505,6 +507,29 @@ class App:
         n_pass = sum(1 for f in findings if f.severity == "PASS")
         self._emit("PASS", f"  {only}: {len(issues)} issues + {n_pass} PASS "
                            f"(log only; the 100 header writes the reports)")
+
+    def _run_change_report(self):
+        """Phase 100 sub (145) - the STANDALONE before/after quality report (not part of the pipeline).
+        Reads the configured current + previous document revisions (`*_previous_path`), classifies the
+        changes (matched / intact / corrected / upgrade / removed; systematic re-schemes netted out), and
+        writes a graphical HTML dashboard + a CSV audit trail. Never halts; opens the report when done."""
+        from pipeline4.domain.changes import run as changes_run
+        label = f"145 {i18n.tr('pb_change_report', self.lang)}"
+        self._emit("PHASE", label)
+        self._status("quality report…")
+        res = changes_run.run_change_report()
+        iol = res["result"].get("iolist", {})
+        if iol.get("available"):
+            self._emit("PASS", f"  IoList: {iol['intact']} intact, {iol['correction_count']} corrections "
+                               f"({len(iol['regressions'])} value-loss), {iol['upgrade_rows']} upgrade rows, "
+                               f"{len(iol['removed'])} removed -> {os.path.basename(res['paths']['html'])}")
+        else:
+            self._emit("INFO", "  no prior I/O List revision configured (set iolist_previous_path in "
+                               f"project_params.yaml) -> {res['dir']}")
+        try:
+            os.startfile(res["paths"]["html"])           # open the report in the default browser
+        except Exception:                                # noqa: BLE001 - opening is best-effort
+            pass
 
     def _run_fill(self, only=None):
         """Phase 200 - Documents Fill Out. The integrated fill: 210 classify (AB Script Type / AC Suggested

@@ -31,7 +31,7 @@ def test_run_order():
 def test_subs_match_oracle():
     # The exact sub-button numbers per phase (ButtonsLayout.xlsx; phase 200 added at STEP 4).
     expected = {
-        100: [110, 120, 130, 140, 150, 155, 156, 160, 170, 180, 190],
+        100: [110, 120, 130, 140, 145, 150, 155, 156, 160, 170, 180, 190],  # 145 = PL4 before/after report (not in the oracle)
         200: [210, 220, 230, 240, 245, 250],     # 245 = the PL4 "Risky Index Fill" orange button (not in the oracle)
         300: [310, 320, 330],
         400: [410, 420, 430],
@@ -85,7 +85,7 @@ def test_phase_of_sub():
 def test_by_number():
     eq(phases.by_number(800).handler, "_run_software")
     eq(phases.by_number(900).handler, "_run_reporting")
-    eq(len(phases.by_number(100).subs), 11, "phase 100 carries its 11 oracle sub-buttons")
+    eq(len(phases.by_number(100).subs), 12, "phase 100: 11 oracle sub-buttons + the PL4 before/after report (145)")
     eq(phases.by_number(999), None, "an unknown number -> None")
 
 

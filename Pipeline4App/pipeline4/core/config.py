@@ -123,6 +123,16 @@ VALIDATION_REPORT_STEM = "documents_validation_report"   # phase-100 complete re
 VALIDATION_ERRORS_STEM = "documents_validation_errors"   # phase-100 errors-only report (+ .txt / .html)
 
 
+def changes_report_dir() -> str:
+    """The ph100 before/after quality report (`io_documents_quality_report.html` + `.csv`) - DOCUMENTATION
+    under ProjectDocumentation/Reports (same tree as the validation/coverage reports; NOT a BuilderData
+    surface). The report is a STANDALONE analysis (not part of the pipeline)."""
+    return os.path.join(output_root(), "ProjectDocumentation", "Reports")
+
+
+CHANGES_REPORT_STEM = "io_documents_quality_report"      # the ph100 before/after report base (+ .html / .csv)
+
+
 # --- sheet-name resolution (regex / JS-literal, case-insensitive) -------------------------------- #
 def js_to_re(pattern: str) -> str:
     """Accept a JS-style regex literal ('/pattern/flags' or 'pattern/flags') and return the bare Python
@@ -365,6 +375,22 @@ def load_column_map(document: str) -> list:
         "preliminary_check_exclude": _as_bool(r.get("preliminary_check_exclude")),
     } for r in read_config_csv(os.path.join(input_docs_dir(), "column_map.csv"))
         if (r.get("document") or "").strip() == document]
+
+
+def load_change_weights() -> dict:
+    """The ph100 before/after report weight model (`change_weights.csv`): {document -> {field -> tier}},
+    tier in {critical, major, minor, exclude, effect}. `exclude` drops the column from the comparison
+    entirely (a dead/never-authored column); `effect` marks a C&E effect column (X/blank, handled
+    specially - a lost effect is a regression, a new one an upgrade roll-out). A present field absent from
+    the file defaults to `minor` at compare time. Missing file -> {} (everything defaults to minor)."""
+    out: dict = {}
+    for r in read_config_csv(os.path.join(input_docs_dir(), "change_weights.csv")):
+        document = (r.get("document") or "").strip()
+        field = (r.get("field") or "").strip()
+        if not document or not field:
+            continue
+        out.setdefault(document, {})[field] = (r.get("tier") or "minor").strip().lower() or "minor"
+    return out
 
 
 def _load_rules(filename: str) -> list:

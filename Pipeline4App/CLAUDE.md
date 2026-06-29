@@ -555,6 +555,40 @@ text is ported verbatim into each finding's `detail`.
   + populating `diag_block_name` at staging, which would touch the locked 300 parity) + the **`accept`**
   doc-mutating treatment (dropped).
 
+## Phase 100b — Before/After Quality Report — DONE (PL4-native, standalone; see `CHANGES_SPEC.md`)
+`domain/changes/` (reader · match · classify · report · run). A **standalone, non-pipeline** analysis under
+ph100: compares a PRIOR document revision (`*_previous_path`) against the CURRENT one (I/O List + C&E Matrix
++ AREA) and classifies every row **intact / corrected / upgrade / removed** to expose HUMAN document-quality
+problems (a "what went wrong" review). Never touches the SSOT/BuilderData, never gates/halts, not in
+`run_order`; writes a graphical HTML dashboard + a CSV audit trail to `ProjectDocumentation/Reports/`.
+- **The design risk it solves (evidence-derived from the real 8FVX R0.0→R1.2 pair):** a naive column diff
+  reports ~369 I/O "corrections", but the genuine human-defect residue is ~14–40 rows; the bulk is a handful
+  of DELIBERATE re-schemes (a 310-row address re-map = 36 byte-rules; a confined re-slot; a cyclic re-pin; a
+  device-tag rename). The whole design **nets systematic re-schemes OUT of the defect count** and surfaces
+  the small genuine residue + regressions.
+- **Matching (`match.py`)** — node-scoped, ADDRESS-BLIND, deterministic 5-tier cascade (normalize → partition
+  by the stable `profinet_name` nodes → T1 exact fld+desc → T2 multichannel by connector+pin/position → T3
+  within-node connector+pin [recovers device-tag renames] → T4 fuzzy → T5 positional spacer-fill with a
+  no-blank→named guard). Address/slot/pin are NEVER identity keys. **Validated: 883/883 old rows matched, 0
+  false buckets.** Leftovers force-match within a node (so removed≈0 by design). C&E matches by CONCATENATE
+  ID; AREA matches by line+desc across pooled sheets (a row can MOVE sheet → `moved`).
+- **Classification (`classify.py`)** — systematic events (address byte-bijection [an I↔Q prefix flip stays a
+  GENUINE critical], low-cardinality slot/pin re-map, T3 device rename) are netted out; semantic fields
+  (type_hw/normal_condition/desc/ts_ref/mnemonic) are NEVER systematic. A pair is corrected iff it has ≥1
+  non-systematic changed field; row tier = max changed-field tier (`change_weights.csv`, 3 tiers). Each diff
+  is **direction-tagged** (gap-fill / value-change / value-loss); a value-loss on critical/major = a
+  **regression** (a tag, ONE bucket — user decision). Channel-uncertain (T2pos) corrections **aggregate** to
+  one block-level change. Node-aware **upgrade** (contiguous ≥4-row new block) vs forgotten signal. C&E: a
+  lost effect = critical regression, a new effect column rolled out = upgrade. AREA read **with formulas**
+  (`data_only=False` — cells are `=...` strings; a cached read fabricates phantom deletions) → per-area
+  counts + moved-sheet count + a reorganization flag.
+- **Output** — `io_documents_quality_report.{html,csv}`; self-contained light/dark HTML (every value
+  HTML-escaped); first-issue mode (missing/identical prior → "no prior revision" notice).
+- **Config/GUI** — `config_project/input_docs/change_weights.csv` + `config.load_change_weights()` /
+  `changes_report_dir()` / `CHANGES_REPORT_STEM`. The `preliminary_check_exclude` (pipeline-owned AA–AH)
+  columns are NOT compared. GUI phase-100 sub-button **145** `pb_change_report` (PL4-native, EN/IT) →
+  `_run_change_report` (opens the HTML). Tests: `test_changes.py` (11, hermetic).
+
 ## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0–M6 + STEP 1 i18n + STEP 2 + STEP 3 DONE; see `GUI_PLAN.md`)
 **STEP 3 DONE (M5 Files + M6 Project Manager + M0b chrome remainder).**
 **M5 — Files tab** (view-only): a notebook **Files** tab (`gui/files_panel.py` + the Tk-free

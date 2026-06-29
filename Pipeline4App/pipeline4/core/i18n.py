@@ -36,6 +36,7 @@ STRINGS: dict = {
     "pb_validate_ce":     {"en": "Validate C&E Matrix", "it": "Valida Matrice C&E"},
     "pb_xcheck_cem_iol":  {"en": "Cross-Check CEM->IOL", "it": "Verifica incrociata CEM->IOL"},
     "pb_xcheck_iol_cem":  {"en": "Cross-Check IOL->CEM", "it": "Verifica incrociata IOL->CEM"},
+    "pb_change_report":   {"en": "Before/After Quality Report", "it": "Report Qualita Prima/Dopo"},
     "pb_validate_diag":   {"en": "Validate Diagnosis Assignments", "it": "Valida Assegnazioni Diagnostica"},
     "pb_clean_iolist":    {"en": "Clean IOList Addresses & FLD", "it": "Pulisci Indirizzi & FLD IOList"},
     "pb_clean_cematrix":  {"en": "Clean CEMatrix Addresses & FLD", "it": "Pulisci Indirizzi & FLD Matrice C&E"},
