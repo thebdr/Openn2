@@ -10,30 +10,28 @@ from __future__ import annotations
 
 import re
 
+from pipeline4.core import expr
+
 _TOKEN = re.compile(r"\{([A-Za-z0-9_]+)(:[^}]+)?\}")
 
+# A bare PEP-3101 / {token} field hole: `{name}` or `{name:spec}` (a leading [A-Za-z_]\w* field name,
+# optional `:spec` up to the closing `}`). `{}` and any hole already in `{$...}` engine form are left be.
+_BARE_HOLE = re.compile(r"\{([A-Za-z_]\w*)(:[^{}]*)?\}")
 
-def _format_value(value: str, spec) -> str:
-    """Apply an optional `:spec` to a (string) row value. A numeric spec (`:03d`/`:02d`/...) coerces the
-    value to int first (so `{diag_cabinet:03d}` on `'0'` -> `'000'`); a blank value stays blank (an empty
-    cabinet is not padded to `000`). Falls back to the raw value when the coercion/format fails."""
-    if not spec or value == "":
-        return value
-    fmt = spec[1:]                      # drop the leading ':'
-    try:
-        if fmt[-1:] in "dxXobn":
-            return format(int(float(value)), fmt)
-        return format(value, fmt)
-    except (ValueError, TypeError):
-        return value
+
+def _dollarize(template) -> str:
+    """Rewrite a PEP-3101 / `{token}` template to the unified engine's `{$token}` hole syntax: every
+    `{name}` -> `{$name}` and `{name:spec}` -> `{$name:spec}`. A bare `{}` and any hole already written
+    `{$...}` (a `$` immediately after `{`) are left untouched, so this is idempotent over engine holes."""
+    return _BARE_HOLE.sub(lambda m: "{$" + m.group(1) + (m.group(2) or "") + "}", template or "")
 
 
 def interp(template, row) -> str:
     """Resolve a `{canonical}` template against the row; trim the outer whitespace (templates carry
     intentional inner spacing). A token may carry a Python format spec (`{diag_cabinet:03d}`) - the
-    diagnosis columns rely on it (a bare-token resolver would emit the literal `{diag_cabinet:03d}`)."""
-    return _TOKEN.sub(lambda m: _format_value(str(row.get(m.group(1), "") or ""), m.group(2)),
-                      template or "").strip()
+    diagnosis columns rely on it (a bare-token resolver would emit the literal `{diag_cabinet:03d}`).
+    DELEGATES to the unified `expr.render` (mode="empty": a missing field -> ""), via `_dollarize`."""
+    return expr.render(_dollarize(template), row, mode="empty").strip()
 
 
 def interp_keep(template, row) -> str:

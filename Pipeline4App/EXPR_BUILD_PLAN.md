@@ -156,8 +156,22 @@ byte-transparent — alongside is the safe choice.
   scratch copy of the real I/O List: stage→fill→re-stage is idempotent — 0 mismatches / 269 uids; all data sheets
   (AB-AF) + DiagnosisBlocks + IF_ sheets byte-VALUE-identical (only a stale `_UnresolvedIndex` is correctly rebuilt);
   the original doc md5+mtime UNCHANGED.** `test_fillout_integration` 6/6; full gate **354/354**; verifier verdict sound.
-- **ph200 is now OPERABLE END-TO-END.** Remaining: **M-E5** (converge `dbtemplate`/`identity` onto `core/expr`,
-  byte-gated per site — the plan's LATER/opportunistic cleanup; the engine is fully proven on ph200).
+- **ph200 is now OPERABLE END-TO-END.**
+- **M-E5 (convergence) — DONE + byte-verified (2026-06-29).** Step 1: closed the `render` strict/keep fidelity gap
+  (now scans EVERY top-level `$field` in a hole via `parser.referenced_fields`, not just simple-field holes —
+  commit 9799531). Step 2 (render convergence): `identity.interp` + `dbtemplate.render` now DELEGATE to
+  `core/expr.render` via `identity._dollarize` (rewrites `{name}`/`{name:spec}` → `{$name}` engine holes;
+  idempotent over `{$…}`). `interp` → `expr.render(…, mode="empty").strip()`; `dbtemplate.render` →
+  `expr.render(…, mode="strict")` with `ExprError`→`DbTemplateError` re-raise (the 520 halt path unchanged). Removed
+  the duplicate `_format_value` + `_SafeFormatter`. **BYTE GATE GREEN (independently re-verified): 0 differences /
+  13 files** — 9 GlobalDB XMLs + `signals.csv` + DiagList_IO/Logic + the OPC SCL all byte-identical (generated with
+  vs. without the convergence). Full gate **356/356**.
+  - **Intentionally NOT converged (documented):** `dbtemplate.compile_for_each` (iteration orchestration, not a
+    single render expression) and `identity.interp_keep` (its absent tokens must stay `{token}` form for the
+    phase-400 generator — incompatible with `expr.render`'s `{$token}` keep mode). These are the genuinely
+    non-render-expression cases; converging them would add risk without benefit.
+- **THE ENTIRE PLAN IS COMPLETE** — engine built, retrofitted into ph200 (all four sub-phases + the stage→fill→
+  re-stage flow), and the duplicate render engines converged onto `core/expr`, every step parity/byte-verified.
 
 ## Resolved decisions
 1. **Pipeline order** → **stage → fill → re-stage(if changed) → validate → generate → report** (the hard rule).

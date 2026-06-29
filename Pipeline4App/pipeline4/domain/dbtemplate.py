@@ -19,6 +19,9 @@ from __future__ import annotations
 import re
 import string
 
+from pipeline4.core import expr
+from pipeline4.domain.identity import _dollarize
+
 
 class DbTemplateError(ValueError):
     """A malformed template or for_each expression (-> logged + pipeline halt)."""
@@ -26,42 +29,25 @@ class DbTemplateError(ValueError):
 
 # --- 1. PEP-3101 value/name templates ------------------------------------------------------------ #
 _FIELD_RE = re.compile(r"[A-Za-z_]\w*\Z")
-
-
-class _SafeFormatter(string.Formatter):
-    """str.format() restricted to `{name}` / `{name:spec}` over a dict - no `{0}`, no `{a.b}`/`{a[i]}`."""
-
-    def get_value(self, key, args, kwargs):
-        if isinstance(key, int):
-            raise DbTemplateError("positional fields {0} are not allowed; use {name}")
-        if not _FIELD_RE.match(key or ""):
-            raise DbTemplateError(f"invalid template field {{{key}}} (use a bare {{name}})")
-        if key not in kwargs:
-            raise DbTemplateError(f"unknown template field {{{key}}}")
-        return kwargs[key]
-
-    def format_field(self, value, format_spec):
-        last = format_spec[-1] if format_spec else ""
-        try:
-            if last and last in "dboxXc":
-                value = int(str(value).strip())
-            elif last and last in "eEfFgG%":
-                value = float(str(value).strip())
-            return format(value, format_spec)
-        except (ValueError, TypeError) as e:
-            raise DbTemplateError(f"bad format spec {format_spec!r} for value {value!r}: {e}")
-
-
-_FMT = _SafeFormatter()
+# A {hole} body up to the optional ':spec' (mirrors PEP-3101 parsing) - the field-name part `_SafeFormatter`
+# used to validate as a bare name (rejecting `{0}` positional + `{a.b}`/`{a[i]}` access).
+_HOLE_FIELD = re.compile(r"\{([^{}:]*)(?::[^{}]*)?\}")
 
 
 def render(template, ctx: dict) -> str:
-    """Render a PEP-3101 `template` against `ctx`; raise DbTemplateError on an unknown field / bad spec."""
+    """Render a PEP-3101 `template` against `ctx`; raise DbTemplateError on an unknown field / bad spec.
+    DELEGATES to the unified `expr.render` (mode="strict": a missing field raises, matching the old
+    `_SafeFormatter`'s `unknown template field`), via `_dollarize`. `expr.ExprError` is re-raised as
+    `DbTemplateError` so the 520 caller's halt path (which catches DbTemplateError) is unchanged.
+    The bare-name guard (no `{0}` positional, no `{a.b}`/`{a[i]}` access) is preserved up front - it is
+    NOT expressible through `_dollarize` (which only rewrites bare-name holes)."""
+    s = str(template if template is not None else "")
+    for field in _HOLE_FIELD.findall(s):
+        if field and not _FIELD_RE.match(field):
+            raise DbTemplateError(f"invalid template field {{{field}}} (use a bare {{name}})")
     try:
-        return _FMT.vformat(str(template if template is not None else ""), (), ctx)
-    except DbTemplateError:
-        raise
-    except (KeyError, IndexError, ValueError) as e:
+        return expr.render(_dollarize(s), ctx, mode="strict")
+    except expr.ExprError as e:
         raise DbTemplateError(f"bad template {template!r}: {e}")
 
 
