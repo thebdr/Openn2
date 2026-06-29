@@ -47,6 +47,7 @@ STRINGS: dict = {
     # --- 200 Documents Fill Out (registry omits ph200 until STEP 4 builds it) -------------- #
     "pb_fill_script_type":  {"en": "Fill IOList Script Type Column", "it": "Compila Colonna Script Type IOList"},
     "pb_fill_index":        {"en": "Fill IOList Index Column", "it": "Compila Colonna Index IOList"},
+    "pb_risky_index":       {"en": "Risky Index Fill (review)", "it": "Compila Index Rischioso (rivedi)"},
     "pb_fill_diag_cabinet": {"en": "Fill IOList Diag Cabinet Column", "it": "Compila Colonna Diag Cabinet IOList"},
     "pb_fill_diag_bit":     {"en": "Fill IOList Diag Bit Column", "it": "Compila Colonna Diag Bit IOList"},
     "pb_open_fill_config":  {"en": "Open Fill Config .csv", "it": "Apri Fill Config .csv"},

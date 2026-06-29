@@ -58,6 +58,13 @@ def test_set_cells_numeric_value_preserves_style():
     ok('<c r="C1" s="5" t="inlineStr"><is><t xml:space="preserve">7</t></is></c>' in out2, "str stays inline")
 
 
+def test_set_cells_redtext_writes_red_run():
+    out, _ = xe.set_cells(_SHEET, {"C1": xe.RedText("0001")})   # a RED inline-string run (risky-index mark)
+    _wf(out)
+    ok('t="inlineStr"' in out and '<rPr><color rgb="FFFF0000"/></rPr>' in out
+       and '<t xml:space="preserve">0001</t>' in out, "RedText -> a red rich-text run; style preserved")
+
+
 def test_set_cells_inserts_new_columns_and_blanks():
     import re
     sheet = (_NS + "<sheetData><row r=\"1\">"
@@ -255,6 +262,7 @@ if __name__ == "__main__":
          test_edit_existing_cell_preserves_style_neighbours_and_unrelated_array),
         ("edit_into_array_freezes_to_cached_values_no_overlap", test_edit_into_array_freezes_to_cached_values_no_overlap),
         ("set_cells_numeric_value_preserves_style", test_set_cells_numeric_value_preserves_style),
+        ("set_cells_redtext_writes_red_run", test_set_cells_redtext_writes_red_run),
         ("set_cells_inserts_new_columns_and_blanks", test_set_cells_inserts_new_columns_and_blanks),
         ("insert_cell_into_row_column_sorted", test_insert_cell_into_row_column_sorted),
         ("insert_new_row_sorted", test_insert_new_row_sorted),

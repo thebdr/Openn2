@@ -199,7 +199,43 @@ class App:
             return lambda key=sub.opens: self._on_open(key)
         if sub.kind == "action":
             return lambda n=sub.number: self._on_sub(n)
-        return None                               # a "special" (Clean) - not ported -> disabled
+        if sub.kind == "special" and sub.label_key == "pb_risky_index":
+            return lambda: self._on_special("_run_risky_index")
+        return None                               # an un-wired "special" (Clean) - not ported -> disabled
+
+    def _on_special(self, handler_name):
+        """A GUI-only 'special' (orange) action click (main thread): run it on a worker thread."""
+        if self._busy:
+            self.log.append("WARN", "  " + i18n.tr("st_running", self.lang))
+            return
+        self._set_busy(True)
+        threading.Thread(target=self._special_worker, args=(handler_name,), daemon=True).start()
+
+    def _special_worker(self, handler_name):
+        """Runs OFF the main thread: invoke the named special handler (no `only=`); never crash the window."""
+        self._run_halted = False
+        try:
+            getattr(self, handler_name)()
+        except Exception:  # noqa: BLE001
+            self._emit("ERROR", f"{handler_name} crashed:\n{traceback.format_exc()}")
+        finally:
+            self._q.put(("done",))
+
+    def _run_risky_index(self):
+        """The MANUAL 'Risky Index Fill' (orange, NOT in the pipeline): over the already-filled I/O List, fill
+        each <input required> index by matching it to an existing object index of the same family in the same
+        IO node (positional address range), per script_type by ROW ORDER. The filled cells are written RED +
+        listed in a `_RiskyIndex` review sheet. A row-order GUESS - REVIEW the sheet."""
+        from pipeline4.domain.fillout import fill
+        self._status("risky index…")
+        label = f"245 {i18n.tr('pb_risky_index', self.lang)}"
+        self._emit("PHASE", label)
+        res = fill.risky_index_fill()
+        self._render(res["findings"])                                  # WARN/INFO only (doc already written)
+        backup = f"  (backup {os.path.basename(res['backup'])})" if res.get("backup") else "  (no change)"
+        self._emit("WARN", f"  RISKY: filled {res['filled']} index cell(s) by node row-order; "
+                           f"{res.get('leftover', 0)} left unresolved -> "
+                           f"{os.path.basename(res['output_path'])}{backup}. REVIEW the _RiskyIndex sheet.")
 
     def _on_sub(self, number):
         """A dropdown action click (main thread): run ONE sub-phase on a worker thread. The owning phase

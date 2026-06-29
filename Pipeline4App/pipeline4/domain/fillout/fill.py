@@ -24,7 +24,7 @@ from pipeline4.core.finding import Finding
 from pipeline4.domain.fillout import (
     classify, reader, diag_blocks, index_assign, diag_alloc,
 )
-from pipeline4.domain.fillout.families import load_object_families
+from pipeline4.domain.fillout.families import load_object_families, family_for
 from pipeline4.io import xlsx_edit
 
 INPUT_REQUIRED = classify.INPUT_REQUIRED
@@ -374,3 +374,109 @@ def _diag_blocks_write(io_path, rows, blocks, place, min_b, max_b, cell_edits, n
     else:                                                          # no DiagnosisBlocks sheet -> create fresh
         new_sheets.append({"name": diag_blocks.DIAGBLOCKS_SHEET,
                            "rows": diag_blocks.diagnosis_blocks_grid(blocks, derived, default)})
+
+
+# --------------------------------------------------------------------------------------------- #
+# the MANUAL "Risky Index Fill" - NOT part of the pipeline (a GUI-only orange action). Over the
+# ALREADY-FILLED I/O List it fills each `<input required>` index by matching it to an existing object
+# index of the SAME family in the SAME IO node (the positional address-range node), per script_type by
+# ROW ORDER, up to the number of existing objects (leftover stays unresolved). 'Risky' = a row-order
+# heuristic, so the filled cells are written RED + listed in a `_RiskyIndex` review sheet.
+# --------------------------------------------------------------------------------------------- #
+_RISKY_SHEET = "_RiskyIndex"
+
+
+def _risky_index_sheet(assigns: list, ad_col: str) -> dict:
+    """The `_RiskyIndex` review sheet (same shape as `_UnresolvedIndex`): a header + one row per risky-filled
+    signal, col A an internal hyperlink to the filled index cell, plus the assigned value + a REVIEW note."""
+    rows = [["Source", "Column", "Device (FLD)", "Description", "Risky index (review)"]]
+    links = []
+    for i, (raw, idx) in enumerate(assigns, start=2):
+        sheet, rownum = raw["source_sheet"], raw["source_row"]
+        fld = (str(raw.get("functional_unit") or "") + str(raw.get("location") or "")
+               + str(raw.get("device") or "")).strip()
+        desc = (_clean(raw.get("desc_l1")) + " " + _clean(raw.get("desc_l1b"))).strip()
+        rows.append([f"{sheet} - Row {rownum}", ad_col, fld, desc,
+                     f"{idx}  (matched by row order to the family object in this IO node - REVIEW)"])
+        links.append((f"A{i}", f"'{sheet}'!{ad_col}{rownum}", f"{sheet} - Row {rownum}"))
+    return {"name": _RISKY_SHEET, "rows": rows, "hyperlinks": links}
+
+
+def risky_assignments(rows: list, families: list, node_key: dict) -> tuple:
+    """The PURE risky-index assignment over staged rows. `node_key[uid]` = the row's IO-node key (or None).
+    For each (node, family) collect the existing object indices (distinct, ROW ORDER) and the `<input required>`
+    rows per script_type; then match the i-th unresolved (row order) of each (node, family, script_type) to the
+    i-th existing index, leaving the rest unresolved. Returns `([(row, index), ...], leftover_count)`."""
+    from collections import defaultdict
+    existing, seen = defaultdict(list), defaultdict(set)
+    unresolved = defaultdict(list)                                  # (node, family.key, script_type) -> rows
+    for r in sorted(rows, key=lambda r: (str(r.get("source_sheet") or ""), int(r.get("source_row") or 0))):
+        st = (r.get("script_type") or "").strip()
+        fam = family_for(st, families)
+        nk = node_key.get(r["uid"])
+        if fam is None or nk is None:
+            continue
+        idx = str(r.get("index") or "").strip()
+        if idx == INPUT_REQUIRED:
+            unresolved[(nk, fam.key, st)].append(r)
+        elif idx.isdigit() and idx not in seen[(nk, fam.key)]:
+            seen[(nk, fam.key)].add(idx)
+            existing[(nk, fam.key)].append(idx)
+    assigns, leftover = [], 0
+    for (nk, famkey, _st), urs in unresolved.items():
+        avail = existing.get((nk, famkey), [])
+        for i, r in enumerate(urs):
+            if i < len(avail):
+                assigns.append((r, avail[i]))
+            else:
+                leftover += 1
+    return assigns, leftover
+
+
+def risky_index_fill(params: dict | None = None) -> dict:
+    """Fill `<input required>` index cells (AD) by the family/node row-order heuristic, RED + a _RiskyIndex
+    sheet. Doc-only; backup + drop-on-noop. Returns {output_path, backup, filled, leftover, findings}."""
+    from collections import defaultdict
+    from pipeline4.domain import staging, diagnosis
+
+    params = params or config.load_params()
+    io_path = params.get("iolist_path")
+    if not io_path or not os.path.exists(io_path):
+        return {"output_path": io_path or "", "backup": "", "filled": 0, "leftover": 0,
+                "findings": [_f("fill_no_iolist", "FAIL", f"I/O List not found: {io_path!r}", io_path or "")]}
+
+    db, _ = staging.stage(params)
+    rows = list(db.table("signals"))
+    families = load_object_families()
+    colmap = config.load_column_map("IoList")
+    ad = next((m["column"] for m in colmap if m["canonical"] == "index"), None)
+
+    # the IO node per row = the node whose positional I/Q byte range contains the signal's address (node_of)
+    node_key = {r["uid"]: (lambda n: n["uid"] if n else None)(diagnosis.node_of(rows, r)) for r in rows}
+    assigns, leftover = risky_assignments(rows, families, node_key)
+
+    findings = []
+    if not assigns:
+        return {"output_path": io_path, "backup": "", "filled": 0, "leftover": leftover,
+                "findings": [_f("risky_index_none", "INFO", "no <input required> index resolved by the node "
+                                "row-order heuristic", io_path)]}
+
+    cell_edits: dict = defaultdict(dict)
+    for r, idx in assigns:                                          # write each filled index RED
+        if ad:
+            cell_edits[r["source_sheet"]][f"{ad}{r['source_row']}"] = xlsx_edit.RedText(idx)
+    backup = _backup_path(io_path)
+    shutil.copy2(io_path, backup)
+    frozen = xlsx_edit.edit_workbook(io_path, cell_edits={s: e for s, e in cell_edits.items() if e},
+                                     new_sheets=[_risky_index_sheet(assigns, ad)])
+    for sheet, master, rng in frozen:
+        findings.append(_f("fill_array_frozen", "WARN",
+                           f"froze a dynamic array (spill {rng}) the fill landed in", f"{sheet}!{master}"))
+    findings.append(_f("risky_index_filled", "WARN",
+                      f"risky-filled {len(assigns)} index cell(s) by the node row-order heuristic - REVIEW the "
+                      f"_RiskyIndex sheet ({leftover} left unresolved)", io_path))
+    if _same_content(backup, io_path):
+        os.remove(backup)
+        backup = ""
+    return {"output_path": io_path, "backup": backup, "filled": len(assigns), "leftover": leftover,
+            "findings": findings}

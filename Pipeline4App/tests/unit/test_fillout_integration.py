@@ -169,6 +169,52 @@ def test_range_component_suffix_and_shared_index():
         eq(str(ws2["AD5"].value or "").strip(), ad3, "KI2/2 shares the KQ index")
 
 
+def test_risky_assignments_by_node_type_and_row_order():
+    # the manual "risky index fill" heuristic: per (node, family, script_type), the i-th <input required>
+    # (row order) takes the i-th existing object index in that node/family; leftover stays unresolved.
+    from pipeline4.domain.fillout import fill
+    from pipeline4.domain.fillout.families import ObjectFamily, LINK_FLD
+    door = ObjectFamily(family="door", key="D", member_types=("DI", "DD", "DL", "DR"), anchor="DI1/2",
+                        link=LINK_FLD, index_stride=1, bits=2, diag_block="+SafetyDoors")
+
+    def r(uid, st, idx, row):
+        return {"uid": uid, "script_type": st, "index": idx, "functional_unit": "=S1", "location": "+L",
+                "device": "-X" + str(row), "desc_l1": "d", "source_sheet": "S", "source_row": row}
+
+    # node N1: 2 door objects (0001, 0002) + 2 DL + 1 DR unresolved; one stray row in NO node (skipped)
+    rows = [r("a", "DI1/2", "0001", 1), r("b", "DD", "0001", 2), r("c", "DI1/2", "0002", 3),
+            r("d", "DD", "0002", 4), r("e", "DL", "<input required>", 5), r("f", "DL", "<input required>", 6),
+            r("g", "DR", "<input required>", 7), r("h", "DL", "<input required>", 8)]
+    node_key = {u: "N1" for u in "abcdefg"}
+    node_key["h"] = None                                          # not in any node -> never filled
+    assigns, leftover = fill.risky_assignments(rows, [door], node_key)
+    got = {row["uid"]: idx for row, idx in assigns}
+    eq(got.get("e"), "0001", "1st DL (row order) -> the 1st object index 0001")
+    eq(got.get("f"), "0002", "2nd DL -> the 2nd object index 0002")
+    eq(got.get("g"), "0001", "1st DR -> object 0001 (matched per script_type, independently of the DLs)")
+    ok("h" not in got, "a row in no IO node is never risky-filled")
+    eq(leftover, 0, "every in-node unresolved member lined up with an object")
+
+
+def test_risky_assignments_leftover_when_more_than_objects():
+    from pipeline4.domain.fillout import fill
+    from pipeline4.domain.fillout.families import ObjectFamily, LINK_FLD
+    door = ObjectFamily(family="door", key="D", member_types=("DI", "DL"), anchor="DI1/2", link=LINK_FLD,
+                        index_stride=1, bits=2, diag_block="+SafetyDoors")
+
+    def r(uid, st, idx, row):
+        return {"uid": uid, "script_type": st, "index": idx, "functional_unit": "=S1", "location": "+L",
+                "device": "-X" + str(row), "desc_l1": "d", "source_sheet": "S", "source_row": row}
+
+    # ONE object (0001) but THREE DL unresolved -> only the 1st lines up, two stay unresolved
+    rows = [r("a", "DI1/2", "0001", 1), r("e", "DL", "<input required>", 2),
+            r("f", "DL", "<input required>", 3), r("g", "DL", "<input required>", 4)]
+    node_key = {u: "N1" for u in "aefg"}
+    assigns, leftover = fill.risky_assignments(rows, [door], node_key)
+    eq([row["uid"] for row, _ in assigns], ["e"], "only the 1st DL lines up with the single object")
+    eq(leftover, 2, "the extra two DL stay unresolved (never invents an index)")
+
+
 def test_diag_blocks_append_only_reuses_existing_id():
     # diag_blocks.read_existing reuses a present cabinet's ID_Local; block_rows appends only new cabinets.
     wb = Workbook()
@@ -197,5 +243,7 @@ if __name__ == "__main__":
         ("only_arg_restricts_writeback", test_only_arg_restricts_writeback),
         ("index_unresolved_is_reported", test_index_unresolved_is_reported),
         ("range_component_suffix_and_shared_index", test_range_component_suffix_and_shared_index),
+        ("risky_assignments_by_node_type_and_row_order", test_risky_assignments_by_node_type_and_row_order),
+        ("risky_assignments_leftover_when_more_than_objects", test_risky_assignments_leftover_when_more_than_objects),
         ("diag_blocks_append_only_reuses_existing_id", test_diag_blocks_append_only_reuses_existing_id),
     ]))

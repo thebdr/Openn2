@@ -61,6 +61,7 @@ PHASES = (
         Sub(220, "pb_fill_index"),                                       # §7 index (built)
         Sub(230, "pb_fill_diag_cabinet"),                               # §8 diag cabinet (built)
         Sub(240, "pb_fill_diag_bit"),                                   # §8 diag bit (built)
+        Sub(245, "pb_risky_index", kind="special"),                     # ORANGE manual: risky index fill (not in the pipeline)
         Sub(250, "pb_open_iolist", kind="open", opens="iolist"),
     )),
     Phase(300, "ph_staging", handler="_run_staging", subs=(

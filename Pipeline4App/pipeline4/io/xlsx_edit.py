@@ -87,6 +87,16 @@ def _freeze_array_range(xml: str, rng: str) -> str:
     return cellpat.sub(repl, xml)
 
 
+class RedText(str):
+    """A cell value to render in RED font (an inline-string rich-text run, like the link style) - the risky
+    index assist marks its auto-filled cells red for the operator to review. No styles.xml change is needed
+    (the colour rides on the inline `<r><rPr>`), so it stays surgical + formula-preserving."""
+    __slots__ = ()
+
+
+_RED_RPR = '<rPr><color rgb="FFFF0000"/></rPr>'
+
+
 def set_cells(sheet_xml: str, edits: dict) -> tuple:
     """Return (new_xml, materialized) where `materialized` = [(master_ref, range), ...] for any array
     formula FROZEN to its cached values to make room for an edit. Each {cell_ref: value} edit is applied
@@ -109,6 +119,9 @@ def set_cells(sheet_xml: str, edits: dict) -> tuple:
         s_attr = f' s="{style}"' if style else ""
         if value is None or value == "":
             new_cell = f'<c r="{ref}"{s_attr}/>'                  # a blank cell (reads None; clears a stale value)
+        elif isinstance(value, RedText):                         # a RED inline-string run (the risky-index mark)
+            new_cell = (f'<c r="{ref}"{s_attr} t="inlineStr"><is><r>{_RED_RPR}'
+                        f'<t xml:space="preserve">{_esc(value)}</t></r></is></c>')
         elif isinstance(value, (int, float)) and not isinstance(value, bool):
             new_cell = f'<c r="{ref}"{s_attr}><v>{value}</v></c>'
         else:

@@ -32,7 +32,7 @@ def test_subs_match_oracle():
     # The exact sub-button numbers per phase (ButtonsLayout.xlsx; phase 200 added at STEP 4).
     expected = {
         100: [110, 120, 130, 140, 150, 155, 156, 160, 170, 180, 190],
-        200: [210, 220, 230, 240, 250],
+        200: [210, 220, 230, 240, 245, 250],     # 245 = the PL4 "Risky Index Fill" orange button (not in the oracle)
         300: [310, 320, 330],
         400: [410, 420, 430],
         500: [510, 520, 530, 540],
@@ -53,7 +53,7 @@ def test_kinds_and_enablement():
     eq(disabled, {150, 155, 156, 430, 810, 840, 920},
        "the deferred/unported (greyed) buttons (ph200 210/220/230/240 all built)")
     specials = {s.number for p in phases.PHASES for s in p.subs if s.kind == "special"}
-    eq(specials, {155, 156, 430}, "the special (Clean / custom-interface) buttons")
+    eq(specials, {155, 156, 245, 430}, "the special buttons (Clean / custom-interface + the 245 Risky Index Fill)")
     for n in (160, 330, 530, 930):                       # a sampling of wired opens
         ok(phases.sub_by_number(n).opens, f"open button {n} names a target")
     # oracle titles that are easy to mis-transcribe (label_key -> EN via i18n, vs ButtonsLayout.xlsx)
