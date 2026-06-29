@@ -116,6 +116,29 @@ def test_only_arg_restricts_writeback():
         eq(str(ws["AE3"].value or "").strip(), "", "only=220 still leaves AE blank")
 
 
+def test_index_unresolved_is_reported():
+    # a door-lamp DL is a MANUAL door member (no DI anchor): 220 cannot auto-group it -> <input required>,
+    # which MUST be reported (the unresolved count + a fill_unresolved FAIL + a _UnresolvedIndex row pointing
+    # at the AD column). Regression: the report was 210-only and silently dropped 220's index-unresolved rows.
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "io.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = _SHEET
+        ws["F2"] = "5"; ws["R2"] = "PLC"; ws["K2"] = "MAIN PLC NODE"; ws["O2"] = "=S1"
+        # a door-open lamp output, AB pre-set to DL (a manual door member), blank index
+        ws["G3"] = "Q0.0"; ws["K3"] = "DOOR OPEN LAMP"
+        ws["O3"] = "=S1"; ws["P3"] = "+Z1"; ws["Q3"] = "-D9"; ws["AB3"] = "DL"
+        wb.save(p)
+        res = fill.fill_out(_params(p), only=220)
+        ok(res["unresolved"] >= 1, f"the ungroupable DL index is reported unresolved (got {res['unresolved']})")
+        ok(any(f.type == "fill_unresolved" for f in res["findings"]), "a fill_unresolved FAIL finding is emitted")
+        ws2 = load_workbook(p)["_UnresolvedIndex"]
+        body = list(ws2.iter_rows(min_row=2, values_only=True))
+        ok(body, "_UnresolvedIndex lists the unresolved index row (not just the header)")
+        ok(any(r[1] == "AD" for r in body), "the unresolved entry points at the AD (index) column")
+
+
 def test_diag_blocks_append_only_reuses_existing_id():
     # diag_blocks.read_existing reuses a present cabinet's ID_Local; block_rows appends only new cabinets.
     wb = Workbook()
@@ -142,5 +165,6 @@ if __name__ == "__main__":
         ("noop_drops_backup_on_prefilled_doc", test_noop_drops_backup_on_prefilled_doc),
         ("retyping_after_210_feeds_220_230", test_retyping_after_210_feeds_220_230),
         ("only_arg_restricts_writeback", test_only_arg_restricts_writeback),
+        ("index_unresolved_is_reported", test_index_unresolved_is_reported),
         ("diag_blocks_append_only_reuses_existing_id", test_diag_blocks_append_only_reuses_existing_id),
     ]))

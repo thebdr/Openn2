@@ -102,18 +102,19 @@ def _read_output_headers(io_path: str, sheets: list, colmap: list, header_row: i
         wb.close()
 
 
-def _unresolved_sheet(unresolved: list, ab_col: str) -> dict:
-    """The `_UnresolvedIndex` sheet spec: a header + one row per unresolved signal, col A an internal
-    hyperlink to the exact AB cell to fix."""
-    rows = [["Source", "Script Type", "Device (FLD)", "Description", "Reason"]]
+def _unresolved_sheet(entries: list) -> dict:
+    """The `_UnresolvedIndex` sheet spec: a header + one row per unresolved CELL (an `<input required>` the
+    fill couldn't auto-resolve), col A an internal hyperlink to the exact cell to fix. `entries` is a list of
+    `(row, col_letter, reason)` and covers BOTH a 210 script_type (AB) and a 220 index (AD) left unresolved."""
+    rows = [["Source", "Column", "Device (FLD)", "Description", "Reason"]]
     links = []
-    for i, raw in enumerate(unresolved, start=2):
+    for i, (raw, col, reason) in enumerate(entries, start=2):
         sheet, rownum = raw["source_sheet"], raw["source_row"]
         fld = (str(raw.get("functional_unit") or "") + str(raw.get("location") or "")
                + str(raw.get("device") or "")).strip()
         desc = (_clean(raw.get("desc_l1")) + " " + _clean(raw.get("desc_l1b"))).strip()
-        rows.append([f"{sheet} - Row {rownum}", "", fld, desc, "unmatched type"])
-        links.append((f"A{i}", f"'{sheet}'!{ab_col}{rownum}", f"{sheet} - Row {rownum}"))
+        rows.append([f"{sheet} - Row {rownum}", col, fld, desc, reason])
+        links.append((f"A{i}", f"'{sheet}'!{col}{rownum}", f"{sheet} - Row {rownum}"))
     return {"name": _UNRESOLVED_SHEET, "rows": rows, "hyperlinks": links}
 
 
@@ -264,17 +265,22 @@ def fill_out(params: dict | None = None, only=None) -> dict:
                 if st and st != INPUT_REQUIRED:
                     filled += 1
             if st == INPUT_REQUIRED and not _skipped(row):
-                unresolved.append(row)
+                unresolved.append((row, ab, "the description matched no script-type rule"))
                 findings.append(_f("fill_unresolved", "FAIL",
                                    "the description matched no script-type rule - fill it in the source I/O List",
                                    f"{sheet}!{ab}{rownum}"))
-        # 220 - AD index (blank-only)
+        # 220 - AD index (blank-only); an ungroupable row -> <input required> is UNRESOLVED (reported)
         if 220 in legs and ad:
             ix = str(row.get("index") or "").strip()
             if ix and _blank(_orig_cell(row, "index")):
                 cell_edits[sheet][f"{ad}{rownum}"] = row["index"]
                 if ix != INPUT_REQUIRED:
                     indexed += 1
+            if ix == INPUT_REQUIRED and not _skipped(row):
+                unresolved.append((row, ad, "the object index could not be auto-assigned (ungroupable member)"))
+                findings.append(_f("fill_unresolved", "FAIL",
+                                   "the index could not be auto-assigned - fill it in the source I/O List",
+                                   f"{sheet}!{ad}{rownum}"))
         # 230/240 - AE diag_cabinet + AF diag_bit (blank-only)
         if 230 in legs:
             cab = str(row.get("diag_cabinet") or "").strip()
@@ -289,9 +295,10 @@ def fill_out(params: dict | None = None, only=None) -> dict:
     if 230 in legs:
         _diag_blocks_write(io_path, rows, blocks, place, min_b, max_b, cell_edits, new_sheets, append)
 
-    # the _UnresolvedIndex report sheet (only the 210 leg owns it; rebuilt fresh each run)
-    if 210 in legs:
-        new_sheets.append(_unresolved_sheet(unresolved, ab))
+    # the _UnresolvedIndex report sheet - rebuilt fresh whenever a leg that can leave `<input required>` ran
+    # (210 script_type OR 220 index). It lists every unresolved cell across those legs.
+    if 210 in legs or 220 in legs:
+        new_sheets.append(_unresolved_sheet(unresolved))
 
     backup = _backup_path(io_path)
     shutil.copy2(io_path, backup)
