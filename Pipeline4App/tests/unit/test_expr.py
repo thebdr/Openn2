@@ -6,7 +6,6 @@ the format-spec coercion, the sentinel verbatim, clean(), and the data funcs ove
 """
 from _harness import run, eq, ok, raises
 from pipeline4.core import expr
-from pipeline4.core import rule_expr as rx
 from pipeline4.core.expr import Scope, ExprError
 
 
@@ -46,13 +45,12 @@ def test_in_list():
     eq(expr.test('$script_type in ["KQ","KI"]', {"script_type": "DD"}), False, "not in list")
 
 
-# --- extract: capture-first + slice + rule_expr PARITY ------------------------------------------- #
-def test_extract_parity_with_rule_expr():
-    # rule_expr's last == whole[-1]; expr's -1: slices the whole match (no group)
-    for d2, pat in [("FOO CH7 BAR", "CH."), ("ENCODER CELL 4", r"CELL.\d"), ("EMERG RESET AREA 3", "AREA .")]:
-        rxlast = rx.render("{extract(d2,/%s/,last)}" % pat, {"d2": d2})
-        exlast = expr.evaluate("extract($d2, /%s/, -1:)" % pat, {"d2": d2})
-        eq(exlast, rxlast, "expr -1: == rule_expr last on /%s/" % pat)
+# --- extract: capture-first + slice (the former rule_expr `last` parity, now a fixed table) ------- #
+def test_extract_last_slice_table():
+    # `-1:` slices the whole match (no group) == the last char (rule_expr's old `last` semantics)
+    for d2, pat, want in [("FOO CH7 BAR", "CH.", "7"), ("ENCODER CELL 4", r"CELL.\d", "4"),
+                          ("EMERG RESET AREA 3", "AREA .", "3")]:
+        eq(expr.evaluate("extract($d2, /%s/, -1:)" % pat, {"d2": d2}), want, "expr -1: last char on /%s/" % pat)
     eq(expr.evaluate("extract($d2, /CH./, -1:)", {"d2": "FOO CH7 BAR"}), "7", "last char")
     eq(expr.evaluate("extract($d2, /CH./, :1)", {"d2": "FOO CH7 BAR"}), "C", ":1 == first char")
     eq(expr.evaluate("extract($d2, /NOPE/, -1:)", {"d2": "xyz"}), "", "no match -> empty")
@@ -107,6 +105,22 @@ def test_string_funcs():
 def test_clean():
     eq(expr.evaluate("clean($f)", {"f": "a\x00b\tc   d\n"}), "a b c d", "control chars + ws collapse + strip")
     eq(expr.evaluate("clean($f)", {"f": "  hi   there  "}), "hi there", "ws collapse")
+
+
+def test_strip():
+    eq(expr.evaluate("strip($f)", {"f": "  hi  there  "}), "hi  there", "strip trims ends but does NOT collapse")
+    eq(expr.evaluate("strip($f)", {"f": "PA"}), "PA", "strip of a clean token is identity")
+    eq(expr.render("{strip($t)}", {"t": " P  W "}), "P  W",
+       "strip in a render hole keeps internal spaces (vs clean which would collapse)")
+
+
+# --- single-quoted string literals (config CSVs avoid double-quote escaping) ---------------------- #
+def test_single_quoted_strings():
+    eq(expr.evaluate("'a'", {}), "a", "single-quoted string literal evaluates to its content")
+    eq(expr.evaluate("join(' ', $a, $b)", {"a": "x", "b": "y"}), "x y", "single-quote as a join separator")
+    ok(expr.test("$type_hw = 'DI'", {"type_hw": "DI"}), "single-quote as an = rhs")
+    eq(expr.test("$type_hw = 'DI'", {"type_hw": "XX"}), False, "single-quote = rhs mismatch -> False")
+    eq(expr.evaluate("'it\\'s'", {}), "it's", "escaped single-quote inside a single-quoted string")
 
 
 # --- if / coalesce ------------------------------------------------------------------------------- #
@@ -219,7 +233,7 @@ if __name__ == "__main__":
         ("numeric_and_funcs", test_numeric_and_funcs),
         ("boolean_composition", test_boolean_composition),
         ("in_list", test_in_list),
-        ("extract_parity_with_rule_expr", test_extract_parity_with_rule_expr),
+        ("extract_last_slice_table", test_extract_last_slice_table),
         ("extract_capture_first", test_extract_capture_first),
         ("ignorecase_both", test_ignorecase_both),
         ("field_basics_and_bareword", test_field_basics_and_bareword),
@@ -227,6 +241,8 @@ if __name__ == "__main__":
         ("dotted_object_access", test_dotted_object_access),
         ("string_funcs", test_string_funcs),
         ("clean", test_clean),
+        ("strip", test_strip),
+        ("single_quoted_strings", test_single_quoted_strings),
         ("if_and_coalesce", test_if_and_coalesce),
         ("let", test_let),
         ("render_basic", test_render_basic),

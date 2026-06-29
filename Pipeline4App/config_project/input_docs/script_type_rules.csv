@@ -1,20 +1,20 @@
 priority,gate,when,type,comment
-10,Node,,{type_hw},node -> Type column (R) verbatim
-20,In,desc ~ /EMERGENCY PUSH.BUTTON PRES/,"E{extract(d2,/CH./,last)}/2",emergency push-button pressed
-21,In,desc ~ /FEEDBACK.*SAFE.*(RELAY|CONTACTOR)/,KI,safety relay/contactor feedback input
-22,In,desc ~ /DOOR.*OPEN/ and d2 ~ /CH/,"DI{extract(d2,/CH./,last)}/2",door channel input
-23,In,desc ~ /DOOR.*OPEN/ and d2 ~ /RESET/,DR,door reset
-24,In,desc ~ /DOOR.*OPEN/,DD,door open (plain)
-25,In,desc ~ /SAFETY ENCODER.*PHOTO/,"N{extract(d2,/CELL.\d/,last)}/2",safety encoder photocell
-26,In,desc ~ /SWITCH DISCONNECTOR.*OPEN/,"B{extract(d2,/CH./,last)}/2",switch-disconnector / breaker
-27,In,desc ~ /FIRE ALARM/,"F{extract(d2,/CH./,last)}/2",fire alarm
-28,In,"desc ~ /EMERG.*RESET/ and isdigit(extract(d2,/AREA ./,last))","R{extract(d2,/AREA ./,last)}",emergency reset (numbered area)
-29,In,desc ~ /EMERG.*RESET/,R*,emergency reset (no area)
-30,In,len(desc) > 3 and present(type_hw),{type_hw},IN catch-all -> Type column (R)
-31,In,len(desc) > 3,{INPUT_REQUIRED},IN catch-all -> sentinel
-40,Out,d1 ~ /(SAFE.*(RELAY|CONTACTOR)|CUT.OFF.*AREA)/,KQ,safety relay / cut-off area (desc part 1)
-41,Out,d1 ~ /DOOR.*OPEN$|SOLENOID.*CONTROL/,DQ,door open / solenoid control (desc part 1)
-42,Out,d2 ~ /(SAFE.*(RELAY|CONTACTOR)|CUT.OFF.*AREA)/,KQ,safety relay / cut-off area (desc part 2)
-43,Out,desc ~ /DOOR.*LAMP/,DL,door lamp
-44,Out,d2 ~ /EMERGENCY AREA \d/,"Z{extract(d2,/AREA ./,last)}",emergency-area output
-45,Out,len(desc) > 3,{INPUT_REQUIRED},OUT catch-all -> sentinel
+10,Node,,{strip($type_hw)},node -> Type column (R) verbatim
+20,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /EMERGENCY PUSH.BUTTON PRES/","E{extract(clean($desc_l1b),/CH./,-1:)}/2",emergency push-button pressed
+21,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /FEEDBACK.*SAFE.*(RELAY|CONTACTOR)/",KI,safety relay/contactor feedback input
+22,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /DOOR.*OPEN/ and clean($desc_l1b) ~ /CH/","DI{extract(clean($desc_l1b),/CH./,-1:)}/2",door channel input
+23,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /DOOR.*OPEN/ and clean($desc_l1b) ~ /RESET/",DR,door reset
+24,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /DOOR.*OPEN/",DD,door open (plain)
+25,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /SAFETY ENCODER.*PHOTO/","N{extract(clean($desc_l1b),/CELL.\d/,-1:)}/2",safety encoder photocell
+26,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /SWITCH DISCONNECTOR.*OPEN/","B{extract(clean($desc_l1b),/CH./,-1:)}/2",switch-disconnector / breaker
+27,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /FIRE ALARM/","F{extract(clean($desc_l1b),/CH./,-1:)}/2",fire alarm
+28,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /EMERG.*RESET/ and isdigit(extract(clean($desc_l1b),/AREA ./,-1:))","R{extract(clean($desc_l1b),/AREA ./,-1:)}",emergency reset (numbered area)
+29,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /EMERG.*RESET/",R*,emergency reset (no area)
+30,In,"len(clean(join(' ', $desc_l1, $desc_l1b))) > 3 and present($type_hw)",{strip($type_hw)},IN catch-all -> Type column (R)
+31,In,"len(clean(join(' ', $desc_l1, $desc_l1b))) > 3",<input required>,IN catch-all -> sentinel
+40,Out,"clean($desc_l1) ~ /(SAFE.*(RELAY|CONTACTOR)|CUT.OFF.*AREA)/",KQ,safety relay / cut-off area (desc part 1)
+41,Out,"clean($desc_l1) ~ /DOOR.*OPEN$|SOLENOID.*CONTROL/",DQ,door open / solenoid control (desc part 1)
+42,Out,"clean($desc_l1b) ~ /(SAFE.*(RELAY|CONTACTOR)|CUT.OFF.*AREA)/",KQ,safety relay / cut-off area (desc part 2)
+43,Out,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /DOOR.*LAMP/",DL,door lamp
+44,Out,"clean($desc_l1b) ~ /EMERGENCY AREA \d/","Z{extract(clean($desc_l1b),/AREA ./,-1:)}",emergency-area output
+45,Out,"len(clean(join(' ', $desc_l1, $desc_l1b))) > 3",<input required>,OUT catch-all -> sentinel

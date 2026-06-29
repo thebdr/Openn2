@@ -31,7 +31,7 @@ _TOKEN_RE = re.compile(
     r"""\s+
       | (?P<field>\$[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)
       | (?P<regex>/(?:\\.|[^/\\])*/)
-      | (?P<string>"(?:\\.|[^"\\])*")
+      | (?P<string>"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')
       | (?P<number>-?\d+(?:\.\d+)?)
       | (?P<bind>:=)
       | (?P<op>!=|>=|<=|[=<>~(),\[\];:])
@@ -42,7 +42,7 @@ _TOKEN_RE = re.compile(
 
 # host / leaf funcs (non-data). Data funcs are dispatched separately (they take a table NAME word).
 _FUNCS = frozenset({
-    "clean", "concat", "join", "numeric", "isdigit", "len", "present", "blank",
+    "clean", "strip", "concat", "join", "numeric", "isdigit", "len", "present", "blank",
     "startswith", "extract", "if", "coalesce", "let",
 })
 _DATA_FUNCS = frozenset({"where", "first", "lookup", "unique", "count", "node_of"})
@@ -64,7 +64,7 @@ def _tokenize(text: str) -> list:
 
 
 def _unescape(s: str) -> str:
-    return s.replace('\\"', '"').replace("\\\\", "\\")
+    return s.replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
 
 
 def _field_thunk(name: str):
@@ -259,6 +259,10 @@ class _Parser:
             self._arity(name, args, 1)
             a = args[0]
             return lambda ctx: runtime.clean(a(ctx))
+        if name == "strip":
+            self._arity(name, args, 1)
+            a = args[0]
+            return lambda ctx: runtime.s(a(ctx)).strip()    # trim only (faithful for a RESULT value; cf. clean())
         if name == "concat":
             return lambda ctx: "".join(runtime.s(a(ctx)) for a in args)
         if name == "join":

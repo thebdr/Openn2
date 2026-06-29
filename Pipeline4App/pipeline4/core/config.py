@@ -370,7 +370,7 @@ def load_column_map(document: str) -> list:
 def _load_rules(filename: str) -> list:
     """Load a priority-ordered ruleset CSV (ph200 classification): rows of {priority, when, type/gate, ...}
     sorted ascending by `priority` (first-match-wins). Cells stay raw strings - the `when`/`type` cells are
-    expressions evaluated by `core.rule_expr`. Missing file -> []."""
+    expressions evaluated by `core.expr`. Missing file -> []."""
     rows = read_config_csv(os.path.join(input_docs_dir(), filename))
     rows.sort(key=lambda r: int((r.get("priority") or "0").strip() or 0))
     return rows

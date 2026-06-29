@@ -10,14 +10,28 @@ Probes the parity-critical + tricky areas the implementer flagged:
   * coalesce/if truthiness edge values (0 / "" / "0" / 0.0);
   * data funcs: where-pred over a row column; node_of boundary (==start, ==end, just-outside, % addr).
 """
+import re as _re
+
 from _harness import run, eq, ok, raises
 from pipeline4.core import expr
-from pipeline4.core import rule_expr as rx
 from pipeline4.core.expr import Scope, ExprError
 
 
+def _last(pat, sv):
+    """The reference `last`-char semantics (the retired rule_expr `last`): the last char of the FIRST
+    case-insensitive match of `pat` in `sv`, or '' if no match."""
+    m = _re.compile(pat, _re.IGNORECASE).search(sv)
+    return m.group(0)[-1] if m and m.group(0) else ""
+
+
+def _first(pat, sv):
+    """The reference `first`-char semantics (the retired rule_expr `first`)."""
+    m = _re.compile(pat, _re.IGNORECASE).search(sv)
+    return m.group(0)[0] if m and m.group(0) else ""
+
+
 # =================================================================================================
-# extract: -1: == rule_expr `last`, :1 == `first`, across patterns + edge strings (NO capture group)
+# extract: -1: == last, :1 == first, across patterns + edge strings (NO capture group)
 # =================================================================================================
 def test_extract_last_parity_matrix():
     pats = ["CH.", r"CELL.\d", "AREA ."]
@@ -30,19 +44,17 @@ def test_extract_last_parity_matrix():
     for pat in pats:
         for sv in strings:
             ctx = {"d2": sv}
-            rx_last = rx.render("{extract(d2,/%s/,last)}" % pat, ctx)
             ex_last = expr.evaluate("extract($d2, /%s/, -1:)" % pat, ctx)
-            eq(ex_last, rx_last, "-1: == last  /%s/ on %r" % (pat, sv))
-            rx_first = rx.render("{extract(d2,/%s/,first)}" % pat, ctx)
+            eq(ex_last, _last(pat, sv), "-1: == last  /%s/ on %r" % (pat, sv))
             ex_first = expr.evaluate("extract($d2, /%s/, :1)" % pat, ctx)
-            eq(ex_first, rx_first, ":1 == first /%s/ on %r" % (pat, sv))
+            eq(ex_first, _first(pat, sv), ":1 == first /%s/ on %r" % (pat, sv))
 
 
 def test_extract_match_at_string_end_and_single_char():
     # match exactly at the end of the string
     eq(expr.evaluate("extract($d, /CH./, -1:)", {"d": "abcCH9"}), "9", "match at end, last char")
     eq(expr.evaluate("extract($d, /CH./, -1:)", {"d": "abcCH9"}),
-       rx.render("{extract(d,/CH./,last)}", {"d": "abcCH9"}), "parity at-end")
+       _last("CH.", "abcCH9"), "parity at-end")
     # a single-char whole match: -1: and :1 are the same char
     eq(expr.evaluate("extract($d, /X/, -1:)", {"d": "aXb"}), "X", "single-char match last")
     eq(expr.evaluate("extract($d, /X/, :1)", {"d": "aXb"}), "X", "single-char match first")
@@ -69,9 +81,9 @@ def test_extract_ignorecase_both_sides():
     eq(expr.test("$d ~ /DOOR/", {"d": "door open"}), True, "~ IGNORECASE reverse")
     eq(expr.evaluate("extract($d, /door(.)/)", {"d": "DOORX"}), "X", "extract IGNORECASE capture")
     eq(expr.evaluate("extract($d, /ch./, -1:)", {"d": "FOO CH7"}), "7", "extract lower-pat on upper text")
-    # parity: rule_expr extract is also IGNORECASE
+    # IGNORECASE parity with the reference last-char semantics
     eq(expr.evaluate("extract($d, /ch./, -1:)", {"d": "FOO CH7"}),
-       rx.render("{extract(d,/ch./,last)}", {"d": "FOO CH7"}), "extract IGNORECASE parity")
+       _last("ch.", "FOO CH7"), "extract IGNORECASE parity")
 
 
 # =================================================================================================

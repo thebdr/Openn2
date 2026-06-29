@@ -40,6 +40,8 @@ OPERATORS (a `value` with no operator is taken on its truthiness; NO arithmetic 
 
 FUNCTIONS:
     clean($f)          control chars (\\x00-\\x1f) -> space, whitespace collapsed, stripped    -> str
+    strip($f)          trim leading/trailing whitespace ONLY (no collapse) - faithful for a    -> str
+                       RESULT value where clean()'s internal collapse would mangle it
     concat(a, b, ...)  string-coerce and concatenate                                       -> str
     join(sep, a, ...)  string-coerce the parts and join with `sep`                         -> str
     numeric(x)         True if x coerces to a float                                        -> bool

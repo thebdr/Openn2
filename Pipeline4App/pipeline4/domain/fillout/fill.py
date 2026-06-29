@@ -19,11 +19,13 @@ from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string as _ci
 
 from pipeline4.core import config
+from pipeline4.core.expr import runtime as _expr_runtime
 from pipeline4.core.finding import Finding
 from pipeline4.domain.fillout import classify, reader
 from pipeline4.io import xlsx_edit
 
 INPUT_REQUIRED = classify.INPUT_REQUIRED
+_clean = _expr_runtime.clean              # the shared text cleaner (control chars -> space, ws collapse)
 _UNRESOLVED_SHEET = "_UnresolvedIndex"
 # the pipeline-owned output columns whose HEADER is written (only into a blank header cell - a customized
 # header is preserved) - mirrors PL3's HEADER_COLS.
@@ -106,7 +108,7 @@ def _unresolved_sheet(unresolved: list, ab_col: str) -> dict:
         sheet, rownum = raw["source_sheet"], raw["source_row"]
         fld = (str(raw.get("functional_unit") or "") + str(raw.get("location") or "")
                + str(raw.get("device") or "")).strip()
-        desc = (classify.clean(raw.get("desc_l1")) + " " + classify.clean(raw.get("desc_l1b"))).strip()
+        desc = (_clean(raw.get("desc_l1")) + " " + _clean(raw.get("desc_l1b"))).strip()
         rows.append([f"{sheet} - Row {rownum}", "", fld, desc, "unmatched type"])
         links.append((f"A{i}", f"'{sheet}'!{ab_col}{rownum}", f"{sheet} - Row {rownum}"))
     return {"name": _UNRESOLVED_SHEET, "rows": rows, "hyperlinks": links}

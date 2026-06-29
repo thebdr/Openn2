@@ -118,7 +118,17 @@ byte-transparent — alongside is the safe choice.
   missing-ness on a SIMPLE `$field` hole — a missing field inside a function-call hole isn't caught under `strict`
   (revisit at **M-E5** convergence, where `dbtemplate`'s raise-on-unknown needs full fidelity); (2) the compiled-expr
   cache keys on `(text, id(scope))` and pins each Scope — fine when callers reuse one Scope, a minor growth note.
-- **NEXT: M-E2** — the stage→fill reorder + make staging carry the full `column_map` set + port ph200 210.
+- **M-E2 (classification port) — DONE + verified (2026-06-29).** Added single-quote string literals + `strip()`
+  to `core/expr`; ported `gate_rules.csv` + `script_type_rules.csv` to `$`-columns (DB-refs) + `clean()`/`join()`/
+  `strip()`/`-1:` slices + literal `<input required>` sentinels; rewrote `classify` to run over a STAGED signals
+  row with the signals `Scope`; **retired `rule_expr`** (deleted). **Oracle parity EXACT: 0 mismatches / 269 rows**
+  vs the pre-port classifier (captured before changes); full gate **329/329**. Independent verifier caught a
+  `clean()`-vs-strip divergence on the `type_hw` RESULT (rules 10/30) — fixed: results use `strip()` (trim-only),
+  matches use `clean()`. Confirmed: the staged `signals` already carries all 64 columns (34 `column_map` + 30
+  derived) — no staging-schema change needed; the stale stub was the earlier confusion.
+- **NEXT (M-E2 remainder):** wire the physical stage→fill→re-stage run order (`fill` reads the staged `signals`,
+  writes `script_type` back to the doc, re-stage if changed) — 210 classifies correctly over raw OR staged rows
+  (same canonical columns), so this is run-order plumbing, not a correctness gate. Then M-E3 (220).
 
 ## Resolved decisions
 1. **Pipeline order** → **stage → fill → re-stage(if changed) → validate → generate → report** (the hard rule).
