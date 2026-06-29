@@ -10,8 +10,32 @@ user's word**, push only when asked. Each chunk is committed with its gate **and
 when domain judgement is needed (it's the user's; you implement). A question is a question — answer it, don't
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
+## LATEST (2026-06-29) — the unified expression engine + ph200 are COMPLETE; the pause is LIFTED
+The "PAUSE all phase development until the unified mini-expression engine is built + retrofitted" priority
+is **RESOLVED**. The authority docs are **`EXPR_ENGINE.md`** (status: COMPLETE) + **`EXPR_BUILD_PLAN.md`**
+(the sequenced, parity-gated build record). What landed (8 commits, all green + pushed; HEAD `9d31cc9`):
+- **`core/expr/`** — a custom **DB-references-only** expression engine (`$column` fields validated against a
+  `Scope`; `clean()`/`strip()`/`concat`/`join`/capture-first `extract`/`if`/`coalesce`/`let`; `render` with
+  format-specs + 3 missing-key modes; data funcs; single-quote strings). Chosen over CEL on **spike evidence**
+  (CEL functional but config-author-unreadable 4/4 + an 8-dep Beta tax). `core/rule_expr.py` is **retired**.
+- **ph200 is now BUILT + operable end-to-end** (it was the missing front-end). `domain/fillout/`: `classify`
+  (210, on `core/expr`), `index_assign` (220) + `families`, `diag_alloc` (230/240) + `diag_blocks` — faithful
+  clean-room ports of PL3's stateful algorithms over the **staged** signals. `fill_out` wires the canonical
+  **stage → fill → re-stage** order (writes AB/AC/AD/AE/AF + the DiagnosisBlocks sheet to the doc; doc-only).
+- **Parity**: each step oracle/idempotent-verified — 210 0/269, 220 0/267, 230/240 0/73, integration 0/269
+  (re-stage idempotent on a non-destructive scratch copy; the real doc untouched). M-E5 converged
+  `identity.interp` + `dbtemplate.render` onto `core/expr.render` — **byte-diff 0** on the locked 520/600 outputs.
+  (Left as-is, documented: `dbtemplate.compile_for_each` iteration + `identity.interp_keep`.)
+- **Gate: 45 test FILES / 356 tests green** (added `test_expr`/`test_expr_adversarial`/`test_fillout_index`/
+  `test_fillout_diag`/`test_fillout_integration`; `test_rule_expr` removed with the retirement).
+- **NEXT** (the previously-paused tail, now unblocked): **M7 GUI polish** (theme/size persistence, log-to-file —
+  see `GUI_PLAN.md`); a **manual GUI smoke** of the ph200 200-button (210/220/230/240 now un-greyed) over a
+  blank-ish doc; and the **interface-completeness follow-ups** (re-verify 510 PLCTags after the +DIAG unblock +
+  the template-native capture — see CLAUDE.md Phase 400/510). The stale per-line claims below are superseded by
+  this block.
+
 ## Where we are
-- **Branch `pl4`**. **8 OF THE 9 GENERATIVE PHASES ARE BUILT** — 300 + 520 + 400 + 510 + 600 + 700 + 800 + 900 +
+- **Branch `pl4`**. **ALL 9 GENERATIVE PHASES + ph200 ARE BUILT** — 300 + 520 + 400 + 510 + 600 + 700 + 800 + 900 +
   **100 (Validation)** + the severity rollout S1–S6, each parity-verified vs PL3; every built GUI button runs
   for real. **ph200 (Documents Fill Out) is NOT built** — the pipeline's 2nd phase that turns a RAW I/O List
   into a classified one (§6 script_type, §7 index, §8 diag cabinet/bit, DiagnosisBlocks). PL4 staging READS
@@ -36,8 +60,11 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   `config.use_project`) · **M0b chrome remainder** (darktitle + the full light/dark re-theme - landed in
   STEP 1). NEXT: **STEP 4** ph200 Documents Fill Out (CSV-driven, the LAST backend effort; confirm its 4 open
   decisions first).
-- **GIT STATE:** local **`pl4`** is at **`2ba6990`** and **PUSHED** — `origin/pl4` synced through it. Recent
-  milestones: **`2ba6990`** STEP 4 / ph200 **210 operable** (CSV-driven script-type fill) · **`0f3061a`** 210a
+- **GIT STATE:** local **`pl4`** is at **`9d31cc9`** and **PUSHED** — `origin/pl4` synced through it. Recent
+  milestones (the expr-engine arc, newest first): **`9d31cc9`** EXPR_ENGINE doc complete · **`cff30ed`** M-E5 render
+  convergence · **`9799531`** M-E5 strict-render fix · **`d8444af`** ph200 stage→fill→re-stage integration ·
+  **`a314b14`** ph200 230/240 diag · **`8deda92`** ph200 220 index · **`ee555c8`** ph200 210 (engine port) ·
+  **`ef4fb86`** core/expr engine. Before that: **`2ba6990`** STEP 4 / ph200 **210 operable** (old grammar) · **`0f3061a`** 210a
   (the classification engine, parity 273/0) · **`c08d4d1`** STEP 3 (M5 Files + M6 Project Manager) · **`5da675c`**
   STEP 2 (the 310/320 staging split) · **`7473ace`** STEP 1 (i18n + font + dark/light theme). Standing
   directive: **push on every major milestone** (Claude decides what counts), so origin tracks the latest
@@ -51,13 +78,11 @@ change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@
   Var font at size 13** [`gui/fonts.py` + `theme.apply_theme`; M0b fonts done]). Run from `Pipeline4App/`:
   `for t in tests/unit/test_*.py; do python "$t"; done`. The GUI is a manual `python launch_gui.py` check (no
   headless GUI tests; each GUI milestone unit-tests its pure logic + a construction smoke).
-- **START THE NEXT SESSION HERE → `EXPR_ENGINE.md`. ALL PHASE DEV PAUSED (user, 2026-06-29):** the unified
-  **mini-expression engine is THE priority** — build it AND retrofit everywhere (ph200, dbtemplate/520,
-  identity, diagnosis/interface templates) before any phase resumes. Build-vs-adopt is researched (CEL/celpy
-  spike vs simpleeval+Liquid hybrid vs thin custom; no off-the-shelf fit, `let()` native to none); the design +
-  final grammar decisions + PENDING engine choice are in **`EXPR_ENGINE.md`**. Decided: ph200 reorders to
-  stage→fill; `$canonical` fields; rule-driven gate. ph200 **210 stays operable** on the OLD `rule_expr`
-  grammar meanwhile. WAITING behind the engine: ph200 220/230/240 + M7 GUI polish. (Historical status below.)
+- **START THE NEXT SESSION HERE → the LATEST block at the top of this file** (the expr-engine + ph200 are DONE;
+  see `EXPR_ENGINE.md` [COMPLETE] + `EXPR_BUILD_PLAN.md`). The 2026-06-29 pause is **LIFTED**; ph200 reordered to
+  **stage→fill→re-stage**, `$canonical` DB-ref fields, rule-driven gate — all delivered + parity-verified.
+  NEXT: M7 GUI polish · a manual GUI smoke of the ph200 200-button · the 510 interface-completeness follow-ups.
+  (Historical pre-engine status below; superseded by the LATEST block.)
 - **(historical) GUI/ph200 status →** `GUI_PLAN.md` (the live GUI tracker). **M0–M6 + STEP 1 i18n + STEP 2 +
   STEP 3 done; STEP 4 (ph200) IN PROGRESS.** GUI port is feature-complete bar polish (M7). **STEP 4 / ph200
   Documents Fill Out** (CSV-rule-driven; the spec + decisions + grammar are in **`PH200_SPEC.md`**, the living
