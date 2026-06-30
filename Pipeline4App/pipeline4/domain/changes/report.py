@@ -277,18 +277,19 @@ def _iolist_section(iol: dict) -> str:
     gf, vc = iol["by_direction"]["gap-fill"], iol["by_direction"]["value-change"]
     regr = len(iol.get("regressions", []))
     if gf >= 2 * max(vc, 1):
-        verdict = 'the prior revision was mostly <strong>INCOMPLETE</strong> (blanks now filled), not wrong'
+        verdict = 'the prior revision was mostly <strong>INCOMPLETE</strong>, not wrong'
     elif vc > gf:
-        verdict = 'the prior revision had mostly <strong>WRONG values</strong> corrected, not just gaps filled'
+        verdict = 'the prior revision had mostly <strong>WRONG values</strong> corrected, not just gaps'
     else:
         verdict = 'the prior revision mixed filled gaps and corrected values'
-    regr_txt = (f' · <strong style="color:{_C["regression"]}">{regr} regressions</strong> (a value got worse)'
-                if regr else ' · <strong>0 regressions</strong> (nothing degraded)')
+    regr_html = (f'<strong style="color:{_C["regression"]}">{regr} regressions</strong>' if regr
+                 else f'{regr} regressions')
+    updates = f'{gf} blank cells filled, {vc} values corrected, {regr_html}'    # all updates, comma-separated
     sev_panel = (f'<div class="panel"><h3>Nature of the {changed} reworked rows '
                  f'<span class="hint">each row by its costliest change — the cost axis the bar above doesn\'t '
                  f'show</span></h3>{_nature_bars(nat_rows)}'
                  f'<p style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);font-size:13px">'
-                 f'<strong>Verdict:</strong> {verdict}{regr_txt}.</p></div>')
+                 f'<strong>Verdict:</strong> {verdict} · {updates}.</p></div>')
     up_blocks = []
     for u in sorted(iol["upgrades"], key=lambda u: -u["count"]):
         drows = [[esc(r["desc"]), _mu(r["fld"]), (f'<code>{esc(r["address"])}</code>' if r["address"] else "")]
