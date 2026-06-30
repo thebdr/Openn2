@@ -232,8 +232,8 @@ def _iolist_section(iol: dict) -> str:
     if addr:
         addr_callout = (f'<p class="notice" style="border-left-color:{_C["critical"]}">'
                         f'<strong>{addr["rows"]} I/O address changes across {addr["nodes"]} nodes</strong> '
-                        f'{_badge("critical", _C["critical"])}<br>An address change is the costliest fix on a '
-                        f'built machine — re-read the manuals, re-test on site, and propagate to every affected '
+                        f'{_badge("critical", _C["critical"])}<br>An address change is the most time-consuming fix '
+                        f'on a built machine — re-read the manuals, re-test on site, and propagate to every affected '
                         f'device. The exact old → new values are listed by node below.</p>')
     grouped = iol.get("grouped_changes", [])
     gnode_rows = [[_badge(g["tier"], _tier_color(g["tier"])), esc(g["node"]), esc(g["label"]),
@@ -250,10 +250,17 @@ def _iolist_section(iol: dict) -> str:
                  f'{_hbars([("Critical", bt["critical"]), ("Major", bt["major"]), ("Minor", bt["minor"])], _C["corrected"])}'
                  f'<h3 style="margin-top:14px">Itemized (non-structural) changes by direction</h3>'
                  f'{_hbars([("Gap-fill (old was blank)", iol["by_direction"]["gap-fill"]), ("Value change", iol["by_direction"]["value-change"]), ("Value loss (got worse)", iol["by_direction"]["value-loss"])], _C["major"])}</div>')
-    up_rows = [[esc(u["node"]), f'+{u["count"]} rows', esc(u["desc"])]
+    up_rows = [[_badge("retrofit", _C["upgrade"]), esc(u["node"]), f'+{u["count"]} rows', esc(u["desc"])]
                for u in sorted(iol["upgrades"], key=lambda u: -u["count"])]
-    up_panel = (f'<div class="panel"><h3>Upgrades <span class="hint">new feature blocks, not defects</span></h3>'
-                f'{_table(["Node", "Added", "Description"], up_rows, "none")}</div>')
+    forgotten_n = len(iol.get("forgotten", []))
+    fnote = (f'<p class="hint">Plus {forgotten_n} isolated forgotten signal(s) — a single row added inside an '
+             f'existing block (a smaller "something was missed").</p>' if forgotten_n else "")
+    up_section = (f'<h3 style="margin-top:26px">Upgrades and Retrofits '
+                  f'<span class="hint">additions to the document</span></h3>'
+                  f'<p class="notice" style="border-left-color:{_C["upgrade"]}">An addition is not a defect — '
+                  f'but it means the original revision was incomplete, so <strong>something was missed</strong>. '
+                  f'Review whether it should have been there from the start.</p>'
+                  f'{_table(["", "Node", "Added", "Description"], up_rows, "no upgrades or retrofits")}{fnote}')
 
     cblocks = sorted(iol.get("correction_blocks", []),
                      key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))
@@ -268,16 +275,17 @@ def _iolist_section(iol: dict) -> str:
   <h2>I/O list <span class="sub">{esc(iol["before"])} → {esc(iol["after"])} · {iol["before_rows"]}→{iol["after_rows"]} rows</span></h2>
   <div class="cards">{cards}</div>
   <div class="barwrap"><div class="bar-title">The {iol["matched"]} matched rows, by highest-severity change</div>{_bar(seg)}</div>
-  <h3>Structural changes — grouped by node <span class="hint">address / slot / pin / device re-keying — the costliest to fix on a built machine, counted not hidden</span></h3>
+  {sev_panel}
+  <h3>Structural changes — grouped by node <span class="hint">address / slot / pin / device re-keying — the MOST TIME-CONSUMING to fix on a built machine, counted not hidden</span></h3>
   {addr_callout}
   {_table(["Tier", "Field", "Rows", "Nodes"], struct_summary, "no structural changes")}
   {ctx}
   {f'<h4 style="margin:16px 0 4px;font-size:13px;font-weight:500">By node — old → new</h4>{_table(["Tier", "Node", "Field", "Rows", "Changes (old → new)"], gnode_rows)}{gmore}' if gnode_rows else ""}
-  <div class="two">{sev_panel}{up_panel}</div>
-  {f'<h3>Channel-uncertain blocks <span class="hint">per-channel attribution not provable — the edits are shown, not which channel got which</span></h3>{_table(["Node", "Scope", "Tier", "What changed (old → new)"], blocks)}' if blocks else ""}
   <h3>Corrections — by node <span class="hint">non-structural field edits, grouped per node, with direction</span></h3>
   {_table(["Tier", "Node", "Scope", "What changed (old → new)"], crows, "no other corrections")}
   {more}
+  {f'<h3>Channel-uncertain blocks <span class="hint">per-channel attribution not provable — the edits are shown, not which channel got which</span></h3>{_table(["Node", "Scope", "Tier", "What changed (old → new)"], blocks)}' if blocks else ""}
+  {up_section}
 </section>'''
 
 
@@ -393,5 +401,5 @@ def render_html(result: dict) -> str:
 {_iolist_section(result["iolist"])}
 {_cematrix_section(result["cematrix"])}
 {_area_section(result["area"])}
-<footer>Structural re-keying (I/O address / slot / pin / device tag) is the costliest correction to apply on a built machine, so it is COUNTED and grouped by node — not hidden. A coordinated re-map is flagged as context, but every changed row is still a field to re-verify on site. Other field changes are itemized per row and tagged by direction (gap-fill / value-change / value-loss). Tiers come from change_weights.csv. Full per-row detail is in the CSV audit trail beside this file.</footer>
+<footer>Structural re-keying (I/O address / slot / pin / device tag) is the most time-consuming correction to apply on a built machine, so it is COUNTED and grouped by node — not hidden. A coordinated re-map is flagged as context, but every changed row is still a field to re-verify on site. Other field changes are itemized per row and tagged by direction (gap-fill / value-change / value-loss). Tiers come from change_weights.csv. Full per-row detail is in the CSV audit trail beside this file.</footer>
 </body></html>'''
