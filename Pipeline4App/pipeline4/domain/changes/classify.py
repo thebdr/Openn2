@@ -177,8 +177,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
     bulk_rename = bool(events.get("__rename__"))
 
     intact = changed = 0
-    corrections: list = []
-    uncertain: list = []
+    corrections: list = []           # ALL itemized corrections (each carries its own `confidence`)
     by_tier = {"critical": 0, "major": 0, "minor": 0}
     by_direction = {"gap-fill": 0, "value-change": 0, "value-loss": 0}
     struct: dict = defaultdict(int)          # (node, field) -> changed-row count (structural / re-scheme)
@@ -220,10 +219,9 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
                  "row_new": new.get("_row"), "fld": fld(old), "desc": desc(old).replace("|", " ").strip(),
                  "diffs": diffs, "tier": item_tier, "directions": sorted({d["direction"] for d in diffs}),
                  "regression": regression, "confidence": pair["confidence"]}
-        (uncertain if pair["confidence"] == "channel-uncertain" else corrections).append(entry)
+        corrections.append(entry)    # channel-uncertain rows stay here too; flagged at the block level
 
-    channel_blocks = _aggregate_by_node(uncertain)
-    correction_blocks = _aggregate_by_node(corrections)       # high-confidence itemized, grouped per device
+    correction_blocks = _aggregate_by_node(corrections)       # all itemized, grouped per node (confidence per block)
     grouped_changes = [{"node": n, "field": f, "count": c, "tier": struct_tier[f],
                         "label": _EVENT_LABELS.get(f, f), "changes": struct_detail[(n, f)]}
                        for (n, f), c in struct.items()]
@@ -241,7 +239,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
         "matched": len(pairs), "intact": intact, "changed": changed,
         "removed": [_row_brief(r) for r in match_result["removed"]],
         "corrections": corrections, "correction_count": len(corrections),
-        "correction_blocks": correction_blocks, "channel_blocks": channel_blocks,
+        "correction_blocks": correction_blocks,
         "by_tier": by_tier, "by_direction": by_direction,
         "regressions": [c for c in corrections if c["regression"]],
         "grouped_changes": grouped_changes, "structural": structural_list,

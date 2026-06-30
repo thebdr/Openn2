@@ -264,12 +264,13 @@ def _iolist_section(iol: dict) -> str:
 
     cblocks = sorted(iol.get("correction_blocks", []),
                      key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))
-    crows = [[_badge(b["tier"], _tier_color(b["tier"])), esc(b["node"]), _scope(b),
+
+    def _conf_flag(b):
+        return (f' {_badge("⚠ channel mapping unverified", _C["neutral"])}'
+                if b.get("confidence") == "channel-uncertain" else "")
+    crows = [[_badge(b["tier"], _tier_color(b["tier"])), esc(b["node"]) + _conf_flag(b), _scope(b),
               _block_changes(b)] for b in cblocks[:80]]
     more = f'<p class="empty">+ {len(cblocks) - 80} more device-blocks in the CSV audit trail</p>' if len(cblocks) > 80 else ""
-    blocks = [[esc(b["node"]), _scope(b), _badge(b["tier"], _tier_color(b["tier"])), _block_changes(b)]
-              for b in sorted(iol["channel_blocks"],
-                              key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))]
 
     return f'''<section>
   <h2>I/O list <span class="sub">{esc(iol["before"])} → {esc(iol["after"])} · {iol["before_rows"]}→{iol["after_rows"]} rows</span></h2>
@@ -284,7 +285,7 @@ def _iolist_section(iol: dict) -> str:
   <h3>Corrections — by node <span class="hint">non-structural field edits, grouped per node, with direction</span></h3>
   {_table(["Tier", "Node", "Scope", "What changed (old → new)"], crows, "no other corrections")}
   {more}
-  {f'<h3>Channel-uncertain blocks <span class="hint">per-channel attribution not provable — the edits are shown, not which channel got which</span></h3>{_table(["Node", "Scope", "Tier", "What changed (old → new)"], blocks)}' if blocks else ""}
+  <p class="hint" style="margin-top:6px"><span class="badge" style="--bc:{_C["neutral"]}">⚠ channel mapping unverified</span> = a multichannel device whose channels were re-addressed/re-pinned, so the edits are shown but not which specific channel got which.</p>
   {up_section}
 </section>'''
 

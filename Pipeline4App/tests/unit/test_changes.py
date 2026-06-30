@@ -114,13 +114,13 @@ def test_channel_block_aggregation():
                  desc_l1="PUMP", desc_l1b=str(i))
         pairs.append({"old": o, "new": n, "tier": "T2pos", "confidence": "channel-uncertain"})
     res = classify.classify_iolist({"pairs": pairs, "removed": [], "added": []}, WEIGHTS)
-    eq(res["correction_count"], 0, "channel-uncertain rows are not per-row corrections")
-    eq(len(res["channel_blocks"]), 1, "they aggregate to one block-level change")
-    block = res["channel_blocks"][0]
-    eq(block["channels"], 3, "the block notes its channel count")
-    flds = {f["field"] for f in block["fields"]}
+    eq(res["correction_count"], 3, "channel-uncertain rows ARE corrections (merged into the one list)")
+    blocks = [b for b in res["correction_blocks"] if b["confidence"] == "channel-uncertain"]
+    eq(len(blocks), 1, "they aggregate to one node block, flagged channel-uncertain")
+    eq(blocks[0]["count"], 3, "the block notes its row/channel count")
+    flds = {f["field"] for f in blocks[0]["fields"]}
     ok("desc_l1" in flds, "the block carries WHAT changed (the field), not just a count")
-    eq(block["fields"][0]["values"], [("MOTOR", "PUMP")] * 3, "the per-channel old->new values are kept")
+    eq(blocks[0]["fields"][0]["values"], [("MOTOR", "PUMP")] * 3, "the per-channel old->new values are kept")
 
 
 def test_render_html_smoke():

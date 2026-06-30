@@ -106,15 +106,10 @@ def _audit_rows(result: dict) -> list:
         for old_v, new_v in g.get("changes", []):        # one row per structural change, with old->new
             rows.append(["IoList", g["node"], g["label"], g["tier"], "structural",
                          f"{old_v!r} -> {new_v!r}", ""])
-    for c in iol.get("corrections", []):
+    for c in iol.get("corrections", []):           # all itemized corrections (incl. channel-uncertain, flagged)
         rows.append(["IoList", c["fld"], c["desc"], c["tier"], "|".join(c["directions"]),
                      "; ".join(f"{d['field']}: {d['old']!r}->{d['new']!r}" for d in c["diffs"]),
                      c["confidence"]])
-    for b in iol.get("channel_blocks", []):
-        changed = "; ".join(f"{f['field']}: " + ", ".join(f"{o!r}->{n!r}" for o, n in f["values"])
-                            for f in b.get("fields", []))
-        rows.append(["IoList", b["fld"], f"{b['desc']} ({b['channels']} channels)".strip(), b["tier"],
-                     "", changed or "channel-block aggregate", b["confidence"]])
     ce = result.get("cematrix", {})
     for s in ce.get("structural", []):
         rows.append(["C&E", s["label"], f"{s['rows']} cause rows", s["tier"], "", "structural", ""])
