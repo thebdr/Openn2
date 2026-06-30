@@ -253,16 +253,27 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
 
 
 def _aggregate_channel(uncertain: list) -> list:
-    """Channel-uncertain ITEMIZED corrections -> one block-level change per (node, fld); the per-channel
-    attribution is not provable, so report the block, not each row."""
+    """Channel-uncertain ITEMIZED corrections -> one block-level change per (node, fld). The per-channel
+    attribution is not provable, so we report the BLOCK rather than claim which channel got which edit -
+    but we still carry WHAT changed: the per-field old->new values aggregated across the channels."""
     chan = defaultdict(list)
     for e in uncertain:
         chan[(e["node"], e["fld"])].append(e)
     blocks = []
     for (node, fld_key), members in chan.items():
         tier = max((m["tier"] for m in members), key=lambda t: TIER_RANK.get(t, 1))
+        by_field: dict = defaultdict(list)        # field -> [(old, new), ...] across the channels
+        field_tier: dict = {}
+        for m in members:
+            for d in m["diffs"]:
+                by_field[d["field"]].append((d["old"], d["new"]))
+                field_tier[d["field"]] = d["tier"]
+        fields = sorted(({"field": f, "tier": field_tier[f], "values": vals}
+                         for f, vals in by_field.items()),
+                        key=lambda x: -TIER_RANK.get(x["tier"], 1))
+        desc = next((m["desc"] for m in members if m["desc"]), "")
         blocks.append({"node": node, "fld": fld_key, "channels": len(members), "tier": tier,
-                       "desc": members[0]["desc"], "confidence": "channel-uncertain"})
+                       "desc": desc, "fields": fields, "confidence": "channel-uncertain"})
     return blocks
 
 

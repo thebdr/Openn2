@@ -116,7 +116,11 @@ def test_channel_block_aggregation():
     res = classify.classify_iolist({"pairs": pairs, "removed": [], "added": []}, WEIGHTS)
     eq(res["correction_count"], 0, "channel-uncertain rows are not per-row corrections")
     eq(len(res["channel_blocks"]), 1, "they aggregate to one block-level change")
-    eq(res["channel_blocks"][0]["channels"], 3, "the block notes its channel count")
+    block = res["channel_blocks"][0]
+    eq(block["channels"], 3, "the block notes its channel count")
+    flds = {f["field"] for f in block["fields"]}
+    ok("desc_l1" in flds, "the block carries WHAT changed (the field), not just a count")
+    eq(block["fields"][0]["values"], [("MOTOR", "PUMP")] * 3, "the per-channel old->new values are kept")
 
 
 def test_render_html_smoke():

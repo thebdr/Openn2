@@ -147,6 +147,17 @@ def _changes_cell(field: str, changes: list) -> str:
     return _address_lines(changes) if field in _ADDR_FIELDS else _changes_inline(changes)
 
 
+def _block_changes(block: dict) -> str:
+    """WHAT changed in a channel-uncertain block: per field, the old -> new values across the channels
+    (deduped with x N). The attribution to a specific channel is not claimed, but the edits are shown."""
+    lines = [f'<code>{esc(f["field"])}</code> {_badge(f["tier"], _tier_color(f["tier"]))} '
+             f'{_changes_inline(f["values"])}' for f in block.get("fields", [])]
+    body = "<br>".join(lines) or "—"
+    if block.get("desc"):
+        body = f'{_mu(block["desc"])}<br>{body}'
+    return body
+
+
 def _changes_inline(changes: list, cap: int = 24) -> str:
     """An inline old → new list for a node's structural changes, e.g. `I922.0 → I1120.0 · …`. DISTINCT
     pairs (a repeated low-cardinality change like a re-slot collapses to `…×N`); capped with a '+N more'
@@ -240,7 +251,7 @@ def _iolist_section(iol: dict) -> str:
                       esc(c["node"]), esc(c["desc"]) or "—", _diff_cells(c["diffs"]),
                       _badge(c["confidence"], _C["neutral"]) if c["confidence"] != "high" else ""])
     more = f'<p class="empty">+ {len(iol["corrections"]) - 80} more in the CSV audit trail</p>' if len(iol["corrections"]) > 80 else ""
-    blocks = [[esc(b["node"]), f'{b["channels"]} channels', _badge(b["tier"], _tier_color(b["tier"])), esc(b["desc"])]
+    blocks = [[esc(b["node"]), f'{b["channels"]} ch', _badge(b["tier"], _tier_color(b["tier"])), _block_changes(b)]
               for b in sorted(iol["channel_blocks"],
                               key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["channels"]))]
 
@@ -254,7 +265,7 @@ def _iolist_section(iol: dict) -> str:
   {ctx}
   {f'<h4 style="margin:16px 0 4px;font-size:13px;font-weight:500">By node — old → new</h4>{_table(["Tier", "Node", "Field", "Rows", "Changes (old → new)"], gnode_rows)}{gmore}' if gnode_rows else ""}
   <div class="two">{sev_panel}{up_panel}</div>
-  {f'<h3>Channel-uncertain blocks <span class="hint">multichannel attribution not provable — aggregated</span></h3>{_table(["Node", "Channels", "Tier", "Description"], blocks)}' if blocks else ""}
+  {f'<h3>Channel-uncertain blocks <span class="hint">per-channel attribution not provable — the edits are shown, not which channel got which</span></h3>{_table(["Node", "Channels", "Tier", "What changed (old → new)"], blocks)}' if blocks else ""}
   <h3>Other corrections <span class="hint">non-structural field changes, itemized per row</span></h3>
   {_table(["Tier", "Node", "Description", "Change", "Note"], crows, "no other corrections")}
   {more}

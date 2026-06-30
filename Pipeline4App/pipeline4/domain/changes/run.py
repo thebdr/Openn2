@@ -111,8 +111,10 @@ def _audit_rows(result: dict) -> list:
                      "; ".join(f"{d['field']}: {d['old']!r}->{d['new']!r}" for d in c["diffs"]),
                      c["confidence"]])
     for b in iol.get("channel_blocks", []):
-        rows.append(["IoList", b["fld"], f"{b['desc']} ({b['channels']} channels)", b["tier"],
-                     "", "channel-block aggregate", b["confidence"]])
+        changed = "; ".join(f"{f['field']}: " + ", ".join(f"{o!r}->{n!r}" for o, n in f["values"])
+                            for f in b.get("fields", []))
+        rows.append(["IoList", b["fld"], f"{b['desc']} ({b['channels']} channels)".strip(), b["tier"],
+                     "", changed or "channel-block aggregate", b["confidence"]])
     ce = result.get("cematrix", {})
     for s in ce.get("structural", []):
         rows.append(["C&E", s["label"], f"{s['rows']} cause rows", s["tier"], "", "structural", ""])
