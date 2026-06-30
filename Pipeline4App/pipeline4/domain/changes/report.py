@@ -8,7 +8,8 @@ positive (amber). Numbers come straight from `classify`.
 from __future__ import annotations
 
 import html
-from collections import Counter
+import re
+from collections import Counter, defaultdict
 
 _C = {"intact": "#0ca30c", "corrected": "#d03b3b", "regression": "#791f1f",
       "upgrade": "#e0991a", "systematic": "#7a7a73", "minor": "#f09595",
@@ -54,6 +55,96 @@ def _table(headers: list, rows: list, empty: str = "none") -> str:
     head = "".join(f"<th>{esc(h)}</th>" for h in headers)
     body = "".join("<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>" for row in rows)
     return f'<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
+
+
+_ADDR_FIELDS = {"bit", "address", "digital_output"}
+_ADDR_RE = re.compile(r"^\s*([IQO])\s*\.?\s*(\d+(?:\.\d+)*)\s*$", re.IGNORECASE)
+
+
+def _decompose(addr) -> tuple | None:
+    """A PLC address -> (prefix, [coords]) or None. Handles both Siemens-compact `I922.0` (coords
+    [922, 0]) and node-qualified `I.10.0.0` (coords [10, 0, 0]). The LAST coord is always the bit."""
+    m = _ADDR_RE.match(str(addr or ""))
+    return (m.group(1).upper(), m.group(2).split(".")) if m else None
+
+
+def _parts(dec: tuple) -> tuple:
+    """(prefix, node|None, byte|None, bit) from a decomposition. 2 coords -> (byte, bit); 3+ ->
+    (node, byte, bit) [node-qualified: node . byte . bit]."""
+    pf, c = dec
+    if len(c) >= 3:
+        return pf, c[0], c[1], c[-1]
+    if len(c) == 2:
+        return pf, None, c[0], c[1]
+    return pf, None, None, (c[0] if c else "")
+
+
+def _hl(s) -> str:
+    return f'<span class="hl">{esc(s)}</span>'
+
+
+def _mu(s) -> str:
+    return f'<span class="mut2">{esc(s)}</span>'
+
+
+def _address_lines(changes: list) -> str:
+    """Style B: qualitative transformation lines for a node's I/O address changes. Each change is
+    classified by WHICH component differs - direction flip (in<->out), node move, byte relocation, or bit
+    reshuffle - grouped, and rendered most-impacted first with only the differing component highlighted."""
+    flips: dict = defaultdict(list)      # (pf_old, pf_new, byte) -> [bit]
+    nodes: dict = defaultdict(int)       # (pf, old_node, new_node) -> count
+    relocs: dict = defaultdict(list)     # (pf, old_byte, new_byte) -> [(old_bit, new_bit)]
+    shuffles: dict = defaultdict(list)   # (pf, byte) -> [(old_bit, new_bit)]
+    others: list = []
+    for old, new in changes:
+        do, dn = _decompose(old), _decompose(new)
+        if not do or not dn:
+            others.append((old, new))
+            continue
+        pfo, no, byo, bio = _parts(do)
+        pfn, nn, byn, bin_ = _parts(dn)
+        if pfo != pfn:
+            flips[(pfo, pfn, byo)].append(bio)
+        elif no != nn:
+            nodes[(pfo, no, nn)] += 1
+        elif byo != byn:
+            relocs[(pfo, byo, byn)].append((bio, bin_))
+        elif bio != bin_:
+            shuffles[(pfo, byo)].append((bio, bin_))
+        else:
+            others.append((old, new))
+
+    lines: list = []                     # (priority, count, html)
+    for (pfo, pfn, by), bits in flips.items():
+        direction = "input→output" if pfo == "I" else "output→input"
+        lines.append((4, len(bits), f'{_hl("⚠ Direction flip (" + direction + ")")} — '
+                      f'{esc(pfo)}{_mu(by)} → {_hl(pfn)}{_mu(by)} {_mu("(" + " ".join("." + b for b in bits) + ")")}'))
+    for (pf, on, nn), count in nodes.items():
+        lines.append((3, count, f'{_mu("Node move")} — {esc(pf)}.{_hl(on)} → {esc(pf)}.{_hl(nn)} '
+                      f'{_mu("(" + str(count) + " addr · byte.bit unchanged)")}'))
+    for (pf, byo, byn), pairs in relocs.items():
+        if all(a == b for a, b in pairs):
+            detail = _mu(f'({len(pairs)} ch · ' + " ".join("." + a for a, _ in pairs) + ")")
+        else:
+            detail = _mu("bits ") + " ".join(_hl(f"{a}→{b}") for a, b in pairs)
+        lines.append((2, len(pairs), f'{_mu("Byte relocation")} — {esc(pf)}{_hl(byo)} → {esc(pf)}{_hl(byn)} {detail}'))
+    for (pf, by), pairs in shuffles.items():
+        lines.append((1, len(pairs), f'{_mu("Bit reshuffle in " + pf + by)} — '
+                      + " · ".join(_hl(f"{a}→{b}") for a, b in pairs)))
+    for old, new in others:
+        lines.append((0, 1, f'<code>{esc(old)}</code> → <code>{esc(new)}</code>'))
+
+    lines.sort(key=lambda x: (-x[0], -x[1]))
+    cap = 12
+    out = "".join(f'<div class="aln">{h}</div>' for _, _, h in lines[:cap])
+    if len(lines) > cap:
+        out += f'<div class="empty">+ {len(lines) - cap} more transformations in the CSV</div>'
+    return out
+
+
+def _changes_cell(field: str, changes: list) -> str:
+    """The per-node 'Changes' cell: qualitative address lines for an address field, else the dedup list."""
+    return _address_lines(changes) if field in _ADDR_FIELDS else _changes_inline(changes)
 
 
 def _changes_inline(changes: list, cap: int = 24) -> str:
@@ -125,7 +216,7 @@ def _iolist_section(iol: dict) -> str:
                         f'device. The exact old → new values are listed by node below.</p>')
     grouped = iol.get("grouped_changes", [])
     gnode_rows = [[_badge(g["tier"], _tier_color(g["tier"])), esc(g["node"]), esc(g["label"]),
-                   g["count"], _changes_inline(g.get("changes", []))] for g in grouped[:60]]
+                   g["count"], _changes_cell(g["field"], g.get("changes", []))] for g in grouped[:60]]
     gmore = (f'<p class="empty">+ {len(grouped) - 60} more node-groups in the CSV audit trail</p>'
              if len(grouped) > 60 else "")
     ctx = ""
@@ -138,7 +229,8 @@ def _iolist_section(iol: dict) -> str:
                  f'{_hbars([("Critical", bt["critical"]), ("Major", bt["major"]), ("Minor", bt["minor"])], _C["corrected"])}'
                  f'<h3 style="margin-top:14px">Itemized (non-structural) changes by direction</h3>'
                  f'{_hbars([("Gap-fill (old was blank)", iol["by_direction"]["gap-fill"]), ("Value change", iol["by_direction"]["value-change"]), ("Value loss (got worse)", iol["by_direction"]["value-loss"])], _C["major"])}</div>')
-    up_rows = [[esc(u["node"]), f'+{u["count"]} rows', esc(u["desc"])] for u in iol["upgrades"]]
+    up_rows = [[esc(u["node"]), f'+{u["count"]} rows', esc(u["desc"])]
+               for u in sorted(iol["upgrades"], key=lambda u: -u["count"])]
     up_panel = (f'<div class="panel"><h3>Upgrades <span class="hint">new feature blocks, not defects</span></h3>'
                 f'{_table(["Node", "Added", "Description"], up_rows, "none")}</div>')
 
@@ -149,7 +241,8 @@ def _iolist_section(iol: dict) -> str:
                       _badge(c["confidence"], _C["neutral"]) if c["confidence"] != "high" else ""])
     more = f'<p class="empty">+ {len(iol["corrections"]) - 80} more in the CSV audit trail</p>' if len(iol["corrections"]) > 80 else ""
     blocks = [[esc(b["node"]), f'{b["channels"]} channels', _badge(b["tier"], _tier_color(b["tier"])), esc(b["desc"])]
-              for b in iol["channel_blocks"]]
+              for b in sorted(iol["channel_blocks"],
+                              key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["channels"]))]
 
     return f'''<section>
   <h2>I/O list <span class="sub">{esc(iol["before"])} → {esc(iol["after"])} · {iol["before_rows"]}→{iol["after_rows"]} rows</span></h2>
@@ -258,6 +351,8 @@ table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0}
 th{text-align:left;color:var(--mut);font-weight:500;border-bottom:1px solid var(--bd);padding:6px 9px}
 td{border-bottom:1px solid var(--bd);padding:6px 9px;vertical-align:top}
 code{background:var(--card);padding:1px 5px;border-radius:4px;font-size:12px}
+.hl{color:#d03b3b;font-weight:500}.mut2{color:var(--mut)}
+.aln{font-size:12.5px;line-height:1.5;margin:2px 0}
 .badge{font-size:11px;padding:1px 7px;border-radius:10px;color:#fff;background:var(--bc);white-space:nowrap}
 .empty{color:var(--mut);font-size:13px;font-style:italic}
 .notice{background:var(--card);border-left:3px solid var(--upg,#e0991a);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px}

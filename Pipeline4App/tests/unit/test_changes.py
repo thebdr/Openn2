@@ -189,6 +189,25 @@ def test_empty_read_not_green():
     ok(not result["iolist"]["available"], "a non-readable / empty I/O List is never shown as all-clean")
 
 
+def test_address_decompose():
+    eq(report._decompose("I922.0"), ("I", ["922", "0"]), "Siemens-compact -> prefix + [byte, bit]")
+    eq(report._decompose("I.10.0.0"), ("I", ["10", "0", "0"]), "node-qualified -> prefix + [node, byte, bit]")
+    eq(report._decompose("Q130.5"), ("Q", ["130", "5"]), "output prefix")
+    eq(report._decompose("notanaddr"), None, "non-address -> None")
+    eq(report._decompose("10000"), None, "a bare number is not an address")
+
+
+def test_address_lines_classify():
+    reloc = report._address_lines([("I700.0", "I600.0"), ("I700.1", "I600.1"), ("I700.2", "I600.2")])
+    ok("Byte relocation" in reloc and "700" in reloc and "600" in reloc, "byte changed, bit same -> relocation")
+    shuf = report._address_lines([("I620.1", "I620.4"), ("I620.2", "I620.1")])
+    ok("Bit reshuffle in I620" in shuf, "same byte, bit changed -> reshuffle")
+    flip = report._address_lines([("I360.0", "Q360.0")])
+    ok("Direction flip" in flip and "input→output" in flip, "prefix changed -> in/out flip (highlighted)")
+    move = report._address_lines([("I.10.0.0", "I.12.0.0")])
+    ok("Node move" in move, "node coord changed -> node move")
+
+
 def test_read_error_degrades():
     import _harness                                          # two real files that are NOT workbooks
     a, b = __file__, _harness.__file__
@@ -218,6 +237,8 @@ TESTS = [
     ("subthreshold_rename_is_genuine", test_subthreshold_rename_is_genuine),
     ("unknown_tier_does_not_crash", test_unknown_tier_does_not_crash),
     ("empty_read_not_green", test_empty_read_not_green),
+    ("address_decompose", test_address_decompose),
+    ("address_lines_classify", test_address_lines_classify),
     ("read_error_degrades", test_read_error_degrades),
 ]
 
