@@ -78,6 +78,8 @@ def test_address_grouped_not_hidden():
     grp = [g for g in res["grouped_changes"] if g["field"] == "bit"]
     eq(len(grp), 1, "grouped into one (node, address) entry")
     eq((grp[0]["node"], grp[0]["count"], grp[0]["tier"]), ("N1", 10, "critical"), "node N1, 10 rows, critical")
+    eq(grp[0]["changes"][0], ("I100.0", "I200.0"), "the actual old->new address values are kept for the drill-down")
+    eq(len(grp[0]["changes"]), 10, "all 10 address changes are retained")
     eq(res["by_tier"]["critical"], 11, "all 11 changed rows read critical (10 address + 1 type)")
     eq(res["correction_count"], 1, "the type gap-fill is itemized; address rows are grouped, not itemized")
     eq(res["corrections"][0]["directions"], ["gap-fill"], "blank->value = gap-fill")

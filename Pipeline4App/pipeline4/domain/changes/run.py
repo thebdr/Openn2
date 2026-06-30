@@ -103,8 +103,9 @@ def _audit_rows(result: dict) -> list:
     rows = [["document", "identity", "description", "tier", "directions", "fields", "confidence"]]
     iol = result.get("iolist", {})
     for g in iol.get("grouped_changes", []):
-        rows.append(["IoList", g["node"], f"{g['label']} x{g['count']} rows", g["tier"],
-                     "", "structural (grouped by node)", ""])
+        for old_v, new_v in g.get("changes", []):        # one row per structural change, with old->new
+            rows.append(["IoList", g["node"], g["label"], g["tier"], "structural",
+                         f"{old_v!r} -> {new_v!r}", ""])
     for c in iol.get("corrections", []):
         rows.append(["IoList", c["fld"], c["desc"], c["tier"], "|".join(c["directions"]),
                      "; ".join(f"{d['field']}: {d['old']!r}->{d['new']!r}" for d in c["diffs"]),

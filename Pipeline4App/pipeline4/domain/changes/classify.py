@@ -183,6 +183,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
     by_direction = {"gap-fill": 0, "value-change": 0, "value-loss": 0}
     struct: dict = defaultdict(int)          # (node, field) -> changed-row count (structural / re-scheme)
     struct_tier: dict = {}
+    struct_detail: dict = defaultdict(list)  # (node, field) -> [(old, new), ...] the actual values changed
 
     def _grouped(field: str) -> bool:
         return field in _GROUP_BY_NODE or (field in _RENAME_FIELDS and bulk_rename)
@@ -200,6 +201,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
             if _grouped(f):
                 struct[(node, f)] += 1
                 struct_tier[f] = _tier(weights, f)
+                struct_detail[(node, f)].append((str(old.get(f, "")), str(new.get(f, ""))))
             else:
                 itemized.append(f)
         # every changed row is bucketed ONCE, by the max tier across ALL its changes (grouped + itemized).
@@ -222,7 +224,8 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
 
     channel_blocks = _aggregate_channel(uncertain)
     grouped_changes = [{"node": n, "field": f, "count": c, "tier": struct_tier[f],
-                        "label": _EVENT_LABELS.get(f, f)} for (n, f), c in struct.items()]
+                        "label": _EVENT_LABELS.get(f, f), "changes": struct_detail[(n, f)]}
+                       for (n, f), c in struct.items()]
     grouped_changes.sort(key=lambda g: (-TIER_RANK.get(g["tier"], 1), -g["count"]))
     structural: dict = {}                        # per-field rollup: address X rows across Y nodes
     for (n, f), c in struct.items():

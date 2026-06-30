@@ -8,6 +8,7 @@ positive (amber). Numbers come straight from `classify`.
 from __future__ import annotations
 
 import html
+from collections import Counter
 
 _C = {"intact": "#0ca30c", "corrected": "#d03b3b", "regression": "#791f1f",
       "upgrade": "#e0991a", "systematic": "#7a7a73", "minor": "#f09595",
@@ -55,6 +56,21 @@ def _table(headers: list, rows: list, empty: str = "none") -> str:
     return f'<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
 
 
+def _changes_inline(changes: list, cap: int = 24) -> str:
+    """An inline old → new list for a node's structural changes, e.g. `I922.0 → I1120.0 · …`. DISTINCT
+    pairs (a repeated low-cardinality change like a re-slot collapses to `…×N`); capped with a '+N more'
+    tail (the full per-row list is in the CSV audit trail)."""
+    if not changes:
+        return ""
+    counts = Counter((str(o), str(n)) for o, n in changes)        # first-seen order preserved
+    cells = []
+    for (o, n), c in list(counts.items())[:cap]:
+        mult = f' <span class="empty">×{c}</span>' if c > 1 else ""
+        cells.append(f'<code>{esc(o) or "∅"}</code> → <code>{esc(n) or "∅"}</code>{mult}')
+    tail = f' <span class="empty">+{len(counts) - cap} more</span>' if len(counts) > cap else ""
+    return "  ·  ".join(cells) + tail
+
+
 def _diff_cells(diffs: list) -> str:
     return "<br>".join(f'<code>{esc(d["field"])}</code>: {esc(d["old"]) or "∅"} → {esc(d["new"]) or "∅"} '
                        f'{_badge(d["direction"], _dir_color(d["direction"]))}' for d in diffs)
@@ -99,16 +115,24 @@ def _iolist_section(iol: dict) -> str:
 
     struct_summary = [[_badge(s["tier"], _tier_color(s["tier"])), esc(s["label"]),
                        s["rows"], s["nodes"]] for s in structural]
+    addr = next((s for s in structural if s["field"] == "bit"), None)
+    addr_callout = ""
+    if addr:
+        addr_callout = (f'<p class="notice" style="border-left-color:{_C["critical"]}">'
+                        f'<strong>{addr["rows"]} I/O address changes across {addr["nodes"]} nodes</strong> '
+                        f'{_badge("critical", _C["critical"])}<br>An address change is the costliest fix on a '
+                        f'built machine — re-read the manuals, re-test on site, and propagate to every affected '
+                        f'device. The exact old → new values are listed by node below.</p>')
     grouped = iol.get("grouped_changes", [])
-    gnode_rows = [[_badge(g["tier"], _tier_color(g["tier"])), esc(g["node"]), esc(g["label"]), g["count"]]
-                  for g in grouped[:40]]
-    gmore = (f'<p class="empty">+ {len(grouped) - 40} more node-groups in the CSV audit trail</p>'
-             if len(grouped) > 40 else "")
+    gnode_rows = [[_badge(g["tier"], _tier_color(g["tier"])), esc(g["node"]), esc(g["label"]),
+                   g["count"], _changes_inline(g.get("changes", []))] for g in grouped[:60]]
+    gmore = (f'<p class="empty">+ {len(grouped) - 60} more node-groups in the CSV audit trail</p>'
+             if len(grouped) > 60 else "")
     ctx = ""
     if iol["systematic_events"]:
-        joined = "; ".join(f'{esc(e["label"])} — {esc(e["summary"])}' for e in iol["systematic_events"])
-        ctx = (f'<p class="hint" style="margin:8px 0 0">Pattern: {joined}. Coordinated (likely a re-base), '
-               f'but every row is still a field to re-verify and apply on the machine.</p>')
+        joined = "; ".join(f'{esc(e["summary"])}' for e in iol["systematic_events"])
+        ctx = (f'<p class="hint" style="margin:8px 0 0">These follow a coordinated re-map ({joined}) — '
+               f'but each row is still a separate address to re-verify and apply on site, not a free pass.</p>')
 
     sev_panel = (f'<div class="panel"><h3>Changed rows by severity</h3>'
                  f'{_hbars([("Critical", bt["critical"]), ("Major", bt["major"]), ("Minor", bt["minor"])], _C["corrected"])}'
@@ -132,9 +156,10 @@ def _iolist_section(iol: dict) -> str:
   <div class="cards">{cards}</div>
   <div class="barwrap"><div class="bar-title">The {iol["matched"]} matched rows, by highest-severity change</div>{_bar(seg)}</div>
   <h3>Structural changes — grouped by node <span class="hint">address / slot / pin / device re-keying — the costliest to fix on a built machine, counted not hidden</span></h3>
+  {addr_callout}
   {_table(["Tier", "Field", "Rows", "Nodes"], struct_summary, "no structural changes")}
   {ctx}
-  {f'<h4 style="margin:16px 0 4px;font-size:13px;font-weight:500">By node</h4>{_table(["Tier", "Node", "Field", "Rows"], gnode_rows)}{gmore}' if gnode_rows else ""}
+  {f'<h4 style="margin:16px 0 4px;font-size:13px;font-weight:500">By node — old → new</h4>{_table(["Tier", "Node", "Field", "Rows", "Changes (old → new)"], gnode_rows)}{gmore}' if gnode_rows else ""}
   <div class="two">{sev_panel}{up_panel}</div>
   {f'<h3>Channel-uncertain blocks <span class="hint">multichannel attribution not provable — aggregated</span></h3>{_table(["Node", "Channels", "Tier", "Description"], blocks)}' if blocks else ""}
   <h3>Other corrections <span class="hint">non-structural field changes, itemized per row</span></h3>
