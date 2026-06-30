@@ -298,7 +298,8 @@ def _iolist_section(iol: dict) -> str:
         f'<p class="notice" style="border-left-color:{_C["complementary"]}">A free slot that was re-addressed '
         f'is not a current defect — nothing is wired to it. But if a signal is added to it later, a wrong '
         f'address would reproduce the original class of mistake, so it is tracked for review.</p>'
-        f'{_table(["Node", "Scope", "What changed (old → new)"], comp_rows, "none")}') if comp_blocks else ""
+        f'<div class="faded">{_table(["Node", "Scope", "What changed (old → new)"], comp_rows, "none")}</div>'
+        ) if comp_blocks else ""
 
     noise_blocks = sorted(iol.get("noise_blocks", []),
                           key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))
@@ -421,6 +422,7 @@ td{border-bottom:1px solid var(--bd);padding:6px 9px;vertical-align:top}
 code{background:var(--card);padding:1px 5px;border-radius:4px;font-size:12px}
 .hl{color:#d03b3b;font-weight:500}.mut2{color:var(--mut)}
 .aln{font-size:12.5px;line-height:1.5;margin:2px 0}
+.faded{opacity:.5}
 .badge{font-size:11px;padding:1px 7px;border-radius:10px;color:#fff;background:var(--bc);white-space:nowrap}
 .empty{color:var(--mut);font-size:13px;font-style:italic}
 .notice{background:var(--card);border-left:3px solid var(--upg,#e0991a);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px}
