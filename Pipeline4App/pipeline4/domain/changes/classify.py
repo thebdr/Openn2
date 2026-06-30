@@ -216,6 +216,8 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
     # each changed row bucketed ONCE by the NATURE of its costliest change (the cost axis the severity bar
     # lacks): an I/O address re-map (costliest) > a pure completion (all blanks filled) > everything else.
     by_nature = {"address": 0, "completion": 0, "other": 0}
+    by_field: dict = defaultdict(int)        # per-field count of USED changed rows - the "what was changed" list
+    comp_addr = 0                            # complementary (unused) rows whose change includes an I/O address
     struct: dict = defaultdict(int)          # (node, field) -> changed-row count (structural / re-scheme)
     struct_tier: dict = {}
     struct_detail: dict = defaultdict(list)  # (node, field) -> [(old, new), ...] the actual values changed
@@ -244,11 +246,15 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
                     "tier": max((d["tier"] for d in comp_diffs), key=lambda t: TIER_RANK.get(t, 1)),
                     "directions": sorted({d["direction"] for d in comp_diffs}),
                     "regression": False, "confidence": pair["confidence"]})
+                if any(d["field"] in _ADDR_FIELDS for d in comp_diffs):
+                    comp_addr += 1
             continue
         if not changed_fields:
             intact += 1
             continue
         changed += 1
+        for f in changed_fields:
+            by_field[f] += 1                 # the per-field "what was changed" tally (used rows)
         itemized = []
         for f in changed_fields:
             if _grouped(f):
@@ -310,6 +316,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
         "corrections": corrections, "correction_count": len(corrections),
         "correction_blocks": correction_blocks, "noise_blocks": noise_blocks,
         "by_tier": by_tier, "by_direction": by_direction, "by_nature": by_nature,
+        "by_field": dict(by_field), "comp_addr": comp_addr,
         "regressions": [c for c in corrections if c["regression"]],
         "grouped_changes": grouped_changes, "structural": structural_list,
         "structural_rows": sum(struct.values()),

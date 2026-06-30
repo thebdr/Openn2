@@ -77,6 +77,23 @@ def _table(headers: list, rows: list, empty: str = "none") -> str:
 _ADDR_FIELDS = {"bit", "address", "digital_output"}
 _ADDR_RE = re.compile(r"^\s*([IQO])\s*\.?\s*(\d+(?:\.\d+)*)\s*$", re.IGNORECASE)
 
+# Human labels for the neutral "what was changed" per-field list (plural; unknown fields fall back to the
+# field name with underscores -> spaces).
+_FIELD_LABELS = {
+    "bit": "I/O addresses", "address": "I/O addresses", "digital_output": "I/O addresses",
+    "slot": "slots", "pin_no": "pins", "connector": "connectors",
+    "device": "device tags", "functional_unit": "functional units", "location": "locations",
+    "profinet_name": "profinet names", "profinet_ip": "profinet IPs", "id_node": "node IDs",
+    "normal_condition": "normal conditions", "type_hw": "hardware types",
+    "part_no": "part numbers", "manufacturer": "manufacturers",
+    "desc_l1": "descriptions", "desc_l1b": "secondary descriptions", "description_module": "module descriptions",
+    "cod_fives": "FIVES codes", "drawing": "drawings", "sheet": "sheets", "ts_ref": "TS refs",
+}
+
+
+def _flabel(field: str) -> str:
+    return _FIELD_LABELS.get(field, field.replace("_", " "))
+
 
 def _decompose(addr) -> tuple | None:
     """A PLC address -> (prefix, [coords]) or None. Handles both Siemens-compact `I922.0` (coords
@@ -272,24 +289,25 @@ def _iolist_section(iol: dict) -> str:
     nat = iol.get("by_nature", {"address": 0, "completion": 0, "other": 0})
     nat_rows = sorted([("I/O address re-map", nat["address"], _C["critical"]),
                        ("Completion (blank → filled)", nat["completion"], _C["completion"]),
-                       ("Value correction / rename", nat["other"], _C["major"])],
+                       ("Value change / rename", nat["other"], _C["major"])],
                       key=lambda r: -r[1])                  # most-impacted first
-    gf, vc = iol["by_direction"]["gap-fill"], iol["by_direction"]["value-change"]
-    regr = len(iol.get("regressions", []))
-    if gf >= 2 * max(vc, 1):
-        verdict = 'the prior revision was mostly <strong>INCOMPLETE</strong>, not wrong'
-    elif vc > gf:
-        verdict = 'the prior revision had mostly <strong>WRONG values</strong> corrected, not just gaps'
-    else:
-        verdict = 'the prior revision mixed filled gaps and corrected values'
-    regr_html = (f'<strong style="color:{_C["regression"]}">{regr} regressions</strong>' if regr
-                 else f'{regr} regressions')
-    updates = f'{gf} blank cells filled, {vc} values corrected, {regr_html}'    # all updates, comma-separated
+    # Neutral, factual list of WHAT WAS CHANGED, by field, comma-separated, only the >0 types, most first.
+    bf = iol.get("by_field", {})
+    addr_used = sum(bf.get(f, 0) for f in _ADDR_FIELDS)
+    addr_total = addr_used + iol.get("comp_addr", 0)
+    items = []
+    if addr_total:
+        items.append(f'{addr_total} I/O addresses ({addr_used} in used rows)')
+    for field, n in sorted(bf.items(), key=lambda kv: -kv[1]):
+        if field in _ADDR_FIELDS or not n:
+            continue
+        items.append(f'{n} {esc(_flabel(field))}')
+    changed_list = ", ".join(items) or "no field changes"
     sev_panel = (f'<div class="panel"><h3>Nature of the {changed} reworked rows '
                  f'<span class="hint">each row by its costliest change — the cost axis the bar above doesn\'t '
                  f'show</span></h3>{_nature_bars(nat_rows)}'
                  f'<p style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);font-size:13px">'
-                 f'<strong>Verdict:</strong> {verdict} · {updates}.</p></div>')
+                 f'<strong>What was changed:</strong> {changed_list}.</p></div>')
     up_blocks = []
     for u in sorted(iol["upgrades"], key=lambda u: -u["count"]):
         drows = [[esc(r["desc"]), _mu(r["fld"]), (f'<code>{esc(r["address"])}</code>' if r["address"] else "")]
@@ -362,8 +380,8 @@ def _iolist_section(iol: dict) -> str:
   {more}
   <p class="hint" style="margin-top:6px"><span class="badge" style="--bc:{_C["neutral"]}">⚠ channel mapping unverified</span> = a multichannel device whose channels were re-addressed/re-pinned, so the edits are shown but not which specific channel got which.</p>
   {noise_section}
-  {comp_section}
   {up_section}
+  {comp_section}
 </section>'''
 
 
