@@ -473,6 +473,7 @@ _STYLE = """
 h1{font-size:22px;font-weight:600;margin:0 0 2px}h2{font-size:18px;font-weight:600;margin:34px 0 14px;border-bottom:1px solid var(--bd);padding-bottom:6px}
 h3{font-size:14px;font-weight:600;margin:18px 0 8px}.sub,.hint{font-weight:400;color:var(--mut);font-size:13px}
 .meta{color:var(--mut);font-size:13px;margin-bottom:6px}
+.intro{max-width:78ch;margin:10px 0 6px;font-size:14px;line-height:1.6}
 .cards{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
 .card{flex:1;min-width:130px;background:var(--card);border-radius:10px;padding:11px 14px}
 .card-l{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px}.card-v{font-size:24px;font-weight:600;margin-top:2px}
@@ -507,7 +508,8 @@ def render_html(result: dict) -> str:
 <title>I/O documents quality report — {esc(meta["project_code"])}</title>
 <style>{_STYLE}</style></head><body>
 <h1>Before vs after — document quality report</h1>
-<div class="meta">Project {esc(meta["project_code"]) or "—"} · generated {esc(meta["generated"])} · a "what went wrong" review (not part of the pipeline)</div>
+<div class="meta">Project {esc(meta["project_code"]) or "—"} · generated {esc(meta["generated"])} · a "what went wrong" review</div>
+<p class="intro">This report compares the previous revision of the project's hand-authored documents — the I/O List and the Cause &amp; Effect Matrix — against the current revision, classifying every change between them. Its purpose is to make the quality of the human work visible: where the earlier revision was wrong or left incomplete, how costly each correction is to apply once the machine is built (a re-addressing is the most expensive), and which changes affect the safety logic — so the documents and the engineering workflow can be improved. It is a read-only review aid: it never modifies the documents and is not a step in the build pipeline.</p>
 {_iolist_section(result["iolist"])}
 {_cematrix_section(result["cematrix"])}
 {_area_section(result["area"])}
