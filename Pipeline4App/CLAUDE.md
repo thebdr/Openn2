@@ -557,10 +557,13 @@ text is ported verbatim into each finding's `detail`.
 
 ## Phase 100b — Before/After Quality Report — DONE (PL4-native, standalone; see `CHANGES_SPEC.md`)
 `domain/changes/` (reader · match · classify · report · run). A **standalone, non-pipeline** analysis under
-ph100: compares a PRIOR document revision (`*_previous_path`) against the CURRENT one (I/O List + C&E Matrix
-+ AREA) and classifies every row **intact / corrected / upgrade / removed** to expose HUMAN document-quality
-problems (a "what went wrong" review). Never touches the SSOT/BuilderData, never gates/halts, not in
-`run_order`; writes a graphical HTML dashboard + a CSV audit trail to `ProjectDocumentation/Reports/`.
+ph100: compares the PRIOR revision (`*_previous_path`) of the project's documents (I/O List + C&E Matrix +
+AREA) with the CURRENT one and **summarizes the EFFORT that brought the project to its current state**
+(completions, corrections, address re-mapping, safety-logic changes; costliest-first) - a NEUTRAL measure,
+not a blame / right-wrong verdict. The report is **viewer-facing**: no references to the pipeline, the
+producing software, or internal field keys / coined acronyms (readable labels + bare reference
+designations). Never touches the SSOT/BuilderData, never gates/halts, not in `run_order`; writes a graphical
+HTML dashboard + a CSV audit trail to `ProjectDocumentation/Reports/`. **Full current design in `CHANGES_SPEC.md`.**
 - **The design (evidence-derived from the real 8FVX R0.0→R1.2 pair):** address (`bit`) is the MOST
   important parameter - a re-addressing is the costliest correction to apply on a built machine (re-read
   manuals, re-test, propagate to many devices). So structural / re-scheme changes (address, slot, pin,
@@ -573,24 +576,27 @@ problems (a "what went wrong" review). Never touches the SSOT/BuilderData, never
   no-blank→named guard). Address/slot/pin are NEVER identity keys. **Validated: 883/883 old rows matched, 0
   false buckets.** Leftovers force-match within a node (so removed≈0 by design). C&E matches by CONCATENATE
   ID; AREA matches by line+desc across pooled sheets (a row can MOVE sheet → `moved`).
-- **Classification (`classify.py`)** — STRUCTURAL fields (`_GROUP_BY_NODE` = bit/slot/pin/connector, + a
-  bulk device-tag rename) are GROUPED BY NODE into `grouped_changes`/`structural` and COUNTED at the field
-  weight; the report leads with them (e.g. "I/O address re-map: 310 rows / 20 nodes [critical]"). Other
-  (semantic) fields are itemized per row. Every changed row is bucketed ONCE by its max-tier change (so an
-  address-only row reads critical). Each itemized diff is **direction-tagged** (gap-fill / value-change /
-  value-loss); a value-loss on critical/major = a **regression** tag (ONE bucket). Tiers come from
-  `change_weights.csv` (hand-tunable, clamped). Channel-uncertain (T2pos) itemized corrections **aggregate**
-  to one block-level change. Node-aware **upgrade** (contiguous ≥4-row new block) vs forgotten signal. C&E:
-  address changes COUNTED (grouped summary, critical); a lost effect = critical regression; a new effect
-  column rolled out = upgrade. AREA read **with formulas**
-  (`data_only=False` — cells are `=...` strings; a cached read fabricates phantom deletions) → per-area
-  counts + moved-sheet count + a reorganization flag.
+- **Non-defect categories (kept OUT of the counts):** a NO-DESCRIPTION row = an unused channel - unchanged
+  → `unused` (grey), changed → `complementary` review (a re-addressed free slot, shown LAST, faded).
+  FunctionalUnit+Location-Device **noise** (punctuation / ≤1-alphanumeric-char identity change, `_fld_noise`
+  = alnum-strip Levenshtein ≤1) split PER DIFF into a listing-only Noise category (counts unchanged).
+  **Struck-through rows** counted + flagged (formatting to avoid).
+- **Classification (`classify.py`)** — STRUCTURAL fields (`_GROUP_BY_NODE` = bit/slot/pin/connector + a bulk
+  device-tag rename) GROUPED BY NODE (`grouped_changes`/`structural`), COUNTED at the field weight; report
+  leads with them. Per described changed row: `by_tier` (once, max tier), `by_nature` (once, costliest:
+  address > completion[all gap-fills] > other), `by_field` (per-field inventory = the neutral "what was
+  changed" list) + `comp_addr`. Itemized diffs direction-tagged (gap-fill/value-change/value-loss; a crit/maj
+  value-loss = regression). Tiers from `change_weights.csv` (critical/major/minor/exclude). Channel-uncertain
+  blocks aggregate + flag. Node-aware **upgrade** (contiguous ≥4) vs forgotten. C&E: address counted (crit);
+  lost effect = crit regression; new effect column = upgrade (orange). **AREA = device-centric MEMBERSHIP**:
+  group by device, compare its SET of areas old→new → extended (areas added = the safety logic grew) / moved
+  / reduced. Read **with formulas** (`data_only=False` - cached reads fabricate phantom deletions).
 - **Output** — `io_documents_quality_report.{html,csv}`; self-contained light/dark HTML (every value
   HTML-escaped); first-issue mode (missing/identical prior → "no prior revision" notice).
 - **Config/GUI** — `config_project/input_docs/change_weights.csv` + `config.load_change_weights()` /
   `changes_report_dir()` / `CHANGES_REPORT_STEM`. The `preliminary_check_exclude` (pipeline-owned AA–AH)
   columns are NOT compared. GUI phase-100 sub-button **145** `pb_change_report` (PL4-native, EN/IT) →
-  `_run_change_report` (opens the HTML). Tests: `test_changes.py` (11, hermetic).
+  `_run_change_report` (opens the HTML). Tests: `test_changes.py` (27, hermetic).
 
 ## GUI — runnable operator window (`gui/` + `launch_gui.py`) — GUI PORT IN PROGRESS (M0–M6 + STEP 1 i18n + STEP 2 + STEP 3 DONE; see `GUI_PLAN.md`)
 **STEP 3 DONE (M5 Files + M6 Project Manager + M0b chrome remainder).**

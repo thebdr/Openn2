@@ -1,92 +1,122 @@
 # ph100 Before/After Document-Quality Report — Spec
 
-A **standalone, non-pipeline** analysis wrapped under phase 100 (Documents Validation). It compares a
-PRIOR document revision against the CURRENT one (the I/O List + C&E Matrix + AREA sheets) and classifies
-every row **intact / corrected / upgrade / removed** to expose **human document-quality** problems — a
-"what went wrong" review that helps spot workflow/skill weaknesses. It NEVER touches the SSOT or the
-BuilderData, never gates/halts, and is not in `run_order`. It only reads two workbook revisions and
-writes a graphical HTML dashboard + a CSV audit trail under `ProjectDocumentation/Reports/`.
+A **standalone, non-pipeline** analysis wrapped under phase 100. It compares the PRIOR revision of the
+project's documents (the I/O List + C&E Matrix + AREA sheets) with the CURRENT one and **summarizes the
+effort that went into bringing the project to its current state** — completions, corrections, address
+re-mapping, and changes to the safety logic, with the items costliest to apply on a built machine
+highlighted first. It is **not** a blame tool (it does not judge who produced what) and **not** a
+right/wrong verdict; it is a neutral measure of the work done. It NEVER touches the SSOT or the
+BuilderData, never gates/halts, is not in `run_order`, and reads only the two workbook revisions → a
+self-contained HTML dashboard + a CSV audit trail under `ProjectDocumentation/Reports/`.
 
-## The central principle
-Address (`bit`) is the single most important parameter — a re-addressing is the costliest correction to
-apply on a built machine (re-read manuals, re-test, propagate to many devices; caught late = far worse).
-So **structural / re-scheme changes (address, slot, pin, device-tag) are GROUPED BY NODE and COUNTED at
-the field's weight — never hidden.** The bulk in the real 8FVX R0.0→R1.2 pair (a 310-row address re-map,
-a re-slot, a re-pin) is detected as a *coordinated* re-map and shown as one-line CONTEXT, but every changed
-row still counts — grouping by node only tames the per-row noise. (An earlier version wrongly netted these
-out of the defect count; corrected per the user's feedback.) Other field changes are itemized per row.
+The report is **viewer-facing**: no references to the pipeline, the producing software, or internal field
+keys / coined acronyms. Field keys render as readable labels; the device identity renders as a bare
+reference designation (`=S1+DL1.CC1`), never the internal pipe-joined `=S1|+DL1.CC1|`.
+
+## Central principle — cost, not blame
+Address (`bit`) is the costliest parameter to change on a built machine (re-read manuals, re-test,
+propagate to many devices; caught late = far worse). So **structural / re-scheme changes (address, slot,
+pin, device-tag) are GROUPED BY NODE and COUNTED at the field's weight — never hidden.** A coordinated bulk
+re-map is detected and shown as one-line CONTEXT, but every changed row still counts — grouping by node
+only tames the per-row noise. Everything sorts most-impacted-first.
+
+## What is and isn't a defect (the non-defect categories)
+The analysis separates real signal changes from things that are not defects:
+- **Unused channels** = rows with NO description (nothing wired). Kept OUT of the defect counts: unchanged
+  → **unused** (light grey); changed → **complementary review** (mid grey, shown LAST, faded). A
+  re-addressed free slot is not a defect today, but if a signal is wired into it later a wrong address would
+  reproduce the original class of mistake — so it is tracked.
+- **Noise** = a change to the device-identity fields (FunctionalUnit+Location-Device) that is only
+  punctuation or AT MOST ONE alphanumeric character (a stray text-guard apostrophe, a `--K`→`-K`, a one-char
+  typo/renumber). Split PER DIFF into a listing-only **Noise** category; the severity counts are unchanged.
+  `_fld_noise` = alphanumeric-stripped Levenshtein ≤ 1; `_lev_le1` the cheap ≤1 check. (Operator's rule —
+  applied to the I/O List FLD fields and the AREA `device_tag`; C&E has no itemized identity field.)
+- **Struck-through rows** = rows carrying a struck-through cell (any text-bearing cell, via the workbook
+  view's `cell_struck`). Counted (just a count) and flagged as a formatting practice to avoid — strike-through
+  carries no reliable meaning. Shown in the Noise section with a live strike-through demo.
 
 ## User decisions (locked)
 - **Matching**: derived empirically from the real corrective-action pair (no single field is stable).
-- **New rows**: node-aware split — a whole new node/block = **upgrade**; an isolated new row = correction.
-- **Weights**: a `change_weights.csv`, 3 tiers (critical/major/minor), shipped default + per-project tunable.
+- **New rows**: node-aware split — a whole new block = **upgrade**; an isolated new row = forgotten signal.
+- **Weights**: a `change_weights.csv`, 4 tiers (critical/major/minor/exclude), shipped default + per-project tunable.
 - **Scope**: I/O List **and** C&E Matrix (+ AREA sheets).
 - **Excluded columns**: the `preliminary_check_exclude` (pipeline-owned AA–AH) columns are not compared.
-- **Re-schemes** (address/slot/pin/device): **grouped by node and COUNTED** at the field's weight (never
-  hidden) — a re-addressing is the costliest fix on a built machine. The coordinated pattern is shown as context.
-- **Direction**: corrections are ONE bucket, each tagged `gap-fill` / `value-change` / `value-loss`;
-  value-losses surface as a sub-count (a tag), not a separate category.
+- **Re-schemes** (address/slot/pin/device): grouped by node and COUNTED (never hidden).
+- **Direction**: corrections are ONE bucket, each tagged `gap-fill` / `value-change` / `value-loss`.
 - **Channel doubt**: ambiguous multichannel blocks collapse to one block-level change.
+- **No opinions**: the summary states *what changed*, by field — not whether it was right or wrong.
 
 ## Matching cascade (node-scoped, address-blind, deterministic) — `match.py`
-Validated: 883/883 old rows matched, 0 false buckets, on the real pair.
+Validated: 883/883 old rows matched, 0 false buckets, on the real 8FVX pair.
 - **normalize** — strip a leading text-guard apostrophe, collapse whitespace, uppercase.
 - **partition** — carry `profinet_name` down to form node blocks (the stable structure).
 - keys: `fld` = functional_unit|location|device; `desc` = desc_l1|desc_l1b; `cp` = connector|pin_no.
   Address/slot/pin are NEVER identity keys (they are exactly what gets re-schemed).
 - **T1** exact fld+desc unique → **T2** dup-group (multichannel) by connector+pin then position →
-  **T3** within-node connector+pin (recovers device-tag renames) → **T4** within-node fuzzy desc/fld
-  (rename safety-net) → **T5** within-node positional spacer fill (hard guard: never pair blank→named).
+  **T3** within-node connector+pin (recovers device-tag renames) → **T4** within-node fuzzy desc/fld →
+  **T5** within-node positional spacer fill (hard guard: never pair blank→named).
 - Unmatched non-blank old = **removed**; unmatched new = **added**. (Leftovers force-match within a node,
-  so removed≈0 unless a node has only an old-side leftover — by design.)
-- Confidence per pair: T1/T2cp/T3 = high; T2pos = channel-uncertain; T4 = fuzzy; T5pos = positional.
-- C&E cause rows match by **CONCATENATE ID**; AREA rows match by line+description across the pooled
-  sheets (areas get reorganized, so a row can move sheet — `moved` is flagged).
+  so removed≈0 by design.) Confidence per pair: T1/T2cp/T3 = high; T2pos = channel-uncertain; T4 = fuzzy.
+- C&E cause rows match by **CONCATENATE ID**; AREA rows match by line+description across the pooled sheets.
 
 ## Classification — `classify.py`
-- **Structural / re-scheme fields** (`_GROUP_BY_NODE` = bit/slot/pin/connector, + a bulk device-tag rename
-  when `__rename__` fires) are **grouped by node** into `grouped_changes` (per node+field) + `structural`
-  (per-field rollup: address X rows / Y nodes), COUNTED at the field's weight. The report leads with them.
-- **Other (semantic) fields** are itemized per row (`corrections`). Every changed row is bucketed ONCE in
-  `by_tier` by its highest-tier change — so an address-only row reads **critical**. `changed = matched −
-  intact`. Each itemized diff is direction-tagged; a value-loss on critical/major = a **regression** tag.
-- **Coordinated-re-map detection** (`detect_address_event` byte-bijection / `detect_value_event`
-  low-cardinality) is kept ONLY as `systematic_events` context (a "looks like a re-base" one-liner) + to
-  set the bulk-rename flag — it never hides a row.
-- **Channel-uncertain** corrections aggregate to one block-level change per (node, fld).
-- **Upgrade** (added rows): a contiguous block of ≥4 in a node = upgrade; an isolated row = forgotten
-  signal; a 2–3 row cluster = flagged for review.
-- **C&E effects**: a lost effect (X→blank in an existing area) = critical regression; a whole new effect
-  column rolled across rows = upgrade roll-out. A coherent contiguous added cause block = upgrade.
-- **AREA**: per-area row counts, how many rows moved sheet, device-tag/address/line corrections, and a
-  structural-reorganization flag. Read **with formulas** (`data_only=False`) — the cells are `=...`
-  strings; a cached read fabricates phantom deletions.
+- No-description rows leave the defect flow (→ `unused` / `complementary_entries` → `complementary_blocks`).
+- **Structural / re-scheme fields** (`_GROUP_BY_NODE` = bit/slot/pin/connector, + a bulk device-tag rename)
+  grouped by node into `grouped_changes` + `structural` (per-field rollup), COUNTED at the field's weight.
+- **`by_tier`** — every described changed row bucketed ONCE by its highest tier (critical/major/minor).
+- **`by_nature`** — every described changed row bucketed ONCE by its COSTLIEST change: I/O address re-map >
+  completion (all changes are blank→filled gap-fills) > other (value change / rename / re-scheme).
+- **`by_field`** — per-field count of described changed rows (the neutral "what was changed" inventory);
+  `comp_addr` = the count of unused-channel rows whose change includes an address.
+- **`struck_rows`** — current-revision rows with a struck-through cell.
+- **FunctionalUnit+Location-Device noise** diffs split out PER DIFF (a row may keep a real correction AND
+  contribute a noise diff); `noise_blocks` grouped by node. Counts unchanged.
+- **Corrections** (non-structural, non-noise) itemized + grouped by node, direction-tagged; a value-loss on
+  critical/major = a **regression** tag; channel-uncertain blocks aggregate + carry a flag.
+- **Upgrade** (added rows): contiguous ≥4 in a node = upgrade; isolated = forgotten; 2–3 = review.
+- **C&E**: address changes counted (critical); a lost effect (X→blank) = critical regression; a whole new
+  effect column rolled across rows = upgrade roll-out; a coherent contiguous added cause block = upgrade.
+- **AREA — device-centric membership**: group rows by device (normalized `device_tag`) and compare the SET
+  of AREA sheets it belongs to, old vs new → `membership` (+ `membership_summary`): **extended** (areas
+  added, none removed = the safety logic grew, the original design did not cover that zone) / **moved** /
+  **reduced**. Read **with formulas** (`data_only=False`) — the cells are `=...` strings; a cached read
+  fabricates phantom deletions. Device-tag noise split out as for the I/O List.
 
 ## Output — `report.py` + `run.py`
-- `io_documents_quality_report.html` — a self-contained, light/dark-aware, print-friendly dashboard
-  (KPI cards, composition bar, systematic-events panel, corrections-by-tier/direction, tables of
-  corrections / upgrades / regressions / removals). No dependency; every data value HTML-escaped.
-- `io_documents_quality_report.csv` — the per-correction audit trail.
-- **First-issue mode**: a missing/identical prior revision degrades to a "no prior revision" notice.
+Self-contained, light/dark-aware HTML; every value HTML-escaped. Effort-framed intro (no pipeline/software
+reference). Readable field labels (singular, `_FIELD_LABELS`); reference designations via `_designation`
+(drops the `|` separators). First-issue mode: a missing/identical prior revision degrades to a notice.
+- **I/O List** section order: KPI cards → **composition bar** (the new revision's rows, by highest-severity:
+  unused · complementary · intact · critical · major · minor · added) → **"What was changed"** (a thin
+  stacked bar by correction TYPE / by field, sequential decorative colours, summing to the field-change total
+  in used rows, + a per-field legend) → **Structural changes — grouped by node** (+ address callout +
+  by-node old→new) → **Corrections — by node** (direction-tagged; channel-uncertain flag) → **Noise —
+  FunctionalUnit+Location-Device cleanup** (punctuation/1-char identity changes + the struck-through-rows
+  count, with a live strike-through demo) → **Upgrades and Retrofits** (orange) → **Complementary reviews**
+  (LAST, faded).
+- **C&E** section: cards → I/O address changes (counted, critical) → **New effect column** (upgrade, orange
+  badge) → Effects removed (safety-critical) → Cause-row corrections.
+- **AREA** section: **Area membership — from → to** (device-centric; added areas orange, removed red, most
+  growth first; banner counts the extensions) → Per-area row counts → AREA corrections → Noise (device-tag).
+- **CSV** audit trail: structural changes + itemized corrections + AREA membership changes + AREA noise.
 
 ## Config / GUI
 - `config_project/input_docs/change_weights.csv` — {document, field, tier}; `config.load_change_weights()`.
 - `config.changes_report_dir()` + `config.CHANGES_REPORT_STEM`.
 - Reads `iolist_path`/`iolist_previous_path` + `matrix_path`/`matrix_previous_path` from `project_params.yaml`.
-- GUI: phase-100 sub-button **145** `pb_change_report` (PL4-native, EN/IT) → `_run_change_report`
-  (opens the HTML when done). Never halts.
+- GUI: phase-100 sub-button **145** `pb_change_report` (PL4-native, EN/IT) → `_run_change_report` (opens the
+  HTML when done). Never halts.
 
-## Expected breakdown (8FVX R0.0→R1.2, the validation pair; tiers per the current change_weights.csv)
-- **I/O List**: 883 matched, 514 intact, 369 changed (by_tier critical 338 / major 13 / minor 18).
-  Structural (grouped by node, COUNTED): **I/O address re-map 310 rows / 20 nodes [critical]**, module
-  re-slot 72 / 3 [critical], connector re-pin 51 / 3 [major]. Itemized corrections 41, channel-uncertain
-  blocks 3, +32 upgrade rows (UL1/UL2 telescopic-belt feedback), 0 removed.
-- **C&E**: 101 matched, **93 address changes [critical]** (counted), 0 other isolated corrections, AREA-2
-  effect roll-out (97 rows = upgrade), +26 contiguous cause rows (upgrade block), 0 effects deleted, 0 removed.
-- **AREA**: a real reorganization — AREA-1 43→4, AREA-2 0→37, 37 rows moved sheet, 2 removed (NOT a
-  cache artifact; surfaced, not suppressed).
+## Expected breakdown (current)
+- **8FVX R0.0→R1.2** (the I/O List validation pair): 883 matched; **172 intact, 382 changed, 185 unused,
+  144 complementary**. *What was changed* (used rows): 238 I/O addresses (+72 on unused channels), 182 normal
+  conditions, 60 slots, 45 pins, 13 hardware types, 13 TS refs, … ; **102 struck-through rows**. C&E: a new
+  effect-column roll-out (upgrade) + a coherent added cause block.
+- **8FSN R9.3→R14.8** (the C&E/AREA pair): **46 devices changed AREA membership — 15 extended, 31 moved,
+  0 reduced** (e.g. a safety relay AREA 6 → AREA 1, AREA 3, AREA 6); 0 struck rows.
 
-## Tests — `tests/unit/test_changes.py` (16, hermetic)
-norm/keys, node carry-down, the cascade (incl. force-match), address-event (prefix-flip stays genuine),
-value-event (low-card vs high-card), systematic netting, direction+regression, node-aware upgrade,
-channel-block aggregation, HTML render smoke, first-issue mode.
+## Tests — `tests/unit/test_changes.py` (27, hermetic)
+norm/keys, node carry-down, the cascade (incl. force-match), address/value events, systematic netting,
+direction+regression, node-aware upgrade, channel-block aggregation, `by_nature` partition, struck-rows
+count, FunctionalUnit+Location-Device noise predicate + per-diff split (I/O List + AREA), AREA membership
+(extended/moved/reduced, multi-area-not-moved, genuine-move), HTML render smoke, read-error degrade.
