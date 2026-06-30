@@ -39,13 +39,15 @@ def _bar(segments: list) -> str:
 
 
 def _hbars(rows: list, color: str) -> str:
-    """rows = [(label, count)] -> horizontal bars scaled to the max."""
-    top = max((n for _, n in rows), default=0) or 1
+    """rows = [(label, count)] -> horizontal bars whose fill is each value's SHARE OF THE GROUP TOTAL, so
+    the bar lengths read as real percentages (they add up to 100%). The count + % are shown."""
+    total = sum(n for _, n in rows) or 1
     out = []
     for label, n in rows:
+        pct = 100 * n / total
         out.append(f'<div class="hb"><span class="hb-l">{esc(label)}</span>'
-                   f'<span class="hb-t"><span class="hb-f" style="width:{100*n/top:.0f}%;background:{color}">'
-                   f'</span></span><span class="hb-n">{esc(n)}</span></div>')
+                   f'<span class="hb-t"><span class="hb-f" style="width:{pct:.0f}%;background:{color}">'
+                   f'</span></span><span class="hb-n">{esc(n)} · {pct:.0f}%</span></div>')
     return "".join(out)
 
 
@@ -246,9 +248,9 @@ def _iolist_section(iol: dict) -> str:
         ctx = (f'<p class="hint" style="margin:8px 0 0">These follow a coordinated re-map ({joined}) — '
                f'but each row is still a separate address to re-verify and apply on site, not a free pass.</p>')
 
-    sev_panel = (f'<div class="panel"><h3>Changed rows by severity</h3>'
+    sev_panel = (f'<div class="panel"><h3>Changed rows by severity <span class="hint">share of the {changed} changed rows</span></h3>'
                  f'{_hbars([("Critical", bt["critical"]), ("Major", bt["major"]), ("Minor", bt["minor"])], _C["corrected"])}'
-                 f'<h3 style="margin-top:14px">Itemized (non-structural) changes by direction</h3>'
+                 f'<h3 style="margin-top:14px">Field changes by direction <span class="hint">share of the field-edits — a row can change several fields</span></h3>'
                  f'{_hbars([("Gap-fill (old was blank)", iol["by_direction"]["gap-fill"]), ("Value change", iol["by_direction"]["value-change"]), ("Value loss (got worse)", iol["by_direction"]["value-loss"])], _C["major"])}</div>')
     up_blocks = []
     for u in sorted(iol["upgrades"], key=lambda u: -u["count"]):
@@ -383,7 +385,7 @@ h3{font-size:14px;font-weight:600;margin:18px 0 8px}.sub,.hint{font-weight:400;c
 .panel{background:var(--card);border-radius:10px;padding:12px 15px}.panel h3{margin-top:0}
 .hb{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--mut);margin:7px 0}
 .hb-l{flex:0 0 auto;max-width:62%}.hb-t{flex:1;height:12px;background:var(--bd);border-radius:4px;overflow:hidden}
-.hb-f{display:block;height:100%}.hb-n{flex:0 0 auto;width:34px;text-align:right;font-variant-numeric:tabular-nums}
+.hb-f{display:block;height:100%}.hb-n{flex:0 0 auto;width:72px;text-align:right;font-variant-numeric:tabular-nums}
 table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0}
 th{text-align:left;color:var(--mut);font-weight:500;border-bottom:1px solid var(--bd);padding:6px 9px}
 td{border-bottom:1px solid var(--bd);padding:6px 9px;vertical-align:top}
