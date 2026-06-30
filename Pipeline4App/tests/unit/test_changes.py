@@ -62,21 +62,25 @@ def test_value_event():
     eq(classify.detect_value_event(high), None, "high-cardinality changes are not a re-map")
 
 
-def test_classify_systematic_netting():
-    # 10 rows whose ONLY change is a byte re-address (systematic) + 1 genuine type gap-fill.
+def test_address_grouped_not_hidden():
+    # 10 rows whose ONLY change is a byte re-address + 1 type gap-fill. Address must be COUNTED + grouped
+    # by node (NOT hidden), because a re-addressing is the costliest correction to apply on the machine.
     pairs = []
     for i in range(10):
-        o = _row(10 + i, profinet_name="N1", device=f"-K1{i}", desc_l1="RELAY", bit=f"I100.{i}")
-        n = _row(10 + i, profinet_name="N1", device=f"-K1{i}", desc_l1="RELAY", bit=f"I200.{i}")
+        o = _row(10 + i, _node="N1", device=f"-K1{i}", desc_l1="RELAY", bit=f"I100.{i}")
+        n = _row(10 + i, _node="N1", device=f"-K1{i}", desc_l1="RELAY", bit=f"I200.{i}")
         pairs.append({"old": o, "new": n, "tier": "T1", "confidence": "high"})
-    g_o = _row(40, device="-K20", desc_l1="RELAY2", type_hw="")
-    g_n = _row(40, device="-K20", desc_l1="RELAY2", type_hw="A")
-    pairs.append({"old": g_o, "new": g_n, "tier": "T1", "confidence": "high"})
+    pairs.append({"old": _row(40, _node="N1", device="-K20", desc_l1="RELAY2", type_hw=""),
+                  "new": _row(40, _node="N1", device="-K20", desc_l1="RELAY2", type_hw="A"),
+                  "tier": "T1", "confidence": "high"})
     res = classify.classify_iolist({"pairs": pairs, "removed": [], "added": []}, WEIGHTS)
-    eq(res["systematic_rows"], 10, "the 10 address-only rows are netted out, not counted as defects")
-    eq(res["correction_count"], 1, "only the genuine type gap-fill counts")
+    eq(res["structural_rows"], 10, "the 10 address changes are COUNTED (not hidden)")
+    grp = [g for g in res["grouped_changes"] if g["field"] == "bit"]
+    eq(len(grp), 1, "grouped into one (node, address) entry")
+    eq((grp[0]["node"], grp[0]["count"], grp[0]["tier"]), ("N1", 10, "critical"), "node N1, 10 rows, critical")
+    eq(res["by_tier"]["critical"], 11, "all 11 changed rows read critical (10 address + 1 type)")
+    eq(res["correction_count"], 1, "the type gap-fill is itemized; address rows are grouped, not itemized")
     eq(res["corrections"][0]["directions"], ["gap-fill"], "blank->value = gap-fill")
-    ok(any(e["field"] == "bit" for e in res["systematic_events"]), "the address re-map is an event")
 
 
 def test_direction_and_regression():
@@ -103,9 +107,9 @@ def test_channel_block_aggregation():
     pairs = []
     for i in range(3):                                          # 3 channels of one device, attribution uncertain
         o = _row(10 + i, profinet_name="N1", functional_unit="=S1", location="+A", device="-K1",
-                 desc_l1="MOTOR", slot=f"-K5{i}")
+                 desc_l1="MOTOR", desc_l1b=str(i))             # an itemized (semantic) change, not structural
         n = _row(10 + i, profinet_name="N1", functional_unit="=S1", location="+A", device="-K1",
-                 desc_l1="MOTOR", slot=f"-K6{i}")
+                 desc_l1="PUMP", desc_l1b=str(i))
         pairs.append({"old": o, "new": n, "tier": "T2pos", "confidence": "channel-uncertain"})
     res = classify.classify_iolist({"pairs": pairs, "removed": [], "added": []}, WEIGHTS)
     eq(res["correction_count"], 0, "channel-uncertain rows are not per-row corrections")
@@ -157,8 +161,8 @@ def test_subthreshold_rename_is_genuine():
     res = classify.classify_iolist(
         {"pairs": [{"old": o, "new": n, "tier": "T3", "confidence": "high"}], "removed": [], "added": []},
         {**WEIGHTS, "device": "critical"})
-    eq(res["systematic_rows"], 0, "one rename is NOT a systematic event")
-    eq(res["correction_count"], 1, "the single device-tag fix is surfaced, not silently netted out")
+    eq(res["structural_rows"], 0, "one sub-threshold rename is NOT bulk-grouped")
+    eq(res["correction_count"], 1, "the single device-tag fix is surfaced as an itemized correction")
     eq(res["corrections"][0]["diffs"][0]["field"], "device")
 
 
@@ -167,8 +171,8 @@ def test_unknown_tier_does_not_crash():
     n = _row(1, device="-K1", desc_l1="X", slot="B")
     res = classify.classify_iolist({"pairs": [{"old": o, "new": n, "tier": "T1", "confidence": "high"}],
                                     "removed": [], "added": []}, {"slot": "bogus-tier"})
-    eq(res["correction_count"], 1, "a hand-edited unknown tier is clamped, not a KeyError")
-    eq(sum(res["by_tier"].values()), 1, "the correction still lands in a bucket (minor)")
+    eq(res["structural_rows"], 1, "the slot change is grouped + counted, not a KeyError")
+    eq(sum(res["by_tier"].values()), 1, "a hand-edited unknown tier is clamped into a bucket (minor)")
 
 
 def test_empty_read_not_green():
@@ -202,7 +206,7 @@ TESTS = [
     ("match_iolist_basic", test_match_iolist_basic),
     ("address_event", test_address_event),
     ("value_event", test_value_event),
-    ("classify_systematic_netting", test_classify_systematic_netting),
+    ("address_grouped_not_hidden", test_address_grouped_not_hidden),
     ("direction_and_regression", test_direction_and_regression),
     ("upgrade_node_aware", test_upgrade_node_aware),
     ("channel_block_aggregation", test_channel_block_aggregation),

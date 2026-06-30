@@ -117,6 +117,10 @@ def detect_value_event(changes: list) -> dict | None:
 _ADDR_FIELDS = {"bit", "address", "digital_output"}
 _RESCHEME_FIELDS = {"slot", "pin_no", "connector"}
 _RENAME_FIELDS = {"device", "functional_unit", "location"}
+# Structural fields whose changes are GROUPED BY NODE and COUNTED (never hidden) - a re-addressing /
+# re-slot / re-pin is the costliest correction to apply on a built machine, so it is surfaced; grouping
+# by node only tames the per-row noise. A bulk device-tag rename also groups (handled via __rename__).
+_GROUP_BY_NODE = _ADDR_FIELDS | _RESCHEME_FIELDS
 
 
 def _detect_systematic(pairs: list, fields: list, weights: dict) -> dict:
@@ -158,82 +162,105 @@ def _is_rename_pair(pair: dict, field: str) -> bool:
 
 
 def classify_iolist(match_result: dict, weights: dict) -> dict:
-    """Classify the I/O List pairs + added/removed into the quality picture."""
+    """Classify the I/O List pairs + added/removed into the quality picture.
+
+    STRUCTURAL / re-scheme fields (I/O address `bit`, slot, pin, connector, + a bulk device-tag rename)
+    are GROUPED BY NODE and COUNTED at the field's weight - never hidden. A re-addressing is the costliest
+    correction to apply on a built machine (re-read manuals, re-test, propagate to many devices), so it is
+    surfaced; grouping by node only tames the per-row noise. Other (semantic) field changes are itemized
+    per row. Every changed row is bucketed ONCE by its highest-tier change (so an address-only row reads
+    critical). The coordinated-re-map detection survives only as context, never as a reason to hide."""
     pairs = match_result["pairs"]
     sample = pairs[0]["old"] if pairs else {}
     fields = _live_fields(weights, sample)
-    events = _detect_systematic(pairs, fields, weights)
+    events = _detect_systematic(pairs, fields, weights)   # coordinated-re-map context + the bulk-rename flag
+    bulk_rename = bool(events.get("__rename__"))
 
-    intact = 0
-    corrections: list = []          # high-confidence genuine corrections
-    uncertain: list = []            # channel-uncertain genuine corrections (aggregated later)
-    systematic_only = 0
+    intact = changed = 0
+    corrections: list = []
+    uncertain: list = []
     by_tier = {"critical": 0, "major": 0, "minor": 0}
     by_direction = {"gap-fill": 0, "value-change": 0, "value-loss": 0}
+    struct: dict = defaultdict(int)          # (node, field) -> changed-row count (structural / re-scheme)
+    struct_tier: dict = {}
+
+    def _grouped(field: str) -> bool:
+        return field in _GROUP_BY_NODE or (field in _RENAME_FIELDS and bulk_rename)
 
     for pair in pairs:
         old, new = pair["old"], pair["new"]
-        changed = [f for f in fields if norm(old.get(f)) != norm(new.get(f))]
-        if not changed:
+        node = old.get("_node", "")
+        changed_fields = [f for f in fields if norm(old.get(f)) != norm(new.get(f))]
+        if not changed_fields:
             intact += 1
             continue
-        genuine_fields = []
-        for f in changed:
-            ev = events.get(f)
-            # net out a change ONLY when a systematic event actually explains it: an address/value re-map
-            # member, OR a device-tag rename WHEN the bulk __rename__ event fired (>=_MIN_SYSTEMATIC). A
-            # sub-threshold T3 device/FU/location fix is a GENUINE correction, not silently dropped.
-            if (ev and ev["member"](old.get(f), new.get(f))) \
-                    or (events.get("__rename__") and _is_rename_pair(pair, f)):
-                continue
-            genuine_fields.append(f)
-        if not genuine_fields:
-            systematic_only += 1
-            continue
+        changed += 1
+        itemized = []
+        for f in changed_fields:
+            if _grouped(f):
+                struct[(node, f)] += 1
+                struct_tier[f] = _tier(weights, f)
+            else:
+                itemized.append(f)
+        # every changed row is bucketed ONCE, by the max tier across ALL its changes (grouped + itemized).
+        row_tier = max((_tier(weights, f) for f in changed_fields), key=lambda t: TIER_RANK.get(t, 1))
+        by_tier[_bucket(row_tier)] += 1
+        if not itemized:
+            continue                              # a structural-only row is counted in `struct` + by_tier
         diffs = [{"field": f, "old": old.get(f, ""), "new": new.get(f, ""),
                   "tier": _tier(weights, f), "direction": _direction(old.get(f), new.get(f))}
-                 for f in genuine_fields]
-        row_tier = max((d["tier"] for d in diffs), key=lambda t: TIER_RANK.get(t, 1))
-        directions = sorted({d["direction"] for d in diffs})
-        regression = any(d["direction"] == "value-loss" and d["tier"] in ("critical", "major") for d in diffs)
-        entry = {"node": old.get("_node", ""), "sheet": old.get("_sheet"),
-                 "row_old": old.get("_row"), "row_new": new.get("_row"),
-                 "fld": fld(old), "desc": desc(old).replace("|", " ").strip(),
-                 "diffs": diffs, "tier": row_tier, "directions": directions,
-                 "regression": regression, "confidence": pair["confidence"]}
-        if pair["confidence"] == "channel-uncertain":
-            uncertain.append(entry)
-            continue
-        corrections.append(entry)
-        by_tier[_bucket(row_tier)] += 1
+                 for f in itemized]
         for d in diffs:
             by_direction[d["direction"]] += 1
+        item_tier = max((d["tier"] for d in diffs), key=lambda t: TIER_RANK.get(t, 1))
+        regression = any(d["direction"] == "value-loss" and d["tier"] in ("critical", "major") for d in diffs)
+        entry = {"node": node, "sheet": old.get("_sheet"), "row_old": old.get("_row"),
+                 "row_new": new.get("_row"), "fld": fld(old), "desc": desc(old).replace("|", " ").strip(),
+                 "diffs": diffs, "tier": item_tier, "directions": sorted({d["direction"] for d in diffs}),
+                 "regression": regression, "confidence": pair["confidence"]}
+        (uncertain if pair["confidence"] == "channel-uncertain" else corrections).append(entry)
 
-    # channel-uncertain corrections -> aggregate to one block-level change per (node, fld).
-    channel_blocks: list = []
-    grouped = defaultdict(list)
-    for e in uncertain:
-        grouped[(e["node"], e["fld"])].append(e)
-    for (node, fld_key), members in grouped.items():
-        tier = max((m["tier"] for m in members), key=lambda t: TIER_RANK.get(t, 1))
-        channel_blocks.append({"node": node, "fld": fld_key, "channels": len(members), "tier": tier,
-                               "desc": members[0]["desc"], "confidence": "channel-uncertain"})
+    channel_blocks = _aggregate_channel(uncertain)
+    grouped_changes = [{"node": n, "field": f, "count": c, "tier": struct_tier[f],
+                        "label": _EVENT_LABELS.get(f, f)} for (n, f), c in struct.items()]
+    grouped_changes.sort(key=lambda g: (-TIER_RANK.get(g["tier"], 1), -g["count"]))
+    structural: dict = {}                        # per-field rollup: address X rows across Y nodes
+    for (n, f), c in struct.items():
+        s = structural.setdefault(f, {"field": f, "label": _EVENT_LABELS.get(f, f),
+                                      "tier": struct_tier[f], "rows": 0, "nodes": 0})
+        s["rows"] += c
+        s["nodes"] += 1
+    structural_list = sorted(structural.values(), key=lambda s: (-TIER_RANK.get(s["tier"], 1), -s["rows"]))
 
     upgrades, forgotten, review = _classify_added(match_result["added"])
-
     return {
-        "matched": len(pairs), "intact": intact,
+        "matched": len(pairs), "intact": intact, "changed": changed,
         "removed": [_row_brief(r) for r in match_result["removed"]],
         "corrections": corrections, "correction_count": len(corrections),
         "channel_blocks": channel_blocks,
         "by_tier": by_tier, "by_direction": by_direction,
         "regressions": [c for c in corrections if c["regression"]],
+        "grouped_changes": grouped_changes, "structural": structural_list,
+        "structural_rows": sum(struct.values()),
         "systematic_events": [_event_brief(e) for e in events.values()],
-        "systematic_rows": systematic_only,
         "upgrades": upgrades, "upgrade_rows": sum(u["count"] for u in upgrades),
         "forgotten": forgotten, "review_clusters": review,
         "added_total": len(match_result["added"]),
     }
+
+
+def _aggregate_channel(uncertain: list) -> list:
+    """Channel-uncertain ITEMIZED corrections -> one block-level change per (node, fld); the per-channel
+    attribution is not provable, so report the block, not each row."""
+    chan = defaultdict(list)
+    for e in uncertain:
+        chan[(e["node"], e["fld"])].append(e)
+    blocks = []
+    for (node, fld_key), members in chan.items():
+        tier = max((m["tier"] for m in members), key=lambda t: TIER_RANK.get(t, 1))
+        blocks.append({"node": node, "fld": fld_key, "channels": len(members), "tier": tier,
+                       "desc": members[0]["desc"], "confidence": "channel-uncertain"})
+    return blocks
 
 
 def _classify_added(added: list) -> tuple:
@@ -260,20 +287,21 @@ _CE_COMPARE = ["module", "address", "slot", "pin", "description", "type"]
 
 
 def classify_ce(match_result: dict, old_areas: list, new_areas: list, weights: dict) -> dict:
-    """Classify the C&E cause-row pairs. Address (c6) is netted as a systematic re-map; the EFFECT columns
-    are handled specially - a lost effect (X->blank in an existing area) is a CRITICAL regression, a new
-    effect column rolled across rows is an UPGRADE. Added cause rows that form a coherent contiguous block
-    are an upgrade, else corrections."""
+    """Classify the C&E cause-row pairs. Address (c6) changes are COUNTED (grouped into one critical
+    summary - never hidden), the other columns itemized per row. EFFECT columns are special - a lost
+    effect (X->blank in an existing area) is a CRITICAL regression, a new effect column rolled across rows
+    is an UPGRADE. Added cause rows that form a coherent contiguous block are an upgrade, else corrections."""
     pairs = match_result["pairs"]
-    events = {}
     addr_changes = [(p["old"].get("address"), p["new"].get("address")) for p in pairs
                     if norm(p["old"].get("address")) != norm(p["new"].get("address"))]
+    events = {}
     addr_event = detect_address_event(addr_changes)
     if addr_event:
         addr_event.update({"field": "address", "tier": "critical", "label": "C&E address re-map"})
-        events["address"] = addr_event
+        events["address"] = addr_event           # coordinated-re-map context only (never hides the rows)
 
-    intact = 0
+    intact = changed = addr_rows = 0
+    addr_tier = _tier(weights, "address")
     corrections: list = []
     by_tier = {"critical": 0, "major": 0, "minor": 0}
     by_direction = {"gap-fill": 0, "value-change": 0, "value-loss": 0}
@@ -283,45 +311,45 @@ def classify_ce(match_result: dict, old_areas: list, new_areas: list, weights: d
 
     for pair in pairs:
         old, new = pair["old"], pair["new"]
-        genuine = []
-        for f in _CE_COMPARE:
-            if norm(old.get(f)) == norm(new.get(f)):
-                continue
-            ev = events.get(f)
-            if ev and ev["member"](old.get(f), new.get(f)):
-                continue
-            genuine.append(f)
-        # effect-column semantics
         old_eff, new_eff = old.get("effects", {}), new.get("effects", {})
         for area in old_areas:
-            was, now = norm(old_eff.get(area)), norm(new_eff.get(area))
-            if was and not now:
+            if norm(old_eff.get(area)) and not norm(new_eff.get(area)):
                 effects_lost.append({"concat_id": old.get("concat_id"), "area": area,
                                      "desc": old.get("description"), "row": old.get("_row")})
         for area in new_area_cols:
             if norm(new_eff.get(area)) and not norm(old_eff.get(area)):
                 rollout_rows += 1
-        if not genuine:
+        addr_changed = norm(old.get("address")) != norm(new.get("address"))
+        if addr_changed:
+            addr_rows += 1                        # the C&E address is grouped + counted, not itemized
+        itemized = [f for f in _CE_COMPARE if f != "address" and norm(old.get(f)) != norm(new.get(f))]
+        if not addr_changed and not itemized:
             intact += 1
             continue
+        changed += 1
+        tiers = ([addr_tier] if addr_changed else []) + [_tier(weights, f) for f in itemized]
+        by_tier[_bucket(max(tiers, key=lambda t: TIER_RANK.get(t, 1)))] += 1
+        if not itemized:
+            continue                              # address-only -> counted in addr_rows + by_tier
         diffs = [{"field": f, "old": old.get(f, ""), "new": new.get(f, ""),
                   "tier": _tier(weights, f), "direction": _direction(old.get(f), new.get(f))}
-                 for f in genuine]
-        row_tier = max((d["tier"] for d in diffs), key=lambda t: TIER_RANK.get(t, 1))
-        corrections.append({"concat_id": old.get("concat_id"), "desc": old.get("description"),
-                            "row": old.get("_row"), "diffs": diffs, "tier": row_tier,
-                            "directions": sorted({d["direction"] for d in diffs})})
-        by_tier[_bucket(row_tier)] += 1
+                 for f in itemized]
         for d in diffs:
             by_direction[d["direction"]] += 1
+        corrections.append({"concat_id": old.get("concat_id"), "desc": old.get("description"),
+                            "row": old.get("_row"), "diffs": diffs,
+                            "tier": max((d["tier"] for d in diffs), key=lambda t: TIER_RANK.get(t, 1)),
+                            "directions": sorted({d["direction"] for d in diffs})})
 
+    structural = ([{"field": "address", "label": "C&E address changes", "tier": addr_tier, "rows": addr_rows}]
+                  if addr_rows else [])
     added = match_result["added"]
-    contiguous = _contiguous(added)
-    added_is_upgrade = len(added) >= _UPGRADE_BLOCK and contiguous
+    added_is_upgrade = len(added) >= _UPGRADE_BLOCK and _contiguous(added)
     return {
-        "matched": len(pairs), "intact": intact,
+        "matched": len(pairs), "intact": intact, "changed": changed,
         "corrections": corrections, "correction_count": len(corrections),
         "by_tier": by_tier, "by_direction": by_direction,
+        "structural": structural, "structural_rows": addr_rows,
         "systematic_events": [_event_brief(e) for e in events.values()],
         "effects_lost": effects_lost,
         "new_area_columns": new_area_cols, "rollout_rows": rollout_rows,

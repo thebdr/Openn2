@@ -97,9 +97,14 @@ def build_report(params: dict | None = None, stamp: str | None = None) -> dict:
 
 
 def _audit_rows(result: dict) -> list:
-    """Flatten every genuine correction (both documents) into CSV rows for the audit trail."""
+    """Flatten every change (both documents) into CSV rows for the audit trail: the node-grouped
+    structural changes (address/slot/pin/device) FIRST - they are the costly ones - then the itemized
+    corrections + channel blocks."""
     rows = [["document", "identity", "description", "tier", "directions", "fields", "confidence"]]
     iol = result.get("iolist", {})
+    for g in iol.get("grouped_changes", []):
+        rows.append(["IoList", g["node"], f"{g['label']} x{g['count']} rows", g["tier"],
+                     "", "structural (grouped by node)", ""])
     for c in iol.get("corrections", []):
         rows.append(["IoList", c["fld"], c["desc"], c["tier"], "|".join(c["directions"]),
                      "; ".join(f"{d['field']}: {d['old']!r}->{d['new']!r}" for d in c["diffs"]),
@@ -107,7 +112,10 @@ def _audit_rows(result: dict) -> list:
     for b in iol.get("channel_blocks", []):
         rows.append(["IoList", b["fld"], f"{b['desc']} ({b['channels']} channels)", b["tier"],
                      "", "channel-block aggregate", b["confidence"]])
-    for c in result.get("cematrix", {}).get("corrections", []):
+    ce = result.get("cematrix", {})
+    for s in ce.get("structural", []):
+        rows.append(["C&E", s["label"], f"{s['rows']} cause rows", s["tier"], "", "structural", ""])
+    for c in ce.get("corrections", []):
         rows.append(["C&E", c.get("concat_id", ""), c["desc"], c["tier"], "|".join(c["directions"]),
                      "; ".join(f"{d['field']}: {d['old']!r}->{d['new']!r}" for d in c["diffs"]), ""])
     return rows

@@ -79,53 +79,66 @@ def _iolist_section(iol: dict) -> str:
     if not iol.get("available"):
         return _unavailable("I/O list", iol.get("reason", ""))
     matched = iol["matched"] or 1
-    intact, sysrows = iol["intact"], iol["systematic_rows"]
-    corr = iol["correction_count"]
-    regr = len(iol["regressions"])
+    intact, changed = iol["intact"], iol["changed"]
+    bt = iol["by_tier"]
+    structural = iol.get("structural", [])
+    address = next((s for s in structural if s["field"] == "bit"), None)
+    addr_rows = address["rows"] if address else 0
     cards = "".join([
         _card("Matched rows", iol["matched"]),
         _card("Intact", intact, _C["intact"]),
-        _card("Genuine corrections", corr, _C["corrected"]),
-        _card("of which value-loss", regr, _C["regression"]),
+        _card("Changed rows", changed, _C["corrected"]),
+        _card("I/O address changes", addr_rows, _C["critical"] if addr_rows else _C["neutral"]),
         _card("Upgrade rows", f'+{iol["upgrade_rows"]}', _C["upgrade"]),
         _card("Removed", len(iol["removed"]), _C["neutral"]),
     ])
     seg = [(100 * intact / matched, _C["intact"], f'Intact {intact}'),
-           (100 * sysrows / matched, _C["systematic"], f'Re-scheme only {sysrows}'),
-           (100 * (corr - regr) / matched, _C["corrected"], f'Correction {corr - regr}'),
-           (100 * regr / matched, _C["regression"], f'Regression {regr}')]
+           (100 * bt["critical"] / matched, _tier_color("critical"), f'Critical {bt["critical"]}'),
+           (100 * bt["major"] / matched, _tier_color("major"), f'Major {bt["major"]}'),
+           (100 * bt["minor"] / matched, _tier_color("minor"), f'Minor {bt["minor"]}')]
 
-    sys_rows = [(f'{esc(e["label"])} — {esc(e["summary"])}', e["rows"]) for e in iol["systematic_events"]]
-    sys_panel = (f'<div class="panel"><h3>Systematic re-scheme events '
-                 f'<span class="hint">deliberate bulk ops — confirm intentional, not defects</span></h3>'
-                 f'{_hbars(sys_rows, _C["systematic"]) if sys_rows else "<p class=empty>none detected</p>"}</div>')
+    struct_summary = [[_badge(s["tier"], _tier_color(s["tier"])), esc(s["label"]),
+                       s["rows"], s["nodes"]] for s in structural]
+    grouped = iol.get("grouped_changes", [])
+    gnode_rows = [[_badge(g["tier"], _tier_color(g["tier"])), esc(g["node"]), esc(g["label"]), g["count"]]
+                  for g in grouped[:40]]
+    gmore = (f'<p class="empty">+ {len(grouped) - 40} more node-groups in the CSV audit trail</p>'
+             if len(grouped) > 40 else "")
+    ctx = ""
+    if iol["systematic_events"]:
+        joined = "; ".join(f'{esc(e["label"])} — {esc(e["summary"])}' for e in iol["systematic_events"])
+        ctx = (f'<p class="hint" style="margin:8px 0 0">Pattern: {joined}. Coordinated (likely a re-base), '
+               f'but every row is still a field to re-verify and apply on the machine.</p>')
 
-    tier_panel = (f'<div class="panel"><h3>Corrections by weight</h3>'
-                  f'{_hbars([("Critical", iol["by_tier"]["critical"]), ("Major", iol["by_tier"]["major"]), ("Minor", iol["by_tier"]["minor"])], _C["corrected"])}'
-                  f'<h3 style="margin-top:14px">Field changes by direction</h3>'
-                  f'{_hbars([("Gap-fill (old was blank)", iol["by_direction"]["gap-fill"]), ("Value change", iol["by_direction"]["value-change"]), ("Value loss (got worse)", iol["by_direction"]["value-loss"])], _C["major"])}</div>')
+    sev_panel = (f'<div class="panel"><h3>Changed rows by severity</h3>'
+                 f'{_hbars([("Critical", bt["critical"]), ("Major", bt["major"]), ("Minor", bt["minor"])], _C["corrected"])}'
+                 f'<h3 style="margin-top:14px">Itemized (non-structural) changes by direction</h3>'
+                 f'{_hbars([("Gap-fill (old was blank)", iol["by_direction"]["gap-fill"]), ("Value change", iol["by_direction"]["value-change"]), ("Value loss (got worse)", iol["by_direction"]["value-loss"])], _C["major"])}</div>')
+    up_rows = [[esc(u["node"]), f'+{u["count"]} rows', esc(u["desc"])] for u in iol["upgrades"]]
+    up_panel = (f'<div class="panel"><h3>Upgrades <span class="hint">new feature blocks, not defects</span></h3>'
+                f'{_table(["Node", "Added", "Description"], up_rows, "none")}</div>')
 
     crows = []
     for c in sorted(iol["corrections"], key=lambda c: -{"critical": 3, "major": 2, "minor": 1}.get(c["tier"], 0))[:80]:
-        crows.append([_badge(c["tier"], _tier_color(c["tier"])) + (" " + _badge("regression", _C["regression"]) if c["regression"] else ""),
+        crows.append([_badge(c["tier"], _tier_color(c["tier"])) + (" " + _badge("value-loss", _C["regression"]) if c["regression"] else ""),
                       esc(c["node"]), esc(c["desc"]) or "—", _diff_cells(c["diffs"]),
                       _badge(c["confidence"], _C["neutral"]) if c["confidence"] != "high" else ""])
     more = f'<p class="empty">+ {len(iol["corrections"]) - 80} more in the CSV audit trail</p>' if len(iol["corrections"]) > 80 else ""
-
-    up_rows = [[esc(u["node"]), f'+{u["count"]} rows', esc(u["desc"])] for u in iol["upgrades"]]
     blocks = [[esc(b["node"]), f'{b["channels"]} channels', _badge(b["tier"], _tier_color(b["tier"])), esc(b["desc"])]
               for b in iol["channel_blocks"]]
 
     return f'''<section>
   <h2>I/O list <span class="sub">{esc(iol["before"])} → {esc(iol["after"])} · {iol["before_rows"]}→{iol["after_rows"]} rows</span></h2>
   <div class="cards">{cards}</div>
-  <div class="barwrap"><div class="bar-title">Composition of the {iol["matched"]} matched rows</div>{_bar(seg)}</div>
-  <div class="two">{sys_panel}{tier_panel}</div>
-  <h3>Upgrades (node-aware additions) <span class="hint">new feature blocks, not defects</span></h3>
-  {_table(["Node", "Added", "Description"], up_rows, "no upgrade blocks")}
+  <div class="barwrap"><div class="bar-title">The {iol["matched"]} matched rows, by highest-severity change</div>{_bar(seg)}</div>
+  <h3>Structural changes — grouped by node <span class="hint">address / slot / pin / device re-keying — the costliest to fix on a built machine, counted not hidden</span></h3>
+  {_table(["Tier", "Field", "Rows", "Nodes"], struct_summary, "no structural changes")}
+  {ctx}
+  {f'<h4 style="margin:16px 0 4px;font-size:13px;font-weight:500">By node</h4>{_table(["Tier", "Node", "Field", "Rows"], gnode_rows)}{gmore}' if gnode_rows else ""}
+  <div class="two">{sev_panel}{up_panel}</div>
   {f'<h3>Channel-uncertain blocks <span class="hint">multichannel attribution not provable — aggregated</span></h3>{_table(["Node", "Channels", "Tier", "Description"], blocks)}' if blocks else ""}
-  <h3>Genuine corrections</h3>
-  {_table(["Tier", "Node", "Description", "Change", "Note"], crows, "no genuine corrections")}
+  <h3>Other corrections <span class="hint">non-structural field changes, itemized per row</span></h3>
+  {_table(["Tier", "Node", "Description", "Change", "Note"], crows, "no other corrections")}
   {more}
 </section>'''
 
@@ -133,16 +146,21 @@ def _iolist_section(iol: dict) -> str:
 def _cematrix_section(ce: dict) -> str:
     if not ce.get("available"):
         return _unavailable("Cause &amp; Effect matrix", ce.get("reason", ""))
+    addr_rows = ce.get("structural_rows", 0)
     cards = "".join([
         _card("Cause rows", f'{ce["before_rows"]}→{ce["after_rows"]}'),
         _card("Intact", ce["intact"], _C["intact"]),
-        _card("Corrections", ce["correction_count"], _C["corrected"]),
+        _card("Address changes", addr_rows, _C["critical"] if addr_rows else _C["neutral"]),
+        _card("Other corrections", ce["correction_count"], _C["corrected"]),
         _card("Effects lost", len(ce["effects_lost"]), _C["regression"]),
         _card("Added (upgrade)", f'+{ce["added_upgrade"]["count"]}' if ce.get("added_upgrade") else len(ce.get("added_corrections", [])), _C["upgrade"]),
-        _card("Removed", len(ce["removed"]), _C["neutral"]),
     ])
-    sys = "".join(f'<li>{esc(e["label"])}: {esc(e["summary"])}</li>' for e in ce["systematic_events"])
-    sys_panel = f'<div class="panel"><h3>Systematic re-scheme</h3><ul>{sys}</ul></div>' if sys else ""
+    ctx = "; ".join(f'{esc(e["label"])} — {esc(e["summary"])}' for e in ce["systematic_events"])
+    sys_panel = ""
+    if addr_rows:
+        sys_panel = (f'<div class="panel"><h3>I/O address changes <span class="hint">counted, not hidden</span></h3>'
+                     f'<p>{addr_rows} cause rows changed I/O address {_badge("critical", _C["critical"])}'
+                     f'{f"<br><span class=hint>Pattern: {ctx}</span>" if ctx else ""}</p></div>')
     rollout = ""
     if ce.get("new_area_columns"):
         rollout = (f'<div class="panel"><h3>New effect column (upgrade)</h3><p>'
@@ -235,5 +253,5 @@ def render_html(result: dict) -> str:
 {_iolist_section(result["iolist"])}
 {_cematrix_section(result["cematrix"])}
 {_area_section(result["area"])}
-<footer>Systematic re-schemes (address / slot / pin / device-tag re-keying) are shown separately and excluded from the genuine-defect count — confirm they are intentional. Corrections are tiered by downstream impact and tagged by direction; a value-loss is a "got worse" regression. Full per-row detail is in the CSV audit trail beside this file.</footer>
+<footer>Structural re-keying (I/O address / slot / pin / device tag) is the costliest correction to apply on a built machine, so it is COUNTED and grouped by node — not hidden. A coordinated re-map is flagged as context, but every changed row is still a field to re-verify on site. Other field changes are itemized per row and tagged by direction (gap-fill / value-change / value-loss). Tiers come from change_weights.csv. Full per-row detail is in the CSV audit trail beside this file.</footer>
 </body></html>'''

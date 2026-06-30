@@ -561,25 +561,28 @@ ph100: compares a PRIOR document revision (`*_previous_path`) against the CURREN
 + AREA) and classifies every row **intact / corrected / upgrade / removed** to expose HUMAN document-quality
 problems (a "what went wrong" review). Never touches the SSOT/BuilderData, never gates/halts, not in
 `run_order`; writes a graphical HTML dashboard + a CSV audit trail to `ProjectDocumentation/Reports/`.
-- **The design risk it solves (evidence-derived from the real 8FVX R0.0→R1.2 pair):** a naive column diff
-  reports ~369 I/O "corrections", but the genuine human-defect residue is ~14–40 rows; the bulk is a handful
-  of DELIBERATE re-schemes (a 310-row address re-map = 36 byte-rules; a confined re-slot; a cyclic re-pin; a
-  device-tag rename). The whole design **nets systematic re-schemes OUT of the defect count** and surfaces
-  the small genuine residue + regressions.
+- **The design (evidence-derived from the real 8FVX R0.0→R1.2 pair):** address (`bit`) is the MOST
+  important parameter - a re-addressing is the costliest correction to apply on a built machine (re-read
+  manuals, re-test, propagate to many devices). So structural / re-scheme changes (address, slot, pin,
+  device-tag) are **GROUPED BY NODE and COUNTED at the field's weight - never hidden**. The coordinated-
+  re-map detection survives only as CONTEXT (a one-line "looks like a re-base"), never as a reason to drop
+  rows. (Earlier the design wrongly netted these OUT of the count - corrected per the user's feedback.)
 - **Matching (`match.py`)** — node-scoped, ADDRESS-BLIND, deterministic 5-tier cascade (normalize → partition
   by the stable `profinet_name` nodes → T1 exact fld+desc → T2 multichannel by connector+pin/position → T3
   within-node connector+pin [recovers device-tag renames] → T4 fuzzy → T5 positional spacer-fill with a
   no-blank→named guard). Address/slot/pin are NEVER identity keys. **Validated: 883/883 old rows matched, 0
   false buckets.** Leftovers force-match within a node (so removed≈0 by design). C&E matches by CONCATENATE
   ID; AREA matches by line+desc across pooled sheets (a row can MOVE sheet → `moved`).
-- **Classification (`classify.py`)** — systematic events (address byte-bijection [an I↔Q prefix flip stays a
-  GENUINE critical], low-cardinality slot/pin re-map, T3 device rename) are netted out; semantic fields
-  (type_hw/normal_condition/desc/ts_ref/mnemonic) are NEVER systematic. A pair is corrected iff it has ≥1
-  non-systematic changed field; row tier = max changed-field tier (`change_weights.csv`, 3 tiers). Each diff
-  is **direction-tagged** (gap-fill / value-change / value-loss); a value-loss on critical/major = a
-  **regression** (a tag, ONE bucket — user decision). Channel-uncertain (T2pos) corrections **aggregate** to
-  one block-level change. Node-aware **upgrade** (contiguous ≥4-row new block) vs forgotten signal. C&E: a
-  lost effect = critical regression, a new effect column rolled out = upgrade. AREA read **with formulas**
+- **Classification (`classify.py`)** — STRUCTURAL fields (`_GROUP_BY_NODE` = bit/slot/pin/connector, + a
+  bulk device-tag rename) are GROUPED BY NODE into `grouped_changes`/`structural` and COUNTED at the field
+  weight; the report leads with them (e.g. "I/O address re-map: 310 rows / 20 nodes [critical]"). Other
+  (semantic) fields are itemized per row. Every changed row is bucketed ONCE by its max-tier change (so an
+  address-only row reads critical). Each itemized diff is **direction-tagged** (gap-fill / value-change /
+  value-loss); a value-loss on critical/major = a **regression** tag (ONE bucket). Tiers come from
+  `change_weights.csv` (hand-tunable, clamped). Channel-uncertain (T2pos) itemized corrections **aggregate**
+  to one block-level change. Node-aware **upgrade** (contiguous ≥4-row new block) vs forgotten signal. C&E:
+  address changes COUNTED (grouped summary, critical); a lost effect = critical regression; a new effect
+  column rolled out = upgrade. AREA read **with formulas**
   (`data_only=False` — cells are `=...` strings; a cached read fabricates phantom deletions) → per-area
   counts + moved-sheet count + a reorganization flag.
 - **Output** — `io_documents_quality_report.{html,csv}`; self-contained light/dark HTML (every value
