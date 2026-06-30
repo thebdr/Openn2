@@ -209,32 +209,41 @@ def _area_key(row: dict) -> str:
 
 def match_area(old_pool: list, new_pool: list) -> dict:
     """Best-effort cross-sheet AREA matching over the POOLED rows of all AREA sheets (areas get
-    reorganized, so a row can move sheet). Keys on line+description, then description alone. Each pair
-    notes whether the row MOVED to a different area sheet. Returns {pairs, removed, added}."""
-    nk = defaultdict(list)
+    reorganized, so a row can move sheet). A device may legitimately appear in SEVERAL AREA sheets, so a
+    SAME-area match is preferred before a cross-area (moved) one - otherwise a device staying in/spanning
+    its area is mis-reported as a move. Each pair notes whether the row actually MOVED to a different sheet.
+    Returns {pairs, removed, added}."""
+    nk_sheet: dict = defaultdict(list)       # (sheet, line+desc) -> [j]   same-area exact
+    nk: dict = defaultdict(list)             # line+desc          -> [j]   cross-area (a move)
+    nk_desc_sheet: dict = defaultdict(list)  # (sheet, desc)      -> [j]   same-area, line changed
+    nk_desc: dict = defaultdict(list)        # desc               -> [j]   cross-area, line changed
     for j, r in enumerate(new_pool):
-        nk[_area_key(r)].append(j)
-    nk_desc = defaultdict(list)
-    for j, r in enumerate(new_pool):
-        nk_desc[norm(r.get("description"))].append(j)
+        key, d, s = _area_key(r), norm(r.get("description")), r.get("_sheet")
+        nk_sheet[(s, key)].append(j)
+        nk[key].append(j)
+        if d:                                # a BLANK description can't key a desc-only match
+            nk_desc_sheet[(s, d)].append(j)
+            nk_desc[d].append(j)
     used_new, pairs, matched_old = set(), [], set()
 
     def take(i, j):
-        moved = old_pool[i].get("_sheet") != new_pool[j].get("_sheet")
-        pairs.append({"old": old_pool[i], "new": new_pool[j], "moved": moved})
+        pairs.append({"old": old_pool[i], "new": new_pool[j],
+                      "moved": old_pool[i].get("_sheet") != new_pool[j].get("_sheet")})
         used_new.add(j)
         matched_old.add(i)
 
-    for i, r in enumerate(old_pool):
-        cand = [j for j in nk.get(_area_key(r), []) if j not in used_new]
-        if cand:
-            take(i, cand[0])
-    for i, r in enumerate(old_pool):
-        if i in matched_old:
-            continue
-        cand = [j for j in nk_desc.get(norm(r.get("description")), []) if j not in used_new]
-        if cand:
-            take(i, cand[0])
+    def sweep(candidates):
+        for i, r in enumerate(old_pool):
+            if i in matched_old:
+                continue
+            cand = [j for j in candidates(r) if j not in used_new]
+            if cand:
+                take(i, cand[0])
+
+    sweep(lambda r: nk_sheet.get((r.get("_sheet"), _area_key(r)), []))                            # 0 same-area exact
+    sweep(lambda r: nk_desc_sheet.get((r.get("_sheet"), norm(r.get("description"))), []))         # 1 same-area, line changed
+    sweep(lambda r: nk.get(_area_key(r), []))                                                     # 2 cross-area (a move)
+    sweep(lambda r: nk_desc.get(norm(r.get("description")), []))                                  # 3 cross-area, line changed
     removed = [old_pool[i] for i in range(len(old_pool)) if i not in matched_old]
     added = [new_pool[j] for j in range(len(new_pool)) if j not in used_new]
     return {"pairs": pairs, "removed": removed, "added": added}

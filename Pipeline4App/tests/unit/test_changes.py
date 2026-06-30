@@ -248,6 +248,27 @@ def test_by_nature_partitions_changed():
     eq(nat["other"], 1, "the type_hw value change -> other bucket")
 
 
+def _arow(sheet, dev, line, out, desc):
+    return {"_sheet": sheet, "device_tag": dev, "line_numbering": line, "digital_output": out, "description": desc}
+
+
+def test_area_multi_area_device_not_moved():
+    # a device legitimately present in TWO area sheets must pair SAME-area, NOT be reported as a move.
+    old = [_arow("AREA 1", "-K1", "L1", "Q1", "PUMP"), _arow("AREA 2", "-K1", "L1", "Q1", "PUMP")]
+    new = [_arow("AREA 1", "-K1", "L1", "Q1", "PUMP"), _arow("AREA 2", "-K1", "L1", "Q1", "PUMP")]
+    mr = match.match_area(old, new)
+    eq(len(mr["pairs"]), 2, "both area appearances pair")
+    eq(sum(1 for p in mr["pairs"] if p["moved"]), 0, "a device spanning two areas is NOT a move")
+
+
+def test_area_genuine_move_detected():
+    # a device that actually changed AREA sheet (no same-area counterpart) IS a move.
+    mr = match.match_area([_arow("AREA 1", "-K1", "L1", "Q1", "PUMP")],
+                          [_arow("AREA 2", "-K1", "L1", "Q1", "PUMP")])
+    eq(len(mr["pairs"]), 1, "matched across sheets")
+    eq(mr["pairs"][0]["moved"], True, "a genuine sheet change IS a move")
+
+
 def test_area_device_tag_noise():
     # a moved AREA row whose ONLY itemized change is a punctuation device_tag cleanup (--K -> -K):
     # the move stays (safety), the device_tag change is split into the AREA noise listing, counts unchanged.
@@ -312,6 +333,8 @@ TESTS = [
     ("fld_noise_predicate", test_fld_noise_predicate),
     ("fld_noise_category", test_fld_noise_category),
     ("by_nature_partitions_changed", test_by_nature_partitions_changed),
+    ("area_multi_area_device_not_moved", test_area_multi_area_device_not_moved),
+    ("area_genuine_move_detected", test_area_genuine_move_detected),
     ("area_device_tag_noise", test_area_device_tag_noise),
     ("area_real_device_tag_change_stays", test_area_real_device_tag_change_stays),
     ("read_error_degrades", test_read_error_degrades),
