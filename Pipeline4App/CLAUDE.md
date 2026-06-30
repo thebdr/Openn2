@@ -628,7 +628,8 @@ device-tag RANGE notation + channel `n/N` suffix, and the manual orange "Risky I
 (replicate PL3 + add SSOT-native features) is the active effort - the
 plan + locked decisions are in **`GUI_PLAN.md`**. **M0 (foundations) DONE:** a **lightweight phase registry**
 (`gui/phases.py` - the single source of the phase order: number/title/kind/subs/requires/handler +
-`RUNNABLE`/`run_order`; no Fill phase), a **worker thread + queue/drain pump** (each phase runs off the Tk main
+`RUNNABLE`/`run_order`; ph200 Fill IS wired - subs 210/220/230/240 + the orange 245 - but kept OUT of
+Run-all by design since it mutates the source doc), a **worker thread + queue/drain pump** (each phase runs off the Tk main
 thread - the handler emits via `self._emit`/`self._status` enqueue, `_drain` applies on the main thread, a
 `ttk.Progressbar` + `_busy` guard; single-phase runs no longer freeze the window), a basic **Run-all** (registry
 `run_order`, each handler self-contained - M4 optimizes to a stage-once shared DB), and a **`ttk.Notebook`**

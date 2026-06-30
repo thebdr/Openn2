@@ -46,7 +46,8 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
 ## Milestones (each gate-green + committed on the user's word)
 - **M0 — Foundations. DONE** (the worker thread + registry + notebook + Run-all). `gui/phases.py` (the
   lightweight registry: number/title/kind/subs/requires/handler + `RUNNABLE`/`run_order`/`by_number` - the
-  single source the bar + dispatch + Run-all consume; no Fill phase). The **worker thread + queue/drain pump**:
+  single source the bar + dispatch + Run-all consume; ph200 Fill is wired but kept out of Run-all by design).
+  The **worker thread + queue/drain pump**:
   `_on_phase` spawns a daemon thread per click, the handler emits via `self._emit`/`self._status` (thread-safe
   enqueue) instead of touching Tk, `_drain` (`root.after(50)`) applies log/status/done on the main thread, a
   `ttk.Progressbar` + a `_busy` guard grey the bar during a run (single-phase runs no longer freeze the

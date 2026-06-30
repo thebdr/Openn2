@@ -45,7 +45,7 @@ STRINGS: dict = {
     "pb_open_ce":         {"en": "Open Cause&Effect Matrix", "it": "Apri Matrice Cause&Effect"},
     "pb_open_val_logs":   {"en": "Validation Logs Folder", "it": "Cartella Log di Validazione"},
 
-    # --- 200 Documents Fill Out (registry omits ph200 until STEP 4 builds it) -------------- #
+    # --- 200 Documents Fill Out (built + wired; the 200 button, kept out of Run-all by design) ---- #
     "pb_fill_script_type":  {"en": "Fill IOList Script Type Column", "it": "Compila Colonna Script Type IOList"},
     "pb_fill_index":        {"en": "Fill IOList Index Column", "it": "Compila Colonna Index IOList"},
     "pb_risky_index":       {"en": "Risky Index Fill (review)", "it": "Compila Index Rischioso (rivedi)"},

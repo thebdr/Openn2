@@ -1,7 +1,8 @@
 """The PL4 phase registry - the SINGLE source of the phase-bar metadata (headers + chevron sub-step
 dropdowns + the dependency-ordered Run-all). The sub-button set is transcribed from the OPERATOR ORACLE
-`Pipeline3App/assets/ButtonsLayout.xlsx` (the canonical map of the pipeline), minus phase 200 (PL4 has
-NO Fill phase yet - STEP 4 builds it; until then PL4 requires a pre-filled I/O List).
+`Pipeline3App/assets/ButtonsLayout.xlsx` (the canonical map of the pipeline). Phase 200 (Documents Fill
+Out) IS built + wired (subs 210/220/230/240 + the orange 245 Risky Index); it is kept OUT of Run-all by
+design (it mutates the source doc - run it deliberately via the 200 button).
 
 Human strings are i18n KEYS, not literals: a phase carries `name_key`, a sub-button `label_key`, both
 resolved through `core/i18n.tr(key, lang)` at render time (so EN/IT is a first-class shipped feature, not
@@ -133,8 +134,9 @@ def run_order() -> list:
     self-contained (re-stages its own prerequisites), so order drives the log narrative, not correctness."""
     nums = [p.number for p in RUNNABLE]
     tail = [n for n in (900, 100) if n in nums]
-    # ph200 (Fill) is excluded from Run-all for now: only 210 (script_type) is built, so a Run-all fill
-    # would write a PARTIAL doc. It runs as its own button. Re-add here once 220/230/240 land.
+    # ph200 (Fill) is fully built (210/220/230/240) but DELIBERATELY excluded from Run-all: it mutates the
+    # source I/O List in place (AB-AF + DiagnosisBlocks), and PL4's normal case is an already-filled doc, so
+    # Fill is a deliberate operator action (the 200 button) - not an automatic side-effect of every full run.
     head = [n for n in nums if n not in tail and n != 200]
     head.sort(key=lambda n: (n != 300, n))          # 300 first, then ascending
     return head + tail
