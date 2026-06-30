@@ -58,22 +58,31 @@ def _table(headers: list, rows: list, empty: str = "none") -> str:
 _ADDR_FIELDS = {"bit", "address", "digital_output"}
 _ADDR_RE = re.compile(r"^\s*([IQO])\s*\.?\s*(\d+(?:\.\d+)*)\s*$", re.IGNORECASE)
 
-# Human labels for the neutral "what was changed" per-field list (plural; unknown fields fall back to the
-# field name with underscores -> spaces).
+# Human labels for the raw field keys (singular; used both in the per-field "what was changed" list and the
+# per-row change cells). Unknown fields fall back to the field name with underscores -> spaces. Covers the
+# I/O List, C&E and AREA field sets.
 _FIELD_LABELS = {
-    "bit": "I/O addresses", "address": "I/O addresses", "digital_output": "I/O addresses",
-    "slot": "slots", "pin_no": "pins", "connector": "connectors",
-    "device": "device tags", "functional_unit": "functional units", "location": "locations",
-    "profinet_name": "profinet names", "profinet_ip": "profinet IPs", "id_node": "node IDs",
-    "normal_condition": "normal conditions", "type_hw": "hardware types",
-    "part_no": "part numbers", "manufacturer": "manufacturers",
-    "desc_l1": "descriptions", "desc_l1b": "secondary descriptions", "description_module": "module descriptions",
-    "cod_fives": "FIVES codes", "drawing": "drawings", "sheet": "sheets", "ts_ref": "TS refs",
+    "bit": "I/O address", "address": "I/O address", "digital_output": "I/O address",
+    "slot": "slot", "pin_no": "pin", "pin": "pin", "connector": "connector",
+    "device": "device tag", "device_tag": "device tag", "functional_unit": "functional unit",
+    "location": "location", "profinet_name": "profinet name", "profinet_ip": "profinet IP",
+    "id_node": "node ID", "normal_condition": "normal condition", "type_hw": "hardware type", "type": "type",
+    "part_no": "part number", "manufacturer": "manufacturer",
+    "desc_l1": "description", "desc_l1b": "secondary description", "description": "description",
+    "description_module": "module description", "module": "module", "line_numbering": "line number",
+    "cod_fives": "FIVES code", "drawing": "drawing", "sheet": "sheet", "ts_ref": "TS ref",
 }
 
 
 def _flabel(field: str) -> str:
     return _FIELD_LABELS.get(field, field.replace("_", " "))
+
+
+def _designation(fld) -> str:
+    """The block's `fld` is functional_unit|location|device joined by '|'; render it as the bare reference
+    designation (parts carry their own =/+/- prefixes, so dropping the separators rebuilds it):
+    '=S1|+DL1.CC1|' -> '=S1+DL1.CC1', '||' -> ''."""
+    return str(fld or "").replace("|", "")
 
 
 def _decompose(addr) -> tuple | None:
@@ -168,7 +177,7 @@ def _block_changes(block: dict) -> str:
     lines = []
     for f in block.get("fields", []):
         dirs = " ".join(_badge(d, _dir_color(d)) for d in f.get("directions", []))
-        lines.append(f'<code>{esc(f["field"])}</code> {_badge(f["tier"], _tier_color(f["tier"]))} {dirs} '
+        lines.append(f'<strong>{esc(_flabel(f["field"]))}</strong> {_badge(f["tier"], _tier_color(f["tier"]))} {dirs} '
                      f'{_changes_inline(f["values"])}')
     body = "<br>".join(lines) or "—"
     if block.get("desc"):
@@ -180,7 +189,7 @@ def _scope(block: dict) -> str:
     """The block's scope: a single device's fld, else 'N devices · M rows'."""
     if block.get("devices", 1) > 1:
         return f'{block["devices"]} devices · {block["count"]} rows'
-    return esc(block.get("fld") or "") or f'{block.get("count", 0)} rows'
+    return esc(_designation(block.get("fld"))) or f'{block.get("count", 0)} rows'
 
 
 def _changes_inline(changes: list, cap: int = 24) -> str:
@@ -199,7 +208,7 @@ def _changes_inline(changes: list, cap: int = 24) -> str:
 
 
 def _diff_cells(diffs: list) -> str:
-    return "<br>".join(f'<code>{esc(d["field"])}</code>: {esc(d["old"]) or "∅"} → {esc(d["new"]) or "∅"} '
+    return "<br>".join(f'<strong>{esc(_flabel(d["field"]))}</strong>: {esc(d["old"]) or "∅"} → {esc(d["new"]) or "∅"} '
                        f'{_badge(d["direction"], _dir_color(d["direction"]))}' for d in diffs)
 
 
@@ -272,7 +281,7 @@ def _iolist_section(iol: dict) -> str:
     # sequence, not severity. Address fields merge into one "I/O addresses"; only >0 types, most first.
     bf = iol.get("by_field", {})
     addr_used = sum(bf.get(f, 0) for f in _ADDR_FIELDS)
-    field_counts = ([("I/O addresses", addr_used)] if addr_used else []) + \
+    field_counts = ([("I/O address", addr_used)] if addr_used else []) + \
                    [(_flabel(field), n) for field, n in bf.items() if field not in _ADDR_FIELDS and n]
     field_counts.sort(key=lambda kv: -kv[1])
     ftotal = sum(n for _, n in field_counts) or 1
@@ -287,7 +296,7 @@ def _iolist_section(iol: dict) -> str:
                  f'(a row can change several fields)</span></h3>{_bar(nat_seg, thin=True)}{addr_note}</div>')
     up_blocks = []
     for u in sorted(iol["upgrades"], key=lambda u: -u["count"]):
-        drows = [[esc(r["desc"]), _mu(r["fld"]), (f'<code>{esc(r["address"])}</code>' if r["address"] else "")]
+        drows = [[esc(r["desc"]), _mu(_designation(r["fld"])), (f'<code>{esc(r["address"])}</code>' if r["address"] else "")]
                  for r in u.get("rows", [])]
         hidden = u["count"] - len(u.get("rows", []))
         extra = f'<p class="empty">+ {hidden} rows without a description (layout)</p>' if hidden > 0 else ""
@@ -454,8 +463,8 @@ def _area_section(area: dict) -> str:
                    esc(n["desc"]), _diff_cells(n["diffs"])] for n in noise[:80]]
     noise_section = (
         f'<h3 style="margin-top:18px">Noise — device-tag cleanup '
-        f'<span class="hint">device_tag changes of only punctuation or a single character</span></h3>'
-        f'<p class="notice" style="border-left-color:{_C["neutral"]}">These device_tag values differ only by '
+        f'<span class="hint">device-tag changes of only punctuation or a single character</span></h3>'
+        f'<p class="notice" style="border-left-color:{_C["neutral"]}">These device-tag values differ only by '
         f'punctuation or a single character (e.g. <code>--K66901</code> → <code>-K66901</code>). A person '
         f'normalizes past them; <strong>automated processing may not</strong> — the AREA matching keys on the '
         f'device tag, so an unmanaged punctuation change can read as a different device and mis-route the safety '
