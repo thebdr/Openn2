@@ -232,6 +232,52 @@ def test_fld_noise_category():
     eq(res["by_tier"]["critical"], 1, "but the row is still counted in by_tier - the change is listing-only")
 
 
+def test_by_nature_partitions_changed():
+    # every CHANGED row is bucketed once by its costliest nature: address re-map > pure completion > other.
+    old = [_row(1, profinet_name="N1", desc_l1="A", bit="I0.0"),       # address change
+           _row(2, profinet_name="N1", desc_l1="B", desc_l1b=""),      # a blank -> filled = completion
+           _row(3, profinet_name="N1", desc_l1="C", type_hw="X")]      # a value change = other
+    new = [_row(1, profinet_name="N1", desc_l1="A", bit="I10.0"),
+           _row(2, profinet_name="N1", desc_l1="B", desc_l1b="FILLED"),
+           _row(3, profinet_name="N1", desc_l1="C", type_hw="Y")]
+    res = classify.classify_iolist(match.match_iolist(old, new), WEIGHTS)
+    nat = res["by_nature"]
+    eq(sum(nat.values()), res["changed"], "by_nature partitions every changed row exactly once (sums to changed)")
+    eq(nat["address"], 1, "the bit change -> address bucket")
+    eq(nat["completion"], 1, "the blank -> filled change -> completion bucket")
+    eq(nat["other"], 1, "the type_hw value change -> other bucket")
+
+
+def test_area_device_tag_noise():
+    # a moved AREA row whose ONLY itemized change is a punctuation device_tag cleanup (--K -> -K):
+    # the move stays (safety), the device_tag change is split into the AREA noise listing, counts unchanged.
+    old = {"_sheet": "AREA 1", "device_tag": "=S1+UL1.CC1--K66901", "digital_output": "Q640.0",
+           "line_numbering": "L1", "description": "TELESCOPIC BELTS"}
+    new = {"_sheet": "AREA 2", "device_tag": "=S1+UL1.CC1-K66901", "digital_output": "Q640.0",
+           "line_numbering": "L1", "description": "TELESCOPIC BELTS"}
+    mr = {"pairs": [{"old": old, "new": new, "moved": True}], "removed": [], "added": []}
+    res = classify.classify_area(mr, {"AREA 1": 1}, {"AREA 2": 1},
+                                 {"device_tag": "critical", "digital_output": "critical",
+                                  "line_numbering": "minor", "description": "major"})
+    eq(res["correction_count"], 0, "the --K66901 -> -K66901 device_tag change is noise, not a correction")
+    eq(len(res["noise"]), 1, "it lands in the AREA noise listing")
+    eq(res["by_tier"]["critical"], 1, "counts unchanged - the row is still counted at its tier")
+    eq(res["moved"], 1, "the move is still recorded (safety-critical, not suppressed)")
+    eq(len(res["moves"]), 1, "and the move detail is present")
+
+
+def test_area_real_device_tag_change_stays():
+    # a genuine device_tag change (2 alnum chars differ) is NOT noise -> stays an AREA correction.
+    old = {"_sheet": "AREA 1", "device_tag": "=S1+UL1.CC1-K66901", "digital_output": "Q640.0",
+           "line_numbering": "L1", "description": "BELT"}
+    new = {"_sheet": "AREA 1", "device_tag": "=S1+UL1.CC1-K77902", "digital_output": "Q640.0",
+           "line_numbering": "L1", "description": "BELT"}
+    mr = {"pairs": [{"old": old, "new": new, "moved": False}], "removed": [], "added": []}
+    res = classify.classify_area(mr, {"AREA 1": 1}, {"AREA 1": 1}, {"device_tag": "critical"})
+    eq(res["correction_count"], 1, "a real device_tag rename stays a correction")
+    eq(len(res["noise"]), 0, "and is NOT classed as noise")
+
+
 def test_read_error_degrades():
     import _harness                                          # two real files that are NOT workbooks
     a, b = __file__, _harness.__file__
@@ -265,6 +311,9 @@ TESTS = [
     ("address_lines_classify", test_address_lines_classify),
     ("fld_noise_predicate", test_fld_noise_predicate),
     ("fld_noise_category", test_fld_noise_category),
+    ("by_nature_partitions_changed", test_by_nature_partitions_changed),
+    ("area_device_tag_noise", test_area_device_tag_noise),
+    ("area_real_device_tag_change_stays", test_area_real_device_tag_change_stays),
     ("read_error_degrades", test_read_error_degrades),
 ]
 

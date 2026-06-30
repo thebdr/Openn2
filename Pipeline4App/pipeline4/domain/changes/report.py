@@ -14,6 +14,7 @@ from collections import Counter, defaultdict
 _C = {"intact": "#0ca30c", "corrected": "#d03b3b", "regression": "#791f1f",
       "upgrade": "#e0991a", "systematic": "#7a7a73",
       "critical": "#a32d2d", "major": "#e24b4a", "minor": "#f09595",   # dark red / red / light red
+      "completion": "#5b83a8",                                         # calm blue - a benign blank-fill
       "unused": "#c4c2ba", "complementary": "#8f8d84", "neutral": "#888780"}   # light grey / mid grey
 
 
@@ -45,6 +46,19 @@ def _hbars(rows: list, color: str) -> str:
     total = sum(n for _, n in rows) or 1
     out = []
     for label, n in rows:
+        pct = 100 * n / total
+        out.append(f'<div class="hb"><span class="hb-l">{esc(label)}</span>'
+                   f'<span class="hb-t"><span class="hb-f" style="width:{pct:.0f}%;background:{color}">'
+                   f'</span></span><span class="hb-n">{esc(n)} · {pct:.0f}%</span></div>')
+    return "".join(out)
+
+
+def _nature_bars(rows: list) -> str:
+    """rows = [(label, count, color)] -> horizontal bars, each scaled to the GROUP TOTAL (they sum to 100%),
+    with a per-row colour (unlike `_hbars`'s single colour)."""
+    total = sum(n for _, n, _ in rows) or 1
+    out = []
+    for label, n, color in rows:
         pct = 100 * n / total
         out.append(f'<div class="hb"><span class="hb-l">{esc(label)}</span>'
                    f'<span class="hb-t"><span class="hb-f" style="width:{pct:.0f}%;background:{color}">'
@@ -255,10 +269,26 @@ def _iolist_section(iol: dict) -> str:
         ctx = (f'<p class="hint" style="margin:8px 0 0">These follow a coordinated re-map ({joined}) — '
                f'but each row is still a separate address to re-verify and apply on site, not a free pass.</p>')
 
-    sev_panel = (f'<div class="panel"><h3>Changed rows by severity <span class="hint">share of the {changed} changed rows</span></h3>'
-                 f'{_hbars([("Critical", bt["critical"]), ("Major", bt["major"]), ("Minor", bt["minor"])], _C["corrected"])}'
-                 f'<h3 style="margin-top:14px">Field changes by direction <span class="hint">share of the field-edits — a row can change several fields</span></h3>'
-                 f'{_hbars([("Gap-fill (old was blank)", iol["by_direction"]["gap-fill"]), ("Value change", iol["by_direction"]["value-change"]), ("Value loss (got worse)", iol["by_direction"]["value-loss"])], _C["major"])}</div>')
+    nat = iol.get("by_nature", {"address": 0, "completion": 0, "other": 0})
+    nat_rows = sorted([("I/O address re-map", nat["address"], _C["critical"]),
+                       ("Completion (blank → filled)", nat["completion"], _C["completion"]),
+                       ("Value correction / rename", nat["other"], _C["major"])],
+                      key=lambda r: -r[1])                  # most-impacted first
+    gf, vc = iol["by_direction"]["gap-fill"], iol["by_direction"]["value-change"]
+    regr = len(iol.get("regressions", []))
+    if gf >= 2 * max(vc, 1):
+        verdict = 'the prior revision was mostly <strong>INCOMPLETE</strong> (blanks now filled), not wrong'
+    elif vc > gf:
+        verdict = 'the prior revision had mostly <strong>WRONG values</strong> corrected, not just gaps filled'
+    else:
+        verdict = 'the prior revision mixed filled gaps and corrected values'
+    regr_txt = (f' · <strong style="color:{_C["regression"]}">{regr} regressions</strong> (a value got worse)'
+                if regr else ' · <strong>0 regressions</strong> (nothing degraded)')
+    sev_panel = (f'<div class="panel"><h3>Nature of the {changed} reworked rows '
+                 f'<span class="hint">each row by its costliest change — the cost axis the bar above doesn\'t '
+                 f'show</span></h3>{_nature_bars(nat_rows)}'
+                 f'<p style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);font-size:13px">'
+                 f'<strong>Verdict:</strong> {verdict}{regr_txt}.</p></div>')
     up_blocks = []
     for u in sorted(iol["upgrades"], key=lambda u: -u["count"]):
         drows = [[esc(r["desc"]), _mu(r["fld"]), (f'<code>{esc(r["address"])}</code>' if r["address"] else "")]
@@ -413,6 +443,20 @@ def _area_section(area: dict) -> str:
 
     crows = [[_badge(c["tier"], _tier_color(c["tier"])), esc(c.get("sheet_old")) + (" → " + esc(c.get("sheet_new")) if c.get("moved") else ""),
               esc(c["desc"]), _diff_cells(c["diffs"])] for c in area["corrections"][:50]]
+
+    noise = area.get("noise", [])
+    noise_rows = [[esc(n.get("sheet_old")) + (" → " + esc(n.get("sheet_new")) if n.get("moved") else ""),
+                   esc(n["desc"]), _diff_cells(n["diffs"])] for n in noise[:80]]
+    noise_section = (
+        f'<h3 style="margin-top:18px">Noise — device-tag cleanup '
+        f'<span class="hint">device_tag changes of only punctuation or a single character</span></h3>'
+        f'<p class="notice" style="border-left-color:{_C["neutral"]}">These device_tag values differ only by '
+        f'punctuation or a single character (e.g. <code>--K66901</code> → <code>-K66901</code>). A human '
+        f'normalizes past them; <strong>the software may not</strong> — the AREA match keys on the device tag, so '
+        f'an un-managed punctuation change can read as a different device and mis-route the safety mapping. '
+        f'Counts unchanged; listed here only.</p>'
+        f'{_table(["Sheet", "Description", "Change (old → new)"], noise_rows, "none")}') if noise else ""
+
     return f'''<section>
   <h2>AREA sheets <span class="sub">output-to-area assignment</span></h2>
   {reorg}
@@ -421,6 +465,7 @@ def _area_section(area: dict) -> str:
   {_table(["Sheet", "Before", "After", ""], crow)}
   <h3>AREA corrections <span class="hint">device-tag / address / line changes on matched rows</span></h3>
   {_table(["Tier", "Sheet", "Description", "Change"], crows, "no AREA-row corrections")}
+  {noise_section}
 </section>'''
 
 

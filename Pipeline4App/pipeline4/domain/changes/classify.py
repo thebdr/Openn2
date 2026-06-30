@@ -213,6 +213,9 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
     noise_entries: list = []         # FLD-only changes that are noise (punctuation / <=1 alphanumeric char)
     by_tier = {"critical": 0, "major": 0, "minor": 0}
     by_direction = {"gap-fill": 0, "value-change": 0, "value-loss": 0}
+    # each changed row bucketed ONCE by the NATURE of its costliest change (the cost axis the severity bar
+    # lacks): an I/O address re-map (costliest) > a pure completion (all blanks filled) > everything else.
+    by_nature = {"address": 0, "completion": 0, "other": 0}
     struct: dict = defaultdict(int)          # (node, field) -> changed-row count (structural / re-scheme)
     struct_tier: dict = {}
     struct_detail: dict = defaultdict(list)  # (node, field) -> [(old, new), ...] the actual values changed
@@ -257,6 +260,12 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
         # every changed row is bucketed ONCE, by the max tier across ALL its changes (grouped + itemized).
         row_tier = max((_tier(weights, f) for f in changed_fields), key=lambda t: TIER_RANK.get(t, 1))
         by_tier[_bucket(row_tier)] += 1
+        if any(f in _ADDR_FIELDS for f in changed_fields):
+            by_nature["address"] += 1
+        elif all(_direction(old.get(f), new.get(f)) == "gap-fill" for f in changed_fields):
+            by_nature["completion"] += 1
+        else:
+            by_nature["other"] += 1
         if not itemized:
             continue                              # a structural-only row is counted in `struct` + by_tier
         diffs = [{"field": f, "old": old.get(f, ""), "new": new.get(f, ""),
@@ -300,7 +309,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
         "removed": [_row_brief(r) for r in match_result["removed"]],
         "corrections": corrections, "correction_count": len(corrections),
         "correction_blocks": correction_blocks, "noise_blocks": noise_blocks,
-        "by_tier": by_tier, "by_direction": by_direction,
+        "by_tier": by_tier, "by_direction": by_direction, "by_nature": by_nature,
         "regressions": [c for c in corrections if c["regression"]],
         "grouped_changes": grouped_changes, "structural": structural_list,
         "structural_rows": sum(struct.values()),
@@ -469,6 +478,7 @@ def _ce_brief(row: dict) -> dict:
 
 
 _AREA_COMPARE = ["device_tag", "digital_output", "line_numbering", "description"]
+_AREA_NOISE_FIELDS = {"device_tag"}      # the FLD-identity field in an AREA row (FU+LOC+DEV concatenated)
 
 
 def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weights: dict) -> dict:
@@ -493,6 +503,7 @@ def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weight
         events["digital_output"] = addr_event
 
     corrections: list = []
+    area_noise: list = []        # device_tag changes that are noise (punctuation / <=1 alnum char) - listing only
     by_tier = {"critical": 0, "major": 0, "minor": 0}
     for pair in pairs:
         old, new = pair["old"], pair["new"]
@@ -510,10 +521,19 @@ def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weight
                   "tier": _tier(weights, f), "direction": _direction(old.get(f), new.get(f))}
                  for f in genuine]
         row_tier = max((d["tier"] for d in diffs), key=lambda t: TIER_RANK.get(t, 1))
-        corrections.append({"sheet_old": old.get("_sheet"), "sheet_new": new.get("_sheet"),
-                            "moved": pair.get("moved"), "desc": old.get("description"),
-                            "diffs": diffs, "tier": row_tier})
-        by_tier[_bucket(row_tier)] += 1
+        by_tier[_bucket(row_tier)] += 1             # counts unchanged - the noise split is listing-only
+        base = {"sheet_old": old.get("_sheet"), "sheet_new": new.get("_sheet"),
+                "moved": pair.get("moved"), "desc": old.get("description"), "device_tag": old.get("device_tag")}
+        # split PER DIFF: a device_tag change that is noise goes to the noise listing even when the row also
+        # has real changes (mirrors the IoList FLD-noise split). The move detail itself is untouched (safety).
+        real = [d for d in diffs if not (d["field"] in _AREA_NOISE_FIELDS and _fld_noise(d["old"], d["new"]))]
+        noise = [d for d in diffs if d["field"] in _AREA_NOISE_FIELDS and _fld_noise(d["old"], d["new"])]
+        if real:
+            corrections.append({**base, "diffs": real,
+                                "tier": max((d["tier"] for d in real), key=lambda t: TIER_RANK.get(t, 1))})
+        if noise:
+            area_noise.append({**base, "diffs": noise,
+                               "tier": max((d["tier"] for d in noise), key=lambda t: TIER_RANK.get(t, 1))})
 
     # a structural reorganization: a sheet that lost most of its rows OR many rows changed sheet.
     reorg = []
@@ -529,6 +549,7 @@ def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weight
         "counts_old": counts_old, "counts_new": counts_new,
         "matched": len(pairs), "moved": moved, "moves": moves,
         "corrections": corrections, "correction_count": len(corrections), "by_tier": by_tier,
+        "noise": area_noise,
         "systematic_events": [_event_brief(e) for e in events.values()],
         "removed": [{"sheet": r.get("_sheet"), "desc": r.get("description"),
                      "device_tag": r.get("device_tag")} for r in match_result["removed"]],

@@ -121,6 +121,9 @@ def _audit_rows(result: dict) -> list:
         rows.append(["AREA", m.get("device_tag", ""), m.get("desc", ""), "critical", "moved",
                      f"area {m.get('sheet_old')!r}->{m.get('sheet_new')!r}; "
                      f"address {m.get('addr_old')!r}->{m.get('addr_new')!r}", ""])
+    for n in area.get("noise", []):                  # device_tag punctuation / 1-char cleanups (listing-only)
+        rows.append(["AREA-noise", n.get("device_tag", ""), n.get("desc", ""), n["tier"], "noise",
+                     "; ".join(f"{d['field']}: {d['old']!r}->{d['new']!r}" for d in n["diffs"]), ""])
     return rows
 
 
