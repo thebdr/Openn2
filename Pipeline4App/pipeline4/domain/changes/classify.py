@@ -254,17 +254,18 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
 
 
 def _aggregate_by_node(entries: list) -> list:
-    """Aggregate itemized correction entries into ONE block per (node, device-fld) - the per-row noise
-    collapses to per-device blocks. Each block carries WHAT changed: per field the old->new values across
-    the rows, the field tier, and the direction(s) (gap-fill / value-change / value-loss). `confidence` is
-    channel-uncertain when any member row is (the per-channel attribution is then not claimed)."""
+    """Aggregate itemized correction entries into ONE block PER NODE (the per-device rows collapse). Each
+    block carries WHAT changed across the whole node: per field the old->new values across ALL the node's
+    rows, the field tier, and the direction(s) (gap-fill / value-change / value-loss). `devices` = how many
+    distinct devices (flds) contributed; `confidence` is channel-uncertain when any member row is."""
     grp = defaultdict(list)
     for e in entries:
-        grp[(e["node"], e["fld"])].append(e)
+        grp[e["node"]].append(e)
     blocks = []
-    for (node, fld_key), members in grp.items():
+    for node, members in grp.items():
         tier = max((m["tier"] for m in members), key=lambda t: TIER_RANK.get(t, 1))
-        by_field: dict = defaultdict(list)            # field -> [(old, new), ...] across the rows
+        flds = sorted({m["fld"] for m in members})
+        by_field: dict = defaultdict(list)            # field -> [(old, new), ...] across the node's rows
         field_tier: dict = {}
         field_dirs: dict = defaultdict(set)
         for m in members:
@@ -275,11 +276,13 @@ def _aggregate_by_node(entries: list) -> list:
         fields = sorted(({"field": f, "tier": field_tier[f], "directions": sorted(field_dirs[f]),
                           "values": vals} for f, vals in by_field.items()),
                         key=lambda x: -TIER_RANK.get(x["tier"], 1))
-        desc = next((m["desc"] for m in members if m["desc"]), "")
+        single = len(flds) == 1
+        desc = next((m["desc"] for m in members if m["desc"]), "") if single else ""
         confidence = "channel-uncertain" if any(m.get("confidence") == "channel-uncertain"
                                                 for m in members) else "high"
-        blocks.append({"node": node, "fld": fld_key, "count": len(members), "channels": len(members),
-                       "tier": tier, "desc": desc, "fields": fields, "confidence": confidence})
+        blocks.append({"node": node, "fld": flds[0] if single else "", "devices": len(flds),
+                       "count": len(members), "channels": len(members), "tier": tier,
+                       "desc": desc, "fields": fields, "confidence": confidence})
     return blocks
 
 

@@ -161,6 +161,13 @@ def _block_changes(block: dict) -> str:
     return body
 
 
+def _scope(block: dict) -> str:
+    """The block's scope: a single device's fld, else 'N devices · M rows'."""
+    if block.get("devices", 1) > 1:
+        return f'{block["devices"]} devices · {block["count"]} rows'
+    return esc(block.get("fld") or "") or f'{block.get("count", 0)} rows'
+
+
 def _changes_inline(changes: list, cap: int = 24) -> str:
     """An inline old → new list for a node's structural changes, e.g. `I922.0 → I1120.0 · …`. DISTINCT
     pairs (a repeated low-cardinality change like a re-slot collapses to `…×N`); capped with a '+N more'
@@ -250,12 +257,12 @@ def _iolist_section(iol: dict) -> str:
 
     cblocks = sorted(iol.get("correction_blocks", []),
                      key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))
-    crows = [[_badge(b["tier"], _tier_color(b["tier"])), esc(b["node"]), esc(b["fld"]) or "—",
+    crows = [[_badge(b["tier"], _tier_color(b["tier"])), esc(b["node"]), _scope(b),
               _block_changes(b)] for b in cblocks[:80]]
     more = f'<p class="empty">+ {len(cblocks) - 80} more device-blocks in the CSV audit trail</p>' if len(cblocks) > 80 else ""
-    blocks = [[esc(b["node"]), f'{b["channels"]} ch', _badge(b["tier"], _tier_color(b["tier"])), _block_changes(b)]
+    blocks = [[esc(b["node"]), _scope(b), _badge(b["tier"], _tier_color(b["tier"])), _block_changes(b)]
               for b in sorted(iol["channel_blocks"],
-                              key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["channels"]))]
+                              key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))]
 
     return f'''<section>
   <h2>I/O list <span class="sub">{esc(iol["before"])} → {esc(iol["after"])} · {iol["before_rows"]}→{iol["after_rows"]} rows</span></h2>
@@ -267,9 +274,9 @@ def _iolist_section(iol: dict) -> str:
   {ctx}
   {f'<h4 style="margin:16px 0 4px;font-size:13px;font-weight:500">By node — old → new</h4>{_table(["Tier", "Node", "Field", "Rows", "Changes (old → new)"], gnode_rows)}{gmore}' if gnode_rows else ""}
   <div class="two">{sev_panel}{up_panel}</div>
-  {f'<h3>Channel-uncertain blocks <span class="hint">per-channel attribution not provable — the edits are shown, not which channel got which</span></h3>{_table(["Node", "Channels", "Tier", "What changed (old → new)"], blocks)}' if blocks else ""}
-  <h3>Corrections — by node <span class="hint">non-structural field edits, grouped per device, with direction</span></h3>
-  {_table(["Tier", "Node", "Device", "What changed (old → new)"], crows, "no other corrections")}
+  {f'<h3>Channel-uncertain blocks <span class="hint">per-channel attribution not provable — the edits are shown, not which channel got which</span></h3>{_table(["Node", "Scope", "Tier", "What changed (old → new)"], blocks)}' if blocks else ""}
+  <h3>Corrections — by node <span class="hint">non-structural field edits, grouped per node, with direction</span></h3>
+  {_table(["Tier", "Node", "Scope", "What changed (old → new)"], crows, "no other corrections")}
   {more}
 </section>'''
 
