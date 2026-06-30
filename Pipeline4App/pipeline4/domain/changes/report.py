@@ -12,8 +12,9 @@ import re
 from collections import Counter, defaultdict
 
 _C = {"intact": "#0ca30c", "corrected": "#d03b3b", "regression": "#791f1f",
-      "upgrade": "#e0991a", "systematic": "#7a7a73", "minor": "#f09595",
-      "major": "#e24b4a", "critical": "#d03b3b", "neutral": "#888780"}
+      "upgrade": "#e0991a", "systematic": "#7a7a73",
+      "critical": "#a32d2d", "major": "#e24b4a", "minor": "#f09595",   # dark red / red / light red
+      "unused": "#c4c2ba", "complementary": "#8f8d84", "neutral": "#888780"}   # light grey / mid grey
 
 
 def esc(value) -> str:
@@ -222,10 +223,16 @@ def _iolist_section(iol: dict) -> str:
         _card("Upgrade rows", f'+{iol["upgrade_rows"]}', _C["upgrade"]),
         _card("Removed", len(iol["removed"]), _C["neutral"]),
     ])
-    seg = [(100 * intact / matched, _C["intact"], f'Intact {intact}'),
-           (100 * bt["critical"] / matched, _tier_color("critical"), f'Critical {bt["critical"]}'),
-           (100 * bt["major"] / matched, _tier_color("major"), f'Major {bt["major"]}'),
-           (100 * bt["minor"] / matched, _tier_color("minor"), f'Minor {bt["minor"]}')]
+    unused, comp = iol.get("unused", 0), iol.get("complementary", 0)
+    added = iol.get("added_total", 0)
+    new_total = (matched + added) or 1                    # = the new revision's row count (matched + added)
+    seg = [(100 * unused / new_total, _C["unused"], f'No description (unused) {unused}'),
+           (100 * comp / new_total, _C["complementary"], f'Complementary review {comp}'),
+           (100 * intact / new_total, _C["intact"], f'Intact {intact}'),
+           (100 * bt["critical"] / new_total, _C["critical"], f'Critical {bt["critical"]}'),
+           (100 * bt["major"] / new_total, _C["major"], f'Major {bt["major"]}'),
+           (100 * bt["minor"] / new_total, _C["minor"], f'Minor {bt["minor"]}'),
+           (100 * added / new_total, _C["upgrade"], f'Added / retrofit {added}')]
 
     struct_summary = [[_badge(s["tier"], _tier_color(s["tier"])), esc(s["label"]),
                        s["rows"], s["nodes"]] for s in structural]
@@ -282,10 +289,21 @@ def _iolist_section(iol: dict) -> str:
               _block_changes(b)] for b in cblocks[:80]]
     more = f'<p class="empty">+ {len(cblocks) - 80} more device-blocks in the CSV audit trail</p>' if len(cblocks) > 80 else ""
 
+    comp_blocks = sorted(iol.get("complementary_blocks", []),
+                         key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))
+    comp_rows = [[esc(b["node"]), _scope(b), _block_changes(b)] for b in comp_blocks[:60]]
+    comp_section = (
+        f'<h3 style="margin-top:22px">Complementary reviews '
+        f'<span class="hint">changes on UNUSED channels (no description) — not defects today</span></h3>'
+        f'<p class="notice" style="border-left-color:{_C["complementary"]}">A free slot that was re-addressed '
+        f'is not a current defect — nothing is wired to it. But if a signal is added to it later, a wrong '
+        f'address would reproduce the original class of mistake, so it is tracked for review.</p>'
+        f'{_table(["Node", "Scope", "What changed (old → new)"], comp_rows, "none")}') if comp_blocks else ""
+
     return f'''<section>
   <h2>I/O list <span class="sub">{esc(iol["before"])} → {esc(iol["after"])} · {iol["before_rows"]}→{iol["after_rows"]} rows</span></h2>
   <div class="cards">{cards}</div>
-  <div class="barwrap"><div class="bar-title">The {iol["matched"]} matched rows, by highest-severity change</div>{_bar(seg)}</div>
+  <div class="barwrap"><div class="bar-title">The {iol["after_rows"]} rows of the new revision, by highest-severity change</div>{_bar(seg)}</div>
   {sev_panel}
   <h3>Structural changes — grouped by node <span class="hint">address / slot / pin / device re-keying — the MOST TIME-CONSUMING to fix on a built machine, counted not hidden</span></h3>
   {addr_callout}
@@ -296,6 +314,7 @@ def _iolist_section(iol: dict) -> str:
   {_table(["Tier", "Node", "Scope", "What changed (old → new)"], crows, "no other corrections")}
   {more}
   <p class="hint" style="margin-top:6px"><span class="badge" style="--bc:{_C["neutral"]}">⚠ channel mapping unverified</span> = a multichannel device whose channels were re-addressed/re-pinned, so the edits are shown but not which specific channel got which.</p>
+  {comp_section}
   {up_section}
 </section>'''
 

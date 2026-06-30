@@ -176,8 +176,13 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
     events = _detect_systematic(pairs, fields, weights)   # coordinated-re-map context + the bulk-rename flag
     bulk_rename = bool(events.get("__rename__"))
 
-    intact = changed = 0
-    corrections: list = []           # ALL itemized corrections (each carries its own `confidence`)
+    # NO-DESCRIPTION rows = unused channels (nothing wired) - kept OUT of the defect analysis:
+    #   unchanged -> `unused` (grey); changed -> `complementary` review (2nd grey) - a re-addressed free
+    #   slot is not a defect today, but if a signal is wired into it later a wrong address reproduces the
+    #   original mistake, so it is tracked for review (the operator's call).
+    intact = changed = unused = complementary = 0
+    corrections: list = []           # itemized corrections on REAL signals (each carries its `confidence`)
+    complementary_entries: list = []  # changes on no-description (unused) rows
     by_tier = {"critical": 0, "major": 0, "minor": 0}
     by_direction = {"gap-fill": 0, "value-change": 0, "value-loss": 0}
     struct: dict = defaultdict(int)          # (node, field) -> changed-row count (structural / re-scheme)
@@ -191,6 +196,21 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
         old, new = pair["old"], pair["new"]
         node = old.get("_node", "")
         changed_fields = [f for f in fields if norm(old.get(f)) != norm(new.get(f))]
+        has_desc = bool(norm(old.get("desc_l1")) or norm(old.get("desc_l1b")))
+        if not has_desc:                                      # an unused channel - out of the defect analysis
+            if not changed_fields:
+                unused += 1
+            else:
+                complementary += 1
+                comp_diffs = [{"field": f, "old": old.get(f, ""), "new": new.get(f, ""),
+                               "tier": _tier(weights, f), "direction": _direction(old.get(f), new.get(f))}
+                              for f in changed_fields]
+                complementary_entries.append({
+                    "node": node, "fld": fld(old), "desc": "", "diffs": comp_diffs,
+                    "tier": max((d["tier"] for d in comp_diffs), key=lambda t: TIER_RANK.get(t, 1)),
+                    "directions": sorted({d["direction"] for d in comp_diffs}),
+                    "regression": False, "confidence": pair["confidence"]})
+            continue
         if not changed_fields:
             intact += 1
             continue
@@ -222,6 +242,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
         corrections.append(entry)    # channel-uncertain rows stay here too; flagged at the block level
 
     correction_blocks = _aggregate_by_node(corrections)       # all itemized, grouped per node (confidence per block)
+    complementary_blocks = _aggregate_by_node(complementary_entries)   # unused-channel changes, grouped per node
     grouped_changes = [{"node": n, "field": f, "count": c, "tier": struct_tier[f],
                         "label": _EVENT_LABELS.get(f, f), "changes": struct_detail[(n, f)]}
                        for (n, f), c in struct.items()]
@@ -236,7 +257,8 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
 
     upgrades, forgotten, review = _classify_added(match_result["added"])
     return {
-        "matched": len(pairs), "intact": intact, "changed": changed,
+        "matched": len(pairs), "intact": intact, "unused": unused, "changed": changed,
+        "complementary": complementary, "complementary_blocks": complementary_blocks,
         "removed": [_row_brief(r) for r in match_result["removed"]],
         "corrections": corrections, "correction_count": len(corrections),
         "correction_blocks": correction_blocks,
