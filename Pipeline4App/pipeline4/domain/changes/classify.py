@@ -222,7 +222,8 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
                  "regression": regression, "confidence": pair["confidence"]}
         (uncertain if pair["confidence"] == "channel-uncertain" else corrections).append(entry)
 
-    channel_blocks = _aggregate_channel(uncertain)
+    channel_blocks = _aggregate_by_node(uncertain)
+    correction_blocks = _aggregate_by_node(corrections)       # high-confidence itemized, grouped per device
     grouped_changes = [{"node": n, "field": f, "count": c, "tier": struct_tier[f],
                         "label": _EVENT_LABELS.get(f, f), "changes": struct_detail[(n, f)]}
                        for (n, f), c in struct.items()]
@@ -240,7 +241,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
         "matched": len(pairs), "intact": intact, "changed": changed,
         "removed": [_row_brief(r) for r in match_result["removed"]],
         "corrections": corrections, "correction_count": len(corrections),
-        "channel_blocks": channel_blocks,
+        "correction_blocks": correction_blocks, "channel_blocks": channel_blocks,
         "by_tier": by_tier, "by_direction": by_direction,
         "regressions": [c for c in corrections if c["regression"]],
         "grouped_changes": grouped_changes, "structural": structural_list,
@@ -252,28 +253,33 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
     }
 
 
-def _aggregate_channel(uncertain: list) -> list:
-    """Channel-uncertain ITEMIZED corrections -> one block-level change per (node, fld). The per-channel
-    attribution is not provable, so we report the BLOCK rather than claim which channel got which edit -
-    but we still carry WHAT changed: the per-field old->new values aggregated across the channels."""
-    chan = defaultdict(list)
-    for e in uncertain:
-        chan[(e["node"], e["fld"])].append(e)
+def _aggregate_by_node(entries: list) -> list:
+    """Aggregate itemized correction entries into ONE block per (node, device-fld) - the per-row noise
+    collapses to per-device blocks. Each block carries WHAT changed: per field the old->new values across
+    the rows, the field tier, and the direction(s) (gap-fill / value-change / value-loss). `confidence` is
+    channel-uncertain when any member row is (the per-channel attribution is then not claimed)."""
+    grp = defaultdict(list)
+    for e in entries:
+        grp[(e["node"], e["fld"])].append(e)
     blocks = []
-    for (node, fld_key), members in chan.items():
+    for (node, fld_key), members in grp.items():
         tier = max((m["tier"] for m in members), key=lambda t: TIER_RANK.get(t, 1))
-        by_field: dict = defaultdict(list)        # field -> [(old, new), ...] across the channels
+        by_field: dict = defaultdict(list)            # field -> [(old, new), ...] across the rows
         field_tier: dict = {}
+        field_dirs: dict = defaultdict(set)
         for m in members:
             for d in m["diffs"]:
                 by_field[d["field"]].append((d["old"], d["new"]))
                 field_tier[d["field"]] = d["tier"]
-        fields = sorted(({"field": f, "tier": field_tier[f], "values": vals}
-                         for f, vals in by_field.items()),
+                field_dirs[d["field"]].add(d["direction"])
+        fields = sorted(({"field": f, "tier": field_tier[f], "directions": sorted(field_dirs[f]),
+                          "values": vals} for f, vals in by_field.items()),
                         key=lambda x: -TIER_RANK.get(x["tier"], 1))
         desc = next((m["desc"] for m in members if m["desc"]), "")
-        blocks.append({"node": node, "fld": fld_key, "channels": len(members), "tier": tier,
-                       "desc": desc, "fields": fields, "confidence": "channel-uncertain"})
+        confidence = "channel-uncertain" if any(m.get("confidence") == "channel-uncertain"
+                                                for m in members) else "high"
+        blocks.append({"node": node, "fld": fld_key, "count": len(members), "channels": len(members),
+                       "tier": tier, "desc": desc, "fields": fields, "confidence": confidence})
     return blocks
 
 

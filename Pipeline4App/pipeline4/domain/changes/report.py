@@ -148,10 +148,13 @@ def _changes_cell(field: str, changes: list) -> str:
 
 
 def _block_changes(block: dict) -> str:
-    """WHAT changed in a channel-uncertain block: per field, the old -> new values across the channels
-    (deduped with x N). The attribution to a specific channel is not claimed, but the edits are shown."""
-    lines = [f'<code>{esc(f["field"])}</code> {_badge(f["tier"], _tier_color(f["tier"]))} '
-             f'{_changes_inline(f["values"])}' for f in block.get("fields", [])]
+    """WHAT changed in a per-device block: per field, the tier, the direction tag(s) (gap-fill /
+    value-change / value-loss), and the old -> new values across the device's rows (deduped with x N)."""
+    lines = []
+    for f in block.get("fields", []):
+        dirs = " ".join(_badge(d, _dir_color(d)) for d in f.get("directions", []))
+        lines.append(f'<code>{esc(f["field"])}</code> {_badge(f["tier"], _tier_color(f["tier"]))} {dirs} '
+                     f'{_changes_inline(f["values"])}')
     body = "<br>".join(lines) or "—"
     if block.get("desc"):
         body = f'{_mu(block["desc"])}<br>{body}'
@@ -245,12 +248,11 @@ def _iolist_section(iol: dict) -> str:
     up_panel = (f'<div class="panel"><h3>Upgrades <span class="hint">new feature blocks, not defects</span></h3>'
                 f'{_table(["Node", "Added", "Description"], up_rows, "none")}</div>')
 
-    crows = []
-    for c in sorted(iol["corrections"], key=lambda c: -{"critical": 3, "major": 2, "minor": 1}.get(c["tier"], 0))[:80]:
-        crows.append([_badge(c["tier"], _tier_color(c["tier"])) + (" " + _badge("value-loss", _C["regression"]) if c["regression"] else ""),
-                      esc(c["node"]), esc(c["desc"]) or "—", _diff_cells(c["diffs"]),
-                      _badge(c["confidence"], _C["neutral"]) if c["confidence"] != "high" else ""])
-    more = f'<p class="empty">+ {len(iol["corrections"]) - 80} more in the CSV audit trail</p>' if len(iol["corrections"]) > 80 else ""
+    cblocks = sorted(iol.get("correction_blocks", []),
+                     key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))
+    crows = [[_badge(b["tier"], _tier_color(b["tier"])), esc(b["node"]), esc(b["fld"]) or "—",
+              _block_changes(b)] for b in cblocks[:80]]
+    more = f'<p class="empty">+ {len(cblocks) - 80} more device-blocks in the CSV audit trail</p>' if len(cblocks) > 80 else ""
     blocks = [[esc(b["node"]), f'{b["channels"]} ch', _badge(b["tier"], _tier_color(b["tier"])), _block_changes(b)]
               for b in sorted(iol["channel_blocks"],
                               key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["channels"]))]
@@ -266,8 +268,8 @@ def _iolist_section(iol: dict) -> str:
   {f'<h4 style="margin:16px 0 4px;font-size:13px;font-weight:500">By node — old → new</h4>{_table(["Tier", "Node", "Field", "Rows", "Changes (old → new)"], gnode_rows)}{gmore}' if gnode_rows else ""}
   <div class="two">{sev_panel}{up_panel}</div>
   {f'<h3>Channel-uncertain blocks <span class="hint">per-channel attribution not provable — the edits are shown, not which channel got which</span></h3>{_table(["Node", "Channels", "Tier", "What changed (old → new)"], blocks)}' if blocks else ""}
-  <h3>Other corrections <span class="hint">non-structural field changes, itemized per row</span></h3>
-  {_table(["Tier", "Node", "Description", "Change", "Note"], crows, "no other corrections")}
+  <h3>Corrections — by node <span class="hint">non-structural field edits, grouped per device, with direction</span></h3>
+  {_table(["Tier", "Node", "Device", "What changed (old → new)"], crows, "no other corrections")}
   {more}
 </section>'''
 
