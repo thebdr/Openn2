@@ -317,6 +317,8 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
         "correction_blocks": correction_blocks, "noise_blocks": noise_blocks,
         "by_tier": by_tier, "by_direction": by_direction, "by_nature": by_nature,
         "by_field": dict(by_field), "comp_addr": comp_addr,
+        "struck_rows": (sum(1 for p in pairs if p["new"].get("_struck"))
+                        + sum(1 for r in match_result["added"] if r.get("_struck"))),
         "regressions": [c for c in corrections if c["regression"]],
         "grouped_changes": grouped_changes, "structural": structural_list,
         "structural_rows": sum(struct.values()),

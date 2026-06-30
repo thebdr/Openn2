@@ -40,6 +40,9 @@ def read_iolist(path: str, params: dict) -> list:
                 if not any(row.values()):
                     continue
                 row["_sheet"], row["_row"] = view.name, r
+                # `_struck` = the row has at least one struck-through cell that carries text (a formatting
+                # practice the report flags - strike-through has no reliable meaning).
+                row["_struck"] = any(view.cell_struck(r, letter) for canon, letter in columns if row.get(canon))
                 rows.append(row)
     finally:
         if views:

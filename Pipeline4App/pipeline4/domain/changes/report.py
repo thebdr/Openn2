@@ -330,9 +330,7 @@ def _iolist_section(iol: dict) -> str:
     noise_blocks = sorted(iol.get("noise_blocks", []),
                           key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))
     noise_rows = [[esc(b["node"]), _scope(b), _block_changes(b)] for b in noise_blocks[:60]]
-    noise_section = (
-        f'<h3 style="margin-top:22px">Noise — FunctionalUnit+Location-Device cleanup '
-        f'<span class="hint">FunctionalUnit+Location-Device changes of only punctuation or a single character</span></h3>'
+    fld_part = (
         f'<p class="notice" style="border-left-color:{_C["neutral"]}">These FunctionalUnit+Location-Device '
         f'values differ only by punctuation or a single character — a stray text-guard apostrophe, a whitespace '
         f'tweak, a one-char typo or renumber. A person reading the sheet normalizes past them without thinking; '
@@ -340,6 +338,16 @@ def _iolist_section(iol: dict) -> str:
         f'<code>-Q66305</code> as two different devices and fail to line the two revisions up, unless that '
         f'normalization is explicitly handled. Counts unchanged; listed here only.</p>'
         f'{_table(["Node", "Scope", "What changed (old → new)"], noise_rows, "none")}') if noise_blocks else ""
+    struck = iol.get("struck_rows", 0)
+    struck_part = (
+        f'<p class="notice" style="border-left-color:{_C["neutral"]}"><strong>{struck} rows contain '
+        f'struck-through cells</strong> (text formatted like <s>this</s>). Strike-through carries no reliable '
+        f'meaning — it may mark a row for deletion, flag a superseded value, or mean nothing — so it is best '
+        f'avoided, at least for anything functional.</p>') if struck else ""
+    noise_section = (
+        f'<h3 style="margin-top:22px">Noise — FunctionalUnit+Location-Device cleanup '
+        f'<span class="hint">small text differences and non-functional formatting</span></h3>'
+        f'{fld_part}{struck_part}') if (noise_blocks or struck) else ""
 
     return f'''<section>
   <h2>I/O list <span class="sub">{esc(iol["before"])} → {esc(iol["after"])} · {iol["before_rows"]}→{iol["after_rows"]} rows</span></h2>

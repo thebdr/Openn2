@@ -248,6 +248,15 @@ def test_by_nature_partitions_changed():
     eq(nat["other"], 1, "the type_hw value change -> other bucket")
 
 
+def test_struck_rows_counted():
+    # a row whose new revision carries a struck-through cell (_struck) is counted (formatting to flag).
+    old = [_row(1, profinet_name="N1", desc_l1="A"), _row(2, profinet_name="N1", desc_l1="B")]
+    new = [_row(1, profinet_name="N1", desc_l1="A"), _row(2, profinet_name="N1", desc_l1="B")]
+    new[0]["_struck"] = True
+    res = classify.classify_iolist(match.match_iolist(old, new), WEIGHTS)
+    eq(res["struck_rows"], 1, "the one struck-through new row is counted")
+
+
 def _arow(sheet, dev, line, out, desc):
     return {"_sheet": sheet, "device_tag": dev, "line_numbering": line, "digital_output": out, "description": desc}
 
@@ -349,6 +358,7 @@ TESTS = [
     ("fld_noise_predicate", test_fld_noise_predicate),
     ("fld_noise_category", test_fld_noise_category),
     ("by_nature_partitions_changed", test_by_nature_partitions_changed),
+    ("struck_rows_counted", test_struck_rows_counted),
     ("area_multi_area_device_not_moved", test_area_multi_area_device_not_moved),
     ("area_genuine_move_detected", test_area_genuine_move_detected),
     ("area_membership_extended_and_moved", test_area_membership_extended_and_moved),
