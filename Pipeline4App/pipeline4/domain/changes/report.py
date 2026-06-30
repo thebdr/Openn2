@@ -415,27 +415,28 @@ def _area_section(area: dict) -> str:
     crow = [[esc(s), area["counts_old"].get(s, 0), area["counts_new"].get(s, 0),
              _badge("reorganized", _C["upgrade"]) if any(r["sheet"] == s for r in area["reorganized"]) else ""]
             for s in counts]
-    reorg = ""
-    if area["reorganized"] or area["moved"]:
-        reorg = (f'<p class="notice" style="border-left-color:{_C["critical"]}"><strong>Structural '
-                 f'reorganization:</strong> {area["moved"]} matched rows moved to a different AREA sheet — the '
-                 f'output-to-area assignment changed. <strong>This is safety-critical:</strong> moving a device '
-                 f'between areas can mean the safety logic no longer protects against the real hazard — the cause '
-                 f'that trips that output now belongs to a different zone. Confirm every move below is intentional '
-                 f'and that the new area is the correct protection zone.</p>')
-
-    def _mv_addr(m):                                       # show old → new only when the output address moved too
-        a, b = str(m.get("addr_old") or "").strip(), str(m.get("addr_new") or "").strip()
-        return f'{esc(a)} → {esc(b)}' if a != b else esc(a)
-    moves = area.get("moves", [])
-    move_rows = [[esc(m["device_tag"]), esc(m["desc"]),
-                  f'{esc(m["sheet_old"])} → {esc(m["sheet_new"])}', _mv_addr(m)] for m in moves[:200]]
-    move_table = (f'<h3>What moved where '
-                  f'<span class="hint">device · area reassignment · output address — each is a safety-zone change '
-                  f'to confirm</span></h3>'
-                  f'{_table(["Device", "Description", "Area: from → to", "Output address"], move_rows)}'
-                  f'{f"<p class=empty>+ {len(moves) - 200} more moves in the CSV audit trail</p>" if len(moves) > 200 else ""}'
-                  ) if moves else ""
+    # device-centric AREA membership: how each device's SET of areas changed (added in orange = the safety
+    # logic grew / the design was incomplete; removed in red = a zone dropped).
+    def _area_set(areas, highlight, color):
+        return ", ".join(f'<strong style="color:{color}">{esc(a)}</strong>' if a in highlight else esc(a)
+                         for a in areas) or "—"
+    mem = area.get("membership", [])
+    msum = area.get("membership_summary", {})
+    mem_rows = [[esc(m["device_tag"]), esc(m["desc"]),
+                 f'{_area_set(m["old_areas"], set(m["removed"]), _C["regression"])} → '
+                 f'{_area_set(m["new_areas"], set(m["added"]), _C["upgrade"])}'] for m in mem[:200]]
+    ext = msum.get("extended", 0)
+    reorg = (f'<p class="notice" style="border-left-color:{_C["critical"]}"><strong>{len(mem)} devices changed '
+             f'their AREA membership</strong> — <strong style="color:{_C["upgrade"]}">{ext} extended to more '
+             f'areas</strong>, {msum.get("moved", 0)} moved, {msum.get("reduced", 0)} reduced. A device copied '
+             f'into an additional area is now part of a <strong>larger safety function</strong> — the original '
+             f'design did not cover that zone. Confirm each extension is intentional and the new zone is '
+             f'correct.</p>') if mem else ""
+    move_table = (f'<h3>Area membership — from → to '
+                  f'<span class="hint">per device · areas added in orange, removed in red — most growth first'
+                  f'</span></h3>{_table(["Device", "Description", "Area: from → to"], mem_rows)}'
+                  f'{f"<p class=empty>+ {len(mem) - 200} more in the CSV audit trail</p>" if len(mem) > 200 else ""}'
+                  ) if mem else ""
 
     crows = [[_badge(c["tier"], _tier_color(c["tier"])), esc(c.get("sheet_old")) + (" → " + esc(c.get("sheet_new")) if c.get("moved") else ""),
               esc(c["desc"]), _diff_cells(c["diffs"])] for c in area["corrections"][:50]]

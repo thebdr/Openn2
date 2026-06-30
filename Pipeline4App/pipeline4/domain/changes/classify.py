@@ -488,19 +488,58 @@ _AREA_COMPARE = ["device_tag", "digital_output", "line_numbering", "description"
 _AREA_NOISE_FIELDS = {"device_tag"}      # the FLD-identity field in an AREA row (FU+LOC+DEV concatenated)
 
 
+def _area_num(name: str):
+    """Natural sort key for an AREA sheet name (AREA 2 < AREA 10)."""
+    m = re.search(r"(\d+)", name or "")
+    return (0, int(m.group(1))) if m else (1, name or "")
+
+
+def _area_membership(pool: list) -> tuple:
+    """{normalized device_tag -> set of AREA sheets it appears in}, plus its raw tag + description."""
+    areas: dict = defaultdict(set)
+    tag: dict = {}
+    desc: dict = {}
+    for r in pool:
+        key = norm(r.get("device_tag"))
+        if not key:
+            continue
+        areas[key].add(r.get("_sheet"))
+        tag.setdefault(key, r.get("device_tag"))
+        desc.setdefault(key, r.get("description"))
+    return areas, tag, desc
+
+
 def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weights: dict) -> dict:
     """Classify the pooled AREA rows. Reports per-area row counts, how many matched rows MOVED to a
     different area sheet (the reorganization signal), the device-tag / address / line corrections, and a
     structural-reorganization flag. The digital_output address is netted as a systematic re-map."""
     pairs = match_result["pairs"]
     moved = sum(1 for p in pairs if p.get("moved"))
-    # the per-device move detail (safety-critical: an output that changed AREA sheet may sit under a
-    # different safety zone now - WHICH device went WHERE, and whether its output address moved too).
-    moves = [{"device_tag": p["old"].get("device_tag"), "desc": p["old"].get("description"),
-              "line": p["old"].get("line_numbering"),
-              "sheet_old": p["old"].get("_sheet"), "sheet_new": p["new"].get("_sheet"),
-              "addr_old": p["old"].get("digital_output"), "addr_new": p["new"].get("digital_output")}
-             for p in pairs if p.get("moved")]
+    # DEVICE-CENTRIC area membership: a device may legitimately belong to several AREA sheets. What matters
+    # for safety is how its SET of areas changed - a device copied into an additional area is now part of a
+    # LARGER safety function, i.e. the original design did not cover that zone. Compare the area SET per
+    # device (present in BOTH revisions) and classify: extended (areas added, none removed) / reduced /
+    # moved (added AND removed).
+    old_pool = [p["old"] for p in pairs] + match_result["removed"]
+    new_pool = [p["new"] for p in pairs] + match_result["added"]
+    old_areas_m, _old_tag, _old_desc = _area_membership(old_pool)
+    new_areas_m, new_tag, new_desc = _area_membership(new_pool)
+    membership: list = []
+    membership_summary = {"extended": 0, "moved": 0, "reduced": 0}
+    for key in set(old_areas_m) & set(new_areas_m):
+        o, n = old_areas_m[key], new_areas_m[key]
+        if o == n:
+            continue
+        added = sorted(n - o, key=_area_num)
+        removed = sorted(o - n, key=_area_num)
+        kind = "extended" if (added and not removed) else "reduced" if (removed and not added) else "moved"
+        membership_summary[kind] += 1
+        membership.append({"device_tag": new_tag.get(key) or _old_tag.get(key),
+                           "desc": new_desc.get(key) or _old_desc.get(key, ""),
+                           "old_areas": sorted(o, key=_area_num), "new_areas": sorted(n, key=_area_num),
+                           "added": added, "removed": removed, "kind": kind})
+    _korder = {"extended": 0, "moved": 1, "reduced": 2}
+    membership.sort(key=lambda m: (_korder[m["kind"]], -len(m["added"]), -len(m["removed"]), m["device_tag"] or ""))
     addr_changes = [(p["old"].get("digital_output"), p["new"].get("digital_output")) for p in pairs
                     if norm(p["old"].get("digital_output")) != norm(p["new"].get("digital_output"))]
     addr_event = detect_address_event(addr_changes)
@@ -554,7 +593,8 @@ def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weight
             reorg.append({"sheet": sheet, "old": 0, "new": cn})
     return {
         "counts_old": counts_old, "counts_new": counts_new,
-        "matched": len(pairs), "moved": moved, "moves": moves,
+        "matched": len(pairs), "moved": moved,
+        "membership": membership, "membership_summary": membership_summary,
         "corrections": corrections, "correction_count": len(corrections), "by_tier": by_tier,
         "noise": area_noise,
         "systematic_events": [_event_brief(e) for e in events.values()],

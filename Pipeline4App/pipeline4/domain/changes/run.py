@@ -117,10 +117,9 @@ def _audit_rows(result: dict) -> list:
         rows.append(["C&E", c.get("concat_id", ""), c["desc"], c["tier"], "|".join(c["directions"]),
                      "; ".join(f"{d['field']}: {d['old']!r}->{d['new']!r}" for d in c["diffs"]), ""])
     area = result.get("area", {})
-    for m in area.get("moves", []):                  # safety-critical: every area reassignment, with addresses
-        rows.append(["AREA", m.get("device_tag", ""), m.get("desc", ""), "critical", "moved",
-                     f"area {m.get('sheet_old')!r}->{m.get('sheet_new')!r}; "
-                     f"address {m.get('addr_old')!r}->{m.get('addr_new')!r}", ""])
+    for m in area.get("membership", []):             # safety: every device whose AREA SET changed (old -> new)
+        rows.append(["AREA-membership", m.get("device_tag", ""), m.get("desc", ""), "critical", m.get("kind", ""),
+                     f"{', '.join(m.get('old_areas', []))} -> {', '.join(m.get('new_areas', []))}", ""])
     for n in area.get("noise", []):                  # device_tag punctuation / 1-char cleanups (listing-only)
         rows.append(["AREA-noise", n.get("device_tag", ""), n.get("desc", ""), n["tier"], "noise",
                      "; ".join(f"{d['field']}: {d['old']!r}->{d['new']!r}" for d in n["diffs"]), ""])

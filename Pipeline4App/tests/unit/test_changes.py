@@ -269,6 +269,23 @@ def test_area_genuine_move_detected():
     eq(mr["pairs"][0]["moved"], True, "a genuine sheet change IS a move")
 
 
+def test_area_membership_extended_and_moved():
+    # device-centric area membership: K1 gains AREA 2 (extended = design grew); K2 moves AREA 3 -> AREA 4.
+    def pair(o, n):
+        return {"old": o, "new": n, "moved": o["_sheet"] != n["_sheet"]}
+    pairs = [pair(_arow("AREA 1", "-K1", "L1", "Q1", "PUMP"), _arow("AREA 1", "-K1", "L1", "Q1", "PUMP")),
+             pair(_arow("AREA 3", "-K2", "L2", "Q2", "FAN"), _arow("AREA 4", "-K2", "L2", "Q2", "FAN"))]
+    added = [_arow("AREA 2", "-K1", "L3", "Q3", "PUMP")]          # K1 copied into a 2nd area (no old counterpart)
+    mr = {"pairs": pairs, "removed": [], "added": added}
+    res = classify.classify_area(mr, {"AREA 1": 1, "AREA 3": 1}, {"AREA 1": 1, "AREA 2": 1, "AREA 4": 1},
+                                 {"device_tag": "critical"})
+    eq(res["membership_summary"]["extended"], 1, "K1 gained AREA 2 with none removed -> extended")
+    eq(res["membership_summary"]["moved"], 1, "K2 AREA 3 -> AREA 4 -> moved")
+    mem = {m["device_tag"]: m for m in res["membership"]}
+    eq(mem["-K1"]["new_areas"], ["AREA 1", "AREA 2"], "K1 now spans AREA 1 + AREA 2")
+    eq(mem["-K1"]["added"], ["AREA 2"], "AREA 2 is the added zone")
+
+
 def test_area_device_tag_noise():
     # a moved AREA row whose ONLY itemized change is a punctuation device_tag cleanup (--K -> -K):
     # the move stays (safety), the device_tag change is split into the AREA noise listing, counts unchanged.
@@ -283,8 +300,7 @@ def test_area_device_tag_noise():
     eq(res["correction_count"], 0, "the --K66901 -> -K66901 device_tag change is noise, not a correction")
     eq(len(res["noise"]), 1, "it lands in the AREA noise listing")
     eq(res["by_tier"]["critical"], 1, "counts unchanged - the row is still counted at its tier")
-    eq(res["moved"], 1, "the move is still recorded (safety-critical, not suppressed)")
-    eq(len(res["moves"]), 1, "and the move detail is present")
+    eq(res["moved"], 1, "the per-row move is still recorded (safety-critical, not suppressed)")
 
 
 def test_area_real_device_tag_change_stays():
@@ -335,6 +351,7 @@ TESTS = [
     ("by_nature_partitions_changed", test_by_nature_partitions_changed),
     ("area_multi_area_device_not_moved", test_area_multi_area_device_not_moved),
     ("area_genuine_move_detected", test_area_genuine_move_detected),
+    ("area_membership_extended_and_moved", test_area_membership_extended_and_moved),
     ("area_device_tag_noise", test_area_device_tag_noise),
     ("area_real_device_tag_change_stays", test_area_real_device_tag_change_stays),
     ("read_error_degrades", test_read_error_degrades),
