@@ -346,6 +346,12 @@ class App:
     def _project_switch_to(self, root):
         try:
             self._apply_project_switch(project.open_project(root))
+        except project.ProjectConfigError as error:          # incomplete config -> fail loud + stop
+            self.log.append("FAIL", f"  project config incomplete - NOT opened: {root}")
+            for rel in error.missing:
+                self.log.append("FAIL", f"    missing canonical config file: {rel}")
+            self.log.append("FAIL", "  this is a setup/scaffolding error - recreate the project (New Project) "
+                                    "so its config is copied complete from the app's builtin config.")
         except (FileNotFoundError, OSError) as error:
             self.log.append("ERROR", f"  could not open project {root}: {error}")
 
@@ -372,6 +378,9 @@ class App:
             return
         try:
             self._apply_project_switch(project.new_project(parent, name.strip()))
+        except project.ProjectConfigError as error:          # the scaffold came out incomplete -> fail loud
+            self.log.append("FAIL", f"  new project scaffolded INCOMPLETE (missing {', '.join(error.missing)}) "
+                                    "- the app's builtin config is itself incomplete; fix the bundled config_project.")
         except (FileExistsError, OSError) as error:
             self.log.append("ERROR", f"  could not create project: {error}")
 

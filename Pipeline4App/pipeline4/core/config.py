@@ -52,6 +52,12 @@ def config_project_dir() -> str:
     return os.path.join(_PROJECT_ROOT, "config_project") if _PROJECT_ROOT else _BUILTIN_CONFIG_PROJECT
 
 
+def builtin_config_project_dir() -> str:
+    """The app's BUNDLED canonical config_project (always, regardless of the active project). It is the
+    completeness reference a project's config_project is verified against (project/assert_config_complete)."""
+    return _BUILTIN_CONFIG_PROJECT
+
+
 def database_dir() -> str:
     """The top-level Database/ folder - the SSOT (one CSV-with-JSON-cells per table)."""
     return os.path.join(_PROJECT_ROOT, "Database") if _PROJECT_ROOT else _BUILTIN_DATABASE

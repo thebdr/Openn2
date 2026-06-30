@@ -1,17 +1,24 @@
 """The Project Manager (project/project.py + project/state.py): is_project / open / close / new /
 auto_reopen + the persisted recent/last-opened state (LOCALAPPDATA redirected to a temp dir)."""
 import os
+import shutil
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline4.core import config
 from pipeline4.project import project, state
+from pipeline4.core import config
 
 
 def _make_project(root):
+    """A MINIMAL project stub (only project_params.yaml) - `is_project` true, but config INCOMPLETE."""
     cp = os.path.join(root, "config_project")
     os.makedirs(cp, exist_ok=True)
     open(os.path.join(cp, "project_params.yaml"), "w").close()
+
+
+def _make_complete_project(root):
+    """A COMPLETE project: the builtin canonical config_project copied in (passes assert_config_complete)."""
+    shutil.copytree(config.builtin_config_project_dir(), os.path.join(root, "config_project"))
 
 
 def _with_temp_localappdata(fn):
@@ -59,7 +66,7 @@ def test_state_roundtrip():
 
 def test_open_close_routes_config():
     def body(d):
-        root = os.path.join(d, "Proj"); _make_project(root)
+        root = os.path.join(d, "Proj"); _make_complete_project(root)
         project.open_project(root)
         eq(config.active_project(), os.path.abspath(root), "open -> config points at the project")
         ok(os.path.abspath(root) in [os.path.abspath(r) for r in state.recent_projects()], "recorded recent")
@@ -88,6 +95,34 @@ def test_new_project_scaffolds():
         ok(os.path.isdir(os.path.join(root, "Database")), "Database/ made")
         ok(os.path.isdir(os.path.join(root, "Output")), "Output/ made")
         eq(config.active_project(), os.path.abspath(root), "new_project opens it")
+        eq(project.config_gaps(root), [], "a fresh project is COMPLETE vs the builtin (no missing files)")
+    _with_temp_localappdata(body)
+
+
+def test_incomplete_project_fails_loud():
+    """A project missing a canonical config file must fail loud (assert + open) - the dev-phase guard so a
+    scaffolding/drift bug is never silently defaulted around."""
+    def body(d):
+        config.use_builtin()
+        root = os.path.join(d, "Drifted"); _make_complete_project(root)
+        eq(project.config_gaps(root), [], "complete to start")
+        os.remove(os.path.join(root, "config_project", "input_docs", "change_weights.csv"))
+        eq(project.config_gaps(root), ["input_docs/change_weights.csv"], "the removed file is reported missing")
+        try:
+            project.assert_config_complete(root)
+            ok(False, "assert_config_complete must raise on an incomplete project")
+        except project.ProjectConfigError as error:
+            ok("input_docs/change_weights.csv" in error.missing, "the error carries the missing path")
+        try:
+            project.open_project(root)
+            ok(False, "open_project must fail loud on an incomplete project")
+        except project.ProjectConfigError:
+            ok(True, "open_project raises ProjectConfigError - fail and stop")
+        eq(config.active_project(), None, "config was NOT switched to the incomplete project")
+        state.push_recent(root)                 # pretend it was the last-opened project
+        config.use_builtin()
+        eq(project.auto_reopen(), None, "auto_reopen SKIPS an incomplete project (no crash at launch)")
+        eq(config.active_project(), None, "and stays on builtin")
     _with_temp_localappdata(body)
 
 
@@ -95,7 +130,7 @@ def test_auto_reopen():
     def body(d):
         config.use_builtin()
         eq(project.auto_reopen(), None, "no last_opened -> None (builtin stays)")
-        root = os.path.join(d, "Proj"); _make_project(root)
+        root = os.path.join(d, "Proj"); _make_complete_project(root)
         state.push_recent(root)                 # records last_opened
         config.use_builtin()                    # simulate a fresh launch
         eq(project.auto_reopen(), os.path.abspath(root), "auto_reopen returns the last project")
@@ -111,5 +146,6 @@ if __name__ == "__main__":
         ("open_close_routes_config", test_open_close_routes_config),
         ("open_nonproject_raises", test_open_nonproject_raises),
         ("new_project_scaffolds", test_new_project_scaffolds),
+        ("incomplete_project_fails_loud", test_incomplete_project_fails_loud),
         ("auto_reopen", test_auto_reopen),
     ]))
