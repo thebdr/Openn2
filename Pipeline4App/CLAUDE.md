@@ -264,7 +264,7 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   the LET mirror, the offset/bit chain resolver, the address-cache seed, the lossless+idempotent insert with the
   table-dxf/calc strip + the array-freeze).
 
-## Phase 510 — I/O Tags — DONE (interface-completeness follow-up tracked; + severity S4)
+## Phase 510 — I/O Tags — DONE (interface-completeness RESOLVED, fresh-PL3 oracle 213/213; + severity S4)
 **Severity S4 (parity-locked):** `interface_tags` returns `(tags, findings)` with the WARN slug **`iotag_no_address`**
 (a named interface element with no resolved I/O address - skipped); `project()`'s return dict renames `warnings` →
 **`findings`**. A PURE projection - it does NOT `record` (only the build steps do); the GUI **`run.render`s** the
@@ -288,13 +288,14 @@ returns `{path, total, io_count, iface_count, tables, warnings}`. The GUI **"500
 `interface_tags`/`write_plc_tags` (the read-the-IF_-sheets path replaced by the SSOT read). Tests: `test_io_tags.py`
 (8 cases, hermetic — the two sources, the dtype map + %-address, the text-forcing, the two-sheet structure, the
 sort+distinct-props, the skip+warn, the return contract).
-- **Parity (real data, non-destructive scratch copy vs the reference `PlcTags/PLCTags.xlsx`)**: headers identical;
-  the **direct-I/O side is EXACT — 98/98 across all 8 signal tag-tables** (Alarms_Warnings 34, SAFETY_Doors 24,
-  SAFETY_Contactors 18, …). The interface side emits the SSOT mirror block; two KNOWN gaps remain (both
-  interface-table completeness, not 510 bugs): **(1)** the ~14 **template-native** interface signals (the SORTER
-  template's 7 shipped signals × 2 instances — in the IF_ sheet, not in `interface_elements`); **(2)** the ~74
-  **+DIAG auto-mirror** tags on SORTER+DIAG-02 (the deferred `in_diag`/ph600 feature). Both are captured together at
-  ph600 (pull the template-native rows + the `in_diag` set into `interface_elements`) — see the Phase 400 follow-up.
+- **Parity — RESOLVED (fresh-PL3 oracle, exact).** The two formerly-KNOWN interface-completeness gaps are
+  CLOSED: the **template-native** signals via 400f (`source="template"` rows in `interface_elements`) and the
+  **+DIAG auto-mirror** via 600a (staging `in_diag` lit up `collect_mirror_set`). Verified by a **fresh-PL3
+  oracle PLCTags diff** (`scratchpad/oracle_510.py`): on a scratch copy, PL4 stages → builds → projects +
+  RE-INSERTS fresh IF_ sheets, then PL3's `generate_io_tags` reads those fresh sheets — **both produce 213
+  tags (98 I/O + 115 interface), 211 unique (Path,Name) keys, 0 PL4-only / 0 PL3-only / 0 field-mismatches**.
+  (The old "213 vs 208" delta was PL3 reading the doc's STALE inserted IF_ sheets; with fresh sheets PL3 also
+  hits 213.) The direct-I/O side is 98/98; the interface side: IF_SORTER-01 25, IF_SORTER+DIAG-02 90.
 
 ## Phase 600 — Diagnosis — DONE (600a + 600b + 600c + 600d; + severity S5)
 **Severity S5 (parity-locked):** `diagnosis.build` returns **`(database, findings)`** (was `(database, errors,
@@ -318,7 +319,8 @@ the GUI `_run_diagnosis` consumes the build tuple + `run.render`s the combined 6
   bare-token resolver emitted the literal `{diag_cabinet:03d}`, so this is a deliberate FIX (the `:03d`/`:02d` specs
   are restored in `diagnosis_columns.csv`). **Side effect (intended): the phase-400 `+DIAG` auto-mirror lights up** -
   `collect_mirror_set`'s `type.in_diag` guard now fires, so SORTER+DIAG-02 grows 4 -> 83 mirror elements (the
-  template-native gap still remains). **Parity**: `diag_desc` **0 mismatches/269** vs PL3 IODatabase; the
+  template-native gap is also closed by 400f - 510 parity is RESOLVED, see §510). **Parity**: `diag_desc`
+  **0 mismatches/269** vs PL3 IODatabase; the
   `diagnosis_cabinets` table **0 field mismatches** vs PL3's `load_diagnostic_blocks` (16 cabinets).
   **NOTE staging now emits 2 tables** (`signals` + `diagnosis_cabinets`).
 - **600b DONE - the builder** (`domain/diagnosis.py` `build()`): populates the unified `diagnosis_entries` from
@@ -351,8 +353,9 @@ the GUI `_run_diagnosis` consumes the build tuple + `run.render`s the combined 6
   data)**: the SCL is **BYTE-IDENTICAL to the reference** (22752 bytes, 438 lines, 1.0000 similarity, 0 diff lines;
   32 REGIONs, 7 Tristate_DW). Tests: `test_diagnosis.py` (+4: render_scl variants/rename, the per-type tristate
   trigger, the BOM/CRLF write, the synthetic-template project). 17 total in the suite.
-- **Still open (the interface-completeness follow-up)**: re-verify 510 PLCTags after the +DIAG unblock + add the
-  template-native capture (see the Phase 400 section). Then 800/900/100.
+- **Interface-completeness follow-up — DONE/VERIFIED**: the +DIAG unblock (600a) + the template-native capture
+  (400f) closed both 510 PLCTags gaps; a fresh-PL3 oracle confirms exact parity (213/213, 0 diffs — see the
+  Phase 510 "Parity — RESOLVED" note).
 
 ## Phase 700 — Hardware — DONE (700a build + 700b CSV projection)
 `domain/hardware.py` + `domain/hardware_csv.py` - a clean-room port of PL3's `hardware.extract` + format-2 writer
