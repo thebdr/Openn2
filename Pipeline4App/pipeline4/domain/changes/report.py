@@ -250,8 +250,16 @@ def _iolist_section(iol: dict) -> str:
                  f'{_hbars([("Critical", bt["critical"]), ("Major", bt["major"]), ("Minor", bt["minor"])], _C["corrected"])}'
                  f'<h3 style="margin-top:14px">Itemized (non-structural) changes by direction</h3>'
                  f'{_hbars([("Gap-fill (old was blank)", iol["by_direction"]["gap-fill"]), ("Value change", iol["by_direction"]["value-change"]), ("Value loss (got worse)", iol["by_direction"]["value-loss"])], _C["major"])}</div>')
-    up_rows = [[_badge("retrofit", _C["upgrade"]), esc(u["node"]), f'+{u["count"]} rows', esc(u["desc"])]
-               for u in sorted(iol["upgrades"], key=lambda u: -u["count"])]
+    up_blocks = []
+    for u in sorted(iol["upgrades"], key=lambda u: -u["count"]):
+        drows = [[esc(r["desc"]), _mu(r["fld"]), (f'<code>{esc(r["address"])}</code>' if r["address"] else "")]
+                 for r in u.get("rows", [])]
+        hidden = u["count"] - len(u.get("rows", []))
+        extra = f'<p class="empty">+ {hidden} rows without a description (layout)</p>' if hidden > 0 else ""
+        up_blocks.append(
+            f'<div style="margin:14px 0 4px">{_badge("retrofit", _C["upgrade"])} '
+            f'<strong>{esc(u["node"])}</strong> {_mu("· +" + str(u["count"]) + " rows")}</div>'
+            f'{_table(["Description", "FLD", "I/O address"], drows, "—")}{extra}')
     forgotten_n = len(iol.get("forgotten", []))
     fnote = (f'<p class="hint">Plus {forgotten_n} isolated forgotten signal(s) — a single row added inside an '
              f'existing block (a smaller "something was missed").</p>' if forgotten_n else "")
@@ -260,7 +268,7 @@ def _iolist_section(iol: dict) -> str:
                   f'<p class="notice" style="border-left-color:{_C["upgrade"]}">An addition is not a defect — '
                   f'but it means the original revision was incomplete, so <strong>something was missed</strong>. '
                   f'Review whether it should have been there from the start.</p>'
-                  f'{_table(["", "Node", "Added", "Description"], up_rows, "no upgrades or retrofits")}{fnote}')
+                  + ("".join(up_blocks) or '<p class="empty">no upgrades or retrofits</p>') + fnote)
 
     cblocks = sorted(iol.get("correction_blocks", []),
                      key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))

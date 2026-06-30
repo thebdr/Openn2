@@ -284,9 +284,25 @@ def _aggregate_by_node(entries: list) -> list:
     return blocks
 
 
+def _added_detail(rows: list) -> list:
+    """The involved added rows as [{desc, fld, address}] - only rows WITH a description (the empty spacer
+    rows are layout, not signals). `fld` is the as-authored FU+LOC+DEV tag; `address` is the I/O bit."""
+    out = []
+    for r in rows:
+        d = desc(r).replace("|", " ").strip()
+        if not d:
+            continue
+        out.append({"desc": d,
+                    "fld": (str(r.get("functional_unit") or "") + str(r.get("location") or "")
+                            + str(r.get("device") or "")).strip(),
+                    "address": str(r.get("bit") or "").strip()})
+    return out
+
+
 def _classify_added(added: list) -> tuple:
     """Node-aware split of added rows: a contiguous block of >=_UPGRADE_BLOCK = upgrade; an isolated row
-    = forgotten signal (correction); a 2-3 row cluster = flagged for review."""
+    = forgotten signal (correction); a 2-3 row cluster = flagged for review. An upgrade carries the
+    involved rows (desc / fld / address) for the retrofit detail."""
     by_node = defaultdict(list)
     for r in added:
         by_node[r.get("_node", "")].append(r)
@@ -295,7 +311,8 @@ def _classify_added(added: list) -> tuple:
         rows.sort(key=lambda r: int(r.get("_row") or 0))
         if len(rows) >= _UPGRADE_BLOCK:
             upgrades.append({"node": node, "count": len(rows),
-                             "desc": desc(rows[0]).replace("|", " ").strip()})
+                             "desc": desc(rows[0]).replace("|", " ").strip(),
+                             "rows": _added_detail(rows)})
         elif len(rows) == 1:
             forgotten.append(_row_brief(rows[0]))
         else:
