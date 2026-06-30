@@ -517,7 +517,7 @@ def render_html(result: dict) -> str:
 <style>{_STYLE}</style></head><body>
 <h1>Before vs after — document quality report</h1>
 <div class="meta">Project {esc(meta["project_code"]) or "—"} · generated {esc(meta["generated"])} · a "what went wrong" review</div>
-<p class="intro">This report summarizes the effort that went into bringing the project to life. It compares the previous revision of the project's documents — the I/O List and the Cause &amp; Effect Matrix — with the current one and classifies every change between them, measuring the work done: completions, corrections, address re-mapping, and changes to the safety logic, with the items costliest to apply on a built machine highlighted first. It is a read-only review and changes nothing.</p>
+<p class="intro">This report summarizes the effort that went into bringing the project to its current state. It compares revisions of the project's documents (I/O List and Cause&amp;Effect Matrix) and classifies every change, measuring the work done: completions, corrections, address re-mapping, and changes to the safety logic, with the items costliest to apply on a built machine highlighted first.</p>
 {_iolist_section(result["iolist"])}
 {_cematrix_section(result["cematrix"])}
 {_area_section(result["area"])}
