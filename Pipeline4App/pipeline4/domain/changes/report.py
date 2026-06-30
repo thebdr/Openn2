@@ -294,7 +294,7 @@ def _iolist_section(iol: dict) -> str:
         up_blocks.append(
             f'<div style="margin:14px 0 4px">{_badge("retrofit", _C["upgrade"])} '
             f'<strong>{esc(u["node"])}</strong> {_mu("· +" + str(u["count"]) + " rows")}</div>'
-            f'{_table(["Description", "FLD", "I/O address"], drows, "—")}{extra}')
+            f'{_table(["Description", "FunctionalUnit+Location-Device", "I/O address"], drows, "—")}{extra}')
     forgotten_n = len(iol.get("forgotten", []))
     fnote = (f'<p class="hint">Plus {forgotten_n} isolated forgotten signal(s) — a single row added inside an '
              f'existing block (a smaller "something was missed").</p>' if forgotten_n else "")
@@ -331,14 +331,14 @@ def _iolist_section(iol: dict) -> str:
                           key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))
     noise_rows = [[esc(b["node"]), _scope(b), _block_changes(b)] for b in noise_blocks[:60]]
     noise_section = (
-        f'<h3 style="margin-top:22px">Noise — FLD cleanup '
-        f'<span class="hint">FLD changes of only punctuation or a single character</span></h3>'
-        f'<p class="notice" style="border-left-color:{_C["neutral"]}">These FLD values differ only by '
-        f'punctuation or a single character — a stray text-guard apostrophe, a whitespace tweak, a one-char '
-        f'typo or renumber. A human reading the sheet normalizes past them without thinking; '
-        f'<strong>the software may not</strong> — it can read <code>-&#39;Q66305</code> and '
-        f'<code>-Q66305</code> as two different identities and break the cross-document join, unless that '
-        f'normalization is explicitly managed. Counts unchanged; listed here only.</p>'
+        f'<h3 style="margin-top:22px">Noise — FunctionalUnit+Location-Device cleanup '
+        f'<span class="hint">FunctionalUnit+Location-Device changes of only punctuation or a single character</span></h3>'
+        f'<p class="notice" style="border-left-color:{_C["neutral"]}">These FunctionalUnit+Location-Device '
+        f'values differ only by punctuation or a single character — a stray text-guard apostrophe, a whitespace '
+        f'tweak, a one-char typo or renumber. A person reading the sheet normalizes past them without thinking; '
+        f'<strong>automated processing may not</strong> — it can read <code>-&#39;Q66305</code> and '
+        f'<code>-Q66305</code> as two different devices and fail to line the two revisions up, unless that '
+        f'normalization is explicitly handled. Counts unchanged; listed here only.</p>'
         f'{_table(["Node", "Scope", "What changed (old → new)"], noise_rows, "none")}') if noise_blocks else ""
 
     return f'''<section>
@@ -448,10 +448,10 @@ def _area_section(area: dict) -> str:
         f'<h3 style="margin-top:18px">Noise — device-tag cleanup '
         f'<span class="hint">device_tag changes of only punctuation or a single character</span></h3>'
         f'<p class="notice" style="border-left-color:{_C["neutral"]}">These device_tag values differ only by '
-        f'punctuation or a single character (e.g. <code>--K66901</code> → <code>-K66901</code>). A human '
-        f'normalizes past them; <strong>the software may not</strong> — the AREA match keys on the device tag, so '
-        f'an un-managed punctuation change can read as a different device and mis-route the safety mapping. '
-        f'Counts unchanged; listed here only.</p>'
+        f'punctuation or a single character (e.g. <code>--K66901</code> → <code>-K66901</code>). A person '
+        f'normalizes past them; <strong>automated processing may not</strong> — the AREA matching keys on the '
+        f'device tag, so an unmanaged punctuation change can read as a different device and mis-route the safety '
+        f'mapping. Counts unchanged; listed here only.</p>'
         f'{_table(["Sheet", "Description", "Change (old → new)"], noise_rows, "none")}') if noise else ""
 
     return f'''<section>
@@ -509,9 +509,9 @@ def render_html(result: dict) -> str:
 <style>{_STYLE}</style></head><body>
 <h1>Before vs after — document quality report</h1>
 <div class="meta">Project {esc(meta["project_code"]) or "—"} · generated {esc(meta["generated"])} · a "what went wrong" review</div>
-<p class="intro">This report compares the previous revision of the project's hand-authored documents — the I/O List and the Cause &amp; Effect Matrix — against the current revision, classifying every change between them. Its purpose is to make the quality of the human work visible: where the earlier revision was wrong or left incomplete, how costly each correction is to apply once the machine is built (a re-addressing is the most expensive), and which changes affect the safety logic — so the documents and the engineering workflow can be improved. It is a read-only review aid: it never modifies the documents and is not a step in the build pipeline.</p>
+<p class="intro">This report summarizes the effort that went into bringing the project to life. It compares the previous revision of the project's documents — the I/O List and the Cause &amp; Effect Matrix — with the current one and classifies every change between them, measuring the work done: completions, corrections, address re-mapping, and changes to the safety logic, with the items costliest to apply on a built machine highlighted first. It is a read-only review and changes nothing.</p>
 {_iolist_section(result["iolist"])}
 {_cematrix_section(result["cematrix"])}
 {_area_section(result["area"])}
-<footer>Structural re-keying (I/O address / slot / pin / device tag) is the most time-consuming correction to apply on a built machine, so it is COUNTED and grouped by node — not hidden. A coordinated re-map is flagged as context, but every changed row is still a field to re-verify on site. Other field changes are itemized per row and tagged by direction (gap-fill / value-change / value-loss). Tiers come from change_weights.csv. Full per-row detail is in the CSV audit trail beside this file.</footer>
+<footer>Structural re-keying (I/O address / slot / pin / device tag) is the most time-consuming correction to apply on a built machine, so it is counted and grouped by node — not hidden. A coordinated re-map is flagged as context, but every changed row is still a field to re-verify on site. Other field changes are listed per row and tagged by direction (a blank filled / a value changed / a value lost). Full per-row detail is in the companion CSV file.</footer>
 </body></html>'''
