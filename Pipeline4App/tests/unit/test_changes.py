@@ -212,6 +212,26 @@ def test_address_lines_classify():
     ok("Node move" in move, "node coord changed -> node move")
 
 
+def test_fld_noise_predicate():
+    ok(classify._fld_noise("-'Q66305..6", "-Q66305..6"), "a stray text-guard apostrophe = noise")
+    ok(classify._fld_noise("=S1 +A", "=S1+A"), "whitespace-only change = noise")
+    ok(classify._fld_noise("-K66901", "-K66902"), "one alphanumeric char (1->2) = noise")
+    ok(not classify._fld_noise("-K66901", "-K77902"), "several alphanumeric chars differ = NOT noise")
+    ok(not classify._fld_noise("-K1", "-K123"), "two added chars = NOT noise")
+
+
+def test_fld_noise_category():
+    # a row whose ONLY change is a noise FLD edit -> the noise listing, NOT corrections; counts unchanged.
+    o = _row(1, profinet_name="N1", functional_unit="=S1", location="+A", device="-'K1", desc_l1="RELAY")
+    n = _row(1, profinet_name="N1", functional_unit="=S1", location="+A", device="-K1", desc_l1="RELAY")
+    res = classify.classify_iolist(
+        {"pairs": [{"old": o, "new": n, "tier": "T1", "confidence": "high"}], "removed": [], "added": []},
+        {**WEIGHTS, "device": "critical"})
+    eq(res["correction_count"], 0, "the apostrophe-only FLD change is NOT a real correction")
+    eq(len(res["noise_blocks"]), 1, "it lands in the noise category")
+    eq(res["by_tier"]["critical"], 1, "but the row is still counted in by_tier - the change is listing-only")
+
+
 def test_read_error_degrades():
     import _harness                                          # two real files that are NOT workbooks
     a, b = __file__, _harness.__file__
@@ -243,6 +263,8 @@ TESTS = [
     ("empty_read_not_green", test_empty_read_not_green),
     ("address_decompose", test_address_decompose),
     ("address_lines_classify", test_address_lines_classify),
+    ("fld_noise_predicate", test_fld_noise_predicate),
+    ("fld_noise_category", test_fld_noise_category),
     ("read_error_degrades", test_read_error_degrades),
 ]
 

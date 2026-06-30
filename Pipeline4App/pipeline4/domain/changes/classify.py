@@ -49,6 +49,33 @@ def _direction(old_value, new_value) -> str:
     return "value-change"
 
 
+def _lev_le1(a: str, b: str) -> bool:
+    """True when the Levenshtein distance between `a` and `b` is <= 1 (one insert/delete/substitute)."""
+    if a == b:
+        return True
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+    i = 0
+    while i < min(la, lb) and a[i] == b[i]:
+        i += 1
+    if la == lb:
+        return a[i + 1:] == b[i + 1:]                      # substitution
+    if la > lb:
+        return a[i + 1:] == b[i:]                          # deletion from a
+    return a[i:] == b[i + 1:]                              # insertion into a
+
+
+def _fld_noise(old, new) -> bool:
+    """A FLD value change is NOISE when - after dropping every non-alphanumeric char - the two values
+    differ by AT MOST ONE alphanumeric character. So a punctuation/whitespace-only change (e.g. a stray
+    text-guard apostrophe `-'Q66305 -> -Q66305`) or a single-char typo/renumber. Operator's rule, applied
+    ONLY to the FLD fields."""
+    ao = re.sub(r"[^a-z0-9]", "", str(old or "").lower())
+    an = re.sub(r"[^a-z0-9]", "", str(new or "").lower())
+    return _lev_le1(ao, an)
+
+
 _ADDR = re.compile(r"^([A-Za-z]+)\s*(\d+)(?:\.(\d+))?$")
 
 
@@ -183,6 +210,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
     intact = changed = unused = complementary = 0
     corrections: list = []           # itemized corrections on REAL signals (each carries its `confidence`)
     complementary_entries: list = []  # changes on no-description (unused) rows
+    noise_entries: list = []         # FLD-only changes that are noise (punctuation / <=1 alphanumeric char)
     by_tier = {"critical": 0, "major": 0, "minor": 0}
     by_direction = {"gap-fill": 0, "value-change": 0, "value-loss": 0}
     struct: dict = defaultdict(int)          # (node, field) -> changed-row count (structural / re-scheme)
@@ -239,10 +267,16 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
                  "row_new": new.get("_row"), "fld": fld(old), "desc": desc(old).replace("|", " ").strip(),
                  "diffs": diffs, "tier": item_tier, "directions": sorted({d["direction"] for d in diffs}),
                  "regression": regression, "confidence": pair["confidence"]}
-        corrections.append(entry)    # channel-uncertain rows stay here too; flagged at the block level
+        # NOISE (operator's rule): a row whose itemized changes are ALL FLD and each is noise (punctuation /
+        # <=1 alphanumeric char). Broken out into its own listing only - the severity counts are unchanged.
+        if all(f in _RENAME_FIELDS and _fld_noise(old.get(f), new.get(f)) for f in itemized):
+            noise_entries.append(entry)
+        else:
+            corrections.append(entry)
 
     correction_blocks = _aggregate_by_node(corrections)       # all itemized, grouped per node (confidence per block)
     complementary_blocks = _aggregate_by_node(complementary_entries)   # unused-channel changes, grouped per node
+    noise_blocks = _aggregate_by_node(noise_entries)          # FLD noise (punctuation / 1-char), grouped per node
     grouped_changes = [{"node": n, "field": f, "count": c, "tier": struct_tier[f],
                         "label": _EVENT_LABELS.get(f, f), "changes": struct_detail[(n, f)]}
                        for (n, f), c in struct.items()]
@@ -261,7 +295,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
         "complementary": complementary, "complementary_blocks": complementary_blocks,
         "removed": [_row_brief(r) for r in match_result["removed"]],
         "corrections": corrections, "correction_count": len(corrections),
-        "correction_blocks": correction_blocks,
+        "correction_blocks": correction_blocks, "noise_blocks": noise_blocks,
         "by_tier": by_tier, "by_direction": by_direction,
         "regressions": [c for c in corrections if c["regression"]],
         "grouped_changes": grouped_changes, "structural": structural_list,

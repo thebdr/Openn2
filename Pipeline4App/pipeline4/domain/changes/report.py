@@ -300,6 +300,15 @@ def _iolist_section(iol: dict) -> str:
         f'address would reproduce the original class of mistake, so it is tracked for review.</p>'
         f'{_table(["Node", "Scope", "What changed (old → new)"], comp_rows, "none")}') if comp_blocks else ""
 
+    noise_blocks = sorted(iol.get("noise_blocks", []),
+                          key=lambda b: (-{"critical": 3, "major": 2, "minor": 1}.get(b["tier"], 0), -b["count"]))
+    noise_rows = [[esc(b["node"]), _scope(b), _block_changes(b)] for b in noise_blocks[:60]]
+    noise_section = (
+        f'<h3 style="margin-top:22px">Noise — FLD cleanup '
+        f'<span class="hint">FLD changes that are only punctuation or a single character — likely text-guard '
+        f'/ typo cleanups, not real corrections (counts unchanged; listed here only)</span></h3>'
+        f'{_table(["Node", "Scope", "What changed (old → new)"], noise_rows, "none")}') if noise_blocks else ""
+
     return f'''<section>
   <h2>I/O list <span class="sub">{esc(iol["before"])} → {esc(iol["after"])} · {iol["before_rows"]}→{iol["after_rows"]} rows</span></h2>
   <div class="cards">{cards}</div>
@@ -314,6 +323,7 @@ def _iolist_section(iol: dict) -> str:
   {_table(["Tier", "Node", "Scope", "What changed (old → new)"], crows, "no other corrections")}
   {more}
   <p class="hint" style="margin-top:6px"><span class="badge" style="--bc:{_C["neutral"]}">⚠ channel mapping unverified</span> = a multichannel device whose channels were re-addressed/re-pinned, so the edits are shown but not which specific channel got which.</p>
+  {noise_section}
   {comp_section}
   {up_section}
 </section>'''
