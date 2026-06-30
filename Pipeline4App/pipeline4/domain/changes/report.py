@@ -306,8 +306,13 @@ def _iolist_section(iol: dict) -> str:
     noise_rows = [[esc(b["node"]), _scope(b), _block_changes(b)] for b in noise_blocks[:60]]
     noise_section = (
         f'<h3 style="margin-top:22px">Noise — FLD cleanup '
-        f'<span class="hint">FLD changes that are only punctuation or a single character — likely text-guard '
-        f'/ typo cleanups, not real corrections (counts unchanged; listed here only)</span></h3>'
+        f'<span class="hint">FLD changes of only punctuation or a single character</span></h3>'
+        f'<p class="notice" style="border-left-color:{_C["neutral"]}">These FLD values differ only by '
+        f'punctuation or a single character — a stray text-guard apostrophe, a whitespace tweak, a one-char '
+        f'typo or renumber. A human reading the sheet normalizes past them without thinking; '
+        f'<strong>the software may not</strong> — it can read <code>-&#39;Q66305</code> and '
+        f'<code>-Q66305</code> as two different identities and break the cross-document join, unless that '
+        f'normalization is explicitly managed. Counts unchanged; listed here only.</p>'
         f'{_table(["Node", "Scope", "What changed (old → new)"], noise_rows, "none")}') if noise_blocks else ""
 
     return f'''<section>
@@ -319,8 +324,9 @@ def _iolist_section(iol: dict) -> str:
   {addr_callout}
   {_table(["Tier", "Field", "Rows", "Nodes"], struct_summary, "no structural changes")}
   {ctx}
-  {f'<h4 style="margin:16px 0 4px;font-size:13px;font-weight:500">By node — old → new</h4>{_table(["Tier", "Node", "Field", "Rows", "Changes (old → new)"], gnode_rows)}{gmore}' if gnode_rows else ""}
+  {f'<h4 style="margin:16px 0 4px;font-size:13px;font-weight:500">By node — old → new</h4><p class="notice" style="border-left-color:{_C["critical"]}">The per-node breakdown of the structural re-keying above — the actual old → new values, grouped by transformation (byte relocation, bit reshuffle, in↔out flip, device rename). Each is a field to re-verify and apply on the machine.</p>{_table(["Tier", "Node", "Field", "Rows", "Changes (old → new)"], gnode_rows)}{gmore}' if gnode_rows else ""}
   <h3>Corrections — by node <span class="hint">non-structural field edits, grouped per node, with direction</span></h3>
+  <p class="notice" style="border-left-color:{_C["corrected"]}">Genuine content fixes on REAL (described) signals — descriptions, type, safety contact sense, terminal refs — grouped per node and tagged by direction: gap-fill (a blank finally filled), value-change (a value corrected), or value-loss (a value that got worse). These are the "what went wrong" edits to review.</p>
   {_table(["Tier", "Node", "Scope", "What changed (old → new)"], crows, "no other corrections")}
   {more}
   <p class="hint" style="margin-top:6px"><span class="badge" style="--bc:{_C["neutral"]}">⚠ channel mapping unverified</span> = a multichannel device whose channels were re-addressed/re-pinned, so the edits are shown but not which specific channel got which.</p>
