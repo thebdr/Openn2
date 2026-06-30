@@ -220,6 +220,9 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
     def _grouped(field: str) -> bool:
         return field in _GROUP_BY_NODE or (field in _RENAME_FIELDS and bulk_rename)
 
+    def _is_noise_diff(d: dict) -> bool:                  # an FLD change that is punctuation / <=1 alnum char
+        return d["field"] in _RENAME_FIELDS and _fld_noise(d["old"], d["new"])
+
     for pair in pairs:
         old, new = pair["old"], pair["new"]
         node = old.get("_node", "")
@@ -261,18 +264,19 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
                  for f in itemized]
         for d in diffs:
             by_direction[d["direction"]] += 1
-        item_tier = max((d["tier"] for d in diffs), key=lambda t: TIER_RANK.get(t, 1))
-        regression = any(d["direction"] == "value-loss" and d["tier"] in ("critical", "major") for d in diffs)
-        entry = {"node": node, "sheet": old.get("_sheet"), "row_old": old.get("_row"),
-                 "row_new": new.get("_row"), "fld": fld(old), "desc": desc(old).replace("|", " ").strip(),
-                 "diffs": diffs, "tier": item_tier, "directions": sorted({d["direction"] for d in diffs}),
-                 "regression": regression, "confidence": pair["confidence"]}
-        # NOISE (operator's rule): a row whose itemized changes are ALL FLD and each is noise (punctuation /
-        # <=1 alphanumeric char). Broken out into its own listing only - the severity counts are unchanged.
-        if all(f in _RENAME_FIELDS and _fld_noise(old.get(f), new.get(f)) for f in itemized):
-            noise_entries.append(entry)
-        else:
-            corrections.append(entry)
+        # split PER DIFF: an FLD diff that is noise goes to the noise listing even when the row ALSO has
+        # real changes (the rest stays a correction). Severity counts (by_tier/by_direction) are unchanged.
+        base = {"node": node, "sheet": old.get("_sheet"), "row_old": old.get("_row"),
+                "row_new": new.get("_row"), "fld": fld(old), "desc": desc(old).replace("|", " ").strip(),
+                "confidence": pair["confidence"]}
+        for bucket, part in ((corrections, [d for d in diffs if not _is_noise_diff(d)]),
+                             (noise_entries, [d for d in diffs if _is_noise_diff(d)])):
+            if part:
+                bucket.append({**base, "diffs": part,
+                               "tier": max((d["tier"] for d in part), key=lambda t: TIER_RANK.get(t, 1)),
+                               "directions": sorted({d["direction"] for d in part}),
+                               "regression": any(d["direction"] == "value-loss" and d["tier"] in ("critical", "major")
+                                                 for d in part)})
 
     correction_blocks = _aggregate_by_node(corrections)       # all itemized, grouped per node (confidence per block)
     complementary_blocks = _aggregate_by_node(complementary_entries)   # unused-channel changes, grouped per node
