@@ -32,38 +32,19 @@ def _badge(text: str, color: str) -> str:
     return f'<span class="badge" style="--bc:{color}">{esc(text)}</span>'
 
 
-def _bar(segments: list) -> str:
-    """segments = [(width_pct, color, label)]; renders a stacked bar + a legend."""
+def _bar(segments: list, thin: bool = False) -> str:
+    """segments = [(width_pct, color, label)]; renders a stacked bar + a legend. `thin` for a slimmer bar."""
     cells = "".join(f'<div style="width:{w:.1f}%;background:{c}"></div>' for w, c, _ in segments if w > 0)
     legend = "".join(f'<span class="lg"><span class="sw" style="background:{c}"></span>{esc(label)}</span>'
                      for _, c, label in segments if label)
-    return f'<div class="bar">{cells}</div><div class="legend">{legend}</div>'
+    return f'<div class="bar{" bar-thin" if thin else ""}">{cells}</div><div class="legend">{legend}</div>'
 
 
-def _hbars(rows: list, color: str) -> str:
-    """rows = [(label, count)] -> horizontal bars whose fill is each value's SHARE OF THE GROUP TOTAL, so
-    the bar lengths read as real percentages (they add up to 100%). The count + % are shown."""
-    total = sum(n for _, n in rows) or 1
-    out = []
-    for label, n in rows:
-        pct = 100 * n / total
-        out.append(f'<div class="hb"><span class="hb-l">{esc(label)}</span>'
-                   f'<span class="hb-t"><span class="hb-f" style="width:{pct:.0f}%;background:{color}">'
-                   f'</span></span><span class="hb-n">{esc(n)} · {pct:.0f}%</span></div>')
-    return "".join(out)
+def _seq_colors(n: int) -> list:
+    """n visually-distinct colours stepping the hue wheel - an arbitrary but consistent SEQUENCE (the by-field
+    'what was changed' bar carries no severity meaning, so colour is decorative, not semantic)."""
+    return [f"hsl({(210 + i * 38) % 360}, 52%, 53%)" for i in range(max(n, 1))]
 
-
-def _nature_bars(rows: list) -> str:
-    """rows = [(label, count, color)] -> horizontal bars, each scaled to the GROUP TOTAL (they sum to 100%),
-    with a per-row colour (unlike `_hbars`'s single colour)."""
-    total = sum(n for _, n, _ in rows) or 1
-    out = []
-    for label, n, color in rows:
-        pct = 100 * n / total
-        out.append(f'<div class="hb"><span class="hb-l">{esc(label)}</span>'
-                   f'<span class="hb-t"><span class="hb-f" style="width:{pct:.0f}%;background:{color}">'
-                   f'</span></span><span class="hb-n">{esc(n)} · {pct:.0f}%</span></div>')
-    return "".join(out)
 
 
 def _table(headers: list, rows: list, empty: str = "none") -> str:
@@ -286,28 +267,24 @@ def _iolist_section(iol: dict) -> str:
         ctx = (f'<p class="hint" style="margin:8px 0 0">These follow a coordinated re-map ({joined}) — '
                f'but each row is still a separate address to re-verify and apply on site, not a free pass.</p>')
 
-    nat = iol.get("by_nature", {"address": 0, "completion": 0, "other": 0})
-    nat_rows = sorted([("I/O address re-map", nat["address"], _C["critical"]),
-                       ("Completion (blank → filled)", nat["completion"], _C["completion"]),
-                       ("Value change / rename", nat["other"], _C["major"])],
-                      key=lambda r: -r[1])                  # most-impacted first
-    # Neutral, factual list of WHAT WAS CHANGED, by field, comma-separated, only the >0 types, most first.
+    # WHAT WAS CHANGED, by field: a thin stacked bar (like the composition bar above, but slimmer) - each
+    # segment is a correction TYPE as a share of all field changes in used rows. Colour is a decorative
+    # sequence, not severity. Address fields merge into one "I/O addresses"; only >0 types, most first.
     bf = iol.get("by_field", {})
     addr_used = sum(bf.get(f, 0) for f in _ADDR_FIELDS)
-    addr_total = addr_used + iol.get("comp_addr", 0)
-    items = []
-    if addr_total:
-        items.append(f'{addr_total} I/O addresses ({addr_used} in used rows)')
-    for field, n in sorted(bf.items(), key=lambda kv: -kv[1]):
-        if field in _ADDR_FIELDS or not n:
-            continue
-        items.append(f'{n} {esc(_flabel(field))}')
-    changed_list = ", ".join(items) or "no field changes"
-    sev_panel = (f'<div class="panel"><h3>Nature of the {changed} reworked rows '
-                 f'<span class="hint">each row by its costliest change — the cost axis the bar above doesn\'t '
-                 f'show</span></h3>{_nature_bars(nat_rows)}'
-                 f'<p style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);font-size:13px">'
-                 f'<strong>What was changed:</strong> {changed_list}.</p></div>')
+    field_counts = ([("I/O addresses", addr_used)] if addr_used else []) + \
+                   [(_flabel(field), n) for field, n in bf.items() if field not in _ADDR_FIELDS and n]
+    field_counts.sort(key=lambda kv: -kv[1])
+    ftotal = sum(n for _, n in field_counts) or 1
+    colors = _seq_colors(len(field_counts))
+    nat_seg = [(100 * n / ftotal, colors[i], f'{label} {n} · {100 * n / ftotal:.0f}%')
+               for i, (label, n) in enumerate(field_counts)]
+    comp_addr = iol.get("comp_addr", 0)
+    addr_note = (f'<p class="hint" style="margin-top:6px">I/O addresses: {addr_used} in used rows · '
+                 f'+{comp_addr} on unused channels (see Complementary reviews).</p>' if comp_addr else "")
+    sev_panel = (f'<div class="panel"><h3>What was changed '
+                 f'<span class="hint">by field — share of the {ftotal} field changes in used rows '
+                 f'(a row can change several fields)</span></h3>{_bar(nat_seg, thin=True)}{addr_note}</div>')
     up_blocks = []
     for u in sorted(iol["upgrades"], key=lambda u: -u["count"]):
         drows = [[esc(r["desc"]), _mu(r["fld"]), (f'<code>{esc(r["address"])}</code>' if r["address"] else "")]
@@ -501,13 +478,11 @@ h3{font-size:14px;font-weight:600;margin:18px 0 8px}.sub,.hint{font-weight:400;c
 .dot{width:9px;height:9px;border-radius:2px;display:inline-block}
 .barwrap{margin:18px 0}.bar-title{font-size:12px;color:var(--mut);margin-bottom:6px}
 .bar{display:flex;height:22px;border-radius:6px;overflow:hidden;border:1px solid var(--bd)}
+.bar-thin{height:12px;border-radius:5px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:12px;color:var(--mut)}
 .lg{display:flex;align-items:center;gap:5px}.sw{width:10px;height:10px;border-radius:2px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:14px 0}
 .panel{background:var(--card);border-radius:10px;padding:12px 15px}.panel h3{margin-top:0}
-.hb{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--mut);margin:7px 0}
-.hb-l{flex:0 0 auto;max-width:62%}.hb-t{flex:1;height:12px;background:var(--bd);border-radius:4px;overflow:hidden}
-.hb-f{display:block;height:100%}.hb-n{flex:0 0 auto;width:72px;text-align:right;font-variant-numeric:tabular-nums}
 table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0}
 th{text-align:left;color:var(--mut);font-weight:500;border-bottom:1px solid var(--bd);padding:6px 9px}
 td{border-bottom:1px solid var(--bd);padding:6px 9px;vertical-align:top}
