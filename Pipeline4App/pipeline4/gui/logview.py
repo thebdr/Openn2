@@ -33,6 +33,7 @@ class LogView(ttk.Frame):
         self._family = theme.MONO_FONT[0]         # the log font family + a live-resizable size (Font dropdown)
         self._size = int(font_size or theme.MONO_FONT[1])
         self._accent = _ACCENT_DARK               # updated by set_theme() on a mode toggle
+        self._sink = None                         # an open text file when 'log to file' is ON (host-owned)
 
         self.text = tk.Text(self, wrap="none", relief="flat", borderwidth=0, state="disabled",
                             background=theme.DARK_BG, foreground=theme.DARK_FG,
@@ -65,6 +66,7 @@ class LogView(ttk.Frame):
         self.text.insert("end", f"{message}\n", tag)
         self.text.see("end")
         self.text.configure(state="disabled")
+        self._tee(f"[{level}] {message}")
 
     def _phase_gap(self) -> None:
         """Two blank lines (2 CRLF) before a blue PHASE banner/title, so each phase block gets breathing
@@ -81,6 +83,7 @@ class LogView(ttk.Frame):
                 self._phase_gap()                       # 2 CRLF before the blue title
                 for line in banner_lines(rec.text)[1:]:  # drop banner_lines' own leading blank; the gap owns it
                     self.text.insert("end", line + "\n", "PHASE")
+                    self._tee(line)
                 continue
             start = self.text.index("end-1c")
             tag = rec.level if rec.level in theme.LOG_COLORS else "INFO"
@@ -88,8 +91,25 @@ class LogView(ttk.Frame):
             self._tag_errlink(start, rec)
             for span in rec.links:
                 self._tag_link_span(start, span)
+            self._tee(rec.text)
         self.text.see("end")
         self.text.configure(state="disabled")
+
+    def set_sink(self, sink) -> None:
+        """Set (or clear, with None) the open text file the log is tee'd to while 'log to file' is ON. The
+        host owns the file's lifecycle (open on toggle-on, close on toggle-off / window close)."""
+        self._sink = sink
+
+    def _tee(self, line: str) -> None:
+        """Mirror one plain log line to the file sink (if any). Best-effort - a write failure never breaks
+        the UI; the host can surface it."""
+        if self._sink is None:
+            return
+        try:
+            self._sink.write(line + "\n")
+            self._sink.flush()
+        except (OSError, ValueError):                   # closed/unwritable file - drop the tee silently
+            pass
 
     def set_shown_levels(self, levels) -> None:
         """Set which log levels are visible (FAIL/ERROR/PHASE are always shown). Hides/shows in place via

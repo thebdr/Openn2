@@ -11,3 +11,11 @@ user_interface:
   #   F = FAIL   E = ERROR   W = WARN   I = INFO   S = SKIP   P = PASS   D = DEBUG
   # PHASE section banners always show. (Omit a letter to hide that level.)
   log_levels: [F, E, W, I, S, P, D]
+  # GUI colour theme: dark | light. Toggled live by the Theme button and persisted here. Unknown -> dark.
+  theme: dark
+  # Tee the log to a timestamped file (ProjectDocumentation/Reports/Logs/pl4_log_<stamp>.txt) while the GUI
+  # runs. Toggled live by the 'Log to file' button. true | false.
+  log_to_file: false
+  # The GUI window size, saved on close. Default 1180 x 720 when absent.
+  width: 1180
+  height: 720

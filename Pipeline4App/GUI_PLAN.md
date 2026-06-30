@@ -177,7 +177,14 @@ PL3's `gui/` (`app_main`/`phasebar`/`logview`/`files`/`grid`/`objedit`/`xlsxview
     `projected 9 XMLs`) + the non-100 phase banners. Tests: `test_validation_i18n.py` (6) + `test_i18n.py`
     (5) + `test_gui_phases.py` (`labels_resolve_in_both_languages`); a headless EN<->IT chrome toggle smoke +
     a real-data EN-vs-IT report check.
-- **M7 — Polish**: theme/size persistence (`app_config.yaml` already read by `load_app_ui`), log-to-file.
+- **M7 — Polish. DONE** (pending a manual GUI smoke): **theme persistence** (`app_config.yaml`
+  `user_interface.theme` light|dark; `load_app_ui` reads it, the window starts in it, the Theme button
+  persists via `config.save_app_theme`), **window-size persistence** (`width`/`height` read at startup +
+  saved on close via a `WM_DELETE_WINDOW` handler + `config.save_app_window_size`; default 1180x720), and
+  **log-to-file** (a toolbar toggle that tees every log line - `LogView._sink` - to a timestamped
+  `ProjectDocumentation/Reports/Logs/pl4_log_<stamp>.txt`; on/off persisted via `config.save_app_log_to_file`,
+  resumed next launch). The 5 simple `save_app_*` savers now share `config._save_app_ui(**updates)`. Tests:
+  `test_app_config.py` (+the resolvers/roundtrip/log-dir; 5 cases).
 
 ## Risks / gotchas
 - **JSON cells corrupt under a naive grid edit** — any table edit MUST go through `table.read_csv`/`write_csv`

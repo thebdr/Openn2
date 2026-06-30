@@ -129,6 +129,12 @@ VALIDATION_REPORT_STEM = "documents_validation_report"   # phase-100 complete re
 VALIDATION_ERRORS_STEM = "documents_validation_errors"   # phase-100 errors-only report (+ .txt / .html)
 
 
+def gui_log_dir() -> str:
+    """Where the GUI's optional 'log to file' tee writes (`pl4_log_<stamp>.txt`) - a Logs/ subfolder of the
+    reports tree."""
+    return os.path.join(validation_report_dir(), "Logs")
+
+
 def changes_report_dir() -> str:
     """The ph100 before/after quality report (`io_documents_quality_report.html` + `.csv`) - DOCUMENTATION
     under ProjectDocumentation/Reports (same tree as the validation/coverage reports; NOT a BuilderData
@@ -220,6 +226,9 @@ APP_FONT_SIZES = (10, 12, 14)             # the log-viewer Font dropdown choices
 _DEFAULT_FONT_SIZE = 10
 
 
+_DEFAULT_WINDOW = (1180, 720)             # GUI window fallback when app_config has no saved size
+
+
 def _resolve_font_size(value) -> int:
     """Coerce a stored font-size value to one of APP_FONT_SIZES (default 10 on anything else)."""
     try:
@@ -229,12 +238,28 @@ def _resolve_font_size(value) -> int:
     return size if size in APP_FONT_SIZES else _DEFAULT_FONT_SIZE
 
 
+def _resolve_theme(value) -> str:
+    """Coerce a stored theme to 'light' | 'dark' (default 'dark')."""
+    return "light" if str(value or "").strip().lower() == "light" else "dark"
+
+
+def _resolve_dim(value, default: int) -> int:
+    """Coerce a stored window dimension to a sane positive int (>= 400), else the default."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return default
+    return n if n >= 400 else default
+
+
 def load_app_ui() -> dict:
     """The `user_interface` block of app_config.yaml. `log_levels` -> the SET of log levels the GUI shows
     (`severity.resolve_set`: single chars or full names, first-char parsed; the PHASE banner always
     shown). `language` -> the GUI language code (`en`/`it`, default `en`). `font_size` -> the log-viewer
-    font size (one of APP_FONT_SIZES, default 10). Absent file/key -> `severity.default_shown()` (all
-    finding levels except DEBUG) + `en` + 10."""
+    font size (one of APP_FONT_SIZES, default 10). `theme` -> 'light'/'dark' (default dark). `width`/`height`
+    -> the saved window size (default 1180x720). `log_to_file` -> whether the GUI tees its log to a file
+    (default False). Absent file/key -> `severity.default_shown()` (all finding levels except DEBUG) + `en`
+    + 10 + dark + 1180x720 + no tee."""
     from pipeline4.core import severity, i18n
     path = app_config_file()
     cfg = _read_yaml(path) if os.path.exists(path) else {}
@@ -242,46 +267,58 @@ def load_app_ui() -> dict:
     raw = ui.get("log_levels")
     return {"log_levels": severity.resolve_set(raw) if raw else severity.default_shown(),
             "language": i18n.normalize(ui.get("language")),
-            "font_size": _resolve_font_size(ui.get("font_size"))}
+            "font_size": _resolve_font_size(ui.get("font_size")),
+            "theme": _resolve_theme(ui.get("theme")),
+            "width": _resolve_dim(ui.get("width"), _DEFAULT_WINDOW[0]),
+            "height": _resolve_dim(ui.get("height"), _DEFAULT_WINDOW[1]),
+            "log_to_file": bool(ui.get("log_to_file"))}
+
+
+def _save_app_ui(**updates) -> None:
+    """Set `user_interface.<key> = value` for each kwarg in `app_config.yaml`, round-tripping the file so its
+    comments survive. The shared writer behind the simple per-key savers (`save_app_log_levels` is bespoke -
+    it builds a flow-style code sequence)."""
+    from ruamel.yaml import YAML
+    path = app_config_file()
+    yaml = YAML()                                   # round-trip mode - preserves comments
+    data = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            data = yaml.load(handle) or {}
+    ui = data.get("user_interface")
+    if not isinstance(ui, dict):                    # an absent OR empty (`user_interface:`) block -> {}
+        ui = data["user_interface"] = {}
+    ui.update(updates)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        yaml.dump(data, handle)
 
 
 def save_app_font_size(size) -> None:
-    """Persist the log-viewer font size to `app_config.yaml` `user_interface.font_size` (one of
-    APP_FONT_SIZES). Round-trips the file so its comments survive."""
-    from ruamel.yaml import YAML
-    path = app_config_file()
-    yaml = YAML()                                   # round-trip mode - preserves comments
-    data = {}
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as handle:
-            data = yaml.load(handle) or {}
-    ui = data.get("user_interface")
-    if not isinstance(ui, dict):                    # an absent OR empty (`user_interface:`) block -> {}
-        ui = data["user_interface"] = {}
-    ui["font_size"] = _resolve_font_size(size)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        yaml.dump(data, handle)
+    """Persist the log-viewer font size (one of APP_FONT_SIZES)."""
+    _save_app_ui(font_size=_resolve_font_size(size))
 
 
 def save_app_language(lang: str) -> None:
-    """Persist the GUI language to `app_config.yaml` `user_interface.language` (`en`/`it`). Round-trips the
-    file so its comments survive."""
-    from ruamel.yaml import YAML
+    """Persist the GUI language (`en`/`it`)."""
     from pipeline4.core import i18n
-    path = app_config_file()
-    yaml = YAML()                                   # round-trip mode - preserves comments
-    data = {}
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as handle:
-            data = yaml.load(handle) or {}
-    ui = data.get("user_interface")
-    if not isinstance(ui, dict):                    # an absent OR empty (`user_interface:`) block -> {}
-        ui = data["user_interface"] = {}
-    ui["language"] = i18n.normalize(lang)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        yaml.dump(data, handle)
+    _save_app_ui(language=i18n.normalize(lang))
+
+
+def save_app_theme(mode: str) -> None:
+    """Persist the GUI theme (`light`/`dark`)."""
+    _save_app_ui(theme=_resolve_theme(mode))
+
+
+def save_app_window_size(width, height) -> None:
+    """Persist the GUI window size (clamped to a sane minimum)."""
+    _save_app_ui(width=_resolve_dim(width, _DEFAULT_WINDOW[0]),
+                 height=_resolve_dim(height, _DEFAULT_WINDOW[1]))
+
+
+def save_app_log_to_file(enabled) -> None:
+    """Persist whether the GUI tees its log to a file."""
+    _save_app_ui(log_to_file=bool(enabled))
 
 
 def save_app_log_levels(levels) -> None:

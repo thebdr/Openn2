@@ -100,6 +100,7 @@ STRINGS: dict = {
     "tb_levels":    {"en": "Levels", "it": "Livelli"},
     "tb_font":      {"en": "Font", "it": "Carattere"},
     "tb_lang":      {"en": "Lang", "it": "Lingua"},
+    "tb_log_to_file": {"en": "Log to file", "it": "Log su file"},
     "tb_project":   {"en": "Project", "it": "Progetto"},
     "pm_builtin":   {"en": "builtin (Shared)", "it": "predefinito (Shared)"},
     "pm_new":       {"en": "New Project", "it": "Nuovo progetto"},

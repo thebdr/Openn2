@@ -35,16 +35,19 @@ APP_TITLE = "Pipeline4 - SSOT database build"
 class App:
     def __init__(self, root):
         self.root = root
-        self.mode = "dark"
         self._busy = False
         self._run_halted = False              # set by _gate on a blocking FAIL -> Run-all stops the chain
         self._q: queue.Queue = queue.Queue()
         app_ui = config.load_app_ui()
+        self.mode = app_ui["theme"]           # light | dark (live-toggled by the theme button, persisted)
         self.lang = app_ui["language"]        # en | it (live-toggled by the Lang button, persisted)
+        self._log_sink = None                 # the open tee file when 'log to file' is ON (host-owned)
+        self._log_to_file0 = app_ui["log_to_file"]   # was the tee ON last session? (enabled after the log exists)
         shown0 = app_ui["log_levels"]
         self._project = project.auto_reopen()  # re-point config at the last-opened project (None = builtin)
         self._set_title()
-        root.geometry("1180x720")
+        root.geometry(f"{app_ui['width']}x{app_ui['height']}")
+        root.protocol("WM_DELETE_WINDOW", self._on_close)   # persist window size + close the tee on exit
         backend = theme.apply_theme(root, self.mode)
 
         toolbar = ttk.Frame(root)
@@ -79,6 +82,8 @@ class App:
         self._font_combo.set(str(app_ui["font_size"]))
         self._font_combo.bind("<<ComboboxSelected>>", self._on_font_size)
         self._font_combo.pack(side="left", padx=2)
+        self._tb_logfile = ttk.Button(toolbar, text=self._logfile_label(), command=self._toggle_logfile)
+        self._tb_logfile.pack(side="left", padx=(10, 2))
         self._backend_label = ttk.Label(toolbar, text=f"theme: {backend}")
         self._backend_label.pack(side="right", padx=2)
 
@@ -121,6 +126,9 @@ class App:
         self.log.append("PHASE", "Pipeline4 - SSOT database build")
         self.log.append("INFO", f"theme backend: {backend}")
         self.log.append("INFO", "Click a phase to run it (on a worker thread), or Run Pipeline for all.")
+        if self._log_to_file0:                 # the tee was ON last session - resume it (the log now exists)
+            self._enable_log_sink()
+            self._tb_logfile.configure(text=self._logfile_label())
 
         # the Windows dark/light title bar - applied LAST, after every widget exists, so darktitle's
         # update_idletasks() doesn't flush sv-ttk's theming against a half-built window (PL3 order).
@@ -806,6 +814,7 @@ class App:
         self._levels_mb.configure(text=i18n.tr("tb_levels", self.lang) + " ▾")
         self._tb_font_label.configure(text=i18n.tr("tb_font", self.lang))
         self._tb_lang.configure(text=f"{i18n.tr('tb_lang', self.lang)}: {self.lang.upper()}")
+        self._tb_logfile.configure(text=self._logfile_label())
         self._tb_project.configure(text=i18n.tr("tb_project", self.lang) + " ▾")
         self.notebook.tab(self._log_tab, text=i18n.tr("tab_log", self.lang))
         self.notebook.tab(self._files_tab, text=i18n.tr("tab_files", self.lang))
@@ -826,7 +835,58 @@ class App:
         self.files.set_theme(self.mode)                      # Files text viewer bg/fg
         self.documents.set_theme(self.mode)                  # Documents tab (all ttk - no-op, for symmetry)
         darktitle.apply(self.root, self.mode == "dark")      # Windows title bar (widgets already exist)
+        config.save_app_theme(self.mode)                     # remember the choice for next launch
         self.log.append("INFO", f"theme -> {self.mode}")
+
+    # --- log-to-file tee (M7) ------------------------------------------------------------------- #
+    def _logfile_label(self) -> str:
+        state = "ON" if self._log_sink is not None else "OFF"
+        return f"{i18n.tr('tb_log_to_file', self.lang)}: {state}"
+
+    def _enable_log_sink(self) -> None:
+        """Open a timestamped log file under the reports tree and tee the log into it. Best-effort."""
+        import datetime
+        try:
+            folder = config.gui_log_dir()
+            os.makedirs(folder, exist_ok=True)
+            stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            path = os.path.join(folder, f"pl4_log_{stamp}.txt")
+            self._log_sink = open(path, "w", encoding="utf-8")
+            self.log.set_sink(self._log_sink)
+            self.log.append("INFO", f"  log -> {path}")
+        except OSError as exc:
+            self._log_sink = None
+            self.log.set_sink(None)
+            self.log.append("WARN", f"  could not open log file: {exc}")
+
+    def _disable_log_sink(self) -> None:
+        self.log.set_sink(None)
+        if self._log_sink is not None:
+            try:
+                self._log_sink.close()
+            except OSError:
+                pass
+            self._log_sink = None
+
+    def _toggle_logfile(self) -> None:
+        """Toggle the live 'log to file' tee, and persist the choice for next launch."""
+        if self._log_sink is None:
+            self._enable_log_sink()
+        else:
+            name = os.path.basename(getattr(self._log_sink, "name", "") or "")
+            self._disable_log_sink()
+            self.log.append("INFO", f"  log file closed{(': ' + name) if name else ''}")
+        config.save_app_log_to_file(self._log_sink is not None)
+        self._tb_logfile.configure(text=self._logfile_label())
+
+    def _on_close(self) -> None:
+        """Persist the window size + close the log tee, then destroy the window."""
+        try:
+            config.save_app_window_size(self.root.winfo_width(), self.root.winfo_height())
+        except Exception:                                    # noqa: BLE001 - never block a clean exit
+            pass
+        self._disable_log_sink()
+        self.root.destroy()
 
     def _clear(self):
         self.log.clear()
