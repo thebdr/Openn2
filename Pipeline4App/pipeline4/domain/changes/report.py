@@ -356,7 +356,8 @@ def _cematrix_section(ce: dict) -> str:
                      f'{f"<br><span class=hint>Pattern: {ctx}</span>" if ctx else ""}</p></div>')
     rollout = ""
     if ce.get("new_area_columns"):
-        rollout = (f'<div class="panel"><h3>New effect column (upgrade)</h3><p>'
+        rollout = (f'<div class="panel" style="border-left:3px solid {_C["upgrade"]}">'
+                   f'<h3>New effect column <span class="badge" style="--bc:{_C["upgrade"]}">upgrade</span></h3><p>'
                    f'{esc(", ".join(ce["new_area_columns"]))} rolled out across {ce["rollout_rows"]} cause rows '
                    f'<span class="hint">a feature roll-out, not corrections</span></p></div>')
     lost = _table(["Cause", "Area", "Description"],
@@ -364,8 +365,9 @@ def _cematrix_section(ce: dict) -> str:
                   "no effects removed (good)")
     up = ""
     if ce.get("added_upgrade"):
-        up = (f'<p class="notice good"><strong>Upgrade:</strong> +{ce["added_upgrade"]["count"]} new contiguous '
-              f'cause rows ({esc(ce["added_upgrade"]["desc"])}) — a coherent new block.</p>')
+        up = (f'<p class="notice" style="border-left-color:{_C["upgrade"]}"><strong style="color:{_C["upgrade"]}">'
+              f'Upgrade:</strong> +{ce["added_upgrade"]["count"]} new contiguous cause rows '
+              f'({esc(ce["added_upgrade"]["desc"])}) — a coherent new block.</p>')
     crows = [[_badge(c["tier"], _tier_color(c["tier"])), esc(c.get("concat_id")), esc(c["desc"]), _diff_cells(c["diffs"])]
              for c in ce["corrections"][:60]]
     return f'''<section>
@@ -389,13 +391,33 @@ def _area_section(area: dict) -> str:
             for s in counts]
     reorg = ""
     if area["reorganized"] or area["moved"]:
-        reorg = (f'<p class="notice"><strong>Structural reorganization:</strong> {area["moved"]} matched rows '
-                 f'moved to a different AREA sheet. The area taxonomy was restructured — review whether intentional.</p>')
+        reorg = (f'<p class="notice" style="border-left-color:{_C["critical"]}"><strong>Structural '
+                 f'reorganization:</strong> {area["moved"]} matched rows moved to a different AREA sheet — the '
+                 f'output-to-area assignment changed. <strong>This is safety-critical:</strong> moving a device '
+                 f'between areas can mean the safety logic no longer protects against the real hazard — the cause '
+                 f'that trips that output now belongs to a different zone. Confirm every move below is intentional '
+                 f'and that the new area is the correct protection zone.</p>')
+
+    def _mv_addr(m):                                       # show old → new only when the output address moved too
+        a, b = str(m.get("addr_old") or "").strip(), str(m.get("addr_new") or "").strip()
+        return f'{esc(a)} → {esc(b)}' if a != b else esc(a)
+    moves = area.get("moves", [])
+    move_rows = [[esc(m["device_tag"]), esc(m["desc"]),
+                  f'{esc(m["sheet_old"])} → {esc(m["sheet_new"])}', _mv_addr(m)] for m in moves[:200]]
+    move_table = (f'<h3>What moved where '
+                  f'<span class="hint">device · area reassignment · output address — each is a safety-zone change '
+                  f'to confirm</span></h3>'
+                  f'{_table(["Device", "Description", "Area: from → to", "Output address"], move_rows)}'
+                  f'{f"<p class=empty>+ {len(moves) - 200} more moves in the CSV audit trail</p>" if len(moves) > 200 else ""}'
+                  ) if moves else ""
+
     crows = [[_badge(c["tier"], _tier_color(c["tier"])), esc(c.get("sheet_old")) + (" → " + esc(c.get("sheet_new")) if c.get("moved") else ""),
               esc(c["desc"]), _diff_cells(c["diffs"])] for c in area["corrections"][:50]]
     return f'''<section>
   <h2>AREA sheets <span class="sub">output-to-area assignment</span></h2>
   {reorg}
+  {move_table}
+  <h3>Per-area row counts <span class="hint">before → after</span></h3>
   {_table(["Sheet", "Before", "After", ""], crow)}
   <h3>AREA corrections <span class="hint">device-tag / address / line changes on matched rows</span></h3>
   {_table(["Tier", "Sheet", "Description", "Change"], crows, "no AREA-row corrections")}

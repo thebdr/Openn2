@@ -477,6 +477,13 @@ def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weight
     structural-reorganization flag. The digital_output address is netted as a systematic re-map."""
     pairs = match_result["pairs"]
     moved = sum(1 for p in pairs if p.get("moved"))
+    # the per-device move detail (safety-critical: an output that changed AREA sheet may sit under a
+    # different safety zone now - WHICH device went WHERE, and whether its output address moved too).
+    moves = [{"device_tag": p["old"].get("device_tag"), "desc": p["old"].get("description"),
+              "line": p["old"].get("line_numbering"),
+              "sheet_old": p["old"].get("_sheet"), "sheet_new": p["new"].get("_sheet"),
+              "addr_old": p["old"].get("digital_output"), "addr_new": p["new"].get("digital_output")}
+             for p in pairs if p.get("moved")]
     addr_changes = [(p["old"].get("digital_output"), p["new"].get("digital_output")) for p in pairs
                     if norm(p["old"].get("digital_output")) != norm(p["new"].get("digital_output"))]
     addr_event = detect_address_event(addr_changes)
@@ -520,7 +527,7 @@ def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weight
             reorg.append({"sheet": sheet, "old": 0, "new": cn})
     return {
         "counts_old": counts_old, "counts_new": counts_new,
-        "matched": len(pairs), "moved": moved,
+        "matched": len(pairs), "moved": moved, "moves": moves,
         "corrections": corrections, "correction_count": len(corrections), "by_tier": by_tier,
         "systematic_events": [_event_brief(e) for e in events.values()],
         "removed": [{"sheet": r.get("_sheet"), "desc": r.get("description"),

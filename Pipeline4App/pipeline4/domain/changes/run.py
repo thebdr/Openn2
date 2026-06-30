@@ -116,6 +116,11 @@ def _audit_rows(result: dict) -> list:
     for c in ce.get("corrections", []):
         rows.append(["C&E", c.get("concat_id", ""), c["desc"], c["tier"], "|".join(c["directions"]),
                      "; ".join(f"{d['field']}: {d['old']!r}->{d['new']!r}" for d in c["diffs"]), ""])
+    area = result.get("area", {})
+    for m in area.get("moves", []):                  # safety-critical: every area reassignment, with addresses
+        rows.append(["AREA", m.get("device_tag", ""), m.get("desc", ""), "critical", "moved",
+                     f"area {m.get('sheet_old')!r}->{m.get('sheet_new')!r}; "
+                     f"address {m.get('addr_old')!r}->{m.get('addr_new')!r}", ""])
     return rows
 
 
