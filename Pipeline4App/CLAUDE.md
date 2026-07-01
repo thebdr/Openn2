@@ -785,5 +785,13 @@ vs PL3 `_format2`/`write_creation_csv`) is verified by a script (not in the gate
 - **No legacy management** (DESIGN 10.6): PL4 reads the source documents fresh; it never ingests PL3
   intermediates. Config is the JSON-cell skeleton, no `|`-list back-compat.
 - **Verbose/explicit naming preferred** (DESIGN 10.7); reuse a PL3 name only where it's the same concept.
+- **ONE expression engine (`core/expr`), native `$`-syntax everywhere.** Every config-CSV expression column is
+  authored in the engine's native form: `{$col}` template holes (`identity.interp`/`interp_keep`/`dbtemplate.render`
+  all delegate to `expr.render`), `$col` predicates (ph200 `when` + `for_each`'s `where` via `expr.test`), and the
+  host funcs `clean()`/`join()`/`extract()`/`numeric()`/`where`/`unique`/`node_of`. The three legacy mini-languages
+  (`_dollarize` bridge, `dbtemplate`'s `for_each` tokenizer/`_Parser`, the `interp_keep` regex) are RETIRED. See
+  `EXPR_BUILD_PLAN.md` (M-E6). NOTE: this made `signals.csv` store its `type`/`interface_tagname` templates in
+  `{$token}` form — so it is NOT byte-identical to the pre-M-E6 300 lock (all resolved outputs unchanged; re-run
+  strict 300 parity with `$`-normalization on those two cells).
 - Run/test from the `Pipeline4App` root. Commit messages end with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.

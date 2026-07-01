@@ -10,7 +10,44 @@ user's word**, push only when asked. Each chunk is committed with its gate **and
 when domain judgement is needed (it's the user's; you implement). A question is a question — answer it, don't
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
-## LATEST (2026-06-29) — the unified expression engine + ph200 are COMPLETE; the pause is LIFTED
+## LATEST (2026-07-01) — ph100b report polish · STEP 4 tail · the FULL expr unification — all pushed
+Local **`pl4`** is at **`aba2da2`** and PUSHED (`origin/pl4` synced). Three efforts landed this session, each
+parity/byte-gated + committed per step (gate: **48 test FILES green** throughout):
+- **ph100b Before/After Quality Report — reshaped + polished (user-driven).** The `domain/changes/` HTML/CSV
+  report (the "what went wrong" review) got a large set of refinements: the **composition bar** (unused ·
+  complementary · intact · critical/major/minor · added — totals the NEW revision's rows); a **"What was changed"**
+  thin type-bar (by field, sequential colours) + a **neutral by-field list** (no right/wrong verdict — "we don't
+  judge"); **device-centric AREA membership** (`from → to`, extended/moved/reduced — a device gaining areas = the
+  safety logic grew); **FunctionalUnit+Location-Device "noise"** (punctuation / ≤1-char identity cleanups, split
+  per-diff) + a **struck-through-rows** count; an **effort-framed, viewer-facing intro** (no pipeline/software/FLD
+  jargon); **readable field labels** + **clean reference designations** (no `|`-joined internal identity);
+  **Complementary reviews** last + faded. **`CHANGES_SPEC.md` rewritten** to this design. Commits through `8414d50`.
+- **STEP 4 tail — ph200 (Documents Fill Out) DONE + verified.** De-staled the "no Fill phase" comments (ph200 IS
+  built + GUI-wired — subs 210/220/230/240 + the orange 245; kept OUT of Run-all BY DESIGN since it mutates the
+  doc). **M7 GUI polish** (theme + window-size + log-to-file-tee persistence, `app_config.yaml`). **510
+  interface-completeness RESOLVED** — a fresh-PL3 PLCTags oracle (`scratchpad/oracle_510.py`) is **213/213, 0
+  diffs** once PL3 reads PL4's freshly-inserted IF_ sheets (the old "213 vs 208" was PL3 reading STALE sheets).
+  Commits `cfd7fc8` / `a780149` / `25b4eeb`.
+- **Expr FULL UNIFICATION (M-E6, B–F) — DONE.** `core/expr` is now the ONE engine: EVERY config-CSV expression
+  column (templates, `for_each` predicates, interface tag-names) is native `{$token}`/`$col`, and the three legacy
+  mini-languages are retired (`identity` `{token}` interp bridge `_dollarize`, `dbtemplate`'s `for_each`
+  tokenizer/`_Parser`, the `interp_keep` regex). 5 byte-gated steps `d14ea49`→`486005e` + docs `aba2da2`. See
+  `EXPR_BUILD_PLAN.md` (the M-E6 record). **Byte-gate:** the only delta across the whole retrofit is `signals.csv`
+  — its `type` object cell + the `interface_tagname` stage-1 base now store templates in native `{$token}` form;
+  every RESOLVED value + downstream output (GlobalDB XMLs / DiagList / SCL / PLCTags / `interface_elements` /
+  CreationInfo) is byte-identical (verified via `scratchpad/expr_parity.py`).
+- **⚠ ONE LASTING FOOTPRINT:** `signals.csv` is no longer byte-identical to its old 300-parity lock (the two
+  template-form deltas above). Functionally identical; if you re-run the strict 300 byte-parity vs PL3, compare
+  with `$`-normalization on the `type` + `interface_tagname` cells (or diff only the non-template columns).
+- **NEXT:** the project is **feature-complete** — all 9 phases + ph200 + severity S1–S6 + the GUI port (M0–M7) +
+  the ph100b report + the expr unification are built + verified. Remaining is verification/deferred, not new
+  build: **(1)** a **manual GUI smoke** — `python launch_gui.py` → run the ph200 **200** button (210/220/230/240 +
+  the orange **245 Risky Index Fill**) over a doc, and check M7 (toggle theme / resize / **Log to file: ON** all
+  persist across a relaunch); **(2)** deferred by decision — validation **150** (diag-slot), **920** TIA coverage,
+  the `accept` treatment, and the transitional **gate-reconcile-once-per-run** fix (lands with an engine). Pick up
+  from CLAUDE.md (live architecture) — this block supersedes the historical ones below.
+
+## PREVIOUS (2026-06-29) — the unified expression engine + ph200 are COMPLETE; the pause is LIFTED
 The "PAUSE all phase development until the unified mini-expression engine is built + retrofitted" priority
 is **RESOLVED**. The authority docs are **`EXPR_ENGINE.md`** (status: COMPLETE) + **`EXPR_BUILD_PLAN.md`**
 (the sequenced, parity-gated build record). What landed — the expr-engine arc (8 commits) through `9d31cc9`,
@@ -79,8 +116,12 @@ then 5 ph200 enhancement commits through **HEAD `3ad85a2`** (all green + pushed)
   `config.use_project`) · **M0b chrome remainder** (darktitle + the full light/dark re-theme - landed in
   STEP 1). NEXT: **STEP 4** ph200 Documents Fill Out (CSV-driven, the LAST backend effort; confirm its 4 open
   decisions first).
-- **GIT STATE:** local **`pl4`** is at **`3ad85a2`** and **PUSHED** — `origin/pl4` synced through it. Recent
-  milestones (newest first): **`3ad85a2`** ph200 Risky Index Fill (orange button) · **`42c9fe3`** ph200 range
+- **GIT STATE:** local **`pl4`** is at **`aba2da2`** and **PUSHED** — `origin/pl4` synced through it. Recent
+  milestones (newest first): **`aba2da2`** expr-unify docs · **`486005e`** expr-unify F (retire `_dollarize`) ·
+  **`04c8125`** expr-unify E (`interp_keep`→`expr.render(keep)`) · **`e7257aa`** expr-unify D (`for_each`→`expr.test`,
+  −180 lines) · **`5aeb22f`** expr-unify C (datablock CSVs native) · **`d14ea49`** expr-unify B (interp CSVs native) ·
+  **`cfd7fc8`** STEP 4 de-stale ph200 · **`a780149`** M7 GUI polish · **`25b4eeb`** 510 interface-completeness RESOLVED ·
+  **`8414d50`**/`d69ce23`/`8c04fb8`/… the ph100b report polish. Before that: **`3ad85a2`** ph200 Risky Index Fill (orange button) · **`42c9fe3`** ph200 range
   notation + channel n/N suffix · **`8841d51`** _UnresolvedIndex covers the 220 index leg · **`14426c2`** diag
   reads diag_bits_range · **`a4d28d8`** HANDOFF refresh · **`9d31cc9`** EXPR_ENGINE doc complete · **`cff30ed`** M-E5 render
   convergence · **`9799531`** M-E5 strict-render fix · **`d8444af`** ph200 stage→fill→re-stage integration ·
