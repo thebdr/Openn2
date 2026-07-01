@@ -46,7 +46,7 @@ def _no_fail(findings) -> bool:
 # --- generate: shells, seeds, the if_elements drop ----------------------------------------------- #
 def test_generate_seeds_and_members():
     defs = [_def("07_DOOR", db_programming_language="F_DB", opc_ua=False, seed=True)]
-    els = [_el("07_DOOR", "Door Closed [ {$combined_FLD} ]", 'row where script_type = "DI1/2"')]
+    els = [_el("07_DOOR", "Door Closed [ {$combined_FLD} ]", "row where $script_type = 'DI1/2'")]
     g, inst, findings = datablocks.generate(_ROWS, defs, els, _TYPES)
     ok(_no_fail(findings), "a clean config -> no FAIL findings")
     names = [m["name"] for m in g["07_DOOR"]["members"]]
@@ -64,7 +64,7 @@ def test_generate_drops_seed_only_db():
 
 def test_generate_unique_instance_family():
     defs = [_def("S1.CAB{$cabinet:03d}", db_type="Instance", instance_of="CabState",
-                 for_each="cabinet in unique(diag_cabinet) where numeric(diag_cabinet)")]
+                 for_each="cabinet in unique($diag_cabinet) where numeric($diag_cabinet)")]
     rows = [{"diag_cabinet": "1"}, {"diag_cabinet": "1"}, {"diag_cabinet": "2"}, {"diag_cabinet": ""}]
     _g, inst, findings = datablocks.generate(rows, defs, [], _TYPES)
     ok(_no_fail(findings))
@@ -73,7 +73,7 @@ def test_generate_unique_instance_family():
 
 def test_generate_f_db_opc_warns():
     defs = [_def("SAFE", db_programming_language="F_DB", opc_ua=True, seed=True)]
-    els = [_el("SAFE", "M [ {$combined_FLD} ]", 'row where script_type = "DI1/2"')]
+    els = [_el("SAFE", "M [ {$combined_FLD} ]", "row where $script_type = 'DI1/2'")]
     _g, _i, findings = datablocks.generate(_ROWS, defs, els, _TYPES)
     ok(_no_fail(findings))
     ok(_has(findings, "db_fdb_opc_ignored"), "opc_ua=true on an F_DB is a WARN finding")
@@ -81,7 +81,7 @@ def test_generate_f_db_opc_warns():
 
 def test_generate_member_dedup():
     defs = [_def("D", seed=False)]
-    els = [_el("D", "M [ {$combined_FLD} ]", 'row where script_type = "DI1/2"')]
+    els = [_el("D", "M [ {$combined_FLD} ]", "row where $script_type = 'DI1/2'")]
     rows = [{"uid": "a", "script_type": "DI1/2", "combined_FLD": "X"},
             {"uid": "b", "script_type": "DI1/2", "combined_FLD": "X"}]   # same rendered name
     g, _i, findings = datablocks.generate(rows, defs, els, _TYPES)
@@ -111,11 +111,11 @@ def test_generate_validation_halts():
     # bad for_each (on the definition) + a Global with a non-literal name
     _g, _i, findings = datablocks.generate(_ROWS, [_def("D", for_each="row where @")], [], _TYPES)
     ok(_has(findings, "db_for_each_invalid"))
-    _g, _i, findings = datablocks.generate(_ROWS, [_def("D", for_each='row where script_type = "DI1/2"')], [], _TYPES)
+    _g, _i, findings = datablocks.generate(_ROWS, [_def("D", for_each="row where $script_type = 'DI1/2'")], [], _TYPES)
     ok(_has(findings, "db_global_needs_literal"), "a Global DB with a for_each is a FAIL finding")
     # db_type=Instance with no instance_of
     _g, _i, findings = datablocks.generate(_ROWS, [_def("S{$index}", db_type="Instance", instance_of="",
-                                                        for_each='row where script_type = "DI1/2"')], [], _TYPES)
+                                                        for_each="row where $script_type = 'DI1/2'")], [], _TYPES)
     ok(_has(findings, "db_instance_needs_fb"), "an Instance family with no FB is a FAIL finding")
 
 
@@ -126,15 +126,15 @@ def test_generate_remaining_slugs():
     _g, _i, findings = datablocks.generate(_ROWS, [_def("D", db_programming_language="LADDER", seed=False)], [], _TYPES)
     ok(_has(findings, "db_unknown_prog_lang") and _no_fail(findings), "an unrecognized prog-lang is a WARN, not a FAIL")
     # db_for_each_matches_nothing (WARN) - a for_each referencing a column present in no row
-    els = [_el("D", "M [ {$combined_FLD} ]", 'row where ghost_col = "x"')]
+    els = [_el("D", "M [ {$combined_FLD} ]", "row where $ghost_col = 'x'")]
     _g, _i, findings = datablocks.generate(_ROWS, [_def("D")], els, _TYPES)
     ok(_has(findings, "db_for_each_matches_nothing"), "a for_each on an absent column is a WARN")
     # db_member_render (FAIL) - {$combined_FLD:03d} on a non-numeric value fails at member render (post-validate)
-    els = [_el("D", "{$combined_FLD:03d}", 'row where script_type = "DI1/2"')]
+    els = [_el("D", "{$combined_FLD:03d}", "row where $script_type = 'DI1/2'")]
     _g, _i, findings = datablocks.generate(_ROWS, [_def("D")], els, _TYPES)
     ok(_has(findings, "db_member_render"), "a bad format spec at member render is a FAIL")
     # db_instance_name_render (FAIL) - {$cab:03d} on a non-numeric unique value fails at instance-name render
-    idefs = [_def("S{$cab:03d}", db_type="Instance", instance_of="FB", for_each="cab in unique(diag_cabinet)")]
+    idefs = [_def("S{$cab:03d}", db_type="Instance", instance_of="FB", for_each="cab in unique($diag_cabinet)")]
     _g, _i, findings = datablocks.generate([{"diag_cabinet": "abc"}], idefs, [], _TYPES)
     ok(_has(findings, "db_instance_name_render"), "a bad format spec at instance-name render is a FAIL")
 
@@ -142,7 +142,7 @@ def test_generate_remaining_slugs():
 # --- write_back: name_in_db / datablocks / plc_binding ------------------------------------------- #
 def test_write_back_single_db_and_tag_fallback():
     defs = [_def("07_DOOR", seed=True)]
-    els = [_el("07_DOOR", "Door Closed [ {$combined_FLD} ]", 'row where script_type = "DI1/2"')]
+    els = [_el("07_DOOR", "Door Closed [ {$combined_FLD} ]", "row where $script_type = 'DI1/2'")]
     rows = [dict(r) for r in _ROWS]
     g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     datablocks.write_back(rows, g)
@@ -157,8 +157,8 @@ def test_write_back_single_db_and_tag_fallback():
 def test_write_back_leftmost_db_order():
     # a PA signal joins ALARM then 00_Commissioning (element-row order) -> leftmost = ALARM
     defs = [_def("PROFINET_NODES_ALARM"), _def("00_Commissioning", db_programming_language="F_DB", seed=True)]
-    els = [_el("PROFINET_NODES_ALARM", "{$combined_FLD}", 'row where script_type = "PA"'),
-           _el("00_Commissioning", "{$combined_FLD}", 'row where script_type = "PA"')]
+    els = [_el("PROFINET_NODES_ALARM", "{$combined_FLD}", "row where $script_type = 'PA'"),
+           _el("00_Commissioning", "{$combined_FLD}", "row where $script_type = 'PA'")]
     rows = [dict(r) for r in _ROWS]
     g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     datablocks.write_back(rows, g)
@@ -171,8 +171,8 @@ def test_write_back_leftmost_db_order():
 def test_write_back_two_members_one_db_picks_primary():
     # a single signal produces two members in one DB (the 04_SPEED case); the FIRST element row is primary
     defs = [_def("04_SPEED", db_programming_language="F_DB", seed=True)]
-    els = [_el("04_SPEED", "Sensor 1 Healthy [ {$iol_FLD} ]", 'row where script_type = "DI1/2"'),
-           _el("04_SPEED", "Healthy [ {$iol_FLD} ]", 'row where script_type = "DI1/2"')]
+    els = [_el("04_SPEED", "Sensor 1 Healthy [ {$iol_FLD} ]", "row where $script_type = 'DI1/2'"),
+           _el("04_SPEED", "Healthy [ {$iol_FLD} ]", "row where $script_type = 'DI1/2'")]
     rows = [dict(_ROWS[0])]
     g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     datablocks.write_back(rows, g)
@@ -183,7 +183,7 @@ def test_write_back_two_members_one_db_picks_primary():
 # --- the SSOT tables ----------------------------------------------------------------------------- #
 def test_fill_db_members_table_and_source():
     defs = [_def("07_DOOR", seed=True)]
-    els = [_el("07_DOOR", "Door Closed [ {$combined_FLD} ]", 'row where script_type = "DI1/2"')]
+    els = [_el("07_DOOR", "Door Closed [ {$combined_FLD} ]", "row where $script_type = 'DI1/2'")]
     rows = [dict(r) for r in _ROWS]
     g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     dbm = db_members_table()
@@ -225,7 +225,7 @@ def test_db_xml_normal_db_follows_opc():
 
 def test_project_writes_only_its_own_dbs():
     defs = [_def("07_DOOR", db_programming_language="F_DB", opc_ua=False, seed=True)]
-    els = [_el("07_DOOR", "Door Closed [ {$combined_FLD} ]", 'row where script_type = "DI1/2"')]
+    els = [_el("07_DOOR", "Door Closed [ {$combined_FLD} ]", "row where $script_type = 'DI1/2'")]
     rows = [dict(r) for r in _ROWS]
     g, _i, _fnd = datablocks.generate(rows, defs, els, _TYPES)
     dbb, dbm = db_blocks_table(), db_members_table()

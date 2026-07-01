@@ -56,53 +56,53 @@ def test_for_each_row_unfiltered():
 
 
 def test_for_each_row_where_eq():
-    items = _items('row where script_type = "DI1/2"')
+    items = _items("row where $script_type = 'DI1/2'")
     eq([r["fld"] for _, r in items], ["A"], "= filters to the exact match")
 
 
 def test_for_each_row_where_in():
-    items = _items('row where script_type in ["DI1/2","DI2/2","DD"]')
+    items = _items("row where $script_type in ['DI1/2','DI2/2','DD']")
     eq([r["fld"] for _, r in items], ["A", "B", "C"], "in [..] is an OR over the listed values")
 
 
 def test_for_each_row_where_numeric():
-    items = _items("row where numeric(diag_cabinet)")
+    items = _items("row where numeric($diag_cabinet)")
     eq([r["fld"] for _, r in items], ["A", "B", "C"], "numeric() keeps the digit cells, drops the blank")
 
 
 def test_for_each_row_where_neq_and_regex():
-    eq([r["fld"] for _, r in _items('row where script_type != "KQ"')], ["A", "B", "C"])
-    eq([r["fld"] for _, r in _items("row where script_type ~ /^DI/")], ["A", "B"], "~ is a regex search")
+    eq([r["fld"] for _, r in _items("row where $script_type != 'KQ'")], ["A", "B", "C"])
+    eq([r["fld"] for _, r in _items("row where $script_type ~ /^DI/")], ["A", "B"], "~ is a regex search")
 
 
 def test_for_each_row_where_boolean_combinators():
-    items = _items('row where numeric(diag_cabinet) and not script_type = "DD"')
+    items = _items("row where numeric($diag_cabinet) and not ($script_type = 'DD')")
     eq([r["fld"] for _, r in items], ["A", "B"], "and / not compose")
-    items = _items('row where script_type = "KQ" or diag_cabinet = "2"')
+    items = _items("row where $script_type = 'KQ' or $diag_cabinet = '2'")
     eq([r["fld"] for _, r in items], ["C", "D"], "or composes")
-    items = _items('row where (script_type = "DI1/2" or script_type = "DD") and numeric(diag_cabinet)')
+    items = _items("row where ($script_type = 'DI1/2' or $script_type = 'DD') and numeric($diag_cabinet)")
     eq([r["fld"] for _, r in items], ["A", "C"], "parentheses group")
 
 
 def test_for_each_unique_distinct_first_seen():
-    items = _items("cab in unique(diag_cabinet) where numeric(diag_cabinet)")
+    items = _items("cab in unique($diag_cabinet) where numeric($diag_cabinet)")
     eq([(b["cab"], r["fld"]) for b, r in items], [("1", "A"), ("2", "C")],
        "unique -> one per DISTINCT value, bound to the var, at its FIRST row, in first-seen order")
 
 
 def test_for_each_unique_pipe_split():
     rows = [{"areas": "AREA 1|AREA 2"}, {"areas": "AREA 2"}, {"areas": "AREA 3"}]
-    items = _items("a in unique(areas)", rows)
+    items = _items("a in unique($areas)", rows)
     eq([b["a"] for b, _ in items], ["AREA 1", "AREA 2", "AREA 3"],
        "a |-multi-valued cell is split; duplicates across rows collapse")
 
 
-# --- 3. parse / tokenize errors (validate-and-halt) ---------------------------------------------- #
+# --- 3. parse errors (validate-and-halt) --------------------------------------------------------- #
 def test_for_each_errors():
-    raises(DbTemplateError, lambda: compile_for_each("row where script_type = "))     # missing rhs
-    raises(DbTemplateError, lambda: compile_for_each("row extra tokens"))             # trailing tokens
+    raises(DbTemplateError, lambda: compile_for_each("row where $script_type ="))     # missing rhs
+    raises(DbTemplateError, lambda: compile_for_each("row extra tokens"))             # bad head
     raises(DbTemplateError, lambda: compile_for_each("banana"))                       # not row/var-in-unique
-    raises(DbTemplateError, lambda: compile_for_each("row where script_type ~ /[/"))  # bad regex
+    raises(DbTemplateError, lambda: compile_for_each("row where $script_type ~ /[/"))  # bad regex
     raises(DbTemplateError, lambda: compile_for_each("row where x @ y"))              # unexpected character
 
 
