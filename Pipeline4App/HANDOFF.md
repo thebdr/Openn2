@@ -26,7 +26,10 @@ then 5 ph200 enhancement commits through **HEAD `3ad85a2`** (all green + pushed)
 - **Parity**: each step oracle/idempotent-verified — 210 0/269, 220 0/267, 230/240 0/73, integration 0/269
   (re-stage idempotent on a non-destructive scratch copy; the real doc untouched). M-E5 converged
   `identity.interp` + `dbtemplate.render` onto `core/expr.render` — **byte-diff 0** on the locked 520/600 outputs.
-  (Left as-is, documented: `dbtemplate.compile_for_each` iteration + `identity.interp_keep`.)
+  **UPDATE (M-E6, full unification DONE):** the native `$`-syntax was retrofitted into EVERY config CSV +
+  the 3 legacy mini-languages retired — `compile_for_each`'s predicate → `core/expr.test`, `interp_keep` →
+  `expr.render(mode="keep")`, `_dollarize` deleted. Only accepted delta: `signals.csv` stores its embedded
+  templates in native `{$token}` form; all resolved outputs byte-identical. See `EXPR_BUILD_PLAN.md` (M-E6 B–F).
 - **ph200 ENHANCEMENTS (post-completion, user-driven; commits `14426c2`/`8841d51`/`42c9fe3`/`3ad85a2`):**
   - `diag_alloc` reads the existing `iolist_params.diag_bits_range` `[0,62]` (dropped the redundant
     `diag_bit_min`/`diag_bit_max` the M-E4 port had added) — `diag_alloc.diag_bit_range()` is the single source.

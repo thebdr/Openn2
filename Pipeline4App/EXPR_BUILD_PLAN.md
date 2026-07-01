@@ -167,12 +167,29 @@ byte-transparent — alongside is the safe choice.
   the duplicate `_format_value` + `_SafeFormatter`. **BYTE GATE GREEN (independently re-verified): 0 differences /
   13 files** — 9 GlobalDB XMLs + `signals.csv` + DiagList_IO/Logic + the OPC SCL all byte-identical (generated with
   vs. without the convergence). Full gate **356/356**.
-  - **Intentionally NOT converged (documented):** `dbtemplate.compile_for_each` (iteration orchestration, not a
-    single render expression) and `identity.interp_keep` (its absent tokens must stay `{token}` form for the
-    phase-400 generator — incompatible with `expr.render`'s `{$token}` keep mode). These are the genuinely
-    non-render-expression cases; converging them would add risk without benefit.
-- **THE ENTIRE PLAN IS COMPLETE** — engine built, retrofitted into ph200 (all four sub-phases + the stage→fill→
-  re-stage flow), and the duplicate render engines converged onto `core/expr`, every step parity/byte-verified.
+  - **(Superseded by the FULL UNIFICATION below.)** M-E5 left `dbtemplate.compile_for_each` + `identity.interp_keep`
+    on their own parsers and kept the `_dollarize` bridge (config cells stayed old-`{token}`). The user later asked
+    to retrofit the engine into **every** config CSV — see the full-unification record next.
+- **FULL UNIFICATION (M-E6, user-driven) — DONE + byte-verified.** Retrofit the native `core/expr` syntax into ALL
+  config-CSV expression columns + retire the three legacy mini-languages, in 5 parity-gated steps (each its own
+  commit; byte-gated on stage/520/400/510/600/800 via `scratchpad/expr_parity.py`):
+  - **B** (`d14ea49`) interp-path template CSVs → native `{$token}` (bridge retained, idempotent).
+  - **C** (`5aeb22f`) datablock CSVs → `{$token}`; `dbtemplate.render` guard accepts `$`.
+  - **D** (`e7257aa`) `for_each` `where`-predicate → `core/expr.test` (loop stays a host pass); deleted the bespoke
+    tokenizer + `_Parser` predicate grammar (~180 lines); `for_each` cells re-authored to `$col` + single-quote strings.
+  - **E** (`04c8125`) `interp_keep` → `expr.render(mode="keep")` (both stages of the interface-tagname fill now
+    native; the engine's `keep` mode `{$token}` flows end-to-end — no new mode needed); 3 interface_tagname columns
+    re-authored.
+  - **F** (`486005e`) retire the `_dollarize` bridge: `interp`/`interp_keep`/`dbtemplate.render` call `expr.render`
+    directly; deleted `_dollarize`/`_TOKEN`/`_BARE_HOLE`; guard tightened to REQUIRE `$`; last bare-`{token}` test
+    inputs migrated.
+  - **ACCEPTED DELTA:** the only byte change across the whole retrofit is `signals.csv` — its `type` object cell +
+    the `interface_tagname` STAGE-1 base now store templates in native `{$token}` form (a faithful record of the
+    now-native config). Every RESOLVED value + every downstream output (GlobalDB XMLs, DiagList, SCL, PLCTags
+    content, interface_elements, CreationInfo) is byte-identical. Gate 48 test files green throughout.
+- **THE ENTIRE PLAN IS COMPLETE** — engine built, retrofitted into ph200 + EVERY config CSV (native `$`-syntax),
+  the three legacy mini-languages (identity `{token}`, dbtemplate `for_each` parser, `interp_keep` regex) retired,
+  every step parity/byte-verified.
 
 ## Resolved decisions
 1. **Pipeline order** → **stage → fill → re-stage(if changed) → validate → generate → report** (the hard rule).

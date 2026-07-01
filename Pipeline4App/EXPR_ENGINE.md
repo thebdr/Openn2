@@ -6,7 +6,11 @@ re-stage flow is operable end-to-end, and the duplicate render engines (`identit
 are converged onto `core/expr.render` (byte-verified: 0 diffs on the locked 520/600 outputs). 8 commits, all
 green + pushed (ef4fb86 engine · ee555c8 210 · 8deda92 220 · a314b14 230/240 · d8444af integration · 9799531 +
 cff30ed convergence). The sequenced build record is in **`EXPR_BUILD_PLAN.md`**. Phase development can resume.
-(`dbtemplate.compile_for_each` iteration + `identity.interp_keep` are intentionally left as-is — see the plan.)
+**UPDATE — FULL UNIFICATION DONE (M-E6, user-driven):** the native `$`-syntax was later retrofitted into EVERY
+config-CSV expression column and the three legacy mini-languages retired — `dbtemplate.compile_for_each`'s predicate
+now runs on `core/expr.test`, `identity.interp_keep` on `expr.render(mode="keep")`, and the `_dollarize` bridge is
+deleted. One accepted byte-delta: `signals.csv` stores its embedded templates in native `{$token}` form; all
+resolved outputs byte-identical. See `EXPR_BUILD_PLAN.md` (the M-E6 B–F record).
 
 ---
 ORIGINAL framing (now satisfied): the user elevated the ph200 rule grammar into a first-class, reusable
