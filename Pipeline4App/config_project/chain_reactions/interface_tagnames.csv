@@ -1,36 +1,36 @@
 type_id,interface_tagname
-A,PNC_Q_{interface_name}-{interface_id}_{desc_l1} {desc_l1b} [ {iol_FLD} ]
-W,PNC_Q_{interface_name}-{interface_id}_{desc_l1} {desc_l1b} [ {iol_FLD} ]
-PA,PNC_Q_{interface_name}-{interface_id}_{desc_l1} {desc_l1b} [ {iol_FLD} {profinet_name} {profinet_ip} ]
-PW,PNC_Q_{interface_name}-{interface_id}_{desc_l1} {desc_l1b} [ {iol_FLD} {profinet_name} {profinet_ip} ]
-E1/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-E2/2,PNC_Q_{interface_name}-{interface_id}_Emergency Push Button [ {combined_FLD} ]
-B1/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-B2/2,PNC_Q_{interface_name}-{interface_id}_Safety Breaker [ {combined_FLD} ]
-N1/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-N2/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-DI1/2,PNC_Q_{interface_name}-{interface_id}_{db_element}
-DI2/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-DD,PNC_Q_{interface_name}-{interface_id}_{db_element}
-DR,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-DL,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-DQ,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI1/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI2/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI1/3,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI2/3,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI3/3,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI1/4,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI2/4,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI3/4,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KI4/4,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KQ,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KQ1/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-KQ2/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-R*,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-R#,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-Z#,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-F1/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
-F2/2,PNC_Q_{interface_name}-{interface_id}_{tag_name}
+A,PNC_Q_{$interface_name}-{$interface_id}_{$desc_l1} {$desc_l1b} [ {$iol_FLD} ]
+W,PNC_Q_{$interface_name}-{$interface_id}_{$desc_l1} {$desc_l1b} [ {$iol_FLD} ]
+PA,PNC_Q_{$interface_name}-{$interface_id}_{$desc_l1} {$desc_l1b} [ {$iol_FLD} {$profinet_name} {$profinet_ip} ]
+PW,PNC_Q_{$interface_name}-{$interface_id}_{$desc_l1} {$desc_l1b} [ {$iol_FLD} {$profinet_name} {$profinet_ip} ]
+E1/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+E2/2,PNC_Q_{$interface_name}-{$interface_id}_Emergency Push Button [ {$combined_FLD} ]
+B1/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+B2/2,PNC_Q_{$interface_name}-{$interface_id}_Safety Breaker [ {$combined_FLD} ]
+N1/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+N2/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+DI1/2,PNC_Q_{$interface_name}-{$interface_id}_{$db_element}
+DI2/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+DD,PNC_Q_{$interface_name}-{$interface_id}_{$db_element}
+DR,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+DL,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+DQ,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI1/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI2/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI1/3,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI2/3,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI3/3,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI1/4,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI2/4,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI3/4,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KI4/4,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KQ,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KQ1/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+KQ2/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+R*,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+R#,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+Z#,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+F1/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+F2/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
 IOC,

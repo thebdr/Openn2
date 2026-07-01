@@ -36,16 +36,12 @@ def interp(template, row) -> str:
 
 
 def interp_keep(template, row) -> str:
-    """Like `interp`, but LEAVE a `{token}` intact when the row has no such key (a present-but-empty key
-    still substitutes to ''). Used to resolve the interface_tagname base at phase 400 while PRESERVING the
-    per-interface `{interface_name}`/`{interface_id}` tokens for the generator to fill."""
-    def sub(m):
-        key = m.group(1)
-        if key in row:
-            value = row.get(key)
-            return "" if value is None else str(value)
-        return m.group(0)
-    return _TOKEN.sub(sub, template or "").strip()
+    """Like `interp`, but LEAVE an unresolved hole intact (a present-but-empty key still substitutes to '')
+    - DELEGATES to `expr.render(mode="keep")`. Used for the two-stage interface_tagname fill at phase 400:
+    stage 1 fills `{$tag_name}`/`{$db_element}`/`{$member}`/`{$direction}` and PRESERVES
+    `{$interface_name}`/`{$interface_id}`; stage 2 (the per-interface generator) fills those. `_dollarize`
+    is retained as an idempotent bridge (a no-op on native `{$token}`); it is removed in the final cleanup."""
+    return expr.render(_dollarize(template), row, mode="keep").strip()
 
 
 def interface_tagname(row, template) -> str:

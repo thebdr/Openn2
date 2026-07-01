@@ -13,34 +13,34 @@ from pipeline4.domain.signals import signals_table
 
 
 def test_interp_keep_keeps_unknown_tokens():
-    eq(identity.interp_keep("a {x} {y} b", {"x": "1"}), "a 1 {y} b", "a missing key's token is kept literal")
-    eq(identity.interp_keep("{x}", {"x": None}), "", "a present-but-None key substitutes to ''")
+    eq(identity.interp_keep("a {$x} {$y} b", {"x": "1"}), "a 1 {$y} b", "a missing key's token is kept literal")
+    eq(identity.interp_keep("{$x}", {"x": None}), "", "a present-but-None key substitutes to ''")
 
 
 def test_interface_tagname_tag_name_and_kept_tokens():
-    # {tag_name} resolves to name_in_tagtable; {interface_name}/{interface_id} are KEPT for the generator
+    # {$tag_name} resolves to name_in_tagtable; {$interface_name}/{$interface_id} are KEPT for the generator
     row = {"name_in_tagtable": "Safety Breaker [ S1-B1 ]"}
-    out = identity.interface_tagname(row, "PNC_Q_{interface_name}-{interface_id}_{tag_name}")
-    eq(out, "PNC_Q_{interface_name}-{interface_id}_Safety Breaker [ S1-B1 ]")
+    out = identity.interface_tagname(row, "PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}")
+    eq(out, "PNC_Q_{$interface_name}-{$interface_id}_Safety Breaker [ S1-B1 ]")
 
 
 def test_interface_tagname_db_element_from_name_in_db():
-    # the door types template uses {db_element}, which in PL4 is the 520-written name_in_db
+    # the door types template uses {$db_element}, which in PL4 is the 520-written name_in_db
     row = {"name_in_db": "Door Closed SAFE_STATE [ =S1+SG1-B1 ]"}
-    out = identity.interface_tagname(row, "PNC_Q_{interface_name}-{interface_id}_{db_element}")
-    eq(out, "PNC_Q_{interface_name}-{interface_id}_Door Closed SAFE_STATE [ =S1+SG1-B1 ]")
+    out = identity.interface_tagname(row, "PNC_Q_{$interface_name}-{$interface_id}_{$db_element}")
+    eq(out, "PNC_Q_{$interface_name}-{$interface_id}_Door Closed SAFE_STATE [ =S1+SG1-B1 ]")
 
 
 def test_interface_tagname_row_tokens_and_empty_template():
     row = {"desc_l1": "EMERGENCY", "desc_l1b": "PUSH BUTTON", "iol_FLD": "S1-E1"}
-    out = identity.interface_tagname(row, "PNC_Q_{interface_name}-{interface_id}_{desc_l1} {desc_l1b} [ {iol_FLD} ]")
-    eq(out, "PNC_Q_{interface_name}-{interface_id}_EMERGENCY PUSH BUTTON [ S1-E1 ]")
+    out = identity.interface_tagname(row, "PNC_Q_{$interface_name}-{$interface_id}_{$desc_l1} {$desc_l1b} [ {$iol_FLD} ]")
+    eq(out, "PNC_Q_{$interface_name}-{$interface_id}_EMERGENCY PUSH BUTTON [ S1-E1 ]")
     eq(identity.interface_tagname(row, ""), "", "no template -> ''")
 
 
 def test_annotate_writes_per_type_from_config():
-    tagnames = {"E1/2": "PNC_Q_{interface_name}-{interface_id}_{tag_name}",
-                "DI1/2": "PNC_Q_{interface_name}-{interface_id}_{db_element}",
+    tagnames = {"E1/2": "PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}",
+                "DI1/2": "PNC_Q_{$interface_name}-{$interface_id}_{$db_element}",
                 "IOC": ""}
     table = signals_table(["script_type"])
     table.add(script_type="E1/2", type={"type_id": "E1/2"}, name_in_tagtable="Emergency Push Button [ X ]")
@@ -49,8 +49,8 @@ def test_annotate_writes_per_type_from_config():
     db = Database([table])
     interfaces.annotate_interface_tagnames(db, tagnames)
     rows = list(db["signals"])
-    eq(rows[0]["interface_tagname"], "PNC_Q_{interface_name}-{interface_id}_Emergency Push Button [ X ]")
-    eq(rows[1]["interface_tagname"], "PNC_Q_{interface_name}-{interface_id}_Door Closed SAFE_STATE [ Y ]")
+    eq(rows[0]["interface_tagname"], "PNC_Q_{$interface_name}-{$interface_id}_Emergency Push Button [ X ]")
+    eq(rows[1]["interface_tagname"], "PNC_Q_{$interface_name}-{$interface_id}_Door Closed SAFE_STATE [ Y ]")
     eq(rows[2]["interface_tagname"], "", "an IOC (no template) gets ''")
 
 
@@ -94,13 +94,13 @@ def test_allocate_bytes_bool_block_and_word():
 
 def test_collect_mirror_set_direct_follower_iflrule_and_dedup():
     rows = [{"script_type": "DI1/2", "interface_mapping": "01", "plc_binding": '"07_DOOR"."Door Closed [ X ]"',
-             "interface_tagname": "PNC_Q_{interface_name}-{interface_id}_door", "functional_unit": "S1",
-             "location": "+SG1", "device": "-B1", "type": {"tag_name": "Door [ {iol_FLD} ]"}, "iol_FLD": "S1-B1"}]
+             "interface_tagname": "PNC_Q_{$interface_name}-{$interface_id}_door", "functional_unit": "S1",
+             "location": "+SG1", "device": "-B1", "type": {"tag_name": "Door [ {$iol_FLD} ]"}, "iol_FLD": "S1-B1"}]
     diag_rules = [{"name": "Safety Door Alarm", "required_types": ["DI1/2", "DI"], "db_name": "07_DOOR",
-                   "member": "Door Alarm [ {functional_unit}{location}{device} ]", "interface_tagname": "PNC_Q_{member}"}]
+                   "member": "Door Alarm [ {$functional_unit}{$location}{$device} ]", "interface_tagname": "PNC_Q_{$member}"}]
     if_rules = [{"name": "Door Open Request", "required_types": ["DI1/2", "DI2/2"], "direction": "I",
                  "data_type": "BOOL", "script_type": "IF_DOOR_CMD",
-                 "member": "Open Door Request [ {functional_unit}{location}{device} ]", "interface_tagname": "PNC_{direction}_{member}"}]
+                 "member": "Open Door Request [ {$functional_unit}{$location}{$device} ]", "interface_tagname": "PNC_{$direction}_{$member}"}]
     elems, _findings = interfaces.collect_mirror_set(rows, index="01", is_diag=False,
                                                      diag_rules=diag_rules, if_rules=if_rules)
     eq(len(elems), 3, "the direct mirror + 1 diag follower + 1 interface-element follower")
