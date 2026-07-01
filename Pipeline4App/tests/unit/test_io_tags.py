@@ -57,7 +57,7 @@ def test_two_sheet_structure_and_headers():
 def test_source_a_direct_io_signal():
     sig = {"script_type": "DI1/2", "bit": "I1.0", "name_in_tagtable": "PB START",
            "tagtable": "EMERGENCY_PushButtons",
-           "type": {"type_id": "DI1/2", "category": "Safety", "io_comment": "[ {script_type} ]"}}
+           "type": {"type_id": "DI1/2", "category": "Safety", "io_comment": "[ {$script_type} ]"}}
     _res, rows, _p = _project(signals=[sig])
     eq(rows[1], ["PB START", "EMERGENCY_PushButtons", "Bool", "%I1.0", "[ DI1/2 ]",
                  "True", "True", "True", None, None],

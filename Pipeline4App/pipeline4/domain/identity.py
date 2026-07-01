@@ -8,40 +8,23 @@ names land with their phases (520/600/400), where they're verified against PL3.
 """
 from __future__ import annotations
 
-import re
-
 from pipeline4.core import expr
-
-_TOKEN = re.compile(r"\{([A-Za-z0-9_]+)(:[^}]+)?\}")
-
-# A bare PEP-3101 / {token} field hole: `{name}` or `{name:spec}` (a leading [A-Za-z_]\w* field name,
-# optional `:spec` up to the closing `}`). `{}` and any hole already in `{$...}` engine form are left be.
-_BARE_HOLE = re.compile(r"\{([A-Za-z_]\w*)(:[^{}]*)?\}")
-
-
-def _dollarize(template) -> str:
-    """Rewrite a PEP-3101 / `{token}` template to the unified engine's `{$token}` hole syntax: every
-    `{name}` -> `{$name}` and `{name:spec}` -> `{$name:spec}`. A bare `{}` and any hole already written
-    `{$...}` (a `$` immediately after `{`) are left untouched, so this is idempotent over engine holes."""
-    return _BARE_HOLE.sub(lambda m: "{$" + m.group(1) + (m.group(2) or "") + "}", template or "")
 
 
 def interp(template, row) -> str:
-    """Resolve a `{$canonical}` template against the row; trim the outer whitespace (templates carry
+    """Resolve a native `{$canonical}` template against the row; trim the outer whitespace (templates carry
     intentional inner spacing). A hole may carry a Python format spec (`{$diag_cabinet:03d}`) - the
     diagnosis columns rely on it. DELEGATES to the unified `expr.render` (mode="empty": a missing field
-    -> ""). `_dollarize` is retained as an IDEMPOTENT bridge (a no-op on native `{$token}` cells) so a
-    legacy bare `{token}` still resolves; it is removed in the final cleanup step."""
-    return expr.render(_dollarize(template), row, mode="empty").strip()
+    -> ""). Config templates are authored in native `{$token}` syntax."""
+    return expr.render(template, row, mode="empty").strip()
 
 
 def interp_keep(template, row) -> str:
-    """Like `interp`, but LEAVE an unresolved hole intact (a present-but-empty key still substitutes to '')
-    - DELEGATES to `expr.render(mode="keep")`. Used for the two-stage interface_tagname fill at phase 400:
-    stage 1 fills `{$tag_name}`/`{$db_element}`/`{$member}`/`{$direction}` and PRESERVES
-    `{$interface_name}`/`{$interface_id}`; stage 2 (the per-interface generator) fills those. `_dollarize`
-    is retained as an idempotent bridge (a no-op on native `{$token}`); it is removed in the final cleanup."""
-    return expr.render(_dollarize(template), row, mode="keep").strip()
+    """Like `interp`, but LEAVE an unresolved hole intact as `{$token}` (a present-but-empty key still
+    substitutes to '') - DELEGATES to `expr.render(mode="keep")`. Used for the two-stage interface_tagname
+    fill at phase 400: stage 1 fills `{$tag_name}`/`{$db_element}`/`{$member}`/`{$direction}` and PRESERVES
+    `{$interface_name}`/`{$interface_id}`; stage 2 (the per-interface generator) fills those."""
+    return expr.render(template, row, mode="keep").strip()
 
 
 def interface_tagname(row, template) -> str:

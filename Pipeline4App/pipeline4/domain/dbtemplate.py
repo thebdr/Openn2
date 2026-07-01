@@ -21,7 +21,6 @@ import string
 
 from pipeline4.core import expr
 from pipeline4.core.expr.parser import referenced_fields
-from pipeline4.domain.identity import _dollarize
 
 
 class DbTemplateError(ValueError):
@@ -29,26 +28,25 @@ class DbTemplateError(ValueError):
 
 
 # --- 1. PEP-3101 value/name templates ------------------------------------------------------------ #
-# A hole body is a field name, native `{$field}` (dotted `$obj.key` allowed) OR a legacy bare `{name}`
-# (the `_dollarize` bridge still rewrites bare -> `$name`) - NOT `{0}` positional or `{a[i]}` access. The
-# `$` is optional here so both native cells and a legacy bare token pass; the engine does the real check.
-_FIELD_RE = re.compile(r"\$?[A-Za-z_][\w.]*\Z")
+# A hole body is a native `{$field}` reference (dotted `$obj.key` allowed) - NOT a forgotten-`$` bare name,
+# `{0}` positional, or `{a[i]}` access. The engine (expr.render) does the real validation; this front-end
+# guard gives a clear error when an author writes `{name}` instead of `{$name}`.
+_FIELD_RE = re.compile(r"\$[A-Za-z_][\w.]*\Z")
 # A {hole} body up to the optional ':spec' (mirrors PEP-3101 parsing).
 _HOLE_FIELD = re.compile(r"\{([^{}:]*)(?::[^{}]*)?\}")
 
 
 def render(template, ctx: dict) -> str:
-    """Render a `{$field}` (or legacy bare `{name}`) template against `ctx`; raise DbTemplateError on an
-    unknown field / bad spec. DELEGATES to the unified `expr.render` (mode="strict": a missing field
-    raises) via the idempotent `_dollarize` bridge (no-op on native `{$..}`; removed in the final cleanup
-    step). `expr.ExprError` is re-raised as `DbTemplateError` so the 520 halt path is unchanged. The
-    up-front guard rejects `{0}` positional / `{a[i]}` access."""
+    """Render a native `{$field}` template against `ctx`; raise DbTemplateError on an unknown field / bad
+    spec. DELEGATES to the unified `expr.render` (mode="strict": a missing field raises); `expr.ExprError`
+    is re-raised as `DbTemplateError` so the 520 halt path is unchanged. The up-front guard requires each
+    hole to be a `{$name}` DB reference (rejecting a forgotten-`$` bare name, `{0}`, `{a[i]}` access)."""
     s = str(template if template is not None else "")
     for field in _HOLE_FIELD.findall(s):
         if field and not _FIELD_RE.match(field):
             raise DbTemplateError(f"invalid template field {{{field}}} (use a {{$name}} DB reference)")
     try:
-        return expr.render(_dollarize(s), ctx, mode="strict")
+        return expr.render(s, ctx, mode="strict")
     except expr.ExprError as e:
         raise DbTemplateError(f"bad template {template!r}: {e}")
 

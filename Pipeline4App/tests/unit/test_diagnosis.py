@@ -17,13 +17,13 @@ from pipeline4.domain.diagnosis_entries import diagnosis_entries_table, diagnosi
 
 
 def test_interp_format_spec():
-    eq(identity.interp("{diag_cabinet:03d}", {"diag_cabinet": "0"}), "000", "0 -> 000")
-    eq(identity.interp("{diag_bit:02d}", {"diag_bit": "62"}), "62", "62 -> 62 (already 2 digits)")
-    eq(identity.interp("{diag_cabinet:03d}", {"diag_cabinet": "5"}), "005")
-    eq(identity.interp("{diag_cabinet:03d}", {"diag_cabinet": "1.0"}), "001", "a float-read int coerces")
-    eq(identity.interp("{diag_cabinet:03d}", {"diag_cabinet": ""}), "", "a blank value is NOT padded")
-    eq(identity.interp("[ {x} {y} ]", {"x": "A", "y": "B"}), "[ A B ]", "bare tokens unchanged")
-    eq(identity.interp("{name}", {"name": "x"}), "x", "no spec -> verbatim")
+    eq(identity.interp("{$diag_cabinet:03d}", {"diag_cabinet": "0"}), "000", "0 -> 000")
+    eq(identity.interp("{$diag_bit:02d}", {"diag_bit": "62"}), "62", "62 -> 62 (already 2 digits)")
+    eq(identity.interp("{$diag_cabinet:03d}", {"diag_cabinet": "5"}), "005")
+    eq(identity.interp("{$diag_cabinet:03d}", {"diag_cabinet": "1.0"}), "001", "a float-read int coerces")
+    eq(identity.interp("{$diag_cabinet:03d}", {"diag_cabinet": ""}), "", "a blank value is NOT padded")
+    eq(identity.interp("[ {$x} {$y} ]", {"x": "A", "y": "B"}), "[ A B ]", "bare tokens unchanged")
+    eq(identity.interp("{$name}", {"name": "x"}), "x", "no spec -> verbatim")
 
 
 def test_load_signal_diagnosis():
@@ -136,7 +136,7 @@ def _sig(**kw):
 
 def test_resolve_logic_or_next_free_bit_and_cabinet():
     rules = [{"name": "Enc", "required_types": ["N1/2", "N2/2"], "dev_type": "A",
-              "db_name": "04_SPEED", "member": "M {index}", "diag_desc": ""}]
+              "db_name": "04_SPEED", "member": "M {$index}", "diag_desc": ""}]
     rows = [
         # an in-diag alarm already at (cabinet 2, bit 0) -> seeds `used`
         _sig(type={"in_diag": True}, type_hw="A", diag_cabinet="2", diag_bit="0"),

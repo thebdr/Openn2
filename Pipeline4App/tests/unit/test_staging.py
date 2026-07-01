@@ -13,7 +13,7 @@ from pipeline4.io import workbook
 
 def test_identity_flds_and_tag():
     row = {"functional_unit": "S1", "location": "+SG1", "device": "-B1", "script_type": "DI1/2", "bit": "I0.0",
-           "type": {"category": "Safety", "tag_name": "Door [ {combined_FLD} ]", "tagtable_name": "SAFETY_Doors"}}
+           "type": {"category": "Safety", "tag_name": "Door [ {$combined_FLD} ]", "tagtable_name": "SAFETY_Doors"}}
     row["combined_FLD"] = identity.combined_fld(row)
     eq(identity.fld(row), "S1+SG1-B1", "iol_FLD = FU+LOC+DEV")
     eq(identity.combined_fld(row), "S1+SG1-B1", "combined == iol when there is no C&E FLD")
@@ -22,30 +22,13 @@ def test_identity_flds_and_tag():
     eq(identity.tagtable(row), "SAFETY_Doors", "tagtable from the type")
 
 
-def test_dollarize():
-    d = identity._dollarize
-    eq(d("{a}"), "{$a}", "a bare field hole -> {$field}")
-    eq(d("{a} {b}"), "{$a} {$b}", "every bare hole is rewritten")
-    eq(d("{diag_cabinet:03d}"), "{$diag_cabinet:03d}", "the :spec is preserved")
-    eq(d("pre {n:02d} post"), "pre {$n:02d} post", "literal text around the hole is verbatim")
-    eq(d(""), "", "empty template -> empty")
-    eq(d(None), "", "None template -> empty")
-    eq(d("{}"), "{}", "a bare {} hole is left untouched")
-    eq(d("{ }"), "{ }", "a whitespace-only hole is not a bare field")
-    eq(d("{$already}"), "{$already}", "an already-$ engine hole is idempotent (not double-dollarized)")
-    eq(d("{$x:03d}"), "{$x:03d}", "an already-$ hole with a spec is left be")
-    eq(d("price $5 {n}"), "price $5 {$n}", "a literal $ outside a hole is verbatim")
-    eq(d("{Aa_1}"), "{$Aa_1}", "a field name may carry digits/underscores")
-    eq(d("{0}"), "{0}", "a positional {0} is NOT a bare field name -> untouched")
-
-
 def test_interp_delegates_to_expr_render():
     # empty mode: a missing field -> "" ; outer whitespace trimmed; numeric spec coerced; blank stays blank.
-    eq(identity.interp("  {a}-{b}  ", {"a": "x", "b": "y"}), "x-y", "resolves + outer-trims")
-    eq(identity.interp("{a}-{missing}", {"a": "x"}), "x-", "a missing field renders empty")
-    eq(identity.interp("CAB{diag_cabinet:03d}", {"diag_cabinet": "1"}), "CAB001", "numeric spec coerces")
-    eq(identity.interp("CAB{diag_cabinet:03d}", {"diag_cabinet": ""}), "CAB", "a blank value is not padded")
-    eq(identity.interp("{n:02d}", {"n": "0"}), "00", "a literal '0' coerces, not blank")
+    eq(identity.interp("  {$a}-{$b}  ", {"a": "x", "b": "y"}), "x-y", "resolves + outer-trims")
+    eq(identity.interp("{$a}-{$missing}", {"a": "x"}), "x-", "a missing field renders empty")
+    eq(identity.interp("CAB{$diag_cabinet:03d}", {"diag_cabinet": "1"}), "CAB001", "numeric spec coerces")
+    eq(identity.interp("CAB{$diag_cabinet:03d}", {"diag_cabinet": ""}), "CAB", "a blank value is not padded")
+    eq(identity.interp("{$n:02d}", {"n": "0"}), "00", "a literal '0' coerces, not blank")
     eq(identity.interp(None, {}), "", "None template -> ''")
 
 
@@ -59,7 +42,7 @@ _COLMAP = [{"column": c, "canonical": n} for c, n in
            [("A", "functional_unit"), ("B", "location"), ("C", "device"),
             ("D", "script_type"), ("E", "bit"), ("F", "skip_reason")]]
 _TYPES = {"DI1/2": {"type_id": "DI1/2", "category": "Safety",
-                    "tag_name": "Door [ {combined_FLD} ]", "tagtable_name": "SAFETY_Doors"}}
+                    "tag_name": "Door [ {$combined_FLD} ]", "tagtable_name": "SAFETY_Doors"}}
 
 
 def _iolist(path):
@@ -206,7 +189,6 @@ if __name__ == "__main__":
     import sys
     sys.exit(run("staging", [
         ("identity_flds_and_tag", test_identity_flds_and_tag),
-        ("dollarize", test_dollarize),
         ("interp_delegates_to_expr_render", test_interp_delegates_to_expr_render),
         ("combined_fld_appends_ce_when_different", test_combined_fld_appends_ce_when_different),
         ("read_view_drops_skip_and_struck", test_read_view_drops_skip_and_struck),
