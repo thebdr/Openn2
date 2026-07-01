@@ -7,22 +7,23 @@ from pipeline4.domain.dbtemplate import (
 
 # --- 1. render (PEP-3101, bare fields, numeric coercion) ----------------------------------------- #
 def test_render_bare_field():
-    eq(render("Door [ {combined_FLD} ]", {"combined_FLD": "S1-B1"}), "Door [ S1-B1 ]")
-    eq(render("{a} {b}", {"a": "x", "b": "y"}), "x y")
+    eq(render("Door [ {$combined_FLD} ]", {"combined_FLD": "S1-B1"}), "Door [ S1-B1 ]")
+    eq(render("{$a} {$b}", {"a": "x", "b": "y"}), "x y")
     eq(render(None, {}), "", "None template -> ''")
 
 
 def test_render_numeric_coercion():
-    eq(render("S1.CABINET{cabinet:03d}.STATE", {"cabinet": "1"}), "S1.CABINET001.STATE",
+    eq(render("S1.CABINET{$cabinet:03d}.STATE", {"cabinet": "1"}), "S1.CABINET001.STATE",
        "an integer spec coerces the string cell '1' -> 1 -> '001'")
-    eq(render("{n:02d}", {"n": "7"}), "07")
-    eq(render("{x:.1f}", {"x": "3"}), "3.0", "a float spec coerces too")
+    eq(render("{$n:02d}", {"n": "7"}), "07")
+    eq(render("{$x:.1f}", {"x": "3"}), "3.0", "a float spec coerces too")
 
 
 def test_render_errors():
-    raises(DbTemplateError, lambda: render("{missing}", {"a": "1"}))      # unknown field
-    raises(DbTemplateError, lambda: render("{0}", {"a": "1"}))            # positional not allowed
-    raises(DbTemplateError, lambda: render("{cabinet:03d}", {"cabinet": "x"}))  # bad numeric coercion
+    raises(DbTemplateError, lambda: render("{$missing}", {"a": "1"}))     # unknown field (expr strict)
+    raises(DbTemplateError, lambda: render("{0}", {"a": "1"}))            # not a {$name} reference
+    raises(DbTemplateError, lambda: render("{missing}", {"a": "1"}))      # forgot the $ -> guard rejects
+    raises(DbTemplateError, lambda: render("{$cabinet:03d}", {"cabinet": "x"}))  # bad numeric coercion
 
 
 def test_template_fields():

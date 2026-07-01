@@ -28,23 +28,24 @@ class DbTemplateError(ValueError):
 
 
 # --- 1. PEP-3101 value/name templates ------------------------------------------------------------ #
-_FIELD_RE = re.compile(r"[A-Za-z_]\w*\Z")
-# A {hole} body up to the optional ':spec' (mirrors PEP-3101 parsing) - the field-name part `_SafeFormatter`
-# used to validate as a bare name (rejecting `{0}` positional + `{a.b}`/`{a[i]}` access).
+# A hole body is a field name, native `{$field}` (dotted `$obj.key` allowed) OR a legacy bare `{name}`
+# (the `_dollarize` bridge still rewrites bare -> `$name`) - NOT `{0}` positional or `{a[i]}` access. The
+# `$` is optional here so both native cells and a legacy bare token pass; the engine does the real check.
+_FIELD_RE = re.compile(r"\$?[A-Za-z_][\w.]*\Z")
+# A {hole} body up to the optional ':spec' (mirrors PEP-3101 parsing).
 _HOLE_FIELD = re.compile(r"\{([^{}:]*)(?::[^{}]*)?\}")
 
 
 def render(template, ctx: dict) -> str:
-    """Render a PEP-3101 `template` against `ctx`; raise DbTemplateError on an unknown field / bad spec.
-    DELEGATES to the unified `expr.render` (mode="strict": a missing field raises, matching the old
-    `_SafeFormatter`'s `unknown template field`), via `_dollarize`. `expr.ExprError` is re-raised as
-    `DbTemplateError` so the 520 caller's halt path (which catches DbTemplateError) is unchanged.
-    The bare-name guard (no `{0}` positional, no `{a.b}`/`{a[i]}` access) is preserved up front - it is
-    NOT expressible through `_dollarize` (which only rewrites bare-name holes)."""
+    """Render a `{$field}` (or legacy bare `{name}`) template against `ctx`; raise DbTemplateError on an
+    unknown field / bad spec. DELEGATES to the unified `expr.render` (mode="strict": a missing field
+    raises) via the idempotent `_dollarize` bridge (no-op on native `{$..}`; removed in the final cleanup
+    step). `expr.ExprError` is re-raised as `DbTemplateError` so the 520 halt path is unchanged. The
+    up-front guard rejects `{0}` positional / `{a[i]}` access."""
     s = str(template if template is not None else "")
     for field in _HOLE_FIELD.findall(s):
         if field and not _FIELD_RE.match(field):
-            raise DbTemplateError(f"invalid template field {{{field}}} (use a bare {{name}})")
+            raise DbTemplateError(f"invalid template field {{{field}}} (use a {{$name}} DB reference)")
     try:
         return expr.render(_dollarize(s), ctx, mode="strict")
     except expr.ExprError as e:

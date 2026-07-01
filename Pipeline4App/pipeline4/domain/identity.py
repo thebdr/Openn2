@@ -27,10 +27,11 @@ def _dollarize(template) -> str:
 
 
 def interp(template, row) -> str:
-    """Resolve a `{canonical}` template against the row; trim the outer whitespace (templates carry
-    intentional inner spacing). A token may carry a Python format spec (`{diag_cabinet:03d}`) - the
-    diagnosis columns rely on it (a bare-token resolver would emit the literal `{diag_cabinet:03d}`).
-    DELEGATES to the unified `expr.render` (mode="empty": a missing field -> ""), via `_dollarize`."""
+    """Resolve a `{$canonical}` template against the row; trim the outer whitespace (templates carry
+    intentional inner spacing). A hole may carry a Python format spec (`{$diag_cabinet:03d}`) - the
+    diagnosis columns rely on it. DELEGATES to the unified `expr.render` (mode="empty": a missing field
+    -> ""). `_dollarize` is retained as an IDEMPOTENT bridge (a no-op on native `{$token}` cells) so a
+    legacy bare `{token}` still resolves; it is removed in the final cleanup step."""
     return expr.render(_dollarize(template), row, mode="empty").strip()
 
 
