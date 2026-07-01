@@ -32,9 +32,9 @@ def test_load_signal_diagnosis():
     eq(d["E1/2"]["in_diag"], True)
     eq(d["E1/2"]["diag_logic"], "invert")
     eq(d["E1/2"]["tristate"], True, "E1/2 is the tristate type")
-    eq(d["E1/2"]["tristate_desc"], "EMERGENCY PUSH-BUTTON RELEASED {combined_FLD}")
+    eq(d["E1/2"]["tristate_desc"], "EMERGENCY PUSH-BUTTON RELEASED {$combined_FLD}")
     eq(d["PA"]["diag_logic"], "mirror")
-    eq(d["PA"]["diag_desc"], "FIELDBUS NODE FAILURE {profinet_name} {profinet_ip}")
+    eq(d["PA"]["diag_desc"], "FIELDBUS NODE FAILURE {$profinet_name} {$profinet_ip}")
     eq(d["B1/2"]["tristate"], False, "a non-tristate in_diag type")
     ok("Z#" in d and d["Z#"]["in_diag"] is True, "a pattern type carries its diag attrs (keyed by type_id)")
 
@@ -43,8 +43,8 @@ def test_load_diagnosis_columns():
     cols = config.load_diagnosis_columns()
     headers = [c["header"] for c in cols]
     eq(headers[0], "Diag Cabinet")
-    eq(cols[0]["expression"], "{diag_cabinet:03d}", "the :03d spec is restored")
-    eq(cols[1]["expression"], "{diag_bit:02d}", "the :02d spec is restored")
+    eq(cols[0]["expression"], "{$diag_cabinet:03d}", "the :03d spec is restored (native $-syntax)")
+    eq(cols[1]["expression"], "{$diag_bit:02d}", "the :02d spec is restored (native $-syntax)")
     ok(any(c["expression"].strip() == "$PLC_Binding$" for c in cols), "the PLC_Binding sentinel column")
     eq(len(cols), 19, "the 19 DiagList columns")
 

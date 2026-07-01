@@ -1,36 +1,36 @@
 ﻿type_id,type_id_desc,category,pair_key,channel,is_pattern,tagtable_name,tag_name,io_comment,ce_mandatory
-A,Alarm,Diag,,,no,Alarms_Warnings,{desc_l1} {desc_l1b} [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-W,Warning,Diag,,,no,Alarms_Warnings,{desc_l1} {desc_l1b} [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-PA,Fieldbus Alarm,Diag,,,no,,,[ {script_type} {index}  {drawing} ],no
-PW,Fieldbus Warning,Diag,,,no,,,[ {script_type} {index}  {drawing} ],no
-E1/2,Emergency Push Button,Safety,E,1,no,EMERGENCY_PushButtons,Emergency Push Button [ {combined_FLD} ],[ {script_type} {index}  {drawing} ],yes
-E2/2,Emergency Push Button,Safety,E,2,no,,,[ {script_type} {index}  {drawing} ],no
-B1/2,Safety Breaker,Safety,B,1,no,SAFETY_Breakers,Safety Breaker [ {combined_FLD} ],[ {script_type} {index}  {drawing} ],yes
-B2/2,Safety Breaker,Safety,B,2,no,,,[ {script_type} {index}  {drawing} ],no
-N1/2,Safety Encoder Sensor 1,Safety,N,1,no,SAFETY_Encoders,Safety Encoder {index} Sensor 1 [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],warn
-N2/2,Safety Encoder Sensor 2,Safety,N,2,no,SAFETY_Encoders,Safety Encoder {index} Sensor 2 [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],warn
-DI1/2,Door Closed Safety Input 1,Safety,DI,1,no,SAFETY_Doors,Door Closed Safety Input 1 [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],yes
-DI2/2,Door Closed Safety Input 2,Safety,DI,2,no,SAFETY_Doors,Door Closed Safety Input 2 [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-DD,Door Closed Diag Input,Diag,,,no,SAFETY_Doors,Door Closed Diagnosis Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-DR,Door Reset Input,Std,,,no,SAFETY_Doors,Door Reset Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-DL,Door Lamp Output,Std,,,no,SAFETY_Doors,Door Lamp Output [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-DQ,Door Unlock Output,Std,,,no,SAFETY_Doors,Door Unlock Output [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI1/2,Contactor Feedback Input,Safety,KI,1,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI2/2,Contactor Feedback Input,Safety,KI,2,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI1/3,Contactor Feedback Input,Safety,KI,1,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI2/3,Contactor Feedback Input,Safety,KI,2,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI3/3,Contactor Feedback Input,Safety,KI,3,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI1/4,Contactor Feedback Input,Safety,KI,1,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI2/4,Contactor Feedback Input,Safety,KI,2,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI3/4,Contactor Feedback Input,Safety,KI,3,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KI4/4,Contactor Feedback Input,Safety,KI,4,no,SAFETY_Contactors,Contactor Feedback Input [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-KQ,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {combined_FLD} ],[ {script_type} {index}  {drawing} ],yes
-KQ1/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {combined_FLD} ],[ {script_type} {index}  {drawing} ],yes
-KQ2/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {combined_FLD} ],[ {script_type} {index}  {drawing} ],yes
-R*,Emergency Reset GLOBAL,Safety,,,no,RESET,Emergency Reset GLOBAL Command [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],warn
-R#,Emergency Reset Area #,Safety,,,yes,RESET,Emergency Reset Command Area {desc_1b} [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],warn
-Z#,Emergency Status Feedback Area #,Safety,,,yes,SAFETY_Status,Emergency Status Feedback Area {desc_1b} [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-F1/2,Fire Alarm,Safety,F,1,no,SAFETY_Status,Fire Alarm [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-F2/2,Fire Alarm,Safety,F,2,no,SAFETY_Status,Fire Alarm [ {iol_FLD} ],[ {script_type} {index}  {drawing} ],no
-IOC,Machine Interface (I/O Controller),Interface,,,no,IOCouplers_Interfaces,,[ {script_type} {index}  {drawing} ],no
+A,Alarm,Diag,,,no,Alarms_Warnings,{$desc_l1} {$desc_l1b} [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+W,Warning,Diag,,,no,Alarms_Warnings,{$desc_l1} {$desc_l1b} [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+PA,Fieldbus Alarm,Diag,,,no,,,[ {$script_type} {$index}  {$drawing} ],no
+PW,Fieldbus Warning,Diag,,,no,,,[ {$script_type} {$index}  {$drawing} ],no
+E1/2,Emergency Push Button,Safety,E,1,no,EMERGENCY_PushButtons,Emergency Push Button [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
+E2/2,Emergency Push Button,Safety,E,2,no,,,[ {$script_type} {$index}  {$drawing} ],no
+B1/2,Safety Breaker,Safety,B,1,no,SAFETY_Breakers,Safety Breaker [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
+B2/2,Safety Breaker,Safety,B,2,no,,,[ {$script_type} {$index}  {$drawing} ],no
+N1/2,Safety Encoder Sensor 1,Safety,N,1,no,SAFETY_Encoders,Safety Encoder {$index} Sensor 1 [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn
+N2/2,Safety Encoder Sensor 2,Safety,N,2,no,SAFETY_Encoders,Safety Encoder {$index} Sensor 2 [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn
+DI1/2,Door Closed Safety Input 1,Safety,DI,1,no,SAFETY_Doors,Door Closed Safety Input 1 [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
+DI2/2,Door Closed Safety Input 2,Safety,DI,2,no,SAFETY_Doors,Door Closed Safety Input 2 [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+DD,Door Closed Diag Input,Diag,,,no,SAFETY_Doors,Door Closed Diagnosis Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+DR,Door Reset Input,Std,,,no,SAFETY_Doors,Door Reset Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+DL,Door Lamp Output,Std,,,no,SAFETY_Doors,Door Lamp Output [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+DQ,Door Unlock Output,Std,,,no,SAFETY_Doors,Door Unlock Output [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI1/2,Contactor Feedback Input,Safety,KI,1,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI2/2,Contactor Feedback Input,Safety,KI,2,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI1/3,Contactor Feedback Input,Safety,KI,1,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI2/3,Contactor Feedback Input,Safety,KI,2,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI3/3,Contactor Feedback Input,Safety,KI,3,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI1/4,Contactor Feedback Input,Safety,KI,1,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI2/4,Contactor Feedback Input,Safety,KI,2,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI3/4,Contactor Feedback Input,Safety,KI,3,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KI4/4,Contactor Feedback Input,Safety,KI,4,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+KQ,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
+KQ1/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
+KQ2/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
+R*,Emergency Reset GLOBAL,Safety,,,no,RESET,Emergency Reset GLOBAL Command [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn
+R#,Emergency Reset Area #,Safety,,,yes,RESET,Emergency Reset Command Area {$desc_1b} [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn
+Z#,Emergency Status Feedback Area #,Safety,,,yes,SAFETY_Status,Emergency Status Feedback Area {$desc_1b} [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+F1/2,Fire Alarm,Safety,F,1,no,SAFETY_Status,Fire Alarm [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+F2/2,Fire Alarm,Safety,F,2,no,SAFETY_Status,Fire Alarm [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+IOC,Machine Interface (I/O Controller),Interface,,,no,IOCouplers_Interfaces,,[ {$script_type} {$index}  {$drawing} ],no
