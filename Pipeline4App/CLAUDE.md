@@ -749,6 +749,30 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
     cosmetic `stale` flag (`apply` ignores status). The proper fix - reconcile once per RUN over the union of all
     findings - lands with the engine (post-S6); until then the per-handler single-gate keeps WITHIN-click churn out.
 
+## GUI/config REFRESH (pre-production-test, 2026-07-02 — UI_REFRESH_PLAN A–I, all landed + pushed)
+The user-reviewed refresh before the first production test (the full spec + commits: `UI_REFRESH_PLAN.md`):
+- **Phase bar**: composite `_PhaseButton` ([icon] number / 2-line narrow description; `theme.narrow_family`
+  = Bahnschrift SemiCondensed→fallbacks); icons via **`assets/icons/phase_icons.yaml`** (Twemoji PNGs + 4
+  project-drawn customs from `scripts/gen_custom_icons.py`; new phase = a row + a 72px PNG); chevron at 61%
+  height; the dropdown clamps at the app border + scrolls.
+- **Theme**: `gui/theme.py` rebuilt — one `TOKENS[mode][role]` table + native clam styling + a
+  `theme.register(cb)`/`set_mode` subscription model. **sv-ttk REMOVED on measurement** (36.6→7.8 ms/log-line
+  repaint, 164→31 ms/toggle on the VMware target). Do NOT add explicit TScrollbar styles (measured ~5x
+  per-repaint cost; scrollbars inherit from the "." root style).
+- **DB Explorer**: lazy async load + `dbquery.dir_stamp` reuse + chunked fill. **Files tab**: CONFIG-DRIVEN
+  via the `files_tab:` section in app_config.yaml (${placeholder} roots + include/exclude regex; active →
+  builtin fallback; no code-baked structure). **yaml/json**: highlighted text view + an Object-explorer
+  editor (`gui/object_editor.py`, ruamel round-trip, `…` path pickers on *path*/*dir* keys).
+- **`user_input/generation_params.yaml`** (active→builtin, neither→RAISE): the 620 SCL DWord names/variant/
+  `S1.CABINET{$index}.{$role}` instance template (core/expr, strict) + the DiagList `$PLC_Binding$` sentinel;
+  a builder declares its output surface at registration (`@builds(name, emit="fc_xml")`) — migrated at
+  byte-parity 26/26. The 02_COM constants + `DB_CONSTANTS` seeds stay in code until after the production test.
+- **expr tooling** (`core/expr/tools.py`): `tokens`/`check`/`check_template`/`function_names` (editor-grade,
+  lenient, precise unknown-$field spans) + the toolbar **ƒx** Expression Builder (`gui/expr_builder.py`,
+  live preview against a real SSOT row). **Guide**: `docs/guide/*.md` + `gui/helpwin.py` (F1 opens the
+  focused area's section; `src://` links open the shipped source; missing sections render the
+  "no instructions provided" page; `scripts/list_guide_stubs.py` lists authoring TODOs).
+
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
 **data-independent suite is the green gate** (currently **236**: keys/table/database, signals schema,

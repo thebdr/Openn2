@@ -1,6 +1,12 @@
 # UI_REFRESH_PLAN — the pre-production-test GUI + config refresh
 
-Status: **PROPOSAL — awaiting user review** (the user's directive: "let me review before building").
+Status: **LANDED (2026-07-02)** — reviewed + approved by the user (icons via the interactive artifact,
+round 2 confirmed), then implemented in order: A `2e4e7b6` · B `57602c2` · C `0018f6d` · E `abd04b5` ·
+D `fee3367` · F `0c0d1ee` (items 3–6; 1–2 deferred until after the production test) · G+H `cba64b0` ·
+I `ce3a2eb`. Gate 55 test files green; per-step scripted verification; byte-parity 26/26 on F.
+Confirmed icons: ⚡ run · ✅ 100 · 🖊️ 200 · custom db-write 300 · 🤝 400 · custom io-arrows 500 ·
+🩺 600 · custom pcb-board 700 · custom code-file 800 · 📈 900 (Twemoji set + matching customs).
+The section texts below are the reviewed spec, kept as the design record.
 Scope: the batch of improvements requested before the first PL4 production test (building the same
 project PL3 built). Companion visual: the icon-review artifact (phase-bar mockup + per-phase icon
 picker). Once reviewed, each section below becomes an implementation step with its own verification.

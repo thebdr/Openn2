@@ -10,7 +10,56 @@ user's word**, push only when asked. Each chunk is committed with its gate **and
 when domain judgement is needed (it's the user's; you implement). A question is a question — answer it, don't
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
-## LATEST (2026-07-01) — ph100b report polish · STEP 4 tail · the FULL expr unification — all pushed
+## LATEST (2026-07-02) — the pre-production GUI/config REFRESH (UI_REFRESH_PLAN A–I) — ALL LANDED + PUSHED
+The user reviewed + approved `UI_REFRESH_PLAN.md` (the icon selection via an interactive artifact, two
+rounds), then said "proceed" — the whole batch landed this session, one commit per step, gate green
+(now **55 test FILES**) + scripted verification each; `origin/pl4` synced through **`ce3a2eb`**:
+- **A `2e4e7b6` — phase-bar redesign.** Composite `_PhaseButton` ([24px icon] number / max-2-line
+  description in `theme.narrow_family` = Bahnschrift SemiCondensed→…); icons = Twemoji PNGs + 4
+  PROJECT-DRAWN customs (db-write/io-arrows/pcb-board/code-file, `scripts/gen_custom_icons.py`) via the
+  `assets/icons/phase_icons.yaml` registry (a new phase = a row + a PNG); chevron strip at 61% height
+  (measured); the dropdown CLAMPS at the app border + scrolls (was: rendered off-screen).
+- **B `57602c2` — theme rebuilt from scratch; sv-ttk DROPPED on evidence.** Mapped-window profiling on
+  the real (VMware) machine: sv-ttk cost 36.6ms/log-line repaint + 164ms/toggle vs 7.8ms + 31ms on
+  clam → 4-5x. New `theme.py`: one `TOKENS[mode][role]` table + native clam styling + a
+  `register`/`set_mode` subscription model (app_main no longer hand-fans-out). GOTCHA (measured): an
+  explicit per-orientation TScrollbar style forces a slow clam redraw path (~52ms/line) — scrollbars
+  deliberately inherit from the "." root style.
+- **C `0018f6d` — Database Explorer perf.** Lazy first-visit load OFF the Tk thread; `dbquery.dir_stamp`
+  (mtime/size) skips rebuilds while the SSOT is unchanged (re-visits are free, a phase run triggers a
+  reload); 200-row chunked grid fill with a generation counter.
+- **E `abd04b5` — Files tab is CONFIG-DRIVEN.** `files_tab:` in app_config.yaml (sections; ${placeholder}
+  roots; include/exclude regex on the relative path); active→builtin fallback; the extension whitelist is
+  GONE (the previously-invisible .html reports now show; unsupported files get Open-externally). Missing
+  section → a pointed header + WARN, never a code-baked default.
+- **D `fee3367` — yaml/json viewers.** Text mode gains syntax highlighting (`gui/highlight.py`); a
+  **Text ⇄ Object explorer** toggle — `gui/object_editor.py` edits scalars inline (ruamel round-trip:
+  comments/order/quotes survive; typed coercion; atomic write) with a `…` file picker on keys containing
+  `path` (dir picker for dir/folder/root).
+- **F `0c0d1ee` — hardcoded generation data → config (items 3–6), BYTE-PARITY 26/26.** NEW
+  `user_input/generation_params.yaml` (active→builtin, neither→raise): the SCL ALARM/WARNING DWord names +
+  default variant + the `S1.CABINET{$index}.{$role}` instance template (rendered via core/expr, strict) +
+  the `$PLC_Binding$` sentinel; `@builds(name, emit="fc_xml")` replaces xml_emit's hardcoded EMITTERS set.
+  Items 1–2 (02_COM constants + DB seed names) stay DEFERRED until after the production test (user-agreed).
+  NOTE: `domain/blocks/builders.py` is the user-coded custom section — audited but deliberately untouched
+  (its ZONE_GROUPS/ESTOP tiers/variants stay); only the one-line emit declaration was added.
+- **G+H `cba64b0` — expr tooling + the ƒx dialog.** `core/expr/tools.py`: `tokens()` (positions, lenient),
+  `check()`/`check_template()` (precise unknown-$field spans; render-faithful spec splitting),
+  `function_names()`. `gui/expr_builder.py` (toolbar **ƒx**): highlight + lint squiggles + autocomplete +
+  live preview of test/evaluate/render against a REAL SSOT row (`_db` injected → data funcs work). The
+  compile cache stays identity-keyed (scope.py documents that as deliberate).
+- **I `ce3a2eb` — the in-app guide.** `docs/guide/*.md` + index.yaml (6 sections shipped); `gui/helpwin.py`
+  renders a Markdown subset (pure `parse_markdown`, tested) with `guide://` / `src://` (opens the SHIPPED
+  source) / https links; **F1** opens the focused area's section (`attach`/`help_id_of`); toolbar **?**;
+  missing sections render the "no instructions provided … see source" page; `scripts/list_guide_stubs.py`
+  = the authoring TODO (currently empty); shared tooltips on the toolbar.
+- **NEXT: the FIRST PRODUCTION TEST** — build with PL4 the same project PL3 built (the user's plan). Watch
+  for: the builtin `config_project/project_params.yaml` currently points at a SMALL sample doc (the builtin
+  SSOT holds 4 signals — coverage.csv there is stale 269-row data from an older run); the real test runs in
+  the user's project. After the test: F items 1–2 (02_COM + seed names → generation_params), and the
+  deferred list below (150 / 920 / accept / gate-reconcile) still stands.
+
+## PREVIOUS (2026-07-01) — ph100b report polish · STEP 4 tail · the FULL expr unification — all pushed
 Local **`pl4`** is at **`aba2da2`** and PUSHED (`origin/pl4` synced). Three efforts landed this session, each
 parity/byte-gated + committed per step (gate: **48 test FILES green** throughout):
 - **ph100b Before/After Quality Report — reshaped + polished (user-driven).** The `domain/changes/` HTML/CSV
