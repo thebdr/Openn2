@@ -29,13 +29,15 @@ class FilesPanel(ttk.Frame):
         panes.pack(fill="both", expand=True)
 
         left = ttk.Frame(panes)
+        # Refresh packs FIRST as a slim full-width strip above the tree (packed after the tree, the
+        # packer squeezed it into a full-height side column). Matches the Database Explorer's toolbar.
+        ttk.Button(left, text="Refresh", command=self.refresh).pack(side="top", fill="x", pady=(0, 2))
         self.tree = ttk.Treeview(left, show="tree", selectmode="browse")
         tvs = ttk.Scrollbar(left, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=tvs.set)
         self.tree.pack(side="left", fill="both", expand=True)
         tvs.pack(side="right", fill="y")
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
-        ttk.Button(left, text="Refresh", command=self.refresh).pack(side="bottom", fill="x")
         panes.add(left, weight=1)
 
         self.editor = ttk.Frame(panes)
