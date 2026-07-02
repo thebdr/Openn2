@@ -1,9 +1,11 @@
-"""The Files tab (GUI M5): a 3-section file tree (config / user-editable / output) on the left, a
-read-only viewer on the right. A `.csv` / `.xlsx` opens in a Treeview grid (the xlsx gets a sheet picker);
-a `.yaml`/`.json`/`.xml`/`.scl`/text file opens in a monospace text pane. Every viewer carries a path
-strip + **Open externally** / **Open folder** buttons (`gui/excel`-free; `gui/extedit`), so editing happens
-in the OS app while PL4 keeps its byte-stable codec the only writer (decision #3: view-only first). The
-Tk-free scan/dispatch/read logic lives in `gui/files_view.py` (tested); this is the view.
+"""The Files tab (GUI M5 + the refresh): a config-driven file tree on the left, a viewer on the right.
+A `.csv` / `.xlsx` opens in the shared read-only DataGrid (the xlsx gets a sheet picker); a
+`.yaml`/`.json` gets highlighting + the Text ⇄ Object-explorer toggle; every text-based file opens in
+an EDITABLE monospace pane (Save/Ctrl+S writes atomically with the original BOM/newline style; a
+dirty pane guards against silent discard; an over-cap file falls back to read-only). Every viewer
+carries a path strip + **Open externally** / **Open folder** buttons (`gui/extedit`). Table edits
+still go through the codec (the grids stay read-only). The Tk-free scan/filter/read/write logic
+lives in `gui/files_view.py` (tested); this is the view.
 """
 from __future__ import annotations
 
@@ -23,6 +25,8 @@ class FilesPanel(ttk.Frame):
         self._paths: dict = {}            # tree item id -> absolute file path
         self._cur: str | None = None      # the file currently shown (re-themed in place)
         self._textw: tk.Text | None = None
+        self._text_editable = False       # the shown text pane accepts edits (drives the dirty guard)
+        self._reselecting = False         # ignore the selection event our own dirty-guard rollback fires
         self._obj_mode = False            # the yaml/json Text ⇄ Object toggle (remembered per session)
 
         panes = ttk.Panedwindow(self, orient="horizontal")
@@ -78,10 +82,30 @@ class FilesPanel(ttk.Frame):
         return 1
 
     def _on_select(self, _event) -> None:
+        if self._reselecting:
+            self._reselecting = False
+            return
         sel = self.tree.selection()
         path = self._paths.get(sel[0]) if sel else None
-        if path:
-            self._load(path)
+        if not path or path == self._cur:
+            return
+        if self._unsaved_text():                  # don't silently drop an in-progress text edit
+            from tkinter import messagebox
+            name = os.path.basename(self._cur or "")
+            if not messagebox.askyesno("Unsaved changes",
+                                       f"Discard unsaved changes to {name}?", parent=self):
+                for item, known in self._paths.items():
+                    if known == self._cur:
+                        self._reselecting = True
+                        self.tree.selection_set(item)
+                        break
+                return
+        self._load(path)
+
+    def _unsaved_text(self) -> bool:
+        """True while the shown text pane is editable and carries unsaved edits."""
+        return (self._text_editable and self._textw is not None
+                and self._textw.winfo_exists() and bool(self._textw.edit_modified()))
 
     # --- dispatch + viewers --------------------------------------------------------------------- #
     def _load(self, path: str) -> None:
@@ -106,6 +130,7 @@ class FilesPanel(ttk.Frame):
 
     def _clear_editor(self) -> None:
         self._textw = None
+        self._text_editable = False
         for w in self.editor.winfo_children():
             w.destroy()
 
@@ -201,27 +226,83 @@ class FilesPanel(ttk.Frame):
             self._text_body(path)
 
     def _text_body(self, path: str) -> None:
-        """The read-only monospace pane (+ one-pass yaml/json syntax highlighting)."""
-        with open(path, encoding="utf-8-sig", errors="replace") as handle:
-            content = handle.read(400_000)            # cap a huge file so the pane stays responsive
+        """The monospace text EDITOR (+ live yaml/json highlighting): text-based files edit in place
+        and save ATOMICALLY with their original BOM/newline style (Save button / Ctrl+S; Revert
+        re-reads). A file over the editor cap opens READ-ONLY - saving a truncated read would destroy
+        the tail (Open externally instead)."""
+        info = files_view.read_text_file(path)
+        editable = not info["truncated"]
+        bar = ttk.Frame(self.editor)
+        bar.pack(side="top", fill="x", padx=6, pady=(0, 2))
         frame = ttk.Frame(self.editor)
         frame.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
-        text = tk.Text(frame, wrap="none", relief="flat", borderwidth=0,
+        text = tk.Text(frame, wrap="none", relief="flat", borderwidth=0, undo=True,
                        background=theme.bg_for(self._mode), foreground=theme.fg_for(self._mode),
                        insertbackground=theme.fg_for(self._mode), font=theme.MONO_FONT)
         vsb = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
         hsb = ttk.Scrollbar(frame, orient="horizontal", command=text.xview)
         text.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-        text.insert("1.0", content)
+        text.insert("1.0", info["text"])
         kind = highlight.kind_of(path)
         if kind:
             highlight.configure_tags(text, self._mode)
-            highlight.apply(text, kind, content)
-        text.configure(state="disabled")
+            highlight.apply(text, kind, info["text"])
         vsb.pack(side="right", fill="y")
         hsb.pack(side="bottom", fill="x")
         text.pack(side="left", fill="both", expand=True)
         self._textw = text
+        self._text_editable = editable
+        if not editable:
+            text.configure(state="disabled")
+            ttk.Label(bar, text=f"read-only: over the {files_view.TEXT_EDIT_CAP // 1000} KB editor cap"
+                                " - Open externally").pack(side="left")
+            return
+
+        save_btn = ttk.Button(bar, text="Save  (Ctrl+S)")
+        save_btn.pack(side="left")
+        ttk.Button(bar, text="Revert", command=lambda: self._load(path)).pack(side="left", padx=6)
+        dirty_lbl = ttk.Label(bar, text="")
+        dirty_lbl.pack(side="left", padx=8)
+        hl_job = [None]
+
+        def set_dirty(flag: bool):
+            dirty_lbl.configure(text="● modified" if flag else "")
+            save_btn.configure(state="normal" if flag else "disabled")
+
+        def rehighlight():
+            hl_job[0] = None
+            if not text.winfo_exists():
+                return
+            content = text.get("1.0", "end-1c")
+            for tag in highlight.COLORS:
+                text.tag_remove(tag, "1.0", "end")
+            highlight.apply(text, kind, content)
+
+        def on_modified(_event=None):
+            if text.edit_modified():
+                set_dirty(True)
+                if kind:                          # debounce the re-highlight while typing
+                    if hl_job[0]:
+                        text.after_cancel(hl_job[0])
+                    hl_job[0] = text.after(200, rehighlight)
+
+        def save(_event=None):
+            try:
+                files_view.write_text_file(path, text.get("1.0", "end-1c"),
+                                           info["bom"], info["crlf"])
+            except OSError as error:
+                self.on_status(f"save failed: {error}")
+                return "break"
+            text.edit_modified(False)
+            set_dirty(False)
+            self.on_status(f"saved {os.path.basename(path)}")
+            return "break"
+
+        save_btn.configure(command=save)
+        set_dirty(False)
+        text.edit_modified(False)                 # the initial insert is not an edit
+        text.bind("<<Modified>>", on_modified)
+        text.bind("<Control-s>", save)
 
     def set_theme(self, mode: str) -> None:
         """Re-theme the panel for a light/dark switch. The ttk widgets follow the token styles; only the

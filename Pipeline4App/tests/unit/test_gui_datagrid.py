@@ -51,6 +51,35 @@ def test_sanitize_one_line():
     eq(datagrid.sanitize(42), "42", "non-strings stringify")
 
 
+def test_boundary_at_grab_zones():
+    widths = [100, 200, 60]                     # separators at x = 100, 300, 360
+    eq(datagrid.boundary_at(widths, 100), 0, "dead-on the first separator")
+    eq(datagrid.boundary_at(widths, 104), 0, "within the +tolerance")
+    eq(datagrid.boundary_at(widths, 96), 0, "within the -tolerance")
+    eq(datagrid.boundary_at(widths, 300), 1, "the second separator")
+    eq(datagrid.boundary_at(widths, 360), 2, "the RIGHTMOST separator is grabbable too")
+    eq(datagrid.boundary_at(widths, 200), None, "mid-column is not a separator")
+    eq(datagrid.boundary_at(widths, 380), None, "past the table is nothing")
+    eq(datagrid.boundary_at([], 10), None, "no columns, no separators")
+
+
+def test_fit_col_width_uncapped_and_fonts():
+    normal, small, header = _measure(10), _measure(4), _measure(10)
+    columns = ["c"]
+    rows = [["x" * 60]]                          # 60 chars, normal font -> 600px + padding
+    w = datagrid.fit_col_width(columns, rows, 0, normal, small, header)
+    eq(w, 600 + 12, "the auto-fit ignores MAX_COL_W (fit means fit)")
+    long_rows = [["y" * 100]]                    # long cell -> the SMALL font measures it
+    eq(datagrid.fit_col_width(columns, long_rows, 0, normal, small, header), 4 * 100 + 12,
+       "a long cell fits at its small-font width (every char, no 64-char cap here)")
+    eq(datagrid.fit_col_width(["wide header"], [["x"]], 0, normal, small, header), 10 * 11 + 12,
+       "the header participates in the fit")
+    eq(datagrid.fit_col_width(columns, [["z" * 500]], 0, normal, small, header),
+       datagrid.FIT_MAX_W, "the fit clamps at FIT_MAX_W")
+    eq(datagrid.fit_col_width(columns, [[""]], 0, normal, small, header),
+       max(datagrid.MIN_DRAG_W, 10 + 12), "an empty column falls to the header/minimum")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_datagrid", [
@@ -59,4 +88,6 @@ if __name__ == "__main__":
         ("compute_col_widths_long_cells_measure_small", test_compute_col_widths_long_cells_measure_small),
         ("fit_text_ellipsis", test_fit_text_ellipsis),
         ("sanitize_one_line", test_sanitize_one_line),
+        ("boundary_at_grab_zones", test_boundary_at_grab_zones),
+        ("fit_col_width_uncapped_and_fonts", test_fit_col_width_uncapped_and_fonts),
     ]))

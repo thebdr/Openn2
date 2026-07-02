@@ -113,6 +113,37 @@ def test_read_xlsx():
         eq(rows2[0], ["only"], "the named second sheet")
 
 
+def test_text_file_round_trip_preserves_style():
+    with tempfile.TemporaryDirectory() as d:
+        # CRLF + BOM file
+        p1 = os.path.join(d, "a.yaml")
+        with open(p1, "wb") as h:
+            h.write(b"\xef\xbb\xbfkey: 1\r\nother: 2\r\n")
+        info = files_view.read_text_file(p1)
+        eq(info["text"], "key: 1\nother: 2\n", "the editor sees \\n-normalized text")
+        eq((info["bom"], info["crlf"], info["truncated"]), (True, True, False))
+        files_view.write_text_file(p1, info["text"].replace("1", "9"), info["bom"], info["crlf"])
+        raw = open(p1, "rb").read()
+        eq(raw, b"\xef\xbb\xbfkey: 9\r\nother: 2\r\n", "BOM + CRLF style survive the save")
+        # plain LF, no BOM
+        p2 = os.path.join(d, "b.txt")
+        with open(p2, "wb") as h:
+            h.write(b"one\ntwo\n")
+        info2 = files_view.read_text_file(p2)
+        eq((info2["bom"], info2["crlf"]), (False, False))
+        files_view.write_text_file(p2, info2["text"] + "three\n", info2["bom"], info2["crlf"])
+        eq(open(p2, "rb").read(), b"one\ntwo\nthree\n", "LF/no-BOM style survives")
+
+
+def test_text_file_truncation_flag():
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "big.log")
+        with open(p, "wb") as h:
+            h.write(b"x" * 100)
+        eq(files_view.read_text_file(p, cap=99)["truncated"], True, "over the cap -> truncated")
+        eq(files_view.read_text_file(p, cap=100)["truncated"], False, "exactly the cap -> whole")
+
+
 def test_extedit_missing_path():
     ok_, msg = extedit.open_external(os.path.join(tempfile.gettempdir(), "no_such_file_xyz.csv"))
     eq(ok_, False, "a missing file -> (False, ...)")
@@ -131,5 +162,7 @@ if __name__ == "__main__":
         ("populate_prunes_and_filters", test_populate_prunes_and_filters),
         ("sections_from_config", test_sections_from_config),
         ("read_xlsx", test_read_xlsx),
+        ("text_file_round_trip_preserves_style", test_text_file_round_trip_preserves_style),
+        ("text_file_truncation_flag", test_text_file_truncation_flag),
         ("extedit_missing_path", test_extedit_missing_path),
     ]))

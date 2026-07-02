@@ -147,6 +147,34 @@ def populate(root: str, include=(), exclude=(), _base: str | None = None) -> lis
     return nodes
 
 
+TEXT_EDIT_CAP = 400_000     # the in-app text editor's size cap (a bigger file opens READ-ONLY)
+
+
+def read_text_file(path: str, cap: int = TEXT_EDIT_CAP) -> dict:
+    """Read a text-based file for the in-app editor: `{text, truncated, bom, crlf}`. The text is
+    \\n-normalized for the Tk widget; `bom`/`crlf` remember the on-disk form so a save writes the file
+    back EXACTLY as it was styled. `truncated` (over the cap) forces the viewer read-only - saving a
+    truncated read would destroy the tail."""
+    with open(path, "rb") as handle:
+        raw = handle.read(cap + 1)
+    truncated = len(raw) > cap
+    raw = raw[:cap]
+    bom = raw.startswith(b"\xef\xbb\xbf")
+    crlf = raw.count(b"\r\n") >= max(1, raw.count(b"\n") - raw.count(b"\r\n"))  # dominant style
+    text = raw.decode("utf-8-sig", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    return {"text": text, "truncated": truncated, "bom": bom, "crlf": crlf and b"\n" in raw}
+
+
+def write_text_file(path: str, text: str, bom: bool, crlf: bool) -> None:
+    """Write the editor's \\n-normalized `text` back ATOMICALLY (temp + os.replace), restoring the
+    original BOM and newline style."""
+    tmp = f"{path}.tmp_textedit"
+    with open(tmp, "w", encoding="utf-8-sig" if bom else "utf-8",
+              newline="\r\n" if crlf else "\n") as handle:
+        handle.write(text)
+    os.replace(tmp, path)
+
+
 def sniff_delim(text: str) -> str:
     """The delimiter of a CSV's first non-empty line: ';' when it has more semicolons than commas, else
     ',' (the SSOT tables are comma; hand-authored config CSVs are sometimes semicolon)."""

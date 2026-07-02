@@ -7,8 +7,10 @@ visible row slice is drawn on each scroll tick, so a 2000-row result costs the s
 
 Column widths ADAPT TO THE DATA: each column is sized to its widest sampled cell (measured in the
 font that cell will actually use - a long cell measures in the small narrow font), clamped to
-[MIN_COL_W, MAX_COL_W]; a cell wider than its column truncates with an ellipsis. The width/fit/font
-rules are pure helpers (measure functions injected) so they are unit-testable without a display.
+[MIN_COL_W, MAX_COL_W]; a cell wider than its column truncates with an ellipsis. Columns RESIZE BY
+MOUSE: drag a header separator, or DOUBLE-CLICK it to auto-fit that column to its content (no cap
+but FIT_MAX_W, no sampling). The width/fit/font/boundary rules are pure helpers (measure functions
+injected) so they are unit-testable without a display.
 """
 from __future__ import annotations
 
@@ -20,6 +22,8 @@ from pipeline4.gui import theme
 
 LONG_CELL_CHARS = 64        # a cell longer than this renders in the small NARROW font
 MIN_COL_W, MAX_COL_W = 60, 420
+MIN_DRAG_W, FIT_MAX_W = 30, 1200   # bounds for MANUAL resizing / the double-click auto-fit
+RESIZE_TOL = 5              # px around a header separator that grabs it for resize
 _PAD_X = 6                  # horizontal cell padding (each side)
 _SAMPLE_ROWS = 200          # rows sampled for the column-width pass
 _ELLIPSIS = "…"
@@ -70,6 +74,29 @@ def sanitize(cell) -> str:
     return text
 
 
+def boundary_at(widths, x, tol: int = RESIZE_TOL):
+    """The column index whose RIGHT edge (the header separator) sits within `tol` px of canvas-x `x` -
+    the resize grab zone - else None."""
+    edge = 0
+    for i, width in enumerate(widths):
+        edge += width
+        if abs(x - edge) <= tol:
+            return i
+    return None
+
+
+def fit_col_width(columns, rows, c, measure_normal, measure_small, measure_header) -> int:
+    """The double-click auto-fit width for column `c`: the widest of the header and EVERY row's cell
+    (each measured in its rendering font), clamped [MIN_DRAG_W, FIT_MAX_W]. Unlike the initial layout
+    there is NO MAX_COL_W cap and NO row sampling - a fit means the content actually fits."""
+    width = measure_header(str(columns[c])) + 2 * _PAD_X
+    for row in rows:
+        cell = row[c] if c < len(row) else ""
+        measure = measure_small if cell_kind(cell) == "small" else measure_normal
+        width = max(width, measure(cell) + 2 * _PAD_X)
+    return max(MIN_DRAG_W, min(FIT_MAX_W, width))
+
+
 # --- the widget -------------------------------------------------------------------------------------- #
 class DataGrid(ttk.Frame):
     """Header canvas + body canvas (x-scroll synced), gridlines, zebra rows, per-cell fonts."""
@@ -104,6 +131,14 @@ class DataGrid(ttk.Frame):
         self.grid_columnconfigure(0, weight=1)
         self.body.bind("<MouseWheel>", self._on_wheel)
         self.body.bind("<Configure>", lambda _e: self._schedule_redraw())
+        # column resize on the header: drag a separator; double-click it to auto-fit the column
+        self._drag: tuple | None = None       # (col, press_x, width0) while a separator drag is live
+        self.header.bind("<Motion>", self._header_hover)
+        self.header.bind("<Leave>", lambda _e: self.header.configure(cursor=""))
+        self.header.bind("<Button-1>", self._header_press)
+        self.header.bind("<B1-Motion>", self._header_drag)
+        self.header.bind("<ButtonRelease-1>", lambda _e: setattr(self, "_drag", None))
+        self.header.bind("<Double-Button-1>", self._header_dclick)
         self._apply_colors()
 
     # --- data ------------------------------------------------------------------------------------ #
@@ -114,14 +149,46 @@ class DataGrid(ttk.Frame):
         self._widths = compute_col_widths(
             self._columns, self._rows,
             self._font_normal.measure, self._font_small.measure, self._font_header.measure)
+        self.body.yview_moveto(0)
+        self._xview_both("moveto", 0)
+        self._apply_widths()
+
+    def _apply_widths(self) -> None:
+        """Sync the scroll regions to the current column widths and redraw (set_data + resizing)."""
         total_w = sum(self._widths) or 1
         total_h = max(1, len(self._rows) * self._row_h)
         self.body.configure(scrollregion=(0, 0, total_w, total_h))
         self.header.configure(scrollregion=(0, 0, total_w, self._header_h))
-        self.body.yview_moveto(0)
-        self._xview_both("moveto", 0)
         self._draw_header()
         self._schedule_redraw()
+
+    # --- column resizing (header separators) ------------------------------------------------------ #
+    def _header_hover(self, event) -> None:
+        on_edge = boundary_at(self._widths, self.header.canvasx(event.x)) is not None
+        self.header.configure(cursor="sb_h_double_arrow" if on_edge else "")
+
+    def _header_press(self, event) -> None:
+        x = self.header.canvasx(event.x)
+        col = boundary_at(self._widths, x)
+        self._drag = (col, x, self._widths[col]) if col is not None else None
+
+    def _header_drag(self, event) -> None:
+        if self._drag is None:
+            return
+        col, x0, width0 = self._drag
+        self._widths[col] = max(MIN_DRAG_W, int(width0 + self.header.canvasx(event.x) - x0))
+        self._apply_widths()
+
+    def _header_dclick(self, event) -> None:
+        """Double-click a header separator: auto-fit that column to its content."""
+        col = boundary_at(self._widths, self.header.canvasx(event.x))
+        if col is None:
+            return
+        self._drag = None
+        self._widths[col] = fit_col_width(self._columns, self._rows, col,
+                                          self._font_normal.measure, self._font_small.measure,
+                                          self._font_header.measure)
+        self._apply_widths()
 
     # --- scrolling ------------------------------------------------------------------------------- #
     def _xview_both(self, *args) -> None:

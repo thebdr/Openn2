@@ -13,13 +13,18 @@ it inherits the app's.
 
 ## Viewers
 
-- `.csv` opens as a read-only grid; `.xlsx` adds a sheet picker.
-- `.yaml` / `.json` open with **syntax highlighting**, plus a **Text / Object explorer** toggle:
+- `.csv` opens as a read-only grid; `.xlsx` adds a sheet picker. Grid columns size themselves to the
+  data - **drag a header separator** to resize one, **double-click the separator** to auto-fit it.
+- **Text-based files edit in place**: change the text, **Save** (or `Ctrl+S`) writes atomically with
+  the file's original BOM/newline style; **Revert** re-reads. Switching files with unsaved changes
+  asks first. A file over the editor cap opens read-only - use *Open externally*.
+- `.yaml` / `.json` add **syntax highlighting** (live while typing), plus a **Text / Object explorer**
+  toggle:
   - the Object explorer shows the document as a key/value tree,
   - double-click a value to edit it in place (Enter commits, Escape cancels),
   - keys containing `path` get a `…` file picker; `dir`/`folder`/`root` keys get a folder picker,
   - **Save** writes losslessly - comments, ordering, and quoting survive.
 - Anything else shows the path strip with **Open externally** / **Open folder**.
 
-Editing a pipeline-produced CSV by hand is possible via *Open externally*, but remember the next
-phase run regenerates it - durable changes belong in the source documents or the config CSVs.
+Editing a pipeline-produced file is possible, but remember the next phase run regenerates it -
+durable changes belong in the source documents or the config CSVs.
