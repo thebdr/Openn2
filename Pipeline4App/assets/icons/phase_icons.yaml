@@ -1,0 +1,17 @@
+# The phase-bar icon registry: phase -> PNG file in THIS folder (all 72x72; the GUI loads them at
+# PhotoImage.subsample(3) -> 24 px). Official art = Twemoji (attribution in NOTICE.txt); the customs
+# (db-write / io-arrows / pcb-board / code-file) are drawn in the same flat style by
+# scripts/gen_custom_icons.py. A missing/unknown file -> that button renders without an icon (one
+# stderr warning, never a crash). A NEW phase needs one row here + one PNG - no code change.
+icon_set: twemoji
+phase_icons:
+  run: high-voltage.png
+  "100": check-mark-button.png
+  "200": pen.png
+  "300": db-write.png
+  "400": handshake.png
+  "500": io-arrows.png
+  "600": stethoscope.png
+  "700": pcb-board.png
+  "800": code-file.png
+  "900": chart-increasing.png

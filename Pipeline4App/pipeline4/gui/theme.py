@@ -45,6 +45,38 @@ LOG_COLORS_LIGHT = {
 }
 
 
+# The NARROW chrome font for the phase-bar labels (a 2-line description must fit a fixed button width).
+# Bahnschrift ships with Windows 10/11; Arial Narrow comes with Office; Segoe UI is the always-there
+# last resort (not narrow, but the labels still wrap to <=2 lines at the bar's chosen width).
+NARROW_CANDIDATES = ("Bahnschrift SemiCondensed", "Bahnschrift", "Arial Narrow", "Segoe UI")
+
+
+def pick_narrow(families) -> str:
+    """The first NARROW_CANDIDATES entry present in `families` (case-insensitive), else the last
+    candidate. Pure (unit-tested); `narrow_family` adds the Tk resolution probe on top."""
+    lower = {str(f).lower() for f in families}
+    for cand in NARROW_CANDIDATES:
+        if cand.lower() in lower:
+            return cand
+    return NARROW_CANDIDATES[-1]
+
+
+def narrow_family(root) -> str:
+    """The narrow family Tk ACTUALLY resolves (GDI can map a named instance like 'Bahnschrift
+    SemiCondensed' even when families() doesn't enumerate it), falling back through the candidates."""
+    try:
+        for cand in NARROW_CANDIDATES:
+            try:
+                actual = tkfont.Font(root=root, family=cand, size=9).actual("family")
+                if str(actual).lower() == cand.lower():
+                    return cand
+            except Exception:  # noqa: BLE001
+                continue
+        return pick_narrow(tkfont.families(root))
+    except Exception:  # noqa: BLE001
+        return NARROW_CANDIDATES[-1]
+
+
 def bg_for(mode: str) -> str:
     return DARK_BG if mode == "dark" else LIGHT_BG
 
