@@ -75,6 +75,32 @@ def test_ragged_row_lenient_and_query_error():
             ok(True, "sqlite3.Error on a bad query")
 
 
+def test_dir_stamp_tracks_changes():
+    with tempfile.TemporaryDirectory() as d:
+        _fixture(d)
+        s1 = dbquery.dir_stamp(d)
+        eq(s1, dbquery.dir_stamp(d), "unchanged folder -> equal stamps (the rebuild is skipped)")
+        with open(os.path.join(d, "signals.csv"), "a", newline="", encoding="utf-8") as h:
+            h.write("u4,S4,KQ,{},[]\r\n")
+        ok(dbquery.dir_stamp(d) != s1, "an appended row changes the stamp (size)")
+        s2 = dbquery.dir_stamp(d)
+        _csv(os.path.join(d, "extra.csv"), ["a"], [["1"]])
+        ok(dbquery.dir_stamp(d) != s2, "a new table changes the stamp")
+
+
+def test_connection_usable_across_threads():
+    # The explorer BUILDS on a worker thread and QUERIES on the Tk thread - the connection must allow it.
+    import threading
+    with tempfile.TemporaryDirectory() as d:
+        _fixture(d)
+        box = {}
+        t = threading.Thread(target=lambda: box.update(zip(("conn", "schema"), dbquery.build_memory_db(d))))
+        t.start()
+        t.join()
+        _c, rows = dbquery.run_query(box["conn"], "SELECT COUNT(*) FROM signals")
+        eq(rows[0][0], 3, "a connection built on another thread answers on this one")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_dbquery", [
@@ -82,4 +108,6 @@ if __name__ == "__main__":
         ("json_extract_and_group_by", test_json_extract_and_group_by),
         ("signals_in_no_db_and_join", test_signals_in_no_db_and_join),
         ("ragged_row_lenient_and_query_error", test_ragged_row_lenient_and_query_error),
+        ("dir_stamp_tracks_changes", test_dir_stamp_tracks_changes),
+        ("connection_usable_across_threads", test_connection_usable_across_threads),
     ]))

@@ -17,11 +17,28 @@ import os
 import sqlite3
 
 
+def dir_stamp(db_dir: str) -> tuple:
+    """A cheap identity of the Database folder: sorted `(filename, mtime_ns, size)` per `*.csv`. Two equal
+    stamps -> the loaded in-memory copy is still current, so the explorer skips the rebuild (visiting the
+    tab stays free; a phase run that rewrote a table changes the stamp and triggers a reload)."""
+    entries = []
+    for path in sorted(glob.glob(os.path.join(db_dir, "*.csv"))):
+        try:
+            meta = os.stat(path)
+            entries.append((os.path.basename(path), meta.st_mtime_ns, meta.st_size))
+        except OSError:                                  # racing a writer - count it as "changed"
+            entries.append((os.path.basename(path), -1, -1))
+    return tuple(entries)
+
+
 def build_memory_db(db_dir: str) -> tuple:
     """Load every `*.csv` under `db_dir` into a fresh in-memory SQLite connection. Returns
     `(connection, {table_name: [columns]})`. Ragged rows are padded/truncated to the header (lenient - a
-    hand-edited CSV shouldn't crash the browser)."""
-    conn = sqlite3.connect(":memory:")
+    hand-edited CSV shouldn't crash the browser).
+
+    `check_same_thread=False`: the explorer BUILDS on a worker thread and QUERIES on the Tk thread -
+    never concurrently (the connection is handed over once built), so cross-thread use is safe."""
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
     schema: dict = {}
     for path in sorted(glob.glob(os.path.join(db_dir, "*.csv"))):
         name = os.path.splitext(os.path.basename(path))[0]

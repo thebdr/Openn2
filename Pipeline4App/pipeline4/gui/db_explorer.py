@@ -1,15 +1,20 @@
 """The Database Explorer tab (GUI M3) - a SQL console over the SSOT.
 
-A schema sidebar (the tables + columns), a SQL editor, and a results grid. On open / Refresh it loads
-`Database/` into an in-memory SQLite DB (`dbquery.build_memory_db`) and runs SQL against it (read-only - an
-in-memory copy; the CSVs are never touched). Sample queries (cross-table JOINs + `json_extract`) seed the
-editor for discoverability; double-click a table in the sidebar to `SELECT * FROM` it. The query engine is
-`dbquery` (Tk-free, tested); this is the Tk view.
+A schema sidebar (the tables + columns), a SQL editor, and a results grid. The SSOT loads into an
+in-memory SQLite DB (`dbquery.build_memory_db`) LAZILY on the first tab visit, OFF the Tk thread (the
+window never blocks on the load), and only when the `Database/` folder actually changed since the last
+load (`dbquery.dir_stamp`) - so re-visiting the tab is free, and a phase run that rewrote the tables
+triggers a fresh load on the next visit. Queries run read-only against the in-memory copy (the CSVs are
+never touched); result rows land in the grid in CHUNKS on the idle loop so a large result can't freeze
+the window. Sample queries (cross-table JOINs + `json_extract`) seed the editor for discoverability;
+double-click a table in the sidebar to `SELECT * FROM` it. The query engine is `dbquery` (Tk-free,
+tested); this is the Tk view.
 """
 from __future__ import annotations
 
 import re
 import sqlite3
+import threading
 import tkinter as tk
 from tkinter import ttk
 
@@ -55,6 +60,7 @@ _FUNCTIONS = frozenset({
 })
 
 _RESULT_CAP = 2000          # max result rows rendered into the grid
+_FILL_CHUNK = 200           # grid rows inserted per idle-loop slice (the window stays responsive)
 
 
 class DatabaseExplorer(ttk.Frame):
@@ -62,6 +68,9 @@ class DatabaseExplorer(ttk.Frame):
         super().__init__(parent)
         self._conn: sqlite3.Connection | None = None
         self._schema: dict = {}
+        self._stamp: tuple | None = None      # the dir_stamp of the loaded copy (None = never loaded)
+        self._loading = False
+        self._fill_gen = 0                    # a newer run() abandons any in-flight chunked fill
 
         panes = ttk.Panedwindow(self, orient="horizontal")
         panes.pack(fill="both", expand=True)
@@ -82,7 +91,7 @@ class DatabaseExplorer(ttk.Frame):
         bar = ttk.Frame(right)
         bar.pack(side="top", fill="x", padx=4, pady=4)
         ttk.Button(bar, text="Run  (Ctrl+Enter)", command=self.run).pack(side="left", padx=2)
-        ttk.Button(bar, text="Refresh", command=self.refresh).pack(side="left", padx=2)
+        ttk.Button(bar, text="Refresh", command=lambda: self.refresh(force=True)).pack(side="left", padx=2)
         ttk.Label(bar, text="Samples:").pack(side="left", padx=(10, 2))
         self._samples = ttk.Combobox(bar, width=34, state="readonly",
                                      values=[name for name, _sql in dbquery.SAMPLE_QUERIES])
@@ -113,31 +122,66 @@ class DatabaseExplorer(ttk.Frame):
         self.results.pack(side="left", fill="both", expand=True)
         panes.add(right, weight=4)
 
-        self.refresh()
+        # LAZY load: the tab maps when it is first selected; every re-visit re-checks the folder stamp
+        # (a no-op while the SSOT is unchanged, a background reload after a phase run rewrote it).
+        self.bind("<Map>", lambda _e: self.refresh())
+        self._status.configure(text="database loads on first visit")
 
-    def refresh(self) -> None:
-        """(Re)load Database/ into a fresh in-memory SQLite DB and repopulate the schema sidebar."""
-        if self._conn is not None:
+    def refresh(self, force: bool = False) -> None:
+        """(Re)load Database/ into an in-memory SQLite DB OFF the Tk thread and repopulate the schema
+        sidebar - skipped entirely when the folder stamp says the loaded copy is current (`force`
+        rebuilds regardless - the toolbar Refresh button)."""
+        if self._loading:
+            return
+        db_dir = config.database_dir()
+        stamp = dbquery.dir_stamp(db_dir)
+        if not force and self._conn is not None and stamp == self._stamp:
+            return                                        # up to date - visiting the tab stays free
+        self._loading = True
+        self._status.configure(text="loading database…")
+        result: dict = {}
+
+        def _build():                                     # worker thread: file IO + sqlite fill only
             try:
-                self._conn.close()
-            except Exception:  # noqa: BLE001
-                pass
-        try:
-            self._conn, self._schema = dbquery.build_memory_db(config.database_dir())
-        except Exception as error:  # noqa: BLE001
-            self._conn, self._schema = None, {}
-            self._status.configure(text=f"load error: {error}")
+                result["ok"] = dbquery.build_memory_db(db_dir)
+            except Exception as error:  # noqa: BLE001
+                result["err"] = error
+
+        thread = threading.Thread(target=_build, daemon=True)
+        thread.start()
+        self._poll_build(thread, result, stamp)
+
+    def _poll_build(self, thread, result, stamp) -> None:
+        """Tk-side poll for the load worker (no cross-thread Tk calls)."""
+        if thread.is_alive():
+            self.after(60, lambda: self._poll_build(thread, result, stamp))
+            return
+        self._loading = False
+        if "err" in result:
+            self._conn, self._schema, self._stamp = None, {}, None
+            self._status.configure(text=f"load error: {result['err']}")
+        else:
+            stale = self._conn
+            self._conn, self._schema = result["ok"]
+            self._stamp = stamp
+            if stale is not None:
+                try:
+                    stale.close()
+                except Exception:  # noqa: BLE001
+                    pass
         self.schema.delete(*self.schema.get_children())
         for table in sorted(self._schema):
             node = self.schema.insert("", "end", text=f"{table}  ({len(self._schema[table])})", open=False)
             for column in self._schema[table]:
                 self.schema.insert(node, "end", text=column)
-        self._status.configure(text=f"{len(self._schema)} tables loaded")
+        if "err" not in result:
+            self._status.configure(text=f"{len(self._schema)} tables loaded")
 
     def run(self) -> None:
-        """Execute the editor's SQL against the in-memory DB and render the result grid."""
+        """Execute the editor's SQL against the in-memory DB and render the result grid (chunked)."""
         if self._conn is None:
-            self._status.configure(text="no database loaded - Refresh")
+            self._status.configure(text="database still loading…" if self._loading
+                                    else "no database loaded - Refresh")
             return
         sql = self.editor.get("1.0", "end").strip()
         if not sql:
@@ -147,15 +191,28 @@ class DatabaseExplorer(ttk.Frame):
         except sqlite3.Error as error:
             self._status.configure(text=f"SQL error: {error}")
             return
+        self._fill_gen += 1
         self.results.delete(*self.results.get_children())
         self.results["columns"] = columns
         for column in columns:
             self.results.heading(column, text=column)
             self.results.column(column, width=max(60, min(360, 9 * len(column) + 30)), anchor="w", stretch=False)
-        for row in rows[:_RESULT_CAP]:
+        self._fill_rows(rows[:_RESULT_CAP], 0, self._fill_gen, len(rows))
+
+    def _fill_rows(self, rows, start, gen, total) -> None:
+        """Insert result rows in _FILL_CHUNK slices on the idle loop - a 2000-row result must not freeze
+        the window; a newer run() bumps the generation and this fill abandons itself."""
+        if gen != self._fill_gen or not self.results.winfo_exists():
+            return
+        end = min(start + _FILL_CHUNK, len(rows))
+        for row in rows[start:end]:
             self.results.insert("", "end", values=["" if v is None else str(v) for v in row])
-        shown = min(len(rows), _RESULT_CAP)
-        self._status.configure(text=f"{len(rows)} rows" + (f" (showing {shown})" if shown < len(rows) else ""))
+        if end < len(rows):
+            self._status.configure(text=f"{total} rows (filling… {end}/{len(rows)})")
+            self.after(1, lambda: self._fill_rows(rows, end, gen, total))
+        else:
+            self._status.configure(text=f"{total} rows"
+                                         + (f" (showing {len(rows)})" if len(rows) < total else ""))
 
     def _on_sample(self, _event) -> None:
         name = self._samples.get()
