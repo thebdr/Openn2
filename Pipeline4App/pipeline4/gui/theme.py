@@ -61,6 +61,8 @@ TOKENS = {
         "surface": "#2b2f33",       # raised chrome: buttons, tab strip, headings
         "surface_hi": "#3a4046",    # hover/pressed
         "field": "#26292c",         # entry / tree / combo fields
+        "field_alt": "#2c3034",     # the zebra stripe of the data grids
+        "grid_line": "#3a3f43",     # the data-grid cell borders
         "border": "#3f4448",
         "trough": "#26292c",
         "accent": "#74b9ff",
@@ -73,6 +75,8 @@ TOKENS = {
         "surface": "#eceff1",
         "surface_hi": "#dde3e6",
         "field": "#ffffff",
+        "field_alt": "#f3f5f7",     # the zebra stripe of the data grids
+        "grid_line": "#d4d9dc",     # the data-grid cell borders
         "border": "#c5cbcf",
         "trough": "#eef0f2",
         "accent": "#0984e3",

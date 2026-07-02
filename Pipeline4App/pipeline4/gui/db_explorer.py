@@ -5,10 +5,11 @@ in-memory SQLite DB (`dbquery.build_memory_db`) LAZILY on the first tab visit, O
 window never blocks on the load), and only when the `Database/` folder actually changed since the last
 load (`dbquery.dir_stamp`) - so re-visiting the tab is free, and a phase run that rewrote the tables
 triggers a fresh load on the next visit. Queries run read-only against the in-memory copy (the CSVs are
-never touched); result rows land in the grid in CHUNKS on the idle loop so a large result can't freeze
-the window. Sample queries (cross-table JOINs + `json_extract`) seed the editor for discoverability;
+never touched). Sample queries (cross-table JOINs + `json_extract`) seed the editor for discoverability;
 double-click a table in the sidebar to `SELECT * FROM` it. The query engine is `dbquery` (Tk-free,
-tested); this is the Tk view.
+tested); this is the Tk view. Results render in the shared `gui/datagrid` canvas grid (gridlines,
+zebra rows, data-adapted column widths, small narrow font for long cells) - VIRTUAL, so only the
+visible slice is ever drawn.
 """
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from pipeline4.core import config
-from pipeline4.gui import dbquery, theme
+from pipeline4.gui import datagrid, dbquery, theme
 
 # ---------------------------------------------------------------------------
 # SQL syntax-highlighting engine (pure Python, no Tk dependency)
@@ -59,8 +60,7 @@ _FUNCTIONS = frozenset({
     "LEAD", "LAG", "FIRST_VALUE", "LAST_VALUE", "NTH_VALUE",
 })
 
-_RESULT_CAP = 2000          # max result rows rendered into the grid
-_FILL_CHUNK = 200           # grid rows inserted per idle-loop slice (the window stays responsive)
+_RESULT_CAP = 2000          # max result rows handed to the grid
 
 
 class DatabaseExplorer(ttk.Frame):
@@ -70,7 +70,6 @@ class DatabaseExplorer(ttk.Frame):
         self._schema: dict = {}
         self._stamp: tuple | None = None      # the dir_stamp of the loaded copy (None = never loaded)
         self._loading = False
-        self._fill_gen = 0                    # a newer run() abandons any in-flight chunked fill
 
         panes = ttk.Panedwindow(self, orient="horizontal")
         panes.pack(fill="both", expand=True)
@@ -113,13 +112,8 @@ class DatabaseExplorer(ttk.Frame):
 
         rframe = ttk.Frame(right)
         rframe.pack(side="top", fill="both", expand=True, padx=4, pady=(4, 4))
-        self.results = ttk.Treeview(rframe, show="headings", selectmode="browse")
-        rvsb = ttk.Scrollbar(rframe, orient="vertical", command=self.results.yview)
-        rhsb = ttk.Scrollbar(rframe, orient="horizontal", command=self.results.xview)
-        self.results.configure(yscrollcommand=rvsb.set, xscrollcommand=rhsb.set)
-        rvsb.pack(side="right", fill="y")
-        rhsb.pack(side="bottom", fill="x")
-        self.results.pack(side="left", fill="both", expand=True)
+        self.results = datagrid.DataGrid(rframe, mode="dark")
+        self.results.pack(fill="both", expand=True)
         panes.add(right, weight=4)
 
         # LAZY load: the tab maps when it is first selected; every re-visit re-checks the folder stamp
@@ -178,7 +172,9 @@ class DatabaseExplorer(ttk.Frame):
             self._status.configure(text=f"{len(self._schema)} tables loaded")
 
     def run(self) -> None:
-        """Execute the editor's SQL against the in-memory DB and render the result grid (chunked)."""
+        """Execute the editor's SQL against the in-memory DB and render the result grid. The DataGrid
+        renders VIRTUALLY (only the visible slice draws), so the whole capped result loads at once -
+        the chunked Treeview fill this replaced is no longer needed."""
         if self._conn is None:
             self._status.configure(text="database still loading…" if self._loading
                                     else "no database loaded - Refresh")
@@ -191,28 +187,10 @@ class DatabaseExplorer(ttk.Frame):
         except sqlite3.Error as error:
             self._status.configure(text=f"SQL error: {error}")
             return
-        self._fill_gen += 1
-        self.results.delete(*self.results.get_children())
-        self.results["columns"] = columns
-        for column in columns:
-            self.results.heading(column, text=column)
-            self.results.column(column, width=max(60, min(360, 9 * len(column) + 30)), anchor="w", stretch=False)
-        self._fill_rows(rows[:_RESULT_CAP], 0, self._fill_gen, len(rows))
-
-    def _fill_rows(self, rows, start, gen, total) -> None:
-        """Insert result rows in _FILL_CHUNK slices on the idle loop - a 2000-row result must not freeze
-        the window; a newer run() bumps the generation and this fill abandons itself."""
-        if gen != self._fill_gen or not self.results.winfo_exists():
-            return
-        end = min(start + _FILL_CHUNK, len(rows))
-        for row in rows[start:end]:
-            self.results.insert("", "end", values=["" if v is None else str(v) for v in row])
-        if end < len(rows):
-            self._status.configure(text=f"{total} rows (filling… {end}/{len(rows)})")
-            self.after(1, lambda: self._fill_rows(rows, end, gen, total))
-        else:
-            self._status.configure(text=f"{total} rows"
-                                         + (f" (showing {len(rows)})" if len(rows) < total else ""))
+        shown = rows[:_RESULT_CAP]
+        self.results.set_data(columns, [["" if v is None else str(v) for v in row] for row in shown])
+        self._status.configure(text=f"{len(rows)} rows"
+                                     + (f" (showing {len(shown)})" if len(shown) < len(rows) else ""))
 
     def _on_sample(self, _event) -> None:
         name = self._samples.get()
@@ -275,8 +253,9 @@ class DatabaseExplorer(ttk.Frame):
                     self.editor.tag_add("sql_fn", s, e)
 
     def set_theme(self, mode: str) -> None:
-        """Re-theme the editor and reconfigure highlight tag colours for light/dark mode."""
+        """Re-theme the editor + the results grid and reconfigure highlight tag colours."""
         self.editor.configure(background=theme.bg_for(mode), foreground=theme.fg_for(mode),
                               insertbackground=theme.fg_for(mode))
         self._configure_hl_tags(mode)
         self._highlight()
+        self.results.set_theme(mode)

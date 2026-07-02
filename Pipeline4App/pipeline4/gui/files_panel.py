@@ -11,7 +11,7 @@ import os
 import tkinter as tk
 from tkinter import ttk
 
-from pipeline4.gui import extedit, files_view, highlight, object_editor, theme
+from pipeline4.gui import datagrid, extedit, files_view, highlight, object_editor, theme
 
 
 class FilesPanel(ttk.Frame):
@@ -128,28 +128,16 @@ class FilesPanel(ttk.Frame):
                    command=lambda: self.on_status(extedit.reveal(path)[1])).pack(side="left", padx=6)
 
     def _grid(self, rows) -> None:
-        """A read-only Treeview grid for `rows` (row 0 = headers); ragged rows are padded."""
+        """The shared read-only DataGrid for `rows` (row 0 = headers): gridlines, zebra rows,
+        data-adapted column widths, and the small narrow font for long cells (gui/datagrid)."""
         frame = ttk.Frame(self.editor)
         frame.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
         if not rows:
             ttk.Label(frame, text="(empty)", padding=8).pack(anchor="nw")
             return
-        ncols = max(len(r) for r in rows)
-        cols = [f"c{i}" for i in range(ncols)]
-        header = rows[0]
-        grid = ttk.Treeview(frame, columns=cols, show="headings", selectmode="browse")
-        for i, c in enumerate(cols):
-            label = str(header[i]) if i < len(header) else ""
-            grid.heading(c, text=label)
-            grid.column(c, width=max(60, min(360, 9 * len(label) + 30)), anchor="w", stretch=False)
-        for row in rows[1:]:
-            grid.insert("", "end", values=[row[i] if i < len(row) else "" for i in range(ncols)])
-        vsb = ttk.Scrollbar(frame, orient="vertical", command=grid.yview)
-        hsb = ttk.Scrollbar(frame, orient="horizontal", command=grid.xview)
-        grid.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-        vsb.pack(side="right", fill="y")
-        hsb.pack(side="bottom", fill="x")
-        grid.pack(side="left", fill="both", expand=True)
+        grid = datagrid.DataGrid(frame, mode=self._mode)
+        grid.pack(fill="both", expand=True)
+        grid.set_data(rows[0], rows[1:])
 
     def _show_csv(self, path: str) -> None:
         self._clear_editor()
@@ -172,8 +160,12 @@ class FilesPanel(ttk.Frame):
             for w in holder.winfo_children():
                 w.destroy()
             _n, rows = files_view.read_xlsx(path, name)
-            grid = _ReadonlyGrid(holder, rows)
+            if not rows:
+                ttk.Label(holder, text="(empty sheet)", padding=8).pack(anchor="nw")
+                return
+            grid = datagrid.DataGrid(holder, mode=self._mode)
             grid.pack(side="top", fill="both", expand=True)
+            grid.set_data(rows[0], rows[1:])
 
         box.bind("<<ComboboxSelected>>", lambda _e: show(box.get()))
         if names:
@@ -240,29 +232,7 @@ class FilesPanel(ttk.Frame):
                                   insertbackground=theme.fg_for(mode))
             if self._cur and highlight.kind_of(self._cur):
                 highlight.configure_tags(self._textw, mode)
-
-
-class _ReadonlyGrid(ttk.Frame):
-    """A scrollable read-only Treeview grid (row 0 = headers) - the xlsx sheet body."""
-
-    def __init__(self, parent, rows):
-        super().__init__(parent)
-        if not rows:
-            ttk.Label(self, text="(empty sheet)", padding=8).pack(anchor="nw")
-            return
-        ncols = max(len(r) for r in rows)
-        cols = [f"c{i}" for i in range(ncols)]
-        header = rows[0]
-        grid = ttk.Treeview(self, columns=cols, show="headings", selectmode="browse")
-        for i, c in enumerate(cols):
-            label = str(header[i]) if i < len(header) else ""
-            grid.heading(c, text=label)
-            grid.column(c, width=max(60, min(360, 9 * len(label) + 30)), anchor="w", stretch=False)
-        for row in rows[1:]:
-            grid.insert("", "end", values=[row[i] if i < len(row) else "" for i in range(ncols)])
-        vsb = ttk.Scrollbar(self, orient="vertical", command=grid.yview)
-        hsb = ttk.Scrollbar(self, orient="horizontal", command=grid.xview)
-        grid.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-        vsb.pack(side="right", fill="y")
-        hsb.pack(side="bottom", fill="x")
-        grid.pack(side="left", fill="both", expand=True)
+        # the canvas DataGrids don't follow ttk styles - re-render the shown grid file in the new
+        # mode (an open xlsx falls back to its first sheet; the text/object views re-theme in place)
+        if self._cur and files_view.viewer_kind(self._cur) in ("csv", "xlsx"):
+            self._load(self._cur)
