@@ -147,7 +147,8 @@ def populate(root: str, include=(), exclude=(), _base: str | None = None) -> lis
     return nodes
 
 
-TEXT_EDIT_CAP = 400_000     # the in-app text editor's size cap (a bigger file opens READ-ONLY)
+TEXT_EDIT_CAP = 50_000_000  # the in-app text editor's size cap (a bigger file opens READ-ONLY)
+HIGHLIGHT_CAP = 2_000_000   # yaml/json syntax highlighting above this would freeze typing - skipped
 
 
 def read_text_file(path: str, cap: int = TEXT_EDIT_CAP) -> dict:
@@ -183,11 +184,28 @@ def sniff_delim(text: str) -> str:
 
 
 def read_csv_rows(path: str) -> list:
-    """A CSV file -> a list of string rows (delimiter sniffed). Read-only; cells stay raw text (JSON cells
-    show as their JSON string, which is exactly what's on disk)."""
+    """A CSV file -> a list of string rows (delimiter sniffed). Cells stay raw text (JSON cells show
+    as their JSON string, which is exactly what's on disk)."""
+    return read_csv_rows_delim(path)[0]
+
+
+def read_csv_rows_delim(path: str) -> tuple:
+    """`(rows, delimiter)` - like read_csv_rows but keeps the sniffed delimiter so an edited table
+    saves back in the same dialect."""
     with open(path, encoding="utf-8-sig", newline="") as handle:
         text = handle.read()
-    return list(_csv.reader(text.splitlines(), delimiter=sniff_delim(text)))
+    delim = sniff_delim(text)
+    return list(_csv.reader(text.splitlines(), delimiter=delim)), delim
+
+
+def write_csv_rows(path: str, rows, delimiter: str = ",") -> None:
+    """Write `rows` back ATOMICALLY (temp + os.replace) in the file's sniffed dialect: the same
+    delimiter, CRLF line ends (the csv convention both the SSOT codec and Excel use), minimal
+    quoting (a JSON cell re-quotes correctly and stays codec-readable)."""
+    tmp = f"{path}.tmp_csvedit"
+    with open(tmp, "w", encoding="utf-8", newline="") as handle:
+        _csv.writer(handle, delimiter=delimiter).writerows(rows)
+    os.replace(tmp, path)
 
 
 def read_xlsx(path: str, sheet: str | None = None):

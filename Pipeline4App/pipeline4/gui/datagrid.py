@@ -1,4 +1,5 @@
-"""The shared READ-ONLY data grid (the Files-tab CSV/xlsx viewers + the Database Explorer results).
+"""The shared data grid (the Files-tab CSV/xlsx viewers + the Database Explorer results) - read-only
+by default, with optional IN-CELL editing (the Files-tab CSV viewer).
 
 ttk.Treeview cannot draw cell gridlines on Tk 8.6 and its tags (fonts/colours) apply per ROW, never
 per cell - so the user-requested look (grid borders, zebra rows, and a smaller NARROW font for cells
@@ -74,6 +75,22 @@ def sanitize(cell) -> str:
     return text
 
 
+def cell_at(widths, row_h, n_rows, x, y):
+    """The `(row, col, cell_x0)` under canvas point (x, y), or None outside the data - the in-cell
+    editor's hit test."""
+    if y < 0 or row_h <= 0:
+        return None
+    row = int(y // row_h)
+    if row >= n_rows:
+        return None
+    x0 = 0
+    for col, width in enumerate(widths):
+        if x0 <= x < x0 + width:
+            return row, col, x0
+        x0 += width
+    return None
+
+
 def boundary_at(widths, x, tol: int = RESIZE_TOL):
     """The column index whose RIGHT edge (the header separator) sits within `tol` px of canvas-x `x` -
     the resize grab zone - else None."""
@@ -99,15 +116,23 @@ def fit_col_width(columns, rows, c, measure_normal, measure_small, measure_heade
 
 # --- the widget -------------------------------------------------------------------------------------- #
 class DataGrid(ttk.Frame):
-    """Header canvas + body canvas (x-scroll synced), gridlines, zebra rows, per-cell fonts."""
+    """Header canvas + body canvas (x-scroll synced), gridlines, zebra rows, per-cell fonts.
+    With `editable=True` a DATA cell edits in place on double-click (single-line Entry overlay;
+    Enter commits through `on_edit(row, col, new) -> bool`, Escape/focus-out cancels); `raw_of(row,
+    col)` supplies the underlying value (the grid itself only holds the sanitized DISPLAY text)."""
 
-    def __init__(self, parent, mode: str = "dark"):
+    def __init__(self, parent, mode: str = "dark", editable: bool = False,
+                 on_edit=None, raw_of=None):
         super().__init__(parent)
         self._mode = mode
         self._columns: list = []
         self._rows: list = []
         self._widths: list = []
         self._redraw_job = None
+        self._editable = editable
+        self._on_edit = on_edit or (lambda *_a: False)
+        self._raw_of = raw_of or (lambda r, c: self._rows[r][c] if c < len(self._rows[r]) else "")
+        self._editbox: tk.Entry | None = None
 
         family = theme.MONO_FONT[0]
         narrow = theme.narrow_family(self)
@@ -139,11 +164,14 @@ class DataGrid(ttk.Frame):
         self.header.bind("<B1-Motion>", self._header_drag)
         self.header.bind("<ButtonRelease-1>", lambda _e: setattr(self, "_drag", None))
         self.header.bind("<Double-Button-1>", self._header_dclick)
+        if editable:
+            self.body.bind("<Double-Button-1>", self._cell_dclick)
         self._apply_colors()
 
     # --- data ------------------------------------------------------------------------------------ #
     def set_data(self, columns, rows) -> None:
         """Load the table: compute the data-adapted column widths, then draw the visible slice."""
+        self._close_editbox()
         self._columns = [str(c) for c in columns]
         self._rows = [[sanitize(cell) for cell in row] for row in rows]
         self._widths = compute_col_widths(
@@ -189,6 +217,49 @@ class DataGrid(ttk.Frame):
                                           self._font_normal.measure, self._font_small.measure,
                                           self._font_header.measure)
         self._apply_widths()
+
+    # --- in-cell editing (editable=True) ----------------------------------------------------------- #
+    def _cell_dclick(self, event) -> None:
+        self._close_editbox()
+        hit = cell_at(self._widths, self._row_h, len(self._rows),
+                      self.body.canvasx(event.x), self.body.canvasy(event.y))
+        if hit is None:
+            return
+        row, col, x0 = hit
+        raw = str(self._raw_of(row, col))
+        if "\n" in raw:                            # a single-line Entry would destroy the other lines
+            self.bell()
+            return
+        edit = tk.Entry(self.body, font=self._font_normal, relief="solid", borderwidth=1)
+        edit.insert(0, raw)
+        edit.select_range(0, "end")
+        self.body.create_window(x0, row * self._row_h, window=edit, anchor="nw",
+                                width=self._widths[col], height=self._row_h, tags="editbox")
+        edit.focus_set()
+        edit.bind("<Return>", lambda _e: self._commit_cell(row, col, edit.get()))
+        edit.bind("<Escape>", lambda _e: self._close_editbox())
+        edit.bind("<FocusOut>", lambda _e: self._close_editbox())
+        self._editbox = edit
+
+    def _commit_cell(self, row: int, col: int, value: str) -> None:
+        """Enter in the cell editor: hand the new value to `on_edit`; on acceptance update the
+        display copy and redraw."""
+        self._close_editbox()
+        if not self._on_edit(row, col, value):
+            return
+        while len(self._rows[row]) <= col:         # a ragged display row pads up to the edited cell
+            self._rows[row].append("")
+        self._rows[row][col] = sanitize(value)
+        self._schedule_redraw()
+
+    def _close_editbox(self) -> None:
+        self.body.delete("editbox")
+        if self._editbox is not None:
+            try:
+                self._editbox.destroy()
+            except tk.TclError:
+                pass
+            self._editbox = None
 
     # --- scrolling ------------------------------------------------------------------------------- #
     def _xview_both(self, *args) -> None:

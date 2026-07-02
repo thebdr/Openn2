@@ -26,6 +26,7 @@ class FilesPanel(ttk.Frame):
         self._cur: str | None = None      # the file currently shown (re-themed in place)
         self._textw: tk.Text | None = None
         self._text_editable = False       # the shown text pane accepts edits (drives the dirty guard)
+        self._csv_dirty = False           # the shown CSV grid carries unsaved cell edits
         self._reselecting = False         # ignore the selection event our own dirty-guard rollback fires
         self._obj_mode = False            # the yaml/json Text ⇄ Object toggle (remembered per session)
 
@@ -89,7 +90,7 @@ class FilesPanel(ttk.Frame):
         path = self._paths.get(sel[0]) if sel else None
         if not path or path == self._cur:
             return
-        if self._unsaved_text():                  # don't silently drop an in-progress text edit
+        if self._unsaved_changes():               # don't silently drop an in-progress edit
             from tkinter import messagebox
             name = os.path.basename(self._cur or "")
             if not messagebox.askyesno("Unsaved changes",
@@ -102,8 +103,10 @@ class FilesPanel(ttk.Frame):
                 return
         self._load(path)
 
-    def _unsaved_text(self) -> bool:
-        """True while the shown text pane is editable and carries unsaved edits."""
+    def _unsaved_changes(self) -> bool:
+        """True while the shown viewer carries unsaved edits (the text pane or the CSV grid)."""
+        if self._csv_dirty:
+            return True
         return (self._text_editable and self._textw is not None
                 and self._textw.winfo_exists() and bool(self._textw.edit_modified()))
 
@@ -131,6 +134,7 @@ class FilesPanel(ttk.Frame):
     def _clear_editor(self) -> None:
         self._textw = None
         self._text_editable = False
+        self._csv_dirty = False
         for w in self.editor.winfo_children():
             w.destroy()
 
@@ -152,22 +156,59 @@ class FilesPanel(ttk.Frame):
         ttk.Button(bar, text="Open folder",
                    command=lambda: self.on_status(extedit.reveal(path)[1])).pack(side="left", padx=6)
 
-    def _grid(self, rows) -> None:
-        """The shared read-only DataGrid for `rows` (row 0 = headers): gridlines, zebra rows,
-        data-adapted column widths, and the small narrow font for long cells (gui/datagrid)."""
+    def _show_csv(self, path: str) -> None:
+        """The CSV grid, EDITABLE per cell: double-click a data cell, Enter commits, Save writes the
+        table back in its own dialect (sniffed delimiter, CRLF, minimal quoting). Multi-line cells
+        refuse the single-line editor (a bell); the header row stays display-only."""
+        self._clear_editor()
+        self._header(path)
+        rows, delim = files_view.read_csv_rows_delim(path)
+        bar = ttk.Frame(self.editor)
+        bar.pack(side="top", fill="x", padx=6, pady=(0, 2))
         frame = ttk.Frame(self.editor)
         frame.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
         if not rows:
             ttk.Label(frame, text="(empty)", padding=8).pack(anchor="nw")
             return
-        grid = datagrid.DataGrid(frame, mode=self._mode)
-        grid.pack(fill="both", expand=True)
-        grid.set_data(rows[0], rows[1:])
+        header_row, data = rows[0], rows[1:]
 
-    def _show_csv(self, path: str) -> None:
-        self._clear_editor()
-        self._header(path)
-        self._grid(files_view.read_csv_rows(path))
+        save_btn = ttk.Button(bar, text="Save")
+        save_btn.pack(side="left")
+        ttk.Button(bar, text="Revert", command=lambda: self._load(path)).pack(side="left", padx=6)
+        dirty_lbl = ttk.Label(bar, text="")
+        dirty_lbl.pack(side="left", padx=8)
+        ttk.Label(bar, text="double-click a cell to edit").pack(side="right")
+
+        def set_dirty(flag: bool):
+            self._csv_dirty = flag
+            dirty_lbl.configure(text="● modified" if flag else "")
+            save_btn.configure(state="normal" if flag else "disabled")
+
+        def on_edit(r: int, c: int, new: str) -> bool:
+            row = data[r]
+            while len(row) <= c:
+                row.append("")
+            if row[c] == new:
+                return False                      # a no-op commit doesn't dirty the file
+            row[c] = new
+            set_dirty(True)
+            return True
+
+        def save():
+            try:
+                files_view.write_csv_rows(path, [header_row] + data, delim)
+            except OSError as error:
+                self.on_status(f"save failed: {error}")
+                return
+            set_dirty(False)
+            self.on_status(f"saved {os.path.basename(path)}")
+
+        save_btn.configure(command=save)
+        set_dirty(False)
+        grid = datagrid.DataGrid(frame, mode=self._mode, editable=True, on_edit=on_edit,
+                                 raw_of=lambda r, c: data[r][c] if c < len(data[r]) else "")
+        grid.pack(fill="both", expand=True)
+        grid.set_data(header_row, data)
 
     def _show_xlsx(self, path: str) -> None:
         self._clear_editor()
@@ -243,7 +284,8 @@ class FilesPanel(ttk.Frame):
         hsb = ttk.Scrollbar(frame, orient="horizontal", command=text.xview)
         text.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         text.insert("1.0", info["text"])
-        kind = highlight.kind_of(path)
+        # highlighting above the cap would freeze every keystroke on a huge yaml/json - skip it there
+        kind = highlight.kind_of(path) if len(info["text"]) <= files_view.HIGHLIGHT_CAP else None
         if kind:
             highlight.configure_tags(text, self._mode)
             highlight.apply(text, kind, info["text"])
@@ -254,8 +296,8 @@ class FilesPanel(ttk.Frame):
         self._text_editable = editable
         if not editable:
             text.configure(state="disabled")
-            ttk.Label(bar, text=f"read-only: over the {files_view.TEXT_EDIT_CAP // 1000} KB editor cap"
-                                " - Open externally").pack(side="left")
+            ttk.Label(bar, text=f"read-only: over the {files_view.TEXT_EDIT_CAP // 1_000_000} MB "
+                                "editor cap - Open externally").pack(side="left")
             return
 
         save_btn = ttk.Button(bar, text="Save  (Ctrl+S)")

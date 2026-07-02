@@ -13,11 +13,14 @@ it inherits the app's.
 
 ## Viewers
 
-- `.csv` opens as a read-only grid; `.xlsx` adds a sheet picker. Grid columns size themselves to the
-  data - **drag a header separator** to resize one, **double-click the separator** to auto-fit it.
+- `.csv` opens as a grid with **in-cell editing**: double-click a data cell, Enter commits, Escape
+  cancels; **Save** writes the table back in its own dialect (same delimiter, proper quoting).
+  Multi-line cells refuse the single-line editor. `.xlsx` stays read-only with a sheet picker. Grid
+  columns size themselves to the data - **drag a header separator** to resize one, **double-click
+  the separator** to auto-fit it.
 - **Text-based files edit in place**: change the text, **Save** (or `Ctrl+S`) writes atomically with
   the file's original BOM/newline style; **Revert** re-reads. Switching files with unsaved changes
-  asks first. A file over the editor cap opens read-only - use *Open externally*.
+  asks first. A file over the 50 MB editor cap opens read-only - use *Open externally*.
 - `.yaml` / `.json` add **syntax highlighting** (live while typing), plus a **Text / Object explorer**
   toggle:
   - the Object explorer shows the document as a key/value tree,

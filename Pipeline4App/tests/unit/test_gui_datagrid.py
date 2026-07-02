@@ -51,6 +51,15 @@ def test_sanitize_one_line():
     eq(datagrid.sanitize(42), "42", "non-strings stringify")
 
 
+def test_cell_at_hit_test():
+    widths, row_h, n = [100, 200], 20, 3
+    eq(datagrid.cell_at(widths, row_h, n, 50, 10), (0, 0, 0), "first cell")
+    eq(datagrid.cell_at(widths, row_h, n, 150, 45), (2, 1, 100), "row 2, col 1, cell x0=100")
+    eq(datagrid.cell_at(widths, row_h, n, 150, 70), None, "below the data")
+    eq(datagrid.cell_at(widths, row_h, n, 350, 10), None, "right of the table")
+    eq(datagrid.cell_at(widths, row_h, n, 50, -5), None, "above the table")
+
+
 def test_boundary_at_grab_zones():
     widths = [100, 200, 60]                     # separators at x = 100, 300, 360
     eq(datagrid.boundary_at(widths, 100), 0, "dead-on the first separator")
@@ -88,6 +97,7 @@ if __name__ == "__main__":
         ("compute_col_widths_long_cells_measure_small", test_compute_col_widths_long_cells_measure_small),
         ("fit_text_ellipsis", test_fit_text_ellipsis),
         ("sanitize_one_line", test_sanitize_one_line),
+        ("cell_at_hit_test", test_cell_at_hit_test),
         ("boundary_at_grab_zones", test_boundary_at_grab_zones),
         ("fit_col_width_uncapped_and_fonts", test_fit_col_width_uncapped_and_fonts),
     ]))

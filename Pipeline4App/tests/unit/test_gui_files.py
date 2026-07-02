@@ -135,6 +135,22 @@ def test_text_file_round_trip_preserves_style():
         eq(open(p2, "rb").read(), b"one\ntwo\nthree\n", "LF/no-BOM style survives")
 
 
+def test_csv_edit_round_trip_keeps_dialect():
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "t.csv")
+        with open(p, "w", encoding="utf-8", newline="") as h:
+            h.write("a;b\r\n1;x\r\n2;y\r\n")                    # semicolon dialect
+        rows, delim = files_view.read_csv_rows_delim(p)
+        eq(delim, ";", "the dialect is sniffed")
+        eq(rows, [["a", "b"], ["1", "x"], ["2", "y"]])
+        rows[1][1] = 'j,"son'                                    # needs quoting in the save
+        files_view.write_csv_rows(p, rows, delim)
+        raw = open(p, "rb").read()
+        eq(raw, b'a;b\r\n1;"j,""son"\r\n2;y\r\n', "same delimiter + CRLF + proper re-quoting")
+        rows2, delim2 = files_view.read_csv_rows_delim(p)
+        eq((rows2[1][1], delim2), ('j,"son', ";"), "the edited cell reads back exactly")
+
+
 def test_text_file_truncation_flag():
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "big.log")
@@ -163,6 +179,7 @@ if __name__ == "__main__":
         ("sections_from_config", test_sections_from_config),
         ("read_xlsx", test_read_xlsx),
         ("text_file_round_trip_preserves_style", test_text_file_round_trip_preserves_style),
+        ("csv_edit_round_trip_keeps_dialect", test_csv_edit_round_trip_keeps_dialect),
         ("text_file_truncation_flag", test_text_file_truncation_flag),
         ("extedit_missing_path", test_extedit_missing_path),
     ]))
