@@ -84,6 +84,8 @@ class App:
         self._font_combo.pack(side="left", padx=2)
         self._tb_logfile = ttk.Button(toolbar, text=self._logfile_label(), command=self._toggle_logfile)
         self._tb_logfile.pack(side="left", padx=(10, 2))
+        self._tb_fx = ttk.Button(toolbar, text="ƒx", width=4, command=self._open_expr_builder)
+        self._tb_fx.pack(side="left", padx=(10, 2))
         self._backend_label = ttk.Label(toolbar, text=f"theme: {backend}")
         self._backend_label.pack(side="right", padx=2)
 
@@ -846,6 +848,14 @@ class App:
         self._backend_label.configure(text=f"theme: {backend}")
         config.save_app_theme(self.mode)                     # remember the choice for next launch
         self.log.append("INFO", f"theme -> {self.mode}")
+
+    def _open_expr_builder(self):
+        """Open (or raise) the ƒx Expression Builder (UI_REFRESH_PLAN H)."""
+        from pipeline4.gui.expr_builder import ExprBuilder
+        if getattr(self, "_fx", None) is not None and self._fx.winfo_exists():
+            self._fx.lift()
+            return
+        self._fx = ExprBuilder(self.root, mode=self.mode)
 
     # --- log-to-file tee (M7) ------------------------------------------------------------------- #
     def _logfile_label(self) -> str:

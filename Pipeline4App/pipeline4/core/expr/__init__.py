@@ -107,8 +107,10 @@ from .parser import compile_expr
 from .render import render
 from .scope import Scope
 from .runtime import truthy
+from .tools import Issue, check, check_template, function_names, tokens
 
-__all__ = ["test", "evaluate", "render", "Scope", "ExprError"]
+__all__ = ["test", "evaluate", "render", "Scope", "ExprError",
+           "tokens", "check", "check_template", "Issue", "function_names"]
 
 # compiled-expr cache keyed by (text, scope-identity)
 _CACHE: dict = {}
