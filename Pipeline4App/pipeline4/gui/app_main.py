@@ -86,6 +86,8 @@ class App:
         self._tb_logfile.pack(side="left", padx=(10, 2))
         self._tb_fx = ttk.Button(toolbar, text="ƒx", width=4, command=self._open_expr_builder)
         self._tb_fx.pack(side="left", padx=(10, 2))
+        self._tb_help = ttk.Button(toolbar, text="?", width=3, command=self._open_help)
+        self._tb_help.pack(side="left", padx=2)
         self._backend_label = ttk.Label(toolbar, text=f"theme: {backend}")
         self._backend_label.pack(side="right", padx=2)
 
@@ -137,6 +139,23 @@ class App:
         for callback in (self.log.set_theme, self.phasebar.set_theme, self.explorer.set_theme,
                          self.files.set_theme, self.documents.set_theme):
             theme.register(callback)
+
+        # the guide (UI_REFRESH_PLAN I): F1 opens the section for the focused area; the attached ids
+        # cover whole containers (help_id_of walks up from the focused inner widget).
+        from pipeline4.gui import helpwin
+        helpwin.attach(self.phasebar, "phase-bar")
+        helpwin.attach(self._log_tab, "getting-started")
+        helpwin.attach(self._files_tab, "files-tab")
+        helpwin.attach(self._documents_tab, "getting-started")
+        helpwin.attach(self._explorer_tab, "database-explorer")
+        helpwin.attach(self._findings_tab, "treatments")
+        root.bind("<F1>", lambda _e: self._open_help())
+        helpwin.add_tooltip(self._tb_theme, "Toggle light/dark theme")
+        helpwin.add_tooltip(self._levels_mb, "Which log levels the log shows")
+        helpwin.add_tooltip(self._tb_lang, "Chrome + findings language (EN/IT)")
+        helpwin.add_tooltip(self._tb_logfile, "Tee the log to a timestamped file")
+        helpwin.add_tooltip(self._tb_fx, "Expression Builder - author + preview ƒx expressions")
+        helpwin.add_tooltip(self._tb_help, "Guide (F1 opens the section for the focused area)")
 
         # the Windows dark/light title bar - applied LAST, after every widget exists, so darktitle's
         # update_idletasks() doesn't flush the ttk styling against a half-built window (PL3 order).
@@ -856,6 +875,16 @@ class App:
             self._fx.lift()
             return
         self._fx = ExprBuilder(self.root, mode=self.mode)
+
+    def _open_help(self, _event=None):
+        """F1 / the ? button: the guide at the focused area's section (default: getting-started)."""
+        from pipeline4.gui import helpwin
+        try:
+            widget = self.root.focus_get()
+        except (KeyError, tk.TclError):            # a foreign/menu focus - fall to the default section
+            widget = None
+        section = helpwin.help_id_of(widget) or "getting-started"
+        helpwin.open_section(self.root, section, mode=self.mode)
 
     # --- log-to-file tee (M7) ------------------------------------------------------------------- #
     def _logfile_label(self) -> str:
