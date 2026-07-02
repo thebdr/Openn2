@@ -11,7 +11,7 @@ import os
 import tkinter as tk
 from tkinter import ttk
 
-from pipeline4.gui import extedit, files_view, theme
+from pipeline4.gui import extedit, files_view, highlight, object_editor, theme
 
 
 class FilesPanel(ttk.Frame):
@@ -23,6 +23,7 @@ class FilesPanel(ttk.Frame):
         self._paths: dict = {}            # tree item id -> absolute file path
         self._cur: str | None = None      # the file currently shown (re-themed in place)
         self._textw: tk.Text | None = None
+        self._obj_mode = False            # the yaml/json Text ⇄ Object toggle (remembered per session)
 
         panes = ttk.Panedwindow(self, orient="horizontal")
         panes.pack(fill="both", expand=True)
@@ -89,6 +90,8 @@ class FilesPanel(ttk.Frame):
                 self._show_csv(path)
             elif kind == "xlsx":
                 self._show_xlsx(path)
+            elif kind == "text" and highlight.kind_of(path):
+                self._show_doc(path)          # yaml/json: Text (highlighted) ⇄ Object explorer
             elif kind == "text":
                 self._show_text(path)
             else:                                     # visible but no in-app viewer: still openable
@@ -178,6 +181,33 @@ class FilesPanel(ttk.Frame):
     def _show_text(self, path: str) -> None:
         self._clear_editor()
         self._header(path)
+        self._text_body(path)
+
+    def _show_doc(self, path: str) -> None:
+        """A yaml/json document: the Text ⇄ Object-explorer toggle above the chosen view
+        (UI_REFRESH_PLAN D). Text = read-only + syntax highlighting; Object = the scalar editor
+        with `…` path pickers and an explicit Save."""
+        self._clear_editor()
+        self._header(path)
+        row = ttk.Frame(self.editor)
+        row.pack(side="top", fill="x", padx=6, pady=(0, 2))
+        choice = tk.StringVar(value="object" if self._obj_mode else "text")
+
+        def flip():
+            self._obj_mode = choice.get() == "object"
+            self._load(path)
+
+        ttk.Radiobutton(row, text="Text", value="text", variable=choice, command=flip).pack(side="left")
+        ttk.Radiobutton(row, text="Object explorer", value="object", variable=choice,
+                        command=flip).pack(side="left", padx=10)
+        if self._obj_mode:
+            editor = object_editor.ObjectEditor(self.editor, path, on_status=self.on_status)
+            editor.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
+        else:
+            self._text_body(path)
+
+    def _text_body(self, path: str) -> None:
+        """The read-only monospace pane (+ one-pass yaml/json syntax highlighting)."""
         with open(path, encoding="utf-8-sig", errors="replace") as handle:
             content = handle.read(400_000)            # cap a huge file so the pane stays responsive
         frame = ttk.Frame(self.editor)
@@ -189,6 +219,10 @@ class FilesPanel(ttk.Frame):
         hsb = ttk.Scrollbar(frame, orient="horizontal", command=text.xview)
         text.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         text.insert("1.0", content)
+        kind = highlight.kind_of(path)
+        if kind:
+            highlight.configure_tags(text, self._mode)
+            highlight.apply(text, kind, content)
         text.configure(state="disabled")
         vsb.pack(side="right", fill="y")
         hsb.pack(side="bottom", fill="x")
@@ -202,6 +236,8 @@ class FilesPanel(ttk.Frame):
         if self._textw is not None and self._textw.winfo_exists():
             self._textw.configure(background=theme.bg_for(mode), foreground=theme.fg_for(mode),
                                   insertbackground=theme.fg_for(mode))
+            if self._cur and highlight.kind_of(self._cur):
+                highlight.configure_tags(self._textw, mode)
 
 
 class _ReadonlyGrid(ttk.Frame):

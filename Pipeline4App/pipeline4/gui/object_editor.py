@@ -1,0 +1,293 @@
+"""The YAML/JSON *Object explorer* view (UI_REFRESH_PLAN D): a key/value tree over the document with
+INLINE SCALAR EDITING and a `…` filesystem picker on path-like keys, saving losslessly.
+
+Model (Tk-free, tested):
+  * `load_document(path)` -> `(doc, kind)` - YAML through ruamel round-trip (comments/order/quotes
+    survive a save), JSON through the stdlib (dict order preserved).
+  * `get_at`/`set_at(doc, path_tuple, text)` - `set_at` COERCES the new text to the OLD scalar's type
+    (bool/int/float stay typed; anything unparsable stays a string) so an edited yaml keeps its types.
+  * `dump_document(path, doc, kind)` - ATOMIC write (temp + os.replace); yaml round-trip, json indent=2.
+  * `path_role(key)` - the `…` picker kind: a key containing dir/folder/root -> "dir"; containing
+    path -> "file"; else None. Case-insensitive (the user's spec: any key containing "path").
+  * `picked_value(old, chosen, base_dir)` - a picked path stays RELATIVE when the old value was
+    relative and the choice is under `base_dir`; otherwise absolute.
+
+View: `ObjectEditor(parent, path, on_status)` - a 2-column Treeview (keys tree + values), double-click
+a value to edit in place (Enter commits, Escape cancels), `…` column click opens the picker, Save
+writes via the model (dirty marker; scalar edits only - add/remove keys is a text/external edit).
+"""
+from __future__ import annotations
+
+import json
+import os
+import tkinter as tk
+from tkinter import filedialog, ttk
+
+_PATH_DIR_WORDS = ("dir", "folder", "root")
+
+
+# --- the Tk-free model --------------------------------------------------------------------------- #
+def load_document(path: str) -> tuple:
+    """Parse `path` -> `(document, kind)` with kind in {'yaml', 'json'}. Raises on a broken file (the
+    caller falls back to the text view with the error)."""
+    low = path.lower()
+    if low.endswith((".yaml", ".yml")):
+        from ruamel.yaml import YAML
+        parser = YAML()                      # round-trip: comments + key order + quotes survive
+        parser.preserve_quotes = True
+        with open(path, encoding="utf-8") as handle:
+            return parser.load(handle), "yaml"
+    if low.endswith(".json"):
+        with open(path, encoding="utf-8-sig") as handle:
+            return json.load(handle), "json"
+    raise ValueError(f"not a yaml/json document: {os.path.basename(path)}")
+
+
+def dump_document(path: str, doc, kind: str) -> None:
+    """Write `doc` back ATOMICALLY (temp file + os.replace - a crash never truncates the original)."""
+    tmp = f"{path}.tmp_objedit"
+    if kind == "yaml":
+        from ruamel.yaml import YAML
+        writer = YAML()
+        writer.preserve_quotes = True
+        writer.width = 4096                  # never re-wrap long lines the user authored
+        with open(tmp, "w", encoding="utf-8", newline="") as handle:
+            writer.dump(doc, handle)
+    else:
+        with open(tmp, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(doc, handle, indent=2, ensure_ascii=False)
+            handle.write("\n")
+    os.replace(tmp, path)
+
+
+def get_at(doc, path_tuple):
+    node = doc
+    for key in path_tuple:
+        node = node[key]
+    return node
+
+
+def coerce(old, text: str):
+    """The new scalar for an edit: typed like the OLD value when the text parses as that type
+    (bool BEFORE int - bool subclasses int), else the raw string."""
+    stripped = str(text).strip()
+    if isinstance(old, bool):
+        low = stripped.lower()
+        if low in ("true", "yes", "on", "1"):
+            return True
+        if low in ("false", "no", "off", "0"):
+            return False
+        return text
+    if isinstance(old, int):
+        try:
+            return int(stripped)
+        except ValueError:
+            return text
+    if isinstance(old, float):
+        try:
+            return float(stripped)
+        except ValueError:
+            return text
+    return text
+
+
+def set_at(doc, path_tuple, text: str) -> None:
+    """Replace the scalar at `path_tuple` with `text` coerced to the old value's type."""
+    parent = get_at(doc, path_tuple[:-1]) if len(path_tuple) > 1 else doc
+    key = path_tuple[-1]
+    parent[key] = coerce(parent[key], text)
+
+
+def path_role(key) -> str | None:
+    """The `…` picker a key gets: 'dir' when the key names a directory (dir/folder/root), 'file' when
+    it contains 'path' (the user's spec, case-insensitive), else None."""
+    low = str(key).lower()
+    if any(word in low for word in _PATH_DIR_WORDS):
+        return "dir"
+    if "path" in low:
+        return "file"
+    return None
+
+
+def picked_value(old, chosen: str, base_dir: str) -> str:
+    """The value a picker choice lands as: RELATIVE (/-separated) when the old value was relative and
+    the choice sits under `base_dir`; absolute otherwise."""
+    old_text = str(old or "")
+    if old_text and not os.path.isabs(old_text):
+        rel = os.path.relpath(chosen, base_dir)
+        if not rel.startswith(".."):
+            return rel.replace(os.sep, "/")
+    return chosen
+
+
+def is_scalar(value) -> bool:
+    return not isinstance(value, (dict, list))
+
+
+# --- the Tk view ---------------------------------------------------------------------------------- #
+class ObjectEditor(ttk.Frame):
+    """The key/value tree + inline editing + `…` pickers + Save/Revert over one yaml/json document."""
+
+    def __init__(self, parent, path: str, on_status=lambda *_a: None):
+        super().__init__(parent)
+        self._path = path
+        self._on_status = on_status
+        self._doc = None
+        self._kind = ""
+        self._dirty = False
+        self._rows: dict = {}                # tree item id -> (path_tuple, role)
+        self._editbox: tk.Entry | None = None
+
+        bar = ttk.Frame(self)
+        bar.pack(side="top", fill="x", pady=(0, 3))
+        self._save_btn = ttk.Button(bar, text="Save", command=self.save, state="disabled")
+        self._save_btn.pack(side="left")
+        ttk.Button(bar, text="Revert", command=self.reload).pack(side="left", padx=6)
+        self._dirty_lbl = ttk.Label(bar, text="")
+        self._dirty_lbl.pack(side="left", padx=8)
+        ttk.Label(bar, text="double-click a value to edit · … picks a path"
+                  ).pack(side="right")
+
+        holder = ttk.Frame(self)
+        holder.pack(side="top", fill="both", expand=True)
+        self.tree = ttk.Treeview(holder, columns=("value", "pick"), show="tree headings",
+                                 selectmode="browse")
+        self.tree.heading("#0", text="key")
+        self.tree.heading("value", text="value")
+        self.tree.heading("pick", text="")
+        self.tree.column("#0", width=260, anchor="w")
+        self.tree.column("value", width=420, anchor="w")
+        self.tree.column("pick", width=34, anchor="center", stretch=False)
+        vsb = ttk.Scrollbar(holder, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        self.tree.pack(side="left", fill="both", expand=True)
+        self.tree.bind("<Double-1>", self._on_double)
+        self.tree.bind("<Button-1>", self._on_click, "+")
+        self.reload()
+
+    # --- model <-> tree --------------------------------------------------------------------------- #
+    def reload(self) -> None:
+        self._close_edit()
+        try:
+            self._doc, self._kind = load_document(self._path)
+        except Exception as error:  # noqa: BLE001
+            self._doc, self._kind = None, ""
+            self._set_dirty(False)
+            self.tree.delete(*self.tree.get_children())
+            self.tree.insert("", "end", text=f"could not parse: {error}")
+            return
+        self._set_dirty(False)
+        self._rebuild()
+
+    def _rebuild(self) -> None:
+        self.tree.delete(*self.tree.get_children())
+        self._rows.clear()
+        self._fill("", self._doc, ())
+
+    def _fill(self, parent, node, path_tuple) -> None:
+        if isinstance(node, dict):
+            items = node.items()
+        elif isinstance(node, list):
+            items = ((f"[{i}]", v) for i, v in enumerate(node))
+        else:
+            return
+        for key, value in items:
+            child_path = path_tuple + ((key if not str(key).startswith("[") else int(str(key)[1:-1])),)
+            if is_scalar(value):
+                role = path_role(key)
+                item = self.tree.insert(parent, "end", text=str(key), open=True,
+                                        values=(self._render(value), "…" if role else ""))
+                self._rows[item] = (child_path, role)
+            else:
+                mark = "{…}" if isinstance(value, dict) else f"[{len(value)}]"
+                item = self.tree.insert(parent, "end", text=str(key), open=True, values=(mark, ""))
+                self._fill(item, value, child_path)
+
+    @staticmethod
+    def _render(value) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        return str(value)
+
+    def _set_dirty(self, dirty: bool) -> None:
+        self._dirty = dirty
+        self._dirty_lbl.configure(text="● modified" if dirty else "")
+        self._save_btn.configure(state="normal" if dirty else "disabled")
+
+    # --- editing ----------------------------------------------------------------------------------- #
+    def _on_double(self, event) -> None:
+        item = self.tree.identify_row(event.y)
+        if self.tree.identify_column(event.x) != "#1" or item not in self._rows:
+            return
+        self._open_edit(item)
+
+    def _on_click(self, event) -> None:
+        item = self.tree.identify_row(event.y)
+        if self.tree.identify_column(event.x) != "#2" or item not in self._rows:
+            return
+        path_tuple, role = self._rows[item]
+        if role:
+            self._pick(item, path_tuple, role)
+
+    def _open_edit(self, item) -> None:
+        self._close_edit()
+        path_tuple, _role = self._rows[item]
+        bbox = self.tree.bbox(item, "#1")
+        if not bbox:
+            return
+        x, y, w, h = bbox
+        edit = tk.Entry(self.tree)
+        edit.insert(0, self._render(get_at(self._doc, path_tuple)))
+        edit.select_range(0, "end")
+        edit.place(x=x, y=y, width=w, height=h)
+        edit.focus_set()
+        edit.bind("<Return>", lambda _e: self._commit_edit(item, path_tuple, edit.get()))
+        edit.bind("<Escape>", lambda _e: self._close_edit())
+        edit.bind("<FocusOut>", lambda _e: self._close_edit())
+        self._editbox = edit
+
+    def _close_edit(self) -> None:
+        if self._editbox is not None:
+            try:
+                self._editbox.destroy()
+            except tk.TclError:
+                pass
+            self._editbox = None
+
+    def _commit_edit(self, item, path_tuple, text: str) -> None:
+        self._close_edit()
+        set_at(self._doc, path_tuple, text)
+        self.tree.set(item, "value", self._render(get_at(self._doc, path_tuple)))
+        self._set_dirty(True)
+
+    def _pick(self, item, path_tuple, role: str) -> None:
+        current = str(get_at(self._doc, path_tuple) or "")
+        base_dir = os.path.dirname(os.path.abspath(self._path))
+        start = current if os.path.isabs(current) else os.path.normpath(os.path.join(base_dir, current))
+        if role == "dir":
+            chosen = filedialog.askdirectory(initialdir=start if os.path.isdir(start) else base_dir,
+                                             parent=self)
+        else:
+            chosen = filedialog.askopenfilename(
+                initialdir=os.path.dirname(start) if os.path.dirname(start) else base_dir,
+                initialfile=os.path.basename(current), parent=self)
+        if not chosen:
+            return
+        value = picked_value(current, os.path.normpath(chosen), base_dir)
+        set_at(self._doc, path_tuple, value)
+        self.tree.set(item, "value", value)
+        self._set_dirty(True)
+
+    def save(self) -> None:
+        if self._doc is None:
+            return
+        try:
+            dump_document(self._path, self._doc, self._kind)
+        except Exception as error:  # noqa: BLE001
+            self._on_status(f"save failed: {error}")
+            return
+        self._set_dirty(False)
+        self._on_status(f"saved {os.path.basename(self._path)}")
