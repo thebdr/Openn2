@@ -21,7 +21,16 @@ from pipeline4.domain import identity
 from pipeline4.domain.diagnosis_entries import diagnosis_cabinets_table, diagnosis_entries_table
 from pipeline4.domain.signals import signals_table
 
-PLC_BINDING_SENTINEL = "$PLC_Binding$"
+def _binding_sentinel() -> str:
+    """The DiagList placeholder cell text that resolves to each entry's PLC binding - relocated to
+    user_input/generation_params.yaml (diagnosis.plc_binding_placeholder; UI_REFRESH_PLAN F). STRICT:
+    a missing key is a located error, never an in-code default. Must match the expression cells in
+    diagnosis/diagnosis_columns.csv."""
+    section = (config.load_generation_params() or {}).get("diagnosis") or {}
+    try:
+        return str(section["plc_binding_placeholder"])
+    except KeyError:
+        raise RuntimeError("generation_params.yaml: diagnosis.plc_binding_placeholder is missing") from None
 
 
 # --- small helpers (ported) --------------------------------------------------------------------- #
@@ -152,10 +161,10 @@ def resolve_logic(rows, cabinets, rules) -> list:
 
 
 # --- column rendering --------------------------------------------------------------------------- #
-def _render(columns, row, binding) -> dict:
-    """{header -> cell} for one DiagList row: the `$PLC_Binding$` sentinel -> `binding`, else the column's
-    `{canonical}` template interpolated against `row` (with the `:03d`/`:02d` specs honored by interp)."""
-    return {c["header"]: (binding if str(c["expression"]).strip() == PLC_BINDING_SENTINEL
+def _render(columns, row, binding, sentinel) -> dict:
+    """{header -> cell} for one DiagList row: the configured binding `sentinel` -> `binding`, else the
+    column's `{canonical}` template interpolated against `row` (`:03d`/`:02d` specs honored by interp)."""
+    return {c["header"]: (binding if str(c["expression"]).strip() == sentinel
                           else identity.interp(c["expression"], row))
             for c in columns}
 
@@ -172,6 +181,7 @@ def build(database: Database | None = None) -> tuple:
     cabinets = list(database["diagnosis_cabinets"]) if "diagnosis_cabinets" in database else []
     rules = config.load_diagnosis_logic_rules()
     columns = config.load_diagnosis_columns()
+    sentinel = _binding_sentinel()
     findings = []
 
     etab = diagnosis_entries_table()
@@ -184,7 +194,7 @@ def build(database: Database | None = None) -> tuple:
                  cabinet=("" if cab is None else cab), bit=("" if bit is None else bit),
                  is_warning=_is_warning(r), in_binding=binding,
                  ml_value=ml_value(r), fl_value=fl_value(rows, r),
-                 diag_columns=_render(columns, r, binding))
+                 diag_columns=_render(columns, r, binding, sentinel))
 
     for it in resolve_logic(rows, cabinets, rules):          # (2) the rule-generated logic items
         r = dict(it["src"])                                  # a synthetic row for the column render
@@ -198,7 +208,7 @@ def build(database: Database | None = None) -> tuple:
         etab.add(source="logic", source_signal=it["src"].get("uid", ""), rule_name=it["rule"]["name"],
                  cabinet=it["cabinet"], bit=it["bit"], is_warning=it["is_warning"], in_binding=it["binding"],
                  ml_value=ml_value(it["src"]), fl_value=fl_value(rows, it["src"]),
-                 diag_columns=_render(columns, r, it["binding"]))
+                 diag_columns=_render(columns, r, it["binding"], sentinel))
 
     if etab.name in database:
         database[etab.name].rows = etab.rows

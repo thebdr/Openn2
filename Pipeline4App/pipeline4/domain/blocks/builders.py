@@ -144,7 +144,7 @@ def _area_descriptions(db: Database) -> dict:
     return out
 
 
-@builds("03_Zone Cumulative")
+@builds("03_Zone Cumulative", emit="fc_xml")   # ships a ready FC XML (800c), not a CreationInfo CSV
 def build_03_zone_cumulative(db: Database) -> Table:
     """Per AREA, one AND-cumulative per signal group that has members: the coil writes
     02_COM."AREA n <LABEL>" = AND of that group's DB members in the area. Each group is one type -> one

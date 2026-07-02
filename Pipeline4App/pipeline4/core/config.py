@@ -222,6 +222,23 @@ def app_config_file() -> str:
     return os.path.join(config_project_dir(), "app_config.yaml")
 
 
+def generation_params_file() -> str:
+    """The relocated generation constants (user_input/generation_params.yaml; UI_REFRESH_PLAN F)."""
+    return os.path.join(user_input_dir(), "generation_params.yaml")
+
+
+def load_generation_params() -> dict:
+    """user_input/generation_params.yaml - the ACTIVE project's copy, falling back to the BUILTIN one
+    (an older project folder inherits the app's values). Raises when NEITHER exists: generation
+    constants are config, never code defaults (the config-completeness rule)."""
+    candidates = (generation_params_file(),
+                  os.path.join(builtin_config_project_dir(), "user_input", "generation_params.yaml"))
+    for path in candidates:
+        if os.path.exists(path):
+            return _read_yaml(path)
+    raise RuntimeError("generation_params.yaml missing (looked in: " + "; ".join(candidates) + ")")
+
+
 def load_files_tab():
     """The Files-tab structure: `files_tab.sections` from the ACTIVE app_config.yaml, falling back to the
     BUILTIN one (the tab structure is app-level UI - a project may override it, and an older project

@@ -173,14 +173,17 @@ def and_coil_fc(table, template_path, block_name,
     return head + NL + NL.join(L)
 
 
-# block name -> emitter. The engine emits these to blocks_import_dir (UTF-8 BOM + CRLF) and drops the CSV.
-EMITTERS = {"03_Zone Cumulative": and_coil_fc}
+# emit KIND -> renderer. WHICH blocks use an emitter is declared at registration
+# (`@builds(name, emit="fc_xml")` in the user-coded builders.py) - the hardcoded name-set is retired
+# (UI_REFRESH_PLAN F). The engine emits these to blocks_import_dir (UTF-8 BOM + CRLF) and drops the CSV.
+EMIT_FUNCS = {"fc_xml": and_coil_fc}
 
 
 def write_fc_xml(name, table, template_path, out_dir) -> str:
-    """Emit `name`'s FC XML (if it has an emitter) into out_dir/<name>.xml as UTF-8 BOM + CRLF (the
-    exported-Openness convention). Returns the path or ''."""
-    emit = EMITTERS.get(name)
+    """Emit `name`'s FC XML (if its registration declares an emitter kind) into out_dir/<name>.xml as
+    UTF-8 BOM + CRLF (the exported-Openness convention). Returns the path or ''."""
+    from pipeline4.domain.blocks import registry
+    emit = EMIT_FUNCS.get(registry.emit_kind(name))
     if emit is None or not template_path or not os.path.exists(template_path):
         return ""
     xml = emit(table, template_path, name)
