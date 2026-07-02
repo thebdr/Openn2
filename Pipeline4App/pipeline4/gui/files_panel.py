@@ -48,18 +48,19 @@ class FilesPanel(ttk.Frame):
         self.refresh()
 
     def refresh(self) -> None:
-        """(Re)build the 3-section tree from `self.sections`. A section with no viewable file shows
-        '(empty)'. Called on construction, after each phase run, and on a project switch."""
+        """(Re)build the section tree from `self.sections` (`{title, roots, include, exclude}` dicts -
+        the compiled files_tab config). A section with no matching file shows '(empty)'. Called on
+        construction, after each phase run, and on a project switch."""
         self.tree.delete(*self.tree.get_children())
         self._paths.clear()
-        for label, roots in self.sections:
-            section = self.tree.insert("", "end", text=label, open=True)
+        for section in self.sections:
+            node = self.tree.insert("", "end", text=section["title"], open=True)
             count = 0
-            for root in roots:
-                for node in files_view.populate(root):
-                    count += self._insert(section, node)
-            if count == 0:
-                self.tree.insert(section, "end", text="(empty)")
+            for root in section.get("roots", ()):
+                for child in files_view.populate(root, section.get("include", ()), section.get("exclude", ())):
+                    count += self._insert(node, child)
+            if count == 0 and section.get("roots"):
+                self.tree.insert(node, "end", text="(empty)")
 
     def _insert(self, parent, node) -> int:
         """Insert one files_view node (and its children) under `parent`; returns the count of FILE nodes
@@ -90,8 +91,11 @@ class FilesPanel(ttk.Frame):
                 self._show_xlsx(path)
             elif kind == "text":
                 self._show_text(path)
-            else:
-                self._placeholder(f"{os.path.basename(path)}: preview not supported - Open externally.")
+            else:                                     # visible but no in-app viewer: still openable
+                self._clear_editor()
+                self._header(path)
+                ttk.Label(self.editor, padding=12,
+                          text=f"{os.path.basename(path)}: no in-app preview - use Open externally.").pack(anchor="nw")
         except Exception as error:  # noqa: BLE001  - a broken file must not take the tab down
             self._placeholder(f"could not open {os.path.basename(path)}: {error}")
 

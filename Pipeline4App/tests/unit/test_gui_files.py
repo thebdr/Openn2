@@ -1,4 +1,5 @@
-"""The Files tab logic (gui/files_view + gui/extedit) - the Tk-free scan/dispatch/read helpers."""
+"""The Files tab logic (gui/files_view + gui/extedit) - the Tk-free scan/filter/dispatch/read helpers,
+including the config-driven visibility (files_tab: regex include/exclude + ${placeholder} roots)."""
 import os
 import tempfile
 
@@ -7,12 +8,24 @@ from openpyxl import Workbook
 from _harness import run, eq, ok
 from pipeline4.gui import extedit, files_view
 
+# the shipped default excludes (mirrors app_config.yaml files_tab)
+_EXCLUDES = ["~\\$.*", ".*\\.pyc$", ".*\\.bak_.*", "__pycache__"]
 
-def test_allowed_filters():
-    for name in ("signals.csv", "PLCTags.xlsx", "app_config.yaml", "x.json", "a.xml", "d.scl", "n.txt"):
-        ok(files_view.allowed(name), f"{name} is shown")
-    for name in ("~$io.xlsx", "signals.bak_20260101.csv", "mod.pyc", "pic.png", "tool.exe"):
-        eq(files_view.allowed(name), False, f"{name} is hidden")
+
+def test_compile_filters_and_matches():
+    exclude, warns = files_view.compile_filters(_EXCLUDES)
+    eq(warns, [], "the shipped patterns all compile")
+    include, _ = files_view.compile_filters([".*"])
+    for rel in ("signals.csv", "sub/PLCTags.xlsx", "Reports/report.html", "tool.exe"):
+        ok(files_view.matches(rel, include, exclude), f"{rel} shows (no extension whitelist anymore)")
+    for rel in ("~$io.xlsx", "signals.bak_20260101.csv", "mod.pyc", "sub/~$lock.xlsx"):
+        eq(files_view.matches(rel, include, exclude), False, f"{rel} excluded")
+    only_html, _ = files_view.compile_filters([r".*\.html$"])
+    ok(files_view.matches("Reports/a.html", only_html, []), "a scoped include matches")
+    eq(files_view.matches("Reports/a.csv", only_html, []), False, "outside the include -> hidden")
+    _c, bad = files_view.compile_filters(["[unclosed"])
+    eq(len(bad), 1, "a bad regex becomes one warning")
+    ok("unclosed" in bad[0], "the warning names the pattern")
 
 
 def test_viewer_kind():
@@ -41,19 +54,47 @@ def test_read_csv_rows():
         eq(rows[2], ["2", "beta"], "the second data row")
 
 
-def test_populate_prunes_and_skips():
+def test_populate_prunes_and_filters():
     with tempfile.TemporaryDirectory() as d:
         open(os.path.join(d, "a.csv"), "w").close()
-        open(os.path.join(d, "mod.pyc"), "w").close()          # disallowed ext
-        open(os.path.join(d, "~$lock.xlsx"), "w").close()      # lock file
+        open(os.path.join(d, "mod.pyc"), "w").close()          # excluded by the shipped regexes
+        open(os.path.join(d, "~$lock.xlsx"), "w").close()      # lock file, excluded
         os.mkdir(os.path.join(d, "sub")); open(os.path.join(d, "sub", "b.yaml"), "w").close()
         os.mkdir(os.path.join(d, "empty"))                     # no shown files -> pruned
-        nodes = files_view.populate(d)
+        include, _ = files_view.compile_filters([".*"])
+        exclude, _ = files_view.compile_filters(_EXCLUDES)
+        nodes = files_view.populate(d, include, exclude)
         names = [n["name"] for n in nodes]
-        eq(names, ["sub/", "a.csv"], "dirs-first sorted; .pyc + ~$ skipped; empty/ pruned")
+        eq(names, ["sub/", "a.csv"], "dirs-first sorted; .pyc + ~$ excluded; empty/ pruned")
         sub = nodes[0]
         ok(sub["is_dir"] and [c["name"] for c in sub["children"]] == ["b.yaml"], "sub/ holds b.yaml")
         eq(nodes[1]["is_dir"], False, "a.csv is a file node")
+        # relative-path scoping: an include anchored to the subfolder shows ONLY its files
+        scoped, _ = files_view.compile_filters([r"^sub/"])
+        only_sub = files_view.populate(d, scoped, [])
+        eq([n["name"] for n in only_sub], ["sub/"], "a ^sub/ include hides the top-level files")
+        # no filters at all -> everything shows (visibility is config's job now)
+        eq(len(files_view.populate(d)), 4, "unfiltered: sub/ + a.csv + mod.pyc + ~$lock all show")
+
+
+def test_sections_from_config():
+    with tempfile.TemporaryDirectory() as d:
+        open(os.path.join(d, "doc.xlsx"), "w").close()
+        specs = [
+            {"title": "Docs", "roots": [d, "${iolist}", "${nope}"], "include": [".*"], "exclude": []},
+            {"title": "Bad",  "roots": [d], "include": ["[broken"]},
+            "not-a-mapping",
+        ]
+        sections, warnings = files_view.sections_from_config(specs, {"iolist_path": ""})
+        eq(len(sections), 2, "the two mapping entries compile; the junk entry is a warning")
+        eq(sections[0]["title"], "Docs")
+        eq(sections[0]["roots"], [d], "a literal root passes; empty ${iolist} skips silently; ${nope} warns")
+        ok(any("unknown placeholder ${nope}" in w for w in warnings), "the unknown placeholder is named")
+        ok(any("Bad: bad regex" in w for w in warnings), "the bad include regex is attributed to its section")
+        ok(any("not-a-mapping" in w for w in warnings), "the junk entry is reported")
+        mapping = files_view.placeholder_map({"iolist_path": "X.xlsx"})
+        eq(mapping["iolist"], "X.xlsx", "the iolist placeholder resolves from params")
+        ok(mapping["config_project"], "the config_project placeholder always resolves")
 
 
 def test_read_xlsx():
@@ -83,11 +124,12 @@ def test_extedit_missing_path():
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_files", [
-        ("allowed_filters", test_allowed_filters),
+        ("compile_filters_and_matches", test_compile_filters_and_matches),
         ("viewer_kind", test_viewer_kind),
         ("sniff_delim", test_sniff_delim),
         ("read_csv_rows", test_read_csv_rows),
-        ("populate_prunes_and_skips", test_populate_prunes_and_skips),
+        ("populate_prunes_and_filters", test_populate_prunes_and_filters),
+        ("sections_from_config", test_sections_from_config),
         ("read_xlsx", test_read_xlsx),
         ("extedit_missing_path", test_extedit_missing_path),
     ]))

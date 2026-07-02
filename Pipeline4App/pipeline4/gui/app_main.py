@@ -411,13 +411,23 @@ class App:
         self._apply_project_switch(None)
 
     def _file_sections(self):
-        """The 3 Files-tree sections under the ACTIVE config/project (re-resolved each refresh so a future
-        project switch is picked up). Falls back to the config-only sections if the project params can't load."""
+        """The Files-tab sections from the `files_tab` config (app_config.yaml; UI_REFRESH_PLAN E),
+        compiled + resolved against the ACTIVE config/project. A missing section -> one explanatory
+        header and a WARN (the structure is never baked into code); placeholder/regex problems surface
+        as WARNs while the rest of the tab keeps working."""
         try:
             params = config.load_params()
         except Exception:  # noqa: BLE001  - a missing/broken project_params must not break the Files tab
             params = {}
-        return files_view.file_sections(params)
+        specs = config.load_files_tab()
+        if specs is None:
+            self.log.append("WARN", "  files_tab section missing in app_config.yaml - the Files tab is empty")
+            return [{"title": "files_tab section missing in app_config.yaml",
+                     "roots": [], "include": [], "exclude": []}]
+        sections, warnings = files_view.sections_from_config(specs, params)
+        for warning in warnings:
+            self.log.append("WARN", f"  files_tab: {warning}")
+        return sections
 
     def _drain(self):
         """Main thread: apply the queued log/status/done events to the widgets, then reschedule."""

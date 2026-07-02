@@ -19,3 +19,27 @@ user_interface:
   # The GUI window size, saved on close. Default 1180 x 720 when absent.
   width: 1180
   height: 720
+
+# The Files-tab structure: each section = one tree root group. `roots` take ${placeholder}s resolved
+# against the ACTIVE config/project, or literal absolute paths. `include`/`exclude` are case-insensitive
+# regexes matched (re.search) on each file's path RELATIVE to its root - folders are always traversed and
+# empty branches pruned; a file shows when ANY include matches and NO exclude does. A shown file without
+# a dedicated viewer still opens via the Open-externally buttons.
+# Placeholders: ${config_project} ${user_input} ${database_dir} ${output_root} ${reports}
+#               ${iolist} ${matrix} ${project_root}
+# A project app_config.yaml WITHOUT this section inherits the app's builtin one; if neither has it, the
+# Files tab shows a pointed warning (the structure is never baked into code).
+files_tab:
+  sections:
+    - title: Project configuration
+      roots: ["${config_project}"]
+      include: [".*"]
+      exclude: ["~\\$.*", ".*\\.pyc$", ".*\\.bak_.*", "__pycache__"]
+    - title: User editable files
+      roots: ["${iolist}", "${matrix}", "${user_input}"]
+      include: [".*"]
+      exclude: ["~\\$.*", ".*\\.bak_.*"]
+    - title: Generated output
+      roots: ["${database_dir}", "${output_root}"]
+      include: [".*"]
+      exclude: ["~\\$.*", ".*\\.bak_.*"]

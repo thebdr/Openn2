@@ -222,6 +222,23 @@ def app_config_file() -> str:
     return os.path.join(config_project_dir(), "app_config.yaml")
 
 
+def load_files_tab():
+    """The Files-tab structure: `files_tab.sections` from the ACTIVE app_config.yaml, falling back to the
+    BUILTIN one (the tab structure is app-level UI - a project may override it, and an older project
+    folder without the section inherits the app's). Returns None when neither defines it - the tab shows
+    a pointed warning instead of a code-baked default (the config-completeness rule)."""
+    for path in (app_config_file(), os.path.join(builtin_config_project_dir(), "app_config.yaml")):
+        try:
+            cfg = _read_yaml(path) if os.path.exists(path) else {}
+        except Exception:  # noqa: BLE001 - a broken yaml falls through to the next candidate
+            continue
+        section = cfg.get("files_tab") if isinstance(cfg, dict) else None
+        sections = section.get("sections") if isinstance(section, dict) else None
+        if isinstance(sections, list):
+            return sections
+    return None
+
+
 APP_FONT_SIZES = (10, 12, 14)             # the log-viewer Font dropdown choices
 _DEFAULT_FONT_SIZE = 10
 
