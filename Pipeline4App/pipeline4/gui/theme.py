@@ -1,13 +1,22 @@
-"""Theme for the PL4 GUI.
+"""Theme for the PL4 GUI - ONE semantic token table per mode + native ttk styling over `clam`.
 
-Applies **sv-ttk** (Sun Valley dark/light) when it's installed, with a graceful fallback to a plain ttk
-theme so the window ALWAYS launches (no hard dependency on a theme package - we are testing). Exposes a
-small palette the rest of the GUI reads: the phase-button fill colours (mirroring PL3's ButtonsLayout)
-and the per-log-level colours. The phase buttons + the log pane are classic `tk` widgets (themed ttk
-buttons can't take a custom background), so they use these explicit colours either way.
+Rebuilt from scratch (the GUI-refresh Step B): the previous sv-ttk backend was MEASURED as the UI-wide
+paint drag on the target machine (a VMware guest) - with sv-ttk a log line painted in 36.6ms, a theme
+toggle in 164ms; on plain clam the same paints cost 7.8ms/line and 31ms/toggle (4-5x). So sv-ttk is
+GONE: every colour now comes from the `TOKENS` table below and is applied to the handful of ttk classes
+the app actually uses. No theme package dependency, identical styling with or without extras installed.
+
+Architecture:
+  * `TOKENS[mode][role]`  - the single place a chrome colour is defined (both modes fully enumerated).
+  * `apply_theme(root, mode)` - style the ttk classes + named fonts from the tokens (init + toggle).
+  * `set_mode(root, mode)` - apply_theme + the Windows title bar + NOTIFY the registered components;
+    components call `theme.register(self.set_theme)` once instead of app_main hand-fanning-out.
+  * The oracle palettes (BUTTON_FILLS/BUTTON_FG - PL3's ButtonsLayout) and the log-level colours are
+    kept verbatim; the phase bar + log pane are classic tk widgets and read them directly.
 """
 from __future__ import annotations
 
+import sys
 import tkinter.font as tkfont
 from tkinter import ttk
 
@@ -26,6 +35,14 @@ LOG_COLORS = {"PHASE": ("#74b9ff", True), "FAIL": ("#ff6b6b", True), "ERROR": ("
               "WARN": ("#fdcb6e", False), "PASS": ("#55efc4", False), "INFO": ("#dfe6e9", False),
               "SKIP": ("#b2bec3", False), "DEBUG": ("#a29bfe", False)}
 
+# Light-mode log colours: same semantic palette but adjusted for a white background (WARN goes orange —
+# yellow is invisible on white; INFO goes near-black instead of near-white).
+LOG_COLORS_LIGHT = {
+    "PHASE": ("#0984e3", True), "FAIL": ("#d63031", True), "ERROR": ("#e17055", True),
+    "WARN": ("#e67e22", False), "PASS": ("#00b894", False), "INFO": ("#2d3436", False),
+    "SKIP": ("#636e72", False), "DEBUG": ("#6c5ce7", False),
+}
+
 DARK_BG = "#1e1e1e"
 DARK_FG = "#dfe6e9"
 LIGHT_BG = "#ffffff"
@@ -36,13 +53,37 @@ APP_FONT_SIZE = 11                 # the app-wide UI font size (Monaspace Neon V
 # for any pre-theme reference. The phase bar + log viewer read this; the chrome reads the named Tk fonts.
 MONO_FONT = (fonts.FALLBACK, APP_FONT_SIZE)
 
-# Light-mode log colours: same semantic palette but adjusted for a white background (WARN goes orange —
-# yellow is invisible on white; INFO goes near-black instead of near-white).
-LOG_COLORS_LIGHT = {
-    "PHASE": ("#0984e3", True), "FAIL": ("#d63031", True), "ERROR": ("#e17055", True),
-    "WARN": ("#e67e22", False), "PASS": ("#00b894", False), "INFO": ("#2d3436", False),
-    "SKIP": ("#636e72", False), "DEBUG": ("#6c5ce7", False),
+# The semantic chrome tokens - the ONLY place a ttk chrome colour is defined. Every role exists in both
+# modes (no ad-hoc per-widget constants).
+TOKENS = {
+    "dark": {
+        "bg": DARK_BG, "fg": DARK_FG,
+        "surface": "#2b2f33",       # raised chrome: buttons, tab strip, headings
+        "surface_hi": "#3a4046",    # hover/pressed
+        "field": "#26292c",         # entry / tree / combo fields
+        "border": "#3f4448",
+        "trough": "#26292c",
+        "accent": "#74b9ff",
+        "disabled_fg": "#7a8288",
+        "select_bg": "#264f78", "select_fg": "#ffffff",
+        "phasebar_bg": DARK_BG,     # buttons pop on the window bg itself
+    },
+    "light": {
+        "bg": LIGHT_BG, "fg": LIGHT_FG,
+        "surface": "#eceff1",
+        "surface_hi": "#dde3e6",
+        "field": "#ffffff",
+        "border": "#c5cbcf",
+        "trough": "#eef0f2",
+        "accent": "#0984e3",
+        "disabled_fg": "#95a1a6",
+        "select_bg": "#cfe6ff", "select_fg": "#1e272e",
+        "phasebar_bg": "#b2bec3",   # medium grey so the white/light oracle fills still stand out
+    },
 }
+
+_mode = "dark"                     # the active mode (set by apply_theme; color() reads it)
+_subs: list = []                   # registered component callbacks, notified by set_mode(mode)
 
 
 # The NARROW chrome font for the phase-bar labels (a 2-line description must fit a fixed button width).
@@ -77,12 +118,17 @@ def narrow_family(root) -> str:
         return NARROW_CANDIDATES[-1]
 
 
+def color(role: str, mode: str | None = None) -> str:
+    """The token colour for `role` in `mode` (default: the active mode)."""
+    return TOKENS[mode or _mode][role]
+
+
 def bg_for(mode: str) -> str:
-    return DARK_BG if mode == "dark" else LIGHT_BG
+    return TOKENS["dark" if mode == "dark" else "light"]["bg"]
 
 
 def fg_for(mode: str) -> str:
-    return DARK_FG if mode == "dark" else LIGHT_FG
+    return TOKENS["dark" if mode == "dark" else "light"]["fg"]
 
 
 def log_colors_for(mode: str) -> dict:
@@ -90,35 +136,106 @@ def log_colors_for(mode: str) -> dict:
 
 
 def phasebar_bg(mode: str) -> str:
-    """The phase-bar frame background: dark bg in dark mode (buttons pop); a medium grey in light mode
-    so the white/light oracle button fills still stand out against the bar."""
-    return DARK_BG if mode == "dark" else "#b2bec3"
+    """The phase-bar frame background (a token role - see TOKENS)."""
+    return TOKENS["dark" if mode == "dark" else "light"]["phasebar_bg"]
+
+
+def register(callback) -> None:
+    """Subscribe a component's `set_theme(mode)` to mode switches (call once at construction).
+    `set_mode` notifies every subscriber - app_main no longer hand-fans-out."""
+    if callback not in _subs:
+        _subs.append(callback)
 
 
 def apply_theme(root, mode: str = "dark") -> str:
-    """Apply sv-ttk if installed (-> returns 'sv-ttk'); otherwise a plain ttk theme (-> 'fallback'), then
-    make the bundled Monaspace Neon Var the app-wide UI font at APP_FONT_SIZE. NEVER raises - the window
-    must come up even with no theme package / no bundled font available.
+    """Style the ttk classes the app uses from the TOKENS table (over the `clam` base theme), point the
+    named Tk fonts at the bundled Monaspace, and remember `mode`. NEVER raises - the window must always
+    come up. Returns the backend id ("native").
 
-    Does NOT touch the Windows title bar: `darktitle.apply` calls `update_idletasks()`, which - if run
-    here, before the App has built its widgets - flushes sv-ttk's theme application against an empty
-    window so the later-created ttk widgets never pick up the theme (toolbar/notebook/status stay light).
-    The App applies the title bar separately, AFTER its widgets exist (mirrors PL3)."""
-    backend = "fallback"
+    Does NOT touch the Windows title bar: `darktitle.apply` calls `update_idletasks()`, which - run
+    before the App has built its widgets - would flush styling against an empty window. The App applies
+    the title bar separately AFTER its widgets exist; `set_mode` (the live toggle) does both."""
+    global _mode
+    _mode = "dark" if mode == "dark" else "light"
+    c = TOKENS[_mode]
     try:
-        import sv_ttk
-        sv_ttk.set_theme(mode)
-        backend = "sv-ttk"
-    except Exception:  # noqa: BLE001  - missing package / any init failure -> fall back, still launch
+        style = ttk.Style(root)
         try:
-            ttk.Style(root).theme_use("clam")
-        except Exception:  # noqa: BLE001
+            style.theme_use("clam")
+        except Exception:  # noqa: BLE001 - unknown base theme: style the current one
             pass
-        try:
-            root.configure(bg=DARK_BG if mode == "dark" else "#f5f6fa")
-        except Exception:  # noqa: BLE001
-            pass
+        root.configure(bg=c["bg"])
+        style.configure(".", background=c["bg"], foreground=c["fg"], bordercolor=c["border"],
+                        darkcolor=c["bg"], lightcolor=c["bg"], troughcolor=c["trough"],
+                        fieldbackground=c["field"], selectbackground=c["select_bg"],
+                        selectforeground=c["select_fg"], insertcolor=c["fg"], focuscolor=c["accent"],
+                        arrowcolor=c["fg"])
+        style.configure("TFrame", background=c["bg"])
+        style.configure("TLabel", background=c["bg"], foreground=c["fg"])
+        style.configure("TButton", background=c["surface"], foreground=c["fg"], padding=(8, 3),
+                        relief="flat", shiftrelief=0)
+        style.map("TButton",
+                  background=[("pressed", c["surface_hi"]), ("active", c["surface_hi"])],
+                  foreground=[("disabled", c["disabled_fg"])])
+        style.configure("TMenubutton", background=c["surface"], foreground=c["fg"], padding=(8, 3),
+                        arrowcolor=c["fg"], relief="flat")
+        style.map("TMenubutton", background=[("active", c["surface_hi"])])
+        style.configure("TNotebook", background=c["bg"], borderwidth=0, tabmargins=(2, 4, 2, 0))
+        style.configure("TNotebook.Tab", background=c["surface"], foreground=c["fg"],
+                        padding=(12, 4), bordercolor=c["border"])
+        style.map("TNotebook.Tab",
+                  background=[("selected", c["bg"])],
+                  foreground=[("selected", c["accent"])],
+                  lightcolor=[("selected", c["bg"])],
+                  expand=[("selected", (1, 1, 1, 0))])
+        style.configure("Treeview", background=c["field"], fieldbackground=c["field"],
+                        foreground=c["fg"], bordercolor=c["border"])
+        style.map("Treeview", background=[("selected", c["select_bg"])],
+                  foreground=[("selected", c["select_fg"])])
+        style.configure("Treeview.Heading", background=c["surface"], foreground=c["fg"],
+                        relief="flat", padding=(4, 3))
+        style.map("Treeview.Heading", background=[("active", c["surface_hi"])])
+        style.configure("TCombobox", fieldbackground=c["field"], background=c["surface"],
+                        foreground=c["fg"], arrowcolor=c["fg"], bordercolor=c["border"])
+        style.map("TCombobox",
+                  fieldbackground=[("readonly", c["field"])],
+                  foreground=[("readonly", c["fg"])],
+                  selectbackground=[("readonly", c["field"])],
+                  selectforeground=[("readonly", c["fg"])])
+        style.configure("TEntry", fieldbackground=c["field"], foreground=c["fg"],
+                        bordercolor=c["border"], insertcolor=c["fg"])
+        # NOTE deliberately NO per-orientation TScrollbar configure/map: an explicit scrollbar style
+        # forces a slow clam redraw path - MEASURED at ~52ms per log-line repaint vs ~10ms without
+        # (the scrollbar thumb repaints on every Text append). The scrollbars inherit every colour
+        # they need from the "." root style above.
+        style.configure("TProgressbar", background=c["accent"], troughcolor=c["trough"],
+                        bordercolor=c["border"], lightcolor=c["accent"], darkcolor=c["accent"])
+        style.configure("TSeparator", background=c["border"])
+        # the Combobox popdown list is a plain tk Listbox created lazily - option_add covers new ones
+        root.option_add("*TCombobox*Listbox.background", c["field"])
+        root.option_add("*TCombobox*Listbox.foreground", c["fg"])
+        root.option_add("*TCombobox*Listbox.selectBackground", c["select_bg"])
+        root.option_add("*TCombobox*Listbox.selectForeground", c["select_fg"])
+    except Exception as exc:  # noqa: BLE001
+        print(f"[theme] styling failed ({exc}) - launching unstyled", file=sys.stderr)
     _apply_app_font(root)
+    return "native"
+
+
+def set_mode(root, mode: str) -> str:
+    """The LIVE mode switch: restyle from the tokens, flip the Windows title bar, then notify every
+    registered component (`register`). Returns the backend id."""
+    backend = apply_theme(root, mode)
+    try:
+        from pipeline4.gui import darktitle
+        darktitle.apply(root, _mode == "dark")
+    except Exception:  # noqa: BLE001
+        pass
+    for callback in list(_subs):
+        try:
+            callback(_mode)
+        except Exception as exc:  # noqa: BLE001 - one broken subscriber must not stop the switch
+            print(f"[theme] subscriber {callback!r} failed: {exc}", file=sys.stderr)
     return backend
 
 

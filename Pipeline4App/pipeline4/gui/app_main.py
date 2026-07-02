@@ -87,7 +87,7 @@ class App:
         self._backend_label = ttk.Label(toolbar, text=f"theme: {backend}")
         self._backend_label.pack(side="right", padx=2)
 
-        self.phasebar = PhaseBar(root, self._on_phase, self._sub_command, lang=self.lang)
+        self.phasebar = PhaseBar(root, self._on_phase, self._sub_command, lang=self.lang, mode=self.mode)
         self.phasebar.pack(side="top", fill="x", padx=8, pady=2)
 
         # the status bar + the busy progressbar live at the bottom (progress just above the status line).
@@ -130,8 +130,14 @@ class App:
             self._enable_log_sink()
             self._tb_logfile.configure(text=self._logfile_label())
 
+        # every themed component subscribes ONCE; theme.set_mode notifies them on a toggle (the manual
+        # per-component fan-out in _toggle_theme is retired with the sv-ttk backend).
+        for callback in (self.log.set_theme, self.phasebar.set_theme, self.explorer.set_theme,
+                         self.files.set_theme, self.documents.set_theme):
+            theme.register(callback)
+
         # the Windows dark/light title bar - applied LAST, after every widget exists, so darktitle's
-        # update_idletasks() doesn't flush sv-ttk's theming against a half-built window (PL3 order).
+        # update_idletasks() doesn't flush the ttk styling against a half-built window (PL3 order).
         from pipeline4.gui import darktitle
         darktitle.apply(self.root, self.mode == "dark")
 
@@ -825,16 +831,9 @@ class App:
         self._set_title()                                    # re-localize the builtin/project title marker
 
     def _toggle_theme(self):
-        from pipeline4.gui import darktitle
         self.mode = "light" if self.mode == "dark" else "dark"
-        backend = theme.apply_theme(self.root, self.mode)   # sv-ttk + font
+        backend = theme.set_mode(self.root, self.mode)       # tokens + title bar + notify subscribers
         self._backend_label.configure(text=f"theme: {backend}")
-        self.log.set_theme(self.mode)                        # log bg/fg + level tag colours
-        self.phasebar.set_theme(self.mode)                   # bar bg + separators + spacers
-        self.explorer.set_theme(self.mode)                   # SQL editor bg/fg + highlight tags
-        self.files.set_theme(self.mode)                      # Files text viewer bg/fg
-        self.documents.set_theme(self.mode)                  # Documents tab (all ttk - no-op, for symmetry)
-        darktitle.apply(self.root, self.mode == "dark")      # Windows title bar (widgets already exist)
         config.save_app_theme(self.mode)                     # remember the choice for next launch
         self.log.append("INFO", f"theme -> {self.mode}")
 

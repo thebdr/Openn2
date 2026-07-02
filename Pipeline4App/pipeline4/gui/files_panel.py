@@ -192,8 +192,8 @@ class FilesPanel(ttk.Frame):
         self._textw = text
 
     def set_theme(self, mode: str) -> None:
-        """Re-theme the panel for a light/dark switch. The ttk widgets follow sv-ttk; only the classic-tk
-        text viewer needs its bg/fg set - reconfigure it live if one is shown."""
+        """Re-theme the panel for a light/dark switch. The ttk widgets follow the token styles; only the
+        classic-tk text viewer needs its bg/fg set - reconfigure it live if one is shown."""
         self._mode = mode
         if self._textw is not None and self._textw.winfo_exists():
             self._textw.configure(background=theme.bg_for(mode), foreground=theme.fg_for(mode),

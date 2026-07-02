@@ -95,4 +95,4 @@ class DocumentsPanel(ttk.Frame):
         self.refresh()                                # the (not set) placeholder is localized too
 
     def set_theme(self, _mode: str) -> None:
-        """The Documents tab is all ttk (it follows sv-ttk automatically) - nothing classic-tk to re-theme."""
+        """The Documents tab is all ttk (it follows the token styles automatically) - nothing classic-tk to re-theme."""
