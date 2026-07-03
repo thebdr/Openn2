@@ -254,6 +254,20 @@ class DataGrid(ttk.Frame):
         data stays index-aligned no matter how the view is sorted/filtered."""
         return sorted(self._view[i] for i in self._selected if i < len(self._view))
 
+    def focus_source_row(self, src: int) -> bool:
+        """Programmatic jump: select the view row showing SOURCE row `src` and scroll it roughly to
+        the middle of the viewport. False when the row is filtered out of the current view."""
+        try:
+            pos = self._view.index(src)
+        except ValueError:
+            return False
+        self._selected, self._anchor = {pos}, pos
+        visible = max(1, self.body.winfo_height() // self._row_h)
+        top = max(0, pos - visible // 2)
+        self.body.yview_moveto(top / max(1, len(self._view)))
+        self._schedule_redraw()
+        return True
+
     def _hit_row(self, event):
         """The VIEW position under the pointer (selection/anchor work in screen space)."""
         hit = cell_at(self._widths, self._row_h, len(self._view),

@@ -106,7 +106,8 @@ class App:
         self.notebook = ttk.Notebook(root)
         self._log_tab = ttk.Frame(self.notebook)
         self.log = LogView(self._log_tab, shown_levels=shown0, font_size=app_ui["font_size"],
-                           mode=self.mode, on_link=self._on_link, on_errtreat=self._on_errtreat)
+                           mode=self.mode, on_link=self._on_link, on_errtreat=self._on_errtreat,
+                           on_errjump=self._on_errjump)
         self.log.pack(side="top", fill="both", expand=True)
         self.notebook.add(self._log_tab, text=i18n.tr("tab_log", self.lang))
         self._files_tab = ttk.Frame(self.notebook)
@@ -646,6 +647,14 @@ class App:
         treatments.set_treatment(uid, level)
         self.findings.refresh()
         self.log.append("INFO", f"  treated {uid} -> {level or 'cleared'} (effective on the next run)")
+
+    def _on_errjump(self, uid) -> None:
+        """A LEFT-click on a finding line's [LEVEL] -> open the Findings tab at that finding's row
+        (the panel drops its filters if they hide it)."""
+        self.notebook.select(self._findings_tab)
+        if not self.findings.focus_uid(uid):
+            self.log.append("WARN", f"  finding {uid} is not in the recorded validation_issues "
+                                    "(re-run its phase to refresh the table)")
 
     # --- the phase handlers (run on the worker thread; emit via self._emit / self._status) ------- #
     def _run_validation(self, only=None):

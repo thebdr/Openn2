@@ -37,10 +37,13 @@ def test_default_shown_hides_debug():
 
 
 def test_load_app_ui_reads_app_config():
-    # the builtin config_project/app_config.yaml ships log_levels: [F, E, W, I, S, P, D] (all 7)
+    # the builtin app_config.yaml is the LIVE store of the user's Levels choice (app-scoped prefs) -
+    # assert the CONTRACT, never the current value: a valid subset of the levels, with the
+    # unhideable PHASE banner + FAIL + ERROR always present.
     ui = config.load_app_ui()
     levels = ui["log_levels"]
-    eq(levels, {"PHASE"} | set(severity.LEVELS), "all 7 finding levels + the PHASE banner")
+    ok(levels <= {"PHASE"} | set(severity.LEVELS), "only known levels")
+    ok({"PHASE", "FAIL", "ERROR"} <= levels, "the banner + the failures are always shown")
 
 
 if __name__ == "__main__":

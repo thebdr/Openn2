@@ -100,6 +100,22 @@ class FindingsPanel(ttk.Frame):
         """The grid's context callback: the selection is already settled - show the treat menu."""
         self.menu.tk_popup(event.x_root, event.y_root)
 
+    def focus_uid(self, uid: str) -> bool:
+        """Jump to the finding `uid` (a log-line [LEVEL] click): refresh if the uid is unknown yet,
+        DROP the phase/severity filters when they hide it, then select + scroll its row. False when
+        the uid isn't in validation_issues at all (e.g. a line from a run that was re-recorded)."""
+        if not any(r["uid"] == uid for r in self._all):
+            self.refresh()
+            if not any(r["uid"] == uid for r in self._all):
+                return False
+        index = next((i for i, r in enumerate(self._shown) if r["uid"] == uid), None)
+        if index is None:                            # hidden by the filters -> clear them
+            self._phase.set("")
+            self._sev.set("")
+            self._render()
+            index = next((i for i, r in enumerate(self._shown) if r["uid"] == uid), None)
+        return index is not None and self.grid_view.focus_source_row(index)
+
     def _treat(self, level: str) -> None:
         """Treat the WHOLE selection at `level` (one registry write), then re-render."""
         rows = [self._shown[i] for i in self.grid_view.selection() if i < len(self._shown)]

@@ -4,7 +4,8 @@ severity level. Two feeds:
 - `append_records(records)` - the STRUCTURED log (`io.render.render_records`): each RenderRec carries the
   line text + the char spans of its `Sheet!Cell` cells (with their workbook `doc`). Each span becomes a
   clickable link (-> `on_link(doc, sheet, cell)` -> open the workbook in Excel at the cell); a treatable
-  line's leading `[LEVEL]` tag is an errlink (right-click -> `on_errtreat(uid, level)`). Binding from the
+  line's leading `[LEVEL]` tag is an errlink - LEFT-click -> `on_errjump(uid)` (the host opens the
+  Findings tab at that row), right-click -> `on_errtreat(uid, level)` (the treat menu). Binding from the
   record (not by re-parsing text) is what makes the cross-workbook links work and can't race.
 Inserts happen on the Tk main thread (the App drains its worker queue into here via `root.after`).
 """
@@ -22,12 +23,13 @@ _ALWAYS_SHOWN = ("PHASE", "SUBPHASE", "FAIL", "ERROR")  # never hideable (banner
 
 
 class LogView(ttk.Frame):
-    def __init__(self, parent, shown_levels=None, on_link=None, on_errtreat=None, font_size=None,
-                 mode: str = "dark", **kw):
+    def __init__(self, parent, shown_levels=None, on_link=None, on_errtreat=None, on_errjump=None,
+                 font_size=None, mode: str = "dark", **kw):
         super().__init__(parent, **kw)
         self.shown_levels = set(shown_levels) if shown_levels is not None else set(theme.LOG_COLORS)
         self.on_link = on_link                    # on_link(doc, sheet, cell)
         self.on_errtreat = on_errtreat            # on_errtreat(uid, level)
+        self.on_errjump = on_errjump              # on_errjump(uid) - left-click [LEVEL] -> the Findings row
         self._links = 0
         self._errs = 0
         self._family = theme.MONO_FONT[0]         # the log font family + a live-resizable size (Font dropdown)
@@ -175,15 +177,20 @@ class LogView(ttk.Frame):
                            lambda _e, d=span.doc, sh=sheet, c=cell: self.on_link(d, sh, c))
 
     def _tag_errlink(self, line_start, rec) -> None:
-        """The leading `[LEVEL]` of a treatable line -> right-click to treat the finding (by uid)."""
-        if rec.level not in _TREATABLE or not (self.on_errtreat and getattr(rec, "uid", "")):
+        """The leading `[LEVEL]` of a treatable line: LEFT-click jumps to the finding's row in the
+        Findings tab (`on_errjump`); right-click opens the treat menu (`on_errtreat`)."""
+        if rec.level not in _TREATABLE or not ((self.on_errtreat or self.on_errjump)
+                                               and getattr(rec, "uid", "")):
             return
         end = f"{line_start}+{len(rec.level) + 2}c"            # "[" + level + "]"
         self.text.tag_add("errlink", line_start, end)
         tag = f"err{self._errs}"
         self._errs += 1
         self.text.tag_add(tag, line_start, end)
-        self.text.tag_bind(tag, "<Button-3>", lambda e, u=rec.uid: self._err_menu(e, u))
+        if self.on_errtreat:
+            self.text.tag_bind(tag, "<Button-3>", lambda e, u=rec.uid: self._err_menu(e, u))
+        if self.on_errjump:
+            self.text.tag_bind(tag, "<Button-1>", lambda _e, u=rec.uid: self.on_errjump(u))
 
     def _err_menu(self, event, uid: str) -> None:
         from pipeline4.core import treatments
