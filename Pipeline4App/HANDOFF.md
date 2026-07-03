@@ -10,7 +10,32 @@ user's word**, push only when asked. Each chunk is committed with its gate **and
 when domain judgement is needed (it's the user's; you implement). A question is a question — answer it, don't
 change code. Commit messages end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
-## LATEST (2026-07-02) — the pre-production GUI/config REFRESH (UI_REFRESH_PLAN A–I) — ALL LANDED + PUSHED
+## LATEST (2026-07-03) — user follow-ups: viewers/editors polish + the BUILDER-OWNED DBs + MachineInterfaces.scl
+All pushed, gate 57 test files green; one commit per step (see git log for the full messages):
+- **Viewers/editors**: Files-tab Refresh is a strip above the tree (`e589591`); the shared **DataGrid**
+  canvas replaces every table Treeview - gridlines, zebra, data-adapted columns, small NARROW font for
+  >64-char cells (`86555a3`); columns resize by DRAG on a header separator + DOUBLE-CLICK auto-fit
+  (`ad12d87`); text-based files EDIT in place (BOM/newline-faithful atomic save, Ctrl+S, dirty guard);
+  editor cap 50 MB (highlight skipped over 2 MB); **CSV cells edit in place** (dialect-preserving save)
+  (`ad12d87` + `c710bf0`). Documents tab split into Current / Previous-revision sections (`c92865b`).
+- **02_COM + 05_EM_STATE are CSV-DECLARED (the user's priority)** (`03f409f`): `datablock_definitions.csv`
+  `create_when=builders` = declared in the ONE DB surface, materialized by the 800 ENGINE after the
+  builders run (members = the distinct values of every `<db>.<placeholder>` builder column - creator AND
+  reference columns; verified equal to the old creator set). `engine.write_builder_dbs` replaces the
+  hardcoded 02_COM writer; seeds now read `generation_params.yaml datablocks.seed_members` (F item 2
+  DONE); coverage shares the engine's collector. **BYTE-PARITY 26/26** + the NEW `05_EM_STATE.xml`
+  (23 members, F_DB, previously hand-maintained in TIA). F item 1's constants died with the
+  generalization — the post-test deferral list shrinks to 150 / 920 / accept / gate-reconcile.
+- **MachineInterfaces.scl** (phase 400, NEW surface): one assignment per interfaced signal, REGION per
+  interface — `>` (Q) `"signal" := expression;` · `<` (I) `expression := "signal";` — the line templates
+  in `generation_params.yaml interfaces.scl_line_templates` rendered via core/expr ($signal_name_q /
+  $expression_q = TIA-quoted variants); written to ImportReady beside the diagnosis SCL. Real data:
+  115 assignments / 2 interfaces / 0 findings. NOTE: template-native rows whose stored Expression ==
+  the tag itself render as self-assignments — faithful to the sheet; change the template data if not
+  wanted.
+- **NEXT: the FIRST PRODUCTION TEST** (unchanged — see the 2026-07-02 block below).
+
+## PREVIOUS (2026-07-02) — the pre-production GUI/config REFRESH (UI_REFRESH_PLAN A–I) — ALL LANDED + PUSHED
 The user reviewed + approved `UI_REFRESH_PLAN.md` (the icon selection via an interactive artifact, two
 rounds), then said "proceed" — the whole batch landed this session, one commit per step, gate green
 (now **55 test FILES**) + scripted verification each; `origin/pl4` synced through **`ce3a2eb`**:

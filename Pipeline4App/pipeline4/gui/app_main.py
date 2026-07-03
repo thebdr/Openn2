@@ -691,6 +691,12 @@ class App:
         n_if, n_el = len(database["interfaces"]), len(database["interface_elements"])
         self._emit("PASS", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "
                            f"IF_*.xlsx in {config.interfaces_dir()}")
+        from pipeline4.domain import interface_scl
+        scl = interface_scl.project(database)
+        self._render(scl["findings"])
+        if scl["path"]:
+            self._emit("PASS", f"  MachineInterfaces SCL: {scl['assignments']} assignments across "
+                               f"{scl['interfaces']} interfaces -> {scl['path']}")
         params = config.load_params()
         if config.get_param(params, "iolist_params.insert_interface_sheets", False):
             self._status("inserting IF_ sheets…")

@@ -9,6 +9,18 @@ datablocks:
   # (datablock_definitions.csv rows with create_when: builders).
   seed_members: [Always FALSE, Always TRUE, No Operation]
 
+interfaces:
+  # The MachineInterfaces SCL projection (phase 400): one assignment per interfaced signal, grouped
+  # in a REGION per interface, the line chosen by the sheet's `Direction </>` glyph ('>' = Q, out
+  # toward the partner; '<' = I, in from the partner). Rendered through core/expr against the
+  # interface_elements row: $signal_name / $expression are the SSOT columns ('Signal Name Side 1' /
+  # 'Expression Side 1'); the _q variants are TIA-QUOTED (wrapped unless the value already starts
+  # with a quote, e.g. a stored "db"."member" binding).
+  scl_file: MachineInterfaces.scl
+  scl_line_templates:
+    ">": "    {$signal_name_q} := {$expression_q};"
+    "<": "    {$expression_q} := {$signal_name_q};"
+
 diagnosis:
   # The packed SCL DWord slot names - the BoolToUDInt instance per cabinet DWord (phase 620). Bit 0-31
   # lands in the first entry, 32-63 in the second.
