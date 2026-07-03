@@ -20,6 +20,9 @@ _ACCENT_DARK = theme.LOG_COLORS["PHASE"][0]        # clickable-link colour in da
 _ACCENT = _ACCENT_DARK                            # module-level default (dark)
 _TREATABLE = ("FAIL", "ERROR", "WARN")
 _ALWAYS_SHOWN = ("PHASE", "SUBPHASE", "FAIL", "ERROR")  # never hideable (banners + the failures)
+# the render-mark style -> Text tag map (the cross-check comparison layers; see io/render.MarkSpan)
+_MARK_TAGS = {"cmp": "cmp", "cmp_op_eq": "cmpopeq", "cmp_op_ne": "cmpopne", "cmp_diff": "cmpdiff"}
+_CMP_DIFF_BG = {"dark": "#5b2b2b", "light": "#f6c9c9"}  # the =/= differing-chars highlight
 
 
 class LogView(ttk.Frame):
@@ -51,10 +54,7 @@ class LogView(ttk.Frame):
 
         for level, (color, bold) in theme.LOG_COLORS.items():
             self.text.tag_configure(level, foreground=color, font=self._tag_font(level, bold))
-        # the cross-check comparison marks - configured AFTER the level tags so they take priority:
-        # an === comparison goes neutral grey; a =/= comparison underlines its differing chars.
-        self.text.tag_configure("cmpeq", foreground=theme.LOG_COLORS["SKIP"][0])
-        self.text.tag_configure("cmpdiff", underline=True)
+        self._config_cmp_tags("dark")             # re-skinned below by set_theme(mode)
         self.text.tag_configure("errlink", underline=True)
         self.text.tag_bind("errlink", "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
         self.text.tag_bind("errlink", "<Leave>", lambda _e: self.text.configure(cursor=""))
@@ -101,8 +101,9 @@ class LogView(ttk.Frame):
             for span in rec.links:
                 self._tag_link_span(start, span)
             for mark in getattr(rec, "marks", ()):
-                self.text.tag_add("cmpeq" if mark.style == "cmp_eq" else "cmpdiff",
-                                  f"{start}+{mark.start}c", f"{start}+{mark.end}c")
+                if mark.style in _MARK_TAGS:
+                    self.text.tag_add(_MARK_TAGS[mark.style],
+                                      f"{start}+{mark.start}c", f"{start}+{mark.end}c")
             self._tee(rec.text)
         self.text.see("end")
         self.text.configure(state="disabled")
@@ -135,6 +136,16 @@ class LogView(ttk.Frame):
         size = max(8, self._size - 1) if level == "SUBPHASE" else self._size
         return (self._family, size, "bold" if bold else "normal")
 
+    def _config_cmp_tags(self, mode: str) -> None:
+        """The cross-check comparison layers (configured AFTER the level tags so they take priority):
+        the WHOLE comparison neutral grey, the === operator green, the =/= operator red, and the
+        differing chars of a =/= on a red-ish BACKGROUND (the text above stays neutral)."""
+        palette = theme.log_colors_for(mode)
+        self.text.tag_configure("cmp", foreground=palette["SKIP"][0])
+        self.text.tag_configure("cmpopeq", foreground=palette["PASS"][0])
+        self.text.tag_configure("cmpopne", foreground=palette["FAIL"][0])
+        self.text.tag_configure("cmpdiff", background=_CMP_DIFF_BG["dark" if mode == "dark" else "light"])
+
     def set_theme(self, mode: str) -> None:
         """Re-theme the log pane for a light/dark mode switch: background, foreground, all level tag
         colours, and the link accent colour. New content after this call uses the new palette; existing
@@ -146,7 +157,7 @@ class LogView(ttk.Frame):
         palette = theme.log_colors_for(mode)
         for level, (color, bold) in palette.items():
             self.text.tag_configure(level, foreground=color, font=self._tag_font(level, bold))
-        self.text.tag_configure("cmpeq", foreground=palette["SKIP"][0])
+        self._config_cmp_tags(mode)
 
     def set_font_size(self, size: int) -> None:
         """Resize the log font live (the Text body + every level tag, preserving each tag's bold). The

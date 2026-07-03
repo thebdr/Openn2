@@ -56,17 +56,23 @@ def test_crosscheck_cmp_and_dual_link():
     eq([(rec.text[s.start:s.end], s.doc) for s in sorted(rec.links, key=lambda s: s.start)],
        [("CE!F5", "ce.xlsx"), ("IO!G9", "io.xlsx")], "each span covers its cell + carries its workbook")
     eq(rec.uid, f.uid, "a FAIL line carries the finding uid")
-    # the marks: an === comparison is ONE neutral span over the whole bit cell; a =/= comparison
-    # underlines the differing chars on both sides (here '1' vs '2', one char each side)
-    eqs = [m for m in rec.marks if m.style == "cmp_eq"]
+    # the layered marks (user-reviewed styling): BOTH comparisons get a whole-cell neutral span;
+    # the operators get their own green/red span; the =/='s differing chars get the highlight span
+    whole = [m for m in rec.marks if m.style == "cmp"]
+    eq([rec.text[m.start:m.end] for m in whole], ["I0.0 === I0.0", "S1 =/= S2"],
+       "both comparisons carry the whole-cell neutral span")
+    ops = [(rec.text[m.start:m.end], m.style) for m in rec.marks
+           if m.style in ("cmp_op_eq", "cmp_op_ne")]
+    eq(ops, [("===", "cmp_op_eq"), ("=/=", "cmp_op_ne")], "the operators are marked green/red")
     diffs = [m for m in rec.marks if m.style == "cmp_diff"]
-    eq(len(eqs), 1, "one neutral span for the === comparison")
-    eq(rec.text[eqs[0].start:eqs[0].end], "I0.0 === I0.0", "the neutral span covers the whole comparison")
-    eq([rec.text[m.start:m.end] for m in diffs], ["1", "2"], "the =/= underline marks the differing chars")
+    eq([rec.text[m.start:m.end] for m in diffs], ["1", "2"],
+       "the =/= highlight marks exactly the differing chars")
     html = render.render_html([f])
-    ok('<span class="cmpeq">I0.0 === I0.0</span>' in html, "the HTML report styles the === neutrally")
-    ok('<span class="cmpdiff">1</span>' in html and '<span class="cmpdiff">2</span>' in html,
-       "the HTML report underlines the =/= diff chars")
+    ok('<span class="cmp cmpopeq">===</span>' in html, "the === operator composes cmp+green in HTML")
+    ok('<span class="cmp cmpopne">=/=</span>' in html, "the =/= operator composes cmp+red in HTML")
+    ok('<span class="cmp cmpdiff">1</span>' in html and '<span class="cmp cmpdiff">2</span>' in html,
+       "the diff chars compose the neutral colour + the background highlight")
+    ok(".cmpdiff{background:" in html, "the diff style is a BACKGROUND, not an underline")
 
 
 def test_cmp_diff_runs():

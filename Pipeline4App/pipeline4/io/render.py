@@ -8,7 +8,8 @@ Rendered finding line (`<id>` is `<phase>-<type>`; `<location>` is `Sheet!Cell`,
 `doc`/`doc2` ride on the Finding for the GUI and are not rendered):
     [LEVEL] <id>  <location>  |  bit | FLD | desc_l1 | desc_l1b | drawing | type-index  ::  <detail>
 A cross-check (130/140) line renders its aligned `<caller> op <other>` comparisons IN the bit + FLD
-columns (op = `===`/`=/=`), with MarkSpans so a viewer can style them (=== neutral, =/= diff-underlined).
+columns (op = `===`/`=/=`), with MarkSpans so a viewer can style them: the whole comparison neutral
+grey, the operator green (===) / red (=/=), and a =/='s differing chars background-highlighted.
 A BANNER finding (severity == severity.BANNER) renders as a section header.
 
 `render_records` is the GUI-facing twin of `render_lines`: it returns the SAME text plus, per line, the char
@@ -30,8 +31,10 @@ _EMPTY_INFO = InfoBlock()
 
 # A clickable cell: [start, end) char offsets into the line + the workbook basename (doc/doc2).
 LinkSpan = namedtuple("LinkSpan", "start end doc")
-# A comparison styling span: [start, end) + style "cmp_eq" (an === comparison, rendered neutral) or
-# "cmp_diff" (the chars that DIFFER across a =/= comparison, rendered underlined).
+# A comparison styling span: [start, end) + style. The layered model (user-reviewed): "cmp" = the
+# WHOLE comparison in a neutral grey (always, both kinds); "cmp_op_eq" / "cmp_op_ne" = the ===/=/=
+# operator itself (green / red); "cmp_diff" = the chars that DIFFER across a =/= comparison,
+# highlighted with a red-ish BACKGROUND (the text stays neutral). Spans NEST (op/diff inside cmp).
 MarkSpan = namedtuple("MarkSpan", "start end style")
 # One rendered entry: kind "banner" (text = title) or "line"; `links` = 0..2 LinkSpans (location, then
 # location2); `uid` = the finding's stable hash (for a treatable line; "" for a banner / PASS);
@@ -78,14 +81,17 @@ def _char_diff_runs(a: str, b: str) -> list:
 
 
 def _cmp_marks(caller: str, other: str, eq: bool, wc: int, cell_start: int) -> list:
-    """The MarkSpans for one comparison cell at line offset `cell_start`: an === comparison marks the
-    whole `<caller> op <other>` neutrally; a =/= comparison underlines the DIFFERING chars on both sides
-    (the caller is right-aligned into its `wc` field; the other starts after `<field> op `)."""
+    """The MarkSpans for one comparison cell at line offset `cell_start` (the caller right-aligns
+    into its `wc` field, the operator sits at wc+1..wc+4, the other side starts at wc+5): the WHOLE
+    `<caller> op <other>` goes neutral ('cmp'), the operator green/red ('cmp_op_eq'/'cmp_op_ne'),
+    and a =/= comparison additionally background-highlights the DIFFERING chars on both sides."""
+    marks = [MarkSpan(cell_start, cell_start + wc + 5 + len(other), "cmp"),
+             MarkSpan(cell_start + wc + 1, cell_start + wc + 4,
+                      "cmp_op_eq" if eq else "cmp_op_ne")]
     if eq:
-        return [MarkSpan(cell_start, cell_start + wc + 5 + len(other), "cmp_eq")]
+        return marks
     caller_at = cell_start + (wc - len(caller))
     other_at = cell_start + wc + 5                    # after the caller field + " op "
-    marks = []
     for start, end in _char_diff_runs(caller, other):
         if start < len(caller):
             marks.append(MarkSpan(caller_at + start, caller_at + min(end, len(caller)), "cmp_diff"))
@@ -210,8 +216,10 @@ _HTML_CSS = """
   .line.skip{color:#a8a8a8;}
   .line.info{color:#e6e6e6;}
   .loc{color:#4ea1ff;text-decoration:underline;}            /* the viewer's clickable-cell styling */
-  .cmpeq{color:#a8a8a8;}                                    /* an === comparison: neutral */
-  .cmpdiff{text-decoration:underline;}                      /* the differing chars of a =/= comparison */
+  .cmp{color:#a8a8a8;}                                      /* the whole comparison: neutral grey */
+  .cmpopeq{color:#9ad67d;font-weight:bold;}                 /* the === operator: green */
+  .cmpopne{color:#ff6b6b;font-weight:bold;}                 /* the =/= operator: red */
+  .cmpdiff{background:#5b2b2b;}                             /* differing chars: red-ish highlight */
 """
 
 _LEVEL_CLASS = {"FAIL": "fail", "ERROR": "fail", "WARN": "warn", "PASS": "pass",
@@ -222,24 +230,41 @@ def _esc(s: str) -> str:
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+_MARK_CLASS = {"cmp": "cmp", "cmp_op_eq": "cmpopeq", "cmp_op_ne": "cmpopne", "cmp_diff": "cmpdiff"}
+
+
 def _line_html(rec) -> str:
-    """A finding line -> escaped HTML: the location link-spans wrap in <span class="loc">, the
-    comparison marks in <span class="cmpeq"> / <span class="cmpdiff"> (links live in the location area,
-    marks in the info area - they never overlap)."""
+    """A finding line -> escaped HTML. The comparison marks NEST (op/diff spans sit inside the
+    neutral whole-comparison span), so styling is composed PER CHARACTER: each char collects its
+    classes and consecutive same-class runs wrap in one <span> (classes sorted for determinism)."""
     text = rec.text
-    styled = [(s.start, s.end, "loc") for s in rec.links]
-    styled += [(m.start, m.end, "cmpeq" if m.style == "cmp_eq" else "cmpdiff")
-               for m in getattr(rec, "marks", ())]
-    if not styled:
+    classes = [None] * len(text)                   # None = plain; else a set of class names
+
+    def paint(start, end, cls):
+        for i in range(max(0, start), min(len(text), end)):
+            if classes[i] is None:
+                classes[i] = set()
+            classes[i].add(cls)
+
+    for span in rec.links:
+        paint(span.start, span.end, "loc")
+    for mark in getattr(rec, "marks", ()):
+        cls = _MARK_CLASS.get(mark.style)
+        if cls:
+            paint(mark.start, mark.end, cls)
+    if not any(classes):
         return _esc(text)
-    out, prev = [], 0
-    for start, end, cls in sorted(styled):
-        if start < prev:                       # defensive: ignore any overlap
-            continue
-        out.append(_esc(text[prev:start]))
-        out.append(f'<span class="{cls}">{_esc(text[start:min(end, len(text))])}</span>')
-        prev = end
-    out.append(_esc(text[prev:]))
+    out, i = [], 0
+    while i < len(text):
+        j = i
+        while j < len(text) and classes[j] == classes[i]:
+            j += 1
+        chunk = _esc(text[i:j])
+        if classes[i]:
+            out.append(f'<span class="{" ".join(sorted(classes[i]))}">{chunk}</span>')
+        else:
+            out.append(chunk)
+        i = j
     return "".join(out)
 
 
