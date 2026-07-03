@@ -1,9 +1,10 @@
 """The busy/progress strip as a PIXEL CHASE: a coyote chasing a roadrunner back and forth across
 the bar. The roadrunner's lead WANDERS between random targets (visible stretch + squeeze; floor =
 exactly touching, never colliding); when it reaches a border it JUMPS over the coyote (a parabolic
-arc, flipping to face the other way mid-air) and the chase resumes the other way - and the FIRST
-border event brings SUPER MARIO in behind the coyote, tailing it at his own wandering distance for
-the rest of the run. Drop-in compatible with the ttk.Progressbar calls the App makes:
+arc, flipping to face the other way mid-air) and the chase resumes the other way - and EACH border
+event adds the next member of the chase train behind the coyote: SUPER MARIO first, then MORTY,
+then MICKEY MOUSE, then a ROCKET, each tailing the one ahead at its own wandering distance for the
+rest of the run. Drop-in compatible with the ttk.Progressbar calls the App makes:
 `configure(mode=|maximum=|value=)`, `["value"]`, `start(interval)`, `stop()`. In determinate mode
 (Run Pipeline) a thin accent PROGRESS UNDERLINE tracks the real per-phase value along the bottom
 while the chase runs above it.
@@ -22,7 +23,7 @@ from pipeline4.gui import theme
 PIXEL = 2                     # sprite pixel size (px)
 BAR_HEIGHT = 40               # tall enough for the FULL jump arc (apex sprite top stays on-canvas)
 SPEED = 20.0                  # coyote px per tick (the user's 10x)
-MARIO_SPEED = 23.0            # Mario closes on the coyote after a turn (slightly faster)
+FOLLOWER_SPEED = 23.0         # a follower closes on the one ahead after a turn (slightly faster)
 GAP_MIN, GAP_MAX = 0.0, 140.0  # the bird's lead between sprite EDGES (0 = head touches tail, never less)
 GAP_RATE = 6.0                # px/tick the lead moves toward its current random target
 RETARGET_P = 0.02             # per-tick chance the lead picks a new random target early
@@ -30,7 +31,7 @@ LAND_GAP = 30.0               # the lead right after a jump landing
 JUMP_TICKS = 12               # jump duration (ticks) - snappy at the 10x pace
 JUMP_LIFT = 17                # apex height (px) - clears the 16px coyote inside BAR_HEIGHT
 MARGIN = 3                    # border padding (px)
-MARIO_GAP_LO, MARIO_GAP_HI = 2.0, 50.0   # Mario's wandering distance behind the coyote
+FOLLOWER_GAP_LO, FOLLOWER_GAP_HI = 2.0, 50.0   # a follower's wandering distance behind its front
 
 # --- the sprites (facing RIGHT; '.' transparent). Two frames each = the leg gallop. -------------- #
 _RR_COLORS = {"P": "#5b6ee1", "Y": "#f4b41a"}                 # the bird: blue body, yellow legs/beak
@@ -91,6 +92,66 @@ MARIO = (
      "...BB.BB....",
      "..HH...HH..."),
 )
+_MORTY_COLORS = {"H": "#7a4a21", "S": "#f7d5a8", "Y": "#f4e04d", "J": "#3f5fbf"}
+MORTY = (
+    ("...HHHH.....",
+     "..SSSSSS....",
+     "..S.SS.S....",
+     "..SSSSSS....",
+     "...YYYY.....",
+     ".SSYYYYSS...",
+     "...JJ.JJ....",
+     "..HH...HH..."),
+    ("...HHHH.....",
+     "..SSSSSS....",
+     "..S.SS.S....",
+     "..SSSSSS....",
+     "...YYYY.....",
+     ".SSYYYYSS...",
+     "..JJ...JJ...",
+     ".HH.....HH.."),
+)
+_MICKEY_COLORS = {"K": "#1a1a1a", "S": "#f7c59f", "R": "#e52521", "Y": "#f4b41a", "W": "#ffffff"}
+MICKEY = (
+    (".KK....KK...",
+     ".KKK..KKK...",
+     "..KKKKKK....",
+     "..KSSSSK....",
+     "...KKKK.....",
+     "..RRWWRR....",
+     "...KK.KK....",
+     "..YY...YY..."),
+    (".KK....KK...",
+     ".KKK..KKK...",
+     "..KKKKKK....",
+     "..KSSSSK....",
+     "...KKKK.....",
+     "..RRWWRR....",
+     "..KK...KK...",
+     ".YY.....YY.."),
+)
+_ROCKET_COLORS = {"G": "#c8ccd4", "R": "#e52521", "O": "#ff9f1c", "W": "#9ad4ff"}
+ROCKET = (
+    ("................",
+     ".....RR.........",
+     "...O.GGGGGGGR...",
+     "..OOOGGWWGGGRR..",
+     "...O.GGGGGGGR...",
+     ".....RR.........",
+     "................",
+     "................"),
+    ("................",
+     ".....RR.........",
+     "..OO.GGGGGGGR...",
+     ".OOOOGGWWGGGRR..",
+     "..OO.GGGGGGGR...",
+     ".....RR.........",
+     "................",
+     "................"),
+)
+# the border-event chase train, in JOIN ORDER: 1st border -> Mario, then Morty, Mickey, the rocket.
+FOLLOWERS = ((MARIO, _MARIO_COLORS), (MORTY, _MORTY_COLORS),
+             (MICKEY, _MICKEY_COLORS), (ROCKET, _ROCKET_COLORS))
 
 
 def sprite_size(frames) -> tuple:
@@ -105,17 +166,20 @@ def jump_arc(t: float) -> float:
 
 def chase_step(state: dict, width: float, rand) -> dict:
     """One pure animation tick. `state`: dir (+1 right / -1 left), cx (coyote centre), gap + gap_t
-    (the bird's lead and its current random TARGET), rw/cw/mw (sprite widths), mx/mgap (Mario -
-    None until his border entrance), and the jump fields (jump = None or the 0..1 progress;
-    jump_from/jump_to = the arc endpoints). `rand()` -> [0,1).
+    (the bird's lead and its current random TARGET), rw/cw (sprite widths), fw (the follower
+    widths, in join order), followers ([{x, gap}] - the border-event chase train so far), and the
+    jump fields (jump = None or the 0..1 progress; jump_from/jump_to = the arc endpoints).
+    `rand()` -> [0,1).
 
     Chasing: the coyote runs at SPEED; the bird's lead WANDERS between random targets in
     [GAP_MIN, GAP_MAX] at GAP_RATE (visible stretch + squeeze; 0 = the coyote's head touching the
     bird's tail - never less, they never collide); the bird rides at cx + dir*(half-spans + gap).
-    Border: the bird takes off - the coyote SKIDS (freezes) while the bird arcs over it to a
-    landing BEHIND it; on landing both reverse, and the FIRST landing spawns SUPER MARIO at the
-    border the bird just left, chasing the coyote from behind at his own wandering distance."""
+    Border: the bird takes off - the coyote SKIDS (freezes, and the whole train with it) while the
+    bird arcs over it to a landing BEHIND it; on landing all reverse, and EACH landing (up to
+    len(fw)) spawns the NEXT follower at the border the bird just left - Mario, then Morty, then
+    Mickey, then the rocket - each tailing the one ahead at its own wandering distance."""
     s = dict(state)
+    s["followers"] = [dict(f) for f in state.get("followers", [])]
     spans = s["cw"] / 2 + s["rw"] / 2
     if s["jump"] is not None:                     # mid-air: only the arc progresses
         t = s["jump"] + 1.0 / JUMP_TICKS
@@ -125,9 +189,10 @@ def chase_step(state: dict, width: float, rand) -> dict:
             s["gap"] = s["gap_t"] = LAND_GAP
             s["rx"] = s["jump_to"]
             s["jump"] = None
-            if s.get("mx") is None:               # the border event: Mario enters behind the coyote
-                s["mx"] = (width - MARGIN - s["mw"] / 2) if old_dir > 0 else (MARGIN + s["mw"] / 2)
-                s["mgap"] = 20.0
+            n = len(s["followers"])
+            if n < len(s["fw"]):                  # the border event: the NEXT follower joins the train
+                border = (width - MARGIN - s["fw"][n] / 2) if old_dir > 0 else (MARGIN + s["fw"][n] / 2)
+                s["followers"].append({"x": border, "gap": 20.0})
         else:
             s["jump"] = t
         return s
@@ -146,10 +211,14 @@ def chase_step(state: dict, width: float, rand) -> dict:
         s["jump_to"] = s["cx"] - s["dir"] * (spans + LAND_GAP)   # ...over the coyote, landing behind
         rx = s["jump_from"]
     s["rx"] = rx
-    if s.get("mx") is not None:                   # Mario tails the coyote at his own wandering gap
-        s["mgap"] = max(MARIO_GAP_LO, min(MARIO_GAP_HI, s["mgap"] + (rand() * 6.0 - 3.0)))
-        target = s["cx"] - s["dir"] * (s["cw"] / 2 + s["mw"] / 2 + s["mgap"])
-        s["mx"] += max(-MARIO_SPEED, min(MARIO_SPEED, target - s["mx"]))
+    # the train: each follower tails the one AHEAD of it at its own wandering gap
+    front_x, front_w = s["cx"], s["cw"]
+    for i, follower in enumerate(s["followers"]):
+        follower["gap"] = max(FOLLOWER_GAP_LO,
+                              min(FOLLOWER_GAP_HI, follower["gap"] + (rand() * 6.0 - 3.0)))
+        target = front_x - s["dir"] * (front_w / 2 + s["fw"][i] / 2 + follower["gap"])
+        follower["x"] += max(-FOLLOWER_SPEED, min(FOLLOWER_SPEED, target - follower["x"]))
+        front_x, front_w = follower["x"], s["fw"][i]
     return s
 
 
@@ -182,22 +251,22 @@ class ChaseBar(tk.Canvas):
         self._ticks = 0
         rw, _rh = sprite_size(ROADRUNNER)
         cw, _ch = sprite_size(COYOTE)
-        mw, _mh = sprite_size(MARIO)
         self._state = {"dir": 1, "cx": 120.0, "gap": 30.0, "gap_t": 30.0, "rx": 180.0,
-                       "rw": float(rw), "cw": float(cw), "mw": float(mw),
-                       "mx": None, "mgap": 20.0, "jump": None}
+                       "rw": float(rw), "cw": float(cw),
+                       "fw": [float(sprite_size(frames)[0]) for frames, _c in FOLLOWERS],
+                       "followers": [], "jump": None}
         # facing index 0 = right, 1 = left (mirrored pixel maps)
         self._rr_img = (_build_image(self, ROADRUNNER, _RR_COLORS, False),
                         _build_image(self, ROADRUNNER, _RR_COLORS, True))
         self._cy_img = (_build_image(self, COYOTE, _CY_COLORS, False),
                         _build_image(self, COYOTE, _CY_COLORS, True))
-        self._m_img = (_build_image(self, MARIO, _MARIO_COLORS, False),
-                       _build_image(self, MARIO, _MARIO_COLORS, True))
+        self._f_imgs = [(_build_image(self, frames, colors, False),
+                         _build_image(self, frames, colors, True)) for frames, colors in FOLLOWERS]
         self._ground_y = BAR_HEIGHT - 6
         self._fill = self.create_rectangle(0, BAR_HEIGHT - 4, 0, BAR_HEIGHT, width=0)
         self._ground = self.create_line(0, self._ground_y + 1, 4000, self._ground_y + 1)
-        self._m_item = self.create_image(-100, self._ground_y, anchor="s",   # under the coyote's z
-                                         image=self._m_img[0][0])
+        self._f_items = [self.create_image(-100, self._ground_y, anchor="s",   # under the coyote's z
+                                           image=pair[0][0]) for pair in self._f_imgs]
         self._cy_item = self.create_image(-100, self._ground_y, anchor="s",
                                           image=self._cy_img[0][0])
         self._rr_item = self.create_image(-100, self._ground_y, anchor="s",
@@ -227,18 +296,18 @@ class ChaseBar(tk.Canvas):
 
     def start(self, interval: int = 30) -> None:
         """Begin a FRESH chase (both modes; determinate keeps its real progress underline).
-        Mario waits for his border entrance again on every new run."""
+        The follower train waits for its border entrances again on every new run."""
         self._interval = max(25, int(interval))
         if self._job is None:
             self._state.update(cx=max(60.0, self.winfo_width() * 0.3 or 120.0),
-                               dir=1, jump=None, gap=30.0, gap_t=30.0, mx=None, mgap=20.0)
+                               dir=1, jump=None, gap=30.0, gap_t=30.0, followers=[])
             self._job = self.after(self._interval, self._tick)
 
     def stop(self) -> None:
         if self._job is not None:
             self.after_cancel(self._job)
             self._job = None
-        for item in (self._rr_item, self._cy_item, self._m_item):   # park the runners off-canvas
+        for item in (self._rr_item, self._cy_item, *self._f_items):  # park the runners off-canvas
             self.coords(item, -100, self._ground_y)
         self._value = 0.0
         self._draw_fill()
@@ -271,10 +340,10 @@ class ChaseBar(tk.Canvas):
             self.coords(self._rr_item, s["rx"], self._ground_y)
             self.itemconfigure(self._cy_item, image=self._cy_img[facing][frame])
             self.coords(self._cy_item, s["cx"], self._ground_y)
-        if s.get("mx") is not None:                # Mario tails the coyote (frozen while it skids)
-            self.itemconfigure(self._m_item,
-                               image=self._m_img[facing][0 if s["jump"] is not None else frame])
-            self.coords(self._m_item, s["mx"], self._ground_y)
+        for i, follower in enumerate(s["followers"]):   # the train (frozen while the coyote skids)
+            self.itemconfigure(self._f_items[i],
+                               image=self._f_imgs[i][facing][0 if s["jump"] is not None else frame])
+            self.coords(self._f_items[i], follower["x"], self._ground_y)
         self.tag_raise(self._rr_item)              # the bird passes OVER the coyote
         self._job = self.after(self._interval, self._tick)
 
