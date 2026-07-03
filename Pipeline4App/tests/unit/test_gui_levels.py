@@ -26,11 +26,12 @@ def test_save_and_load_log_levels():
     def body(d):
         with open(os.path.join(d, "app_config.yaml"), "w", encoding="utf-8") as h:
             h.write("# keep me\nuser_interface:\n  log_levels: [F, E, W, I, S, P, D]\n")
-        # the user unchecks everything toggleable, leaving only WARN (+ the forced FAIL/ERRR)
+        # the user unchecks everything toggleable, leaving only WARN (+ the forced UNHIDEABLE set)
         config.save_app_log_levels({"WARN"})
         shown = config.load_app_ui()["log_levels"]
-        ok({"FAIL", "ERRR", "WARN"} <= shown, "FAIL+ERRR forced, WARN kept")
-        ok("PASS" not in shown and "SKIP" not in shown and "INFO" not in shown, "the unchecked levels dropped")
+        ok({"FAIL", "ERRR", "INFO", "RSLT", "WARN"} <= shown,
+           "FAIL+ERRR+INFO+RSLT forced (greyed in the dropdown), WARN kept")
+        ok("PASS" not in shown and "SKIP" not in shown, "the unchecked toggleable levels dropped")
         text = open(os.path.join(d, "app_config.yaml"), encoding="utf-8").read()
         ok("# keep me" in text, "the file comment survived the round-trip")
         ok("log_levels" in text and "[" in text, "log_levels written in flow form")
@@ -41,8 +42,8 @@ def test_save_creates_file_when_absent():
     def body(_d):
         config.save_app_log_levels({"WARN", "INFO", "PASS", "SKIP", "DEBG"})
         shown = config.load_app_ui()["log_levels"]
-        eq(shown - {"PHASE"}, {"FAIL", "ERRR", "WARN", "INFO", "PASS", "SKIP", "DEBG"},
-           "all levels (forced FAIL/ERRR + the rest) written + read back")
+        eq(shown - {"PHASE"}, {"FAIL", "ERRR", "WARN", "INFO", "PASS", "SKIP", "RSLT", "DEBG"},
+           "all levels (the forced set + the rest) written + read back")
     _with_temp_builtin_ui(body)
 
 
@@ -65,8 +66,8 @@ def test_ui_prefs_are_app_scoped_not_project_scoped():
                 config.use_builtin()
             ui = config.load_app_ui()                     # what the NEXT LAUNCH reads (pre-auto_reopen)
             eq(ui["language"], "it", "the language toggle survives a restart")
-            eq(ui["log_levels"] - {"PHASE"}, {"FAIL", "ERRR", "WARN"},
-               "the levels toggle survives a restart")
+            eq(ui["log_levels"] - {"PHASE"}, {"FAIL", "ERRR", "INFO", "RSLT", "WARN"},
+               "the levels toggle survives a restart (+ the forced set)")
             with open(project_copy, encoding="utf-8") as h:
                 text = h.read()
             ok("language: en" in text and "[F, E, W, I, S, P, D]" in text,

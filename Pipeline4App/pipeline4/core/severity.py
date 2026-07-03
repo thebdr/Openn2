@@ -26,6 +26,9 @@ from __future__ import annotations
 
 LEVELS = ("FAIL", "ERRR", "WARN", "INFO", "SKIP", "PASS", "RSLT", "DEBG")
 HALTING = frozenset({"FAIL"})          # an effective-severity in here halts the pipeline
+# The levels the GUI can never hide (greyed + checked in the Levels dropdown; the saver always
+# includes them): the failures + the progress narrative (INFO) + the phase results (RSLT).
+UNHIDEABLE = frozenset({"FAIL", "ERRR", "INFO", "RSLT"})
 BANNER = "PHASE"                        # a section header, not a finding (always shown)
 HEADER = "HEAD"                         # the per-group column-header log line (chrome, always shown)
 DEFAULT_HIDDEN = frozenset({"DEBG"})   # hidden unless explicitly listed

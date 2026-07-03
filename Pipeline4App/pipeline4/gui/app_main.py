@@ -65,7 +65,7 @@ class App:
         self._levels_mb = ttk.Menubutton(toolbar, text=i18n.tr("tb_levels", self.lang) + " ▾")
         levels_menu = tk.Menu(self._levels_mb, tearoff=0)
         for level in severity.LEVELS:             # FAIL, ERRR, WARN, INFO, SKIP, PASS, DEBG
-            forced = level in ("FAIL", "ERRR")   # always shown, greyed out (can't be disabled)
+            forced = level in severity.UNHIDEABLE   # always shown, greyed out (cannot be disabled)
             var = tk.BooleanVar(value=forced or level in shown0)
             self._level_vars[level] = var
             levels_menu.add_checkbutton(label=level, variable=var, command=self._on_levels_changed,
