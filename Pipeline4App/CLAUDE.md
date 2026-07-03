@@ -736,9 +736,11 @@ written, so an escalated WARN is shown but no misleading `nothing written` halt 
 registry-driven bar, the structured-record clickable log, the Files tab, threading → later.)
 - **Severity taxonomy + the GUI log-level filter.** `core/severity.py` is the single source of the level set -
   ALL levels are FOUR-LETTER codes (production-test decision, the `[XXXX]` column is always 4 chars):
-  **FAIL** (halts), **ERRR** (skip the item, continue), **WARN**, **INFO**, **SKIP**, **PASS**, **DEBG**
+  **FAIL** (halts), **ERRR** (skip the item, continue), **WARN**, **INFO**, **SKIP**, **PASS**, **RSLT**
+  (the phase's ENDING-SUMMARY line, own cyan-bold colour - a LOG level, never a finding/treatment target;
+  a NORMAL Levels-dropdown toggle, the yaml wins - every handler's outcome line emits it), **DEBG**
   (dev-only, hidden by default) + the **PHASE** banner and the **HEAD** column-header line (chrome, always
-  shown). Each level has a distinct first char (F E W I S P D), so config lists/registries can use single
+  shown). Each level has a distinct first char (F E W I S P R D), so config lists/registries can use single
   chars, the 4-letter codes, or legacy full names (`ERROR`/`DEBUG` resolve unchanged) interchangeably
   (`severity.resolve`/`resolve_set`).
 - **THE SEVERITY CONTRACT (production-test decision, 2026-07-03): FAIL ALWAYS HALTS THE PIPELINE.**

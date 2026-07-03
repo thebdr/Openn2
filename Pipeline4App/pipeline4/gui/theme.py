@@ -37,7 +37,7 @@ BUTTON_FG = {"run": "#ffffff", "phase": "#2d3436", "action": "#2d3436",
 LOG_COLORS = {"PHASE": ("#74b9ff", True), "SUBPHASE": ("#74b9ff", False), "HEAD": ("#8f9ba2", True),
               "FAIL": ("#ff6b6b", True), "ERRR": ("#e17055", True), "WARN": ("#fdcb6e", False),
               "PASS": ("#55efc4", False), "INFO": ("#dfe6e9", False), "SKIP": ("#b2bec3", False),
-              "DEBG": ("#a29bfe", False)}
+              "RSLT": ("#00d2d3", True), "DEBG": ("#a29bfe", False)}
 
 # Light-mode log colours: same semantic palette but adjusted for a white background (WARN goes orange —
 # yellow is invisible on white; INFO goes near-black instead of near-white).
@@ -45,7 +45,7 @@ LOG_COLORS_LIGHT = {
     "PHASE": ("#0984e3", True), "SUBPHASE": ("#0984e3", False), "HEAD": ("#7c8a91", True),
     "FAIL": ("#d63031", True), "ERRR": ("#e17055", True), "WARN": ("#e67e22", False),
     "PASS": ("#00b894", False), "INFO": ("#2d3436", False), "SKIP": ("#636e72", False),
-    "DEBG": ("#6c5ce7", False),
+    "RSLT": ("#0097a7", True), "DEBG": ("#6c5ce7", False),
 }
 
 DARK_BG = "#1e1e1e"

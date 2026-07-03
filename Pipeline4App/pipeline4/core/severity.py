@@ -10,10 +10,13 @@ exactly 4 chars wide). Ordered most -> least severe:
   INFO - progress / status; no action.
   SKIP - a deliberate, documented non-action (a rule-excluded row, an N/A check, an acknowledged finding).
   PASS - explicit success (a validation passed).
+  RSLT - a phase's ENDING SUMMARY line (counts/outcome -> target) - a LOG level with its own colour
+         (user spec); no FINDING ever carries it and it is never a treatment target. Shown by default;
+         a normal Levels-dropdown toggle (the yaml wins - not code-forced).
   DEBG - developer-only diagnostics; hidden from the operator by default.
 
-A level is identified by its FIRST CHARACTER (all distinct: F E W I S P D), so a config list may use
-single chars (`[F, E, W, S, P, D]`), the 4-letter codes, OR legacy full names (`ERROR`, `DEBUG` - old
+A level is identified by its FIRST CHARACTER (all distinct: F E W I S P R D), so a config list may use
+single chars (`[F, E, W, S, P, R, D]`), the 4-letter codes, OR legacy full names (`ERROR`, `DEBUG` - old
 configs/registries resolve unchanged) interchangeably. `PHASE` is a SECTION BANNER and `HEAD` the
 column-header line - chrome, not finding levels; always shown, never treatment targets. The treatment
 registry (error_management.csv) can later RECLASSIFY a finding's effective severity per uid (incl.
@@ -21,7 +24,7 @@ escalating to FAIL) - that builds on this taxonomy.
 """
 from __future__ import annotations
 
-LEVELS = ("FAIL", "ERRR", "WARN", "INFO", "SKIP", "PASS", "DEBG")
+LEVELS = ("FAIL", "ERRR", "WARN", "INFO", "SKIP", "PASS", "RSLT", "DEBG")
 HALTING = frozenset({"FAIL"})          # an effective-severity in here halts the pipeline
 BANNER = "PHASE"                        # a section header, not a finding (always shown)
 HEADER = "HEAD"                         # the per-group column-header log line (chrome, always shown)

@@ -255,7 +255,7 @@ class App:
                 self._emit("FAIL", f"  Run Pipeline halted at {number} {name} - "
                                    f"{len(order) - i} remaining phases skipped")
                 return
-        self._emit("PASS", "  Run Pipeline complete")
+        self._emit("RSLT", "  Run Pipeline complete")
 
     # --- sub-phase + open dispatch (the chevron dropdown buttons) -------------------------------- #
     def _sub_command(self, phase, sub):
@@ -690,7 +690,7 @@ class App:
                 self._emit("FAIL", "  100: FAIL findings in the documents - the pipeline HALTS here "
                                    "(the reports are written; fix the documents before building)")
             c = res["counts"]
-            self._emit("PASS", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERRR', 0)} ERRR, "
+            self._emit("RSLT", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERRR', 0)} ERRR, "
                                f"{c.get('WARN', 0)} WARN, {c.get('PASS', 0)} PASS, {c.get('SKIP', 0)} SKIP "
                                f"-> {res['dir']}")
             return
@@ -712,7 +712,7 @@ class App:
         issues = [f for f in findings if f.severity in ("FAIL", "ERRR", "WARN")]
         self._render(findings, label=str(only))         # the FULL sub-phase log (all levels, elide-filtered)
         n_pass = sum(1 for f in findings if f.severity == "PASS")
-        self._emit("PASS", f"  {only}: {len(issues)} issues + {n_pass} PASS "
+        self._emit("RSLT", f"  {only}: {len(issues)} issues + {n_pass} PASS "
                            f"(log only; the 100 header writes the reports)")
 
     def _run_change_report(self):
@@ -727,7 +727,7 @@ class App:
         res = changes_run.run_change_report()
         iol = res["result"].get("iolist", {})
         if iol.get("available"):
-            self._emit("PASS", f"  IoList: {iol['intact']} intact, {iol['correction_count']} corrections "
+            self._emit("RSLT", f"  IoList: {iol['intact']} intact, {iol['correction_count']} corrections "
                                f"({len(iol['regressions'])} value-loss), {iol['upgrade_rows']} upgrade rows, "
                                f"{len(iol['removed'])} removed -> {os.path.basename(res['paths']['html'])}")
         else:
@@ -755,7 +755,7 @@ class App:
         if not self._gate(res["findings"], label=label):
             return
         backup = f"  (backup {os.path.basename(res['backup'])})" if res["backup"] else "  (no change)"
-        self._emit("PASS", f"  filled {res['filled']} script type(s), {res['index']} index, {res['diag']} "
+        self._emit("RSLT", f"  filled {res['filled']} script type(s), {res['index']} index, {res['diag']} "
                            f"diag; {res['mismatch']} kept (Mode-2); {res['unresolved']} unresolved -> "
                            f"{os.path.basename(res['output_path'])}{backup}")
 
@@ -779,7 +779,7 @@ class App:
             return
         signals = database["signals"]
         suffix = "  (I/O List only - run 320 for the C&E)" if only == 310 else ""
-        self._emit("PASS", f"  staged {len(signals)} signals{suffix} "
+        self._emit("RSLT", f"  staged {len(signals)} signals{suffix} "
                            f"-> {os.path.join(config.database_dir(), 'signals.csv')}")
 
     def _run_data_blocks(self, only=None):
@@ -803,16 +803,16 @@ class App:
             return
         if only in (None, 520):
             n_dbs, n_members = len(database["db_blocks"]), len(database["db_members"])
-            self._emit("PASS", f"  {n_members} db_members across {n_dbs} DBs (+ {len(database['instance_dbs'])} "
+            self._emit("RSLT", f"  {n_members} db_members across {n_dbs} DBs (+ {len(database['instance_dbs'])} "
                                f"instance DBs) -> {os.path.join(config.database_dir(), 'db_members.csv')}")
             count = datablock_xml.project(database)
-            self._emit("PASS", f"  projected {count} GlobalDB XMLs -> {config.blocks_import_dir()}")
+            self._emit("RSLT", f"  projected {count} GlobalDB XMLs -> {config.blocks_import_dir()}")
         if only in (None, 510):
             self._status("I/O tags…")
             database, iface_findings = interfaces.build_interfaces(database)
             res = io_tags.project(database)
             self._render(iface_findings + res["findings"], label="510 I/O tags")
-            self._emit("PASS", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
+            self._emit("RSLT", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
                                f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {config.io_tags_dir()}")
 
     def _run_interfaces(self, only=None):
@@ -835,13 +835,13 @@ class App:
         self._render(iface_findings, label="400 interfaces")
         result = interface_xlsx.project(database)
         n_if, n_el = len(database["interfaces"]), len(database["interface_elements"])
-        self._emit("PASS", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "
+        self._emit("RSLT", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "
                            f"IF_*.xlsx in {config.interfaces_dir()}")
         from pipeline4.domain import interface_scl
         scl = interface_scl.project(database)
         self._render(scl["findings"], label="430 MachineInterfaces SCL")
         if scl["path"]:
-            self._emit("PASS", f"  MachineInterfaces SCL: {scl['assignments']} assignments across "
+            self._emit("RSLT", f"  MachineInterfaces SCL: {scl['assignments']} assignments across "
                                f"{scl['interfaces']} interfaces -> {scl['path']}")
         params = config.load_params()
         if config.get_param(params, "iolist_params.insert_interface_sheets", False):
@@ -878,9 +878,9 @@ class App:
             scl = diagnosis_scl.project(database); rendered += scl["findings"]
         self._render(rendered, label="600 diagnosis")
         if res is not None:
-            self._emit("PASS", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> {config.diaglist_dir()}")
+            self._emit("RSLT", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> {config.diaglist_dir()}")
         if scl is not None and scl["path"]:
-            self._emit("PASS", f"  620 OPC SCL: {scl['entries']} entries across {scl['cabinets']} cabinets -> {scl['path']}")
+            self._emit("RSLT", f"  620 OPC SCL: {scl['entries']} entries across {scl['cabinets']} cabinets -> {scl['path']}")
 
     def _run_hardware(self, only=None):
         """Phase 700: stage -> hardware.build -> hardware_csv.project (format-2 Stations.csv + Modules.csv).
@@ -901,7 +901,7 @@ class App:
             self._emit("WARN", "  700 produced no tables (a blocking finding) - nothing further")
             return
         res = hardware_csv.project(database)
-        self._emit("PASS", f"  700: {res['stations']} stations + {res['modules']} modules -> {config.hardware_dir()}")
+        self._emit("RSLT", f"  700: {res['stations']} stations + {res['modules']} modules -> {config.hardware_dir()}")
 
     def _run_software(self, only=None):
         """Phase 800: stage -> 520 -> engine.build. only=820 projects the CreationInfo CSVs + the 03 FC
@@ -931,10 +931,10 @@ class App:
             inst = engine.write_instance_dbs(database)
         self._render(rendered, label="800 software")
         if res is not None:
-            self._emit("PASS", f"  820: {len(database['software_blocks'])} blocks -> {res['count']} "
+            self._emit("RSLT", f"  820: {len(database['software_blocks'])} blocks -> {res['count']} "
                                f"CreationInfo CSVs + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
         if inst is not None:
-            self._emit("PASS", f"  830 InstanceDBs: {inst['count']} instance DBs -> {inst['path']}")
+            self._emit("RSLT", f"  830 InstanceDBs: {inst['count']} instance DBs -> {inst['path']}")
 
     def _run_reporting(self, only=None):
         """Phase 900: build the full SSOT (stage -> 520 -> 700; then the WARN-only 400/600/800) then
@@ -967,7 +967,7 @@ class App:
         res = coverage.project(database)
         self._render(proj, label="900 coverage")
         st = res["stats"]
-        self._emit("PASS", f"  910 coverage: {st['rows']} rows (sig {st['kinds']['signal']}/"
+        self._emit("RSLT", f"  910 coverage: {st['rows']} rows (sig {st['kinds']['signal']}/"
                            f"chan {st['kinds']['channel']}/struct {st['kinds']['structural']}), "
                            f"{st['orphans']} ORPHAN, {st['unplaced']} UNPLACED -> {res['txt']}")
 

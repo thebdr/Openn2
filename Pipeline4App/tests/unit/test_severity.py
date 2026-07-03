@@ -5,12 +5,12 @@ from pipeline4.core import config, severity
 
 
 def test_levels_set():
-    eq(severity.LEVELS, ("FAIL", "ERRR", "WARN", "INFO", "SKIP", "PASS", "DEBG"), "the 7 finding levels")
+    eq(severity.LEVELS, ("FAIL", "ERRR", "WARN", "INFO", "SKIP", "PASS", "RSLT", "DEBG"), "the 8 log levels (RSLT = the phase-result line)")
     ok("DEBG" in severity.LEVELS, "DEBG was added")
     ok("FAIL" in severity.HALTING and "ERRR" not in severity.HALTING, "FAIL halts; ERRR does not")
     eq(severity.BANNER, "PHASE", "PHASE is the banner, not a finding level")
     # every finding level has a distinct first char (so first-char parsing is unambiguous)
-    eq(len({lvl[0] for lvl in severity.LEVELS}), len(severity.LEVELS), "distinct first chars F E W I S P D")
+    eq(len({lvl[0] for lvl in severity.LEVELS}), len(severity.LEVELS), "distinct first chars F E W I S P R D")
 
 
 def test_resolve_first_char_or_full():
@@ -33,7 +33,7 @@ def test_resolve_set_includes_banner():
 def test_default_shown_hides_debug():
     d = severity.default_shown()
     ok("DEBG" not in d, "DEBG hidden by default (no config)")
-    for lvl in ("FAIL", "ERRR", "WARN", "INFO", "SKIP", "PASS", "PHASE"):
+    for lvl in ("FAIL", "ERRR", "WARN", "INFO", "SKIP", "PASS", "RSLT", "PHASE"):
         ok(lvl in d, f"{lvl} shown by default")
 
 
