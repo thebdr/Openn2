@@ -533,7 +533,9 @@ text is ported verbatim into each finding's `detail`.
   workbook via `matrix_params` + `build_ce_index`) · **`crosscheck.py`**: **130 (CEM->IOL)** runs each C&E ref
   through TWO independent searches (by I/O ADDRESS + by FLD) -> `cem_addr_ok`/`cem_addr_fld`/`cem_addr_none` +
   `cem_fld_ok`/`cem_fld_addr`/`cem_fld_none` (each FAIL carries the aligned `Cmp` + the matched I/O cell as the
-  dual-link); **140 (IOL->CEM)** the decision tree (typed & `ce_mandatory` yes/warn -> CHECK [yes=FAIL/warn=WARN];
+  dual-link). **Production-test deviation (user, 2026-07-03): a ref flagged `cem_addr_fld` SUPPRESSES its own
+  `cem_fld_none`** ("address found under a different FLD" already says the FLD isn't there - the second FAIL was
+  redundant on the same row); **140 (IOL->CEM)** the decision tree (typed & `ce_mandatory` yes/warn -> CHECK [yes=FAIL/warn=WARN];
   typed no/unset -> `iol_cem_not_required` SKIP; untyped: a `bypass_words` hit -> SKIP, a safety/`full_check` match
   -> CHECK, else `iol_cem_unclassified`/`iol_cem_skipped` SKIP) -> `iol_cem_match`/`_missing_*`/`_fld_only`/
   `_addr_only` with the Cmp + dual-link. Reads the `type` object cell (PL3's `_type`) + the nested
@@ -546,9 +548,16 @@ text is ported verbatim into each finding's `detail`.
   `validation_issues` (PASS/INFO/SKIP are report-only noise) + saves, applies the treatment registry READ-ONLY
   for the report's EFFECTIVE severity, interleaves a per-(sub)phase banner, and writes the **4 report files**
   (`documents_validation_report`/`_errors` x `.txt`/`.html`) to `config.validation_report_dir()`. NEVER halts.
-  The GUI **"100" button** (`_run_validation`: stage -> run_validation -> `run.render` the ISSUES to the GUI log
-  [reconcile + write the registry; never halts] -> a summary). Tests: `test_validation_phase.py` (1, hermetic:
-  the banner interleaving + the 4 files + treatable-only recording). **PARITY (the real bar - the report is
+  The GUI **"100" button** (`_run_validation`: stage -> run_validation -> the FULL banner-interleaved `items`
+  render to the GUI log via `render.render_records` [EVERY level - the Levels dropdown elide-filters the view;
+  the tee gets it all] + `treatments.apply_and_reconcile` over the issues [registry maintenance; never halts]
+  -> a summary; the `only=` sub-runs render their full finding list too). **Production-test log refresh (user,
+  2026-07-03):** the 110/120/130/140 banners render in the GUI as the SMALLER **SUBPHASE** style (phase blue,
+  normal weight, 1pt smaller, `-` underline vs the bold main PHASE header); a cross-check line's aligned
+  `<caller> op <other>` comparisons render IN the bit+FLD info columns (no longer duplicated before the detail),
+  with `RenderRec.marks` styling them - `===` whole-comparison NEUTRAL grey (`cmpeq`), `=/=` the DIFFERING
+  chars underlined (`cmpdiff`) - in both the LogView and the HTML reports. Tests: `test_validation_phase.py`
+  (1, hermetic: the banner interleaving + the 4 files + treatable-only recording). **PARITY (the real bar - the report is
   documentation, NOT byte-parity): the PL4 finding set == PL3's, EXACTLY.** Over the same real documents (the
   Passing fixtures), PL4 produced **596 findings and PL3 produced 596, with 0 differences** in the tuple
   `(phase, type, norm(location), norm(detail))` across all 4 validators (`scratchpad/parity_100.py`; PL3 is fed

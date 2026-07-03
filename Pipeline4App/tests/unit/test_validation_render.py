@@ -49,11 +49,30 @@ def test_crosscheck_cmp_and_dual_link():
     recs = render.render_records([f])
     rec = recs[0]
     ok("CE!F5 vs IO!G9" in rec.text, "the dual location column")
-    ok("I0.0 === I0.0 | S1 =/= S2 :: device mismatch" in rec.text, "the aligned Cmp body before the detail")
+    # the comparisons render IN the bit + FLD info columns (not duplicated before the detail)
+    ok("| I0.0 === I0.0 | S1 =/= S2" in rec.text, "the aligned comparisons live in the info columns")
+    ok(rec.text.endswith(":: device mismatch"), "the detail carries no duplicated Cmp body")
     eq(len(rec.links), 2, "two clickable link spans (loc1, loc2)")
     eq([(rec.text[s.start:s.end], s.doc) for s in sorted(rec.links, key=lambda s: s.start)],
        [("CE!F5", "ce.xlsx"), ("IO!G9", "io.xlsx")], "each span covers its cell + carries its workbook")
     eq(rec.uid, f.uid, "a FAIL line carries the finding uid")
+    # the marks: an === comparison is ONE neutral span over the whole bit cell; a =/= comparison
+    # underlines the differing chars on both sides (here '1' vs '2', one char each side)
+    eqs = [m for m in rec.marks if m.style == "cmp_eq"]
+    diffs = [m for m in rec.marks if m.style == "cmp_diff"]
+    eq(len(eqs), 1, "one neutral span for the === comparison")
+    eq(rec.text[eqs[0].start:eqs[0].end], "I0.0 === I0.0", "the neutral span covers the whole comparison")
+    eq([rec.text[m.start:m.end] for m in diffs], ["1", "2"], "the =/= underline marks the differing chars")
+    html = render.render_html([f])
+    ok('<span class="cmpeq">I0.0 === I0.0</span>' in html, "the HTML report styles the === neutrally")
+    ok('<span class="cmpdiff">1</span>' in html and '<span class="cmpdiff">2</span>' in html,
+       "the HTML report underlines the =/= diff chars")
+
+
+def test_cmp_diff_runs():
+    eq(render._char_diff_runs("ABC", "ABC"), [], "identical -> no runs")
+    eq(render._char_diff_runs("ABCD", "AXCY"), [(1, 2), (3, 4)], "two isolated diffs -> two runs")
+    eq(render._char_diff_runs("AB", "ABCD"), [(2, 4)], "the longer tail counts as different")
 
 
 def test_errors_only_filter():
@@ -87,6 +106,7 @@ if __name__ == "__main__":
         ("banner_lines_and_render", test_banner_lines_and_render),
         ("info_block_columns", test_info_block_columns),
         ("crosscheck_cmp_and_dual_link", test_crosscheck_cmp_and_dual_link),
+        ("cmp_diff_runs", test_cmp_diff_runs),
         ("errors_only_filter", test_errors_only_filter),
         ("reports_and_html", test_reports_and_html),
     ]))

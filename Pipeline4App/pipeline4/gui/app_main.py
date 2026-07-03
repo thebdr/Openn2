@@ -654,12 +654,16 @@ class App:
         from pipeline4.domain import staging
         from pipeline4.domain.validation import crosscheck, iolist, matrix, messages, phase as validation
         if only is None:
+            from pipeline4.io import render as iorender
             self._emit("PHASE", f"100 {i18n.tr('ph_validation', self.lang)}  (110 + 120 + 130 + 140)")
             self._status("validation…")
             database, _sf = staging.stage()
             res = validation.run_validation(database, lang=self.lang)
             issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERROR", "WARN")]
-            self._render(issues)
+            treatments.apply_and_reconcile(issues)      # registry maintenance (the records come from items)
+            # the FULL report to the log - every level + the 110/120/130/140 sub-phase banners (the Levels
+            # dropdown filters the view; a hidden level is elided, not dropped, and still reaches the tee).
+            self._q.put(("records", iorender.render_records(res["items"])))
             c = res["counts"]
             self._emit("PASS", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERROR', 0)} ERROR, "
                                f"{c.get('WARN', 0)} WARN, {c.get('PASS', 0)} PASS, {c.get('SKIP', 0)} SKIP "
@@ -678,7 +682,7 @@ class App:
                 runner = crosscheck.run_xcheck_cem_iol if only == 130 else crosscheck.run_xcheck_iol_cem
                 findings = runner(database, params)
         issues = [f for f in findings if f.severity in ("FAIL", "ERROR", "WARN")]
-        self._render(issues)
+        self._render(findings)                          # the FULL sub-phase log (all levels, elide-filtered)
         n_pass = sum(1 for f in findings if f.severity == "PASS")
         self._emit("PASS", f"  {only}: {len(issues)} issues + {n_pass} PASS "
                            f"(log only; the 100 header writes the reports)")

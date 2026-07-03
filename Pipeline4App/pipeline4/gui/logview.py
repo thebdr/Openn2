@@ -14,12 +14,11 @@ import tkinter as tk
 from tkinter import ttk
 
 from pipeline4.gui import theme
-from pipeline4.io.render import banner_lines
 
 _ACCENT_DARK = theme.LOG_COLORS["PHASE"][0]        # clickable-link colour in dark mode
 _ACCENT = _ACCENT_DARK                            # module-level default (dark)
 _TREATABLE = ("FAIL", "ERROR", "WARN")
-_ALWAYS_SHOWN = ("PHASE", "FAIL", "ERROR")        # never hideable from the GUI (banners + the failures)
+_ALWAYS_SHOWN = ("PHASE", "SUBPHASE", "FAIL", "ERROR")  # never hideable (banners + the failures)
 
 
 class LogView(ttk.Frame):
@@ -48,8 +47,11 @@ class LogView(ttk.Frame):
         self.grid_columnconfigure(0, weight=1)
 
         for level, (color, bold) in theme.LOG_COLORS.items():
-            self.text.tag_configure(level, foreground=color,
-                                    font=(self._family, self._size, "bold" if bold else "normal"))
+            self.text.tag_configure(level, foreground=color, font=self._tag_font(level, bold))
+        # the cross-check comparison marks - configured AFTER the level tags so they take priority:
+        # an === comparison goes neutral grey; a =/= comparison underlines its differing chars.
+        self.text.tag_configure("cmpeq", foreground=theme.LOG_COLORS["SKIP"][0])
+        self.text.tag_configure("cmpdiff", underline=True)
         self.text.tag_configure("errlink", underline=True)
         self.text.tag_bind("errlink", "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
         self.text.tag_bind("errlink", "<Leave>", lambda _e: self.text.configure(cursor=""))
@@ -68,22 +70,24 @@ class LogView(ttk.Frame):
         self.text.configure(state="disabled")
         self._tee(f"[{level}] {message}")
 
-    def _phase_gap(self) -> None:
-        """Two blank lines (2 CRLF) before a blue PHASE banner/title, so each phase block gets breathing
-        room. Skipped at the very top of the log (no leading gap)."""
+    def _phase_gap(self, lines: int = 2) -> None:
+        """Blank line(s) before a banner/title, so each section gets breathing room (2 before a main
+        PHASE header, 1 before a smaller sub-phase header). Skipped at the very top of the log."""
         if self.text.compare("end-1c", ">", "1.0"):
-            self.text.insert("end", "\n\n")
+            self.text.insert("end", "\n" * lines)
 
     def append_records(self, records) -> None:
-        """Append structured records (`io.render.render_records`): banners, level-coloured finding lines,
-        clickable `Sheet!Cell` link spans, and a treatable line's errlink."""
+        """Append structured records (`io.render.render_records`): sub-phase banners (the SMALLER
+        SUBPHASE header - the main phase header arrives via `append('PHASE', …)`), level-coloured
+        finding lines, clickable `Sheet!Cell` link spans, a treatable line's errlink, and the
+        cross-check comparison marks (=== neutral / =/= diff-chars underlined)."""
         self.text.configure(state="normal")
         for rec in records:
-            if rec.kind == "banner":
-                self._phase_gap()                       # 2 CRLF before the blue title
-                for line in banner_lines(rec.text)[1:]:  # drop banner_lines' own leading blank; the gap owns it
-                    self.text.insert("end", line + "\n", "PHASE")
-                    self._tee(line)
+            if rec.kind == "banner":                    # a sub-phase section header (110/120/130/140)
+                self._phase_gap(1)
+                self.text.insert("end", rec.text + "\n", "SUBPHASE")
+                self.text.insert("end", "-" * max(8, len(rec.text)) + "\n", "SUBPHASE")
+                self._tee(rec.text)
                 continue
             start = self.text.index("end-1c")
             tag = rec.level if rec.level in theme.LOG_COLORS else "INFO"
@@ -91,6 +95,9 @@ class LogView(ttk.Frame):
             self._tag_errlink(start, rec)
             for span in rec.links:
                 self._tag_link_span(start, span)
+            for mark in getattr(rec, "marks", ()):
+                self.text.tag_add("cmpeq" if mark.style == "cmp_eq" else "cmpdiff",
+                                  f"{start}+{mark.start}c", f"{start}+{mark.end}c")
             self._tee(rec.text)
         self.text.see("end")
         self.text.configure(state="disabled")
@@ -117,6 +124,12 @@ class LogView(ttk.Frame):
         self.shown_levels = set(levels) | set(_ALWAYS_SHOWN)
         self._apply_elide()
 
+    def _tag_font(self, level: str, bold: bool) -> tuple:
+        """A level tag's font: the log family/size, bold per the palette - except SUBPHASE, which renders
+        one point SMALLER (the sub-phase header sits visually under the bold main PHASE header)."""
+        size = max(8, self._size - 1) if level == "SUBPHASE" else self._size
+        return (self._family, size, "bold" if bold else "normal")
+
     def set_theme(self, mode: str) -> None:
         """Re-theme the log pane for a light/dark mode switch: background, foreground, all level tag
         colours, and the link accent colour. New content after this call uses the new palette; existing
@@ -125,9 +138,10 @@ class LogView(ttk.Frame):
         bg = theme.bg_for(mode)
         fg = theme.fg_for(mode)
         self.text.configure(background=bg, foreground=fg, insertbackground=fg)
-        for level, (color, bold) in theme.log_colors_for(mode).items():
-            self.text.tag_configure(level, foreground=color,
-                                    font=(self._family, self._size, "bold" if bold else "normal"))
+        palette = theme.log_colors_for(mode)
+        for level, (color, bold) in palette.items():
+            self.text.tag_configure(level, foreground=color, font=self._tag_font(level, bold))
+        self.text.tag_configure("cmpeq", foreground=palette["SKIP"][0])
 
     def set_font_size(self, size: int) -> None:
         """Resize the log font live (the Text body + every level tag, preserving each tag's bold). The
@@ -136,7 +150,7 @@ class LogView(ttk.Frame):
         self._size = int(size)
         self.text.configure(font=(self._family, self._size))
         for level, (_color, bold) in theme.LOG_COLORS.items():
-            self.text.tag_configure(level, font=(self._family, self._size, "bold" if bold else "normal"))
+            self.text.tag_configure(level, font=self._tag_font(level, bold))
 
     def _apply_elide(self) -> None:
         for level in theme.LOG_COLORS:

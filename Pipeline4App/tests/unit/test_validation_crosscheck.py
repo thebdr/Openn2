@@ -70,17 +70,22 @@ def test_ce_match_states():
 def test_xcheck_cem_iol():
     db = _signals([{"functional_unit": "S1", "location": "L1", "device": "D1", "bit": "I0.0", "source_cell": "IO!5"}])
     refs = [_ref("S1", "L1", "D1", "I0.0", "CE!F6"),    # matches -> cem_addr_ok + cem_fld_ok
-            _ref("XX", "", "", "I0.0", "CE!F7"),        # addr there under a DIFFERENT FLD -> cem_addr_fld + cem_fld_none
+            _ref("XX", "", "", "I0.0", "CE!F7"),        # addr there under a DIFFERENT FLD -> cem_addr_fld ONLY
             _ref("ZZ", "", "", "Q9.9", "CE!F8"),        # neither addr nor FLD present -> cem_addr_none + cem_fld_none
             _ref("", "", "", "I1.0", "CE!F9")]          # no device designation -> cem_ref_empty
     restore = _patch_refs(refs)
     try:
-        found = _types(crosscheck.run_xcheck_cem_iol(db, _PARAMS))
+        findings = crosscheck.run_xcheck_cem_iol(db, _PARAMS)
     finally:
         restore()
+    found = _types(findings)
     for expect in [("cem_addr_ok", "PASS"), ("cem_fld_ok", "PASS"), ("cem_addr_fld", "FAIL"),
                    ("cem_fld_none", "FAIL"), ("cem_addr_none", "FAIL"), ("cem_ref_empty", "FAIL")]:
         ok(expect in found, f"expected {expect}")
+    # a cem_addr_fld ref does NOT also emit cem_fld_none (redundant - the address search already says
+    # "found under a different FLD"); the only cem_fld_none is the F8 both-missing ref.
+    fld_none = [f for f in findings if f.type == "cem_fld_none"]
+    eq([f.location for f in fld_none], ["CE!F8"], "cem_fld_none suppressed on a cem_addr_fld row")
 
 
 # --- 140 IOL -> CEM (the decision tree) -------------------------------------------------------- #

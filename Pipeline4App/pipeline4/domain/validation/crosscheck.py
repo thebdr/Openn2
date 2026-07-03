@@ -57,6 +57,7 @@ def run_xcheck_cem_iol(database, params) -> list:
         # SEARCH BY I/O ADDRESS: PASS if the address is in the I/O List under a MATCHING FLD; FAIL if it's
         # there under a DIFFERENT FLD; FAIL if the address isn't there at all.
         ah = io_addr.get(ref["addr"])
+        addr_under_other_fld = False
         if ah is None:
             out.append(vm.entry("FAIL", 130, "cem_addr_none", location=ref["loc"], doc=ce_doc,
                                 location2=_IO_LABEL, doc2=io_doc, info=info))
@@ -64,17 +65,21 @@ def run_xcheck_cem_iol(database, params) -> list:
             out.append(vm.entry("PASS", 130, "cem_addr_ok", location=ref["loc"], doc=ce_doc,
                                 location2=ah["source_cell"], doc2=io_doc, info=info))
         else:
+            addr_under_other_fld = True
             io_flds = ", ".join(sorted(ah["raw_fld"].values())) or "(none)"
             cmp = vm.cmp_detail(ref["raw_addr"], ref["raw_addr"], ref["raw_fld"], io_flds, addr_eq=True, fld_eq=False)
             out.append(vm.entry("FAIL", 130, "cem_addr_fld", location=ref["loc"], doc=ce_doc,
                                 location2=ah["source_cell"], doc2=io_doc, info=info, cmp=cmp))
 
         # SEARCH BY FLD: PASS if the FLD is in the I/O List at a MATCHING address; FAIL if it's there at a
-        # DIFFERENT address; FAIL if the FLD isn't there at all.
+        # DIFFERENT address; FAIL if the FLD isn't there at all - UNLESS the address search already flagged
+        # this ref (cem_addr_fld says "found under a different FLD"; a cem_fld_none on the same row would
+        # restate it - user decision: redundant, suppressed).
         fh = io_fld.get(ref["key"])
         if fh is None:
-            out.append(vm.entry("FAIL", 130, "cem_fld_none", location=ref["loc"], doc=ce_doc,
-                                location2=_IO_LABEL, doc2=io_doc, info=info))
+            if not addr_under_other_fld:
+                out.append(vm.entry("FAIL", 130, "cem_fld_none", location=ref["loc"], doc=ce_doc,
+                                    location2=_IO_LABEL, doc2=io_doc, info=info))
         elif ref["addr"] in fh["addrs"]:
             out.append(vm.entry("PASS", 130, "cem_fld_ok", location=ref["loc"], doc=ce_doc,
                                 location2=fh["source_cell"], doc2=io_doc, info=info))

@@ -36,7 +36,8 @@ def run_validation(database=None, params: dict | None = None, out_dir: str | Non
     when None; 110/120 read the raw workbooks from `params`. The finding detail + the banners + the report
     chrome are built in `lang` (the operator's language - this IS the point of i18n; default `en` keeps the
     parity oracle English). Records the treatable findings + saves, writes the 4 reports. Returns
-    {'findings','applied','paths','counts','dir'}."""
+    {'findings','applied','items','paths','counts','dir'} - `items` is the banner-interleaved
+    effective-severity sequence the reports render (the GUI log renders the SAME items)."""
     params = params or config.load_params()
     if database is None:
         database, _staging_findings = staging.stage(params)
@@ -77,4 +78,5 @@ def run_validation(database=None, params: dict | None = None, out_dir: str | Non
     counts: dict = {}
     for _f, eff in applied:
         counts[eff] = counts.get(eff, 0) + 1
-    return {"findings": findings, "applied": applied, "paths": paths, "counts": counts, "dir": out_dir}
+    return {"findings": findings, "applied": applied, "items": items, "paths": paths,
+            "counts": counts, "dir": out_dir}
