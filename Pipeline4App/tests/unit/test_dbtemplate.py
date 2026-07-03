@@ -97,6 +97,21 @@ def test_for_each_unique_pipe_split():
        "a |-multi-valued cell is split; duplicates across rows collapse")
 
 
+def test_for_each_unique_list_cell_flattens():
+    # a JSON LIST cell (e.g. the staged matrix_areas) yields one candidate per ITEM - the
+    # 02_COM/05_EM_STATE per-area element rows iterate `area in unique($matrix_areas)`.
+    rows = [{"matrix_areas": ["AREA 1", "AREA 2"], "script_type": "KQ"},
+            {"matrix_areas": ["AREA 2"], "script_type": "E1/2"},
+            {"matrix_areas": [], "script_type": "KQ"},
+            {"matrix_areas": ["AREA 3"], "script_type": "KQ"}]
+    items = _items("area in unique($matrix_areas)", rows)
+    eq([b["area"] for b, _ in items], ["AREA 1", "AREA 2", "AREA 3"],
+       "list cells flatten; empties skip; first-seen order")
+    filtered = _items("area in unique($matrix_areas) where $script_type = 'KQ'", rows)
+    eq([b["area"] for b, _ in filtered], ["AREA 1", "AREA 2", "AREA 3"],
+       "the where pre-filters ROWS, then the surviving rows' lists flatten")
+
+
 # --- 3. parse errors (validate-and-halt) --------------------------------------------------------- #
 def test_for_each_errors():
     raises(DbTemplateError, lambda: compile_for_each("row where $script_type ="))     # missing rhs
@@ -122,5 +137,6 @@ if __name__ == "__main__":
         ("for_each_row_where_boolean_combinators", test_for_each_row_where_boolean_combinators),
         ("for_each_unique_distinct_first_seen", test_for_each_unique_distinct_first_seen),
         ("for_each_unique_pipe_split", test_for_each_unique_pipe_split),
+        ("for_each_unique_list_cell_flattens", test_for_each_unique_list_cell_flattens),
         ("for_each_errors", test_for_each_errors),
     ]))

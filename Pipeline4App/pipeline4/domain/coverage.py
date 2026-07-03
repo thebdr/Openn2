@@ -91,14 +91,11 @@ def collect_outputs(database) -> dict:
         if n:
             tags.add(n)
 
-    # (520) {db_name: set(member)} from db_members + the 800 BUILDER-OWNED DBs (02_COM/05_EM_STATE -
-    # the engine's own collector, so the trace and the emitted XMLs stay one truth).
+    # (520) {db_name: set(member)} from db_members (02_COM/05_EM_STATE included - they are ordinary
+    # config DBs whose per-area element rows evaluate over the signals table).
     dbm: dict = {}
     for m in (database["db_members"] if "db_members" in database else []):
         dbm.setdefault(str(m.get("db_name") or ""), set()).add(str(m.get("member") or ""))
-    from pipeline4.domain.blocks import engine as blocks_engine     # late: blocks imports domain widely
-    for name, members in blocks_engine.builder_owned_members(database).items():
-        dbm.setdefault(name, set()).update(members)
 
     # (600) diagnosis bindings (the in_binding + the DiagList PLC_Binding cell) + consumed refs.
     diagb, consumed = set(), []

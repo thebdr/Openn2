@@ -758,15 +758,14 @@ class App:
         self._emit("PASS", f"  700: {res['stations']} stations + {res['modules']} modules -> {config.hardware_dir()}")
 
     def _run_software(self, only=None):
-        """Phase 800: stage -> 520 -> engine.build. only=820 projects the CreationInfo CSVs + the 03 FC XML +
-        the BUILDER-OWNED DBs (02_COM/05_EM_STATE per datablock_definitions.csv create_when=builders);
-        only=830 writes InstanceDBs.csv; None does both. (engine.build always runs - both surfaces
-        project from it.)"""
+        """Phase 800: stage -> 520 -> engine.build. only=820 projects the CreationInfo CSVs + the 03 FC
+        XML; only=830 writes InstanceDBs.csv; None does both. (engine.build always runs - both surfaces
+        project from it. 02_COM/05_EM_STATE are ordinary 520 config DBs - the 500 leg projects them.)"""
         from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks
         from pipeline4.domain.blocks import engine
         label = {820: "820 Generate Blocks", 830: "830 Generate Instances"}.get(
-            only, "800 Software Generation  (820 Blocks + 830 Instances + builder DBs + 03 FC XML)")
+            only, "800 Software Generation  (820 Blocks + 830 Instances + 03 FC XML)")
         self._emit("PHASE", label)
         self._status("software…")
         findings = []
@@ -779,19 +778,15 @@ class App:
             self._emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
         database, blk_findings = engine.build(database)
-        rendered, res, built_dbs, inst = list(blk_findings), None, [], None
+        rendered, res, inst = list(blk_findings), None, None
         if only in (None, 820):
             res = engine.project(database); rendered += res["findings"]
-            built_dbs = engine.write_builder_dbs(database)
         if only in (None, 830):
             inst = engine.write_instance_dbs(database)
         self._render(rendered)
         if res is not None:
             self._emit("PASS", f"  820: {len(database['software_blocks'])} blocks -> {res['count']} "
                                f"CreationInfo CSVs + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
-        for entry in built_dbs:
-            if entry["path"]:
-                self._emit("PASS", f"  {entry['name']} builder-DB: {entry['members']} members -> {entry['path']}")
         if inst is not None:
             self._emit("PASS", f"  830 InstanceDBs: {inst['count']} instance DBs -> {inst['path']}")
 

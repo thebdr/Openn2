@@ -25,7 +25,6 @@ from pipeline4.domain.blocks import templates, xml_emit
 from pipeline4.domain.blocks.database import Database
 from pipeline4.domain.blocks.registry import registry
 from pipeline4.domain.blocks.table import Table
-from pipeline4.domain import datablocks
 from pipeline4.domain.db_members import instance_dbs_table
 from pipeline4.domain.signals import signals_table
 
@@ -177,74 +176,10 @@ def project(database: DB | None = None, out_dir: str | None = None, import_dir: 
     return {"dir": out_dir, "files": files, "xml_files": xml_files, "count": len(files), "findings": []}
 
 
-# --- the BUILDER-OWNED DBs + InstanceDBs.csv (the cross-builder 800c surfaces) -------------------- #
-def builder_db_defs() -> list:
-    """The BUILDER-OWNED DB declarations: `datablock_definitions.csv` rows with `create_when=builders`
-    (the shipped ones: 02_COM, the zone-cumulative safe-DB, and 05_EM_STATE, the per-area
-    emergency-state flags). Declared in the ONE DB config surface with every other block, but
-    materialized HERE after the builders run - their members are the VALUES of the builders'
-    `<db_name>.<placeholder>` columns, unknowable at 520. A new builder-owned DB is a CSV row, not
-    code (UI_REFRESH_PLAN F items 1-2, generalized from the hardcoded 02_COM writer)."""
-    return [d for d in config.load_db_definitions() if d.get("create_when") == "builders"]
-
-
-def builder_owned_members(database: DB) -> dict:
-    """{db_name: [member, ...]} for every builder-owned DB: its seeds (per the row's `seed` flag)
-    followed by the distinct non-empty values of EVERY builder column named `<db_name>.<anything>`,
-    first-seen in member-row order (keys alphabetical within a row - the `values` cell is the codec's
-    sorted-keys JSON). Creator and reference columns collect alike: a referenced member must exist,
-    so the union IS the member set (verified == the old creator-column set on the real data). A DB
-    whose builders produced no values contributes nothing (it is not written). Coverage reads this
-    SAME map, so the emitted member sets and the XMLs stay one truth."""
-    members = database["software_block_members"] if "software_block_members" in database else []
-    out: dict = {}
-    for d in builder_db_defs():
-        name = d["db_name"]
-        prefix = f"{name}."
-        collected: list = []
-        for m in members:
-            values = m["values"] or {}
-            for key, value in values.items():
-                if str(key).startswith(prefix):
-                    v = str(value or "").strip()
-                    if v and v not in collected:
-                        collected.append(v)
-        if not collected:
-            continue
-        seeds = list(datablocks.seed_members()) if d.get("seed") else []
-        out[name] = [m2 for m2 in dict.fromkeys(str(x).strip() for x in seeds + collected) if m2]
-    return out
-
-
-def write_builder_dbs(database: DB, out_dir: str | None = None) -> list:
-    """Emit every builder-owned DB as a GlobalDB XML into `out_dir` (defaults to
-    `config.blocks_import_dir()`), the attributes from ITS OWN definitions row (`db_xml` enforces the
-    F_DB OPC-lock, so 02_COM's bytes match the previous hardcoded writer exactly). Returns one
-    `{name, path, members, findings}` per declared DB - path '' = skipped (its builders produced no
-    members). Pure projections (`findings: []`)."""
-    out_dir = out_dir or config.blocks_import_dir()
-    owned = builder_owned_members(database)
-    results = []
-    for d in builder_db_defs():
-        name = d["db_name"]
-        names = owned.get(name) or []
-        if not names:
-            results.append({"name": name, "path": "", "members": 0, "findings": []})
-            continue
-        db = {"prog_lang": d.get("db_programming_language") or "DB",
-              "memory_layout": d.get("memory_layout") or "Optimized",
-              "opc_ua": d.get("opc_ua", True), "webserver": d.get("webserver", True),
-              "only_load_memory": d.get("only_load_memory", False),
-              "write_protected": d.get("write_protected", False),
-              "retain_reserve": d.get("retain_reserve", False),
-              "memory_reserve": d.get("memory_reserve", ""),
-              "members": [{"member": m} for m in names]}
-        os.makedirs(out_dir, exist_ok=True)
-        path = os.path.join(out_dir, f"{name}.xml")
-        with open(path, "w", encoding="utf-8-sig", newline="") as handle:
-            handle.write(datablock_xml.db_xml(name, db, 1))
-        results.append({"name": name, "path": path, "members": len(names), "findings": []})
-    return results
+# --- InstanceDBs.csv (the cross-builder 800c surface) --------------------------------------------- #
+# NOTE: 02_COM + 05_EM_STATE are ordinary 520 config DBs now (datablock_definitions.csv +
+# per-area datablock_elements.csv rows over the signals table) - the transitional builder-column
+# collector this section once held is retired; the 520 projector writes their XMLs.
 
 
 def _builder_instance_rows(database: DB) -> list:

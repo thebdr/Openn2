@@ -135,10 +135,7 @@ def generate(rows, definitions, elements, types) -> tuple:
     # 3. build the Global DB shells (seeds prepended)
     global_dbs = {}
     for d in global_defs:
-        # `never` is declared-but-not-created; `builders` is BUILDER-OWNED - declared here (the ONE DB
-        # config surface) but materialized by the 800 engine AFTER the builders run (its members are
-        # the builders' `<db>.<placeholder>` column values, unknowable at 520).
-        if (d.get("create_when") or "if_elements").strip().lower() in ("never", "builders"):
+        if (d.get("create_when") or "if_elements").strip().lower() == "never":
             continue
         seeds = [_seed_member(c) for c in seed_members()] if d.get("seed") else []
         global_dbs[d["db_name"]] = {

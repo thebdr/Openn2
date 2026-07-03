@@ -78,7 +78,8 @@ class ForEach:
       - literal: one `({}, None)`;
       - row:     one `({}, row)` per row passing the predicate;
       - unique:  one `({var: value}, first_row)` per DISTINCT value of `column` (rows pre-filtered by the
-                 predicate; a `|`-multi-valued cell is split), in first-seen order.
+                 predicate; a `|`-multi-valued cell is split, a JSON LIST cell yields per item - e.g.
+                 `unique($matrix_areas)` iterates the areas), in first-seen order.
     `columns` is every `$col` the predicate (+ the `unique` column) names - the engine checks them against
     the real row keys for the matches-nothing WARN. `predicate` is a core/expr string (None = no filter)."""
 
@@ -98,8 +99,13 @@ class ForEach:
             return
         seen = set()                                          # kind == "unique"
         for r in keep:
-            cell = _cell(r, self.column)
-            for v in (cell.split("|") if "|" in cell else [cell]):
+            raw = (r or {}).get(self.column, "")
+            if isinstance(raw, (list, tuple)):                # a JSON LIST cell (e.g. matrix_areas)
+                values = [str(x) for x in raw]                #   -> one candidate per item
+            else:
+                cell = str(raw or "").strip()
+                values = cell.split("|") if "|" in cell else [cell]
+            for v in values:
                 v = v.strip()
                 if v and v not in seen:
                     seen.add(v)

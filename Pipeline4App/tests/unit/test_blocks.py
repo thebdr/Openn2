@@ -321,50 +321,8 @@ def test_project_03_emits_xml_and_drops_csv():
         ok(os.path.exists(os.path.join(creation, "00_X.csv")), "00_X CSV still written")
 
 
-# --- 800c: the BUILDER-OWNED DBs (datablock_definitions.csv create_when=builders) ----------------- #
-def test_write_builder_dbs_members_and_fdb():
-    with tempfile.TemporaryDirectory() as d:
-        mem = engine.software_block_members_table()
-        mem.add(block="03_Zone Cumulative", seq=0, values={"02_COM.{db_element}": "AREA 1 PB"})
-        mem.add(block="03_Zone Cumulative", seq=1, values={"02_COM.{db_element}": "AREA 1 FDB"})
-        mem.add(block="03_Zone Cumulative", seq=2, values={"02_COM.{db_element}": "AREA 1 PB"})   # dup -> once
-        # a REFERENCE column collects too (union semantics: a referenced member must exist)
-        mem.add(block="04_ESTOP", seq=0, values={"02_COM.{matrix_area} DOORS": "AREA 1 DOORS"})
-        res = {r["name"]: r for r in engine.write_builder_dbs(DB([mem]), out_dir=d)}
-        com = res["02_COM"]
-        eq(com["members"], 6, "3 seed constants + 2 creator + 1 referenced member")
-        xml = open(com["path"], encoding="utf-8-sig").read()
-        ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in xml, "the 02_COM DB is fail-safe F_DB")
-        ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in xml, "F_DB is OPC-locked")
-        for m in ("Always FALSE", "Always TRUE", "No Operation", "AREA 1 PB", "AREA 1 FDB", "AREA 1 DOORS"):
-            ok(f'<Member Name="{m}"' in xml, f"member {m!r} present")
-        eq(res["05_EM_STATE"]["path"], "", "no 05_EM_STATE columns here -> that DB is skipped")
-
-
-def test_write_builder_dbs_em_state_from_references():
-    with tempfile.TemporaryDirectory() as d:
-        mem = engine.software_block_members_table()
-        mem.add(block="04_ESTOP", seq=0, values={"05_EM_STATE.{matrix_area}_Q": "AREA 1 Q",
-                                                 "05_EM_STATE.{matrix_areas.1}_RESET": "AREA 1 RESET"})
-        mem.add(block="08_Gate Manager", seq=0, values={"05_EM_STATE.{matrix_area}_Q": "AREA 1 Q"})
-        res = {r["name"]: r for r in engine.write_builder_dbs(DB([mem]), out_dir=d)}
-        em = res["05_EM_STATE"]
-        eq(em["members"], 2, "no seeds (its row says seed=false) + 2 distinct references")
-        xml = open(em["path"], encoding="utf-8-sig").read()
-        ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in xml, "05_EM_STATE is fail-safe F_DB")
-        for m in ("AREA 1 Q", "AREA 1 RESET"):
-            ok(f'<Member Name="{m}"' in xml, f"member {m!r} present")
-        ok("Always FALSE" not in xml, "seed=false -> no seed constants")
-        eq(res["02_COM"]["path"], "", "no 02_COM columns here -> that DB is skipped")
-
-
-def test_write_builder_dbs_no_members_writes_nothing():
-    with tempfile.TemporaryDirectory() as d:
-        mem = engine.software_block_members_table()
-        mem.add(block="07_Speed Control", seq=0, values={"instanceOf-01_Speed_Control_SLS": "SLS_SORTER_01"})
-        results = engine.write_builder_dbs(DB([mem]), out_dir=d)
-        ok(all(r["path"] == "" and r["members"] == 0 for r in results), "nothing collected -> nothing written")
-        ok(not os.listdir(d), "the out dir stays empty")
+# (the transitional 800c builder-column DB writer was retired: 02_COM/05_EM_STATE are ordinary 520
+#  config DBs now - per-area element rows in datablock_elements.csv; see test_datablocks/test_dbtemplate)
 
 
 # --- 800c: InstanceDBs.csv --------------------------------------------------------------------- #
@@ -415,8 +373,5 @@ if __name__ == "__main__":
         ("and_coil_fc_one_network_per_row", test_and_coil_fc_one_network_per_row),
         ("write_fc_xml_bom_and_path", test_write_fc_xml_bom_and_path),
         ("project_03_emits_xml_and_drops_csv", test_project_03_emits_xml_and_drops_csv),
-        ("write_builder_dbs_members_and_fdb", test_write_builder_dbs_members_and_fdb),
-        ("write_builder_dbs_em_state_from_references", test_write_builder_dbs_em_state_from_references),
-        ("write_builder_dbs_no_members_writes_nothing", test_write_builder_dbs_no_members_writes_nothing),
         ("write_instance_dbs_merge_and_dedup", test_write_instance_dbs_merge_and_dedup),
     ]))
