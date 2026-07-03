@@ -186,7 +186,9 @@ class LogView(ttk.Frame):
         from pipeline4.core import treatments
         menu = tk.Menu(self.text, tearoff=0)
         for level in treatments.TREATMENTS:                   # fail / error / warn / skip / ignore
-            menu.add_command(label=f"Treat as {level.upper()}", command=lambda lv=level: self.on_errtreat(uid, lv))
+            menu.add_command(label=f"Treat as {level.upper()}", command=lambda lv=level: self.on_errtreat(uid, lv),
+                             # skip/ignore greyed for now (UI only) until the app reaches a stable version
+                             state="disabled" if level in ("skip", "ignore") else "normal")
         menu.add_separator()
         menu.add_command(label="Clear treatment", command=lambda: self.on_errtreat(uid, ""))
         try:

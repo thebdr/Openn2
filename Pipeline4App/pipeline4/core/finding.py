@@ -35,8 +35,10 @@ class Finding:
     location: str = ""       # "Sheet!Cell" OR a logical locator ("DB <name>", "IF_<inst>/<sig>")
     source_uid: str = ""     # FK to the producing entity's uid (a signal / interface_element) - audit only
     doc: str = ""            # workbook basename for a GUI link; NOT hashed (volatile)
-    # --- the rich validation-report payload (phase 100 only; None for every other phase) - NOT hashed,
-    # NOT persisted to validation_issues; consumed by io/render.py to reproduce PL3's aligned report line.
+    # --- the rich validation-report payload (phase 100 only; None for every other phase) - NOT hashed;
+    # consumed by io/render.py to reproduce PL3's aligned report line, and PERSISTED to validation_issues
+    # (location2/doc2 + the bit/FLD identity + the flattened comparison) so the Findings panel shows the
+    # SAME key context as the log: what differed and where both sides live.
     location2: str = ""      # a cross-check's 2nd link: the matched Sheet!Cell, OR a workbook label on a miss
     doc2: str = ""           # workbook basename for `location2`
     info: InfoBlock | None = None   # the middle column (bit/FLD/desc/drawing/type-index)
@@ -52,14 +54,26 @@ class Finding:
         return f"{self.phase}-{self.type}" if self.type else str(self.phase)
 
 
+def compared_text(cmp) -> str:
+    """A Cmp flattened to the compact one-cell comparison the Findings panel shows:
+    `<caller_addr> op <other_addr> | <caller_fld> op <other_fld>` (op = ===/=/=). '' for None."""
+    if cmp is None:
+        return ""
+    op_a = "===" if cmp.addr_eq else "=/="
+    op_f = "===" if cmp.fld_eq else "=/="
+    return f"{cmp.caller_addr} {op_a} {cmp.other_addr} | {cmp.caller_fld} {op_f} {cmp.other_fld}"
+
+
 def validation_issues_table() -> Table:
     """The SSOT record of every finding the pipeline produced (one row per finding, at its DEFAULT
     severity). The treatment overlay (effective severity) lives in error_management.csv, joined by uid -
     NOT stored here, so the table stays a pure record of facts. `uid` is supplied (not re-stamped) so it
-    equals `Finding.uid` (the registry key)."""
+    equals `Finding.uid` (the registry key). The tail columns persist the rich phase-100 context (the
+    other-side link, the bit/FLD identity, the flattened comparison) - empty for the other phases."""
     return Table(
         "validation_issues",
-        columns=["uid", "id", "phase", "type", "severity", "location", "detail", "source_uid", "doc"],
+        columns=["uid", "id", "phase", "type", "severity", "location", "detail", "source_uid", "doc",
+                 "location2", "doc2", "bit", "fld", "compared"],
         json_columns=[],
         key_columns=["phase", "type", "location", "detail"],
     )
@@ -67,10 +81,14 @@ def validation_issues_table() -> Table:
 
 def record(database, findings) -> None:
     """Append `findings` to the database's `validation_issues` table (creating it if absent), each row
-    carrying the Finding's own `uid`. The caller saves the database."""
+    carrying the Finding's own `uid` + its report context (location2/bit/FLD/compared - what the log
+    line shows, so the Findings panel can too). The caller saves the database."""
     if "validation_issues" not in database:
         database.add_table(validation_issues_table())
     table = database["validation_issues"]
     for f in findings:
+        info = f.info or InfoBlock()
         table.add(uid=f.uid, id=f.id, phase=f.phase, type=f.type, severity=f.severity,
-                  location=f.location, detail=f.detail, source_uid=f.source_uid, doc=f.doc)
+                  location=f.location, detail=f.detail, source_uid=f.source_uid, doc=f.doc,
+                  location2=f.location2, doc2=f.doc2, bit=info.bit, fld=info.fld,
+                  compared=compared_text(f.cmp))

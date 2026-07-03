@@ -27,7 +27,8 @@ def test_id_and_frozen():
 def test_validation_issues_table_shape():
     t = validation_issues_table()
     eq(t.name, "validation_issues")
-    for c in ("uid", "id", "phase", "type", "severity", "location", "detail", "source_uid", "doc"):
+    for c in ("uid", "id", "phase", "type", "severity", "location", "detail", "source_uid", "doc",
+              "location2", "doc2", "bit", "fld", "compared"):
         ok(c in t.columns, f"{c} column present")
     ok("treatment" not in t.columns and "effective_severity" not in t.columns,
        "the table records FACTS only; treatments live in error_management.csv")
@@ -47,6 +48,28 @@ def test_record_uses_finding_uid():
     eq(len(list(db["validation_issues"])), 3, "a second record appends")
 
 
+def test_record_persists_report_context():
+    """The phase-100 context (location2, bit/FLD, the flattened comparison) lands in the table so the
+    Findings panel shows the SAME key details as the log line; other phases leave the tail empty."""
+    from pipeline4.core.finding import compared_text
+    from pipeline4.core.model import Cmp, InfoBlock
+    cmp = Cmp("I110.0", "I110.0", True, "=S1 -S80001", "=S1 -X80101", False)
+    eq(compared_text(cmp), "I110.0 === I110.0 | =S1 -S80001 =/= =S1 -X80101",
+       "the Cmp flattens to the one-cell comparison")
+    eq(compared_text(None), "", "no cmp -> empty cell")
+    db = Database([])
+    record(db, [Finding(phase=130, type="cem_addr_fld", severity="FAIL", detail="different FLD",
+                        location="CE!F102", doc="ce.xlsx", location2="IO!O195", doc2="io.xlsx",
+                        info=InfoBlock(bit="I110.0", fld="=S1 -S80001"), cmp=cmp),
+                Finding(phase=520, type="db_dup", severity="WARN", detail="dropped", location="DB A")])
+    rich, plain = list(db["validation_issues"])
+    eq((rich["location2"], rich["doc2"]), ("IO!O195", "io.xlsx"), "the other-side link is persisted")
+    eq((rich["bit"], rich["fld"]), ("I110.0", "=S1 -S80001"), "the signal identity is persisted")
+    eq(rich["compared"], compared_text(cmp), "the comparison is persisted")
+    eq((plain["location2"], plain["bit"], plain["compared"]), ("", "", ""),
+       "a non-100 finding leaves the context columns empty")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("finding", [
@@ -54,4 +77,5 @@ if __name__ == "__main__":
         ("id_and_frozen", test_id_and_frozen),
         ("validation_issues_table_shape", test_validation_issues_table_shape),
         ("record_uses_finding_uid", test_record_uses_finding_uid),
+        ("record_persists_report_context", test_record_persists_report_context),
     ]))

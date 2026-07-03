@@ -645,10 +645,16 @@ Run-all by design since it mutates the source doc), a **worker thread + queue/dr
 thread - the handler emits via `self._emit`/`self._status` enqueue, `_drain` applies on the main thread, a
 `ttk.Progressbar` + `_busy` guard; single-phase runs no longer freeze the window), a basic **Run-all** (registry
 `run_order`, each handler self-contained - M4 optimizes to a stage-once shared DB), and a **`ttk.Notebook`**
-(Log tab). **M2 (Findings panel) DONE:** a `ttk.Treeview` tab over `validation_issues` ⋈ the treatment registry
-(phase/type/default+**effective** severity/location/detail; phase + severity filters; right-click → treat
-fail/error/warn/skip/ignore/clear → writes `error_management.csv` → re-render; auto-refresh after each run).
-The pure join/treat logic is `gui/findings_view.py` (tested); `gui/findings_panel.py` is the Tk view. **M3
+(Log tab). **M2 (Findings panel) DONE — rebuilt on the shared DataGrid (production-test feedback, 2026-07-03):** the tab
+over `validation_issues` ⋈ the treatment registry now uses `gui/datagrid.py` (zebra, data-adapted column
+widths, the small narrow font for >64-char cells, drag/double-click column resize) with row MULTI-selection
+(plain/Ctrl/Shift — the pure `updated_selection` model, tested) + severity-coloured rows (`set_data(row_fg=…)`)
++ theme-registered. **`validation_issues` now PERSISTS the log line's key context** (`location2`/`doc2`/`bit`/
+`fld`/`compared` — the flattened `===`/`=/=` comparison via `finding.compared_text`) so the panel answers
+"what differed, where do both sides live"; context columns hide when empty across the view. Right-click treats
+the WHOLE selection in ONE registry write (`findings_view.apply_treatments`); **`skip` + `ignore` are GREYED
+(UI-only, panel + log menus) until the app reaches a stable version**. Filters + auto-refresh unchanged. The
+pure join/treat logic is `gui/findings_view.py` (tested); `gui/findings_panel.py` is the Tk view. **M3
 (Database Explorer) DONE:** a SQL console tab over the SSOT - `gui/dbquery.py` (`build_memory_db` loads
 `Database/*.csv` into in-memory SQLite, JSON cells queryable via `json_extract()`; `run_query`; `SAMPLE_QUERIES`
 - SELECT*/json_extract/GROUP BY/cross-table JOINs) + `gui/db_explorer.py` (schema sidebar, SQL editor

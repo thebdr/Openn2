@@ -102,6 +102,20 @@ def boundary_at(widths, x, tol: int = RESIZE_TOL):
     return None
 
 
+def updated_selection(selected, anchor, row: int, ctrl: bool = False, shift: bool = False) -> tuple:
+    """The next `(selected_set, anchor)` after a click on `row` (the standard list-selection model):
+    a plain click selects just that row; Ctrl toggles it; Shift extends from the anchor (inclusive).
+    The anchor moves on plain/Ctrl clicks and stays put across Shift extensions."""
+    selected = set(selected)
+    if shift and anchor is not None:
+        lo, hi = sorted((anchor, row))
+        return set(range(lo, hi + 1)), anchor
+    if ctrl:
+        selected ^= {row}
+        return selected, row
+    return {row}, row
+
+
 def fit_col_width(columns, rows, c, measure_normal, measure_small, measure_header) -> int:
     """The double-click auto-fit width for column `c`: the widest of the header and EVERY row's cell
     (each measured in its rendering font), clamped [MIN_DRAG_W, FIT_MAX_W]. Unlike the initial layout
@@ -119,10 +133,13 @@ class DataGrid(ttk.Frame):
     """Header canvas + body canvas (x-scroll synced), gridlines, zebra rows, per-cell fonts.
     With `editable=True` a DATA cell edits in place on double-click (single-line Entry overlay;
     Enter commits through `on_edit(row, col, new) -> bool`, Escape/focus-out cancels); `raw_of(row,
-    col)` supplies the underlying value (the grid itself only holds the sanitized DISPLAY text)."""
+    col)` supplies the underlying value (the grid itself only holds the sanitized DISPLAY text).
+    With `selectable=True` rows MULTI-select (click / Ctrl-toggle / Shift-range); a right-click on
+    an unselected row selects it first, then `on_context(event, selected_row_indices)` fires (the
+    host's context menu). `set_data(..., row_fg=[...])` colours each row's text (severity colours)."""
 
     def __init__(self, parent, mode: str = "dark", editable: bool = False,
-                 on_edit=None, raw_of=None):
+                 on_edit=None, raw_of=None, selectable: bool = False, on_context=None):
         super().__init__(parent)
         self._mode = mode
         self._columns: list = []
@@ -133,6 +150,11 @@ class DataGrid(ttk.Frame):
         self._on_edit = on_edit or (lambda *_a: False)
         self._raw_of = raw_of or (lambda r, c: self._rows[r][c] if c < len(self._rows[r]) else "")
         self._editbox: tk.Entry | None = None
+        self._selectable = selectable
+        self._on_context = on_context
+        self._selected: set = set()
+        self._anchor: int | None = None
+        self._row_fg: list = []
 
         family = theme.MONO_FONT[0]
         narrow = theme.narrow_family(self)
@@ -166,20 +188,56 @@ class DataGrid(ttk.Frame):
         self.header.bind("<Double-Button-1>", self._header_dclick)
         if editable:
             self.body.bind("<Double-Button-1>", self._cell_dclick)
+        if selectable:
+            self.body.bind("<Button-1>", self._body_press)
+            self.body.bind("<Button-3>", self._body_context)
         self._apply_colors()
 
     # --- data ------------------------------------------------------------------------------------ #
-    def set_data(self, columns, rows) -> None:
-        """Load the table: compute the data-adapted column widths, then draw the visible slice."""
+    def set_data(self, columns, rows, row_fg=None) -> None:
+        """Load the table: compute the data-adapted column widths, then draw the visible slice.
+        `row_fg` optionally colours each row's text (a list of colours, None/'' = the theme fg);
+        the selection is cleared (the row indices no longer mean the same rows)."""
         self._close_editbox()
         self._columns = [str(c) for c in columns]
         self._rows = [[sanitize(cell) for cell in row] for row in rows]
+        self._row_fg = list(row_fg or [])
+        self._selected, self._anchor = set(), None
         self._widths = compute_col_widths(
             self._columns, self._rows,
             self._font_normal.measure, self._font_small.measure, self._font_header.measure)
         self.body.yview_moveto(0)
         self._xview_both("moveto", 0)
         self._apply_widths()
+
+    # --- row selection (selectable=True) ---------------------------------------------------------- #
+    def selection(self) -> list:
+        """The selected row indices, ascending."""
+        return sorted(self._selected)
+
+    def _hit_row(self, event):
+        hit = cell_at(self._widths, self._row_h, len(self._rows),
+                      self.body.canvasx(event.x), self.body.canvasy(event.y))
+        return None if hit is None else hit[0]
+
+    def _body_press(self, event) -> None:
+        row = self._hit_row(event)
+        if row is None:
+            return
+        self._selected, self._anchor = updated_selection(
+            self._selected, self._anchor, row,
+            ctrl=bool(event.state & 0x0004), shift=bool(event.state & 0x0001))
+        self._schedule_redraw()
+
+    def _body_context(self, event) -> None:
+        """Right-click: a click on an UNSELECTED row selects just it (the standard model), then the
+        host's context menu fires over the whole selection."""
+        row = self._hit_row(event)
+        if row is not None and row not in self._selected:
+            self._selected, self._anchor = {row}, row
+            self._schedule_redraw()
+        if self._on_context and self._selected:
+            self._on_context(event, self.selection())
 
     def _apply_widths(self) -> None:
         """Sync the scroll regions to the current column widths and redraw (set_data + resizing)."""
@@ -276,6 +334,7 @@ class DataGrid(ttk.Frame):
         self._c_line = theme.TOKENS[self._mode]["grid_line"]
         self._c_fg = theme.TOKENS[self._mode]["fg"]
         self._c_head = theme.TOKENS[self._mode]["surface"]
+        self._c_sel = theme.TOKENS[self._mode]["select_bg"]
         self.body.configure(bg=self._c_field)
         self.header.configure(bg=self._c_head)
 
@@ -319,10 +378,14 @@ class DataGrid(ttk.Frame):
         x_right = x_left + self.body.winfo_width()
         for i in range(first, last + 1):
             y = i * row_h
-            fill = self._c_alt if i % 2 else self._c_field           # zebra
+            if i in self._selected:                                  # selection overrides the zebra
+                fill = self._c_sel
+            else:
+                fill = self._c_alt if i % 2 else self._c_field       # zebra
             self.body.create_rectangle(0, y, total_w, y + row_h, fill=fill,
                                        outline="", tags="cells")
             row = self._rows[i]
+            fg = (self._row_fg[i] if i < len(self._row_fg) and self._row_fg[i] else self._c_fg)
             x = 0
             for c, width in enumerate(widths):
                 if x + width >= x_left and x <= x_right:
@@ -331,7 +394,7 @@ class DataGrid(ttk.Frame):
                     if cell:
                         text = fit_text(cell, width - 2 * _PAD_X, font.measure)
                         self.body.create_text(x + _PAD_X, y + row_h / 2, text=text, anchor="w",
-                                              font=font, fill=self._c_fg, tags="cells")
+                                              font=font, fill=fg, tags="cells")
                 x += width
             self.body.create_line(0, y + row_h, total_w, y + row_h,                # row border
                                   fill=self._c_line, tags="cells")

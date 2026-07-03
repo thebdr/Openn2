@@ -89,6 +89,24 @@ def test_fit_col_width_uncapped_and_fonts():
        max(datagrid.MIN_DRAG_W, 10 + 12), "an empty column falls to the header/minimum")
 
 
+def test_updated_selection_model():
+    """The multi-select click model: plain replaces, Ctrl toggles, Shift ranges from the anchor."""
+    sel, anchor = datagrid.updated_selection(set(), None, 3)
+    eq((sel, anchor), ({3}, 3), "a plain click selects just that row + moves the anchor")
+    sel, anchor = datagrid.updated_selection(sel, anchor, 5, ctrl=True)
+    eq((sel, anchor), ({3, 5}, 5), "Ctrl adds + moves the anchor")
+    sel, anchor = datagrid.updated_selection(sel, anchor, 5, ctrl=True)
+    eq((sel, anchor), ({3}, 5), "Ctrl on a selected row toggles it OFF")
+    sel, anchor = datagrid.updated_selection(sel, anchor, 1, shift=True)
+    eq((sel, anchor), ({1, 2, 3, 4, 5}, 5), "Shift selects the anchor..row range (anchor stays)")
+    sel, anchor = datagrid.updated_selection(sel, anchor, 7, shift=True)
+    eq((sel, anchor), ({5, 6, 7}, 5), "a second Shift re-ranges from the SAME anchor")
+    sel, anchor = datagrid.updated_selection(sel, None, 2, shift=True)
+    eq((sel, anchor), ({2}, 2), "Shift with no anchor degrades to a plain click")
+    sel, anchor = datagrid.updated_selection({1, 2, 9}, 9, 4)
+    eq((sel, anchor), ({4}, 4), "a plain click REPLACES a multi-selection")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_datagrid", [
@@ -100,4 +118,5 @@ if __name__ == "__main__":
         ("cell_at_hit_test", test_cell_at_hit_test),
         ("boundary_at_grab_zones", test_boundary_at_grab_zones),
         ("fit_col_width_uncapped_and_fonts", test_fit_col_width_uncapped_and_fonts),
+        ("updated_selection_model", test_updated_selection_model),
     ]))

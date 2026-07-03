@@ -14,12 +14,17 @@ def _issue(uid, phase, type_, sev, loc="IO!A1", detail="d"):
 
 def test_panel_rows_effective_severity():
     issues = [_issue("u1", 110, "addr_format", "FAIL"), _issue("u2", 140, "iol_cem_missing_plain", "WARN")]
+    issues[0]["location2"], issues[0]["compared"] = "IO!G9", "I0.0 =/= I1.0 | S1 === S1"
     reg = {"u1": treatments.Treatment(uid="u1", treatment="warn")}   # downgrade u1 FAIL -> WARN
     rows = findings_view.panel_rows(issues, reg)
     eq(rows[0]["severity"], "FAIL", "the default is preserved")
     eq(rows[0]["effective"], "WARN", "the treatment downgrades the effective severity")
     eq(rows[0]["treatment"], "warn")
     eq(rows[1]["effective"], "WARN", "an untreated finding keeps its default")
+    eq((rows[0]["location2"], rows[0]["compared"]), ("IO!G9", "I0.0 =/= I1.0 | S1 === S1"),
+       "the log-line context rides on the panel row")
+    eq((rows[1]["location2"], rows[1]["bit"], rows[1]["compared"]), ("", "", ""),
+       "an old-schema/plain row defaults its context columns to empty")
 
 
 def test_filter_rows():
@@ -47,6 +52,26 @@ def test_apply_treatment_create_and_update():
             # clear it
             findings_view.apply_treatment("u9", "", row)
             eq(treatments.load()["u9"].treatment, "", "cleared the treatment")
+        finally:
+            config.use_builtin()
+
+
+def test_apply_treatments_bulk():
+    """The multi-select treat: every selected row's uid is set in ONE registry write."""
+    with tempfile.TemporaryDirectory() as d:
+        config.use_project(d)
+        try:
+            rows = [_issue("m1", 130, "cem_addr_fld", "FAIL"),
+                    _issue("m2", 130, "cem_addr_none", "FAIL"),
+                    _issue("m3", 140, "iol_cem_missing_plain", "WARN")]
+            findings_view.apply_treatments(rows, "warn")
+            reg = treatments.load()
+            eq({u: reg[u].treatment for u in ("m1", "m2", "m3")},
+               {"m1": "warn", "m2": "warn", "m3": "warn"}, "all selected uids treated")
+            findings_view.apply_treatments(rows[:2], "")
+            reg = treatments.load()
+            eq((reg["m1"].treatment, reg["m2"].treatment, reg["m3"].treatment), ("", "", "warn"),
+               "a bulk clear touches only the given rows")
         finally:
             config.use_builtin()
 
@@ -81,5 +106,6 @@ if __name__ == "__main__":
         ("panel_rows_effective_severity", test_panel_rows_effective_severity),
         ("filter_rows", test_filter_rows),
         ("apply_treatment_create_and_update", test_apply_treatment_create_and_update),
+        ("apply_treatments_bulk", test_apply_treatments_bulk),
         ("apply_and_records", test_apply_and_records),
     ]))

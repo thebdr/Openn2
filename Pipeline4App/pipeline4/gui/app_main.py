@@ -118,7 +118,7 @@ class App:
         self.documents.pack(side="top", fill="both", expand=True)
         self.notebook.add(self._documents_tab, text=i18n.tr("tab_documents", self.lang))
         self._findings_tab = ttk.Frame(self.notebook)
-        self.findings = FindingsPanel(self._findings_tab)
+        self.findings = FindingsPanel(self._findings_tab, mode=self.mode)
         self.findings.pack(side="top", fill="both", expand=True)
         self.notebook.add(self._findings_tab, text=i18n.tr("tab_findings", self.lang))
         self._explorer_tab = ttk.Frame(self.notebook)
@@ -138,7 +138,7 @@ class App:
         # every themed component subscribes ONCE; theme.set_mode notifies them on a toggle (the manual
         # per-component fan-out in _toggle_theme is retired with the sv-ttk backend).
         for callback in (self.log.set_theme, self.phasebar.set_theme, self.explorer.set_theme,
-                         self.files.set_theme, self.documents.set_theme):
+                         self.files.set_theme, self.documents.set_theme, self.findings.set_theme):
             theme.register(callback)
 
         # the guide (UI_REFRESH_PLAN I): F1 opens the section for the focused area; the attached ids

@@ -1,10 +1,15 @@
 """The Findings panel (GUI M2) - a tab listing the SSOT findings with one-click treatments.
 
-Reads the `validation_issues` table (the facts of the last run, persisted under `Database/`) joined to the
-`error_management.csv` treatment registry, shows each finding's phase/type/default+EFFECTIVE severity/
-location/detail, filterable by phase + effective severity. Right-click a row to treat it (fail/error/warn/
-skip/ignore/clear) - writes the registry by `uid` and re-renders. `refresh()` reloads (the host calls it
-after a phase run). The pure join/treat logic is in `findings_view` (tested); this is the Tk view.
+Rebuilt on the shared `DataGrid` (production-test feedback): zebra rows, data-adapted column widths
+with the small narrow font for >64-char cells, mouse-resizable columns, and row MULTI-selection.
+Reads the `validation_issues` table (the facts of the last run, persisted under `Database/`) joined to
+the `error_management.csv` treatment registry; each row now also shows the log line's KEY CONTEXT -
+the other-side location (`vs`), the bit/FLD identity, and the flattened `===`/`=/=` comparison (what
+was different) - persisted by `finding.record`. Context columns that are empty across the whole view
+are hidden. Filterable by phase + effective severity; rows are coloured by effective severity.
+Right-click treats the WHOLE selection (fail/error/warn/clear; `skip`+`ignore` are GREYED for now -
+UI only, re-enabled once the app reaches a stable version). The pure join/treat logic is in
+`findings_view` (tested); this is the Tk view.
 """
 from __future__ import annotations
 
@@ -17,10 +22,13 @@ from pipeline4.core.database import Database as DB
 from pipeline4.core.finding import validation_issues_table
 from pipeline4.core import treatments
 from pipeline4.gui import findings_view, theme
+from pipeline4.gui.datagrid import DataGrid
 
-_COLUMNS = (("phase", 60), ("type", 170), ("severity", 70), ("effective", 75),
-            ("treatment", 80), ("location", 150), ("detail", 460))
+_BASE_COLUMNS = ("phase", "type", "severity", "effective", "treatment", "location")
+_CONTEXT_COLUMNS = ("location2", "bit", "fld", "compared")   # hidden when empty across the view
+_HEADERS = {"location2": "vs", "compared": "compared (=== / =/=)"}
 _SEVERITIES = ("", "FAIL", "ERROR", "WARN", "INFO", "SKIP", "PASS")
+_DISABLED_TREATMENTS = ("skip", "ignore")    # greyed for now (UI only) until the app is stable
 
 
 def _load_issues() -> list:
@@ -36,9 +44,9 @@ def _load_issues() -> list:
 
 
 class FindingsPanel(ttk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, mode: str = "dark"):
         super().__init__(parent)
-        self._rows: dict = {}                       # tree item id -> the display row
+        self._mode = "dark" if mode == "dark" else "light"
 
         bar = ttk.Frame(self)
         bar.pack(side="top", fill="x", padx=4, pady=4)
@@ -54,26 +62,19 @@ class FindingsPanel(ttk.Frame):
         self._count = ttk.Label(bar, text="0 findings")
         self._count.pack(side="right", padx=4)
 
-        cols = [c for c, _w in _COLUMNS]
-        self.tree = ttk.Treeview(self, columns=cols, show="headings", selectmode="browse")
-        for col, width in _COLUMNS:
-            self.tree.heading(col, text=col.title())
-            self.tree.column(col, width=width, anchor="w", stretch=(col == "detail"))
-        for level, (color, _bold) in theme.LOG_COLORS.items():
-            self.tree.tag_configure(level, foreground=color)
-        vsb = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        vsb.pack(side="right", fill="y")
-        self.tree.pack(side="left", fill="both", expand=True)
+        self.grid_view = DataGrid(self, mode=self._mode, selectable=True, on_context=self._popup)
+        self.grid_view.pack(side="top", fill="both", expand=True)
 
         self.menu = tk.Menu(self, tearoff=0)
-        for level in treatments.TREATMENTS:         # fail / error / warn / skip / ignore
-            self.menu.add_command(label=f"Treat as {level.upper()}", command=lambda lv=level: self._treat(lv))
+        for level in treatments.TREATMENTS:          # fail / error / warn / skip / ignore
+            self.menu.add_command(label=f"Treat as {level.upper()}",
+                                  command=lambda lv=level: self._treat(lv),
+                                  state="disabled" if level in _DISABLED_TREATMENTS else "normal")
         self.menu.add_separator()
         self.menu.add_command(label="Clear treatment", command=lambda: self._treat(""))
-        self.tree.bind("<Button-3>", self._popup)
 
         self._all: list = []
+        self._shown: list = []                       # the filtered rows, index-aligned with the grid
         self.refresh()
 
     def refresh(self) -> None:
@@ -84,25 +85,31 @@ class FindingsPanel(ttk.Frame):
         self._render()
 
     def _render(self) -> None:
-        self.tree.delete(*self.tree.get_children())
-        self._rows.clear()
         rows = findings_view.filter_rows(self._all, self._phase.get(), self._sev.get())
-        for r in rows:
-            iid = self.tree.insert("", "end", tags=(r["effective"],), values=(
-                r["phase"], r["type"], r["severity"], r["effective"], r["treatment"], r["location"], r["detail"]))
-            self._rows[iid] = r
-        self._count.configure(text=f"{len(rows)} findings" + (f" of {len(self._all)}" if len(rows) != len(self._all) else ""))
+        self._shown = rows
+        # the context columns only appear when the view actually carries their data
+        cols = list(_BASE_COLUMNS) + [c for c in _CONTEXT_COLUMNS if any(r[c] for r in rows)] + ["detail"]
+        palette = theme.log_colors_for(self._mode)
+        row_fg = [palette.get(r["effective"], ("",))[0] for r in rows]
+        headers = [_HEADERS.get(c, c.title()) for c in cols]
+        self.grid_view.set_data(headers, [[r[c] for c in cols] for r in rows], row_fg=row_fg)
+        self._count.configure(text=f"{len(rows)} findings"
+                              + (f" of {len(self._all)}" if len(rows) != len(self._all) else ""))
 
-    def _popup(self, event) -> None:
-        iid = self.tree.identify_row(event.y)
-        if iid:
-            self.tree.selection_set(iid)
-            self.tree.focus(iid)
-            self.menu.tk_popup(event.x_root, event.y_root)
+    def _popup(self, event, _selected) -> None:
+        """The grid's context callback: the selection is already settled - show the treat menu."""
+        self.menu.tk_popup(event.x_root, event.y_root)
 
     def _treat(self, level: str) -> None:
-        row = self._rows.get(self.tree.focus())
-        if not row:
+        """Treat the WHOLE selection at `level` (one registry write), then re-render."""
+        rows = [self._shown[i] for i in self.grid_view.selection() if i < len(self._shown)]
+        if not rows:
             return
-        findings_view.apply_treatment(row["uid"], level, row)
+        findings_view.apply_treatments(rows, level)
         self.refresh()
+
+    def set_theme(self, mode: str) -> None:
+        """Follow a light/dark toggle: re-skin the grid + re-render (the severity colours re-resolve)."""
+        self._mode = "dark" if mode == "dark" else "light"
+        self.grid_view.set_theme(self._mode)
+        self._render()
