@@ -7,7 +7,8 @@ from pipeline4.gui import chasebar as cb
 
 def test_sprites_well_formed():
     for name, frames, colors in (("roadrunner", cb.ROADRUNNER, cb._RR_COLORS),
-                                 ("coyote", cb.COYOTE, cb._CY_COLORS)):
+                                 ("coyote", cb.COYOTE, cb._CY_COLORS),
+                                 ("mario", cb.MARIO, cb._MARIO_COLORS)):
         widths = {len(row) for frame in frames for row in frame}
         eq(len(widths), 1, f"{name}: every row of every frame has the same width")
         eq(len({len(frame) for frame in frames}), 1, f"{name}: both frames have the same row count")
@@ -24,25 +25,47 @@ def test_jump_arc():
 
 
 def _state(**over):
-    base = {"dir": 1, "cx": 200.0, "gap": 30.0, "rx": 0.0, "rw": 32.0, "cw": 36.0, "jump": None}
+    base = {"dir": 1, "cx": 200.0, "gap": 30.0, "gap_t": 30.0, "rx": 0.0,
+            "rw": 32.0, "cw": 36.0, "mw": 24.0, "mx": None, "mgap": 20.0, "jump": None}
     base.update(over)
     return base
 
 
 def test_chase_step_running():
-    steady = lambda: 0.45                      # rand()*4 - 1.8 = 0 -> the lead holds steady
-    s = cb.chase_step(_state(), 600.0, steady)
-    eq(s["cx"], 200.0 + cb.SPEED, "the coyote advances at SPEED")
-    eq(s["gap"], 30.0, "a steady rand holds the lead")
-    eq(s["rx"], s["cx"] + (36.0 / 2 + 32.0 / 2) + 30.0, "the roadrunner rides ahead by spans + gap")
+    steady = lambda: 0.45
+    s = cb.chase_step(_state(gap=30.0, gap_t=80.0), 2000.0, steady)
+    eq(s["cx"], 200.0 + cb.SPEED, "the coyote advances at SPEED (the 10x pace)")
+    eq(s["gap"], 30.0 + cb.GAP_RATE, "the lead moves toward its target at GAP_RATE")
+    eq(s["rx"], s["cx"] + (36.0 / 2 + 32.0 / 2) + s["gap"], "the bird rides ahead by spans + gap")
     ok(s["jump"] is None, "no border, no jump")
-    grow = cb.chase_step(_state(), 600.0, lambda: 0.99)
-    shrink = cb.chase_step(_state(), 600.0, lambda: 0.0)
-    ok(grow["gap"] > 30.0 > shrink["gap"], "the lead drifts with the random draw")
-    s = _state(gap=cb.GAP_MAX)
-    eq(cb.chase_step(s, 600.0, lambda: 0.99)["gap"], cb.GAP_MAX, "the lead clamps at GAP_MAX")
-    s = _state(gap=cb.GAP_MIN)
-    eq(cb.chase_step(s, 600.0, lambda: 0.0)["gap"], cb.GAP_MIN, "the lead clamps at GAP_MIN")
+    s = cb.chase_step(_state(gap=80.0, gap_t=20.0), 2000.0, steady)
+    eq(s["gap"], 80.0 - cb.GAP_RATE, "a lower target squeezes the lead")
+    # reaching the target picks a NEW random target (the lead visibly wanders, never sits still)
+    s = cb.chase_step(_state(gap=30.0, gap_t=30.0), 2000.0, lambda: 0.5)
+    eq(s["gap_t"], cb.GAP_MIN + 0.5 * (cb.GAP_MAX - cb.GAP_MIN), "arrival retargets the lead")
+    # the floor: gap 0 = the coyote's head TOUCHES the bird's tail - never less (no collision)
+    s = _state(gap=3.0, gap_t=0.0)
+    for _ in range(40):
+        s = cb.chase_step(s, 20000.0, lambda: 0.0)     # rand 0 -> retargets always pick GAP_MIN
+        ok(s["gap"] >= 0.0, "the lead never goes below touching")
+    eq(s["gap"], 0.0, "the lead can REACH exactly touching (head = tail)")
+    eq(s["rx"] - 16.0, s["cx"] + 18.0, "at gap 0 the sprite edges meet exactly")
+
+
+def test_chase_step_mario_tails_the_coyote():
+    steady = lambda: 0.45
+    s = _state(mx=500.0, mgap=20.0)
+    s1 = cb.chase_step(s, 2000.0, steady)
+    target = s1["cx"] - (36.0 / 2 + 24.0 / 2 + s1["mgap"])
+    ok(abs(s1["mx"] - 500.0) <= cb.MARIO_SPEED, "Mario moves at most MARIO_SPEED per tick")
+    ok(abs(s1["mx"] - target) <= abs(500.0 - target), "…toward his behind-the-coyote target")
+    for _ in range(200):
+        s1 = cb.chase_step(s1, 20000.0, steady)
+        ok(cb.MARIO_GAP_LO <= s1["mgap"] <= cb.MARIO_GAP_HI, "Mario's distance stays clamped")
+        if s1["jump"] is not None:
+            break
+    settled = s1["cx"] - (36.0 / 2 + 24.0 / 2 + s1["mgap"])
+    ok(abs(s1["mx"] - settled) < cb.MARIO_SPEED + 1, "Mario settles onto his wander distance")
 
 
 def test_chase_step_border_jump_and_flip():
@@ -67,9 +90,13 @@ def test_chase_step_border_jump_and_flip():
     eq(s["dir"], -1, "landing reverses the chase")
     eq(s["gap"], cb.LAND_GAP, "the lead resets on landing")
     eq(s["rx"], s["jump_to"], "the bird lands at the arc's endpoint")
+    eq(s["mx"], 600.0 - cb.MARGIN - 12.0,
+       "the FIRST border event spawns Mario AT the border the bird just left (behind the coyote)")
+    mario_entrance = s["mx"]
     s2 = cb.chase_step(s, 600.0, steady)
     eq(s2["rx"], s2["cx"] - (36.0 / 2 + 32.0 / 2) - s2["gap"],
        "the chase resumes leftwards with the bird ahead")
+    ok(s2["mx"] < mario_entrance, "Mario runs in after the coyote")
 
 
 def test_chase_step_left_border():
@@ -92,6 +119,7 @@ if __name__ == "__main__":
         ("sprites_well_formed", test_sprites_well_formed),
         ("jump_arc", test_jump_arc),
         ("chase_step_running", test_chase_step_running),
+        ("chase_step_mario_tails_the_coyote", test_chase_step_mario_tails_the_coyote),
         ("chase_step_border_jump_and_flip", test_chase_step_border_jump_and_flip),
         ("chase_step_left_border", test_chase_step_left_border),
     ]))
