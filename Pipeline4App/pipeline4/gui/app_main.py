@@ -665,17 +665,18 @@ class App:
 
     # --- the phase handlers (run on the worker thread; emit via self._emit / self._status) ------- #
     def _run_validation(self, only=None):
-        """Phase 100. only=None: stage -> the 4 validators -> record the issues + write the 4 reports.
-        only=110/120/130/140: run just that validator and render to the log (the header writes the
-        reports). only=145: the standalone before/after quality report. Never halts."""
-        if only == 145:
-            return self._run_change_report()
+        """Phase 100 - the 4-step validation workflow (user spec): 1 validate doc 1 (110 I/O List),
+        2 validate doc 2 if present (120 C&E), 3 cross-checks (130+140), 4 diagnosis checks (150 -
+        requires a FILLED doc, SKIPs on a virgin one). only=None runs all + records the issues +
+        writes the reports; only=<sub> runs just that validator to the log. A FAIL halts the
+        pipeline after the reports are written (the severity contract)."""
         from pipeline4.core import config
         from pipeline4.domain import staging
-        from pipeline4.domain.validation import crosscheck, iolist, matrix, messages, phase as validation
+        from pipeline4.domain.validation import (crosscheck, diagcheck, iolist, matrix, messages,
+                                                 phase as validation)
         if only is None:
             from pipeline4.io import render as iorender
-            self._emit("PHASE", f"100 {i18n.tr('ph_validation', self.lang)}  (110 + 120 + 130 + 140)")
+            self._emit("PHASE", f"100 {i18n.tr('ph_validation', self.lang)}  (110 + 120 + 130 + 140 + 150)")
             self._status("validation…")
             database, _sf = staging.stage()
             res = validation.run_validation(database, lang=self.lang)
@@ -701,6 +702,9 @@ class App:
                 findings = iolist.run_iolist(params)
             elif only == 120:
                 findings = matrix.run_ce_matrix(params)
+            elif only == 150:                      # step 4: diagnosis checks over the staged SSOT
+                database, _sf = staging.stage(params)
+                findings = diagcheck.run_diag_checks(database, params)
             else:                                  # 130 / 140 read the staged signals
                 database, _sf = staging.stage(params)
                 runner = crosscheck.run_xcheck_cem_iol if only == 130 else crosscheck.run_xcheck_iol_cem
@@ -712,12 +716,12 @@ class App:
                            f"(log only; the 100 header writes the reports)")
 
     def _run_change_report(self):
-        """Phase 100 sub (145) - the STANDALONE before/after quality report (not part of the pipeline).
+        """Phase 900 sub (940) - the STANDALONE before/after quality report (not part of the pipeline).
         Reads the configured current + previous document revisions (`*_previous_path`), classifies the
         changes (matched / intact / corrected / upgrade / removed; systematic re-schemes netted out), and
         writes a graphical HTML dashboard + a CSV audit trail. Never halts; opens the report when done."""
         from pipeline4.domain.changes import run as changes_run
-        label = f"145 {i18n.tr('pb_change_report', self.lang)}"
+        label = f"940 {i18n.tr('pb_change_report', self.lang)}"
         self._emit("PHASE", label)
         self._status("quality report…")
         res = changes_run.run_change_report()
@@ -935,7 +939,10 @@ class App:
     def _run_reporting(self, only=None):
         """Phase 900: build the full SSOT (stage -> 520 -> 700; then the WARN-only 400/600/800) then
         coverage.build (the coverage table + ORPHAN/UNPLACED findings) -> coverage.project (the reports).
-        (910 == the whole phase.)"""
+        (910 == the whole phase; 940 = the standalone before/after quality report, moved here from the
+        validation dropdown - it is a REPORT, not a document check.)"""
+        if only == 940:
+            return self._run_change_report()
         from pipeline4.core import config, run
         from pipeline4.domain import staging, datablocks, interfaces, diagnosis, hardware, coverage
         from pipeline4.domain.blocks import engine

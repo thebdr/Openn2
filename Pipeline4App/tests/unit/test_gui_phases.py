@@ -31,7 +31,7 @@ def test_run_order():
 def test_subs_match_oracle():
     # The exact sub-button numbers per phase (ButtonsLayout.xlsx; phase 200 added at STEP 4).
     expected = {
-        100: [110, 120, 130, 140, 145, 150, 155, 156, 160, 170, 180, 190],  # 145 = PL4 before/after report (not in the oracle)
+        100: [110, 120, 130, 140, 150, 155, 156, 160, 170, 180, 190],  # 150 = step 4 diagnosis checks (live)
         200: [210, 220, 230, 240, 245, 250],     # 245 = the PL4 "Risky Index Fill" orange button (not in the oracle)
         300: [310, 320, 330],
         400: [410, 420, 430],
@@ -39,7 +39,7 @@ def test_subs_match_oracle():
         600: [610, 620, 630, 640],
         700: [710, 720, 730],
         800: [810, 820, 830, 840, 850],
-        900: [910, 920, 930],
+        900: [910, 920, 940, 930],   # 940 = the PL4 before/after report (moved from 145 - it is a REPORT)
     }
     for num, subs in expected.items():
         eq([s.number for s in phases.by_number(num).subs], subs, f"phase {num} sub numbers")
@@ -50,8 +50,8 @@ def test_kinds_and_enablement():
     opens = {s.number for p in phases.PHASES for s in p.subs if s.kind == "open"}
     eq(opens, {160, 170, 180, 190, 250, 330, 420, 530, 540, 630, 640, 730, 840, 850, 930}, "the open buttons")
     disabled = {s.number for p in phases.PHASES for s in p.subs if not s.enabled}
-    eq(disabled, {150, 155, 156, 430, 810, 840, 920},
-       "the deferred/unported (greyed) buttons (ph200 210/220/230/240 all built)")
+    eq(disabled, {155, 156, 430, 810, 840, 920},
+       "the deferred/unported (greyed) buttons (150 is LIVE now - the workflow's step 4)")
     specials = {s.number for p in phases.PHASES for s in p.subs if s.kind == "special"}
     eq(specials, {155, 156, 245, 430}, "the special buttons (Clean / custom-interface + the 245 Risky Index Fill)")
     for n in (160, 330, 530, 930):                       # a sampling of wired opens
@@ -85,7 +85,7 @@ def test_phase_of_sub():
 def test_by_number():
     eq(phases.by_number(800).handler, "_run_software")
     eq(phases.by_number(900).handler, "_run_reporting")
-    eq(len(phases.by_number(100).subs), 12, "phase 100: 11 oracle sub-buttons + the PL4 before/after report (145)")
+    eq(len(phases.by_number(100).subs), 11, "phase 100: the 11 oracle sub-buttons (the report moved to 900/940)")
     eq(phases.by_number(999), None, "an unknown number -> None")
 
 

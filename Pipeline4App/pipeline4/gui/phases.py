@@ -49,8 +49,7 @@ PHASES = (
         Sub(120, "pb_validate_ce"),
         Sub(130, "pb_xcheck_cem_iol"),
         Sub(140, "pb_xcheck_iol_cem"),
-        Sub(145, "pb_change_report"),                                    # PL4-native: before/after quality report (not in the pipeline)
-        Sub(150, "pb_validate_diag", enabled=False),                     # deferred (touches 300 parity)
+        Sub(150, "pb_validate_diag"),                                    # step 4: diagnosis checks (SKIPs on a virgin doc)
         Sub(155, "pb_clean_iolist", kind="special", enabled=False),      # clean.py not ported
         Sub(156, "pb_clean_cematrix", kind="special", enabled=False),
         Sub(160, "pb_open_errmgmt", kind="open", opens="error_mgmt"),
@@ -103,6 +102,7 @@ PHASES = (
     Phase(900, "ph_reporting", handler="_run_reporting", requires=(300,), subs=(
         Sub(910, "pb_gen_cov_pipeline"),
         Sub(920, "pb_gen_cov_tia", enabled=False),                       # 920 deferred (pending OP4 export)
+        Sub(940, "pb_change_report"),                                    # PL4-native: before/after quality report (moved from 145 - it is a REPORT)
         Sub(930, "pb_open_reports", kind="open", opens="coverage"),
     )),
 )

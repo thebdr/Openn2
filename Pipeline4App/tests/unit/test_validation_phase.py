@@ -30,7 +30,7 @@ def test_run_validation_orchestration():
             for name in ("documents_validation_report.txt", "documents_validation_report.html",
                          "documents_validation_errors.txt", "documents_validation_errors.html"):
                 ok(os.path.exists(os.path.join(rep, name)), f"{name} written")
-            eq(res["counts"], {"PASS": 1, "FAIL": 2, "INFO": 1, "WARN": 1}, "effective counts (no treatments)")
+            eq(res["counts"], {"PASS": 1, "FAIL": 2, "INFO": 2, "WARN": 1}, "effective counts (+ the 150 summary INFO)")
 
             comp = open(res["paths"]["documents_validation_report.txt"], encoding="utf-8").read()
             ok("110 Validate I/O List" in comp and "140 Cross-Check IOL->CEM" in comp, "all sub-phase banners")

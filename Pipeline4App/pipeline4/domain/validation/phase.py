@@ -19,11 +19,12 @@ from pipeline4.core import config, i18n, severity, treatments
 from pipeline4.core.finding import Finding, record
 from pipeline4.io import render
 from pipeline4.domain import staging
-from pipeline4.domain.validation import crosscheck, iolist, matrix, messages
+from pipeline4.domain.validation import crosscheck, diagcheck, iolist, matrix, messages
 
 # the sub-phase banner label KEYS (the registry's pb_* keys; resolved per language at render time)
 _BANNER_KEYS = {110: "pb_validate_iolist", 120: "pb_validate_ce",
-                130: "pb_xcheck_cem_iol", 140: "pb_xcheck_iol_cem"}
+                130: "pb_xcheck_cem_iol", 140: "pb_xcheck_iol_cem",
+                150: "pb_validate_diag"}
 _TREATABLE = ("FAIL", "ERRR", "WARN")
 
 
@@ -45,11 +46,12 @@ def run_validation(database=None, params: dict | None = None, out_dir: str | Non
         database, _staging_findings = staging.stage(params)
 
     with messages.active_lang(lang):                                # findings build their detail in `lang`
-        findings = []
-        findings += iolist.run_iolist(params)                      # 110 (raw I/O List)
-        findings += matrix.run_ce_matrix(params)                   # 120 (raw C&E)
-        findings += crosscheck.run_xcheck_cem_iol(database, params)  # 130 (CEM -> IOL, SSOT)
-        findings += crosscheck.run_xcheck_iol_cem(database, params)  # 140 (IOL -> CEM, SSOT)
+        findings = []                                              # the 4-step workflow (user spec):
+        findings += iolist.run_iolist(params)                      # 1. doc 1 (110, raw I/O List)
+        findings += matrix.run_ce_matrix(params)                   # 2. doc 2 if present (120, raw C&E)
+        findings += crosscheck.run_xcheck_cem_iol(database, params)  # 3. cross-checks (130 CEM -> IOL)
+        findings += crosscheck.run_xcheck_iol_cem(database, params)  #    + 140 (IOL -> CEM)
+        findings += diagcheck.run_diag_checks(database, params)    # 4. diagnosis (150; SKIPs on a virgin doc)
 
     # record only the ISSUES (FAIL/ERROR/WARN) into validation_issues - PASS/INFO/SKIP are report-only noise.
     record(database, [f for f in findings if f.severity in _TREATABLE])

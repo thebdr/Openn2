@@ -565,9 +565,19 @@ text is ported verbatim into each finding's `detail`.
   `(phase, type, norm(location), norm(detail))` across all 4 validators (`scratchpad/parity_100.py`; PL3 is fed
   PL4's staged rows so both validate the same data). Real-data counts: 341 PASS / 239 SKIP / 12 INFO / 4 WARN /
   0 FAIL (a clean project).
-- **OUT OF SCOPE (user decisions):** **150** (diagnosis-slot uniqueness - needs relocating `diag_container_check`
-  + populating `diag_block_name` at staging, which would touch the locked 300 parity) + the **`accept`**
-  doc-mutating treatment (dropped).
+- **THE 4-STEP VALIDATION WORKFLOW (production-test restructure, 2026-07-03):** 1 validate doc 1 (110
+  I/O List) · 2 validate doc 2 if present (120 C&E; SKIPs when absent) · 3 cross-checks (130+140) ·
+  4 diagnosis checks (**150 - NOW LIVE**, `domain/validation/diagcheck.py`): PL4-NATIVE over the SSOT
+  (no staging/parity touch - the old blocker was PL3's doc-based approach): per in-diag signal the
+  (Diag Cabinet, Diag Bit) pair must be numeric (`diag_invalid` FAIL), the cabinet must exist in
+  DiagnosisBlocks (`diag_unknown_cab` FAIL - a new PL4 check), and the slot must be unique per
+  ALARM/WARNING family (`diag_dup_slot` FAIL / `diag_unique` PASS; family = type_hw ends 'W', PL3's
+  rule). **Step 4 requires a FILLED doc**: a virgin one (no in-diag row assigned) SKIPs
+  (`diag_virgin`) pointing at 200 Fill. PL3's `diag_container_check` is NOT ported (needs the per-type
+  container config column + the cabinet FullName - a reviewed config addition when wanted). The
+  **before/after quality report moved 145 -> 940 under 900 Reporting** (it is a REPORT, not a document
+  check). Tests: `test_validation_diagcheck.py` (4, hermetic).
+- **OUT OF SCOPE (user decisions):** the **`accept`** doc-mutating treatment (dropped).
 
 ## Phase 100b — Before/After Quality Report — DONE (PL4-native, standalone; see `CHANGES_SPEC.md`)
 `domain/changes/` (reader · match · classify · report · run). A **standalone, non-pipeline** analysis under

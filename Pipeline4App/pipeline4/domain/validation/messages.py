@@ -112,6 +112,22 @@ MESSAGES = {
                         "it": "{checked} segnali I/O verificati rispetto alla matrice Cause&Effect"},
     "iol_cem_skip_summary": {"en": "{skipped} signals skipped by the exclusion lists",
                              "it": "{skipped} segnali ignorati dalle liste di esclusione"},
+    # --- 150 diagnosis checks (the workflow's step 4; PL3 texts, always-plural) ------------------ #
+    "diag_virgin": {"en": "No diagnosis assignments in the document - run 200 Documents Fill Out first "
+                          "(the diagnosis checks need a FILLED document)",
+                    "it": "Nessuna assegnazione diagnostica nel documento - eseguire prima 200 Compilazione "
+                          "Documenti (i controlli diagnostica richiedono un documento COMPILATO)"},
+    "diag_invalid": {"en": "In-diagnosis signal has missing/invalid {fields}",
+                     "it": "Segnale in diagnostica con {fields} mancante/non valido"},
+    "diag_unknown_cab": {"en": "Diag Cabinet {cab} is not in the DiagnosisBlocks sheet - its OPC block "
+                               "would silently not exist",
+                         "it": "Il quadro diagnostica {cab} non esiste nel foglio DiagnosisBlocks - il suo "
+                               "blocco OPC non esisterebbe"},
+    "diag_unique": {"en": "Diagnosis slot {slot} is unique", "it": "Slot diagnostica {slot} univoco"},
+    "diag_dup_slot": {"en": "Duplicate diagnosis slot {slot} - also at {others}",
+                      "it": "Slot diagnostica duplicato {slot} - anche in {others}"},
+    "diag_summary": {"en": "{n} in-diagnosis signals checked",
+                     "it": "{n} segnali in diagnostica verificati"},
 }
 
 _active = {"lang": "en"}                  # the ambient validation language (set per run by active_lang)

@@ -7,7 +7,7 @@ from pipeline4.domain.validation.model import entry
 
 
 def test_messages_bilingual():
-    eq(len(messages.MESSAGES), 50, "all 50 phase-100 slugs present")
+    eq(len(messages.MESSAGES), 56, "all 56 phase-100 slugs present (+ the 6 step-4 diagnosis slugs)")
     for slug, e in messages.MESSAGES.items():
         ok(e.get("en"), f"{slug} has EN")
         ok(e.get("it"), f"{slug} has IT")
