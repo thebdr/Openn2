@@ -786,11 +786,21 @@ The user-reviewed refresh before the first production test (the full spec + comm
   active sort/filters render as removable CHIPS above the header + a `k of n rows` count; filtered column
   headers read accent-coloured. `selection()`/`raw_of`/`on_edit` stay SOURCE-indexed, so hosts (the
   Findings treat, the CSV cell editor) are sort/filter-agnostic. `XLSX_MAX_ROWS` 3000 -> 50_000 (real
-  projects reach 10-20k rows - user). **ROADMAP (user-agreed)**: extract the viewer OUT of Pipeline4App as
-  a standalone/embeddable package (core/ + Tk shell), later a Rust core port (calamine+PyO3 - the xlsx
-  LOAD is the real bottleneck, not the virtual-rendered view), egui shell only if the standalone exe
-  needs it; remaining viewer features (quick-search, copy/export, freeze columns, row detail, footer
-  stats) land with the extraction.
+  projects reach 10-20k rows - user).
+- **Table viewer EXTRACTED (2026-07-03) -> the top-level `TableViewerApp/` package** (`tableviewer`:
+  `core.py` PURE engine [the executable spec for the Rust port] · `grid.py` Tk widget+popups · `theme.py`
+  REBINDABLE palette/fonts · `files.py` csv/xlsx loaders · `app.py`+`launch_viewer.py` standalone window).
+  **`pipeline4/gui/datagrid.py` is now the EMBEDDING SHIM**: sys.path's the sibling package, binds
+  `tableviewer.theme` to PL4's tokens + bundled fonts (pixel-identical, theme-toggle follows), re-exports
+  the historical surface - the 3 hosts + the test suite unchanged. Landed WITH the extraction (every PL4
+  table at once): **Ctrl+F global quick search** (col=None spec, live, a removable chip), **Ctrl+C TSV
+  copy** (selection in view order, else the filtered view), **row-detail card** (double-click on read-only
+  grids; set_data keeps raw rows so multi-line cells show whole), **column stats** in the filter popup
+  footer. Tests: `test_tableviewer_shim.py` (4: re-exports+theme binding, quick-search spec, tsv/stats,
+  the package STANDS ALONE - subprocess runs its own tests + imports pipeline4-free);
+  `TableViewerApp/tests/test_core.py` (bare-python standalone sanity). STILL DEFERRED: frozen/pinned
+  columns (a two-region canvas rework); then the Rust core port (calamine+PyO3), egui shell only if the
+  standalone exe needs it.
 - **`user_input/generation_params.yaml`** (active→builtin, neither→RAISE): the 620 SCL DWord names/variant/
   `S1.CABINET{$index}.{$role}` instance template (core/expr, strict) + the DiagList `$PLC_Binding$` sentinel;
   a builder declares its output surface at registration (`@builds(name, emit="fc_xml")`) — migrated at
