@@ -106,7 +106,7 @@ class App:
         self.notebook = ttk.Notebook(root)
         self._log_tab = ttk.Frame(self.notebook)
         self.log = LogView(self._log_tab, shown_levels=shown0, font_size=app_ui["font_size"],
-                           on_link=self._on_link, on_errtreat=self._on_errtreat)
+                           mode=self.mode, on_link=self._on_link, on_errtreat=self._on_errtreat)
         self.log.pack(side="top", fill="both", expand=True)
         self.notebook.add(self._log_tab, text=i18n.tr("tab_log", self.lang))
         self._files_tab = ttk.Frame(self.notebook)

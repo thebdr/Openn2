@@ -22,7 +22,8 @@ _ALWAYS_SHOWN = ("PHASE", "SUBPHASE", "FAIL", "ERROR")  # never hideable (banner
 
 
 class LogView(ttk.Frame):
-    def __init__(self, parent, shown_levels=None, on_link=None, on_errtreat=None, font_size=None, **kw):
+    def __init__(self, parent, shown_levels=None, on_link=None, on_errtreat=None, font_size=None,
+                 mode: str = "dark", **kw):
         super().__init__(parent, **kw)
         self.shown_levels = set(shown_levels) if shown_levels is not None else set(theme.LOG_COLORS)
         self.on_link = on_link                    # on_link(doc, sheet, cell)
@@ -56,6 +57,8 @@ class LogView(ttk.Frame):
         self.text.tag_bind("errlink", "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
         self.text.tag_bind("errlink", "<Leave>", lambda _e: self.text.configure(cursor=""))
         self._apply_elide()                       # hide the not-shown levels (lines are inserted, then elided)
+        self.set_theme(mode)                      # skin from the PERSISTED mode (the widget defaults are dark;
+                                                  # a light-theme launch must not open a dark pane)
 
     def append(self, level: str, message: str) -> None:
         """A plain (link-less) line - level-coloured. Inserted regardless of the shown set; a not-shown
