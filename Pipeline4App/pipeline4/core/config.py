@@ -222,6 +222,15 @@ def app_config_file() -> str:
     return os.path.join(config_project_dir(), "app_config.yaml")
 
 
+def builtin_app_config_file() -> str:
+    """The BUILTIN app_config.yaml - the home of the `user_interface` block. UI preferences
+    (language, log levels, theme, font, window size, tee) are APP/user-scoped, NOT project-scoped:
+    they must load and save against the SAME file no matter which project is open. (The launch-time
+    read also happens BEFORE auto_reopen, so an active-file save would silently 'unpersist' -
+    the production-test bug.) `files_tab` stays active->builtin (a project may override it)."""
+    return os.path.join(builtin_config_project_dir(), "app_config.yaml")
+
+
 def generation_params_file() -> str:
     """The relocated generation constants (user_input/generation_params.yaml; UI_REFRESH_PLAN F)."""
     return os.path.join(user_input_dir(), "generation_params.yaml")
@@ -293,9 +302,10 @@ def load_app_ui() -> dict:
     font size (one of APP_FONT_SIZES, default 10). `theme` -> 'light'/'dark' (default dark). `width`/`height`
     -> the saved window size (default 1180x720). `log_to_file` -> whether the GUI tees its log to a file
     (default False). Absent file/key -> `severity.default_shown()` (all finding levels except DEBUG) + `en`
-    + 10 + dark + 1180x720 + no tee."""
+    + 10 + dark + 1180x720 + no tee. ALWAYS the BUILTIN file - UI prefs are app-scoped (see
+    `builtin_app_config_file`)."""
     from pipeline4.core import severity, i18n
-    path = app_config_file()
+    path = builtin_app_config_file()
     cfg = _read_yaml(path) if os.path.exists(path) else {}
     ui = (cfg.get("user_interface") or {}) if isinstance(cfg, dict) else {}
     raw = ui.get("log_levels")
@@ -309,11 +319,12 @@ def load_app_ui() -> dict:
 
 
 def _save_app_ui(**updates) -> None:
-    """Set `user_interface.<key> = value` for each kwarg in `app_config.yaml`, round-tripping the file so its
-    comments survive. The shared writer behind the simple per-key savers (`save_app_log_levels` is bespoke -
-    it builds a flow-style code sequence)."""
+    """Set `user_interface.<key> = value` for each kwarg in the BUILTIN app_config.yaml (UI prefs are
+    app-scoped - the same file load_app_ui reads, whatever project is open), round-tripping the file so
+    its comments survive. The shared writer behind the simple per-key savers (`save_app_log_levels` is
+    bespoke - it builds a flow-style code sequence)."""
     from ruamel.yaml import YAML
-    path = app_config_file()
+    path = builtin_app_config_file()
     yaml = YAML()                                   # round-trip mode - preserves comments
     data = {}
     if os.path.exists(path):
@@ -356,16 +367,17 @@ def save_app_log_to_file(enabled) -> None:
 
 
 def save_app_log_levels(levels) -> None:
-    """Persist the GUI's shown log levels to `app_config.yaml` `user_interface.log_levels` as first-char
-    codes in canonical severity order (FAIL/ERROR are always included - they cannot be hidden). Round-trips
-    the file so its comments survive. `levels` is a set/iterable of canonical level names (severity.LEVELS)."""
+    """Persist the GUI's shown log levels to the BUILTIN app_config.yaml `user_interface.log_levels`
+    (app-scoped, like every UI pref) as first-char codes in canonical severity order (FAIL/ERROR are
+    always included - they cannot be hidden). Round-trips the file so its comments survive. `levels`
+    is a set/iterable of canonical level names (severity.LEVELS)."""
     from ruamel.yaml import YAML
     from ruamel.yaml.comments import CommentedSeq
     from pipeline4.core import severity
     shown = set(levels) | severity.HALTING | {"ERROR"}
     codes = CommentedSeq(level[0] for level in severity.LEVELS if level in shown)
     codes.fa.set_flow_style()                       # keep the [F, E, W, ...] one-line form
-    path = app_config_file()
+    path = builtin_app_config_file()
     yaml = YAML()                                   # round-trip mode - preserves comments
     data = {}
     if os.path.exists(path):

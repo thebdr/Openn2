@@ -9,14 +9,16 @@ from pipeline4.core import config
 
 
 def _with_temp_app_config(fn):
-    """Run fn() with config.app_config_file redirected to a fresh temp file (builtin untouched)."""
-    orig = config.app_config_file
+    """Run fn() with the UI-pref home (config.builtin_app_config_file - the loaders AND savers are
+    pinned to the BUILTIN file, app-scoped) redirected to a fresh temp file, so the tracked builtin
+    is untouched."""
+    orig = config.builtin_app_config_file
     with tempfile.TemporaryDirectory() as d:
-        config.app_config_file = lambda: os.path.join(d, "app_config.yaml")
+        config.builtin_app_config_file = lambda: os.path.join(d, "app_config.yaml")
         try:
             fn()
         finally:
-            config.app_config_file = orig
+            config.builtin_app_config_file = orig
 
 
 def test_resolve_font_size():
