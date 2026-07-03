@@ -39,6 +39,7 @@ PROJECT_TYPES = (
 BACKUPS_KEPT_MAX = 20
 BACKUPS_KEPT_DEFAULT = 5
 DOCS_DIRNAME = "input_documents"          # where Import-documents copies the source docs (current/previous)
+SCHEMA_VERSION = 1                        # the project meta/layout format (bumped on breaking changes)
 
 _NAME_BAD = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -134,23 +135,38 @@ def new_project(parent: str, name: str) -> str:
     return open_project(root)
 
 
-def write_project_meta(root: str, name: str, types, multi_system: bool, backups_kept: int) -> None:
-    """Insert/replace the `project:` section of `<root>/config_project/project_params.yaml`
-    (round-tripping the template's comments). `backups_kept` is the € user-editable knob - each phase
-    run backs the FULL project up (timestamped zip beside the project), pruned to this count."""
+def _update_meta(root: str, updates: dict) -> None:
+    """Merge `updates` into the `project:` section of `<root>/config_project/project_params.yaml`
+    (ruamel round-trip - the template's comments survive; the other sections are untouched)."""
     from ruamel.yaml import YAML
     yaml = YAML()
     path = os.path.join(root, _PARAMS_REL)
     with open(path, encoding="utf-8") as handle:
         data = yaml.load(handle) or {}
-    data["project"] = {
+    section = data.get("project")
+    if not isinstance(section, dict):
+        section = {}
+    section.update(updates)
+    data["project"] = section
+    with open(path, "w", encoding="utf-8") as handle:
+        yaml.dump(data, handle)
+
+
+def write_project_meta(root: str, name: str, types, multi_system: bool, backups_kept: int) -> None:
+    """Write the full `project:` meta at creation. `backups_kept` + `notes` are the € user-editable
+    knobs (each user button press backs the FULL project up, pruned to `backups_kept`); the
+    `schema_version`/`created`/`app_version` stamps identify what made the project (migration safety)."""
+    from pipeline4 import __version__
+    _update_meta(root, {
         "name": str(name),
         "types": [str(t) for t in types],
         "multi_system": bool(multi_system),
         "backups_kept": max(0, min(BACKUPS_KEPT_MAX, int(backups_kept))),
-    }
-    with open(path, "w", encoding="utf-8") as handle:
-        yaml.dump(data, handle)
+        "schema_version": SCHEMA_VERSION,
+        "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "app_version": __version__,
+        "notes": "",
+    })
 
 
 def load_project_meta(root: str) -> dict:
@@ -174,6 +190,22 @@ def create_project(base_folder: str, name: str, types, multi_system: bool, backu
     root = new_project(os.path.join(base_folder, name), name)
     write_project_meta(root, name, types, multi_system, backups_kept)
     return root
+
+
+def save_as(root: str, base_folder: str, new_name: str) -> str:
+    """'Save Project As': COPY the whole current project to `<base_folder>/<new_name>/<new_name>` (the
+    same double-nested layout; the backup zips stay with the ORIGINAL - the copy starts a fresh history),
+    restamp the meta name, open the copy, and return its root. The rename/migrate helper."""
+    problem = validate_name(new_name)
+    if problem:
+        raise ValueError(problem)
+    new_name = str(new_name).strip()
+    new_root = os.path.abspath(os.path.join(base_folder, new_name, new_name))
+    if os.path.exists(new_root):
+        raise FileExistsError(new_root)
+    shutil.copytree(os.path.abspath(root), new_root, ignore=shutil.ignore_patterns("~$*"))
+    _update_meta(new_root, {"name": new_name})
+    return open_project(new_root)
 
 
 # --- backups + archive (timestamped zips of the FULL project) ------------------------------------- #
@@ -228,41 +260,111 @@ def archive_project(root: str, dest_zip: str) -> int:
     return zip_folder(root, dest_zip)
 
 
+def restore_backup(root: str, zip_path: str) -> str:
+    """Extract a backup zip into a NEW sibling folder (`<outer>/restored_<zip stem>/`) - the live
+    project is NEVER overwritten - and return the restored project ROOT (the zip's top-level folder
+    is the project name). Raises FileExistsError when that restore folder already exists."""
+    outer = os.path.dirname(os.path.abspath(root))
+    stem = os.path.splitext(os.path.basename(zip_path))[0]
+    dest_parent = os.path.abspath(os.path.join(outer, f"restored_{stem}"))
+    if os.path.exists(dest_parent):
+        raise FileExistsError(dest_parent)
+    with zipfile.ZipFile(zip_path) as bundle:
+        tops = set()
+        for member in bundle.namelist():
+            target = os.path.abspath(os.path.join(dest_parent, member))
+            if target != dest_parent and not target.startswith(dest_parent + os.sep):  # zip-slip guard
+                raise ValueError(f"unsafe path in backup zip: {member}")
+            tops.add(member.replace("\\", "/").split("/", 1)[0])
+        bundle.extractall(dest_parent)
+    inner = sorted(t for t in tops if t)
+    return os.path.join(dest_parent, inner[0]) if inner else dest_parent
+
+
 # --- import the source documents INTO the project (self-contained projects) ----------------------- #
+def record_imports(root: str, records: dict) -> None:
+    """Remember where the imported documents CAME from: `{key: {source, mtime}}` merged into the
+    `project.imported` meta - the stale-import check compares the original's current mtime against
+    the recorded one, so a source someone keeps editing is flagged instead of silently diverging."""
+    if not records:
+        return
+    merged = dict(load_project_meta(root).get("imported") or {})
+    merged.update(records)
+    _update_meta(root, {"imported": merged})
+
+
+def _remembered_source(record: dict) -> tuple:
+    """(source_path, recorded_mtime) out of one `project.imported` record ('' / 0 when unusable)."""
+    source = str((record or {}).get("source") or "")
+    try:
+        recorded = int((record or {}).get("mtime") or 0)
+    except (TypeError, ValueError):
+        recorded = 0
+    return source, recorded
+
+
+def stale_imports(root: str) -> list:
+    """The imported documents whose ORIGINAL source file changed AFTER the import: [(key, source)].
+    The GUI warns on open; the next Import-documents run refreshes the project copy from the source.
+    (A >1s mtime margin absorbs filesystem timestamp granularity.)"""
+    out = []
+    for key, record in (load_project_meta(root).get("imported") or {}).items():
+        source, recorded = _remembered_source(record)
+        if source and os.path.isfile(source) and int(os.path.getmtime(source)) > recorded + 1:
+            out.append((key, source))
+    return out
+
+
 def import_documents(root: str) -> list:
     """Copy every configured input document that lives OUTSIDE the project into
     `<root>/input_documents/current|previous/` and rewrite its path in project_params.yaml RELATIVE
     to config_project (so the whole project moves as one folder). A path already inside the project
-    is only normalized to relative. Returns [(key, action, new_value)] for the status line.
-    `root` must be the ACTIVE project (save_document_path writes the active params file)."""
+    is normalized to relative; when its remembered SOURCE (a prior import) is newer than the copy,
+    the copy is REFRESHED from it. Each copy records `{source, mtime}` into the `project.imported`
+    meta (the stale-import check). Returns [(key, action, new_value)] for the status line - action
+    in imported | refreshed | up-to-date | missing. `root` must be the ACTIVE project
+    (save_document_path writes the active params file)."""
     active = config.active_project()
     if not active or os.path.abspath(active) != os.path.abspath(root):
         raise ValueError("import_documents requires the target to be the ACTIVE project")
     params = config.load_params(os.path.join(root, _PARAMS_REL))
     config_dir = os.path.join(os.path.abspath(root), CONFIG_DIRNAME)
+    remembered = load_project_meta(root).get("imported") or {}
+    records: dict = {}
     actions = []
     for key in config.DOCUMENT_KEYS:
-        source = str(params.get(key) or "").strip()
-        if not source:
+        configured = str(params.get(key) or "").strip()
+        if not configured:
             continue
-        source = os.path.abspath(source)
-        if not os.path.isfile(source):
-            actions.append((key, "missing", source))
-            continue
+        configured = os.path.abspath(configured)
         inside = os.path.commonpath([os.path.abspath(root)]) == \
-            os.path.commonpath([os.path.abspath(root), source])
+            os.path.commonpath([os.path.abspath(root), configured])
         if inside:
-            target = source
-            action = "relinked"
+            target = configured
+            action = "up-to-date"
+            source, recorded = _remembered_source(remembered.get(key))
+            if source and os.path.isfile(source) and int(os.path.getmtime(source)) > recorded + 1:
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                shutil.copy2(source, target)      # the original moved on since the import - refresh
+                records[key] = {"source": source, "mtime": int(os.path.getmtime(source))}
+                action = "refreshed"
+            if not os.path.isfile(target):
+                actions.append((key, "missing", configured))
+                continue
         else:
+            if not os.path.isfile(configured):
+                actions.append((key, "missing", configured))
+                continue
             sub = "previous" if key.endswith("_previous_path") else "current"
-            target = os.path.join(root, DOCS_DIRNAME, sub, os.path.basename(source))
+            target = os.path.join(root, DOCS_DIRNAME, sub, os.path.basename(configured))
             os.makedirs(os.path.dirname(target), exist_ok=True)
-            shutil.copy2(source, target)
+            shutil.copy2(configured, target)
+            records[key] = {"source": configured, "mtime": int(os.path.getmtime(configured))}
             action = "imported"
         relative = os.path.relpath(target, config_dir).replace(os.sep, "/")
         config.save_document_path(key, relative)
         actions.append((key, action, relative))
+    record_imports(root, records)
     return actions
 
 

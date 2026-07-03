@@ -130,6 +130,7 @@ class App:
         self.log.append("PHASE", "Pipeline4 - SSOT database build")
         self.log.append("INFO", f"theme backend: {backend}")
         self.log.append("INFO", "Click a phase to run it (on a worker thread), or Run Pipeline for all.")
+        self._warn_stale_imports()             # flag source docs edited after their import (launch check)
         if self._log_to_file0:                 # the tee was ON last session - resume it (the log now exists)
             self._enable_log_sink()
             self._tb_logfile.configure(text=self._logfile_label())
@@ -185,9 +186,10 @@ class App:
         threading.Thread(target=self._worker, args=(number, label), daemon=True).start()
 
     def _backup_before(self, label) -> None:
-        """The per-phase project backup (worker thread): a timestamped zip of the FULL project beside
-        it, pruned to `project.backups_kept` (the € knob in project_params.yaml; 0 / builtin = off).
-        A backup failure warns and never blocks the run."""
+        """The per-BUTTON-PRESS project backup (worker thread): ONE timestamped zip of the FULL project
+        beside it per user action (a phase click, Run Pipeline, a sub-phase, a special - never the blue
+        open buttons), pruned to `project.backups_kept` (the € knob in project_params.yaml; 0 / builtin
+        = off). A backup failure warns and never blocks the run."""
         if not self._project:
             return
         try:
@@ -208,6 +210,7 @@ class App:
         self._run_halted = False
         try:
             if number == 0:
+                self._backup_before("run_pipeline")   # one backup per button press, not per chain leg
                 self._run_all()
             else:
                 phase = phases.by_number(number)
@@ -235,7 +238,6 @@ class App:
             name = i18n.tr(phase.name_key, self.lang)
             self._status(f"[{i}/{len(order)}] {number} {name}…")
             self._emit("INFO", f"[{i}/{len(order)}] running {number} {name}")
-            self._backup_before(number)
             try:
                 getattr(self, phase.handler)()
             except Exception:  # noqa: BLE001 - attribute the crash to THIS phase, stop the chain like a halt
@@ -388,6 +390,17 @@ class App:
         menu.add_separator()
         menu.add_command(label=i18n.tr("pm_archive", self.lang), command=self._project_archive,
                          state="normal" if self._project else "disabled")
+        menu.add_command(label=i18n.tr("pm_save_as", self.lang) + "…", command=self._project_save_as,
+                         state="normal" if self._project else "disabled")
+        restore_menu = tk.Menu(menu, tearoff=0)
+        backups = self._backup_zips()
+        for zip_path in backups:
+            restore_menu.add_command(label=os.path.basename(zip_path),
+                                     command=lambda z=zip_path: self._project_restore(z))
+        if not backups:
+            restore_menu.add_command(label=i18n.tr("pm_no_backups", self.lang), state="disabled")
+        menu.add_cascade(label=i18n.tr("pm_restore", self.lang), menu=restore_menu,
+                         state="normal" if self._project else "disabled")
         menu.add_command(label=i18n.tr("pm_close", self.lang), command=self._project_close,
                          state="normal" if self._project else "disabled")
 
@@ -402,6 +415,21 @@ class App:
         self.findings.refresh()
         where = project.project_name(root) if root else i18n.tr("pm_builtin", self.lang)
         self.log.append("PHASE", f"project -> {where}")
+        self._warn_stale_imports()
+
+    def _warn_stale_imports(self) -> None:
+        """WARN when an imported document's ORIGINAL source changed after the import (the project copy
+        silently diverges) - checked at launch + on every project switch; the Import-documents button
+        refreshes the copy from the remembered source."""
+        if not self._project:
+            return
+        try:
+            stale = project.stale_imports(self._project)
+        except Exception:  # noqa: BLE001 - a malformed meta must not break a project switch
+            return
+        for key, source in stale:
+            self.log.append("WARN", f"  {key.replace('_path', '')}: the original document changed after "
+                                    f"it was imported - {source} (Import documents refreshes the copy)")
 
     def _project_switch_to(self, root):
         try:
@@ -451,6 +479,59 @@ class App:
             self.log.append("ERROR", f"  archive failed: {error}")
             return
         self.log.append("PASS", "  " + i18n.tr("pm_archived", self.lang, n=count, path=chosen))
+
+    def _backup_zips(self):
+        """The current project's backup zips, newest first (feeds the Restore-from-backup submenu)."""
+        if not self._project:
+            return []
+        folder = project.backups_dir(self._project)
+        try:
+            names = [n for n in os.listdir(folder) if n.lower().endswith(".zip")]
+        except OSError:
+            return []
+        return [os.path.join(folder, n) for n in sorted(names, reverse=True)]
+
+    def _project_save_as(self):
+        """Save Project As: copy the WHOLE current project to <base>/<name>/<name> (fresh backup
+        history - the zips stay with the original) and switch to the copy. The rename/migrate helper."""
+        from tkinter import filedialog, simpledialog
+        if not self._project:
+            return
+        base = filedialog.askdirectory(parent=self.root, title=i18n.tr("pm_save_as", self.lang),
+                                       initialdir=os.path.dirname(os.path.dirname(self._project)))
+        if not base:
+            return
+        name = simpledialog.askstring(i18n.tr("pm_save_as", self.lang), i18n.tr("np_name", self.lang),
+                                      parent=self.root,
+                                      initialvalue=project.project_name(self._project) + "_copy")
+        if not name:
+            return
+        try:
+            new_root = project.save_as(self._project, base, name)
+        except (ValueError, FileExistsError, OSError, project.ProjectConfigError) as error:
+            self.log.append("ERROR", f"  save as failed: {error}")
+            return
+        self._apply_project_switch(new_root)
+        self.log.append("PASS", "  " + i18n.tr("pm_saved_as", self.lang, path=new_root))
+
+    def _project_restore(self, zip_path):
+        """Restore a backup: extract it to a NEW sibling folder (the live project is never overwritten)
+        and switch to the restored copy."""
+        from tkinter import messagebox
+        if not self._project:
+            return
+        if not messagebox.askyesno(i18n.tr("pm_restore", self.lang),
+                                   i18n.tr("pm_restore_confirm", self.lang,
+                                           name=os.path.basename(zip_path)), parent=self.root):
+            return
+        try:
+            new_root = project.restore_backup(self._project, zip_path)
+            opened = project.open_project(new_root)
+        except (ValueError, FileExistsError, OSError, project.ProjectConfigError) as error:
+            self.log.append("ERROR", f"  restore failed: {error}")
+            return
+        self._apply_project_switch(opened)
+        self.log.append("PASS", "  " + i18n.tr("pm_restored", self.lang, path=opened))
 
     def _project_set_root(self):
         from tkinter import filedialog

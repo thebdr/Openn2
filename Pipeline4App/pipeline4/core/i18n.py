@@ -112,6 +112,15 @@ STRINGS: dict = {
     "pm_set_root":  {"en": "Set projects root", "it": "Imposta cartella progetti"},
     "pm_archive":   {"en": "Archive Project…", "it": "Archivia progetto…"},
     "pm_archived":  {"en": "archived {n} files -> {path}", "it": "archiviati {n} file -> {path}"},
+    "pm_save_as":   {"en": "Save Project As", "it": "Salva progetto come"},
+    "pm_saved_as":  {"en": "project copied -> {path}", "it": "progetto copiato -> {path}"},
+    "pm_restore":   {"en": "Restore from backup", "it": "Ripristina da backup"},
+    "pm_no_backups": {"en": "(no backups yet)", "it": "(nessun backup)"},
+    "pm_restore_confirm": {"en": "Extract {name} to a NEW folder beside the project and switch to it?\n"
+                                 "The current project is not touched.",
+                           "it": "Estrarre {name} in una NUOVA cartella accanto al progetto e aprirla?\n"
+                                 "Il progetto corrente non viene toccato."},
+    "pm_restored":  {"en": "backup restored -> {path}", "it": "backup ripristinato -> {path}"},
     "pm_close":     {"en": "Close Project (use builtin)", "it": "Chiudi progetto (usa predefinito)"},
     # --- the New Project dialog ------------------------------------------------------------ #
     "np_title":     {"en": "New project", "it": "Nuovo progetto"},

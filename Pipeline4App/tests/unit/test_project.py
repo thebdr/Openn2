@@ -157,6 +157,9 @@ def test_create_project_double_nested_with_meta():
         eq(meta.get("types"), ["siemens_plc_safety"])
         eq(meta.get("multi_system"), False)
         eq(meta.get("backups_kept"), project.BACKUPS_KEPT_MAX, "backups_kept clamps to the 20 limit")
+        eq(meta.get("schema_version"), project.SCHEMA_VERSION, "the meta format is stamped")
+        ok(meta.get("created") and meta.get("app_version"), "created + app_version stamps present")
+        eq(meta.get("notes"), "", "the € notes field starts empty")
         eq(config.active_project(), root, "created + opened")
         try:
             project.create_project(d, "bad/name", ["siemens_plc_safety"], False, 5)
@@ -214,7 +217,7 @@ def test_archive_and_import_documents():
         with open(params["iolist_previous_path"], "rb") as h:
             eq(h.read(), b"PREV")
         actions2 = {k: (a, v) for k, a, v in project.import_documents(root)}
-        eq(actions2["iolist_path"][0], "relinked", "a second run only normalizes (already inside)")
+        eq(actions2["iolist_path"][0], "up-to-date", "a second run with an unchanged source only normalizes")
         dest = os.path.join(d, "arch.zip")
         count = project.archive_project(root, dest)
         ok(count > 10 and os.path.isfile(dest), "Archive Project writes one compressed zip")
@@ -224,6 +227,70 @@ def test_archive_and_import_documents():
             ok(False, "import must refuse a non-active project")
         except ValueError:
             ok(True, "the active-project guard holds")
+    _with_temp_localappdata(body)
+
+
+def test_stale_import_detection_and_refresh():
+    """The stale-import cycle: import records {source, mtime}; editing the ORIGINAL flags the key in
+    stale_imports (the GUI open-time WARN); the next Import REFRESHES the project copy from it."""
+    def body(d):
+        config.use_builtin()
+        root = project.create_project(d, "Stale", ["siemens_plc_safety"], False, 5)
+        src = os.path.join(d, "ext"); os.makedirs(src)
+        doc = os.path.join(src, "io.xlsx")
+        with open(doc, "wb") as h:
+            h.write(b"V1")
+        config.save_document_path("iolist_path", doc)
+        actions = {k: a for k, a, _v in project.import_documents(root)}
+        eq(actions["iolist_path"], "imported", "first run copies the external doc")
+        rec = project.load_project_meta(root).get("imported", {}).get("iolist_path", {})
+        eq(rec.get("source"), os.path.abspath(doc), "the import remembers WHERE the copy came from")
+        eq(project.stale_imports(root), [], "an untouched source is not stale")
+        with open(doc, "wb") as h:
+            h.write(b"V2-NEWER")
+        newer = os.path.getmtime(doc) + 10
+        os.utime(doc, (newer, newer))               # simulate the original edited AFTER the import
+        eq(project.stale_imports(root), [("iolist_path", os.path.abspath(doc))],
+           "an edited original is flagged stale")
+        actions2 = {k: a for k, a, _v in project.import_documents(root)}
+        eq(actions2["iolist_path"], "refreshed", "the next import refreshes the copy from the source")
+        with open(config.load_params()["iolist_path"], "rb") as h:
+            eq(h.read(), b"V2-NEWER", "the project copy now carries the new content")
+        eq(project.stale_imports(root), [], "refreshed -> no longer stale")
+    _with_temp_localappdata(body)
+
+
+def test_restore_backup_and_save_as():
+    def body(d):
+        config.use_builtin()
+        root = project.create_project(d, "Rst", ["siemens_plc_safety"], False, 5)
+        marker = os.path.join(root, "Database", "marker.txt")
+        with open(marker, "w") as h:
+            h.write("SNAPSHOT")
+        zip_path = project.make_backup(root, "300", keep=5)
+        with open(marker, "w") as h:
+            h.write("CHANGED-AFTER-BACKUP")
+        restored = project.restore_backup(root, zip_path)
+        ok(os.path.abspath(restored) != os.path.abspath(root), "restore NEVER lands on the live project")
+        eq(os.path.dirname(os.path.dirname(restored)), os.path.dirname(root),
+           "the restore folder is a SIBLING inside the outer root")
+        ok(project.is_project(restored), "the restored folder is a full project")
+        with open(os.path.join(restored, "Database", "marker.txt")) as h:
+            eq(h.read(), "SNAPSHOT", "the restored copy carries the BACKED-UP state")
+        with open(marker) as h:
+            eq(h.read(), "CHANGED-AFTER-BACKUP", "the live project is untouched")
+        try:
+            project.restore_backup(root, zip_path)
+            ok(False, "a second restore of the same zip must not clobber the first")
+        except FileExistsError:
+            ok(True, "an existing restore folder raises FileExistsError")
+        copy = project.save_as(root, d, "RstCopy")
+        eq(copy, os.path.abspath(os.path.join(d, "RstCopy", "RstCopy")),
+           "save-as lands at the double-nested <base>/<name>/<name>")
+        eq(project.load_project_meta(copy).get("name"), "RstCopy", "the meta name is restamped")
+        eq(project.load_project_meta(copy).get("backups_kept"), 5, "the other meta knobs survive the copy")
+        eq(config.active_project(), copy, "save-as switches to the copy")
+        ok(not os.path.isdir(project.backups_dir(copy)), "the backup zips stay with the ORIGINAL")
     _with_temp_localappdata(body)
 
 
@@ -241,4 +308,6 @@ if __name__ == "__main__":
         ("create_project_double_nested_with_meta", test_create_project_double_nested_with_meta),
         ("backup_rotation_and_zip", test_backup_rotation_and_zip),
         ("archive_and_import_documents", test_archive_and_import_documents),
+        ("stale_import_detection_and_refresh", test_stale_import_detection_and_refresh),
+        ("restore_backup_and_save_as", test_restore_backup_and_save_as),
     ]))
