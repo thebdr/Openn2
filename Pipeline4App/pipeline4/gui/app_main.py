@@ -94,10 +94,12 @@ class App:
         self.phasebar = PhaseBar(root, self._on_phase, self._sub_command, lang=self.lang, mode=self.mode)
         self.phasebar.pack(side="top", fill="x", padx=8, pady=2)
 
-        # the status bar + the busy progressbar live at the bottom (progress just above the status line).
+        # the status bar + the busy strip live at the bottom (the pixel CHASE runs while a phase is
+        # busy; Run-Pipeline adds its real progress underline).
+        from pipeline4.gui.chasebar import ChaseBar
         self.status = ttk.Label(root, text=i18n.tr("st_ready", self.lang), anchor="w", relief="sunken")
         self.status.pack(side="bottom", fill="x")
-        self.progress = ttk.Progressbar(root, mode="indeterminate")
+        self.progress = ChaseBar(root, mode=self.mode)
         self.progress.pack(side="bottom", fill="x")
 
         # the Log notebook (Findings / Database Explorer / Files tabs join here in later milestones).
@@ -138,7 +140,8 @@ class App:
         # every themed component subscribes ONCE; theme.set_mode notifies them on a toggle (the manual
         # per-component fan-out in _toggle_theme is retired with the sv-ttk backend).
         for callback in (self.log.set_theme, self.phasebar.set_theme, self.explorer.set_theme,
-                         self.files.set_theme, self.documents.set_theme, self.findings.set_theme):
+                         self.files.set_theme, self.documents.set_theme, self.findings.set_theme,
+                         self.progress.set_theme):
             theme.register(callback)
 
         # the guide (UI_REFRESH_PLAN I): F1 opens the section for the focused area; the attached ids
@@ -594,12 +597,13 @@ class App:
     def _set_busy(self, busy: bool, *, determinate: bool = False, total: int = 0):
         self._busy = busy
         self.phasebar.set_enabled(not busy)
-        if busy and determinate:              # Run-all: a real 0..N bar stepped per completed phase
+        if busy and determinate:              # Run-all: the chase + a real 0..N underline per phase
             self.progress.configure(mode="determinate", maximum=max(1, total), value=0)
-        elif busy:                            # single phase: an indeterminate bounce
+            self.progress.start(12)
+        elif busy:                            # single phase: the chase alone
             self.progress.configure(mode="indeterminate")
             self.progress.start(12)
-        else:                                 # idle: stop + reset to the indeterminate default
+        else:                                 # idle: stop + reset
             self.progress.stop()
             self.progress.configure(mode="indeterminate", value=0)
 
