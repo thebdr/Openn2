@@ -63,6 +63,17 @@ def test_fill_ab_ac_modes_and_unresolved():
         eq([f.type for f in res["findings"] if f.severity == "FAIL"], ["fill_unresolved"], "one blocking FAIL")
         eq([f.type for f in res["findings"] if f.type == "fill_type_mismatch"][0:1], ["fill_type_mismatch"], "Mode-2 audit WARN")
         ok(res["backup"], "the raw doc changed -> the backup is KEPT")
+        # the finding hand-off: doc-located findings carry the WORKBOOK (the log links + the Findings
+        # jump need it) and the treatable ones are RECORDED (ph200 is doc-only, but findings are facts)
+        fail = next(f for f in res["findings"] if f.severity == "FAIL")
+        eq(fail.doc, "io.xlsx", "a Sheet!Cell finding carries its workbook")
+        ok("!" in fail.location, "…and a doc-located location")
+        issues_path = os.path.join(config.database_dir(), "validation_issues.csv")
+        ok(os.path.exists(issues_path), "the fill findings are recorded to validation_issues")
+        with open(issues_path, encoding="utf-8") as h:
+            body = h.read()
+        ok(fail.uid in body and "fill_unresolved" in body,
+           "the [FAIL] log line's uid IS in the table - the Findings jump lands")
 
 
 def test_fill_is_idempotent_noop_drops_backup():

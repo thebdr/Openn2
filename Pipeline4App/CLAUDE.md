@@ -547,7 +547,9 @@ text is ported verbatim into each finding's `detail`.
   (database, params): runs 110->120->130->140, **records only the treatable (FAIL/ERROR/WARN) findings** into
   `validation_issues` (PASS/INFO/SKIP are report-only noise) + saves, applies the treatment registry READ-ONLY
   for the report's EFFECTIVE severity, interleaves a per-(sub)phase banner, and writes the **4 report files**
-  (`documents_validation_report`/`_errors` x `.txt`/`.html`) to `config.validation_report_dir()`. NEVER halts.
+  (`documents_validation_report`/`_errors` x `.txt`/`.html`) to `config.validation_report_dir()`.
+  `run_validation` itself never raises (reports always written); since the 2026-07-03 severity contract the
+  GUI then HALTS the pipeline on any FAIL finding (see THE SEVERITY CONTRACT above).
   The GUI **"100" button** (`_run_validation`: stage -> run_validation -> the FULL banner-interleaved `items`
   render to the GUI log via `render.render_records` [EVERY level - the Levels dropdown elide-filters the view;
   the tee gets it all] + `treatments.apply_and_reconcile` over the issues [registry maintenance; never halts]
@@ -729,6 +731,17 @@ registry-driven bar, the structured-record clickable log, the Files tab, threadi
   shown). Each level has a distinct first char (F E W I S P D), so config lists/registries can use single
   chars, the 4-letter codes, or legacy full names (`ERROR`/`DEBUG` resolve unchanged) interchangeably
   (`severity.resolve`/`resolve_set`).
+- **THE SEVERITY CONTRACT (production-test decision, 2026-07-03): FAIL ALWAYS HALTS THE PIPELINE.**
+  FAIL = halts (pre-write via `_gate`: nothing written; post-write via `_render`: the output already on
+  disk is flagged SUSPECT + the run/Run-all chain stops - incl. a treatment-ESCALATED finding); ERRR =
+  possibly-corrupt output, no halt; WARN/SKIP/PASS/INFO = informative. Every phase seam enforces it:
+  the gated builds (300/520/700 + ph200 fill via `_gate`), the projection/report phases (400/510/600/800/
+  900/145 via the now-halt-capable `_render`), and the full 100 (halt after reconcile - reports written,
+  generation blocked). **ph200 findings are RECORDED**: the fill is doc-only, so `fill._finalize_findings`
+  stamps `doc` onto every Sheet!Cell-located finding (the log links + the [FAIL]->Findings jump need it)
+  and `finding.record_standalone` appends the treatable ones to `validation_issues.csv` alone (loads/saves
+  ONLY that table - no other SSOT file touched). NOTE: in Run-all, validation (100) runs LAST by design -
+  its halt marks the run, it does not protect the already-run generation phases.
 - **THE LOG ENGINE (production-test consolidation, 2026-07-03).** All TABULAR log data flows through ONE
   engine - `io/render.render_records` over Findings - consumed by every phase via the GUI `_gate`/`_render`
   seam and `run_validation` (and persisted to `validation_issues` for the Findings tab). Its layout rules:

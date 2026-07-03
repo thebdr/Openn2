@@ -300,7 +300,7 @@ class App:
         label = f"245 {i18n.tr('pb_risky_index', self.lang)}"
         self._emit("PHASE", label)
         res = fill.risky_index_fill()
-        self._render(res["findings"])                                  # WARN/INFO only (doc already written)
+        self._render(res["findings"], label="245 risky index")         # doc already written
         backup = f"  (backup {os.path.basename(res['backup'])})" if res.get("backup") else "  (no change)"
         self._emit("WARN", f"  RISKY: filled {res['filled']} index cell(s) by node row-order; "
                            f"{res.get('leftover', 0)} left unresolved -> "
@@ -621,10 +621,17 @@ class App:
             return False
         return True
 
-    def _render(self, findings) -> None:
-        """Apply the registry + post the EFFECTIVE-severity findings as structured records (never halts)."""
-        _applied, recs = findings_view.apply_and_records(findings)
+    def _render(self, findings, *, label: str = "") -> None:
+        """Apply the registry + post the EFFECTIVE-severity findings as structured records. The severity
+        CONTRACT (user spec): FAIL always HALTS THE PIPELINE - even from a projection/report phase whose
+        output is already on disk (the halt stops the RUN and marks the output suspect; it cannot
+        unwrite). ERRR/WARN/… never halt. `_gate` is the pre-write variant (halt BEFORE writing)."""
+        applied, recs = findings_view.apply_and_records(findings)
         self._q.put(("records", recs))
+        if treatments.should_halt(applied):
+            self._run_halted = True           # Run-all stops the chain here
+            self._emit("FAIL", f"  {label or 'phase'}: a FAIL-severity finding HALTS the pipeline - "
+                               "the output written above is SUSPECT, review it before use")
 
     # --- log link callbacks (main thread) ------------------------------------------------------- #
     def _resolve_doc(self, basename: str) -> str:
@@ -673,10 +680,14 @@ class App:
             database, _sf = staging.stage()
             res = validation.run_validation(database, lang=self.lang)
             issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERRR", "WARN")]
-            treatments.apply_and_reconcile(issues)      # registry maintenance (the records come from items)
+            applied = treatments.apply_and_reconcile(issues)   # registry maintenance
             # the FULL report to the log - every level + the 110/120/130/140 sub-phase banners (the Levels
             # dropdown filters the view; a hidden level is elided, not dropped, and still reaches the tee).
             self._q.put(("records", iorender.render_records(res["items"])))
+            if treatments.should_halt(applied):        # the severity contract: FAIL halts the pipeline
+                self._run_halted = True
+                self._emit("FAIL", "  100: FAIL findings in the documents - the pipeline HALTS here "
+                                   "(the reports are written; fix the documents before building)")
             c = res["counts"]
             self._emit("PASS", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERRR', 0)} ERRR, "
                                f"{c.get('WARN', 0)} WARN, {c.get('PASS', 0)} PASS, {c.get('SKIP', 0)} SKIP "
@@ -695,7 +706,7 @@ class App:
                 runner = crosscheck.run_xcheck_cem_iol if only == 130 else crosscheck.run_xcheck_iol_cem
                 findings = runner(database, params)
         issues = [f for f in findings if f.severity in ("FAIL", "ERRR", "WARN")]
-        self._render(findings)                          # the FULL sub-phase log (all levels, elide-filtered)
+        self._render(findings, label=str(only))         # the FULL sub-phase log (all levels, elide-filtered)
         n_pass = sum(1 for f in findings if f.severity == "PASS")
         self._emit("PASS", f"  {only}: {len(issues)} issues + {n_pass} PASS "
                            f"(log only; the 100 header writes the reports)")
@@ -796,7 +807,7 @@ class App:
             self._status("I/O tags…")
             database, iface_findings = interfaces.build_interfaces(database)
             res = io_tags.project(database)
-            self._render(iface_findings + res["findings"])
+            self._render(iface_findings + res["findings"], label="510 I/O tags")
             self._emit("PASS", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
                                f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {config.io_tags_dir()}")
 
@@ -817,14 +828,14 @@ class App:
             self._emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
         database, iface_findings = interfaces.build_interfaces(database)
-        self._render(iface_findings)
+        self._render(iface_findings, label="400 interfaces")
         result = interface_xlsx.project(database)
         n_if, n_el = len(database["interfaces"]), len(database["interface_elements"])
         self._emit("PASS", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "
                            f"IF_*.xlsx in {config.interfaces_dir()}")
         from pipeline4.domain import interface_scl
         scl = interface_scl.project(database)
-        self._render(scl["findings"])
+        self._render(scl["findings"], label="430 MachineInterfaces SCL")
         if scl["path"]:
             self._emit("PASS", f"  MachineInterfaces SCL: {scl['assignments']} assignments across "
                                f"{scl['interfaces']} interfaces -> {scl['path']}")
@@ -861,7 +872,7 @@ class App:
             res = diaglist_csv.project(database); rendered += res["findings"]
         if only in (None, 620):
             scl = diagnosis_scl.project(database); rendered += scl["findings"]
-        self._render(rendered)
+        self._render(rendered, label="600 diagnosis")
         if res is not None:
             self._emit("PASS", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> {config.diaglist_dir()}")
         if scl is not None and scl["path"]:
@@ -914,7 +925,7 @@ class App:
             res = engine.project(database); rendered += res["findings"]
         if only in (None, 830):
             inst = engine.write_instance_dbs(database)
-        self._render(rendered)
+        self._render(rendered, label="800 software")
         if res is not None:
             self._emit("PASS", f"  820: {len(database['software_blocks'])} blocks -> {res['count']} "
                                f"CreationInfo CSVs + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
@@ -947,7 +958,7 @@ class App:
         database, fb = engine.build(database); proj += fb
         database, fc = coverage.build(database); proj += fc
         res = coverage.project(database)
-        self._render(proj)
+        self._render(proj, label="900 coverage")
         st = res["stats"]
         self._emit("PASS", f"  910 coverage: {st['rows']} rows (sig {st['kinds']['signal']}/"
                            f"chan {st['kinds']['channel']}/struct {st['kinds']['structural']}), "

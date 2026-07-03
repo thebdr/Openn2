@@ -40,6 +40,20 @@ def _f(type_: str, severity: str, detail: str, location: str = "") -> Finding:
     return Finding(phase=200, type=type_, severity=severity, detail=detail, location=location)
 
 
+def _finalize_findings(findings, io_path: str) -> list:
+    """The ph200 finding hand-off: stamp the WORKBOOK onto every doc-located (Sheet!Cell) finding -
+    the GUI's clickable cell links and the log->Findings jump both need `doc` - and RECORD the
+    treatable ones into validation_issues (ph200 is doc-only, no Database flows through the fill,
+    but its findings are still facts the Findings tab must show)."""
+    from dataclasses import replace
+    from pipeline4.core.finding import record_standalone
+    doc = os.path.basename(io_path or "")
+    out = [replace(f, doc=doc) if (doc and "!" in (f.location or "") and not f.doc) else f
+           for f in findings]
+    record_standalone([f for f in out if f.severity in ("FAIL", "ERRR", "WARN")])
+    return out
+
+
 def _blank(value) -> bool:
     s = str(value or "").strip()
     return s == "" or s == INPUT_REQUIRED
@@ -231,7 +245,9 @@ def fill_out(params: dict | None = None, only=None) -> dict:
     if not io_path or not os.path.exists(io_path):
         return {"output_path": io_path or "", "backup": "", "filled": 0, "index": 0, "diag": 0,
                 "unresolved": 0, "mismatch": 0,
-                "findings": [_f("fill_no_iolist", "FAIL", f"I/O List not found: {io_path!r}", io_path or "")]}
+                "findings": _finalize_findings(
+                    [_f("fill_no_iolist", "FAIL", f"I/O List not found: {io_path!r}", io_path or "")],
+                    io_path)}
 
     legs = _legs(only)
     colmap = config.load_column_map("IoList")
@@ -325,7 +341,7 @@ def fill_out(params: dict | None = None, only=None) -> dict:
     if _same_content(backup, io_path):                             # value-identical no-op -> drop the backup
         os.remove(backup)
         backup = ""
-    return {"output_path": io_path, "backup": backup, "findings": findings,
+    return {"output_path": io_path, "backup": backup, "findings": _finalize_findings(findings, io_path),
             "filled": filled, "index": indexed, "diag": diagnosed,
             "unresolved": len(unresolved), "mismatch": mismatch}
 
@@ -443,7 +459,9 @@ def risky_index_fill(params: dict | None = None) -> dict:
     io_path = params.get("iolist_path")
     if not io_path or not os.path.exists(io_path):
         return {"output_path": io_path or "", "backup": "", "filled": 0, "leftover": 0,
-                "findings": [_f("fill_no_iolist", "FAIL", f"I/O List not found: {io_path!r}", io_path or "")]}
+                "findings": _finalize_findings(
+                    [_f("fill_no_iolist", "FAIL", f"I/O List not found: {io_path!r}", io_path or "")],
+                    io_path)}
 
     db, _ = staging.stage(params)
     rows = list(db.table("signals"))
@@ -479,4 +497,4 @@ def risky_index_fill(params: dict | None = None) -> dict:
         os.remove(backup)
         backup = ""
     return {"output_path": io_path, "backup": backup, "filled": len(assigns), "leftover": leftover,
-            "findings": findings}
+            "findings": _finalize_findings(findings, io_path)}

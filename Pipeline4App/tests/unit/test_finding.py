@@ -70,6 +70,25 @@ def test_record_persists_report_context():
        "a non-100 finding leaves the context columns empty")
 
 
+def test_record_standalone_appends_only_issues():
+    """The doc-only-phase seam (ph200): records straight to <dir>/validation_issues.csv, APPENDS to
+    what a previous save left there, and touches NO other SSOT file."""
+    import os
+    import tempfile
+    from pipeline4.core.finding import record_standalone
+    with tempfile.TemporaryDirectory() as d:
+        first = Finding(phase=300, type="stg_x", severity="WARN", detail="earlier", location="IO!A1")
+        eq(record_standalone([first], d), 1, "creates the file on first record")
+        second = Finding(phase=200, type="fill_unresolved", severity="FAIL", detail="fill it",
+                         location="NET SAFETY 50!AD179", doc="io.xlsx")
+        eq(record_standalone([second], d), 1)
+        eq(record_standalone([], d), 0, "an empty batch writes nothing")
+        with open(os.path.join(d, "validation_issues.csv"), encoding="utf-8") as h:
+            body = h.read()
+        ok(first.uid in body and second.uid in body, "the second record APPENDED (no clobber)")
+        eq(os.listdir(d), ["validation_issues.csv"], "no other SSOT table is created or touched")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("finding", [
@@ -78,4 +97,5 @@ if __name__ == "__main__":
         ("validation_issues_table_shape", test_validation_issues_table_shape),
         ("record_uses_finding_uid", test_record_uses_finding_uid),
         ("record_persists_report_context", test_record_persists_report_context),
+        ("record_standalone_appends_only_issues", test_record_standalone_appends_only_issues),
     ]))

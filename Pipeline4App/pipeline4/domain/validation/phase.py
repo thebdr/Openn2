@@ -3,7 +3,9 @@ records the treatable facts into `validation_issues`, and writes the two operato
 errors-only) as txt + html. Clean-room analog of PL3's `phases/p100_validation.py` (PL4 has no `phases/`
 package - phases run inline from the GUI - so this is a plain `run_validation` the GUI/parity calls).
 
-The phase NEVER halts (user decision): a validation FAIL is real but reported, not blocking. The report
+`run_validation` itself never raises/halts - the 4 validators always complete and the reports are always
+written. The SEVERITY CONTRACT (production-test decision) is enforced by the GUI seam: a FAIL finding then
+HALTS THE PIPELINE (the run state / the Run-all chain) - reports written, generation blocked. The report
 shows EFFECTIVE severity (the treatment registry applied). 150 (diagnosis-slot) + the `accept` treatment are
 out of scope. `run_validation` is READ-ONLY w.r.t. the treatment registry (the GUI's `run.render` reconciles
 + writes it); so a headless/parity call doesn't mutate `user_input/`.

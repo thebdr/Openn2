@@ -79,6 +79,24 @@ def validation_issues_table() -> Table:
     )
 
 
+def record_standalone(findings, directory: str | None = None) -> int:
+    """Record `findings` straight into `<directory>/validation_issues.csv` WITHOUT a live Database -
+    the seam for the DOC-ONLY phases (ph200 writes the source document, not the SSOT, but its
+    findings are still facts the Findings tab must show / the [FAIL] jump must land on). Loads ONLY
+    the issues table (an absent file starts empty), appends, saves ONLY it - no other SSOT table is
+    touched. Returns the appended row count."""
+    from pipeline4.core import config
+    from pipeline4.core.database import Database
+    findings = list(findings)
+    if not findings:
+        return 0
+    directory = directory or config.database_dir()
+    database = Database([validation_issues_table()]).load(directory)
+    record(database, findings)
+    database.save(directory)
+    return len(findings)
+
+
 def record(database, findings) -> None:
     """Append `findings` to the database's `validation_issues` table (creating it if absent), each row
     carrying the Finding's own `uid` + its report context (location2/bit/FLD/compared - what the log
