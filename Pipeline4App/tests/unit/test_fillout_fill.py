@@ -5,7 +5,24 @@ import tempfile
 from openpyxl import Workbook, load_workbook
 
 from _harness import run, eq, ok
+from pipeline4.core import config
 from pipeline4.domain.fillout import fill
+
+
+def _sandboxed(fn):
+    """Run `fn` with `config.database_dir` pointed at a throwaway dir: the domain build/fill paths
+    SAVE the SSOT, and un-redirected that overwrote the builtin Shared/Database (the parity
+    environment) with this module's synthetic staging on every gate run."""
+    def wrapped():
+        original = config.database_dir
+        with tempfile.TemporaryDirectory() as sandbox:
+            config.database_dir = lambda: sandbox
+            try:
+                fn()
+            finally:
+                config.database_dir = original
+    return wrapped
+
 
 _SHEET = "NETSAFETY"
 
@@ -61,6 +78,6 @@ def test_fill_is_idempotent_noop_drops_backup():
 if __name__ == "__main__":
     import sys
     sys.exit(run("fillout_fill", [
-        ("fill_ab_ac_modes_and_unresolved", test_fill_ab_ac_modes_and_unresolved),
-        ("fill_is_idempotent_noop_drops_backup", test_fill_is_idempotent_noop_drops_backup),
+        ("fill_ab_ac_modes_and_unresolved", _sandboxed(test_fill_ab_ac_modes_and_unresolved)),
+        ("fill_is_idempotent_noop_drops_backup", _sandboxed(test_fill_is_idempotent_noop_drops_backup)),
     ]))

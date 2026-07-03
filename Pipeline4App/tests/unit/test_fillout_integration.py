@@ -10,7 +10,23 @@ import tempfile
 from openpyxl import Workbook, load_workbook
 
 from _harness import run, eq, ok
+from pipeline4.core import config
 from pipeline4.domain.fillout import fill, diag_blocks, diag_alloc
+
+
+def _sandboxed(fn):
+    """Run `fn` with `config.database_dir` pointed at a throwaway dir: fill_out's staging leg SAVES
+    the SSOT, and un-redirected that OVERWROTE the builtin Shared/Database (the parity environment)
+    with this module's tiny synthetic staging on every gate run - the '4-signal builtin' pollution."""
+    def wrapped():
+        original = config.database_dir
+        with tempfile.TemporaryDirectory() as sandbox:
+            config.database_dir = lambda: sandbox
+            try:
+                fn()
+            finally:
+                config.database_dir = original
+    return wrapped
 
 _SHEET = "NETSAFETY"
 
@@ -236,14 +252,15 @@ def test_diag_blocks_append_only_reuses_existing_id():
 if __name__ == "__main__":
     import sys
     sys.exit(run("fillout_integration", [
-        ("full_fill_writes_index_and_diag_cells", test_full_fill_writes_index_and_diag_cells),
-        ("diagnosisblocks_sheet_created_with_derived", test_diagnosisblocks_sheet_created_with_derived),
-        ("noop_drops_backup_on_prefilled_doc", test_noop_drops_backup_on_prefilled_doc),
-        ("retyping_after_210_feeds_220_230", test_retyping_after_210_feeds_220_230),
-        ("only_arg_restricts_writeback", test_only_arg_restricts_writeback),
-        ("index_unresolved_is_reported", test_index_unresolved_is_reported),
-        ("range_component_suffix_and_shared_index", test_range_component_suffix_and_shared_index),
-        ("risky_assignments_by_node_type_and_row_order", test_risky_assignments_by_node_type_and_row_order),
-        ("risky_assignments_leftover_when_more_than_objects", test_risky_assignments_leftover_when_more_than_objects),
-        ("diag_blocks_append_only_reuses_existing_id", test_diag_blocks_append_only_reuses_existing_id),
-    ]))
+        (name, _sandboxed(fn)) for name, fn in [
+            ("full_fill_writes_index_and_diag_cells", test_full_fill_writes_index_and_diag_cells),
+            ("diagnosisblocks_sheet_created_with_derived", test_diagnosisblocks_sheet_created_with_derived),
+            ("noop_drops_backup_on_prefilled_doc", test_noop_drops_backup_on_prefilled_doc),
+            ("retyping_after_210_feeds_220_230", test_retyping_after_210_feeds_220_230),
+            ("only_arg_restricts_writeback", test_only_arg_restricts_writeback),
+            ("index_unresolved_is_reported", test_index_unresolved_is_reported),
+            ("range_component_suffix_and_shared_index", test_range_component_suffix_and_shared_index),
+            ("risky_assignments_by_node_type_and_row_order", test_risky_assignments_by_node_type_and_row_order),
+            ("risky_assignments_leftover_when_more_than_objects", test_risky_assignments_leftover_when_more_than_objects),
+            ("diag_blocks_append_only_reuses_existing_id", test_diag_blocks_append_only_reuses_existing_id),
+        ]]))

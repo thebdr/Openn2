@@ -16,6 +16,22 @@ from pipeline4.domain import identity, staging
 from pipeline4.domain.diagnosis_entries import diagnosis_entries_table, diagnosis_cabinets_table
 
 
+def _sandboxed(fn):
+    """Run `fn` with `config.database_dir` pointed at a throwaway dir: the domain build/fill paths
+    SAVE the SSOT, and un-redirected that overwrote the builtin Shared/Database (the parity
+    environment) with this module's synthetic staging on every gate run."""
+    def wrapped():
+        original = config.database_dir
+        with tempfile.TemporaryDirectory() as sandbox:
+            config.database_dir = lambda: sandbox
+            try:
+                fn()
+            finally:
+                config.database_dir = original
+    return wrapped
+
+
+
 def test_interp_format_spec():
     eq(identity.interp("{$diag_cabinet:03d}", {"diag_cabinet": "0"}), "000", "0 -> 000")
     eq(identity.interp("{$diag_bit:02d}", {"diag_bit": "62"}), "62", "62 -> 62 (already 2 digits)")
@@ -340,22 +356,22 @@ def test_scl_project_missing_template_finding():
 if __name__ == "__main__":
     import sys
     sys.exit(run("diagnosis", [
-        ("interp_format_spec", test_interp_format_spec),
-        ("load_signal_diagnosis", test_load_signal_diagnosis),
-        ("load_diagnosis_columns", test_load_diagnosis_columns),
-        ("table_defs", test_table_defs),
-        ("load_diagnosis_blocks", test_load_diagnosis_blocks),
-        ("load_diagnosis_blocks_absent", test_load_diagnosis_blocks_absent),
-        ("ml_value", test_ml_value),
-        ("node_of_and_fl_value", test_node_of_and_fl_value),
-        ("resolve_logic_or_next_free_bit_and_cabinet", test_resolve_logic_or_next_free_bit_and_cabinet),
-        ("resolve_logic_cabinet_from_blocks", test_resolve_logic_cabinet_from_blocks),
-        ("build_unified_io_and_logic", test_build_unified_io_and_logic),
-        ("diaglist_project", test_diaglist_project),
-        ("diaglist_crlf_no_bom", test_diaglist_crlf_no_bom),
-        ("render_scl_variants_and_rename", test_render_scl_variants_and_rename),
-        ("render_scl_per_type_tristate_trigger", test_render_scl_per_type_tristate_trigger),
-        ("scl_project_writes_bom_crlf", test_scl_project_writes_bom_crlf),
-        ("scl_project_synthetic_template", test_scl_project_synthetic_template),
-        ("scl_project_missing_template_finding", test_scl_project_missing_template_finding),
+        ("interp_format_spec", _sandboxed(test_interp_format_spec)),
+        ("load_signal_diagnosis", _sandboxed(test_load_signal_diagnosis)),
+        ("load_diagnosis_columns", _sandboxed(test_load_diagnosis_columns)),
+        ("table_defs", _sandboxed(test_table_defs)),
+        ("load_diagnosis_blocks", _sandboxed(test_load_diagnosis_blocks)),
+        ("load_diagnosis_blocks_absent", _sandboxed(test_load_diagnosis_blocks_absent)),
+        ("ml_value", _sandboxed(test_ml_value)),
+        ("node_of_and_fl_value", _sandboxed(test_node_of_and_fl_value)),
+        ("resolve_logic_or_next_free_bit_and_cabinet", _sandboxed(test_resolve_logic_or_next_free_bit_and_cabinet)),
+        ("resolve_logic_cabinet_from_blocks", _sandboxed(test_resolve_logic_cabinet_from_blocks)),
+        ("build_unified_io_and_logic", _sandboxed(test_build_unified_io_and_logic)),
+        ("diaglist_project", _sandboxed(test_diaglist_project)),
+        ("diaglist_crlf_no_bom", _sandboxed(test_diaglist_crlf_no_bom)),
+        ("render_scl_variants_and_rename", _sandboxed(test_render_scl_variants_and_rename)),
+        ("render_scl_per_type_tristate_trigger", _sandboxed(test_render_scl_per_type_tristate_trigger)),
+        ("scl_project_writes_bom_crlf", _sandboxed(test_scl_project_writes_bom_crlf)),
+        ("scl_project_synthetic_template", _sandboxed(test_scl_project_synthetic_template)),
+        ("scl_project_missing_template_finding", _sandboxed(test_scl_project_missing_template_finding)),
     ]))
