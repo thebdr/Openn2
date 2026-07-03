@@ -138,6 +138,95 @@ def test_auto_reopen():
     _with_temp_localappdata(body)
 
 
+def test_validate_name():
+    eq(project.validate_name("Good Name-01"), "", "a normal name passes")
+    ok(project.validate_name(""), "empty rejected")
+    ok(project.validate_name("bad/name"), "path separator rejected")
+    ok(project.validate_name('bad:"name'), "reserved characters rejected")
+    ok(project.validate_name("trailing."), "trailing dot rejected")
+
+
+def test_create_project_double_nested_with_meta():
+    def body(d):
+        config.use_builtin()
+        root = project.create_project(d, "Nest", ["siemens_plc_safety"], False, 99)
+        eq(root, os.path.abspath(os.path.join(d, "Nest", "Nest")),
+           "the <base>/<name>/<name> DOUBLE-NESTED layout (backups live in the outer root)")
+        meta = project.load_project_meta(root)
+        eq(meta.get("name"), "Nest")
+        eq(meta.get("types"), ["siemens_plc_safety"])
+        eq(meta.get("multi_system"), False)
+        eq(meta.get("backups_kept"), project.BACKUPS_KEPT_MAX, "backups_kept clamps to the 20 limit")
+        eq(config.active_project(), root, "created + opened")
+        try:
+            project.create_project(d, "bad/name", ["siemens_plc_safety"], False, 5)
+            ok(False, "a bad name must raise")
+        except ValueError:
+            ok(True, "ValueError on a bad name")
+    _with_temp_localappdata(body)
+
+
+def test_backup_rotation_and_zip():
+    def body(d):
+        config.use_builtin()
+        root = project.create_project(d, "Bk", ["siemens_plc_safety"], False, 5)
+        open(os.path.join(root, "Database", "~$lock.xlsx"), "w").close()   # must be skipped
+        first = project.make_backup(root, "300", keep=2)
+        ok(first.endswith(".zip") and os.path.isfile(first), "the timestamped zip exists")
+        eq(os.path.dirname(first), project.backups_dir(root), "backups live BESIDE the project")
+        import zipfile
+        with zipfile.ZipFile(first) as bundle:
+            names = bundle.namelist()
+        ok(all(n.startswith("Bk/") for n in names), "arcnames rooted at the project name")
+        ok(not any("~$" in n for n in names), "Excel lock files skipped")
+        project.make_backup(root, "400", keep=2)
+        third = project.make_backup(root, "500", keep=2)
+        left = sorted(os.listdir(project.backups_dir(root)))
+        eq(len(left), 2, "pruned to keep=2")
+        ok(os.path.basename(first) not in left and os.path.basename(third) in left,
+           "the OLDEST backup is the one pruned")
+        eq(project.make_backup(root, "x", keep=0), "", "keep=0 -> backups off")
+    _with_temp_localappdata(body)
+
+
+def test_archive_and_import_documents():
+    def body(d):
+        config.use_builtin()
+        root = project.create_project(d, "Self", ["siemens_plc_safety"], False, 5)
+        src_a = os.path.join(d, "docs_a"); os.makedirs(src_a)
+        src_b = os.path.join(d, "docs_b"); os.makedirs(src_b)
+        cur = os.path.join(src_a, "io.xlsx")
+        prev = os.path.join(src_b, "io.xlsx")           # SAME basename - the current/previous split
+        with open(cur, "wb") as h:
+            h.write(b"CUR")
+        with open(prev, "wb") as h:
+            h.write(b"PREV")
+        config.save_document_path("iolist_path", cur)
+        config.save_document_path("iolist_previous_path", prev)
+        actions = {k: (a, v) for k, a, v in project.import_documents(root)}
+        eq(actions["iolist_path"], ("imported", "../input_documents/current/io.xlsx"),
+           "copied + rewritten RELATIVE to config_project")
+        eq(actions["iolist_previous_path"], ("imported", "../input_documents/previous/io.xlsx"),
+           "the previous revision lands in its own subfolder (no basename collision)")
+        params = config.load_params()
+        with open(params["iolist_path"], "rb") as h:
+            eq(h.read(), b"CUR", "the relative path resolves INSIDE the project to the right file")
+        with open(params["iolist_previous_path"], "rb") as h:
+            eq(h.read(), b"PREV")
+        actions2 = {k: (a, v) for k, a, v in project.import_documents(root)}
+        eq(actions2["iolist_path"][0], "relinked", "a second run only normalizes (already inside)")
+        dest = os.path.join(d, "arch.zip")
+        count = project.archive_project(root, dest)
+        ok(count > 10 and os.path.isfile(dest), "Archive Project writes one compressed zip")
+        project.close_project()
+        try:
+            project.import_documents(root)
+            ok(False, "import must refuse a non-active project")
+        except ValueError:
+            ok(True, "the active-project guard holds")
+    _with_temp_localappdata(body)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("project", [
@@ -148,4 +237,8 @@ if __name__ == "__main__":
         ("new_project_scaffolds", test_new_project_scaffolds),
         ("incomplete_project_fails_loud", test_incomplete_project_fails_loud),
         ("auto_reopen", test_auto_reopen),
+        ("validate_name", test_validate_name),
+        ("create_project_double_nested_with_meta", test_create_project_double_nested_with_meta),
+        ("backup_rotation_and_zip", test_backup_rotation_and_zip),
+        ("archive_and_import_documents", test_archive_and_import_documents),
     ]))

@@ -184,6 +184,25 @@ class App:
             self._set_busy(True)
         threading.Thread(target=self._worker, args=(number, label), daemon=True).start()
 
+    def _backup_before(self, label) -> None:
+        """The per-phase project backup (worker thread): a timestamped zip of the FULL project beside
+        it, pruned to `project.backups_kept` (the € knob in project_params.yaml; 0 / builtin = off).
+        A backup failure warns and never blocks the run."""
+        if not self._project:
+            return
+        try:
+            keep = int(config.get_param(config.load_params(), "project.backups_kept", 0) or 0)
+        except Exception:  # noqa: BLE001
+            keep = 0
+        if keep <= 0:
+            return
+        try:
+            path = project.make_backup(self._project, str(label), keep)
+            if path:
+                self._emit("INFO", f"  backup -> {os.path.basename(path)}")
+        except Exception as exc:  # noqa: BLE001
+            self._emit("WARN", f"  project backup failed: {exc}")
+
     def _worker(self, number, label):
         """Runs OFF the main thread: dispatch to the phase handler (or Run-all); never touch Tk here."""
         self._run_halted = False
@@ -197,6 +216,7 @@ class App:
                     self._emit("PHASE", f"{number} {label}")
                     self._emit("WARN", f"  phase {number} not implemented yet")
                 else:
+                    self._backup_before(number)
                     handler()
         except Exception:  # noqa: BLE001 - a handler crash must never take the window down
             self._emit("ERROR", f"handler for {label} crashed:\n{traceback.format_exc()}")
@@ -215,6 +235,7 @@ class App:
             name = i18n.tr(phase.name_key, self.lang)
             self._status(f"[{i}/{len(order)}] {number} {name}…")
             self._emit("INFO", f"[{i}/{len(order)}] running {number} {name}")
+            self._backup_before(number)
             try:
                 getattr(self, phase.handler)()
             except Exception:  # noqa: BLE001 - attribute the crash to THIS phase, stop the chain like a halt
@@ -256,6 +277,7 @@ class App:
         """Runs OFF the main thread: invoke the named special handler (no `only=`); never crash the window."""
         self._run_halted = False
         try:
+            self._backup_before(handler_name.lstrip("_"))
             getattr(self, handler_name)()
         except Exception:  # noqa: BLE001
             self._emit("ERROR", f"{handler_name} crashed:\n{traceback.format_exc()}")
@@ -296,6 +318,7 @@ class App:
             if handler is None:
                 self._emit("WARN", f"  sub-phase {number} is not runnable")
             else:
+                self._backup_before(number)
                 handler(only=number)
         except Exception:  # noqa: BLE001 - a handler crash must never take the window down
             self._emit("ERROR", f"sub-phase {number} crashed:\n{traceback.format_exc()}")
@@ -363,6 +386,8 @@ class App:
         menu.add_cascade(label=i18n.tr("pm_recent", self.lang), menu=recent_menu)
         menu.add_command(label=i18n.tr("pm_set_root", self.lang) + "…", command=self._project_set_root)
         menu.add_separator()
+        menu.add_command(label=i18n.tr("pm_archive", self.lang), command=self._project_archive,
+                         state="normal" if self._project else "disabled")
         menu.add_command(label=i18n.tr("pm_close", self.lang), command=self._project_close,
                          state="normal" if self._project else "disabled")
 
@@ -402,22 +427,30 @@ class App:
         self._project_switch_to(chosen)
 
     def _project_new(self):
-        from tkinter import filedialog, simpledialog
-        parent = filedialog.askdirectory(parent=self.root, title=i18n.tr("pm_new_parent", self.lang),
-                                         initialdir=state.projects_root())
-        if not parent:
+        """The New-project dialog (type/multi-system/name/base/backups); creation itself is
+        project.create_project (the <base>/<name>/<name> double-nested layout + the project meta)."""
+        from pipeline4.gui.new_project import NewProjectDialog
+        NewProjectDialog(self.root, lang=self.lang, on_created=self._apply_project_switch)
+
+    def _project_archive(self):
+        """Archive Project: a compressed zip of the current project at a user-picked path."""
+        from tkinter import filedialog
+        if not self._project:
             return
-        name = simpledialog.askstring(i18n.tr("pm_new", self.lang), i18n.tr("pm_new_name", self.lang),
-                                      parent=self.root)
-        if not name or not name.strip():
+        import datetime
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        initial = f"{project.project_name(self._project)}_{stamp}.zip"
+        chosen = filedialog.asksaveasfilename(parent=self.root, title=i18n.tr("pm_archive", self.lang),
+                                              defaultextension=".zip", initialfile=initial,
+                                              filetypes=(("Zip archive", "*.zip"),))
+        if not chosen:
             return
         try:
-            self._apply_project_switch(project.new_project(parent, name.strip()))
-        except project.ProjectConfigError as error:          # the scaffold came out incomplete -> fail loud
-            self.log.append("FAIL", f"  new project scaffolded INCOMPLETE (missing {', '.join(error.missing)}) "
-                                    "- the app's builtin config is itself incomplete; fix the bundled config_project.")
-        except (FileExistsError, OSError) as error:
-            self.log.append("ERROR", f"  could not create project: {error}")
+            count = project.archive_project(self._project, chosen)
+        except OSError as error:
+            self.log.append("ERROR", f"  archive failed: {error}")
+            return
+        self.log.append("PASS", "  " + i18n.tr("pm_archived", self.lang, n=count, path=chosen))
 
     def _project_set_root(self):
         from tkinter import filedialog

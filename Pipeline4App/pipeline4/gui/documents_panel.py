@@ -53,15 +53,22 @@ class DocumentsPanel(ttk.Frame):
                 clear.grid(row=r, column=3, sticky="w", pady=5)
                 self._rows[key] = {"label": label, "entry": entry, "browse": browse, "clear": clear}
 
+        # import the configured documents INTO the project (self-contained projects: the files copy
+        # to <project>/input_documents/current|previous and the paths become RELATIVE).
+        self._import_btn = ttk.Button(self, text="", command=self._import_documents)
+        self._import_btn.pack(side="top", anchor="w", padx=12, pady=(2, 10))
+
         self.set_lang(lang)
         self.refresh()
 
     # --- state ---------------------------------------------------------------------------------- #
     def refresh(self) -> None:
-        """Reload all 4 paths from the active project_params.yaml (on construction + a project switch)."""
+        """Reload all 4 paths from the active project_params.yaml (on construction + a project switch).
+        The Import button only makes sense with a project open (the builtin has no folder to own)."""
         paths = config.load_document_paths()
         for key, widgets in self._rows.items():
             self._show(widgets["entry"], paths.get(key, ""))
+        self._import_btn.configure(state="normal" if config.active_project() else "disabled")
 
     def _show(self, entry: ttk.Entry, value: str) -> None:
         entry.configure(state="normal")
@@ -91,6 +98,26 @@ class DocumentsPanel(ttk.Frame):
         self.refresh()
         self.on_status(i18n.tr("doc_cleared", self.lang, doc=self._label_for(key)))
 
+    def _import_documents(self) -> None:
+        """Copy the configured documents into the project + rewrite their paths relative - the project
+        becomes fully self-contained (project.import_documents does the work)."""
+        from pipeline4.project import project
+        root = config.active_project()
+        if not root:
+            self.on_status(i18n.tr("doc_import_no_project", self.lang))
+            return
+        try:
+            actions = project.import_documents(root)
+        except (ValueError, OSError) as error:
+            self.on_status(f"import failed: {error}")
+            return
+        self.refresh()
+        if not actions:
+            self.on_status(i18n.tr("doc_import_none", self.lang))
+            return
+        done = ", ".join(f"{key.replace('_path', '')}: {action}" for key, action, _v in actions)
+        self.on_status(i18n.tr("doc_import_done", self.lang, done=done))
+
     # --- chrome --------------------------------------------------------------------------------- #
     def set_lang(self, lang: str) -> None:
         self.lang = lang
@@ -101,6 +128,7 @@ class DocumentsPanel(ttk.Frame):
             widgets["label"].configure(text=self._label_for(key))
             widgets["browse"].configure(text=i18n.tr("doc_browse", lang))
             widgets["clear"].configure(text=i18n.tr("doc_clear", lang))
+        self._import_btn.configure(text=i18n.tr("doc_import", lang))
         self.refresh()                                # the (not set) placeholder is localized too
 
     def set_theme(self, _mode: str) -> None:
