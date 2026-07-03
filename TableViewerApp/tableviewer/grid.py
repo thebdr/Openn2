@@ -3,11 +3,15 @@
 count barely matters), data-adapted column widths with drag / double-click-fit resizing.
 
 Header CLICK = tri-state natural sort; header RIGHT-CLICK = the cascade filter popup (substring /
-regex / pick-list of the visible rows' distinct values, with the column's stats footer). Active
-sort/filters show as removable CHIPS above the header. Ctrl+F = the global QUICK SEARCH (any cell,
-live, a removable chip). Ctrl+C = copy the selection (or the whole filtered view) as TSV.
-Double-click = in-place cell edit (`editable=True`) or the full ROW DETAIL popup (read-only grids).
-`selectable=True` = row multi-select (click / Ctrl / Shift / drag) + `on_context` for a host menu.
+regex / pick-list of the visible rows' distinct values, with the column's stats footer, plus
+PIN/UNPIN). Active sort/filters/search/pinning show as removable CHIPS above the header. Ctrl+F =
+the global QUICK SEARCH (any cell, live). Ctrl+C = copy the selection (or the whole filtered view)
+as TSV. Double-click = in-place cell edit (`editable=True`) or the full ROW DETAIL popup
+(read-only grids). `selectable=True` = row multi-select (click / Ctrl / Shift / drag) +
+`on_context` for a host menu. PINNED COLUMNS (`set_frozen(n)` / the popup button): while the table
+is x-scrolled, the first n columns re-draw as an opaque STRIP at the viewport's left edge (header
++ body, an accent separator) over the scrolling columns; every hit test maps through
+`core.hit_x`, so clicks/edits/filters on the strip land on the pinned columns.
 
 Everything stateful reads `tableviewer.theme` at call time, so an embedder can rebind the palette
 and fonts (see theme.py). ttk.Treeview can't do per-cell fonts or gridlines on Tk 8.6 - hence the
@@ -55,6 +59,7 @@ class DataGrid(ttk.Frame):
         self._sort: tuple | None = None      # (col, 'asc'|'desc') - the header-click tri-state
         self._filters: list = []             # cascade filter specs ({col, text, regex, values})
         self._quick: str = ""                # the global quick search (Ctrl+F; col=None spec)
+        self._frozen: int = 0                # pinned leading columns (drawn as a strip while x-scrolled)
         self._view: list = []                # visible SOURCE row indices, in display order
         self._click_col: int | None = None   # a header press outside a separator (sort on release)
         self._popup: tk.Toplevel | None = None
@@ -73,7 +78,7 @@ class DataGrid(ttk.Frame):
         vsb = ttk.Scrollbar(self, orient="vertical", command=self.body.yview)
         hsb = ttk.Scrollbar(self, orient="horizontal", command=self._xview_both)
         self.body.configure(yscrollcommand=lambda a, b: (vsb.set(a, b), self._schedule_redraw()),
-                            xscrollcommand=hsb.set)
+                            xscrollcommand=lambda a, b: (hsb.set(a, b), self._on_xscroll()))
         self.chips.grid(row=0, column=0, columnspan=2, sticky="ew")
         self.chips.grid_remove()
         self.header.grid(row=1, column=0, sticky="nsew")
@@ -119,7 +124,7 @@ class DataGrid(ttk.Frame):
         self._rows = [[sanitize(cell) for cell in row] for row in rows]
         self._raw_rows = [["" if cell is None else str(cell) for cell in row] for row in rows]
         self._row_fg = list(row_fg or [])
-        self._sort, self._filters, self._quick = None, [], ""
+        self._sort, self._filters, self._quick, self._frozen = None, [], "", 0
         self._widths = compute_col_widths(
             self._columns, self._rows,
             self._font_normal.measure, self._font_small.measure, self._font_header.measure)
@@ -168,6 +173,26 @@ class DataGrid(ttk.Frame):
         self._close_popup()
         self._popup = _QuickSearch(self)
 
+    def set_frozen(self, n: int) -> None:
+        """Pin the first `n` columns: while the table is x-scrolled they render as a STRIP at the
+        viewport's left edge over the scrolling columns (0 = unpinned)."""
+        self._frozen = max(0, min(int(n), len(self._columns)))
+        self._update_chips()
+        self._apply_widths()
+
+    def _frozen_w(self) -> float:
+        return core.frozen_width(self._widths, self._frozen)
+
+    def _hit_px(self, canvas, widget_x) -> float:
+        """A pointer x mapped to the NATURAL canvas x (pinned-strip aware) for every hit test."""
+        return core.hit_x(widget_x, canvas.canvasx(0), self._frozen_w())
+
+    def _on_xscroll(self) -> None:
+        """An x-scroll reveals culled columns (the virtual renderer only draws the visible window)
+        and moves the pinned strip - redraw both surfaces."""
+        self._schedule_redraw()
+        self._draw_header()
+
     def copy_view(self) -> None:
         """Ctrl+C: the SELECTED rows (view order) - or the whole filtered view when nothing is
         selected - to the clipboard as TSV (pastes into Excel as cells)."""
@@ -194,10 +219,14 @@ class DataGrid(ttk.Frame):
         + Clear all. Hidden entirely when nothing is active."""
         for child in self.chips.winfo_children():
             child.destroy()
-        active = int(self._sort is not None) + len(self._filters) + int(bool(self._quick))
+        active = (int(self._sort is not None) + len(self._filters) + int(bool(self._quick))
+                  + int(self._frozen > 0))
         if not active:
             self.chips.grid_remove()
             return
+        if self._frozen:
+            ttk.Button(self.chips, text=f"⚲ {self._frozen} pinned  ✕", style="Toolbutton",
+                       command=lambda: self.set_frozen(0)).pack(side="left", padx=(2, 2), pady=1)
         if self._sort is not None:
             col, direction = self._sort
             name = self._columns[col] if col < len(self._columns) else f"col {col}"
@@ -228,7 +257,7 @@ class DataGrid(ttk.Frame):
     def _hit_row(self, event):
         """The VIEW position under the pointer (selection/anchor work in screen space)."""
         hit = cell_at(self._widths, self._row_h, len(self._view),
-                      self.body.canvasx(event.x), self.body.canvasy(event.y))
+                      self._hit_px(self.body, event.x), self.body.canvasy(event.y))
         return None if hit is None else hit[0]
 
     def _body_press(self, event) -> None:
@@ -284,14 +313,16 @@ class DataGrid(ttk.Frame):
         return None
 
     def _header_hover(self, event) -> None:
-        on_edge = boundary_at(self._widths, self.header.canvasx(event.x)) is not None
+        on_edge = boundary_at(self._widths, self._hit_px(self.header, event.x)) is not None
         self.header.configure(cursor="sb_h_double_arrow" if on_edge else "")
 
     def _header_press(self, event) -> None:
-        x = self.header.canvasx(event.x)
+        x = self._hit_px(self.header, event.x)
         col = boundary_at(self._widths, x)
         if col is not None:                    # on a separator -> a resize drag begins
-            self._drag = (col, x, self._widths[col])
+            # the drag delta runs in WIDGET space - consistent whether the press landed on the
+            # pinned strip or a scrolled column
+            self._drag = (col, event.x, self._widths[col])
             self._click_col = None
         else:                                  # on a column -> a sort click (decided on release)
             self._drag = None
@@ -306,8 +337,8 @@ class DataGrid(ttk.Frame):
         self._click_col = None
 
     def _header_filter_menu(self, event) -> None:
-        """Right-click a column header -> its cascade-filter popup."""
-        col = self._col_at(self.header.canvasx(event.x))
+        """Right-click a column header -> its cascade-filter popup (+ pin/unpin)."""
+        col = self._col_at(self._hit_px(self.header, event.x))
         if col is None or not self._rows:
             return
         self._close_popup()
@@ -326,12 +357,12 @@ class DataGrid(ttk.Frame):
             return
         self._click_col = None                 # a real drag is a resize, not a sort click
         col, x0, width0 = self._drag
-        self._widths[col] = max(MIN_DRAG_W, int(width0 + self.header.canvasx(event.x) - x0))
+        self._widths[col] = max(MIN_DRAG_W, int(width0 + event.x - x0))   # widget-space delta
         self._apply_widths()
 
     def _header_dclick(self, event) -> None:
         """Double-click a header separator: auto-fit that column to its content."""
-        col = boundary_at(self._widths, self.header.canvasx(event.x))
+        col = boundary_at(self._widths, self._hit_px(self.header, event.x))
         if col is None:
             return
         self._drag = None
@@ -344,7 +375,7 @@ class DataGrid(ttk.Frame):
     def _cell_dclick(self, event) -> None:
         self._close_editbox()
         hit = cell_at(self._widths, self._row_h, len(self._view),
-                      self.body.canvasx(event.x), self.body.canvasy(event.y))
+                      self._hit_px(self.body, event.x), self.body.canvasy(event.y))
         if hit is None:
             return
         view_row, col, x0 = hit
@@ -356,7 +387,9 @@ class DataGrid(ttk.Frame):
         edit = tk.Entry(self.body, font=self._font_normal, relief="solid", borderwidth=1)
         edit.insert(0, raw)
         edit.select_range(0, "end")
-        self.body.create_window(x0, view_row * self._row_h, window=edit, anchor="nw",
+        # a PINNED cell renders at the viewport's left edge - the editor overlay lands on the strip
+        draw_x = self.body.canvasx(0) + x0 if col < self._frozen else x0
+        self.body.create_window(draw_x, view_row * self._row_h, window=edit, anchor="nw",
                                 width=self._widths[col], height=self._row_h, tags="editbox")
         edit.focus_set()
         edit.bind("<Return>", lambda _e: self._commit_cell(src, col, edit.get()))
@@ -425,21 +458,36 @@ class DataGrid(ttk.Frame):
         if self._redraw_job is None:
             self._redraw_job = self.after_idle(self._redraw)
 
+    def _header_cell(self, x: float, c: int) -> None:
+        """One header cell (rect + sorted-arrow/filter-accent title) at canvas x."""
+        width = self._widths[c]
+        self.header.create_rectangle(x, 0, x + width, self._header_h,
+                                     fill=self._c_head, outline=self._c_line)
+        title = self._columns[c]
+        if self._sort is not None and self._sort[0] == c:
+            title += " ▲" if self._sort[1] == "asc" else " ▼"
+        label = fit_text(title, width - 2 * PAD_X, self._font_header.measure)
+        filtered = any(spec.get("col") == c for spec in self._filters)
+        self.header.create_text(x + PAD_X, self._header_h / 2, text=label, anchor="w",
+                                font=self._font_header,
+                                fill=self._c_accent if filtered else self._c_fg)
+
     def _draw_header(self) -> None:
+        if not self.header.winfo_exists():
+            return
         self.header.delete("all")
-        filtered = {spec["col"] for spec in self._filters}
         x = 0
-        for c, (column, width) in enumerate(zip(self._columns, self._widths)):
-            self.header.create_rectangle(x, 0, x + width, self._header_h,
-                                         fill=self._c_head, outline=self._c_line)
-            title = column
-            if self._sort is not None and self._sort[0] == c:
-                title += " ▲" if self._sort[1] == "asc" else " ▼"
-            label = fit_text(title, width - 2 * PAD_X, self._font_header.measure)
-            fg = self._c_accent if c in filtered else self._c_fg   # a filtered column reads accented
-            self.header.create_text(x + PAD_X, self._header_h / 2, text=label,
-                                    anchor="w", font=self._font_header, fill=fg)
-            x += width
+        for c in range(len(self._columns)):
+            self._header_cell(x, c)
+            x += self._widths[c]
+        # the pinned strip: while x-scrolled, the first columns re-draw AT the viewport's left edge
+        x_left = self.header.canvasx(0)
+        if self._frozen and x_left > 0:
+            x = x_left
+            for c in range(min(self._frozen, len(self._columns))):
+                self._header_cell(x, c)
+                x += self._widths[c]
+            self.header.create_line(x, 0, x, self._header_h, fill=self._c_accent, width=2)
 
     def _redraw(self) -> None:
         self._redraw_job = None
@@ -485,6 +533,40 @@ class DataGrid(ttk.Frame):
             x += width
             self.body.create_line(x, first * row_h, x, (last + 1) * row_h,
                                   fill=self._c_line, tags="cells")
+        # the pinned strip: the first columns re-draw OVER the scrolled content at the viewport's
+        # left edge (opaque row-slice backgrounds first, then the cells, then the strip borders)
+        if self._frozen and x_left > 0:
+            fw = self._frozen_w()
+            for i in range(first, last + 1):
+                src = self._view[i]
+                y = i * row_h
+                if i in self._selected:
+                    fill = self._c_sel
+                else:
+                    fill = self._c_alt if i % 2 else self._c_field
+                self.body.create_rectangle(x_left, y, x_left + fw, y + row_h, fill=fill,
+                                           outline="", tags="cells")
+                row = self._rows[src]
+                fg = (self._row_fg[src] if src < len(self._row_fg) and self._row_fg[src]
+                      else self._c_fg)
+                x = x_left
+                for c in range(min(self._frozen, len(widths))):
+                    cell = row[c] if c < len(row) else ""
+                    if cell:
+                        font = self._font_small if cell_kind(cell) == "small" else self._font_normal
+                        text = fit_text(cell, widths[c] - 2 * PAD_X, font.measure)
+                        self.body.create_text(x + PAD_X, y + row_h / 2, text=text, anchor="w",
+                                              font=font, fill=fg, tags="cells")
+                    x += widths[c]
+                self.body.create_line(x_left, y + row_h, x_left + fw, y + row_h,
+                                      fill=self._c_line, tags="cells")
+            x = x_left
+            for c in range(min(self._frozen, len(widths))):                         # strip borders
+                x += widths[c]
+                self.body.create_line(x, first * row_h, x, (last + 1) * row_h,
+                                      fill=self._c_line, tags="cells")
+            self.body.create_line(x_left + fw, first * row_h, x_left + fw, (last + 1) * row_h,
+                                  fill=self._c_accent, width=2, tags="cells")
 
 
 class _FilterPopup(tk.Toplevel):
@@ -532,10 +614,19 @@ class _FilterPopup(tk.Toplevel):
         buttons.pack(fill="x", pady=(8, 0))
         ttk.Button(buttons, text="Apply", command=self._apply).pack(side="left")
         ttk.Button(buttons, text="Clear column", command=self._clear_col).pack(side="left", padx=6)
+        pinned = col < grid._frozen                  # inside the strip -> the button UNPINS
+        ttk.Button(buttons, text="Unpin" if pinned else "Pin ≤ here",
+                   command=self._toggle_pin).pack(side="left", padx=(0, 6))
         ttk.Button(buttons, text="Cancel", command=self.destroy).pack(side="left")
         self._text.focus_set()
         self.bind("<Return>", lambda _e: self._apply())
         self.bind("<Escape>", lambda _e: self.destroy())
+
+    def _toggle_pin(self) -> None:
+        """Pin the columns up to (and including) this one - or drop the pinning entirely when this
+        column already sits inside the strip."""
+        self._grid.set_frozen(0 if self._col < self._grid._frozen else self._col + 1)
+        self.destroy()
 
     def _apply(self) -> None:
         """Picked values win over the pattern (they are the more explicit intent); empty both = no-op."""

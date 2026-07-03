@@ -798,9 +798,15 @@ The user-reviewed refresh before the first production test (the full spec + comm
   grids; set_data keeps raw rows so multi-line cells show whole), **column stats** in the filter popup
   footer. Tests: `test_tableviewer_shim.py` (4: re-exports+theme binding, quick-search spec, tsv/stats,
   the package STANDS ALONE - subprocess runs its own tests + imports pipeline4-free);
-  `TableViewerApp/tests/test_core.py` (bare-python standalone sanity). STILL DEFERRED: frozen/pinned
-  columns (a two-region canvas rework); then the Rust core port (calamine+PyO3), egui shell only if the
-  standalone exe needs it.
+  `TableViewerApp/tests/test_core.py` (bare-python standalone sanity). **PINNED COLUMNS DONE** (the last
+  viewer feature): `set_frozen(n)` / the filter popup's Pin-≤-here/Unpin + the removable ⚲ chip - while
+  x-scrolled the first n columns re-draw as an opaque STRIP (header + body, an accent separator) at the
+  viewport's left edge; EVERY hit test maps through the pure `core.hit_x` (strip coords = the natural
+  [0, frozen_w) coords; past-strip = canvasx - the covered zone is unreachable), so sort clicks /
+  filters / cell edits land on pinned columns (a pinned cell's edit overlay re-anchors to the strip).
+  ALSO fixed the latent x-scroll-without-redraw culling bug (xscrollcommand now schedules the body
+  redraw + the header repaint). REMAINING: the Rust core port (calamine+PyO3), an egui shell only if
+  the standalone exe needs it.
 - **`user_input/generation_params.yaml`** (active→builtin, neither→RAISE): the 620 SCL DWord names/variant/
   `S1.CABINET{$index}.{$role}` instance template (core/expr, strict) + the DiagList `$PLC_Binding$` sentinel;
   a builder declares its output surface at registration (`@builds(name, emit="fc_xml")`) — migrated at

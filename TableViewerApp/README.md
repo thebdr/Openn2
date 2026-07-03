@@ -22,6 +22,8 @@ tkinter; `openpyxl` only for xlsx files.
 - **Copy / export** — Ctrl+C copies the selection (or the whole filtered view) as TSV; the toolbar
   exports the current view to CSV.
 - **Row detail** — double-click a row: the full row as a vertical name/value card.
+- **Pinned columns** — right-click a header → "Pin ≤ here": while x-scrolling, the first columns
+  stay as a strip at the left edge (unpin from the same popup or the chip).
 - **Select** — click / Ctrl / Shift / drag; **resize** — drag a header separator, double-click it
   to auto-fit.
 
@@ -49,4 +51,4 @@ this way through its `pipeline4/gui/datagrid.py` shim.
 - `tests/test_core.py` — standalone sanity tests (`python tests/test_core.py`); the full behaviour
   suite lives in Pipeline4App's gate and runs against this package through the shim.
 
-Deferred: frozen/pinned columns (needs a two-region canvas rework); the Rust core port.
+Deferred: the Rust core port (calamine + PyO3), an egui shell if the standalone exe needs it.

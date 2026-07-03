@@ -89,6 +89,20 @@ def test_fit_col_width_uncapped_and_fonts():
        max(datagrid.MIN_DRAG_W, 10 + 12), "an empty column falls to the header/minimum")
 
 
+def test_pinned_column_hit_mapping():
+    """The pinned-strip hit test: inside the strip the widget x IS the natural x (the first
+    columns' natural positions are [0, frozen_w)); past it, normal canvas scrolling applies;
+    with no strip it degenerates to plain canvasx."""
+    eq(datagrid.frozen_width([100, 80, 200], 2), 180, "the strip width = the first n columns")
+    eq(datagrid.frozen_width([100, 80], 0), 0, "unpinned -> no strip")
+    eq(datagrid.hit_x(50, 300.0, 180), 50, "a click INSIDE the strip maps to the pinned column")
+    eq(datagrid.hit_x(200, 300.0, 180), 500.0, "past the strip -> x_left + widget_x (scrolled)")
+    eq(datagrid.hit_x(200, 0.0, 180), 200.0, "unscrolled: identical to canvasx either way")
+    eq(datagrid.hit_x(50, 300.0, 0), 350.0, "no strip -> plain canvasx")
+    # unambiguous: past-strip hits always land BEYOND the covered zone (>= x_left + frozen_w)
+    ok(datagrid.hit_x(180, 300.0, 180) >= 300.0 + 180, "the covered zone is unreachable")
+
+
 def test_updated_selection_model():
     """The multi-select click model: plain replaces, Ctrl toggles, Shift ranges from the anchor."""
     sel, anchor = datagrid.updated_selection(set(), None, 3)
@@ -161,6 +175,7 @@ if __name__ == "__main__":
         ("cell_at_hit_test", test_cell_at_hit_test),
         ("boundary_at_grab_zones", test_boundary_at_grab_zones),
         ("fit_col_width_uncapped_and_fonts", test_fit_col_width_uncapped_and_fonts),
+        ("pinned_column_hit_mapping", test_pinned_column_hit_mapping),
         ("updated_selection_model", test_updated_selection_model),
         ("natural_sort_key", test_natural_sort_key),
         ("cycle_sort_tristate", test_cycle_sort_tristate),

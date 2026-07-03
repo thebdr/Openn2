@@ -184,6 +184,23 @@ def distinct_values(rows, view, col: int, cap: int = 1000) -> list:
     return sorted(seen, key=natural_key)[:cap]
 
 
+# --- pinned (frozen) columns -------------------------------------------------------------------------- #
+def frozen_width(widths, frozen: int) -> float:
+    """The pixel width of the pinned strip: the first `frozen` columns."""
+    return sum(widths[:max(0, frozen)])
+
+
+def hit_x(widget_x: float, x_left: float, frozen_w: float) -> float:
+    """Map a WIDGET-space x to the NATURAL (unscrolled canvas) x for hit-testing under pinned
+    columns. Inside the pinned strip the natural coords ARE the widget coords (the strip renders
+    the first columns at the viewport's left edge, and their natural positions are [0, frozen_w));
+    past the strip, normal canvas scrolling applies. With no strip (frozen_w 0) this is exactly
+    canvasx. Unambiguous: past-strip clicks map to >= x_left + frozen_w, beyond the covered zone."""
+    if widget_x < frozen_w:
+        return widget_x
+    return x_left + widget_x
+
+
 # --- selection --------------------------------------------------------------------------------------- #
 def updated_selection(selected, anchor, row: int, ctrl: bool = False, shift: bool = False) -> tuple:
     """The next `(selected_set, anchor)` after a click on `row` (the standard list-selection model):

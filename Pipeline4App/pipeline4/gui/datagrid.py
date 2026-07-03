@@ -36,7 +36,7 @@ _tv_theme.narrow_family = _pl4_theme.narrow_family
 from tableviewer.core import (                           # noqa: E402,F401
     LONG_CELL_CHARS, MIN_COL_W, MAX_COL_W, MIN_DRAG_W, FIT_MAX_W, RESIZE_TOL,
     apply_filters, boundary_at, cell_at, cell_kind, column_stats, compute_col_widths,
-    cycle_sort, distinct_values, filter_passes, fit_col_width, fit_text, natural_key,
-    sanitize, sorted_view, stats_text, to_tsv, updated_selection,
+    cycle_sort, distinct_values, filter_passes, fit_col_width, fit_text, frozen_width,
+    hit_x, natural_key, sanitize, sorted_view, stats_text, to_tsv, updated_selection,
 )
 from tableviewer.grid import DataGrid, _FilterPopup      # noqa: E402,F401

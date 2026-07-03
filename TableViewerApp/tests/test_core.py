@@ -41,6 +41,10 @@ check("Σ 4" in core.stats_text(stats) and "1 blank" in core.stats_text(stats), 
 sel, anchor = core.updated_selection({1}, 1, 4, shift=True)
 check(sel == {1, 2, 3, 4} and anchor == 1, "shift-range selection")
 
+check(core.frozen_width([100, 80, 200], 2) == 180, "pinned strip width")
+check(core.hit_x(50, 300.0, 180) == 50 and core.hit_x(200, 300.0, 180) == 500.0,
+      "pinned-strip hit mapping")
+
 check(core.fit_text("abcdef", 30, lambda t: 10 * len(t)) == "ab…", "ellipsis fit")
 check(core.cell_kind("x" * 65) == "small" and core.cell_kind("x" * 64) == "normal", "long-cell font rule")
 
