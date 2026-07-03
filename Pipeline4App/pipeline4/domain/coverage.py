@@ -299,6 +299,14 @@ def render_txt(result) -> str:
 
 
 # --- build (-> the coverage SSOT table + findings) + project (-> the report files) --------------- #
+def _io_doc() -> str:
+    """The I/O List basename - the GUI log resolves it for the clickable Sheet!Cell links."""
+    try:
+        return os.path.basename(str(config.load_params().get("iolist_path") or ""))
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _findings(result) -> list:
     """The WARN findings: one cov_orphan_signal per ORPHAN signal + one cov_unplaced_member per UNPLACED
     (db, member). Informational - the GUI renders them, never gates."""
@@ -306,7 +314,7 @@ def _findings(result) -> list:
     for rec in result["orphans"]:
         out.append(Finding(phase=900, type="cov_orphan_signal", severity="WARN",
                            detail=f"{rec['FLD']} [{rec['address']}] type={rec['type']} - lands in no output",
-                           location=str(rec["source"]), source_uid=""))
+                           location=str(rec["source"]), source_uid="", doc=_io_doc()))
     for u in result["unplaced"]:
         out.append(Finding(phase=900, type="cov_unplaced_member", severity="WARN",
                            detail=f'"{u["member"]}" referenced by {u["referenced_by"]} - never created in the DB',

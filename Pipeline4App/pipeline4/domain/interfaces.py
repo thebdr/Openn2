@@ -12,6 +12,7 @@ keeping `{interface_name}`/`{interface_id}` for the generator. It runs AFTER 520
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 
@@ -28,11 +29,20 @@ from pipeline4.domain.signals import signals_table
 TRIGGER_TYPE = "IOC"
 
 
-def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "") -> Finding:
+def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "", doc: str = "") -> Finding:
     """A phase-400 Finding - the interface-build report container (WARN-only: a no-Index IOC row, a signal
     that could not be mirrored). Replaces the old warning strings."""
     return Finding(phase=400, type=type, severity=severity, detail=detail,
-                   location=location, source_uid=source_uid)
+                   location=location, source_uid=source_uid, doc=doc)
+
+
+def _io_doc() -> str:
+    """The I/O List basename - the GUI log resolves it for the clickable Sheet!Cell links."""
+    try:
+        return os.path.basename(str(config.load_params().get("iolist_path") or ""))
+    except Exception:  # noqa: BLE001
+        return ""
+
 GENERIC_SHEET = "<GENERIC>"
 _DIAG_RE = re.compile(r"\+\s*DIAG", re.IGNORECASE)   # the +DIAG marker in an IOC Index
 _DIR_TO_IO = {"<": "I", ">": "Q"}
@@ -180,10 +190,10 @@ def find_interfaces(rows) -> tuple:
         if str(r.get("script_type", "") or "").strip().upper() != TRIGGER_TYPE:
             continue
         instance = str(r.get("index", "") or "").strip()
-        loc = f"{r.get('source_sheet', '')}!{r.get('source_row', '')}"
+        loc = str(r.get("source_cell") or "").strip()             or f"{r.get('source_sheet', '')}!{r.get('source_row', '')}"
         if not instance:
             findings.append(_f("if_ioc_no_index", "WARN", "IOC row has no Index - skipped", loc,
-                               str(r.get("uid", ""))))
+                               str(r.get("uid", "")), doc=_io_doc()))
             continue
         machine_type, index = parse_instance(instance)
         records.append({
@@ -357,8 +367,9 @@ def collect_mirror_set(rows, *, index, is_diag, diag_rules, if_rules) -> tuple:
         if not name:
             findings.append(_f("if_signal_not_mirrored", "WARN",
                                f"{st} {identity.fld(r)}: no db_element or tag - not mirrored",
-                               f"{r.get('source_sheet', '')}!{r.get('source_row', '')}",
-                               str(r.get("uid", ""))))
+                               str(r.get("source_cell") or "").strip()
+                               or f"{r.get('source_sheet', '')}!{r.get('source_row', '')}",
+                               str(r.get("uid", "")), doc=_io_doc()))
             continue
         e = _Elem(script_type=st, mirror_name=name,
                   signal_name=str(r.get("interface_tagname", "") or ""),

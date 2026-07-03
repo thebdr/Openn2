@@ -24,6 +24,7 @@ Signal Type", col-7 "I/O Addresses Parameter", and I/O List col-AG are written, 
 """
 from __future__ import annotations
 
+import os
 import re
 
 from pipeline4.core import config, run
@@ -37,10 +38,19 @@ HEAD_CM = "PLCCARDCM"
 _ADDR = re.compile(r"\s*([IQ])\s*(\d+)\.(\d+)", re.IGNORECASE)
 
 
-def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "") -> Finding:
+def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "", doc: str = "") -> Finding:
     """A phase-700 Finding - the hardware report container (the missing-DTD FAIL / switch WARN)."""
     return Finding(phase=700, type=type, severity=severity, detail=detail,
-                   location=location, source_uid=source_uid)
+                   location=location, source_uid=source_uid, doc=doc)
+
+def _io_doc() -> str:
+    """The I/O List basename - the GUI log resolves it back to the open document for the clickable
+    Sheet!Cell links (findings pointing at DOC ROWS must carry location=source_cell + this doc)."""
+    try:
+        return os.path.basename(str(config.load_params().get("iolist_path") or ""))
+    except Exception:  # noqa: BLE001 - a missing/broken params file must not break the build
+        return ""
+
 
 
 # --- the SSOT tables ----------------------------------------------------------------------------- #
@@ -229,16 +239,22 @@ def extract(rows, dtd) -> tuple:
             rec = by_id.get(model.upper())
             if rec is None:                                   # not in the DTD -> can't generate
                 sheet = row.get("source_sheet")
-                loc = f"[{sheet}] row {row.get('source_row')}" if sheet else f"row {row.get('source_row')}"
-                where = f"{loc} {row.get('profinet_name') or row.get('device') or ''}".strip()
+                fallback = f"[{sheet}] row {row.get('source_row')}" if sheet else f"row {row.get('source_row')}"
+                where = str(row.get("source_cell") or "").strip() or fallback   # source_cell -> a LIVE link
+                name = str(row.get("profinet_name") or row.get("device") or "").strip()
+                io_doc = _io_doc() if "!" in where else ""
                 if _looks_like_switch(row):
                     findings.append(_f("hw_switch_not_in_dtd", "WARN",
-                                       f"switch model {model!r} not in DeviceTypesDatabase - skipped",
-                                       where, str(row.get("uid", ""))))
+                                       f"switch model {model!r}"
+                                       + (f" ({name})" if name else "")
+                                       + " not in DeviceTypesDatabase - skipped",
+                                       where, str(row.get("uid", "")), doc=io_doc))
                 else:
                     findings.append(_f("hw_device_not_in_dtd", "FAIL",
-                                       f"device model {model!r} not in DeviceTypesDatabase - skipped",
-                                       where, str(row.get("uid", ""))))
+                                       f"device model {model!r}"
+                                       + (f" ({name})" if name else "")
+                                       + " not in DeviceTypesDatabase - skipped",
+                                       where, str(row.get("uid", "")), doc=io_doc))
                 cur = None
                 continue
             cur = {"role": role, "row": row, "model": model, "rec": rec,

@@ -115,9 +115,10 @@ def test_station_io_addr_and_ag_override():
 def test_missing_dtd_fail_and_switch_warning():
     rows = [
         {"script_type": "PLC", "part_no": "UNKNOWN_CPU", "profinet_name": "n1",
-         "source_sheet": "NS", "source_row": 2, "device": "-K1"},
+         "source_sheet": "NS", "source_row": 2, "device": "-K1", "source_cell": "NS!A2"},
         {"script_type": "PLC", "part_no": "SW1", "description_module": "MANAGED SWITCH",
-         "profinet_name": "n2", "source_sheet": "NS", "source_row": 3, "device": "-K2"},
+         "profinet_name": "n2", "source_sheet": "NS", "source_row": 3, "device": "-K2",
+         "source_cell": "NS!A3"},
     ]
     stations, _m, findings = hardware.extract(rows, _dtd())
     eq(stations, [], "neither head is generatable")
@@ -126,6 +127,17 @@ def test_missing_dtd_fail_and_switch_warning():
        "a non-switch missing head is a FAIL; a switch is a WARN")
     ok(all(f.phase == 700 for f in findings), "phase 700")
     ok(any("UNKNOWN_CPU" in f.detail for f in findings))
+    # the log link contract: a doc-row finding carries location=source_cell (Sheet!Cell) + the
+    # workbook doc; the device name lives in the DETAIL (it used to squat in the location text)
+    eq(sorted(f.location for f in findings), ["NS!A2", "NS!A3"],
+       "doc-row findings point at the exact source cell (clickable)")
+    ok(all(f.doc for f in findings), "…and carry the workbook for the GUI link resolver")
+    ok(any("(n2)" in f.detail for f in findings), "the device name moved into the detail")
+    # rows WITHOUT source_cell (older stagings) fall back to the descriptive text - never crash
+    bare = [{"script_type": "PLC", "part_no": "UNKNOWN_CPU", "source_sheet": "NS", "source_row": 9}]
+    _s, _m2, fb = hardware.extract(bare, _dtd())
+    eq(fb[0].location, "[NS] row 9", "the no-source_cell fallback keeps the old text (no link)")
+    eq(fb[0].doc, "", "…and carries no doc (nothing to resolve)")
 
 
 # --- table fill ---------------------------------------------------------------------------------- #
