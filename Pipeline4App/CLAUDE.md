@@ -778,6 +778,19 @@ The user-reviewed refresh before the first production test (the full spec + comm
   via the `files_tab:` section in app_config.yaml (${placeholder} roots + include/exclude regex; active →
   builtin fallback; no code-baked structure). **yaml/json**: highlighted text view + an Object-explorer
   editor (`gui/object_editor.py`, ruamel round-trip, `…` path pickers on *path*/*dir* keys).
+- **DataGrid sort + cascade filters (production test, 2026-07-03)** - every table viewer (Files CSV/xlsx,
+  DB Explorer results, Findings) at once: header CLICK = tri-state NATURAL sort (asc -> desc -> release;
+  `I2.2 < I2.10 < I10.1`, blanks last; NON-destructive - only the `_view` source-index list permutes);
+  header RIGHT-CLICK = the filter popup (substring / regex / an Excel-style pick list of the VISIBLE rows'
+  distinct values - the CASCADE: each filter narrows what the previous left; filters compose as AND);
+  active sort/filters render as removable CHIPS above the header + a `k of n rows` count; filtered column
+  headers read accent-coloured. `selection()`/`raw_of`/`on_edit` stay SOURCE-indexed, so hosts (the
+  Findings treat, the CSV cell editor) are sort/filter-agnostic. `XLSX_MAX_ROWS` 3000 -> 50_000 (real
+  projects reach 10-20k rows - user). **ROADMAP (user-agreed)**: extract the viewer OUT of Pipeline4App as
+  a standalone/embeddable package (core/ + Tk shell), later a Rust core port (calamine+PyO3 - the xlsx
+  LOAD is the real bottleneck, not the virtual-rendered view), egui shell only if the standalone exe
+  needs it; remaining viewer features (quick-search, copy/export, freeze columns, row detail, footer
+  stats) land with the extraction.
 - **`user_input/generation_params.yaml`** (active→builtin, neither→RAISE): the 620 SCL DWord names/variant/
   `S1.CABINET{$index}.{$role}` instance template (core/expr, strict) + the DiagList `$PLC_Binding$` sentinel;
   a builder declares its output surface at registration (`@builds(name, emit="fc_xml")`) — migrated at

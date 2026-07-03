@@ -107,6 +107,49 @@ def test_updated_selection_model():
     eq((sel, anchor), ({4}, 4), "a plain click REPLACES a multi-selection")
 
 
+def test_natural_sort_key():
+    rows = ["I10.1", "I2.0", "I2.10", "I2.2"]
+    eq(sorted(rows, key=datagrid.natural_key), ["I2.0", "I2.2", "I2.10", "I10.1"],
+       "digit runs compare numerically (I2.2 < I2.10 < I10.1)")
+    eq(sorted(["10", "9", "100"], key=datagrid.natural_key), ["9", "10", "100"], "'10' after '9'")
+    eq(sorted(["b", "", "a"], key=datagrid.natural_key), ["a", "b", ""], "blank cells sort LAST")
+    eq(sorted(["Beta", "alpha"], key=datagrid.natural_key), ["alpha", "Beta"], "case-insensitive")
+
+
+def test_cycle_sort_tristate():
+    s1 = datagrid.cycle_sort(None, 2)
+    eq(s1, (2, "asc"), "first click -> ascending")
+    s2 = datagrid.cycle_sort(s1, 2)
+    eq(s2, (2, "desc"), "second click -> descending")
+    eq(datagrid.cycle_sort(s2, 2), None, "third click RELEASES the sort (original order)")
+    eq(datagrid.cycle_sort(s2, 0), (0, "asc"), "a different column starts fresh at asc")
+
+
+def test_filter_passes_modes():
+    ok(datagrid.filter_passes("NET SAFETY 50", {"col": 0, "text": "safety"}), "substring, case-insensitive")
+    ok(not datagrid.filter_passes("NET SAFETY 50", {"col": 0, "text": "sorter"}))
+    ok(datagrid.filter_passes("I110.0", {"col": 0, "text": r"^I\d+\.0$", "regex": True}), "regex mode")
+    ok(not datagrid.filter_passes("Q1.0", {"col": 0, "text": r"^I", "regex": True}))
+    ok(not datagrid.filter_passes("x", {"col": 0, "text": "([", "regex": True}), "a broken regex matches nothing")
+    ok(datagrid.filter_passes("A", {"col": 0, "values": {"A", "B"}}), "value-set membership")
+    ok(not datagrid.filter_passes("C", {"col": 0, "values": {"A", "B"}}))
+    ok(datagrid.filter_passes("anything", {"col": 0, "text": ""}), "an empty spec passes everything")
+
+
+def test_apply_filters_cascade_and_sorted_view():
+    rows = [["S1", "I2.0"], ["S1", "I10.1"], ["S2", "I2.2"], ["S1", "Q1.0"]]
+    view = datagrid.apply_filters(rows, [{"col": 0, "text": "S1"}])
+    eq(view, [0, 1, 3], "one filter narrows to the matching source indices")
+    view = datagrid.apply_filters(rows, [{"col": 0, "text": "S1"}, {"col": 1, "text": "^I", "regex": True}])
+    eq(view, [0, 1], "the second filter narrows the FIRST filter's survivors (cascade = AND)")
+    eq(datagrid.sorted_view(rows, view, (1, "asc")), [0, 1], "natural asc: I2.0 before I10.1")
+    eq(datagrid.sorted_view(rows, view, (1, "desc")), [1, 0], "desc reverses")
+    eq(datagrid.sorted_view(rows, view, None), [0, 1], "released sort -> the original document order")
+    eq(datagrid.distinct_values(rows, view, 1), ["I2.0", "I10.1"],
+       "the filter popup offers only the VISIBLE rows' values, natural-sorted")
+    eq(datagrid.distinct_values(rows, [0, 1, 2, 3], 0), ["S1", "S2"], "distinct + full view")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_datagrid", [
@@ -119,4 +162,8 @@ if __name__ == "__main__":
         ("boundary_at_grab_zones", test_boundary_at_grab_zones),
         ("fit_col_width_uncapped_and_fonts", test_fit_col_width_uncapped_and_fonts),
         ("updated_selection_model", test_updated_selection_model),
+        ("natural_sort_key", test_natural_sort_key),
+        ("cycle_sort_tristate", test_cycle_sort_tristate),
+        ("filter_passes_modes", test_filter_passes_modes),
+        ("apply_filters_cascade_and_sorted_view", test_apply_filters_cascade_and_sorted_view),
     ]))

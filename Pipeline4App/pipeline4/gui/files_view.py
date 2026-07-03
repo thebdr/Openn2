@@ -23,7 +23,7 @@ _GRID_EXT = (".csv",)
 _XLSX_EXT = (".xlsx", ".xlsm", ".xls")
 _TEXT_EXT = (".yaml", ".yml", ".json", ".xml", ".scl", ".db", ".txt", ".md", ".log")
 
-XLSX_MAX_ROWS, XLSX_MAX_COLS = 3000, 80   # cap a huge sheet so the preview stays responsive (PL3 parity)
+XLSX_MAX_ROWS, XLSX_MAX_COLS = 50_000, 120  # cap a runaway sheet only - real projects reach 10-20k rows (user)
 
 _PLACEHOLDER_RE = re.compile(r"^\$\{([A-Za-z_]+)\}$")
 
