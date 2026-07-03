@@ -126,6 +126,9 @@ STRINGS: dict = {
                               "revision (the prior feeds the ph100 before/after report).",
                         "it": "I documenti di input del progetto. Imposta la revisione corrente e quella "
                               "precedente (la precedente alimenta il report prima/dopo della fase 100)."},
+    "doc_sec_current":  {"en": "Current documents", "it": "Documenti correnti"},
+    "doc_sec_previous": {"en": "Previous revision (feeds the ph100 before/after report)",
+                         "it": "Revisione precedente (alimenta il report prima/dopo della fase 100)"},
     "doc_iolist":      {"en": "I/O List (current)", "it": "I/O List (corrente)"},
     "doc_iolist_prev": {"en": "I/O List (previous)", "it": "I/O List (precedente)"},
     "doc_matrix":      {"en": "C&E Matrix (current)", "it": "Matrice C&E (corrente)"},
