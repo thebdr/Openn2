@@ -26,8 +26,7 @@ import os
 from pipeline4.core import config
 from pipeline4.core.finding import Finding, record
 from pipeline4.core.table import Table
-from pipeline4.domain import diagnosis, identity, interfaces
-from pipeline4.domain.datablocks import DB_CONSTANTS
+from pipeline4.domain import datablocks, diagnosis, identity, interfaces
 
 import re
 
@@ -38,9 +37,12 @@ _STAGE_LABEL = {"interfaces": "400 interfaces", "io_tags": "510 I/O tags",
                 "hardware": "700 hardware", "software": "800 software"}
 
 _QUALREF = re.compile(r'"([^"]+)"\."([^"]+)"')        # a TIA-qualified "<db>"."<member>" reference
-_PADS = set(DB_CONSTANTS)                              # Always FALSE / Always TRUE / No Operation
-_COM_MEMBER_COL = "02_COM.{db_element}"                # the 800 builders' 02_COM cumulative cells
-_COM_DB = "02_COM"
+
+
+def _pads() -> set:
+    """The seed constants (Always FALSE/TRUE/No Operation) - from generation_params.yaml, the same
+    values the 520 seeds and the builder-owned DBs prepend."""
+    return set(datablocks.seed_members())
 
 
 # --- the SSOT table (the persisted per-signal trace) --------------------------------------------- #
@@ -73,19 +75,6 @@ def row_kind(row) -> str:
 
 
 # --- reading the SSOT tables into the emitted-identity sets (replaces PL3's on-disk readers) ------ #
-def _com_members(database) -> list:
-    """The distinct 02_COM.{db_element} cumulatives across the 800 builder rows (first-seen) - the
-    phase-800-owned 02_COM safe-DB's members, which are NOT in db_members. Mirrors blocks.engine."""
-    out = []
-    if "software_block_members" not in database:
-        return out
-    for m in database["software_block_members"]:
-        v = str((m.get("values") or {}).get(_COM_MEMBER_COL, "") or "").strip()
-        if v and v not in out:
-            out.append(v)
-    return out
-
-
 def collect_outputs(database) -> dict:
     """Read every SSOT table into the emitted-identity sets the trace attributes against - the same dict
     shape PL3's `collect_outputs(out_root)` produced from disk. A missing table degrades to empty +
@@ -102,14 +91,14 @@ def collect_outputs(database) -> dict:
         if n:
             tags.add(n)
 
-    # (520) {db_name: set(member)} from db_members + the 800-owned 02_COM safe-DB members.
+    # (520) {db_name: set(member)} from db_members + the 800 BUILDER-OWNED DBs (02_COM/05_EM_STATE -
+    # the engine's own collector, so the trace and the emitted XMLs stay one truth).
     dbm: dict = {}
     for m in (database["db_members"] if "db_members" in database else []):
         dbm.setdefault(str(m.get("db_name") or ""), set()).add(str(m.get("member") or ""))
-    com = _com_members(database)
-    if com:
-        dbm.setdefault(_COM_DB, set()).update(DB_CONSTANTS)
-        dbm[_COM_DB].update(com)
+    from pipeline4.domain.blocks import engine as blocks_engine     # late: blocks imports domain widely
+    for name, members in blocks_engine.builder_owned_members(database).items():
+        dbm.setdefault(name, set()).update(members)
 
     # (600) diagnosis bindings (the in_binding + the DiagList PLC_Binding cell) + consumed refs.
     diagb, consumed = set(), []
@@ -145,6 +134,7 @@ def collect_outputs(database) -> dict:
     # (800) {emitted value: set(block id)} from the builder @ rows (the block id = name before '_'),
     # ITERATOR cells spread; pads dropped. The 03 FC-XML refs are covered here (its rows are in the table).
     swrefs: dict = {}
+    pads = _pads()
     block_id = {b["name"]: str(b["name"]).split("_", 1)[0]
                 for b in (database["software_blocks"] if "software_blocks" in database else [])}
     for m in (database["software_block_members"] if "software_block_members" in database else []):
@@ -152,7 +142,7 @@ def collect_outputs(database) -> dict:
         for v in (m.get("values") or {}).values():
             for c in (v if isinstance(v, (list, tuple)) else [v]):
                 c = str(c).strip()
-                if c and c not in _PADS:
+                if c and c not in pads:
                     swrefs.setdefault(c, set()).add(bid)
 
     found = {

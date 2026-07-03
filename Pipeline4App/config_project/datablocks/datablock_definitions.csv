@@ -13,3 +13,5 @@ S1.CABINET{$cabinet:03d}.WARNING2,Instance,DB,BoolToUDInt_Inverted_Filtered_Tris
 07_DOOR,Global,F_DB,,,Optimized,false,true,false,false,false,,true,if_elements,Door closed / door alarm
 PROFINET_NODES_ALARM,Global,DB,,,Optimized,true,true,false,false,false,,true,if_elements,Profinet node alarm flags
 PROFINET_NODES_WARNING,Global,DB,,,Optimized,true,true,false,false,false,,true,if_elements,Profinet node warning flags
+02_COM,Global,F_DB,,,Optimized,false,true,false,false,false,,true,builders,Zone-cumulative safe outputs - BUILDER-OWNED (members = the 800 builders' 02_COM.* column values)
+05_EM_STATE,Global,F_DB,,,Optimized,false,true,false,false,false,,false,builders,Per-area emergency-state flags - BUILDER-OWNED (members = the 800 builders' 05_EM_STATE.* column values)

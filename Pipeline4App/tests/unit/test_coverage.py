@@ -10,7 +10,7 @@ from pipeline4.core import config
 from pipeline4.core.database import Database as DB
 from pipeline4.core.table import Table as CoreTable
 from pipeline4.domain import coverage
-from pipeline4.domain.datablocks import DB_CONSTANTS
+from pipeline4.domain.datablocks import seed_members
 
 
 def _sig(**kw):
@@ -126,7 +126,7 @@ def test_collect_outputs_from_tables():
     o = coverage.collect_outputs(db)
     eq(o["tags"], {"TAG1", "IFTAG"}, "io-signal name_in_tagtable + interface_elements signal_name")
     eq(o["db_members"]["07_DOOR"], {"m1"})
-    eq(o["db_members"]["02_COM"], set(DB_CONSTANTS) | {"AREA 1 PB"}, "02_COM = seeds + the builders' cumulatives")
+    eq(o["db_members"]["02_COM"], set(seed_members()) | {"AREA 1 PB"}, "02_COM = seeds + the builders' cumulatives")
     ok('"03_FDBACK"."x"' in o["diag_bindings"])
     eq(o["iface_exprs"], {'"04_SPEED"."enc"'})
     eq(o["iface_instances"], {"SORTER-01"})

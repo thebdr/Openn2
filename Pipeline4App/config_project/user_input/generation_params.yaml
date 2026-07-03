@@ -3,6 +3,12 @@
 # was byte-parity-verified on the real data. A project folder without this file inherits the app's
 # builtin copy (config.load_generation_params: active -> builtin; there are NO values baked in code).
 
+datablocks:
+  # The seed members every `seed: true` DB starts with (Bool; space, not underscore). Prepended by
+  # phase 520 to the config-declared DBs and by the 800 engine to the builder-owned ones
+  # (datablock_definitions.csv rows with create_when: builders).
+  seed_members: [Always FALSE, Always TRUE, No Operation]
+
 diagnosis:
   # The packed SCL DWord slot names - the BoolToUDInt instance per cabinet DWord (phase 620). Bit 0-31
   # lands in the first entry, 32-63 in the second.

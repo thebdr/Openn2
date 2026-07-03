@@ -23,7 +23,15 @@ from pipeline4.domain import dbtemplate as T
 from pipeline4.domain.db_members import db_blocks_table, db_members_table, instance_dbs_table
 from pipeline4.domain.signals import signals_table
 
-DB_CONSTANTS = ["Always FALSE", "Always TRUE", "No Operation"]   # the DB seed (Bool); space, not underscore
+def seed_members() -> list:
+    """The seed members every `seed: true` DB starts with (Bool; space, not underscore) - relocated
+    to user_input/generation_params.yaml (datablocks.seed_members; UI_REFRESH_PLAN F item 2). STRICT:
+    a missing key is a located error, never an in-code default."""
+    section = (config.load_generation_params() or {}).get("datablocks") or {}
+    try:
+        return [str(x) for x in section["seed_members"]]
+    except KeyError:
+        raise RuntimeError("generation_params.yaml: datablocks.seed_members is missing") from None
 
 
 def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "") -> Finding:
@@ -127,9 +135,12 @@ def generate(rows, definitions, elements, types) -> tuple:
     # 3. build the Global DB shells (seeds prepended)
     global_dbs = {}
     for d in global_defs:
-        if (d.get("create_when") or "if_elements").strip().lower() == "never":
+        # `never` is declared-but-not-created; `builders` is BUILDER-OWNED - declared here (the ONE DB
+        # config surface) but materialized by the 800 engine AFTER the builders run (its members are
+        # the builders' `<db>.<placeholder>` column values, unknowable at 520).
+        if (d.get("create_when") or "if_elements").strip().lower() in ("never", "builders"):
             continue
-        seeds = [_seed_member(c) for c in DB_CONSTANTS] if d.get("seed") else []
+        seeds = [_seed_member(c) for c in seed_members()] if d.get("seed") else []
         global_dbs[d["db_name"]] = {
             "prog_lang": d.get("db_programming_language") or "DB",
             "memory_layout": d.get("memory_layout") or "Optimized",
