@@ -213,9 +213,10 @@ class DataGrid(ttk.Frame):
     With `editable=True` a DATA cell edits in place on double-click (single-line Entry overlay;
     Enter commits through `on_edit(row, col, new) -> bool`, Escape/focus-out cancels); `raw_of(row,
     col)` supplies the underlying value (the grid itself only holds the sanitized DISPLAY text).
-    With `selectable=True` rows MULTI-select (click / Ctrl-toggle / Shift-range); a right-click on
-    an unselected row selects it first, then `on_context(event, selected_row_indices)` fires (the
-    host's context menu). `set_data(..., row_fg=[...])` colours each row's text (severity colours)."""
+    With `selectable=True` rows MULTI-select (click / Ctrl-toggle / Shift-range / click-DRAG a
+    range); a right-click on an unselected row selects it first, then `on_context(event,
+    selected_row_indices)` fires (the host's context menu). `set_data(..., row_fg=[...])` colours
+    each row's text (severity colours)."""
 
     def __init__(self, parent, mode: str = "dark", editable: bool = False,
                  on_edit=None, raw_of=None, selectable: bool = False, on_context=None):
@@ -279,6 +280,7 @@ class DataGrid(ttk.Frame):
             self.body.bind("<Double-Button-1>", self._cell_dclick)
         if selectable:
             self.body.bind("<Button-1>", self._body_press)
+            self.body.bind("<B1-Motion>", self._body_drag_select)
             self.body.bind("<Button-3>", self._body_context)
         self._apply_colors()
 
@@ -379,6 +381,20 @@ class DataGrid(ttk.Frame):
             self._selected, self._anchor, row,
             ctrl=bool(event.state & 0x0004), shift=bool(event.state & 0x0001))
         self._schedule_redraw()
+
+    def _body_drag_select(self, event) -> None:
+        """Click-drag extends the selection as a contiguous range from the press row (the anchor) to
+        the row under the pointer - clamped to the table, so drifting off the columns or past the
+        last row keeps extending instead of dropping the drag."""
+        if self._anchor is None or not self._view:
+            return
+        row = int(self.body.canvasy(event.y) // self._row_h)
+        row = max(0, min(len(self._view) - 1, row))
+        lo, hi = sorted((self._anchor, row))
+        new = set(range(lo, hi + 1))
+        if new != self._selected:
+            self._selected = new
+            self._schedule_redraw()
 
     def _body_context(self, event) -> None:
         """Right-click: a click on an UNSELECTED row selects just it (the standard model), then the

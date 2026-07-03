@@ -186,6 +186,20 @@ def apply_theme(root, mode: str = "dark") -> str:
         style.configure("TMenubutton", background=c["surface"], foreground=c["fg"], padding=(8, 3),
                         arrowcolor=c["fg"], relief="flat")
         style.map("TMenubutton", background=[("active", c["surface_hi"])])
+        # Toolbutton (the DataGrid filter/sort chips) + check/radio: clam's DEFAULT `active` state maps
+        # to a LIGHT background while the root fg stays theme-white -> white-on-white hover in dark
+        # mode. Pin hover to surface_hi with an explicit fg.
+        style.configure("Toolbutton", background=c["surface"], foreground=c["fg"], padding=(6, 2))
+        style.map("Toolbutton",
+                  background=[("pressed", c["surface_hi"]), ("active", c["surface_hi"])],
+                  foreground=[("disabled", c["disabled_fg"]), ("active", c["fg"])])
+        for boxy in ("TCheckbutton", "TRadiobutton"):
+            style.configure(boxy, background=c["bg"], foreground=c["fg"],
+                            indicatorbackground=c["field"], indicatorforeground=c["fg"])
+            style.map(boxy,
+                      background=[("active", c["surface_hi"])],
+                      foreground=[("disabled", c["disabled_fg"]), ("active", c["fg"])],
+                      indicatorbackground=[("active", c["field"])])
         style.configure("TNotebook", background=c["bg"], borderwidth=0, tabmargins=(2, 4, 2, 0))
         style.configure("TNotebook.Tab", background=c["surface"], foreground=c["fg"],
                         padding=(12, 4), bordercolor=c["border"])
