@@ -64,8 +64,8 @@ class App:
         self._level_vars = {}                     # the Levels dropdown: a checkbutton per severity level
         self._levels_mb = ttk.Menubutton(toolbar, text=i18n.tr("tb_levels", self.lang) + " ▾")
         levels_menu = tk.Menu(self._levels_mb, tearoff=0)
-        for level in severity.LEVELS:             # FAIL, ERROR, WARN, INFO, SKIP, PASS, DEBUG
-            forced = level in ("FAIL", "ERROR")   # always shown, greyed out (can't be disabled)
+        for level in severity.LEVELS:             # FAIL, ERRR, WARN, INFO, SKIP, PASS, DEBG
+            forced = level in ("FAIL", "ERRR")   # always shown, greyed out (can't be disabled)
             var = tk.BooleanVar(value=forced or level in shown0)
             self._level_vars[level] = var
             levels_menu.add_checkbutton(label=level, variable=var, command=self._on_levels_changed,
@@ -226,7 +226,7 @@ class App:
                     self._backup_before(number)
                     handler()
         except Exception:  # noqa: BLE001 - a handler crash must never take the window down
-            self._emit("ERROR", f"handler for {label} crashed:\n{traceback.format_exc()}")
+            self._emit("ERRR", f"handler for {label} crashed:\n{traceback.format_exc()}")
         finally:
             self._q.put(("done",))
 
@@ -245,7 +245,7 @@ class App:
             try:
                 getattr(self, phase.handler)()
             except Exception:  # noqa: BLE001 - attribute the crash to THIS phase, stop the chain like a halt
-                self._emit("ERROR", f"  {number} {name} crashed:\n{traceback.format_exc()}")
+                self._emit("ERRR", f"  {number} {name} crashed:\n{traceback.format_exc()}")
                 self._emit("FAIL", f"  Run Pipeline aborted at {number} {name} - "
                                    f"{len(order) - i} remaining phases skipped")
                 self._q.put(("progress_step",))
@@ -286,7 +286,7 @@ class App:
             self._backup_before(handler_name.lstrip("_"))
             getattr(self, handler_name)()
         except Exception:  # noqa: BLE001
-            self._emit("ERROR", f"{handler_name} crashed:\n{traceback.format_exc()}")
+            self._emit("ERRR", f"{handler_name} crashed:\n{traceback.format_exc()}")
         finally:
             self._q.put(("done",))
 
@@ -327,7 +327,7 @@ class App:
                 self._backup_before(number)
                 handler(only=number)
         except Exception:  # noqa: BLE001 - a handler crash must never take the window down
-            self._emit("ERROR", f"sub-phase {number} crashed:\n{traceback.format_exc()}")
+            self._emit("ERRR", f"sub-phase {number} crashed:\n{traceback.format_exc()}")
         finally:
             self._q.put(("done",))
 
@@ -445,7 +445,7 @@ class App:
             self.log.append("FAIL", "  this is a setup/scaffolding error - recreate the project (New Project) "
                                     "so its config is copied complete from the app's builtin config.")
         except (FileNotFoundError, OSError) as error:
-            self.log.append("ERROR", f"  could not open project {root}: {error}")
+            self.log.append("ERRR", f"  could not open project {root}: {error}")
 
     def _project_open(self):
         from tkinter import filedialog
@@ -454,7 +454,7 @@ class App:
         if not chosen:
             return
         if not project.is_project(chosen):
-            self.log.append("ERROR", f"  not a project folder (no config_project/project_params.yaml): {chosen}")
+            self.log.append("ERRR", f"  not a project folder (no config_project/project_params.yaml): {chosen}")
             return
         self._project_switch_to(chosen)
 
@@ -480,7 +480,7 @@ class App:
         try:
             count = project.archive_project(self._project, chosen)
         except OSError as error:
-            self.log.append("ERROR", f"  archive failed: {error}")
+            self.log.append("ERRR", f"  archive failed: {error}")
             return
         self.log.append("PASS", "  " + i18n.tr("pm_archived", self.lang, n=count, path=chosen))
 
@@ -513,7 +513,7 @@ class App:
         try:
             new_root = project.save_as(self._project, base, name)
         except (ValueError, FileExistsError, OSError, project.ProjectConfigError) as error:
-            self.log.append("ERROR", f"  save as failed: {error}")
+            self.log.append("ERRR", f"  save as failed: {error}")
             return
         self._apply_project_switch(new_root)
         self.log.append("PASS", "  " + i18n.tr("pm_saved_as", self.lang, path=new_root))
@@ -532,7 +532,7 @@ class App:
             new_root = project.restore_backup(self._project, zip_path)
             opened = project.open_project(new_root)
         except (ValueError, FileExistsError, OSError, project.ProjectConfigError) as error:
-            self.log.append("ERROR", f"  restore failed: {error}")
+            self.log.append("ERRR", f"  restore failed: {error}")
             return
         self._apply_project_switch(opened)
         self.log.append("PASS", "  " + i18n.tr("pm_restored", self.lang, path=opened))
@@ -672,13 +672,13 @@ class App:
             self._status("validation…")
             database, _sf = staging.stage()
             res = validation.run_validation(database, lang=self.lang)
-            issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERROR", "WARN")]
+            issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERRR", "WARN")]
             treatments.apply_and_reconcile(issues)      # registry maintenance (the records come from items)
             # the FULL report to the log - every level + the 110/120/130/140 sub-phase banners (the Levels
             # dropdown filters the view; a hidden level is elided, not dropped, and still reaches the tee).
             self._q.put(("records", iorender.render_records(res["items"])))
             c = res["counts"]
-            self._emit("PASS", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERROR', 0)} ERROR, "
+            self._emit("PASS", f"  100: {c.get('FAIL', 0)} FAIL, {c.get('ERRR', 0)} ERRR, "
                                f"{c.get('WARN', 0)} WARN, {c.get('PASS', 0)} PASS, {c.get('SKIP', 0)} SKIP "
                                f"-> {res['dir']}")
             return
@@ -694,7 +694,7 @@ class App:
                 database, _sf = staging.stage(params)
                 runner = crosscheck.run_xcheck_cem_iol if only == 130 else crosscheck.run_xcheck_iol_cem
                 findings = runner(database, params)
-        issues = [f for f in findings if f.severity in ("FAIL", "ERROR", "WARN")]
+        issues = [f for f in findings if f.severity in ("FAIL", "ERRR", "WARN")]
         self._render(findings)                          # the FULL sub-phase log (all levels, elide-filtered)
         n_pass = sum(1 for f in findings if f.severity == "PASS")
         self._emit("PASS", f"  {only}: {len(issues)} issues + {n_pass} PASS "
@@ -955,7 +955,7 @@ class App:
 
     # --- chrome ---------------------------------------------------------------------------------- #
     def _on_levels_changed(self) -> None:
-        """A Levels-dropdown toggle: apply the shown set live + persist it to app_config.yaml (FAIL/ERROR
+        """A Levels-dropdown toggle: apply the shown set live + persist it to app_config.yaml (FAIL/ERRR
         are always included)."""
         levels = {level for level, var in self._level_vars.items() if var.get()}
         self.log.set_shown_levels(levels)

@@ -30,19 +30,22 @@ BUTTON_FILLS = {"run": "#e84393", "phase": "#f5f6fa", "action": "#dfe6e9",
 BUTTON_FG = {"run": "#ffffff", "phase": "#2d3436", "action": "#2d3436",
              "open": "#1e272e", "special": "#ffffff", "chevron": "#f5f6fa", "disabled": "#636e72"}
 
-# log level -> (foreground colour, bold?). FAIL (halt) is bold red; ERROR a softer red; DEBUG muted.
+# log level -> (foreground colour, bold?). FAIL (halt) is bold red; ERRR a softer red; DEBG muted.
 # SUBPHASE is the SMALLER sub-phase section header (110/120/…) - phase blue, but normal weight (the
-# LogView also renders it one point smaller than the bold main PHASE header).
-LOG_COLORS = {"PHASE": ("#74b9ff", True), "SUBPHASE": ("#74b9ff", False), "FAIL": ("#ff6b6b", True),
-              "ERROR": ("#e17055", True), "WARN": ("#fdcb6e", False), "PASS": ("#55efc4", False),
-              "INFO": ("#dfe6e9", False), "SKIP": ("#b2bec3", False), "DEBUG": ("#a29bfe", False)}
+# LogView also renders it one point smaller than the bold main PHASE header); HEAD is the per-group
+# column-header line (quiet grey bold - a table header, not a finding).
+LOG_COLORS = {"PHASE": ("#74b9ff", True), "SUBPHASE": ("#74b9ff", False), "HEAD": ("#8f9ba2", True),
+              "FAIL": ("#ff6b6b", True), "ERRR": ("#e17055", True), "WARN": ("#fdcb6e", False),
+              "PASS": ("#55efc4", False), "INFO": ("#dfe6e9", False), "SKIP": ("#b2bec3", False),
+              "DEBG": ("#a29bfe", False)}
 
 # Light-mode log colours: same semantic palette but adjusted for a white background (WARN goes orange —
 # yellow is invisible on white; INFO goes near-black instead of near-white).
 LOG_COLORS_LIGHT = {
-    "PHASE": ("#0984e3", True), "SUBPHASE": ("#0984e3", False), "FAIL": ("#d63031", True),
-    "ERROR": ("#e17055", True), "WARN": ("#e67e22", False), "PASS": ("#00b894", False),
-    "INFO": ("#2d3436", False), "SKIP": ("#636e72", False), "DEBUG": ("#6c5ce7", False),
+    "PHASE": ("#0984e3", True), "SUBPHASE": ("#0984e3", False), "HEAD": ("#7c8a91", True),
+    "FAIL": ("#d63031", True), "ERRR": ("#e17055", True), "WARN": ("#e67e22", False),
+    "PASS": ("#00b894", False), "INFO": ("#2d3436", False), "SKIP": ("#636e72", False),
+    "DEBG": ("#6c5ce7", False),
 }
 
 DARK_BG = "#1e1e1e"

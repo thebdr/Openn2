@@ -22,7 +22,7 @@ from pipeline4.domain.validation import crosscheck, iolist, matrix, messages
 # the sub-phase banner label KEYS (the registry's pb_* keys; resolved per language at render time)
 _BANNER_KEYS = {110: "pb_validate_iolist", 120: "pb_validate_ce",
                 130: "pb_xcheck_cem_iol", 140: "pb_xcheck_iol_cem"}
-_TREATABLE = ("FAIL", "ERROR", "WARN")
+_TREATABLE = ("FAIL", "ERRR", "WARN")
 
 
 def _banner(num: int, lang: str = "en") -> Finding:

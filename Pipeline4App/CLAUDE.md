@@ -722,10 +722,23 @@ in database` after the gate and returns gracefully (no KeyError on the never-bui
 PROJECTION phases (400/510) call **`run.render`** (gate minus the halt) instead - their BuilderData is already
 written, so an escalated WARN is shown but no misleading `nothing written` halt line is printed. (Phase
 registry-driven bar, the structured-record clickable log, the Files tab, threading → later.)
-- **Severity taxonomy + the GUI log-level filter.** `core/severity.py` is the single source of the level set:
-  **FAIL** (halts), **ERROR** (skip the item, continue), **WARN**, **INFO**, **SKIP**, **PASS**, **DEBUG**
-  (dev-only, hidden by default) + the **PHASE** banner. Each level has a distinct first char (F E W I S P D), so
-  config lists can use single chars or full names interchangeably (`severity.resolve`/`resolve_set`). **`config_project/app_config.yaml`**
+- **Severity taxonomy + the GUI log-level filter.** `core/severity.py` is the single source of the level set -
+  ALL levels are FOUR-LETTER codes (production-test decision, the `[XXXX]` column is always 4 chars):
+  **FAIL** (halts), **ERRR** (skip the item, continue), **WARN**, **INFO**, **SKIP**, **PASS**, **DEBG**
+  (dev-only, hidden by default) + the **PHASE** banner and the **HEAD** column-header line (chrome, always
+  shown). Each level has a distinct first char (F E W I S P D), so config lists/registries can use single
+  chars, the 4-letter codes, or legacy full names (`ERROR`/`DEBUG` resolve unchanged) interchangeably
+  (`severity.resolve`/`resolve_set`).
+- **THE LOG ENGINE (production-test consolidation, 2026-07-03).** All TABULAR log data flows through ONE
+  engine - `io/render.render_records` over Findings - consumed by every phase via the GUI `_gate`/`_render`
+  seam and `run_validation` (and persisted to `validation_issues` for the Findings tab). Its layout rules:
+  the `| |` info columns are computed PER (SUB)PHASE GROUP and ONLY the columns some line in that group
+  actually fills are rendered (`_phase_widths` returns `used`; no empty `| |` placeholders - a no-info group
+  carries no pipes at all); every group opens with a **[HEAD]** line carrying the column titles in the same
+  alignment (title widths participate in the layout; emitted after the level filter so a filtered-empty
+  group has no orphan header). The handlers' NARRATIVE progress lines (counts/paths) stay free text by
+  design - they follow the uniform `[LEVL]  <sub#>: <counts> -> <target>` 2-space-indent convention and are
+  heterogeneous one-off facts, not columns. **`config_project/app_config.yaml`**
   (NEW — a tracked, COSMETIC GUI launch config, NOT per-project run params) carries `user_interface.log_levels`
   (default `[F, E, W, I, S, P, D]` — all 7 levels shown); `config.load_app_ui()` reads it → the shown-level set;
   `LogView(shown_levels=…)` filters `append` (PHASE always shown). This is the first piece of the severity model.

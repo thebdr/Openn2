@@ -6,7 +6,10 @@ ONE source renders both reports; only the level filter differs - the complete lo
 
 Rendered finding line (`<id>` is `<phase>-<type>`; `<location>` is `Sheet!Cell`, never the workbook name -
 `doc`/`doc2` ride on the Finding for the GUI and are not rendered):
-    [LEVEL] <id>  <location>  |  bit | FLD | desc_l1 | desc_l1b | drawing | type-index  ::  <detail>
+    [LEVL] <id>  <location>  |  bit | FLD | …  ::  <detail>
+The info columns are laid out PER (SUB)PHASE GROUP and only the columns some line in that group
+actually fills are rendered (no empty `| |` placeholders; a no-info group carries no pipes); each
+group opens with a [HEAD] line carrying the column titles in the same alignment.
 A cross-check (130/140) line renders its aligned `<caller> op <other>` comparisons IN the bit + FLD
 columns (op = `===`/`=/=`), with MarkSpans so a viewer can style them: the whole comparison neutral
 grey, the operator green (===) / red (=/=), and a =/='s differing chars background-highlighted.
@@ -25,8 +28,8 @@ from pipeline4.core import severity
 from pipeline4.core.model import InfoBlock
 
 INFO_HEADERS = ("bit", "FLD", "desc_l1", "desc_l1b", "drawing", "type-index")
-# The error-only report keeps banners + INFO + WARN + ERROR + FAIL (drops PASS/SKIP/DEBUG).
-ERROR_REPORT_LEVELS = (severity.BANNER, "INFO", "WARN", "ERROR", "FAIL")
+# The error-only report keeps banners/headers + INFO + WARN + ERRR + FAIL (drops PASS/SKIP/DEBG).
+ERROR_REPORT_LEVELS = (severity.BANNER, severity.HEADER, "INFO", "WARN", "ERRR", "FAIL")
 _EMPTY_INFO = InfoBlock()
 
 # A clickable cell: [start, end) char offsets into the line + the workbook basename (doc/doc2).
@@ -101,7 +104,13 @@ def _cmp_marks(caller: str, other: str, eq: bool, wc: int, cell_start: int) -> l
 
 
 def _phase_widths(entries) -> dict:
-    w = defaultdict(lambda: {"id": 0, "loc": 0, "loc1": 0, "info": [0] * len(INFO_HEADERS),
+    """Per-(sub)phase column layout: the field maxima AND `used` - the ordered indices of the info
+    columns that at least one line in THAT group actually fills (a plain non-empty cell, or the
+    bit/FLD slots of a cmp line). Unused columns are DROPPED from the group's layout entirely - no
+    empty `| |` placeholders; a group whose lines carry no info renders with no pipes at all. The
+    [HEAD] titles participate in the widths so the header always fits its column."""
+    w = defaultdict(lambda: {"id": len("type"), "loc": len("location"), "loc1": 0,
+                             "info": [0] * len(INFO_HEADERS), "used": [],
                              "ca": 0, "oa": 0, "cf": 0, "of": 0})
     for f in entries:                         # pass 1: per-field maxima (incl. the caller-cell width)
         if _is_banner(f):
@@ -113,14 +122,23 @@ def _phase_widths(entries) -> dict:
         for i, c in enumerate((f.info or _EMPTY_INFO).cells()):
             if f.cmp is not None and i in (0, 1):   # a cmp line renders the COMPARISON in bit/FLD instead
                 continue
-            ph["info"][i] = max(ph["info"][i], len(str(c)))
+            if str(c):
+                ph["info"][i] = max(ph["info"][i], len(str(c)))
+                if i not in ph["used"]:
+                    ph["used"].append(i)
         if f.cmp is not None:
+            for i in (0, 1):                  # a comparison occupies the bit + FLD columns
+                if i not in ph["used"]:
+                    ph["used"].append(i)
             ph["ca"], ph["oa"] = max(ph["ca"], len(f.cmp.caller_addr)), max(ph["oa"], len(f.cmp.other_addr))
             ph["cf"], ph["of"] = max(ph["cf"], len(f.cmp.caller_fld)), max(ph["of"], len(f.cmp.other_fld))
-    for ph in w.values():                     # fold the composite `<caller> op <other>` cell widths in
-        if ph["ca"] or ph["oa"]:
+    for ph in w.values():
+        ph["used"].sort()
+        if ph["ca"] or ph["oa"]:              # fold the composite `<caller> op <other>` cell widths in
             ph["info"][0] = max(ph["info"][0], ph["ca"] + ph["oa"] + 5)
             ph["info"][1] = max(ph["info"][1], ph["cf"] + ph["of"] + 5)
+        for i in ph["used"]:                  # the [HEAD] titles fit their columns
+            ph["info"][i] = max(ph["info"][i], len(INFO_HEADERS[i]))
     for f in entries:                         # pass 2: the combined-location width (needs loc1 from pass 1)
         if _is_banner(f):
             continue
@@ -137,21 +155,26 @@ def banner_lines(detail: str) -> list:
 def _format_line(f, w) -> tuple:
     """One finding -> (text, [LinkSpan], [MarkSpan]). The location column is `<loc1> vs <loc2>` for a
     cross-check (both clickable); a cross-check's aligned `<caller> op <other>` comparisons render IN
-    the bit + FLD info columns (the marks style them: === neutral, =/= diff-chars underlined). Spans
-    cover the cell glyphs (not padding), computed on the pre-rstrip line."""
+    the bit + FLD info columns (the layered marks style them). Only the group's USED columns render
+    (w['used']); a group with none carries no pipes. Spans cover the cell glyphs (not padding),
+    computed on the pre-rstrip line."""
     cells = [str(c) for c in (f.info or _EMPTY_INFO).cells()]
     marks = []
     loc = _location_text(f, w["loc1"]).ljust(w["loc"])
-    prefix = f"[{f.severity:<4}] {f.id:<{max(1, w['id'])}}  {loc}  | "
+    prefix = f"[{f.severity:<4}] {f.id:<{max(1, w['id'])}}  {loc}"
     if f.cmp is not None:
         c = f.cmp
         cells[0] = _cmp_cell(c.caller_addr, c.other_addr, c.addr_eq, w["ca"], w["oa"])
         cells[1] = _cmp_cell(c.caller_fld, c.other_fld, c.fld_eq, w["cf"], w["of"])
-        cell_at = len(prefix)                 # the bit cell starts right after the prefix
-        marks += _cmp_marks(c.caller_addr, c.other_addr, c.addr_eq, w["ca"], cell_at)
-        cell_at += max(w["info"][0], len(cells[0])) + 3          # + " | "
-        marks += _cmp_marks(c.caller_fld, c.other_fld, c.fld_eq, w["cf"], cell_at)
-    info = " | ".join(cell.ljust(w["info"][i]) for i, cell in enumerate(cells))
+    parts, cell_at = [], len(prefix) + 4      # each cell begins after "  | " / " | "
+    for i in w["used"]:
+        if f.cmp is not None and i == 0:
+            marks += _cmp_marks(c.caller_addr, c.other_addr, c.addr_eq, w["ca"], cell_at)
+        elif f.cmp is not None and i == 1:
+            marks += _cmp_marks(c.caller_fld, c.other_fld, c.fld_eq, w["cf"], cell_at)
+        parts.append(cells[i].ljust(w["info"][i]))
+        cell_at += w["info"][i] + 3           # + " | "
+    info = ("  | " + " | ".join(parts)) if parts else ""
     line = f"{prefix}{info}  :: {f.detail}"
     spans = []
     if f.location:                            # loc1: leftmost occurrence is the location field
@@ -163,16 +186,30 @@ def _format_line(f, w) -> tuple:
     return line.rstrip(), spans, marks        # rstrip drops only trailing space; spans stay valid
 
 
+def _head_line(w) -> str:
+    """The [HEAD] column-header line for one (sub)phase group, aligned to the SAME layout its data
+    lines use: `[HEAD] type  location  | <used titles> ::  detail`."""
+    parts = [INFO_HEADERS[i].ljust(w["info"][i]) for i in w["used"]]
+    info = ("  | " + " | ".join(parts)) if parts else ""
+    return f"[{severity.HEADER:<4}] {'type':<{max(1, w['id'])}}  {'location'.ljust(w['loc'])}{info}  :: detail".rstrip()
+
+
 def render_records(findings, errors_only: bool = False) -> list:
-    """Render `findings` (banner findings interleaved, in order) to structured records. `errors_only`
-    keeps banners + INFO/WARN/ERROR/FAIL."""
+    """Render `findings` (banner findings interleaved, in order) to structured records. Each
+    (sub)phase group gets a [HEAD] column-header record before its FIRST data line (emitted after
+    the level filter, so a fully-filtered group carries no orphan header). `errors_only` keeps
+    banners/headers + INFO/WARN/ERRR/FAIL."""
     entries = [f for f in findings if (not errors_only or f.severity in ERROR_REPORT_LEVELS)]
     widths = _phase_widths(entries)
     recs = []
+    headed = set()                            # the phases whose [HEAD] is already out
     for f in entries:
         if _is_banner(f):
             recs.append(RenderRec("banner", severity.BANNER, f.detail, ()))
             continue
+        if f.phase not in headed:
+            headed.add(f.phase)
+            recs.append(RenderRec("line", severity.HEADER, _head_line(widths[f.phase]), ()))
         text, spans, marks = _format_line(f, widths[f.phase])
         uid = f.uid if f.severity not in ("PASS", "SKIP") else ""
         recs.append(RenderRec("line", f.severity, text, tuple(spans), uid, tuple(marks)))
@@ -210,6 +247,7 @@ _HTML_CSS = """
   .log{overflow-x:auto;}
   .line{white-space:pre;width:max-content;min-width:100%;}   /* NO WRAP - horizontal scroll */
   .line.section{color:#4ea1ff;font-weight:bold;}
+  .line.head{color:#8f9ba2;font-weight:bold;}
   .line.fail{color:#ff6b6b;font-weight:bold;}
   .line.warn{color:#e0a458;}
   .line.pass{color:#9ad67d;}
@@ -222,8 +260,8 @@ _HTML_CSS = """
   .cmpdiff{background:#5b2b2b;}                             /* differing chars: red-ish highlight */
 """
 
-_LEVEL_CLASS = {"FAIL": "fail", "ERROR": "fail", "WARN": "warn", "PASS": "pass",
-                "SKIP": "skip", "INFO": "info", "DEBUG": "info"}
+_LEVEL_CLASS = {"FAIL": "fail", "ERRR": "fail", "WARN": "warn", "PASS": "pass",
+                "SKIP": "skip", "INFO": "info", "DEBG": "info", "HEAD": "head"}
 
 
 def _esc(s: str) -> str:

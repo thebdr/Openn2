@@ -18,7 +18,7 @@ def test_effective_severity():
     eq(treatments.effective_severity("WARN", "fail"), "FAIL", "ESCALATE a WARN to a halting FAIL")
     eq(treatments.effective_severity("FAIL", "warn"), "WARN", "DOWNGRADE a FAIL so the run proceeds")
     eq(treatments.effective_severity("FAIL", "skip"), "SKIP")
-    eq(treatments.effective_severity("ERROR", "ignore"), "SKIP", "ignore -> SKIP")
+    eq(treatments.effective_severity("ERRR", "ignore"), "SKIP", "ignore -> SKIP")
     eq(treatments.effective_severity("WARN", "W"), "WARN", "single-char treatment works (first-char resolve)")
     eq(treatments.effective_severity("FAIL", "bogus"), "FAIL", "an unknown treatment -> the default")
 
@@ -72,7 +72,7 @@ def test_non_treatable_not_registered():
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "em.csv")
         treatments.apply_and_reconcile([_f(300, "ok", "PASS", "fine"), _f(300, "note", "INFO", "fyi")], path)
-        eq(treatments.load(path), {}, "PASS/INFO findings don't get registry rows (only FAIL/ERROR/WARN do)")
+        eq(treatments.load(path), {}, "PASS/INFO findings don't get registry rows (only FAIL/ERRR/WARN do)")
 
 
 if __name__ == "__main__":

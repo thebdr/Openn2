@@ -28,7 +28,7 @@ from pipeline4.core import config, severity
 FIELDS = ["uid", "id", "phase", "type", "treatment", "status", "location", "message"]
 TREATMENTS = ("fail", "error", "warn", "skip", "ignore")   # + "accept" (doc-mutating) lands with phase 100
 # findings the operator can treat (the actionable ones get a registry row; PASS/INFO/SKIP/DEBUG don't).
-_TREATABLE = frozenset({"FAIL", "ERROR", "WARN"})
+_TREATABLE = frozenset({"FAIL", "ERRR", "WARN"})
 
 
 @dataclass

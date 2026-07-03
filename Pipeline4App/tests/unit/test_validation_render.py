@@ -31,15 +31,23 @@ def test_banner_lines_and_render():
                 Finding(phase=110, type="x", severity="WARN", detail="hi", location="IO!A1")]
     lines = render.render_lines(findings)
     eq(lines[:3], ["", "110 Validate I/O List", "=" * 21], "a banner -> blank, title, === underline")
-    ok(lines[3].startswith("[WARN] 110-x") and "IO!A1" in lines[3] and lines[3].endswith(":: hi"))
+    ok(lines[3].startswith("[HEAD] type") and "location" in lines[3] and lines[3].endswith(":: detail"),
+       "each group opens with the [HEAD] column-header line")
+    ok("|" not in lines[3], "a no-info group's header carries no pipes")
+    ok(lines[4].startswith("[WARN] 110-x") and "IO!A1" in lines[4] and lines[4].endswith(":: hi"))
+    ok("|" not in lines[4], "a no-info group's data lines carry no empty | | placeholders")
 
 
 def test_info_block_columns():
     f = Finding(phase=110, type="addr_format", severity="FAIL", detail="bad address", location="IO!G5",
                 info=InfoBlock(bit="I0.0", fld="S1", desc_l1="DOOR"))
-    line = render.render_lines([f])[0]
-    ok("| I0.0 | S1 | DOOR |" in line, "the InfoBlock cells render between the | separators")
+    head, line = render.render_lines([f])
+    ok("| bit" in head and "| FLD" in head and "| desc_l1" in head, "the header titles the used columns")
+    ok("desc_l1b" not in head and "drawing" not in head and "type-index" not in head,
+       "the UNUSED columns are dropped from the group's layout entirely")
+    ok("| I0.0 | S1" in line and "| DOOR" in line, "the used InfoBlock cells render between |s")
     ok(line.startswith("[FAIL] 110-addr_format"))
+    eq(line.count("|"), 3, "exactly the 3 used columns - no empty trailing placeholders")
 
 
 def test_crosscheck_cmp_and_dual_link():
@@ -47,7 +55,9 @@ def test_crosscheck_cmp_and_dual_link():
                 location="CE!F5", doc="ce.xlsx", location2="IO!G9", doc2="io.xlsx",
                 cmp=Cmp("I0.0", "I0.0", True, "S1", "S2", False))
     recs = render.render_records([f])
-    rec = recs[0]
+    eq(recs[0].level, "HEAD", "the group opens with its header line")
+    ok("| bit" in recs[0].text and "| FLD" in recs[0].text, "a cmp group uses the bit + FLD columns")
+    rec = recs[1]
     ok("CE!F5 vs IO!G9" in rec.text, "the dual location column")
     # the comparisons render IN the bit + FLD info columns (not duplicated before the detail)
     ok("| I0.0 === I0.0 | S1 =/= S2" in rec.text, "the aligned comparisons live in the info columns")
@@ -88,9 +98,9 @@ def test_errors_only_filter():
                 Finding(phase=110, type="w", severity="WARN", detail="w"),
                 Finding(phase=110, type="f", severity="FAIL", detail="f")]
     kept = [r.level for r in render.render_records(findings, errors_only=True)]
-    eq(kept, ["PHASE", "WARN", "FAIL"], "errors-only drops PASS/SKIP, keeps banner + WARN + FAIL")
+    eq(kept, ["PHASE", "HEAD", "WARN", "FAIL"], "errors-only drops PASS/SKIP, keeps banner+head+WARN+FAIL")
     full = [r.level for r in render.render_records(findings, errors_only=False)]
-    eq(full, ["PHASE", "PASS", "SKIP", "WARN", "FAIL"], "complete keeps everything")
+    eq(full, ["PHASE", "HEAD", "PASS", "SKIP", "WARN", "FAIL"], "complete keeps everything")
 
 
 def test_reports_and_html():

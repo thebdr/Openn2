@@ -1,5 +1,5 @@
 """GUI M1 - the Levels dropdown persistence: config.save_app_log_levels round-trips the BUILTIN
-app_config.yaml (FAIL/ERROR always included, comments preserved) and load_app_ui reads it back.
+app_config.yaml (FAIL/ERRR always included, comments preserved) and load_app_ui reads it back.
 UI prefs are APP-scoped - saving with a project OPEN must land in the same (builtin) file the next
 launch reads, never in the project's copy (the production-test persistence bug). Hermetic: the
 builtin app_config home is redirected to a temp file."""
@@ -26,10 +26,10 @@ def test_save_and_load_log_levels():
     def body(d):
         with open(os.path.join(d, "app_config.yaml"), "w", encoding="utf-8") as h:
             h.write("# keep me\nuser_interface:\n  log_levels: [F, E, W, I, S, P, D]\n")
-        # the user unchecks everything toggleable, leaving only WARN (+ the forced FAIL/ERROR)
+        # the user unchecks everything toggleable, leaving only WARN (+ the forced FAIL/ERRR)
         config.save_app_log_levels({"WARN"})
         shown = config.load_app_ui()["log_levels"]
-        ok({"FAIL", "ERROR", "WARN"} <= shown, "FAIL+ERROR forced, WARN kept")
+        ok({"FAIL", "ERRR", "WARN"} <= shown, "FAIL+ERRR forced, WARN kept")
         ok("PASS" not in shown and "SKIP" not in shown and "INFO" not in shown, "the unchecked levels dropped")
         text = open(os.path.join(d, "app_config.yaml"), encoding="utf-8").read()
         ok("# keep me" in text, "the file comment survived the round-trip")
@@ -39,10 +39,10 @@ def test_save_and_load_log_levels():
 
 def test_save_creates_file_when_absent():
     def body(_d):
-        config.save_app_log_levels({"WARN", "INFO", "PASS", "SKIP", "DEBUG"})
+        config.save_app_log_levels({"WARN", "INFO", "PASS", "SKIP", "DEBG"})
         shown = config.load_app_ui()["log_levels"]
-        eq(shown - {"PHASE"}, {"FAIL", "ERROR", "WARN", "INFO", "PASS", "SKIP", "DEBUG"},
-           "all levels (forced FAIL/ERROR + the rest) written + read back")
+        eq(shown - {"PHASE"}, {"FAIL", "ERRR", "WARN", "INFO", "PASS", "SKIP", "DEBG"},
+           "all levels (forced FAIL/ERRR + the rest) written + read back")
     _with_temp_builtin_ui(body)
 
 
@@ -65,7 +65,7 @@ def test_ui_prefs_are_app_scoped_not_project_scoped():
                 config.use_builtin()
             ui = config.load_app_ui()                     # what the NEXT LAUNCH reads (pre-auto_reopen)
             eq(ui["language"], "it", "the language toggle survives a restart")
-            eq(ui["log_levels"] - {"PHASE"}, {"FAIL", "ERROR", "WARN"},
+            eq(ui["log_levels"] - {"PHASE"}, {"FAIL", "ERRR", "WARN"},
                "the levels toggle survives a restart")
             with open(project_copy, encoding="utf-8") as h:
                 text = h.read()

@@ -18,8 +18,8 @@ from pipeline4.gui import theme
 
 _ACCENT_DARK = theme.LOG_COLORS["PHASE"][0]        # clickable-link colour in dark mode
 _ACCENT = _ACCENT_DARK                            # module-level default (dark)
-_TREATABLE = ("FAIL", "ERROR", "WARN")
-_ALWAYS_SHOWN = ("PHASE", "SUBPHASE", "FAIL", "ERROR")  # never hideable (banners + the failures)
+_TREATABLE = ("FAIL", "ERRR", "WARN")
+_ALWAYS_SHOWN = ("PHASE", "SUBPHASE", "HEAD", "FAIL", "ERRR")  # never hideable (chrome + the failures)
 # the render-mark style -> Text tag map (the cross-check comparison layers; see io/render.MarkSpan)
 _MARK_TAGS = {"cmp": "cmp", "cmp_op_eq": "cmpopeq", "cmp_op_ne": "cmpopne", "cmp_diff": "cmpdiff"}
 _CMP_DIFF_BG = {"dark": "#5b2b2b", "light": "#f6c9c9"}  # the =/= differing-chars highlight

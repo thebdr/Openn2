@@ -374,7 +374,7 @@ def save_app_log_levels(levels) -> None:
     from ruamel.yaml import YAML
     from ruamel.yaml.comments import CommentedSeq
     from pipeline4.core import severity
-    shown = set(levels) | severity.HALTING | {"ERROR"}
+    shown = set(levels) | severity.HALTING | {"ERRR"}
     codes = CommentedSeq(level[0] for level in severity.LEVELS if level in shown)
     codes.fa.set_flow_style()                       # keep the [F, E, W, ...] one-line form
     path = builtin_app_config_file()

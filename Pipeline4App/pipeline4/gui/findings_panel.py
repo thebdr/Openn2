@@ -27,7 +27,7 @@ from pipeline4.gui.datagrid import DataGrid
 _BASE_COLUMNS = ("phase", "type", "severity", "effective", "treatment", "location")
 _CONTEXT_COLUMNS = ("location2", "bit", "fld", "compared")   # hidden when empty across the view
 _HEADERS = {"location2": "vs", "compared": "compared (=== / =/=)"}
-_SEVERITIES = ("", "FAIL", "ERROR", "WARN", "INFO", "SKIP", "PASS")
+_SEVERITIES = ("", "FAIL", "ERRR", "WARN", "INFO", "SKIP", "PASS")
 _DISABLED_TREATMENTS = ("skip", "ignore")    # greyed for now (UI only) until the app is stable
 
 

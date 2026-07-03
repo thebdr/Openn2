@@ -85,13 +85,14 @@ def test_apply_and_records():
                         Finding(phase=110, type="row_ok", severity="PASS", detail="ok", location="IO!O5")]
             applied, recs = findings_view.apply_and_records(findings)
             eq([eff for _f, eff in applied], ["FAIL", "PASS"], "effective severities (no treatments)")
-            line_recs = [r for r in recs if r.kind == "line"]
+            eq(recs[0].level, "HEAD", "every rendered group opens with its [HEAD] column-header line")
+            line_recs = [r for r in recs if r.level != "HEAD"]
             eq(len(line_recs), 2, "a record per finding")
             eq(line_recs[0].level, "FAIL")
             eq(line_recs[0].uid, findings[0].uid, "the FAIL record carries the finding uid (for the errlink)")
             # render_records does NOT synthesize banners (the handler emits the PHASE banner as a plain line);
             # only severity==PHASE findings render as banners, and plain findings carry none.
-            eq([r.kind for r in recs], ["line", "line"], "plain findings -> line records only, no banner")
+            eq([r.kind for r in recs], ["line", "line", "line"], "head + findings are line records, no banner")
             # a treatment now downgrades the rendered level
             findings_view.apply_treatment(findings[0].uid, "warn", {"phase": 110, "type": "addr_format"})
             applied2, _r = findings_view.apply_and_records(findings)

@@ -1,30 +1,33 @@
 """The PL4 log / finding SEVERITY taxonomy - the single source of the level set.
 
-Ordered most -> least severe:
-  FAIL  - a blocking failure: HALTS the phase (+ anything depending on it); output not written/usable.
-          (config-structure error, an unresolvable REQUIRED input, a missing DTD model, a locked output.)
-  ERROR - a LOCALIZED failure: the offending item is skipped, the phase finishes + writes the rest
-          (output usable-but-incomplete).
-  WARN  - output produced, but a condition to review (a fallback used, a duplicate dropped, stale config).
-  INFO  - progress / status; no action.
-  SKIP  - a deliberate, documented non-action (a rule-excluded row, an N/A check, an acknowledged finding).
-  PASS  - explicit success (a validation passed).
-  DEBUG - developer-only diagnostics; hidden from the operator by default.
+Every level is a FOUR-LETTER code (the user's original design: the log's `[XXXX]` column is always
+exactly 4 chars wide). Ordered most -> least severe:
+  FAIL - a blocking failure: HALTS the phase (+ anything depending on it); output not written/usable.
+         (config-structure error, an unresolvable REQUIRED input, a missing DTD model, a locked output.)
+  ERRR - a LOCALIZED failure: the offending item is skipped, the phase finishes + writes the rest
+         (output usable-but-incomplete).
+  WARN - output produced, but a condition to review (a fallback used, a duplicate dropped, stale config).
+  INFO - progress / status; no action.
+  SKIP - a deliberate, documented non-action (a rule-excluded row, an N/A check, an acknowledged finding).
+  PASS - explicit success (a validation passed).
+  DEBG - developer-only diagnostics; hidden from the operator by default.
 
 A level is identified by its FIRST CHARACTER (all distinct: F E W I S P D), so a config list may use
-single chars (`[F, E, W, S, P, D]`) OR full names (`[FAIL, WARN, ...]`) interchangeably. `PHASE` is a
-SECTION BANNER, not a finding level - it is always shown and never a treatment target. The treatment
+single chars (`[F, E, W, S, P, D]`), the 4-letter codes, OR legacy full names (`ERROR`, `DEBUG` - old
+configs/registries resolve unchanged) interchangeably. `PHASE` is a SECTION BANNER and `HEAD` the
+column-header line - chrome, not finding levels; always shown, never treatment targets. The treatment
 registry (error_management.csv) can later RECLASSIFY a finding's effective severity per uid (incl.
 escalating to FAIL) - that builds on this taxonomy.
 """
 from __future__ import annotations
 
-LEVELS = ("FAIL", "ERROR", "WARN", "INFO", "SKIP", "PASS", "DEBUG")
+LEVELS = ("FAIL", "ERRR", "WARN", "INFO", "SKIP", "PASS", "DEBG")
 HALTING = frozenset({"FAIL"})          # an effective-severity in here halts the pipeline
 BANNER = "PHASE"                        # a section header, not a finding (always shown)
-DEFAULT_HIDDEN = frozenset({"DEBUG"})  # hidden unless explicitly listed
+HEADER = "HEAD"                         # the per-group column-header log line (chrome, always shown)
+DEFAULT_HIDDEN = frozenset({"DEBG"})   # hidden unless explicitly listed
 
-_BY_FIRST = {level[0]: level for level in LEVELS}   # F->FAIL, E->ERROR, W->WARN, I->INFO, S->SKIP, P->PASS, D->DEBUG
+_BY_FIRST = {level[0]: level for level in LEVELS}   # F->FAIL, E->ERRR, W->WARN, I->INFO, S->SKIP, P->PASS, D->DEBG
 
 
 def resolve(token) -> str | None:
