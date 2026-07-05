@@ -111,13 +111,15 @@ def _compile_language(name: str, spec: dict):
         parts.append("(?P<str>" + "|".join(
             re.escape(q) + r"(?:\\.|[^" + re.escape(q) + r"\\\n])*" + re.escape(q)
             for q in quotes) + ")")
+    for i, (tag, pattern) in enumerate(spec.get("extra") or []):
+        # extras take PRECEDENCE over keywords + numbers: a typed literal like WORD#16#F0 must
+        # tokenize whole, not fall apart into the WORD keyword + a plain 16
+        parts.append(f"(?P<x{i}_{tag}>{pattern})")
     for group, tag in (("keywords", "key"), ("keywords2", "bool")):
         words = spec.get(group) or []
         if words:
             alt = "|".join(re.escape(w) for w in sorted(words, key=len, reverse=True))
             parts.append(r"(?P<" + tag + r">\b(?:" + alt + r")\b)")
-    for i, (tag, pattern) in enumerate(spec.get("extra") or []):
-        parts.append(f"(?P<x{i}_{tag}>{pattern})")   # extras BEFORE num: 16#FF must beat plain 16
     if spec.get("numbers", True):
         parts.append(r"(?P<num>(?<![\w.])-?\d+(?:\.\d+)?(?![\w.]))")
     flags = re.DOTALL | (re.IGNORECASE if spec.get("case_insensitive") else 0)

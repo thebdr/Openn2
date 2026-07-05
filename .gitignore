@@ -24,6 +24,10 @@ Shared/OutputTree/
 Pipeline3App/user_input/*.csv
 Pipeline4App/config_project/user_input/*.csv
 
+# Rust build output (FileXY core port)
+FileXYApp/rust/filexy-core/target/
+FileXYApp/rust/filexy-core/Cargo.lock
+
 # NuGet restore output
 Openn2App/packages/
 
@@ -39,4 +43,3 @@ Openn3App/lib/Siemens.Engineering.dll
 Openn3App/GeneratedBlocks/
 Openn3App/AttributeDumps/
 Openn3App/Logs/
-TableViewerApp/

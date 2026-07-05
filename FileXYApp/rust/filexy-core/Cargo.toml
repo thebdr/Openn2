@@ -1,0 +1,17 @@
+[package]
+name = "filexy-core"
+version = "0.1.0"
+edition = "2021"
+description = "FileXY's pure grid engine, ported from filexy/core.py (the executable spec)."
+license = "MIT"
+
+[dependencies]
+regex = "1"
+
+# NEXT STEPS (the agreed roadmap):
+#   pyo3 = { version = "0.23", features = ["extension-module"], optional = true }  + maturin
+#     -> a `filexy_core` Python module the Tk shell can swap in for the pure-Python core
+#   calamine = "0.26"   -> the xlsx loader (the REAL performance win; openpyxl is 10-20x slower)
+
+[lib]
+name = "filexy_core"

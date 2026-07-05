@@ -833,9 +833,9 @@ The user-reviewed refresh before the first production test (the full spec + comm
   `objectview.py` (the object explorer/editor). PL4 shims: `gui/_filexy.py` is the ONE bootstrap
   (sys.path + theme binding); `gui/datagrid.py`, `gui/highlight.py`, `gui/object_editor.py` re-export -
   hosts + tests untouched. Doc-view routing now keys on `object_kind_of` (yaml/json/xml only), so scl/sql
-  route to the TEXT editor with highlighting. NOTE: the old on-disk `TableViewerApp/` was LOCKED by the
-  user's running app during the rename - it is gitignored + untracked; DELETE it once the app is closed.
-  (`tableviewer`:
+  route to the TEXT editor with highlighting. (The old on-disk `TableViewerApp/` was LOCKED by the
+  user's running app during the rename; DELETED 2026-07-05 once the app closed.)
+  (`filexy`:
   `core.py` PURE engine [the executable spec for the Rust port] · `grid.py` Tk widget+popups · `theme.py`
   REBINDABLE palette/fonts · `files.py` csv/xlsx loaders · `app.py`+`launch_viewer.py` standalone window).
   **`pipeline4/gui/datagrid.py` is now the EMBEDDING SHIM**: sys.path's the sibling package, binds
@@ -844,17 +844,30 @@ The user-reviewed refresh before the first production test (the full spec + comm
   table at once): **Ctrl+F global quick search** (col=None spec, live, a removable chip), **Ctrl+C TSV
   copy** (selection in view order, else the filtered view), **row-detail card** (double-click on read-only
   grids; set_data keeps raw rows so multi-line cells show whole), **column stats** in the filter popup
-  footer. Tests: `test_tableviewer_shim.py` (4: re-exports+theme binding, quick-search spec, tsv/stats,
+  footer. Tests: `test_filexy_shim.py` (4: re-exports+theme binding, quick-search spec, tsv/stats,
   the package STANDS ALONE - subprocess runs its own tests + imports pipeline4-free);
-  `TableViewerApp/tests/test_core.py` (bare-python standalone sanity). **PINNED COLUMNS DONE** (the last
+  `FileXYApp/tests/test_core.py` (bare-python standalone sanity). **PINNED COLUMNS DONE** (the last
   viewer feature): `set_frozen(n)` / the filter popup's Pin-≤-here/Unpin + the removable ⚲ chip - while
   x-scrolled the first n columns re-draw as an opaque STRIP (header + body, an accent separator) at the
   viewport's left edge; EVERY hit test maps through the pure `core.hit_x` (strip coords = the natural
   [0, frozen_w) coords; past-strip = canvasx - the covered zone is unreachable), so sort clicks /
   filters / cell edits land on pinned columns (a pinned cell's edit overlay re-anchors to the strip).
   ALSO fixed the latent x-scroll-without-redraw culling bug (xscrollcommand now schedules the body
-  redraw + the header repaint). REMAINING: the Rust core port (calamine+PyO3), an egui shell only if
-  the standalone exe needs it.
+  redraw + the header repaint).
+- **SCL highlight v2 + the Rust core port STARTED (2026-07-05)** - `langs.json` scl entry upgraded from
+  the vscode-simatic-scl rule INVENTORY (repo has NO license -> only Siemens language FACTS extracted,
+  all regexes written fresh): OOP keywords (METHOD/INTERFACE/EXTENDS/...), the full type+builtin set,
+  typed literals (`WORD#16#F0`, `T#2d_3h` - whole-token), `%DB1.DBX0.0` addresses, `#locals` incl.
+  `#"quoted"`, `x_TO_y` conversions, `S7_*` pragmas, `"quoted globals"`. FIX in
+  `filexy/highlight.py::_compile_language`: EXTRA rules compile BEFORE keyword groups + numbers (else
+  the keyword alternation split typed literals). **`FileXYApp/rust/filexy-core/`** = the Rust port of
+  the pure engine (user's learning goal; toolchain: rustup/cargo 1.96.1 + VS18 MSVC): `sort.rs`
+  (derive-Ord NaturalKey replaces Python's tuple trick) / `filter.rs` / `select.rs` / `layout.rs`
+  (measure CLOSURES injected; + `sanitize`) / `export.rs` - every test vector mirrors a Python golden
+  test (13/13 `cargo test`; behaviour contracts: broken regex matches NOTHING, blank = `""` exactly,
+  `%g`-style integral printing). `rust/README.md` = port map + roadmap. REMAINING: PyO3 bindings
+  (maturin) so `grid.py` can swap engines, calamine xlsx loader, an egui shell only if the standalone
+  exe needs it. Bash note: `export PATH="$PATH:/c/Users/bogdan.dragoi/.cargo/bin"` first.
 - **`user_input/generation_params.yaml`** (active→builtin, neither→RAISE): the 620 SCL DWord names/variant/
   `S1.CABINET{$index}.{$role}` instance template (core/expr, strict) + the DiagList `$PLC_Binding$` sentinel;
   a builder declares its output surface at registration (`@builds(name, emit="fc_xml")`) — migrated at

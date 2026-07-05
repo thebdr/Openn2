@@ -9,20 +9,36 @@
       "FUNCTION", "END_FUNCTION", "FUNCTION_BLOCK", "END_FUNCTION_BLOCK",
       "ORGANIZATION_BLOCK", "END_ORGANIZATION_BLOCK", "DATA_BLOCK", "END_DATA_BLOCK",
       "TYPE", "END_TYPE", "VAR", "VAR_INPUT", "VAR_OUTPUT", "VAR_IN_OUT", "VAR_TEMP",
-      "VAR_GLOBAL", "VAR_CONSTANT", "END_VAR", "BEGIN", "STRUCT", "END_STRUCT",
+      "VAR_GLOBAL", "VAR_CONSTANT", "END_VAR", "CONST", "END_CONST", "BEGIN",
+      "STRUCT", "END_STRUCT", "METHOD", "END_METHOD", "INTERFACE", "END_INTERFACE",
+      "NAMESPACE", "END_NAMESPACE", "IMPLEMENTS", "EXTENDS", "OVERRIDE", "ABSTRACT",
+      "FINAL", "PRIVATE", "PUBLIC", "PROTECTED", "INTERNAL",
       "IF", "THEN", "ELSIF", "ELSE", "END_IF", "CASE", "OF", "END_CASE",
       "FOR", "TO", "BY", "DO", "END_FOR", "WHILE", "END_WHILE", "REPEAT", "UNTIL",
       "END_REPEAT", "RETURN", "EXIT", "CONTINUE", "REGION", "END_REGION", "GOTO",
-      "AND", "OR", "XOR", "NOT", "MOD"
+      "LABEL", "END_LABEL", "AT", "RETAIN", "NON_RETAIN", "REF_TO", "THIS",
+      "AND", "OR", "XOR", "NOT", "MOD", "DIV"
     ],
     "keywords2": [
-      "TRUE", "FALSE", "NULL",
+      "TRUE", "FALSE", "NULL", "VOID",
       "BOOL", "BYTE", "WORD", "DWORD", "LWORD", "SINT", "INT", "DINT", "LINT",
       "USINT", "UINT", "UDINT", "ULINT", "REAL", "LREAL", "TIME", "LTIME",
-      "DATE", "TOD", "DT", "CHAR", "STRING", "WSTRING", "ARRAY", "VOID", "VARIANT"
+      "S5TIME", "DATE", "TOD", "TIME_OF_DAY", "DT", "DTL", "DATE_AND_TIME",
+      "CHAR", "WCHAR", "STRING", "WSTRING", "ARRAY", "VARIANT", "ANY", "POINTER",
+      "COUNTER", "TIMER", "DB_ANY", "HW_ANY", "HW_IO", "HW_DEVICE", "OB_ANY",
+      "ABS", "SQR", "SQRT", "EXP", "LN", "LOG", "ACOS", "ASIN", "ATAN", "COS",
+      "SIN", "TAN", "ROL", "ROR", "SHL", "SHR", "SEL", "MAX", "MIN", "LIMIT",
+      "MUX", "ROUND", "TRUNC", "CEIL", "FLOOR", "NORM_X", "SCALE_X", "MOVE",
+      "TON", "TOF", "TP", "TONR", "CTU", "CTD", "CTUD", "R_TRIG", "F_TRIG"
     ],
     "extra": [
-      ["num", "(?<![\\w.])(?:16#[0-9A-Fa-f_]+|2#[01_]+|8#[0-7_]+|[TtLl]#[\\w.]+)"]
+      ["num", "(?<![\\w#])(?:[A-Za-z_]\\w*#)?(?:16#[0-9A-Fa-f_]+|2#[01_]+|8#[0-7_]+)\\b"],
+      ["num", "\\b(?:LT|T|S5T|LTOD|TOD|TIME_OF_DAY|TIME|LDT|DT|DTL|DATE_AND_TIME|DATE|D|W)#[\\w.\\-+:]+"],
+      ["num", "%[A-Za-z][\\w.]*\\d"],
+      ["bool", "#\"[^\"\\n]*\"|#[A-Za-z_]\\w*"],
+      ["bool", "\\b[A-Za-z]\\w*_TO_[A-Za-z]\\w*\\b"],
+      ["bool", "\\bS7_\\w+"],
+      ["key", "\"[^\"\\n]*\""]
     ]
   },
   "sql": {
