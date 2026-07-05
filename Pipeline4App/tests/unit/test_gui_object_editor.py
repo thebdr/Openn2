@@ -88,6 +88,46 @@ def test_picked_value_relative_keeping():
         eq(oe.picked_value("", chosen, d), chosen, "an empty old value -> absolute")
 
 
+def test_add_neighbor_list_and_dict():
+    """The right-click 'Add element': a list member duplicates its STRUCTURE right after itself
+    (independent copy); a mapping entry inserts a new key AFTER the clicked one, order + comments
+    preserved (ruamel) / order rebuilt (json dict); an existing key refuses."""
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "c.yaml")
+        with open(path, "w", encoding="utf-8") as h:
+            h.write("# top comment\nsections:\n  - title: A   # keep\n    roots: [x]\n"
+                    "  - title: B\n    roots: [y]\nlanguage: en\n")
+        doc, kind = oe.load_document(path)
+        new_path = oe.add_list_neighbor(doc, ("sections", 0))
+        eq(new_path, ("sections", 1), "the copy lands right after the original")
+        eq(len(doc["sections"]), 3)
+        eq(doc["sections"][1]["title"], "A", "a structural duplicate")
+        doc["sections"][1]["title"] = "A2"
+        eq(doc["sections"][0]["title"], "A", "…and an INDEPENDENT one (deepcopy)")
+        oe.add_dict_neighbor(doc, ("language",), "region")
+        eq(list(doc), ["sections", "language", "region"], "the new key sits after the clicked one")
+        eq(doc["region"], "", "a new mapping entry starts as an empty string")
+        try:
+            oe.add_dict_neighbor(doc, ("language",), "region")
+            ok(False, "an existing key must refuse")
+        except ValueError:
+            ok(True, "duplicate key -> ValueError")
+        oe.dump_document(path, doc, kind)
+        text = open(path, encoding="utf-8").read()
+        ok("# top comment" in text and "# keep" in text, "comments survive the neighbor inserts")
+    # a PLAIN json dict rebuilds its order on insert
+    doc = {"a": 1, "c": 3}
+    oe.add_dict_neighbor(doc, ("a",), "b")
+    eq(list(doc), ["a", "b", "c"], "plain-dict order preserved via rebuild")
+    try:
+        oe.add_list_neighbor(doc, ("a",))
+        ok(False, "a dict entry is not a list member")
+    except ValueError:
+        ok(True, "wrong-type add refuses")
+
+
 def test_xml_load_and_items():
     """XML opens in the explorer as a READ-ONLY structure: attributes as @rows, non-blank text as
     #text, children in document order with [n] disambiguation for repeated tags."""
@@ -112,6 +152,7 @@ if __name__ == "__main__":
     import sys
     sys.exit(run("gui_object_editor", [
         ("xml_load_and_items", test_xml_load_and_items),
+        ("add_neighbor_list_and_dict", test_add_neighbor_list_and_dict),
         ("yaml_edit_preserves_comments_and_types", test_yaml_edit_preserves_comments_and_types),
         ("coerce_rules", test_coerce_rules),
         ("json_round_trip", test_json_round_trip),

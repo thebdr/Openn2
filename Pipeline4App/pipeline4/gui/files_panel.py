@@ -36,7 +36,13 @@ class FilesPanel(ttk.Frame):
         left = ttk.Frame(panes)
         # Refresh packs FIRST as a slim full-width strip above the tree (packed after the tree, the
         # packer squeezed it into a full-height side column). Matches the Database Explorer's toolbar.
-        ttk.Button(left, text="Refresh", command=self.refresh).pack(side="top", fill="x", pady=(0, 2))
+        controls = ttk.Frame(left)
+        controls.pack(side="top", fill="x", pady=(0, 2))
+        ttk.Button(controls, text="Refresh", command=self.refresh).pack(side="left", fill="x", expand=True)
+        ttk.Button(controls, text="⊞", width=3,
+                   command=lambda: self._set_open_all(True)).pack(side="left", padx=(2, 0))
+        ttk.Button(controls, text="⊟", width=3,
+                   command=lambda: self._set_open_all(False)).pack(side="left", padx=(2, 0))
         self.tree = ttk.Treeview(left, show="tree", selectmode="browse")
         tvs = ttk.Scrollbar(left, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=tvs.set)
@@ -54,6 +60,15 @@ class FilesPanel(ttk.Frame):
     def set_sections(self, sections) -> None:
         self.sections = sections
         self.refresh()
+
+    def _set_open_all(self, open_: bool) -> None:
+        """The ⊞/⊟ buttons beside Refresh: expand / collapse every node of the file tree."""
+        def walk(item):
+            self.tree.item(item, open=open_)
+            for child in self.tree.get_children(item):
+                walk(child)
+        for top in self.tree.get_children(""):
+            walk(top)
 
     def refresh(self) -> None:
         """(Re)build the section tree from `self.sections` (`{title, roots, include, exclude}` dicts -
@@ -261,7 +276,8 @@ class FilesPanel(ttk.Frame):
         ttk.Radiobutton(row, text="Object explorer", value="object", variable=choice,
                         command=flip).pack(side="left", padx=10)
         if self._obj_mode:
-            editor = object_editor.ObjectEditor(self.editor, path, on_status=self.on_status)
+            editor = object_editor.ObjectEditor(self.editor, path, on_status=self.on_status,
+                                                mode=self._mode)
             editor.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
         else:
             self._text_body(path)
