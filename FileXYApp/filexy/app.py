@@ -11,7 +11,7 @@ from tkinter import filedialog, messagebox, ttk
 from . import files, theme
 from .grid import DataGrid
 
-_TITLE = "Table Viewer"
+_TITLE = "FileXY"
 _FILETYPES = (("Tables", "*.csv *.xlsx *.xlsm"), ("CSV", "*.csv"),
               ("Excel workbook", "*.xlsx *.xlsm"), ("All files", "*.*"))
 

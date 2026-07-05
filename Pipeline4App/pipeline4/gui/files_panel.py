@@ -134,8 +134,8 @@ class FilesPanel(ttk.Frame):
                 self._show_csv(path)
             elif kind == "xlsx":
                 self._show_xlsx(path)
-            elif kind == "text" and highlight.kind_of(path):
-                self._show_doc(path)          # yaml/json: Text (highlighted) ⇄ Object explorer
+            elif kind == "text" and highlight.object_kind_of(path):
+                self._show_doc(path)          # yaml/json/xml: Text (highlighted) ⇄ Object explorer
             elif kind == "text":
                 self._show_text(path)
             else:                                     # visible but no in-app viewer: still openable
@@ -300,16 +300,36 @@ class FilesPanel(ttk.Frame):
         hsb = ttk.Scrollbar(frame, orient="horizontal", command=text.xview)
         text.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         text.insert("1.0", info["text"])
-        # highlighting above the cap would freeze every keystroke on a huge yaml/json - skip it there
-        kind = highlight.kind_of(path) if len(info["text"]) <= files_view.HIGHLIGHT_CAP else None
-        if kind:
-            highlight.configure_tags(text, self._mode)
-            highlight.apply(text, kind, info["text"])
+        # highlighting above the cap would freeze every keystroke on a huge file - skip it there
+        highlightable = len(info["text"]) <= files_view.HIGHLIGHT_CAP
+        kind = [highlight.kind_of(path) if highlightable else None]  # a HOLDER - the picker swaps it
+        highlight.configure_tags(text, self._mode)
+        if kind[0]:
+            highlight.apply(text, kind[0], info["text"])
         vsb.pack(side="right", fill="y")
         hsb.pack(side="bottom", fill="x")
         text.pack(side="left", fill="both", expand=True)
         self._textw = text
         self._text_editable = editable
+
+        def repaint():
+            for tag in highlight.COLORS:
+                text.tag_remove(tag, "1.0", "end")
+            if kind[0]:
+                highlight.apply(text, kind[0], text.get("1.0", "end-1c"))
+
+        if highlightable:                     # the SELECTABLE language (Notepad++-style; langs.json)
+            ttk.Label(bar, text="Lang:").pack(side="right", padx=(8, 2))
+            lang_box = ttk.Combobox(bar, width=8, state="readonly",
+                                    values=["plain"] + highlight.available_kinds())
+            lang_box.set(kind[0] or "plain")
+            lang_box.pack(side="right")
+
+            def on_lang(_event=None):
+                kind[0] = None if lang_box.get() == "plain" else lang_box.get()
+                repaint()
+            lang_box.bind("<<ComboboxSelected>>", on_lang)
+
         if not editable:
             text.configure(state="disabled")
             ttk.Label(bar, text=f"read-only: over the {files_view.TEXT_EDIT_CAP // 1_000_000} MB "
@@ -331,15 +351,12 @@ class FilesPanel(ttk.Frame):
             hl_job[0] = None
             if not text.winfo_exists():
                 return
-            content = text.get("1.0", "end-1c")
-            for tag in highlight.COLORS:
-                text.tag_remove(tag, "1.0", "end")
-            highlight.apply(text, kind, content)
+            repaint()
 
         def on_modified(_event=None):
             if text.edit_modified():
                 set_dirty(True)
-                if kind:                          # debounce the re-highlight while typing
+                if kind[0]:                       # debounce the re-highlight while typing
                     if hl_job[0]:
                         text.after_cancel(hl_job[0])
                     hl_job[0] = text.after(200, rehighlight)

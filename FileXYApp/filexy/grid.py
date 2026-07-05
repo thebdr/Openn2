@@ -1,4 +1,4 @@
-"""The Tk shell over `tableviewer.core`: a canvas data grid - gridlines, zebra rows, per-cell fonts
+"""The Tk shell over `filexy.core`: a canvas data grid - gridlines, zebra rows, per-cell fonts
 (long cells drop to a small narrow font), VIRTUAL rendering (only the visible slice draws, so row
 count barely matters), data-adapted column widths with drag / double-click-fit resizing.
 
@@ -13,7 +13,7 @@ is x-scrolled, the first n columns re-draw as an opaque STRIP at the viewport's 
 + body, an accent separator) over the scrolling columns; every hit test maps through
 `core.hit_x`, so clicks/edits/filters on the strip land on the pinned columns.
 
-Everything stateful reads `tableviewer.theme` at call time, so an embedder can rebind the palette
+Everything stateful reads `filexy.theme` at call time, so an embedder can rebind the palette
 and fonts (see theme.py). ttk.Treeview can't do per-cell fonts or gridlines on Tk 8.6 - hence the
 canvas."""
 from __future__ import annotations

@@ -13,7 +13,8 @@ def test_kind_of():
     eq(highlight.kind_of("B.YML"), "yaml")
     eq(highlight.kind_of("x.json"), "json")
     eq(highlight.kind_of("x.xml"), "xml", "xml highlights too (production-test request)")
-    eq(highlight.kind_of("x.scl"), None, "other text kinds stay plain")
+    eq(highlight.kind_of("x.scl"), "scl", "scl is a data-driven language now (langs.json)")
+    eq(highlight.kind_of("x.log"), None, "an unmapped text kind stays plain")
 
 
 def test_yaml_spans():
@@ -66,6 +67,24 @@ def test_xml_spans():
     ok(not any(t == "hl_bool" and v == "Name" for t, v in got), "a tag is not an attribute")
 
 
+def test_data_driven_languages():
+    """The Notepad++-UDL-style langs.json tier: scl/sql/ini ship as PLAIN DATA compiled into the
+    same span engine; extensions route kind_of; only yaml/json/xml carry the Object view."""
+    ok({"scl", "sql", "ini"} <= set(highlight.LANGS), "the shipped languages loaded")
+    eq(highlight.kind_of("Diagnostic for OPC.scl"), "scl")
+    eq(highlight.kind_of("q.SQL"), "sql")
+    eq(highlight.object_kind_of("a.scl"), None, "a data language has NO object view")
+    eq(highlight.object_kind_of("a.yaml"), "yaml", "the structured kinds keep theirs")
+    ok(set(("yaml", "json", "xml")) <= set(highlight.available_kinds()), "the picker lists all kinds")
+    scl = "// note\nIF NOT #x THEN\n  y := 16#FF;\n  s := 'it''s';\nEND_IF;"
+    got = [(tag, scl[a:b]) for tag, a, b in highlight.spans("scl", scl)]
+    ok(("hl_cmt", "// note") in got, "scl line comment")
+    ok(("hl_key", "IF") in got and ("hl_key", "END_IF") in got and ("hl_key", "NOT") in got,
+       "scl keywords (case-insensitive)")
+    ok(("hl_num", "16#FF") in got, "the scl hex literal beats the plain number rule")
+    ok(any(tag == "hl_str" for tag, _v in got), "scl strings")
+
+
 def test_unknown_kind_is_empty():
     eq(highlight.spans("toml", "a = 1"), [], "unknown kinds produce no spans")
 
@@ -78,5 +97,6 @@ if __name__ == "__main__":
         ("yaml_list_item_keys", test_yaml_list_item_keys),
         ("json_spans", test_json_spans),
         ("xml_spans", test_xml_spans),
+        ("data_driven_languages", test_data_driven_languages),
         ("unknown_kind_is_empty", test_unknown_kind_is_empty),
     ]))

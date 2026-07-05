@@ -1,0 +1,53 @@
+{
+  "scl": {
+    "extensions": [".scl", ".db", ".udt", ".awl"],
+    "case_insensitive": true,
+    "comment_line": "//",
+    "comment_block": ["(*", "*)"],
+    "strings": ["'"],
+    "keywords": [
+      "FUNCTION", "END_FUNCTION", "FUNCTION_BLOCK", "END_FUNCTION_BLOCK",
+      "ORGANIZATION_BLOCK", "END_ORGANIZATION_BLOCK", "DATA_BLOCK", "END_DATA_BLOCK",
+      "TYPE", "END_TYPE", "VAR", "VAR_INPUT", "VAR_OUTPUT", "VAR_IN_OUT", "VAR_TEMP",
+      "VAR_GLOBAL", "VAR_CONSTANT", "END_VAR", "BEGIN", "STRUCT", "END_STRUCT",
+      "IF", "THEN", "ELSIF", "ELSE", "END_IF", "CASE", "OF", "END_CASE",
+      "FOR", "TO", "BY", "DO", "END_FOR", "WHILE", "END_WHILE", "REPEAT", "UNTIL",
+      "END_REPEAT", "RETURN", "EXIT", "CONTINUE", "REGION", "END_REGION", "GOTO",
+      "AND", "OR", "XOR", "NOT", "MOD"
+    ],
+    "keywords2": [
+      "TRUE", "FALSE", "NULL",
+      "BOOL", "BYTE", "WORD", "DWORD", "LWORD", "SINT", "INT", "DINT", "LINT",
+      "USINT", "UINT", "UDINT", "ULINT", "REAL", "LREAL", "TIME", "LTIME",
+      "DATE", "TOD", "DT", "CHAR", "STRING", "WSTRING", "ARRAY", "VOID", "VARIANT"
+    ],
+    "extra": [
+      ["num", "(?<![\\w.])(?:16#[0-9A-Fa-f_]+|2#[01_]+|8#[0-7_]+|[TtLl]#[\\w.]+)"]
+    ]
+  },
+  "sql": {
+    "extensions": [".sql"],
+    "case_insensitive": true,
+    "comment_line": "--",
+    "comment_block": ["/*", "*/"],
+    "strings": ["'"],
+    "keywords": [
+      "SELECT", "FROM", "WHERE", "GROUP", "ORDER", "BY", "HAVING", "LIMIT", "OFFSET",
+      "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "CROSS", "ON", "AS", "UNION", "ALL",
+      "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE", "CREATE", "TABLE", "VIEW",
+      "INDEX", "DROP", "ALTER", "DISTINCT", "CASE", "WHEN", "THEN", "ELSE", "END",
+      "AND", "OR", "NOT", "IN", "IS", "LIKE", "BETWEEN", "EXISTS"
+    ],
+    "keywords2": ["NULL", "TRUE", "FALSE", "PRIMARY", "KEY", "FOREIGN", "REFERENCES", "DEFAULT"]
+  },
+  "ini": {
+    "extensions": [".ini", ".cfg", ".conf", ".properties"],
+    "comment_line": ";",
+    "strings": ["\""],
+    "keywords": [],
+    "extra": [
+      ["key", "^\\[[^\\]\\n]*\\]"],
+      ["bool", "^[ \\t]*[A-Za-z_][\\w.-]*(?=[ \\t]*=)"]
+    ]
+  }
+}

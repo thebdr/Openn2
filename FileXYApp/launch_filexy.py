@@ -5,7 +5,7 @@ import tkinter as tk
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from tableviewer.app import ViewerApp  # noqa: E402
+from filexy.app import ViewerApp  # noqa: E402
 
 
 def main() -> None:

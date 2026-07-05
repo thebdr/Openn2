@@ -1,4 +1,4 @@
-"""Standalone sanity for tableviewer.core - runnable with a bare `python tests/test_core.py` (no
+"""Standalone sanity for filexy.core - runnable with a bare `python tests/test_core.py` (no
 harness, no tkinter). The FULL behaviour suite lives in Pipeline4App's gate and exercises this same
 package through the pipeline4.gui.datagrid shim; this file keeps the extracted package honest when
 it ships alone."""
@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from tableviewer import core  # noqa: E402
+from filexy import core  # noqa: E402
 
 failures = []
 

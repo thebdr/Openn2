@@ -1,5 +1,5 @@
-"""The table-viewer extraction seam: the `pipeline4.gui.datagrid` shim re-exports the extracted
-`tableviewer` package bound to PL4's theme, the NEW core capabilities (quick search / TSV export /
+"""The FileXY extraction seam: the `pipeline4.gui.datagrid` shim re-exports the extracted
+`filexy` package bound to PL4's theme, the NEW core capabilities (quick search / TSV export /
 column stats) work through it, and the package stands ALONE (imports + its own test file pass in a
 subprocess with no pipeline4 on the path)."""
 import os
@@ -10,20 +10,20 @@ from _harness import run, eq, ok
 from pipeline4.gui import datagrid
 
 _TV_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..",
-                                        "TableViewerApp"))
+                                        "FileXYApp"))
 
 
 def test_shim_reexports_and_theme_binding():
-    import tableviewer
-    from tableviewer import grid as tv_grid, theme as tv_theme
+    import filexy
+    from filexy import grid as fx_grid, theme as fx_theme
     from pipeline4.gui import theme as pl4_theme
-    ok(datagrid.DataGrid is tv_grid.DataGrid, "the shim's DataGrid IS the package widget")
-    ok(tv_theme.TOKENS is pl4_theme.TOKENS, "the viewer renders with PL4's OWN tokens")
-    eq(tv_theme.mono_family(None), pl4_theme.MONO_FONT[0], "…and PL4's bundled mono font")
+    ok(datagrid.DataGrid is fx_grid.DataGrid, "the shim's DataGrid IS the package widget")
+    ok(fx_theme.TOKENS is pl4_theme.TOKENS, "the viewer renders with PL4's OWN tokens")
+    eq(fx_theme.mono_family(None), pl4_theme.MONO_FONT[0], "…and PL4's bundled mono font")
     for name in ("cell_kind", "natural_key", "apply_filters", "updated_selection", "to_tsv",
                  "column_stats", "fit_col_width", "FIT_MAX_W", "LONG_CELL_CHARS"):
         ok(hasattr(datagrid, name), f"shim re-exports {name}")
-    ok(bool(tableviewer.__version__), "the package carries a version")
+    ok(bool(filexy.__version__), "the package carries a version")
 
 
 def test_quick_search_spec():
@@ -59,9 +59,9 @@ def test_package_stands_alone():
         capture_output=True, text=True, cwd=_TV_ROOT, timeout=120)
     eq(result.returncode, 0, f"standalone test_core passes:\n{result.stdout}\n{result.stderr}")
     probe = ("import sys; sys.path.insert(0, r'" + _TV_ROOT + "'); "
-             "import tableviewer, tableviewer.app, tableviewer.files; "
+             "import filexy, filexy.app, filexy.files, filexy.highlight, filexy.objectview; "
              "assert 'pipeline4' not in sys.modules, 'the package must not import pipeline4'; "
-             "print(tableviewer.__version__)")
+             "print(filexy.__version__)")
     result = subprocess.run([sys.executable, "-c", probe],
                             capture_output=True, text=True, cwd=_TV_ROOT, timeout=120)
     eq(result.returncode, 0, f"standalone import is pipeline4-free:\n{result.stderr}")
@@ -69,7 +69,7 @@ def test_package_stands_alone():
 
 if __name__ == "__main__":
     import sys as _sys
-    _sys.exit(run("tableviewer_shim", [
+    _sys.exit(run("filexy_shim", [
         ("shim_reexports_and_theme_binding", test_shim_reexports_and_theme_binding),
         ("quick_search_spec", test_quick_search_spec),
         ("to_tsv_and_column_stats", test_to_tsv_and_column_stats),

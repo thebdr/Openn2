@@ -825,7 +825,17 @@ The user-reviewed refresh before the first production test (the full spec + comm
   headers read accent-coloured. `selection()`/`raw_of`/`on_edit` stay SOURCE-indexed, so hosts (the
   Findings treat, the CSV cell editor) are sort/filter-agnostic. `XLSX_MAX_ROWS` 3000 -> 50_000 (real
   projects reach 10-20k rows - user).
-- **Table viewer EXTRACTED (2026-07-03) -> the top-level `TableViewerApp/` package** (`tableviewer`:
+- **Table viewer EXTRACTED (2026-07-03) -> RENAMED `FileXYApp/` (package `filexy`, 2026-07-03)** - the
+  file-EDITOR logic joined it (user: "I'm liking the whole file editor vibe"): `highlight.py` (now with
+  DATA-DRIVEN languages a la Notepad++ UDL - `langs.json` ships scl/sql/ini; a language = a JSON entry:
+  extensions/comments/strings/keyword groups/extra regexes; `load_languages` merges a user file;
+  `available_kinds()` feeds the Files tab's SELECTABLE `Lang:` picker in the text editor) and
+  `objectview.py` (the object explorer/editor). PL4 shims: `gui/_filexy.py` is the ONE bootstrap
+  (sys.path + theme binding); `gui/datagrid.py`, `gui/highlight.py`, `gui/object_editor.py` re-export -
+  hosts + tests untouched. Doc-view routing now keys on `object_kind_of` (yaml/json/xml only), so scl/sql
+  route to the TEXT editor with highlighting. NOTE: the old on-disk `TableViewerApp/` was LOCKED by the
+  user's running app during the rename - it is gitignored + untracked; DELETE it once the app is closed.
+  (`tableviewer`:
   `core.py` PURE engine [the executable spec for the Rust port] · `grid.py` Tk widget+popups · `theme.py`
   REBINDABLE palette/fonts · `files.py` csv/xlsx loaders · `app.py`+`launch_viewer.py` standalone window).
   **`pipeline4/gui/datagrid.py` is now the EMBEDDING SHIM**: sys.path's the sibling package, binds

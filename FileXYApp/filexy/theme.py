@@ -2,9 +2,9 @@
 palette out of the box, and an EMBEDDER (Pipeline4) can point the whole package at its own tokens
 and fonts with three assignments:
 
-    tableviewer.theme.TOKENS = my_tokens          # same role names
-    tableviewer.theme.mono_family = my_resolver   # (widget) -> family name
-    tableviewer.theme.narrow_family = my_resolver
+    filexy.theme.TOKENS = my_tokens          # same role names
+    filexy.theme.mono_family = my_resolver   # (widget) -> family name
+    filexy.theme.narrow_family = my_resolver
 
 The grid reads these at call time (module-attribute lookup), so rebinding before widget
 construction is all an embedder needs."""
@@ -91,4 +91,4 @@ def apply(root, mode: str = "dark") -> None:
         style.map("TCombobox", fieldbackground=[("readonly", c["field"])],
                   foreground=[("readonly", c["fg"])])
     except Exception as exc:  # noqa: BLE001
-        print(f"[tableviewer] styling failed ({exc}) - running unstyled", file=sys.stderr)
+        print(f"[filexy] styling failed ({exc}) - running unstyled", file=sys.stderr)
