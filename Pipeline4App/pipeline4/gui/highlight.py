@@ -1,12 +1,14 @@
 """Text-mode syntax highlighting for the Files tab (UI_REFRESH_PLAN D): a Tk-free tokenizer emitting
-`(tag, start, end)` spans for YAML and JSON, and the tag-colour setup for a Tk Text widget. Same
+`(tag, start, end)` spans for YAML, JSON and XML, and the tag-colour setup for a Tk Text widget. Same
 regex-alternation + debounce-free single-pass approach as the Database Explorer's SQL highlighter
 (the panes are read-only, so one pass at load time is all that's needed).
 
 Pragmatic by design (a viewer, not a parser): YAML keys are recognized in BLOCK style (`key:` at line
 start / after `- `), not inside flow `{...}`; a `#` starts a comment only at line start or after
 whitespace (so a `#` inside a quoted scalar stays part of the string, which the alternation order
-already guarantees for quoted strings)."""
+already guarantees for quoted strings). XML colours tag names + brackets (key), attribute names
+(bool tint), quoted values/CDATA (str) and comments - a quoted word inside element TEXT also tints,
+which a viewer can live with."""
 from __future__ import annotations
 
 import re
@@ -37,11 +39,25 @@ _JSON = re.compile(
 
 _WS_COLON = re.compile(r"[ \t\r\n]*:")
 
+_XML = re.compile(
+    r"(?P<cmt><!--.*?-->)"                                   # comments first (swallow their innards)
+    r"|(?P<str><!\[CDATA\[.*?\]\]>|\"[^\"\n]*\"|'[^'\n]*')"  # CDATA + quoted attribute values
+    r"|(?P<key></?[A-Za-z_][\w.:-]*|<[?!][\w.:-]*|[?/]?>)"   # tag names + brackets + declarations
+    r"|(?P<bool>[A-Za-z_][\w.:-]*(?=\s*=))",                 # attribute names (before '=')
+    re.DOTALL,
+)
+
 
 def spans(kind: str, text: str) -> list:
-    """`(tag, start, end)` spans for `kind` in {'yaml', 'json'}; [] for anything else."""
+    """`(tag, start, end)` spans for `kind` in {'yaml', 'json', 'xml'}; [] for anything else."""
     out = []
-    if kind == "yaml":
+    if kind == "xml":
+        for m in _XML.finditer(text):
+            for tag in ("cmt", "str", "key", "bool"):
+                if m.group(tag) is not None:
+                    out.append((f"hl_{tag}", m.start(tag), m.end(tag)))
+                    break
+    elif kind == "yaml":
         for m in _YAML.finditer(text):
             for tag in ("cmt", "str", "key", "bool", "num"):
                 if m.group(tag) is not None:
@@ -61,12 +77,14 @@ def spans(kind: str, text: str) -> list:
 
 
 def kind_of(path: str) -> str | None:
-    """The highlight kind for a filename: 'yaml' | 'json' | None."""
+    """The highlight kind for a filename: 'yaml' | 'json' | 'xml' | None."""
     low = str(path).lower()
     if low.endswith((".yaml", ".yml")):
         return "yaml"
     if low.endswith(".json"):
         return "json"
+    if low.endswith(".xml"):
+        return "xml"
     return None
 
 

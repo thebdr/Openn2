@@ -12,6 +12,7 @@ Inserts happen on the Tk main thread (the App drains its worker queue into here 
 from __future__ import annotations
 
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk
 
 from pipeline4.gui import theme
@@ -44,8 +45,14 @@ class LogView(ttk.Frame):
                             background=theme.DARK_BG, foreground=theme.DARK_FG,
                             insertbackground=theme.DARK_FG, font=(self._family, self._size), padx=8, pady=6)
         vs = ttk.Scrollbar(self, orient="vertical", command=self.text.yview)
-        hs = ttk.Scrollbar(self, orient="horizontal", command=self.text.xview)
-        self.text.configure(yscrollcommand=vs.set, xscrollcommand=hs.set)
+        # the STABLE horizontal scrollbar (user spec): tk.Text maps its h-thumb against the longest
+        # line currently VISIBLE, so the thumb resizes on every append/v-scroll. The adapter below
+        # maps it against the longest line SEEN instead (_max_chars only ever grows; clear() resets).
+        hs = ttk.Scrollbar(self, orient="horizontal", command=self._hsb_drag)
+        self._hsb = hs
+        self._max_chars = 0
+        self._char_px = tkfont.Font(root=self, family=self._family, size=self._size).measure("0")
+        self.text.configure(yscrollcommand=vs.set, xscrollcommand=self._hsb_update)
         self.text.grid(row=0, column=0, sticky="nsew")
         vs.grid(row=0, column=1, sticky="ns")
         hs.grid(row=1, column=0, sticky="ew")
@@ -62,11 +69,46 @@ class LogView(ttk.Frame):
         self.set_theme(mode)                      # skin from the PERSISTED mode (the widget defaults are dark;
                                                   # a light-theme launch must not open a dark pane)
 
+    # --- the stable horizontal scrollbar ---------------------------------------------------------- #
+    def _track_width(self, line: str) -> None:
+        if len(line) > self._max_chars:
+            self._max_chars = len(line)
+
+    def _stable_metrics(self) -> tuple:
+        """(viewport_px, max_line_px, visible_longest_px, first_visible_fraction) - the fixed domain
+        (the longest line seen) plus tk.Text's own visible-relative view state."""
+        view_px = max(1, self.text.winfo_width() - 20)          # minus padding + a slack margin
+        max_px = max(view_px, self._max_chars * self._char_px + 24)
+        first, last = (float(v) for v in self.text.xview())
+        frac = max(0.0, min(1.0, last - first))
+        longest = view_px / frac if 0 < frac < 1 else view_px
+        return view_px, max_px, longest, first
+
+    def _hsb_update(self, _first, _last) -> None:
+        """tk.Text's xscrollcommand -> the thumb re-mapped onto the stable longest-line-SEEN domain
+        (so it never resizes as short lines append or the view scrolls vertically)."""
+        view_px, max_px, longest, first_vis = self._stable_metrics()
+        offset = first_vis * longest
+        lo = max(0.0, min(1.0, offset / max_px))
+        hi = max(lo, min(1.0, (offset + view_px) / max_px))
+        self._hsb.set(lo, hi)
+
+    def _hsb_drag(self, *args) -> None:
+        """The scrollbar's command -> a stable-domain moveto converted back to tk.Text's
+        visible-relative fraction (scroll units/pages pass straight through)."""
+        if args and args[0] == "moveto":
+            _view_px, max_px, longest, _f = self._stable_metrics()
+            offset = float(args[1]) * max_px
+            self.text.xview("moveto", offset / max(longest, 1.0))
+        else:
+            self.text.xview(*args)
+
     def append(self, level: str, message: str) -> None:
         """A plain (link-less) line - level-coloured. Inserted regardless of the shown set; a not-shown
         level's tag is ELIDED, so the Levels dropdown can show/hide it live."""
         level = (level or "INFO").upper()
         tag = level if level in theme.LOG_COLORS else "INFO"
+        self._track_width(message)
         self.text.configure(state="normal")
         if level == "PHASE":
             self._phase_gap()
@@ -88,6 +130,7 @@ class LogView(ttk.Frame):
         cross-check comparison marks (=== neutral / =/= diff-chars underlined)."""
         self.text.configure(state="normal")
         for rec in records:
+            self._track_width(rec.text)
             if rec.kind == "banner":                    # a sub-phase section header (110/120/130/140)
                 self._phase_gap(1)
                 self.text.insert("end", rec.text + "\n", "SUBPHASE")
@@ -165,6 +208,7 @@ class LogView(ttk.Frame):
         to app_config.yaml."""
         self._size = int(size)
         self.text.configure(font=(self._family, self._size))
+        self._char_px = tkfont.Font(root=self, family=self._family, size=self._size).measure("0")
         for level, (_color, bold) in theme.LOG_COLORS.items():
             self.text.tag_configure(level, font=self._tag_font(level, bold))
 
@@ -223,3 +267,5 @@ class LogView(ttk.Frame):
         self.text.configure(state="disabled")
         self._links = 0
         self._errs = 0
+        self._max_chars = 0                  # the ONLY reset of the stable h-scroll domain (user spec)
+        self._hsb.set(0.0, 1.0)

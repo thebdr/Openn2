@@ -88,9 +88,30 @@ def test_picked_value_relative_keeping():
         eq(oe.picked_value("", chosen, d), chosen, "an empty old value -> absolute")
 
 
+def test_xml_load_and_items():
+    """XML opens in the explorer as a READ-ONLY structure: attributes as @rows, non-blank text as
+    #text, children in document order with [n] disambiguation for repeated tags."""
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "block.xml")
+        with open(path, "w", encoding="utf-8") as h:
+            h.write('<Doc Ver="1"><Member Name="A">x</Member><Member Name="B"/><Info/></Doc>')
+        doc, kind = oe.load_document(path)
+        eq(kind, "xml")
+        ok(oe._is_element(doc) and doc.tag == "Doc")
+        items = oe.xml_items(doc)
+        eq(items[0], ("@Ver", "1"), "attributes come first as @rows")
+        eq([k for k, _v in items[1:]], ["Member [1]", "Member [2]", "Info"],
+           "repeated tags disambiguate; a unique tag stays bare")
+        member = items[1][1]
+        eq(oe.xml_items(member), [("@Name", "A"), ("#text", "x")], "text lands as #text")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_object_editor", [
+        ("xml_load_and_items", test_xml_load_and_items),
         ("yaml_edit_preserves_comments_and_types", test_yaml_edit_preserves_comments_and_types),
         ("coerce_rules", test_coerce_rules),
         ("json_round_trip", test_json_round_trip),

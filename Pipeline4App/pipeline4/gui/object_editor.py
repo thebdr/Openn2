@@ -28,8 +28,10 @@ _PATH_DIR_WORDS = ("dir", "folder", "root")
 
 # --- the Tk-free model --------------------------------------------------------------------------- #
 def load_document(path: str) -> tuple:
-    """Parse `path` -> `(document, kind)` with kind in {'yaml', 'json'}. Raises on a broken file (the
-    caller falls back to the text view with the error)."""
+    """Parse `path` -> `(document, kind)` with kind in {'yaml', 'json', 'xml'}. Raises on a broken
+    file (the caller falls back to the text view with the error). XML parses to its root Element and
+    the explorer shows it READ-ONLY: an ElementTree re-write would drop comments/formatting - and the
+    BuilderData XMLs are byte-parity surfaces - so XML edits belong in the Text mode."""
     low = path.lower()
     if low.endswith((".yaml", ".yml")):
         from ruamel.yaml import YAML
@@ -40,7 +42,34 @@ def load_document(path: str) -> tuple:
     if low.endswith(".json"):
         with open(path, encoding="utf-8-sig") as handle:
             return json.load(handle), "json"
-    raise ValueError(f"not a yaml/json document: {os.path.basename(path)}")
+    if low.endswith(".xml"):
+        import xml.etree.ElementTree as ET
+        return ET.parse(path).getroot(), "xml"
+    raise ValueError(f"not a yaml/json/xml document: {os.path.basename(path)}")
+
+
+def _is_element(value) -> bool:
+    """True for an ElementTree Element (duck-typed - Element is a C type, isinstance is brittle)."""
+    return hasattr(value, "tag") and hasattr(value, "attrib") and hasattr(value, "iter")
+
+
+def xml_items(elem) -> list:
+    """The explorer rows of one XML element, in document order: ('@name', value) per attribute, a
+    ('#text', text) row when the element carries non-blank text, then the child elements - duplicate
+    tags get an ' [n]' suffix so every row reads uniquely."""
+    items = [(f"@{k}", v) for k, v in elem.attrib.items()]
+    text = (elem.text or "").strip()
+    if text:
+        items.append(("#text", text))
+    totals: dict = {}
+    for child in elem:
+        totals[child.tag] = totals.get(child.tag, 0) + 1
+    seen: dict = {}
+    for child in elem:
+        seen[child.tag] = seen.get(child.tag, 0) + 1
+        label = child.tag if totals[child.tag] == 1 else f"{child.tag} [{seen[child.tag]}]"
+        items.append((label, child))
+    return items
 
 
 def dump_document(path: str, doc, kind: str) -> None:
@@ -145,8 +174,8 @@ class ObjectEditor(ttk.Frame):
         ttk.Button(bar, text="Revert", command=self.reload).pack(side="left", padx=6)
         self._dirty_lbl = ttk.Label(bar, text="")
         self._dirty_lbl.pack(side="left", padx=8)
-        ttk.Label(bar, text="double-click a value to edit · … picks a path"
-                  ).pack(side="right")
+        self._hint = ttk.Label(bar, text="double-click a value to edit · … picks a path")
+        self._hint.pack(side="right")
 
         holder = ttk.Frame(self)
         holder.pack(side="top", fill="both", expand=True)
@@ -178,15 +207,24 @@ class ObjectEditor(ttk.Frame):
             self.tree.insert("", "end", text=f"could not parse: {error}")
             return
         self._set_dirty(False)
+        if self._kind == "xml":              # a read-only structure view (see load_document)
+            self._hint.configure(text="XML structure is read-only - edit in Text mode")
+        else:
+            self._hint.configure(text="double-click a value to edit · … picks a path")
         self._rebuild()
 
     def _rebuild(self) -> None:
         self.tree.delete(*self.tree.get_children())
         self._rows.clear()
-        self._fill("", self._doc, ())
+        if self._kind == "xml":              # show the root element as the top node
+            self._fill("", {f"<{self._doc.tag}>": self._doc}, ())
+        else:
+            self._fill("", self._doc, ())
 
     def _fill(self, parent, node, path_tuple) -> None:
-        if isinstance(node, dict):
+        if _is_element(node):
+            items = xml_items(node)
+        elif isinstance(node, dict):
             items = node.items()
         elif isinstance(node, list):
             items = ((f"[{i}]", v) for i, v in enumerate(node))
@@ -194,11 +232,16 @@ class ObjectEditor(ttk.Frame):
             return
         for key, value in items:
             child_path = path_tuple + ((key if not str(key).startswith("[") else int(str(key)[1:-1])),)
-            if is_scalar(value):
+            if _is_element(value):
+                item = self.tree.insert(parent, "end", text=str(key), open=True,
+                                        values=(f"<{value.tag}>", ""))
+                self._fill(item, value, child_path)
+            elif is_scalar(value):
                 role = path_role(key)
                 item = self.tree.insert(parent, "end", text=str(key), open=True,
                                         values=(self._render(value), "…" if role else ""))
-                self._rows[item] = (child_path, role)
+                if self._kind != "xml":      # xml rows never register -> no edit, no picker
+                    self._rows[item] = (child_path, role)
             else:
                 mark = "{…}" if isinstance(value, dict) else f"[{len(value)}]"
                 item = self.tree.insert(parent, "end", text=str(key), open=True, values=(mark, ""))

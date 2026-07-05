@@ -12,7 +12,8 @@ def test_kind_of():
     eq(highlight.kind_of("a.yaml"), "yaml")
     eq(highlight.kind_of("B.YML"), "yaml")
     eq(highlight.kind_of("x.json"), "json")
-    eq(highlight.kind_of("x.xml"), None, "only yaml/json highlight for now")
+    eq(highlight.kind_of("x.xml"), "xml", "xml highlights too (production-test request)")
+    eq(highlight.kind_of("x.scl"), None, "other text kinds stay plain")
 
 
 def test_yaml_spans():
@@ -53,8 +54,20 @@ def test_json_spans():
     ok(("hl_bool", "true") in got and ("hl_bool", "null") in got, "true/null")
 
 
+def test_xml_spans():
+    text = ('<?xml version="1.0"?>\n<Root Id="7">\n  <!-- note -->\n'
+            '  <Name>DB_1</Name>\n</Root>')
+    got = [(tag, text[s:e]) for tag, s, e in highlight.spans("xml", text)]
+    ok(("hl_key", "<Root") in got and ("hl_key", "</Name") in got, "tag names")
+    ok(("hl_key", "<?xml") in got, "the declaration")
+    ok(("hl_bool", "Id") in got and ("hl_bool", "version") in got, "attribute names")
+    ok(("hl_str", '"7"') in got and ("hl_str", '"1.0"') in got, "attribute values")
+    ok(("hl_cmt", "<!-- note -->") in got, "comments")
+    ok(not any(t == "hl_bool" and v == "Name" for t, v in got), "a tag is not an attribute")
+
+
 def test_unknown_kind_is_empty():
-    eq(highlight.spans("xml", "<a>1</a>"), [], "unknown kinds produce no spans")
+    eq(highlight.spans("toml", "a = 1"), [], "unknown kinds produce no spans")
 
 
 if __name__ == "__main__":
@@ -64,5 +77,6 @@ if __name__ == "__main__":
         ("yaml_spans", test_yaml_spans),
         ("yaml_list_item_keys", test_yaml_list_item_keys),
         ("json_spans", test_json_spans),
+        ("xml_spans", test_xml_spans),
         ("unknown_kind_is_empty", test_unknown_kind_is_empty),
     ]))
