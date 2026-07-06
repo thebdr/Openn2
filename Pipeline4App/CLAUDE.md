@@ -437,7 +437,16 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
   `_chunked`/`PAD` + the 3 simple builders **00** Commissioning / **06** Feedback Error / **07** Speed Control,
   verbatim - except **06's iterator now emits the padded 8-slot bank TWICE** (16 cells, the second an exact
   copy: one bank per template side - user spec 2026-07-07, a deliberate PL3 deviation) ·
-  `engine.py` (the serialization verbatim + `build`/`project`). **`build()`** runs every registered
+  `engine.py` (the serialization verbatim + `build`/`project`).
+  **08 door-network interlock (template evolution, user decisions 2026-07-07):** the 08 template's TT02
+  (door) network now consumes the sorter interlock itself, so each door row fills
+  `tagName:SorterRunningIOC` + the `05_EM_STATE` `SORTER_nn_NOT_RUNNING` member (nn via `sorter_nn`: the
+  N1/2 encoder whose areas intersect the door DI's, FALLBACK the DI's sorter-AREA number - the real
+  encoders carry no areas; '' for a non-sorter door, ruled out in practice) and **`tagName:DoorReset` =
+  the DR tag** (the one reset button feeds both the open-request and reset FB pins). ALSO fixed: the
+  synthesized running tag is **`PNC_I_SORTER-nn SORTER- RUNNING`** (the MachineInterfaces native
+  spelling, verified to exist in the pilot's interface tags) - the old `SORTER RUNNING` named a
+  non-existent tag. Empty TT02 Component slots broke the TIA import (the OP error that triggered this). **`build()`** runs every registered
   builder -> the **`software_blocks`** (name/template/the `%` key inventory `["TemplateType"]+scan`/the Table
   column ORDER) + **`software_block_members`** (one row per @ row, the `values` JSON cell = the row, a list value =
   the ITERATOR) tables + `record` (`blk_builder_no_rows` WARN) + save. **`project()`** reconstructs each Table from

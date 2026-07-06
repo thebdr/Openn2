@@ -209,9 +209,9 @@ def test_builder_08_gate_manager_sorters_and_doors():
     node = _node("n1", "1.2.3.4", i0="0", i1="20", q0="0", q1="20")
     rows = [
         node,
-        {"script_type": "N1/2", "index": "1"},                         # a sorter -> one TT01 row
+        {"script_type": "N1/2", "index": "1", "matrix_areas": ["AREA 1"]},   # a sorter -> one TT01 row
         {"script_type": "DI1/2", "index": "5", "bit": "I1.0", "name_in_db": "D_in", "iol_FLD": "DOORA",
-         "name_in_tagtable": "TDI1", "IsSorterArea": "yes"},
+         "name_in_tagtable": "TDI1", "IsSorterArea": "yes", "matrix_areas": ["AREA 1"]},
         {"script_type": "DR", "index": "5", "name_in_tagtable": "TDR"},  # reset exists
         {"script_type": "DQ", "index": "5", "name_in_tagtable": "TDQ"},  # the door DQ -> one TT02 row
     ]
@@ -225,6 +225,12 @@ def test_builder_08_gate_manager_sorters_and_doors():
     eq(d["00_Commissioning.{db_element}"], "n1 1.2.3.4", "bypass = the DI's node")
     eq(d["tagName:DoorClosedCh1"], "TDI1")
     eq(d["tagName:DoorSolenoidUnlock"], "TDQ")
+    eq(d["tagName:DoorReset"], "TDR", "the DR tag feeds BOTH the open-request and the reset pin")
+    eq(d["tagName:DoorOpenRequest"], "TDR")
+    eq(d["tagName:SorterRunningIOC"], "PNC_I_SORTER-01 SORTER- RUNNING",
+       "the door's sorter via the DI's area; 'SORTER- RUNNING' = the MachineInterfaces native tag")
+    eq(d["05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING"], "SORTER_01_NOT_RUNNING",
+       "the door row consumes the sorter interlock member itself (template TT02)")
     eq((d["choice:IsSorterDoor"], d["choice:DoorResetNecessary"]), ("Always TRUE", "Always TRUE"))
 
 

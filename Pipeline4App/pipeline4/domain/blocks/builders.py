@@ -392,7 +392,11 @@ def build_08_gate_manager(db: Database) -> Table:
     SORTER_nn_STOPPED / SORTER_nn_NOT_RUNNING; nn = the encoder index, as in 07), TT02 = one per Door
     DQ (the 02_Safety_Door FB; DI1/2 DI2/2 DD DR DL matched by the DQ's index). The commissioning
     bypass is the DI's node (the safety input is what gets bypassed). choice:IsSorterDoor = the door's
-    IsSorterArea; choice:DoorResetNecessary = whether a same-index DR (reset input) exists."""
+    IsSorterArea; choice:DoorResetNecessary = whether a same-index DR (reset input) exists. The door
+    network ALSO consumes the sorter interlock (template evolution, user spec 2026-07-07):
+    tagName:SorterRunningIOC + the 05_EM_STATE SORTER_nn_NOT_RUNNING member, nn resolved via the DI's
+    matrix_areas x the N1/2 encoders (`sorter_nn`); tagName:DoorReset = the DR tag (the one reset
+    button feeds both the open-request and the reset FB pins)."""
     t = Table("08_Gate Manager")
 
     # TT01 - one @ row per sorter (distinct N1/2 index), no door instance / bypass
@@ -407,7 +411,7 @@ def build_08_gate_manager(db: Database) -> Table:
             template_type="01",
             **{"instanceOf-02_Safety_Door": ""},
             NetworkComment=f"SORTER {nn} SPEED CONTROL",
-            **{"tagName:SorterRunningIOC": f"PNC_I_SORTER-{nn} SORTER RUNNING"},
+            **{"tagName:SorterRunningIOC": f"PNC_I_SORTER-{nn} SORTER- RUNNING"},
             **{"SPEED_STATE_REC.SORTER_{index}_STOPPED": f"SORTER_{nn}_STOPPED"},
             **{"05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING": f"SORTER_{nn}_NOT_RUNNING"},
             **{"00_Commissioning.{db_element}": ""},
@@ -424,6 +428,24 @@ def build_08_gate_manager(db: Database) -> Table:
     def member(r):
         return r.get("name_in_db", "") if r else ""
 
+    def sorter_nn(anchor_row):
+        """The door's SORTER number, via the DI's area (user decision 2026-07-07): the first N1/2
+        encoder whose matrix_areas intersect the door anchor's -> its index, 2-digit. FALLBACK (the
+        real encoders are cabinet-mounted and carry NO areas): the anchor's sorter AREA number
+        (`_sorter_areas` x `_area_nn` - 'AREA 1' -> '01', the area number == the sorter number).
+        '' when nothing matches - a non-sorter door, which the user rules out in practice (the OP
+        import flags one if it ever appears)."""
+        areas = set(_as_list((anchor_row or {}).get("matrix_areas")))
+        if not areas:
+            return ""
+        for r in db.by_type("N1/2"):
+            idx = str(r.get("index", "")).strip()
+            if idx.isdigit() and areas & set(_as_list(r.get("matrix_areas"))):
+                return f"{int(idx):02d}"
+        for area in sorted(areas & _sorter_areas(db)):
+            return _area_nn(area)
+        return ""
+
     for dq in db.by_type("DQ"):
         idx = str(dq.get("index", "")).strip()
         di1, di2, dd = first_of("DI1/2", idx), first_of("DI2/2", idx), first_of("DD", idx)
@@ -432,6 +454,7 @@ def build_08_gate_manager(db: Database) -> Table:
         node = _node_of(db, di1 or dq)                       # bypass the DI's node (the safety input)
         bypass = f"{node['profinet_name']} {node['profinet_ip']}".strip() if node else ""
         inst = f"SFDOOR_{anchor.get('iol_FLD', '')}"
+        nn = sorter_nn(anchor)                               # the door's sorter, via the DI's area
         t.add(
             template_type="02",
             **{"instanceOf-02_Safety_Door": inst},
@@ -441,8 +464,15 @@ def build_08_gate_manager(db: Database) -> Table:
             **{"tagName:DoorClosedCh2": tag(di2)},
             **{"tagName:DoorClosedDiagInput": tag(dd)},
             **{"tagName:DoorOpenRequest": tag(dr)},
+            **{"tagName:DoorReset": tag(dr)},                # the one reset button feeds both FB pins
             **{"tagName:DoorSolenoidUnlock": tag(dq)},
             **{"tagName:DoorResetLamp": tag(dl)},
+            # the door network consumes the sorter interlock itself (the template's TT02 references
+            # these; empty Component slots break the TIA import - user spec 2026-07-07). The tag
+            # spelling ('SORTER- RUNNING') is the MachineInterfaces template's native row - the tag
+            # that actually exists in PLCTags (not 'SORTER RUNNING').
+            **{"tagName:SorterRunningIOC": f"PNC_I_SORTER-{nn} SORTER- RUNNING" if nn else ""},
+            **{"05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING": f"SORTER_{nn}_NOT_RUNNING" if nn else ""},
             **{"07_DOOR.{db_element:DI1/2}": member(di1)},
             **{"07_DOOR.{db_element:DI2/2}": member(di2)},
             **{"07_DOOR.{db_element:DD}": member(dd)},
