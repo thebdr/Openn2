@@ -23,7 +23,7 @@ from pipeline4.domain import datablock_xml
 from pipeline4.domain.blocks import builders as _builders  # noqa: F401  (import registers the builders)
 from pipeline4.domain.blocks import templates, xml_emit
 from pipeline4.domain.blocks.database import Database
-from pipeline4.domain.blocks.registry import registry
+from pipeline4.domain.blocks.registry import emit_kind, registry
 from pipeline4.domain.blocks.table import Table
 from pipeline4.domain.db_members import instance_dbs_table
 from pipeline4.domain.signals import signals_table
@@ -182,27 +182,65 @@ def project(database: DB | None = None, out_dir: str | None = None, import_dir: 
 # collector this section once held is retired; the 520 projector writes their XMLs.
 
 
+def _members_by_block(database: DB) -> dict:
+    """{block name -> its `software_block_members` rows} (unsorted; callers order by seq)."""
+    members: dict = {}
+    for m in database["software_block_members"]:
+        members.setdefault(m["block"], []).append(m)
+    return members
+
+
+def _block_instances(b, members_by_block) -> list:
+    """(name, fb) for ONE block's non-empty `instanceOf-<FB>` cells, in the block's COLUMN order x
+    member seq - the per-block leg of `_builder_instance_rows`, reused by `block_report`."""
+    cols = [c for c in b["columns"] if c.startswith(INSTANCE_OF)]
+    if not cols:
+        return []
+    rows = sorted(members_by_block.get(b["name"], []), key=lambda m: int(m["seq"]))
+    out = []
+    for c in cols:
+        fb = c[len(INSTANCE_OF):]
+        for m in rows:
+            name = str((m["values"] or {}).get(c, "") or "").strip()
+            if name:
+                out.append((name, fb))
+    return out
+
+
 def _builder_instance_rows(database: DB) -> list:
     """(name, fb) for every non-empty `instanceOf-<FB>` cell across all builder tables, in PL3 order:
     block (table) order x the block's COLUMN order (software_blocks.columns) x member seq. Port of PL3
     engine._instance_rows (which reads the live Table columns; PL4 reads the SSOT members' value cells)."""
-    out = []
     if "software_blocks" not in database:
-        return out
-    members_by_block: dict = {}
-    for m in database["software_block_members"]:
-        members_by_block.setdefault(m["block"], []).append(m)
+        return []
+    members = _members_by_block(database)
+    out = []
     for b in database["software_blocks"]:
-        cols = [c for c in b["columns"] if c.startswith(INSTANCE_OF)]
-        if not cols:
-            continue
-        rows = sorted(members_by_block.get(b["name"], []), key=lambda m: int(m["seq"]))
-        for c in cols:
-            fb = c[len(INSTANCE_OF):]
-            for m in rows:
-                name = str((m["values"] or {}).get(c, "") or "").strip()
-                if name:
-                    out.append((name, fb))
+        out.extend(_block_instances(b, members))
+    return out
+
+
+def block_report(database: DB) -> list:
+    """One dict per built block - the data behind the verbose 800 log (user spec: an INFO line per
+    generated block with its template, its output surface, and the builder function). Keys: `name`,
+    `template_stem` ('' when the block has NO shipped template - the stem fell back to the name),
+    `builder` ('builders.<fn>' from the registry; '-' for an unregistered block), `emit`
+    ('csv' | 'fc_xml' - the declared output surface), `rows` (@-row count), `instances` (the block's
+    non-empty instanceOf-<FB> cells -> its InstanceDBs.csv contribution). A pure read of the SSOT
+    tables + the registry."""
+    if "software_blocks" not in database:
+        return []
+    members = _members_by_block(database)
+    reg = registry()
+    out = []
+    for b in database["software_blocks"]:
+        fn = reg.get(b["name"])
+        builder = f"{fn.__module__.rsplit('.', 1)[-1]}.{fn.__name__}" if fn else "-"
+        out.append({"name": b["name"],
+                    "template_stem": b["template_stem"] if b["template_stem"] != b["name"] else "",
+                    "builder": builder, "emit": emit_kind(b["name"]),
+                    "rows": len(members.get(b["name"], [])),
+                    "instances": len(_block_instances(b, members))})
     return out
 
 

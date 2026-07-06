@@ -325,6 +325,30 @@ def test_project_03_emits_xml_and_drops_csv():
 #  config DBs now - per-area element rows in datablock_elements.csv; see test_datablocks/test_dbtemplate)
 
 
+# --- the verbose 800 log data ------------------------------------------------------------------- #
+def test_block_report_verbose_log_data():
+    blk, mem = engine.software_blocks_table(), engine.software_block_members_table()
+    blk.add(name="05_Output Feedback", template_stem="TEMPLATE--v1.0--05_Output Feedback",
+            template_ref="r", keys=["TemplateType"], columns=["TemplateType", "instanceOf-FDBACK"])
+    blk.add(name="03_Zone Cumulative", template_stem="TEMPLATE--v1.0--03_Zone Cumulative",
+            template_ref="r", keys=["TemplateType"], columns=["TemplateType"])
+    blk.add(name="99_Unknown", template_stem="99_Unknown", template_ref="r",     # stem == name: no template
+            keys=["TemplateType"], columns=["TemplateType"])
+    mem.add(block="05_Output Feedback", seq=0, values={"instanceOf-FDBACK": "FDBACK_A"})
+    mem.add(block="05_Output Feedback", seq=1, values={"instanceOf-FDBACK": ""})   # blank -> no instance
+    rep = engine.block_report(DB([blk, mem]))
+    eq([r["name"] for r in rep], ["05_Output Feedback", "03_Zone Cumulative", "99_Unknown"],
+       "one report entry per built block, in table order")
+    r5 = rep[0]
+    eq(r5["template_stem"], "TEMPLATE--v1.0--05_Output Feedback")
+    eq(r5["builder"], "builders.build_05_output_feedback", "the registered builder function resolves")
+    eq((r5["emit"], r5["rows"], r5["instances"]), ("csv", 2, 1),
+       "declared surface + @-row count + only the NON-EMPTY instanceOf cells count")
+    eq(rep[1]["emit"], "fc_xml", "03 declares the FC-XML surface at registration")
+    eq((rep[2]["template_stem"], rep[2]["builder"]), ("", "-"),
+       "no shipped template -> '' (the log omits it); an unregistered block -> '-'")
+
+
 # --- 800c: InstanceDBs.csv --------------------------------------------------------------------- #
 def test_write_instance_dbs_merge_and_dedup():
     with tempfile.TemporaryDirectory() as d:
@@ -373,5 +397,6 @@ if __name__ == "__main__":
         ("and_coil_fc_one_network_per_row", test_and_coil_fc_one_network_per_row),
         ("write_fc_xml_bom_and_path", test_write_fc_xml_bom_and_path),
         ("project_03_emits_xml_and_drops_csv", test_project_03_emits_xml_and_drops_csv),
+        ("block_report_verbose_log_data", test_block_report_verbose_log_data),
         ("write_instance_dbs_merge_and_dedup", test_write_instance_dbs_merge_and_dedup),
     ]))

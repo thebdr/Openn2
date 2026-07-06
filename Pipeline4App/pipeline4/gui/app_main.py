@@ -929,6 +929,14 @@ class App:
             self._emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
         database, blk_findings = engine.build(database)
+        # the verbose per-block log (user spec): each generated block, its template (when a shipped
+        # one exists), the declared output surface, and the builder function that produced it
+        surface = {"csv": "CreationInfo CSV", "fc_xml": "FC XML (ImportReady)"}
+        for r in engine.block_report(database):
+            tmpl = f"  template={r['template_stem']}" if r["template_stem"] else ""
+            inst_note = f" + {r['instances']} instance DBs" if r["instances"] else ""
+            self._emit("INFO", f"  {r['name']}  <-  {r['builder']}(){tmpl}  ->  "
+                               f"{surface.get(r['emit'], r['emit'])}, {r['rows']} rows{inst_note}")
         rendered, res, inst = list(blk_findings), None, None
         if only in (None, 820):
             res = engine.project(database); rendered += res["findings"]

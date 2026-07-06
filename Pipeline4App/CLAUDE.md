@@ -479,6 +479,13 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
   - **GUI "800" button** (`gui/app_main._run_software`): stage -> 520 build -> `engine.build` -> `engine.project`
     (CSVs + 03 FC XML) -> `write_com_db` -> `write_instance_dbs`; accumulates staging+520 findings + `run.gate`
     ONCE (the `db_blocks not in database` downgrade guard), `run.render`s the WARN-only build/project findings.
+    **Verbose per-block log (production feedback, 2026-07-06):** after `engine.build` the handler emits one
+    INFO line per generated block via **`engine.block_report(database)`** (a pure read of the SSOT tables +
+    the registry): `<block>  <-  builders.<fn>()  template=<stem>  ->  CreationInfo CSV|FC XML (ImportReady),
+    <n> rows [+ k instance DBs]` - the template omitted when none is shipped (stem fell back to the name),
+    the surface from the registration's `emit`, the instance count = the block's non-empty `instanceOf-<FB>`
+    cells (`_builder_instance_rows` refactored into per-block `_block_instances`, order-preserving).
+    Test: `test_blocks.py::block_report_verbose_log_data`.
   - **PARITY (over the same 269 520-enriched staged rows, vs PL3's real writers):** all three byte surfaces are
     **BYTE-IDENTICAL** - 03 FC XML (38018 B), 02_COM.xml (9578 B, F_DB OPC-locked, 15 members), InstanceDBs.csv
     (8569 B, 102 entries); the 03 CreationInfo CSV is dropped (so 7 CSVs remain, still byte-identical from 800b).
