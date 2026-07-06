@@ -151,13 +151,13 @@ def test_builder_04_estop_sorter_tier_and_generic():
     ]
     t = builders.build_04_estop(Database(rows))
     eq(len(t), 2, "one network per area")
-    s = next(r for r in t.rows if r["instanceOf-ESTOP1"] == "ESTOP_AREA 1")
+    s = next(r for r in t.rows if r["instanceOf-F_ESTOP1"] == "ESTOP_AREA 1")
     eq(s["TemplateType"], "01", "3 doors -> the cap-4 tier")
     eq(s["ITERATOR_STRINGS"], ["DOOR0", "DOOR1", "DOOR2", builders.PAD], "doors padded to the tier")
     eq(s["01_PushButton.SafetyBreaker1"], "BRK1")
     eq(s["01_PushButton.SafetyBreaker2"], "Always TRUE", "the missing 2nd breaker is AND-neutral")
     eq(s["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "SORTER_01_ENCODER_HEALTHY", "sorter-only")
-    g = next(r for r in t.rows if r["instanceOf-ESTOP1"] == "ESTOP_AREA 2")
+    g = next(r for r in t.rows if r["instanceOf-F_ESTOP1"] == "ESTOP_AREA 2")
     eq((g["TemplateType"], g["ITERATOR_STRINGS"]), ("06", []), "generic: TT06, no door slots")
     eq(g["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "", "no encoder on a generic area")
 
@@ -183,7 +183,7 @@ def test_builder_05_output_feedback_source_row_orders_unit():
     eq(len(t), 1, "one contactor unit (index 7)")
     r = t.rows[0]
     eq(r["03_FDBACK_RAW.{db_element}"], "KQ_early", "source_row sort -> the earliest KQ is kq0")
-    eq(r["instanceOf-FDBACK"], "FDBACK_EARLY_D2", "instanceOf = kq0 FLD + each extra KQ's device")
+    eq(r["instanceOf-F_FDBACK"], "FDBACK_EARLY_D2", "instanceOf = kq0 FLD + each extra KQ's device")
     eq(r["tagName:Contactor1_Output"], "TAGQ1")
     eq(r["tagName:Contactor1_QBadInput"], "QBAD_TAGQ1")
     eq(r["NetworkComment"], "AREA 1 Contactor Output FLDx L1", "matrix_areas |-joined, whitespace collapsed")
@@ -325,6 +325,38 @@ def test_project_03_emits_xml_and_drops_csv():
 #  config DBs now - per-area element rows in datablock_elements.csv; see test_datablocks/test_dbtemplate)
 
 
+def test_project_ships_templates_with_relative_refs():
+    # the CreationInfo folder is SELF-CONTAINED (user spec): the template XML copies to
+    # Templates/ and the CSV references it relatively - an absolute PL path is dead on the OP machine
+    with tempfile.TemporaryDirectory() as d:
+        src = os.path.join(d, "TEMPLATE--v1.0--00_X.xml")
+        with open(src, "w", encoding="utf-8-sig", newline="") as f:    # real templates carry a BOM
+            f.write("<Document>tpl</Document>\r\n")
+        creation = os.path.join(d, "creation")
+        blk, mem = engine.software_blocks_table(), engine.software_block_members_table()
+        blk.add(name="00_X", template_stem="TEMPLATE--v1.0--00_X", template_ref=src,
+                keys=["TemplateType"], columns=["TemplateType"])
+        mem.add(block="00_X", seq=0, values={"TemplateType": "01"})
+        res = engine.project(DB([blk, mem]), out_dir=creation)
+        lines = open(res["files"][0], encoding="utf-8").read().splitlines()
+        eq(lines[0], "$,template=Templates/TEMPLATE--v1.0--00_X.xml",
+           "the CSV references the SHIPPED template, relative to its own folder")
+        shipped = os.path.join(creation, "Templates", "TEMPLATE--v1.0--00_X.xml")
+        ok(os.path.exists(shipped), "the template ships WITH the CreationInfo CSVs")
+        eq(open(shipped, "rb").read(), open(src, "rb").read(), "a byte-exact copy (BOM preserved)")
+        # a block with NO shippable template: the relative ref still writes, nothing is copied
+        blk2, mem2 = engine.software_blocks_table(), engine.software_block_members_table()
+        blk2.add(name="99_Y", template_stem="99_Y", template_ref=os.path.join(d, "nope", "99_Y.xml"),
+                 keys=["TemplateType"], columns=["TemplateType"])
+        mem2.add(block="99_Y", seq=0, values={"TemplateType": "01"})
+        creation2 = os.path.join(d, "creation2")
+        res2 = engine.project(DB([blk2, mem2]), out_dir=creation2)
+        eq(open(res2["files"][0], encoding="utf-8").read().splitlines()[0],
+           "$,template=Templates/99_Y.xml", "the ref stays relative even when the source is absent")
+        ok(not os.path.exists(os.path.join(creation2, "Templates")),
+           "a missing source ships nothing (the OP import reports it, like the old dangling path)")
+
+
 # --- the verbose 800 log data ------------------------------------------------------------------- #
 def test_block_report_verbose_log_data():
     blk, mem = engine.software_blocks_table(), engine.software_block_members_table()
@@ -397,6 +429,7 @@ if __name__ == "__main__":
         ("and_coil_fc_one_network_per_row", test_and_coil_fc_one_network_per_row),
         ("write_fc_xml_bom_and_path", test_write_fc_xml_bom_and_path),
         ("project_03_emits_xml_and_drops_csv", test_project_03_emits_xml_and_drops_csv),
+        ("project_ships_templates_with_relative_refs", test_project_ships_templates_with_relative_refs),
         ("block_report_verbose_log_data", test_block_report_verbose_log_data),
         ("write_instance_dbs_merge_and_dedup", test_write_instance_dbs_merge_and_dedup),
     ]))

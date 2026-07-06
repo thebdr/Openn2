@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import os
+import shutil
 
 from pipeline4.core import config, run
 from pipeline4.core.database import Database as DB
@@ -145,17 +146,38 @@ def build(database: DB | None = None) -> tuple:
     return database, findings
 
 
+def _ship_template(template_ref: str, tpl_dir: str) -> str:
+    """Copy a CSV-emitting block's template XML into `<creation_dir>/Templates/` and return the
+    RELATIVE reference written into the CSV (`Templates/<file>.xml`, forward slash -
+    machine-independent). The absolute `template_ref` is a PL-machine path
+    (config.BLOCK_TEMPLATES_DIR), dead on the OP machine - shipping the template WITH the CSVs makes
+    the CreationInfo folder self-contained (user spec, 2026-07-07). A missing source ships nothing
+    but still writes the relative ref (the OP import reports it, exactly like the old dangling
+    absolute path did)."""
+    base = os.path.basename(str(template_ref or ""))
+    if not base:
+        return ""
+    if os.path.exists(template_ref):
+        os.makedirs(tpl_dir, exist_ok=True)
+        shutil.copyfile(template_ref, os.path.join(tpl_dir, base))
+    return f"Templates/{base}"
+
+
 def project(database: DB | None = None, out_dir: str | None = None, import_dir: str | None = None) -> dict:
     """Project `software_blocks` + `software_block_members` -> the `$/#/%/@` CreationInfo CSVs in `out_dir`
-    (defaults to `config.blocks_creation_dir()`). A block with a direct-XML emitter (03) instead ships a ready
-    `SW.Blocks.FC` XML to `import_dir` (defaults to `config.blocks_import_dir()`) and its CSV is DROPPED (OP4
-    imports the XML, not a template-fill CSV) - a stale CSV is removed. A pure projection (`findings: []`).
+    (defaults to `config.blocks_creation_dir()`), each block's template XML COPIED to `<out_dir>/Templates/`
+    and referenced RELATIVELY (`$ template=Templates/<file>.xml` - the CreationInfo folder is
+    self-contained; an absolute PL path is meaningless on the OP machine). A block with a direct-XML
+    emitter (03) instead ships a ready `SW.Blocks.FC` XML to `import_dir` (defaults to
+    `config.blocks_import_dir()`) and its CSV is DROPPED (OP4 imports the XML, not a template-fill CSV;
+    no template ships either) - a stale CSV is removed. A pure projection (`findings: []`).
     Returns {'dir', 'files', 'xml_files', 'count', 'findings'} ('count'/'files' = the CSVs only)."""
     if database is None:
         database = DB([software_blocks_table(), software_block_members_table()]).load(config.database_dir())
     out_dir = out_dir or config.blocks_creation_dir()
     import_dir = import_dir or config.blocks_import_dir()
     os.makedirs(out_dir, exist_ok=True)
+    tpl_dir = os.path.join(out_dir, "Templates")
     members: dict = {}
     if "software_block_members" in database:
         for m in database["software_block_members"]:
@@ -172,7 +194,8 @@ def project(database: DB | None = None, out_dir: str | None = None, import_dir: 
             if os.path.exists(stale_csv):
                 os.remove(stale_csv)
             continue
-        files.append(_write_creation_csv(out_dir, b["name"], b["template_ref"], table, b["keys"]))
+        rel_ref = _ship_template(b["template_ref"], tpl_dir)
+        files.append(_write_creation_csv(out_dir, b["name"], rel_ref, table, b["keys"]))
     return {"dir": out_dir, "files": files, "xml_files": xml_files, "count": len(files), "findings": []}
 
 

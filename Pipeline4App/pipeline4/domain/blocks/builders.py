@@ -224,7 +224,7 @@ def build_04_estop(db: Database) -> Table:
         power_cut = f"{area} POWER_CUT" if is_sorter else ""
         t.add(
             template_type=tt,
-            **{"instanceOf-ESTOP1": f"ESTOP_{area}"},
+            **{"instanceOf-F_ESTOP1": f"ESTOP_{area}"},
             NetworkComment=f"{area} ESTOP",
             **{"02_COM.{matrix_area} PB": f"{area} PB"},          # raw-area: matches the 03 02_COM members
             **{"02_COM.{matrix_area} FDB": f"{area} FDB"},
@@ -268,7 +268,7 @@ def build_05_output_feedback(db: Database) -> Table:
       OnCondition     = the union of the KQ matrix areas -> 05_EM_STATE."AREA nn Q_Delayed" / "..._RESET".
     TemplateType = the smallest variant covering (OnCondition, FeedbackInput, ContactorOutput); unused
     FeedbackInput slots (a count between the 1/2/4 tiers) pad with PAD. Error member = the first KQ's
-    name_in_db in 03_FDBACK_RAW; instanceOf-FDBACK = 'FDBACK_'+that KQ's FLD (+ '_<device>' per extra KQ)."""
+    name_in_db in 03_FDBACK_RAW; instanceOf-F_FDBACK = 'FDBACK_'+that KQ's FLD (+ '_<device>' per extra KQ)."""
     groups, order = {}, []                                          # index -> {'kq': [...], 'ki': [...]}
     for r in db.rows:
         st = str(r.get("script_type", "")).upper()
@@ -304,7 +304,7 @@ def build_05_output_feedback(db: Database) -> Table:
         areas_str = "|".join(_as_list(kq0.get("matrix_areas")))    # PL3 rendered the |-joined string here
         row = {
             "TemplateType": f"{variant[3]:02d}" if variant else "",
-            "instanceOf-FDBACK": inst,
+            "instanceOf-F_FDBACK": inst,
             "NetworkComment": re.sub(r"\s+", " ", f"{areas_str} Contactor Output "
                                      f"{kq0.get('combined_FLD', '')} {kq0.get('numerazione_linea', '')}").strip(),
             "03_FDBACK_RAW.{db_element}": kq0.get("name_in_db", ""),

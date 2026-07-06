@@ -2,7 +2,7 @@
 <Document>
   <Engineering version="V18" />
   <DocumentInfo>
-    <Created>2026-06-16T05:09:47.9071282Z</Created>
+    <Created>2026-06-25T15:27:36.1795486Z</Created>
     <ExportSetting>WithDefaults</ExportSetting>
     <InstalledProducts>
       <Product>
@@ -199,7 +199,7 @@
     </Access>
     <Access Scope="GlobalVariable" UId="30">
       <Symbol>
-        <Component Name="!!tagName:DoorClosedCh1$$" />
+        <Component Name="!!tagName:DoorReset$$" />
       </Symbol>
     </Access>
     <Access Scope="GlobalVariable" UId="31">

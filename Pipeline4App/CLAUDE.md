@@ -486,6 +486,15 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
     the surface from the registration's `emit`, the instance count = the block's non-empty `instanceOf-<FB>`
     cells (`_builder_instance_rows` refactored into per-block `_block_instances`, order-preserving).
     Test: `test_blocks.py::block_report_verbose_log_data`.
+  - **Templates SHIP with the CSVs (contract evolution, 2026-07-07 - user report: the absolute `$ template=`
+    path is dead on the OP machine).** `engine.project` copies each CSV-emitting block's template XML to
+    **`blocks_creation_dir/Templates/<file>.xml`** (`_ship_template`, byte-exact/BOM-preserved, overwrite)
+    and writes the CSV `$` line as the RELATIVE **`template=Templates/<file>.xml`** (forward slash) - the
+    CreationInfo folder is self-contained. `software_blocks.template_ref` STAYS the absolute local path (the
+    build input + the copy source); the relative form is a projection concern. The 03 FC-XML block ships no
+    template (nothing references one); a missing template source still writes the relative ref, ships
+    nothing. Deliberate byte-parity break vs PL3 on the `$` line; logged in the coordination doc (OP4
+    resolves `template=` against the CSV's folder). Test: `test_blocks.py::project_ships_templates_with_relative_refs`.
   - **PARITY (over the same 269 520-enriched staged rows, vs PL3's real writers):** all three byte surfaces are
     **BYTE-IDENTICAL** - 03 FC XML (38018 B), 02_COM.xml (9578 B, F_DB OPC-locked, 15 members), InstanceDBs.csv
     (8569 B, 102 entries); the 03 CreationInfo CSV is dropped (so 7 CSVs remain, still byte-identical from 800b).
