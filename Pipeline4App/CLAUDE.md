@@ -383,9 +383,11 @@ GUI **"700" button** runs stage -> build -> project.
 - **700a DONE - `build()` + the tables + config.** A head opens a station (`script_type` PLC->Plc, PlcCardCm->
   PlcCardCm, or Type col-R first letter P->IoDevice); the rows beneath it (until the next head) are its signals.
   Stations: name=`profinet_name`, Model Id=Part No (spaces stripped), Subnet from the IP, group=
-  `<functional_unit>_IODevices`, Custom Parameters = the DTD col-7 `%I%`/`%Q%`+N address template then col-AG
+  `<functional_unit>_IODevices` (**EMPTY for the Plc head** - the PLC stays at the TIA root; OP honors
+  Group for every row - user decision 2026-07-07), Custom Parameters = the DTD col-7 `%I%`/`%Q%`+N address
+  template then col-AG
   (override), + **`connector`** = the head row's I/O-List col-I cell VERBATIM (added 2026-07-06, user spec;
-  e.g. the pilot's `X1-P1 R` port designations). Modules (IoDevice only): cards grouped by Slot (a Slot == the device's own tag is the TIA-auto-plugged
+  e.g. the pilot's `X1-P1 R` port designations - the OP side extracts the `X\d\d?` designation). Modules (IoDevice only): cards grouped by Slot (a Slot == the device's own tag is the TIA-auto-plugged
   card, skipped); I/Q Addr = the card start byte; Custom Parameters = `PotentialGroup=1` on the first card + the DTD
   col-6 by-signal-type `Ch(#)`->channel blocks then col-AG; default cards (DTD `<PARENT>:SUFFIX`) add one row per
   station of PARENT. **Severity model:** a head whose Part No isn't in the DeviceTypesDatabase -> **`hw_device_not_in_dtd`

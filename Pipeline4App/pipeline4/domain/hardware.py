@@ -20,7 +20,8 @@ level. Note: doc-validation 110 deliberately exempts `.1`-suffixed IPs from `ip_
 build-side skip is where the redundant-CPU pair is handled.
 
 - **Station**: name = Profinet name, Model Id = Part No (spaces stripped), Subnet from the IP, group =
-  `<FunctionalUnit>_IODevices`. Custom Parameters = the DTD "I/O Addresses Parameter" (`%I%`/`%Q%` -> the
+  `<FunctionalUnit>_IODevices` - EMPTY for the Plc head (the PLC stays at the TIA root; OP honors Group
+  for every row, 2026-07-07). Custom Parameters = the DTD "I/O Addresses Parameter" (`%I%`/`%Q%` -> the
   device start byte, `+N` arithmetic) then the I/O List col-AG params (override, last). Connector = the
   head row's `connector` cell VERBATIM (col I; appended to Stations.csv as the LAST column, 2026-07-06).
 - **Modules** (IoDevice only): signal rows grouped into cards by Slot (col E); a card whose Slot == the
@@ -215,7 +216,10 @@ def extract(rows, dtd) -> tuple:
             "model_id": model, "ip_address": str(row.get("profinet_ip") or "").strip(),
             "pn_number": "", "subnet": _subnet(row.get("profinet_ip")),
             "custom_parameters": station_params,
-            "group_path": str(row.get("functional_unit") or "").strip() + "_IODevices",
+            # the PLC head stays at the TIA root (OP now honors Group for every row - a grouped Plc
+            # would land inside its own device folder); the other stations keep the FU device group
+            "group_path": ("" if cur["role"] == "Plc" else
+                           str(row.get("functional_unit") or "").strip() + "_IODevices"),
             "connector": str(row.get("connector") or "").strip(),
             "source_signal": str(row.get("uid", "")),
         })

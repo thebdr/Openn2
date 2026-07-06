@@ -79,7 +79,8 @@ def test_extract_stations_and_modules():
     eq(plc["station_name"], "n1")
     eq(plc["model_id"], "CPU1")
     eq(plc["subnet"], "Subnet50")
-    eq(plc["group_path"], "=S1_IODevices")
+    eq(plc["group_path"], "", "the Plc head stays at the TIA root (empty Group - OP honors grouping)")
+    eq(stations[1]["group_path"], "=S1_IODevices", "an IoDevice keeps the FU device group")
     eq(plc["connector"], "-X1", "the head row's connector cell, verbatim")
     eq(stations[1]["connector"], "", "no connector on the head row -> empty")
     # modules for the IoDevice n6: cards -C1, -C2 (the -K6 head-tag card is auto-plugged), + default PS card
@@ -215,8 +216,9 @@ def test_format2_projection():
         ok(s.startswith("#!format=2,,,,,,,,,\r\n"), "Stations format-2 tag (9 columns since Connector)")
         ok("# Role,Station Name,Model Id,IP Address,PN Number (empty:last IP Octet)" in s, "descriptive header")
         ok("Group = folder/subfolder/...,Connector," in s, "the header names the appended Connector column")
-        ok("Plc,n1,CPU1,192.168.50.1,,Subnet50,,=S1_IODevices,-X1" in s,
-           "a station data row (connector appended LAST - positional contract)")
+        ok("Plc,n1,CPU1,192.168.50.1,,Subnet50,,,-X1" in s,
+           "the Plc data row: EMPTY Group (root), connector appended LAST")
+        ok(",=S1_IODevices," in s, "the IoDevice row keeps the FU device group")
         m = open(res["modules_path"], "rb").read().decode("utf-8")
         ok(m.startswith("#!format=2,,,,,,,\r\n"), "Modules format-2 tag")
         ok("n6,1,-C1,DI16,0,0,PotentialGroup=1 | Ch(0).Filter=1 | Ch(1).Filter=1,DI 16x24VDC" in m,
