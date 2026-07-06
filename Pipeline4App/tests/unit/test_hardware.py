@@ -29,7 +29,8 @@ def _dtd():
 def _rows():
     return [
         {"script_type": "PLC", "part_no": "CPU1", "profinet_name": "n1", "profinet_ip": "192.168.50.1",
-         "functional_unit": "=S1", "slot": "-K1", "type_hw": "", "bit": "", "source_sheet": "NS50", "source_row": 2},
+         "functional_unit": "=S1", "slot": "-K1", "type_hw": "", "bit": "", "connector": "-X1",
+         "source_sheet": "NS50", "source_row": 2},
         {"script_type": "", "type_hw": "PA", "part_no": "COUPLER", "profinet_name": "n6",
          "profinet_ip": "192.168.50.6", "functional_unit": "=S1", "slot": "-K6", "bit": "",
          "source_sheet": "NS50", "source_row": 3},
@@ -79,6 +80,8 @@ def test_extract_stations_and_modules():
     eq(plc["model_id"], "CPU1")
     eq(plc["subnet"], "Subnet50")
     eq(plc["group_path"], "=S1_IODevices")
+    eq(plc["connector"], "-X1", "the head row's connector cell, verbatim")
+    eq(stations[1]["connector"], "", "no connector on the head row -> empty")
     # modules for the IoDevice n6: cards -C1, -C2 (the -K6 head-tag card is auto-plugged), + default PS card
     names = [(m["slot"], m["module_name"], m["model_id"]) for m in modules]
     eq(names, [(1, "-C1", "DI16"), (2, "-C2", "DQ16"), (3, "COUPLER:PS", "COUPLER:PS")])
@@ -209,9 +212,11 @@ def test_format2_projection():
         ok(not sraw.startswith(b"\xef\xbb\xbf"), "no BOM (matches the reference)")
         ok(sraw.count(b"\n") > 0 and sraw.count(b"\n") == sraw.count(b"\r\n"), "CRLF only")
         s = sraw.decode("utf-8")
-        ok(s.startswith("#!format=2,,,,,,,,\r\n"), "Stations format-2 tag")
+        ok(s.startswith("#!format=2,,,,,,,,,\r\n"), "Stations format-2 tag (9 columns since Connector)")
         ok("# Role,Station Name,Model Id,IP Address,PN Number (empty:last IP Octet)" in s, "descriptive header")
-        ok("Plc,n1,CPU1,192.168.50.1,,Subnet50,,=S1_IODevices" in s, "a station data row")
+        ok("Group = folder/subfolder/...,Connector," in s, "the header names the appended Connector column")
+        ok("Plc,n1,CPU1,192.168.50.1,,Subnet50,,=S1_IODevices,-X1" in s,
+           "a station data row (connector appended LAST - positional contract)")
         m = open(res["modules_path"], "rb").read().decode("utf-8")
         ok(m.startswith("#!format=2,,,,,,,\r\n"), "Modules format-2 tag")
         ok("n6,1,-C1,DI16,0,0,PotentialGroup=1 | Ch(0).Filter=1 | Ch(1).Filter=1,DI 16x24VDC" in m,

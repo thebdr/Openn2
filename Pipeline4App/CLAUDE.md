@@ -384,7 +384,8 @@ GUI **"700" button** runs stage -> build -> project.
   PlcCardCm, or Type col-R first letter P->IoDevice); the rows beneath it (until the next head) are its signals.
   Stations: name=`profinet_name`, Model Id=Part No (spaces stripped), Subnet from the IP, group=
   `<functional_unit>_IODevices`, Custom Parameters = the DTD col-7 `%I%`/`%Q%`+N address template then col-AG
-  (override). Modules (IoDevice only): cards grouped by Slot (a Slot == the device's own tag is the TIA-auto-plugged
+  (override), + **`connector`** = the head row's I/O-List col-I cell VERBATIM (added 2026-07-06, user spec;
+  e.g. the pilot's `X1-P1 R` port designations). Modules (IoDevice only): cards grouped by Slot (a Slot == the device's own tag is the TIA-auto-plugged
   card, skipped); I/Q Addr = the card start byte; Custom Parameters = `PotentialGroup=1` on the first card + the DTD
   col-6 by-signal-type `Ch(#)`->channel blocks then col-AG; default cards (DTD `<PARENT>:SUFFIX`) add one row per
   station of PARENT. **Severity model:** a head whose Part No isn't in the DeviceTypesDatabase -> **`hw_device_not_in_dtd`
@@ -414,6 +415,10 @@ GUI **"700" button** runs stage -> build -> project.
   (halt-capable, `run.gate`) -> `hardware_csv.project` (hardware needs only staging, NOT 520). **PARITY: `Stations.csv`
   (1145 bytes) + `Modules.csv` (1896 bytes) byte-identical to PL3's `_format2` over the same extract.** Test:
   `test_hardware.py::format2_projection` (no BOM, CRLF, the fmt2 tag + descriptive header + data rows).
+  **CONTRACT EVOLUTION (2026-07-06): `Stations.csv` gains the 9th `Connector` column** (the station's
+  `connector`, appended LAST so an un-updated positional reader is unaffected; the fmt2 tag/header lines grew
+  a comma) - deliberate byte-parity break vs PL3 on Stations only (Modules stays byte-identical); logged in
+  `Shared/PL4_OP4_coordination.md`'s update log with the OP4 to-do.
 
 ## Phase 800 — Software — DONE (800a spine + 800b complex builders + 800c XML/02_COM/InstanceDBs/GUI)
 `domain/blocks/` (package) - a clean-room port of PL3's `domain/blocks/`. The model: **`Database`** (read-only

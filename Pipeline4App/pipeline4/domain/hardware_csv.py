@@ -17,12 +17,14 @@ from pipeline4.core.database import Database
 from pipeline4.domain.hardware import hardware_modules_table, hardware_stations_table
 
 # The SSOT (snake_case) columns in format-2 ORDER, and the literal format-2 tag + descriptive-header lines
-# (verbatim from the committed reference - the bytes must match for parity; OP4 reads by position).
+# (from the committed reference; OP4 reads by position). PL4 CONTRACT EVOLUTION (2026-07-06, co-designed
+# with OP4): Stations gains a 9th `Connector` column (the head row's I/O-List col-I value, verbatim) -
+# appended LAST so an un-updated positional reader is unaffected. Modules stays PL3-byte-identical.
 _STATIONS_KEYS = ["role", "station_name", "model_id", "ip_address", "pn_number", "subnet",
-                  "custom_parameters", "group_path"]
-_STATIONS_FMT2 = "#!format=2,,,,,,,,"
+                  "custom_parameters", "group_path", "connector"]
+_STATIONS_FMT2 = "#!format=2,,,,,,,,,"
 _STATIONS_HDR = ("# Role,Station Name,Model Id,IP Address,PN Number (empty:last IP Octet),Subnet,"
-                 "Custom Parameters (separator= | ), Group = folder/subfolder/...,")
+                 "Custom Parameters (separator= | ), Group = folder/subfolder/...,Connector,")
 
 _MODULES_KEYS = ["station_name", "slot", "module_name", "model_id", "i_addr", "q_addr",
                  "custom_parameters", "comment"]

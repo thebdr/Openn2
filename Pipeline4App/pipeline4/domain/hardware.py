@@ -21,7 +21,8 @@ build-side skip is where the redundant-CPU pair is handled.
 
 - **Station**: name = Profinet name, Model Id = Part No (spaces stripped), Subnet from the IP, group =
   `<FunctionalUnit>_IODevices`. Custom Parameters = the DTD "I/O Addresses Parameter" (`%I%`/`%Q%` -> the
-  device start byte, `+N` arithmetic) then the I/O List col-AG params (override, last).
+  device start byte, `+N` arithmetic) then the I/O List col-AG params (override, last). Connector = the
+  head row's `connector` cell VERBATIM (col I; appended to Stations.csv as the LAST column, 2026-07-06).
 - **Modules** (IoDevice only): signal rows grouped into cards by Slot (col E); a card whose Slot == the
   device's own tag is the TIA-auto-plugged card and is skipped. I Addr = Q Addr = the card start byte;
   Comment = the DTD comment. Custom Parameters = `PotentialGroup=1` on the first card + the DTD "Parameters
@@ -71,7 +72,7 @@ def hardware_stations_table() -> Table:
     return Table(
         "hardware_stations",
         columns=["uid", "role", "station_name", "model_id", "ip_address", "pn_number", "subnet",
-                 "custom_parameters", "group_path", "source_signal"],
+                 "custom_parameters", "group_path", "connector", "source_signal"],
         json_columns=[],
         key_columns=["station_name", "model_id"],
     )
@@ -215,6 +216,7 @@ def extract(rows, dtd) -> tuple:
             "pn_number": "", "subnet": _subnet(row.get("profinet_ip")),
             "custom_parameters": station_params,
             "group_path": str(row.get("functional_unit") or "").strip() + "_IODevices",
+            "connector": str(row.get("connector") or "").strip(),
             "source_signal": str(row.get("uid", "")),
         })
         if cur["role"] != "IoDevice":
@@ -313,7 +315,7 @@ def _fill_stations(table, stations) -> None:
         table.add(role=s["role"], station_name=s["station_name"], model_id=s["model_id"],
                   ip_address=s["ip_address"], pn_number=s["pn_number"], subnet=s["subnet"],
                   custom_parameters=s["custom_parameters"], group_path=s["group_path"],
-                  source_signal=s["source_signal"])
+                  connector=s["connector"], source_signal=s["source_signal"])
 
 
 def _fill_modules(table, modules) -> None:
