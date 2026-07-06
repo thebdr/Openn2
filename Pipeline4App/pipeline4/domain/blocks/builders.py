@@ -327,8 +327,10 @@ def build_05_output_feedback(db: Database) -> Table:
 def build_06_feedback_error(db: Database) -> Table:
     """One 03_FDBACK error FB instance per node: the node's KQ contactor-feedback members (grouped by
     address range), chunked to the FB's 8 IN/OUT slots. The iterator (each KQ's name_in_db) names a member
-    in BOTH 03_FDBACK_RAW (the FDBACK ERROR n inputs) and 03_FDBACK (the ERROR n outputs); it is padded to
-    8 with PAD. Commissioning_bypass is the node's '<profinet_name> <profinet_ip>'."""
+    in BOTH 03_FDBACK_RAW (the FDBACK ERROR n inputs) and 03_FDBACK (the ERROR n outputs) - it carries the
+    padded 8-slot bank TWICE (16 cells: the 8 slots + an exact copy, so the template consumes one bank per
+    side instead of re-reading the same cells - user spec 2026-07-07). Padded to 8 with PAD.
+    Commissioning_bypass is the node's '<profinet_name> <profinet_ip>'."""
     SLOTS = 8   # the FB's FDBACK ERROR 1..8 / ERROR 1..8
     t = Table("06_Feedback Error")
     for node, members in _group_by_node(db, "KQ"):
@@ -342,7 +344,7 @@ def build_06_feedback_error(db: Database) -> Table:
                 **{"instanceOf-03_FDBACK error": inst},
                 **{"00_Commissioning.{db_element}": ident},
                 NetworkComment=f"{inst} {node['profinet_ip']}",
-                ITERATOR_STRINGS=names,
+                ITERATOR_STRINGS=names + names,          # the 8-slot bank, then its exact copy
             )
     return t
 

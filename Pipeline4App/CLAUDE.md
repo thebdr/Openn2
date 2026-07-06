@@ -435,7 +435,9 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
   shipped `*.xml` for the `!!key$$` key inventory + `short_name`/`template_ref`/`COIL_COLUMN_BLOCKS` - the `.xlsm`
   scan is deferred, only the template scan is ported) · `builders.py` (the helpers `_node_of`/`_group_by_node`/
   `_chunked`/`PAD` + the 3 simple builders **00** Commissioning / **06** Feedback Error / **07** Speed Control,
-  verbatim) · `engine.py` (the serialization verbatim + `build`/`project`). **`build()`** runs every registered
+  verbatim - except **06's iterator now emits the padded 8-slot bank TWICE** (16 cells, the second an exact
+  copy: one bank per template side - user spec 2026-07-07, a deliberate PL3 deviation) ·
+  `engine.py` (the serialization verbatim + `build`/`project`). **`build()`** runs every registered
   builder -> the **`software_blocks`** (name/template/the `%` key inventory `["TemplateType"]+scan`/the Table
   column ORDER) + **`software_block_members`** (one row per @ row, the `values` JSON cell = the row, a list value =
   the ITERATOR) tables + `record` (`blk_builder_no_rows` WARN) + save. **`project()`** reconstructs each Table from

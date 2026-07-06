@@ -85,9 +85,12 @@ def test_builder_06_feedback_error_chunks_to_8():
     t = builders.build_06_feedback_error(Database([node] + kqs))
     eq(len(t), 2, "10 KQ -> 2 chunks of 8")
     eq(t.rows[0]["instanceOf-03_FDBACK error"], "FDBK_ERR_n1_1")
-    eq(len(t.rows[0]["ITERATOR_STRINGS"]), 8, "the iterator is padded to 8")
+    eq(len(t.rows[0]["ITERATOR_STRINGS"]), 16, "the padded 8-slot bank emits TWICE (user spec)")
     eq(t.rows[0]["ITERATOR_STRINGS"][:2], ["KQ0", "KQ1"])
-    eq(t.rows[1]["ITERATOR_STRINGS"], ["KQ8", "KQ9"] + [builders.PAD] * 6, "the 2nd chunk padded with No Operation")
+    eq(t.rows[0]["ITERATOR_STRINGS"][:8], t.rows[0]["ITERATOR_STRINGS"][8:],
+       "the second bank is an exact copy of the first")
+    eq(t.rows[1]["ITERATOR_STRINGS"], (["KQ8", "KQ9"] + [builders.PAD] * 6) * 2,
+       "the 2nd chunk: padded with No Operation, then repeated")
 
 
 def test_builder_07_speed_control_pairs_encoders():
