@@ -864,10 +864,38 @@ The user-reviewed refresh before the first production test (the full spec + comm
   the pure engine (user's learning goal; toolchain: rustup/cargo 1.96.1 + VS18 MSVC): `sort.rs`
   (derive-Ord NaturalKey replaces Python's tuple trick) / `filter.rs` / `select.rs` / `layout.rs`
   (measure CLOSURES injected; + `sanitize`) / `export.rs` - every test vector mirrors a Python golden
-  test (13/13 `cargo test`; behaviour contracts: broken regex matches NOTHING, blank = `""` exactly,
-  `%g`-style integral printing). `rust/README.md` = port map + roadmap. REMAINING: PyO3 bindings
-  (maturin) so `grid.py` can swap engines, calamine xlsx loader, an egui shell only if the standalone
-  exe needs it. Bash note: `export PATH="$PATH:/c/Users/bogdan.dragoi/.cargo/bin"` first.
+  test (15/15 `cargo test`; behaviour contracts: broken regex matches NOTHING, blank = `""` exactly,
+  `%g`-style integral printing). `rust/README.md` = port map + roadmap. Bash note:
+  `export PATH="$PATH:/c/Users/bogdan.dragoi/.cargo/bin"` first.
+- **The Rust engine is LIVE (2026-07-06)** - `src/python.rs` (PyO3 0.26, abi3-py310) + `src/xlsx.rs`
+  (calamine): `py rust/install_native.py` (from FileXYApp/) maturin-builds and drops
+  `FileXYApp/filexy_core.pyd` (gitignored); `filexy/core.py`'s end-of-module `_install_native()`
+  swaps apply_filters/sorted_view/distinct_values/to_tsv/column_stats/sanitize_rows, `files.py`
+  routes read_xlsx/xlsx_sheets through calamine - transparently for PL4's embedding too (the shims
+  re-export AFTER the swap; the full PL4 gate runs green with ENGINE=rust). `core.ENGINE` reports
+  the active engine; `FILEXY_RUST=0` = the escape hatch; TypeError falls back to Python (non-str
+  cells), Python-only regex (lookarounds/backrefs) routes to `re` (`_needs_python_regex`);
+  `core.PY_IMPLS` keeps the originals for tests. PARITY (`FileXYApp/tests/test_native.py`, 48
+  checks): golden vectors through BOTH engines + CELL-BY-CELL loader comparison on the real
+  workbooks (DeviceTypesDatabase.xlsx 28 sheets ~7k rows: openpyxl ~300ms vs calamine ~15ms,
+  **~19-24x**) - found+fixed: stable-DESC ties (Python sorted(reverse=True) keeps original order ->
+  a reversed comparator, NOT sort+reverse), XML CRLF normalization (openpyxl normalizes per XML
+  1.0, quick-xml doesn't). `set_data` now uses bulk `core.sanitize_rows`; the standalone title
+  shows the engine. An adversarial multi-agent review then confirmed+fixed 7 more: regex routing
+  made EXACT (re.compile pre-check + native `regex_ok` - no token lists; Python-only syntax
+  [\Z, \4+, (?P=, conditionals, atomics] runs on `re`, Python-BROKEN patterns [(?i) mid-pattern]
+  match nothing), FULL Unicode case folding via `caseless` (Python casefold: ss<->ß) in substring
+  filters + natural_key, per-spec regex PRECOMPILE in apply_filters (was per-cell!), duration
+  formats ([h]:mm:ss) render as Python str(timedelta) ('1 day, 12:00:00'), out-of-range date
+  serials -> '#VALUE!' like openpyxl, `files.py` falls back to openpyxl (warn-once) when calamine
+  ERRORS (e.g. #SPILL!-class cached errors - the file stays openable), install_native.py handles
+  the Windows-locked .pyd (rename-aside + atomic replace + 'close the app' message), stale-.pyd
+  AttributeError guarded (falls back to Python), `__version__` stamped. ACCEPTED divergences
+  (documented in xlsx.rs/files.py): leading/trailing formatting-only rows dropped; writers that
+  emit '<v>4.0</v>' text (POI etc.) show '4'; plain-digit ints >=1e16 lose exact digits (f64);
+  regex-internal (?i) is simple-fold (İ). REMAINING: a resident #[pyclass] Table handle (skip the
+  per-call list[list[str]] conversion) once 50k+ rows feel slow; an egui shell only if the
+  standalone exe needs it.
 - **`user_input/generation_params.yaml`** (active→builtin, neither→RAISE): the 620 SCL DWord names/variant/
   `S1.CABINET{$index}.{$role}` instance template (core/expr, strict) + the DiagList `$PLC_Binding$` sentinel;
   a builder declares its output surface at registration (`@builds(name, emit="fc_xml")`) — migrated at

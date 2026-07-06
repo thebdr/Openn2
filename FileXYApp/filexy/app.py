@@ -8,7 +8,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import files, theme
+from . import core, files, theme
 from .grid import DataGrid
 
 _TITLE = "FileXY"
@@ -21,7 +21,7 @@ class ViewerApp:
         self.root = root
         self.mode = "dark"
         self.path: str | None = None
-        root.title(_TITLE)
+        root.title(f"{_TITLE} · {core.ENGINE} engine")
         root.geometry("1100x640")
         theme.apply(root, self.mode)
 

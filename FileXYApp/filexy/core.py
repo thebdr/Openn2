@@ -69,6 +69,12 @@ def sanitize(cell) -> str:
     return text
 
 
+def sanitize_rows(rows) -> list:
+    """Every cell sanitized - the whole-table form `set_data` uses (a single call the native
+    engine can take over, instead of one FFI hop per cell)."""
+    return [[sanitize(cell) for cell in row] for row in rows]
+
+
 def cell_at(widths, row_h, n_rows, x, y):
     """The `(row, col, cell_x0)` under canvas point (x, y), or None outside the data - the in-cell
     editor's hit test."""
@@ -253,3 +259,94 @@ def stats_text(stats: dict) -> str:
     if stats.get("numeric"):
         text += (f" · Σ {stats['sum']:g} · min {stats['min']:g} · max {stats['max']:g}")
     return text
+
+
+# --- the optional native (Rust) engine ---------------------------------------------------------------- #
+# `filexy_core` is the compiled Rust port of this module (FileXYApp/rust/filexy-core, built by
+# rust/install_native.py). When importable, the DATA-SIZED functions above are swapped for the
+# native ones - transparently for every caller, since this block runs before any importer binds
+# names. The measure-injected layout maths and the per-event hit tests stay Python: crossing the
+# FFI to call Tk font closures would cost more than it saves. Parity between the engines is gated
+# by tests/test_native.py (shared golden vectors + cell-by-cell real-workbook comparisons).
+# Opt out with FILEXY_RUST=0 - the escape hatch if the native engine ever misbehaves.
+ENGINE = "python"
+PY_IMPLS = {"apply_filters": apply_filters, "sorted_view": sorted_view,
+            "distinct_values": distinct_values, "to_tsv": to_tsv, "column_stats": column_stats,
+            "sanitize_rows": sanitize_rows}
+
+
+def _wrap_native(native_fn, py_fn):
+    """The native function, falling back to Python when the arguments don't cross the FFI (cells
+    that are not str - PL4 hosts sometimes set_data raw values). Data loaded from files is all
+    strings, so the big tables always take the native path."""
+    def call(*args, **kwargs):
+        try:
+            return native_fn(*args, **kwargs)
+        except TypeError:
+            return py_fn(*args, **kwargs)
+    call.__name__ = py_fn.__name__
+    call.__doc__ = py_fn.__doc__
+    return call
+
+
+def _install_native() -> None:
+    global ENGINE, apply_filters, sorted_view, distinct_values, to_tsv, column_stats, sanitize_rows
+    import os
+    if os.environ.get("FILEXY_RUST", "1") == "0":
+        return
+    try:
+        import filexy_core as native
+        # bind everything up front: a STALE .pyd missing one function must mean "stay on
+        # Python", not an AttributeError that kills the whole package import
+        native_apply, native_sort = native.apply_filters, native.sorted_view
+        native_distinct, native_tsv = native.distinct_values, native.to_tsv
+        native_stats, native_sanitize = native.column_stats, native.sanitize_rows
+        native_regex_ok = native.regex_ok
+    except (ImportError, AttributeError):
+        return
+
+    py_apply_filters, py_sorted_view = apply_filters, sorted_view
+
+    def needs_python_engine(filters) -> bool:
+        """True when a regex filter must run on the Python engine. Exact, no token lists:
+        - a pattern Python's `re` REJECTS must 'match nothing' (the filter_passes contract),
+          which only the Python path honours (Rust may consider it valid and match);
+        - a pattern Rust's regex crate rejects (lookarounds, backrefs, \\Z, conditionals -
+          Python-only syntax) would silently match nothing natively."""
+        for spec in filters:
+            if spec.get("regex") and spec.get("values") is None:
+                text = spec.get("text", "")
+                if not text:
+                    continue
+                try:
+                    re.compile(text)
+                except re.error:
+                    return True
+                if not native_regex_ok(text):
+                    return True
+        return False
+
+    def apply_filters_native(rows, filters):
+        if needs_python_engine(filters):
+            return py_apply_filters(rows, filters)
+        try:
+            return native_apply(rows, list(filters))
+        except TypeError:
+            return py_apply_filters(rows, filters)
+
+    def sorted_view_native(rows, view, sort):
+        try:
+            return native_sort(rows, list(view), tuple(sort) if sort else None)
+        except TypeError:
+            return py_sorted_view(rows, view, sort)
+
+    apply_filters = apply_filters_native
+    sorted_view = sorted_view_native
+    distinct_values = _wrap_native(native_distinct, distinct_values)
+    to_tsv = _wrap_native(native_tsv, to_tsv)
+    column_stats = _wrap_native(native_stats, column_stats)
+    sanitize_rows = _wrap_native(native_sanitize, sanitize_rows)
+    ENGINE = "rust"
+
+
+_install_native()

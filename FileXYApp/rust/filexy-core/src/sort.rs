@@ -46,7 +46,8 @@ fn finish(run: &str, is_digit: bool) -> Part {
             return Part::Num(n);
         }
     }
-    Part::Text(run.to_lowercase())
+    // FULL case folding = Python's str.casefold ("straße" sorts as "strasse"); to_lowercase isn't
+    Part::Text(caseless::default_case_fold_str(run))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,20 +69,22 @@ pub fn cycle_sort(state: SortState, col: usize) -> SortState {
 }
 
 /// `view` (source indices) ordered by the sort state - NON-destructive: the source rows never
-/// move, only the view permutes; None returns the original document order. Stable + natural.
+/// move, only the view permutes; None returns the original document order. Stable + natural,
+/// with Python's `reverse=True` semantics: equal keys keep their ORIGINAL order in BOTH
+/// directions - so Desc is a reversed comparator, NOT a sort-then-reverse (that would flip ties).
 pub fn sorted_view(rows: &[Vec<String>], view: &[usize], sort: SortState) -> Vec<usize> {
-    let mut out = view.to_vec();
-    if let Some((col, dir)) = sort {
-        let key_of = |i: usize| {
-            let cell = rows[i].get(col).map(String::as_str).unwrap_or("");
-            natural_key(cell)
-        };
-        out.sort_by_key(|&i| key_of(i)); // stable, like Python's sorted()
-        if dir == Dir::Desc {
-            out.reverse();
-        }
+    let Some((col, dir)) = sort else {
+        return view.to_vec();
+    };
+    let mut keyed: Vec<(NaturalKey, usize)> = view
+        .iter()
+        .map(|&i| (natural_key(rows[i].get(col).map(String::as_str).unwrap_or("")), i))
+        .collect();
+    match dir {
+        Dir::Asc => keyed.sort_by(|a, b| a.0.cmp(&b.0)),
+        Dir::Desc => keyed.sort_by(|a, b| b.0.cmp(&a.0)),
     }
-    out
+    keyed.into_iter().map(|(_, i)| i).collect()
 }
 
 #[cfg(test)]
@@ -101,6 +104,8 @@ mod tests {
         assert_eq!(sorted_strs(&["10", "9", "100"]), vec!["9", "10", "100"]);
         assert_eq!(sorted_strs(&["b", "", "a"]), vec!["a", "b", ""], "blanks sort LAST");
         assert_eq!(sorted_strs(&["Beta", "alpha"]), vec!["alpha", "Beta"], "case-insensitive");
+        assert_eq!(sorted_strs(&["strassf", "straße"]), vec!["straße", "strassf"],
+                   "full case folding: ß sorts as ss (Python casefold)");
     }
 
     #[test]
@@ -120,5 +125,8 @@ mod tests {
         assert_eq!(sorted_view(&rows, &[0, 1, 2], Some((1, Dir::Asc))), vec![0, 2, 1]);
         assert_eq!(sorted_view(&rows, &[0, 1], Some((1, Dir::Desc))), vec![1, 0]);
         assert_eq!(sorted_view(&rows, &[0, 1], None), vec![0, 1], "released = document order");
+        // Python's reverse=True stability: ties keep their ORIGINAL order in Desc too
+        assert_eq!(sorted_view(&rows, &[0, 1, 2], Some((0, Dir::Desc))), vec![2, 0, 1],
+                   "Desc ties stay in view order (sorted(reverse=True) semantics)");
     }
 }

@@ -24,9 +24,11 @@ Shared/OutputTree/
 Pipeline3App/user_input/*.csv
 Pipeline4App/config_project/user_input/*.csv
 
-# Rust build output (FileXY core port)
+# Rust build output (FileXY core port) + the installed native engine (rebuild: rust/install_native.py)
+# filexy_core* also covers the .pyd.old/.pyd.new files the installer parks beside a locked module
 FileXYApp/rust/filexy-core/target/
 FileXYApp/rust/filexy-core/Cargo.lock
+FileXYApp/filexy_core*
 
 # NuGet restore output
 Openn2App/packages/

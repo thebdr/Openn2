@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use regex::RegexBuilder;
+use regex::{Regex, RegexBuilder};
 
 use crate::sort::natural_key;
 
@@ -18,31 +18,62 @@ pub struct FilterSpec {
     pub values: Option<HashSet<String>>,
 }
 
+/// Python's str.casefold - FULL case folding ("SS" finds "ß"), which to_lowercase is not.
+fn fold(s: &str) -> String {
+    caseless::default_case_fold_str(s)
+}
+
+/// The spec compiled ONCE, applied per cell. Python's `re` caches compiled patterns internally;
+/// without this, apply_filters would recompile the regex for EVERY cell of a 20k-row table.
+enum Matcher<'a> {
+    Values(&'a HashSet<String>),
+    All,
+    Regex(Option<Regex>), // None = the pattern didn't compile -> matches nothing (the contract)
+    Substr(String),
+}
+
+impl<'a> Matcher<'a> {
+    fn new(spec: &'a FilterSpec) -> Self {
+        if let Some(values) = &spec.values {
+            return Matcher::Values(values);
+        }
+        if spec.text.is_empty() {
+            return Matcher::All;
+        }
+        if spec.regex {
+            return Matcher::Regex(
+                RegexBuilder::new(&spec.text).case_insensitive(true).build().ok(),
+            );
+        }
+        Matcher::Substr(fold(&spec.text))
+    }
+
+    fn passes(&self, cell: &str) -> bool {
+        match self {
+            Matcher::Values(values) => values.contains(cell),
+            Matcher::All => true,
+            Matcher::Regex(Some(re)) => re.is_match(cell),
+            Matcher::Regex(None) => false,
+            Matcher::Substr(text) => fold(cell).contains(text.as_str()),
+        }
+    }
+}
+
 pub fn filter_passes(cell: &str, spec: &FilterSpec) -> bool {
-    if let Some(values) = &spec.values {
-        return values.contains(cell);
-    }
-    if spec.text.is_empty() {
-        return true;
-    }
-    if spec.regex {
-        return match RegexBuilder::new(&spec.text).case_insensitive(true).build() {
-            Ok(re) => re.is_match(cell),
-            Err(_) => false, // a broken regex matches nothing (the Python contract)
-        };
-    }
-    cell.to_lowercase().contains(&spec.text.to_lowercase())
+    Matcher::new(spec).passes(cell)
 }
 
 /// The visible SOURCE row indices: the rows passing EVERY filter (cascade = AND; each filter was
 /// added over the then-visible rows, and the conjunction reproduces that narrowing exactly).
 pub fn apply_filters(rows: &[Vec<String>], filters: &[FilterSpec]) -> Vec<usize> {
+    let matchers: Vec<(Option<usize>, Matcher)> =
+        filters.iter().map(|spec| (spec.col, Matcher::new(spec))).collect();
     let mut view = Vec::new();
     'rows: for (i, row) in rows.iter().enumerate() {
-        for spec in filters {
-            let passes = match spec.col {
-                None => row.iter().any(|cell| filter_passes(cell, spec)), // quick search
-                Some(c) => filter_passes(row.get(c).map(String::as_str).unwrap_or(""), spec),
+        for (col, matcher) in &matchers {
+            let passes = match col {
+                None => row.iter().any(|cell| matcher.passes(cell)), // quick search
+                Some(c) => matcher.passes(row.get(*c).map(String::as_str).unwrap_or("")),
             };
             if !passes {
                 continue 'rows;
@@ -95,6 +126,14 @@ mod tests {
         };
         assert!(filter_passes("A", &values) && !filter_passes("C", &values));
         assert!(filter_passes("anything", &text_spec(Some(0), "")), "empty spec passes all");
+    }
+
+    #[test]
+    fn substring_uses_full_case_folding() {
+        // Python: pattern.casefold() in cell.casefold() - "ss" finds "ß" and vice versa
+        assert!(filter_passes("straße", &text_spec(Some(0), "ss")), "ss finds ß");
+        assert!(filter_passes("PRESS", &text_spec(Some(0), "ß")), "ß finds SS");
+        assert!(filter_passes("µm", &text_spec(Some(0), "μ")), "micro sign folds to Greek mu");
     }
 
     #[test]

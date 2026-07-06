@@ -121,7 +121,7 @@ class DataGrid(ttk.Frame):
         self._close_editbox()
         self._close_popup()
         self._columns = [str(c) for c in columns]
-        self._rows = [[sanitize(cell) for cell in row] for row in rows]
+        self._rows = core.sanitize_rows(rows)
         self._raw_rows = [["" if cell is None else str(cell) for cell in row] for row in rows]
         self._row_fg = list(row_fg or [])
         self._sort, self._filters, self._quick, self._frozen = None, [], "", 0

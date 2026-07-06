@@ -7,11 +7,16 @@ license = "MIT"
 
 [dependencies]
 regex = "1"
+calamine = { version = "0.26", features = ["dates"] }   # the xlsx loader (the REAL perf win)
+chrono = { version = "0.4", default-features = false, features = ["std"] }  # calamine's date type
+caseless = "0.2"   # FULL Unicode case folding = Python's str.casefold (to_lowercase is not: ß->ss)
+# pyo3 only when building the Python extension (maturin); `cargo test` stays Python-free.
+pyo3 = { version = "0.26", features = ["extension-module", "abi3-py310"], optional = true }
 
-# NEXT STEPS (the agreed roadmap):
-#   pyo3 = { version = "0.23", features = ["extension-module"], optional = true }  + maturin
-#     -> a `filexy_core` Python module the Tk shell can swap in for the pure-Python core
-#   calamine = "0.26"   -> the xlsx loader (the REAL performance win; openpyxl is 10-20x slower)
+[features]
+python = ["dep:pyo3"]
 
 [lib]
 name = "filexy_core"
+# rlib for `cargo test`; cdylib is the Python extension module maturin packages.
+crate-type = ["rlib", "cdylib"]

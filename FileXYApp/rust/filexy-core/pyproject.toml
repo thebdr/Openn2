@@ -1,0 +1,15 @@
+# maturin packaging for the Python extension module. Build with rust/install_native.py (or:
+#   py -m maturin build --release --manifest-path FileXYApp/rust/filexy-core/Cargo.toml
+# and drop the wheel's filexy_core*.pyd next to the filexy package).
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "filexy-core"
+requires-python = ">=3.10"
+classifiers = ["Programming Language :: Rust"]
+dynamic = ["version"]
+
+[tool.maturin]
+features = ["python"]

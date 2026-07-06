@@ -8,12 +8,19 @@
 //!   updated_selection                           -> select
 //!   cell_kind / widths / fit / hit tests        -> layout   (pixel-measure closures injected)
 //!   to_tsv / column_stats / stats_text          -> export
+//!   files.py read_xlsx / xlsx_sheets            -> xlsx     (calamine - the performance goal)
+//!
+//! With feature "python" (how maturin builds it), `python.rs` exposes the data-sized functions
+//! as the `filexy_core` extension module that filexy/core.py + files.py swap in at import.
 
 pub mod export;
 pub mod filter;
 pub mod layout;
+#[cfg(feature = "python")]
+mod python;
 pub mod select;
 pub mod sort;
+pub mod xlsx;
 
 pub use export::{column_stats, stats_text, to_tsv, ColumnStats};
 pub use filter::{apply_filters, distinct_values, filter_passes, FilterSpec};
@@ -24,3 +31,4 @@ pub use layout::{
 };
 pub use select::updated_selection;
 pub use sort::{cycle_sort, natural_key, sorted_view, Dir, NaturalKey, Part, SortState};
+pub use xlsx::{load_xlsx, py_float_str, sheet_names};
