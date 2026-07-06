@@ -296,6 +296,21 @@ sort+distinct-props, the skip+warn, the return contract).
   tags (98 I/O + 115 interface), 211 unique (Path,Name) keys, 0 PL4-only / 0 PL3-only / 0 field-mismatches**.
   (The old "213 vs 208" delta was PL3 reading the doc's STALE inserted IF_ sheets; with fresh sheets PL3 also
   hits 213.) The direct-I/O side is 98/98; the interface side: IF_SORTER-01 25, IF_SORTER+DIAG-02 90.
+- **The duplicate-tag gate (production fix, 2026-07-06).** Two tags on the same **(tag table, name)**
+  [case-insensitive — TIA's uniqueness rule; the import breaks] emit one **`iotag_duplicate` FAIL per 2nd+
+  occurrence**: `location` = the duplicate's I/O-List row, `location2` = the FIRST occurrence's (the log
+  renders `<dup> vs <first>`, both clickable — the tag dicts now carry `location`/`source_uid`, a mirror
+  element resolving its `source_signal`'s `source_cell`), detail `already seen at <first>`. On any raw FAIL
+  `project` **records the FAILs alone** (`finding.record_standalone` — the [FAIL]→Findings jump) and does
+  **NOT write the workbook** (`path` = ''); the GUI 510 leg `_gate`s that path (halt; a registry downgrade
+  still never writes — the raw-FAIL guard, same as 520/700). The same name on TWO tables stays legal (one
+  signal mirrors into several IF_ tables by design — 9 such names in the builtin fixture, 0 flagged).
+  Root cause (FVX_PL4_Pilot): I/O-List rows duplicated verbatim (NET SAFETY 50 O113-118 == O121-126, same
+  FLD, different bits) → 6 same-table pairs; staging is silent by design (the signal uid includes
+  `source_cell`), so the PLCTags surface is where the collision exists. The builtin fixture's own 2
+  `Fire Alarm` pairs now FAIL the dev 500 run too — a real defect in the dev I/O List, previously shipped
+  silently (the old "213 tags / 211 unique keys" note). Tests: `test_io_tags.py` (11 — +3: the same-table
+  FAIL with both links + no-write + record, the cross-table by-design pass, the mirror source-row link).
 
 ## Phase 600 — Diagnosis — DONE (600a + 600b + 600c + 600d; + severity S5)
 **Severity S5 (parity-locked):** `diagnosis.build` returns **`(database, findings)`** (was `(database, errors,

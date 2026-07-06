@@ -136,6 +136,90 @@ def test_return_contract_mixes_sources():
     ok(res["path"].endswith("PLCTags.xlsx"), "writes PLCTags.xlsx")
 
 
+def test_duplicate_same_table_fails_links_rows_and_blocks_write():
+    # the FVX_PL4_Pilot defect: I/O-List rows duplicated verbatim -> the same (tag table, name) twice.
+    # Case-insensitive; each 2nd+ occurrence FAILs, location = ITS row, location2 = the FIRST row's.
+    from pipeline4.core import config
+    sigs = [
+        {"script_type": "A", "bit": "I13.0", "name_in_tagtable": "Fire Alarm", "tagtable": "Alarms",
+         "source_cell": "NET SAFETY 50!O113", "type": {"category": "Std", "io_comment": ""}},
+        {"script_type": "A", "bit": "I14.0", "name_in_tagtable": "FIRE ALARM", "tagtable": "Alarms",
+         "source_cell": "NET SAFETY 50!O121", "type": {"category": "Std", "io_comment": ""}},
+        {"script_type": "A", "bit": "I15.0", "name_in_tagtable": "fire alarm", "tagtable": "Alarms",
+         "source_cell": "NET SAFETY 50!O122", "type": {"category": "Std", "io_comment": ""}},
+    ]
+    db = _db(signals=sigs)
+    orig_params, orig_dbdir = config.load_params, config.database_dir
+    with tempfile.TemporaryDirectory() as d:
+        config.load_params = lambda *a, **k: {"iolist_path": os.path.join(d, "IOList.xlsx")}
+        config.database_dir = lambda: d
+        try:
+            res = io_tags.project(db, out_dir=d)
+        finally:
+            config.load_params, config.database_dir = orig_params, orig_dbdir
+        eq(res["path"], "", "a duplicate tag blocks the write (raw-FAIL guard)")
+        ok(not os.path.exists(os.path.join(d, io_tags.TAG_TABLE_FILE)), "PLCTags.xlsx is NOT on disk")
+        dups = [f for f in res["findings"] if f.type == "iotag_duplicate"]
+        eq(len(dups), 2, "one FAIL per 2nd+ occurrence (the first row is not flagged)")
+        eq({f.severity for f in dups}, {"FAIL"})
+        eq(dups[0].location, "NET SAFETY 50!O121", "location = the duplicate's own I/O-List row")
+        eq(dups[1].location, "NET SAFETY 50!O122")
+        eq({f.location2 for f in dups}, {"NET SAFETY 50!O113"}, "location2 = the FIRST occurrence's row")
+        ok("already seen at NET SAFETY 50!O113" in dups[0].detail, "the detail names the first row")
+        ok("in table 'Alarms'" in dups[0].detail)
+        eq((dups[0].doc, dups[0].doc2), ("IOList.xlsx", "IOList.xlsx"),
+           "both links carry the I/O List basename (the GUI's clickable-cell resolution)")
+        eq(dups[0].source_uid, db["signals"].rows[1]["uid"], "FK to the duplicate's producing signal")
+        with open(os.path.join(d, "validation_issues.csv"), encoding="utf-8-sig") as fh:
+            recorded = [line for line in fh if "iotag_duplicate" in line]
+        eq(len(recorded), 2, "the FAILs are recorded (the [FAIL]->Findings jump)")
+
+
+def test_duplicate_name_across_tables_is_by_design():
+    # one signal mirrors into SEVERAL IF_ tables (SORTER-01 + SORTER+DIAG-02) - never a duplicate.
+    els = [
+        {"interface": "SORTER-01", "signal_name": "PNC_I_Open Door", "data_type": "BOOL",
+         "direction": "I", "io_address_side1": "I10010.0", "description": ""},
+        {"interface": "SORTER+DIAG-02", "signal_name": "PNC_I_Open Door", "data_type": "BOOL",
+         "direction": "I", "io_address_side1": "I20010.0", "description": ""},
+    ]
+    res, rows, _p = _project(elements=els)
+    eq([f for f in res["findings"] if f.type == "iotag_duplicate"], [],
+       "the same name on two tables is not flagged")
+    eq(len(rows), 3, "both tags written")
+
+
+def test_duplicate_interface_tag_links_the_source_signal_row():
+    # a duplicate WITHIN one interface: the mirror element's link follows source_signal back to the
+    # producing I/O-List row; an element with no source signal falls back to <interface>/<name>.
+    from pipeline4.core import config
+    sig = {"script_type": "IOC", "bit": "I2.0", "name_in_tagtable": "", "source_cell": "IO!O44",
+           "type": {"category": "Interface"}}
+    db = _db(signals=[sig])
+    sig_uid = db["signals"].rows[0]["uid"]
+    els = [
+        {"interface": "S-01", "signal_name": "PNC_Q_Alarm", "data_type": "BOOL", "direction": "Q",
+         "io_address_side1": "Q10000.0", "description": "", "source": "template"},
+        {"interface": "S-01", "signal_name": "pnc_q_alarm", "data_type": "BOOL", "direction": "Q",
+         "io_address_side1": "Q10000.1", "description": "", "source_signal": sig_uid},
+    ]
+    for e in els:
+        db["interface_elements"].add(**e)
+    orig_params, orig_dbdir = config.load_params, config.database_dir
+    with tempfile.TemporaryDirectory() as d:
+        config.load_params = lambda *a, **k: {"iolist_path": os.path.join(d, "IOList.xlsx")}
+        config.database_dir = lambda: d
+        try:
+            res = io_tags.project(db, out_dir=d)
+        finally:
+            config.load_params, config.database_dir = orig_params, orig_dbdir
+    dups = [f for f in res["findings"] if f.type == "iotag_duplicate"]
+    eq(len(dups), 1)
+    eq(dups[0].location, "IO!O44", "the mirror duplicate links its source signal's I/O-List row")
+    eq(dups[0].location2, "S-01/PNC_Q_Alarm", "the template-native first occurrence: logical locator")
+    eq((dups[0].doc, dups[0].doc2), ("IOList.xlsx", ""), "doc only on a Sheet!Cell location")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("io_tags", [
@@ -147,4 +231,9 @@ if __name__ == "__main__":
         ("source_b_word_and_unresolved", test_source_b_word_and_unresolved),
         ("text_forcing_and_sort_and_props", test_text_forcing_and_sort_and_props),
         ("return_contract_mixes_sources", test_return_contract_mixes_sources),
+        ("duplicate_same_table_fails_links_rows_and_blocks_write",
+         test_duplicate_same_table_fails_links_rows_and_blocks_write),
+        ("duplicate_name_across_tables_is_by_design", test_duplicate_name_across_tables_is_by_design),
+        ("duplicate_interface_tag_links_the_source_signal_row",
+         test_duplicate_interface_tag_links_the_source_signal_row),
     ]))

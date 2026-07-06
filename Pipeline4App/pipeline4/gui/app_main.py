@@ -811,6 +811,11 @@ class App:
             self._status("I/O tags…")
             database, iface_findings = interfaces.build_interfaces(database)
             res = io_tags.project(database)
+            if not res["path"]:               # duplicate tags: the raw-FAIL guard skipped the write
+                if self._gate(iface_findings + res["findings"], label="510 I/O tags"):
+                    self._emit("WARN", "  510: the duplicate-tag FAILs are downgraded in the registry, "
+                                       "but PLCTags.xlsx is never written on a raw FAIL - fix the I/O List rows")
+                return
             self._render(iface_findings + res["findings"], label="510 I/O tags")
             self._emit("RSLT", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
                                f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {config.io_tags_dir()}")
