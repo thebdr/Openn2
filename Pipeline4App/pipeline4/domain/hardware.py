@@ -10,6 +10,15 @@ opens a station; the rows after it (until the next head) are its signals. A head
 not in the DeviceTypesDatabase can't be generated -> a **`hw_device_not_in_dtd` FAIL** (a
 **`hw_switch_not_in_dtd` WARN** for a switch), and the station is skipped.
 
+A head whose IP is ALREADY a generated station's is skipped too - only the FIRST station per IP is
+generated (TIA rejects two devices on one IP; a redundant-CPU pair documents Master + Backup on the same
+address). The skip is a **`hw_duplicate_ip` WARN** - downgraded to **INFO** when the head's module
+description mentions "backup" (the documented, expected redundancy case). The finding links the skipped
+head's I/O-List row (`location`) and the generated station's (`location2`); the detail text is IDENTICAL
+for both severities, so the uid - which excludes severity - survives a description edit that flips the
+level. Note: doc-validation 110 deliberately exempts `.1`-suffixed IPs from `ip_duplicated`, so this
+build-side skip is where the redundant-CPU pair is handled.
+
 - **Station**: name = Profinet name, Model Id = Part No (spaces stripped), Subnet from the IP, group =
   `<FunctionalUnit>_IODevices`. Custom Parameters = the DTD "I/O Addresses Parameter" (`%I%`/`%Q%` -> the
   device start byte, `+N` arithmetic) then the I/O List col-AG params (override, last).
@@ -38,10 +47,12 @@ HEAD_CM = "PLCCARDCM"
 _ADDR = re.compile(r"\s*([IQ])\s*(\d+)\.(\d+)", re.IGNORECASE)
 
 
-def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "", doc: str = "") -> Finding:
-    """A phase-700 Finding - the hardware report container (the missing-DTD FAIL / switch WARN)."""
+def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "", doc: str = "",
+       location2: str = "", doc2: str = "") -> Finding:
+    """A phase-700 Finding - the hardware report container (the missing-DTD FAIL / switch WARN + the
+    duplicate-IP skip, whose location/location2 pair links the skipped head and the generated station)."""
     return Finding(phase=700, type=type, severity=severity, detail=detail,
-                   location=location, source_uid=source_uid, doc=doc)
+                   location=location, source_uid=source_uid, doc=doc, location2=location2, doc2=doc2)
 
 def _io_doc() -> str:
     """The I/O List basename - the GUI log resolves it back to the open document for the clickable
@@ -161,13 +172,31 @@ def _looks_like_switch(row) -> bool:
     return "SWITCH" in text
 
 
+def _is_backup(row) -> bool:
+    """A head documented as a redundancy partner ('backup' in its module description) - its duplicate-IP
+    skip is the EXPECTED case (INFO), not a review condition (WARN)."""
+    return "backup" in str(row.get("description_module") or "").lower()
+
+
+def _where(row) -> str:
+    """The row's log locator: `source_cell` (a LIVE Sheet!Cell link) when staged, else the descriptive
+    `[<sheet>] row <n>` fallback (older stagings; no link)."""
+    sheet = row.get("source_sheet")
+    fallback = f"[{sheet}] row {row.get('source_row')}" if sheet else f"row {row.get('source_row')}"
+    return str(row.get("source_cell") or "").strip() or fallback
+
+
 # --- the single-pass extract -> snake_case station/module rows + findings ------------------------ #
 def extract(rows, dtd) -> tuple:
     """One ordered pass -> (stations, modules, findings). A head with no DTD model is a
-    `hw_device_not_in_dtd` FAIL (`hw_switch_not_in_dtd` WARN for a switch) and the station is skipped."""
+    `hw_device_not_in_dtd` FAIL (`hw_switch_not_in_dtd` WARN for a switch) and the station is skipped.
+    A head whose IP a GENERATED station already uses is skipped too (only the first per IP is generated)
+    - a `hw_duplicate_ip` WARN, or INFO for a documented backup head (`_is_backup`); its signal rows are
+    dropped with it (no station -> no cards)."""
     by_id, default_cards = dtd["by_id"], dtd["default_cards"]
     stations, modules, findings = [], [], []
     cur = None
+    seen_ips = {}          # ip -> the FIRST generated station's {name, where} - the dedup anchor
 
     def finalize():
         if cur is None:
@@ -235,13 +264,25 @@ def extract(rows, dtd) -> tuple:
         role = _role(row)
         if role is not None:
             finalize()
+            ip = str(row.get("profinet_ip") or "").strip()
+            name = str(row.get("profinet_name") or row.get("device") or "").strip()
+            if ip and ip in seen_ips:                         # a generated station already owns this IP
+                first, where = seen_ips[ip], _where(row)
+                io_doc = _io_doc()
+                findings.append(_f("hw_duplicate_ip", "INFO" if _is_backup(row) else "WARN",
+                                   f"duplicate IP {ip}"
+                                   + (f" ({name})" if name else "")
+                                   + f" - station skipped, only the first ('{first['name'] or first['where']}')"
+                                   + " is generated",
+                                   where, str(row.get("uid", "")), doc=io_doc if "!" in where else "",
+                                   location2=first["where"],
+                                   doc2=io_doc if "!" in first["where"] else ""))
+                cur = None
+                continue
             model = _model_id(row.get("part_no"))
             rec = by_id.get(model.upper())
             if rec is None:                                   # not in the DTD -> can't generate
-                sheet = row.get("source_sheet")
-                fallback = f"[{sheet}] row {row.get('source_row')}" if sheet else f"row {row.get('source_row')}"
-                where = str(row.get("source_cell") or "").strip() or fallback   # source_cell -> a LIVE link
-                name = str(row.get("profinet_name") or row.get("device") or "").strip()
+                where = _where(row)                           # source_cell -> a LIVE link
                 io_doc = _io_doc() if "!" in where else ""
                 if _looks_like_switch(row):
                     findings.append(_f("hw_switch_not_in_dtd", "WARN",
@@ -259,6 +300,8 @@ def extract(rows, dtd) -> tuple:
                 continue
             cur = {"role": role, "row": row, "model": model, "rec": rec,
                    "head_tag": str(row.get("slot") or "").strip(), "signals": []}
+            if ip:                                            # this head GENERATES -> it owns the IP
+                seen_ips[ip] = {"name": name, "where": _where(row)}
         elif cur is not None:
             cur["signals"].append(row)
     finalize()

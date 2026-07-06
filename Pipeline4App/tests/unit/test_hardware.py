@@ -140,6 +140,43 @@ def test_missing_dtd_fail_and_switch_warning():
     eq(fb[0].doc, "", "…and carries no doc (nothing to resolve)")
 
 
+def test_duplicate_ip_stations_skipped():
+    # the FVX_PL4_Pilot case: a redundant-CPU pair documents Master + Backup on ONE IP (110's
+    # ip_duplicated deliberately exempts .1-suffixed IPs) - only the FIRST station per IP is generated.
+    rows = [
+        {"script_type": "", "type_hw": "PA", "part_no": "COUPLER", "profinet_name": "n1",
+         "profinet_ip": "192.168.50.1", "functional_unit": "=S1", "slot": "-K1", "bit": "",
+         "source_sheet": "NS", "source_row": 2, "source_cell": "NS!O2",
+         "description_module": "CPU 1518F (Master)"},
+        {"script_type": "", "type_hw": "PA", "part_no": "COUPLER", "profinet_name": "n2",
+         "profinet_ip": "192.168.50.1", "functional_unit": "=S1", "slot": "-K2", "bit": "",
+         "source_sheet": "NS", "source_row": 3, "source_cell": "NS!O3",
+         "description_module": "CPU 1518F (Backup)"},
+        {"script_type": "A", "part_no": "DI16", "slot": "-C9", "bit": "I90.0",
+         "source_sheet": "NS", "source_row": 4},                       # the skipped head's card row
+        {"script_type": "", "type_hw": "PA", "part_no": "COUPLER", "profinet_name": "n3",
+         "profinet_ip": "192.168.50.1", "functional_unit": "=S1", "slot": "-K3", "bit": "",
+         "source_sheet": "NS", "source_row": 5, "source_cell": "NS!O5",
+         "description_module": "THIRD DEVICE"},
+        {"script_type": "", "type_hw": "PA", "part_no": "COUPLER", "profinet_name": "n6",
+         "profinet_ip": "192.168.50.6", "functional_unit": "=S1", "slot": "-K6", "bit": "",
+         "source_sheet": "NS", "source_row": 6, "source_cell": "NS!O6"},
+    ]
+    stations, modules, findings = hardware.extract(rows, _dtd())
+    eq([s["station_name"] for s in stations], ["n1", "n6"], "only the FIRST station per IP is generated")
+    ok(all(m["station_name"] in ("n1", "n6") for m in modules),
+       "a skipped head generates NO cards (its signal rows are dropped with it)")
+    dups = [f for f in findings if f.type == "hw_duplicate_ip"]
+    eq([f.severity for f in dups], ["INFO", "WARN"],
+       "'backup' in the module description -> INFO (expected redundancy), else WARN")
+    eq((dups[0].location, dups[0].location2), ("NS!O3", "NS!O2"),
+       "location = the skipped head's row, location2 = the generated station's")
+    eq((dups[1].location, dups[1].location2), ("NS!O5", "NS!O2"))
+    ok("duplicate IP 192.168.50.1" in dups[0].detail)
+    ok("only the first ('n1') is generated" in dups[0].detail)
+    ok(not hardware.run.has_blocking(dups), "the skip never halts the build")
+
+
 # --- table fill ---------------------------------------------------------------------------------- #
 def test_fill_tables_and_uids():
     stations, modules, _f = hardware.extract(_rows(), _dtd())
@@ -192,6 +229,7 @@ if __name__ == "__main__":
         ("extract_auto_plug_skipped", test_extract_auto_plug_skipped),
         ("station_io_addr_and_ag_override", test_station_io_addr_and_ag_override),
         ("missing_dtd_fail_and_switch_warning", test_missing_dtd_fail_and_switch_warning),
+        ("duplicate_ip_stations_skipped", test_duplicate_ip_stations_skipped),
         ("fill_tables_and_uids", test_fill_tables_and_uids),
         ("format2_projection", test_format2_projection),
     ]))

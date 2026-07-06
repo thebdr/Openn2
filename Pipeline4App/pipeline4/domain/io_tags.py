@@ -21,6 +21,7 @@ Output -> `config.io_tags_dir()`/PLCTags.xlsx (sheets "PLC Tags" + "TagTable Pro
 from __future__ import annotations
 
 import os
+from collections import Counter
 
 from openpyxl import Workbook
 
@@ -122,8 +123,10 @@ def duplicate_findings(tags) -> list:
     and the collision is a source-document defect staging cannot see (two I/O-List rows with the same FLD
     have distinct uids - the uid includes source_cell). The finding links BOTH producing rows: `location` =
     the duplicate's I/O-List row, `location2` = the FIRST occurrence's (the log renders `<dup> vs <first>`,
-    both clickable), detail "already seen at <first>". The same name on TWO tables is deliberately NOT
-    flagged - one signal mirrors into several IF_ tables by design."""
+    both clickable - the first-occurrence link lives THERE, not in the detail); the detail carries the
+    tag's total occurrence count (`Count: <n>`). The same name on TWO tables is deliberately NOT flagged -
+    one signal mirrors into several IF_ tables by design."""
+    counts = Counter((t["path"], str(t["name"]).casefold()) for t in tags)
     findings, first, doc = [], {}, None
     for t in tags:
         key = (t["path"], str(t["name"]).casefold())
@@ -135,7 +138,7 @@ def duplicate_findings(tags) -> list:
         loc = t.get("location") or f"{t['path']}/{t['name']}"
         loc2 = head.get("location") or f"{head['path']}/{head['name']}"
         findings.append(_f("iotag_duplicate", "FAIL",
-                           f"duplicate tag '{t['name']}' in table '{t['path']}' - already seen at {loc2}",
+                           f"duplicate tag '{t['name']}' in table '{t['path']}' - Count: {counts[key]}",
                            loc, t.get("source_uid", ""), location2=loc2,
                            doc=doc if "!" in loc else "", doc2=doc if "!" in loc2 else ""))
     return findings

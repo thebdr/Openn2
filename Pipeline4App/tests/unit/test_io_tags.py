@@ -165,7 +165,8 @@ def test_duplicate_same_table_fails_links_rows_and_blocks_write():
         eq(dups[0].location, "NET SAFETY 50!O121", "location = the duplicate's own I/O-List row")
         eq(dups[1].location, "NET SAFETY 50!O122")
         eq({f.location2 for f in dups}, {"NET SAFETY 50!O113"}, "location2 = the FIRST occurrence's row")
-        ok("already seen at NET SAFETY 50!O113" in dups[0].detail, "the detail names the first row")
+        ok(dups[0].detail.endswith("- Count: 3"), "the detail carries the TOTAL occurrence count")
+        ok(dups[1].detail.endswith("- Count: 3"), "…on every 2nd+ finding of the same tag")
         ok("in table 'Alarms'" in dups[0].detail)
         eq((dups[0].doc, dups[0].doc2), ("IOList.xlsx", "IOList.xlsx"),
            "both links carry the I/O List basename (the GUI's clickable-cell resolution)")
@@ -217,6 +218,7 @@ def test_duplicate_interface_tag_links_the_source_signal_row():
     eq(len(dups), 1)
     eq(dups[0].location, "IO!O44", "the mirror duplicate links its source signal's I/O-List row")
     eq(dups[0].location2, "S-01/PNC_Q_Alarm", "the template-native first occurrence: logical locator")
+    ok(dups[0].detail.endswith("- Count: 2"), "a pair counts 2")
     eq((dups[0].doc, dups[0].doc2), ("IOList.xlsx", ""), "doc only on a Sheet!Cell location")
 
 

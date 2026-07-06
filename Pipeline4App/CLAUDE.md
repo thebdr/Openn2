@@ -300,7 +300,9 @@ sort+distinct-props, the skip+warn, the return contract).
   [case-insensitive — TIA's uniqueness rule; the import breaks] emit one **`iotag_duplicate` FAIL per 2nd+
   occurrence**: `location` = the duplicate's I/O-List row, `location2` = the FIRST occurrence's (the log
   renders `<dup> vs <first>`, both clickable — the tag dicts now carry `location`/`source_uid`, a mirror
-  element resolving its `source_signal`'s `source_cell`), detail `already seen at <first>`. On any raw FAIL
+  element resolving its `source_signal`'s `source_cell`), detail `… - Count: <n>` (the tag's TOTAL
+  occurrence count; the first-occurrence pointer lives in the `location2` link, not the text — user
+  feedback after the production test). On any raw FAIL
   `project` **records the FAILs alone** (`finding.record_standalone` — the [FAIL]→Findings jump) and does
   **NOT write the workbook** (`path` = ''); the GUI 510 leg `_gate`s that path (halt; a registry downgrade
   still never writes — the raw-FAIL guard, same as 520/700). The same name on TWO tables stays legal (one
@@ -387,7 +389,15 @@ GUI **"700" button** runs stage -> build -> project.
   col-6 by-signal-type `Ch(#)`->channel blocks then col-AG; default cards (DTD `<PARENT>:SUFFIX`) add one row per
   station of PARENT. **Severity model:** a head whose Part No isn't in the DeviceTypesDatabase -> **`hw_device_not_in_dtd`
   FAIL** (halts + no write; operator-downgradable) / **`hw_switch_not_in_dtd` WARN** (a switch, "SWITCH" in the
-  description). `build` returns `(database, findings)` + `run.has_blocking` guard + `record` + save. **Config:**
+  description). `build` returns `(database, findings)` + `run.has_blocking` guard + `record` + save.
+  **Duplicate-IP skip (production fix, 2026-07-06):** a head whose IP a GENERATED station already uses is
+  SKIPPED (only the first station per IP is generated; its signal rows drop with it - no cards) ->
+  **`hw_duplicate_ip` WARN**, downgraded to **INFO** when the head's `description_module` mentions
+  "backup" (the documented redundant-CPU pair, e.g. FVX_PL4_Pilot's Master+Backup 1518F on 192.168.50.1 -
+  which doc-validation 110 deliberately exempts: `ip_duplicated` skips `.1`-suffixed IPs). The finding
+  dual-links the skipped head's row (`location`) vs the generated station's (`location2`); the detail is
+  IDENTICAL for both severities so the uid (which excludes severity) survives a backup-description edit.
+  Never halts. Test: `test_hardware.py::duplicate_ip_stations_skipped`. **Config:**
   `config.load_device_types_db` (delim-sniffed; `by_id` + `default_cards`; cols model_id/dev_type/order/comment/
   params/params_by_type/io_addr_params - col-5 `params` is OP4-applied, NEVER written) + `parse_params_by_type` +
   `hardware_dir()` + `DEVICE_TYPES_DB_DEFAULT` (`Shared/HardwareConfigBuilderData/DeviceTypesDatabase.csv`).
