@@ -47,6 +47,12 @@ check(core.hit_x(50, 300.0, 180) == 50 and core.hit_x(200, 300.0, 180) == 500.0,
 
 check(core.fit_text("abcdef", 30, lambda t: 10 * len(t)) == "ab…", "ellipsis fit")
 check(core.cell_kind("x" * 65) == "small" and core.cell_kind("x" * 64) == "normal", "long-cell font rule")
+check(core.render_kind("x" * 80, 200, lambda t: 10 * len(t)) == "small"
+      and core.render_kind("x" * 80, 900, lambda t: 10 * len(t)) == "normal"
+      and core.render_kind("x" * 10, 20, lambda t: 10 * len(t)) == "normal",
+      "width-aware render font (a widened column re-expands a long cell)")
+check(core.pad_columns(["#", "note"], [["@", "a", "b", "c", "d"]]) == ["#", "note", "", "", ""],
+      "ragged header pads to the widest row")
 
 print(f"-> {'FAILED: ' + '; '.join(failures) if failures else 'all passed'}")
 sys.exit(1 if failures else 0)

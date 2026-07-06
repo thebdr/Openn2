@@ -30,6 +30,16 @@ def cell_kind(text: str) -> str:
     return "small" if len(text) > LONG_CELL_CHARS else "normal"
 
 
+def render_kind(text: str, avail_px: int, measure_normal) -> str:
+    """The RENDER font for a cell at the CURRENT column width: a long cell (`cell_kind` 'small')
+    drops to the narrow font only WHILE it cannot show whole in the normal font - so widening the
+    column past the text re-expands it (the static 64-char rule never recovered after a resize;
+    user feedback). A short cell never narrows - it ellipsizes in the normal font."""
+    if cell_kind(text) == "small" and measure_normal(text) > avail_px:
+        return "small"
+    return "normal"
+
+
 def compute_col_widths(columns, rows, measure_normal, measure_small, measure_header) -> list:
     """Per-column pixel widths adapted to the data: the widest of the header and the sampled cells
     (each measured in ITS OWN rendering font, long cells capped at LONG_CELL_CHARS chars for the
@@ -73,6 +83,15 @@ def sanitize_rows(rows) -> list:
     """Every cell sanitized - the whole-table form `set_data` uses (a single call the native
     engine can take over, instead of one FFI hop per cell)."""
     return [[sanitize(cell) for cell in row] for row in rows]
+
+
+def pad_columns(columns, rows) -> list:
+    """The display header padded with '' to the WIDEST row, so a RAGGED file cannot hide data
+    columns behind a short first row (a CreationInfo/InstanceDBs CSV opens with a 2-cell `#`
+    comment row while its `@` data rows carry 5) - every data cell gets a rendered column."""
+    columns = [str(c) for c in columns]
+    width = max([len(columns)] + [len(row) for row in rows])
+    return columns + ["" for _ in range(width - len(columns))]
 
 
 def cell_at(widths, row_h, n_rows, x, y):

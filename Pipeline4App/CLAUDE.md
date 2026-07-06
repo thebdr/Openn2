@@ -884,6 +884,16 @@ The user-reviewed refresh before the first production test (the full spec + comm
   filters / cell edits land on pinned columns (a pinned cell's edit overlay re-anchors to the strip).
   ALSO fixed the latent x-scroll-without-redraw culling bug (xscrollcommand now schedules the body
   redraw + the header repaint).
+  **Production-test viewer fixes (2026-07-06, user feedback):** (1) `set_data` pads the header to the
+  WIDEST row via `core.pad_columns` - a ragged file (InstanceDBs.csv opens with a 2-cell `#` comment row
+  over 5-cell `@` data rows) no longer hides its extra data columns (fixes every host at once; the CSV
+  editor still saves the ORIGINAL header - the pad is display-only). (2) **Click-select is UNIVERSAL**:
+  every grid highlights the clicked row (select_bg; Ctrl/Shift/drag multi-select) + outlines the clicked
+  CELL (`_cursor`, accent, pinned-strip aware; reset with the view on sort/filter/set_data);
+  `selectable=True` now gates only the host context menu, and Ctrl+C copies the clicked selection on any
+  grid. (3) **Width-aware render font** (`core.render_kind`): a >64-char cell drops to the narrow font
+  only WHILE it can't show whole in the normal font - widening the column past the text RE-EXPANDS it
+  (the static `cell_kind` rule never recovered after a resize); short cells never narrow.
 - **SCL highlight v2 + the Rust core port STARTED (2026-07-05)** - `langs.json` scl entry upgraded from
   the vscode-simatic-scl rule INVENTORY (repo has NO license -> only Siemens language FACTS extracted,
   all regexes written fresh): OOP keywords (METHOD/INTERFACE/EXTENDS/...), the full type+builtin set,

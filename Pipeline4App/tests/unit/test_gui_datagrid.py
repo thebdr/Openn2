@@ -15,6 +15,28 @@ def test_cell_kind_boundary():
     eq(datagrid.cell_kind(""), "normal", "empty is normal")
 
 
+def test_render_kind_reexpands_on_width():
+    normal = _measure(10)
+    long_cell = "x" * 80                        # cell_kind 'small' (over the 64-char rule)
+    eq(datagrid.render_kind(long_cell, 300, normal), "small", "doesn't fit normal -> narrow font")
+    eq(datagrid.render_kind(long_cell, 900, normal), "normal",
+       "a column widened past the text RE-EXPANDS it (the static rule never recovered)")
+    eq(datagrid.render_kind("y" * 30, 100, normal), "normal",
+       "a short overflowing cell never narrows - it ellipsizes in the normal font")
+
+
+def test_pad_columns_ragged_file():
+    # the InstanceDBs.csv shape: a 2-cell '#' comment first row over 5-cell '@' data rows
+    cols = datagrid.pad_columns(["#", "Instance DBs created..."],
+                                [["%", "Name", "InstanceOf", "Number", "Folder"],
+                                 ["@", "EMPB_1", "00_PB", "", "00_PB"]])
+    eq(cols, ["#", "Instance DBs created...", "", "", ""],
+       "the header pads to the WIDEST row - no data column hides behind a short first row")
+    eq(datagrid.pad_columns(["a", "b"], [["1"]]), ["a", "b"], "an already-wide header stays put")
+    eq(datagrid.pad_columns([], []), [], "empty table")
+    eq(datagrid.pad_columns([1, 2], [[""] * 3]), ["1", "2", ""], "non-string headers stringify")
+
+
 def test_compute_col_widths_adapts_to_data():
     normal, small, header = _measure(10), _measure(4), _measure(10)
     columns = ["id", "description"]
@@ -168,6 +190,8 @@ if __name__ == "__main__":
     import sys
     sys.exit(run("gui_datagrid", [
         ("cell_kind_boundary", test_cell_kind_boundary),
+        ("render_kind_reexpands_on_width", test_render_kind_reexpands_on_width),
+        ("pad_columns_ragged_file", test_pad_columns_ragged_file),
         ("compute_col_widths_adapts_to_data", test_compute_col_widths_adapts_to_data),
         ("compute_col_widths_long_cells_measure_small", test_compute_col_widths_long_cells_measure_small),
         ("fit_text_ellipsis", test_fit_text_ellipsis),

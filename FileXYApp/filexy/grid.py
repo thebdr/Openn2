@@ -7,11 +7,13 @@ regex / pick-list of the visible rows' distinct values, with the column's stats 
 PIN/UNPIN). Active sort/filters/search/pinning show as removable CHIPS above the header. Ctrl+F =
 the global QUICK SEARCH (any cell, live). Ctrl+C = copy the selection (or the whole filtered view)
 as TSV. Double-click = in-place cell edit (`editable=True`) or the full ROW DETAIL popup
-(read-only grids). `selectable=True` = row multi-select (click / Ctrl / Shift / drag) +
-`on_context` for a host menu. PINNED COLUMNS (`set_frozen(n)` / the popup button): while the table
-is x-scrolled, the first n columns re-draw as an opaque STRIP at the viewport's left edge (header
-+ body, an accent separator) over the scrolling columns; every hit test maps through
-`core.hit_x`, so clicks/edits/filters on the strip land on the pinned columns.
+(read-only grids). CLICK-SELECT is universal: every grid highlights the clicked row (select_bg;
+Ctrl/Shift/drag multi-select) and outlines the clicked CELL (the accent cursor); `selectable=True`
+now gates only `on_context` (the host's right-click menu). PINNED COLUMNS (`set_frozen(n)` / the
+popup button): while the table is x-scrolled, the first n columns re-draw as an opaque STRIP at
+the viewport's left edge (header + body, an accent separator) over the scrolling columns; every
+hit test maps through `core.hit_x`, so clicks/edits/filters on the strip land on the pinned
+columns.
 
 Everything stateful reads `filexy.theme` at call time, so an embedder can rebind the palette
 and fonts (see theme.py). ttk.Treeview can't do per-cell fonts or gridlines on Tk 8.6 - hence the
@@ -23,9 +25,9 @@ import tkinter.font as tkfont
 from tkinter import ttk
 
 from . import core, theme
-from .core import (PAD_X, MIN_DRAG_W, boundary_at, cell_at, cell_kind, compute_col_widths,
-                   cycle_sort, distinct_values, fit_col_width, fit_text, sanitize, sorted_view,
-                   updated_selection)
+from .core import (PAD_X, MIN_DRAG_W, boundary_at, cell_at, compute_col_widths,
+                   cycle_sort, distinct_values, fit_col_width, fit_text, render_kind, sanitize,
+                   sorted_view, updated_selection)
 
 
 class DataGrid(ttk.Frame):
@@ -55,6 +57,7 @@ class DataGrid(ttk.Frame):
         self._on_context = on_context
         self._selected: set = set()          # VIEW positions (what's on screen); selection() maps to source
         self._anchor: int | None = None
+        self._cursor: tuple | None = None    # (view_row, col) of the last clicked CELL (accent outline)
         self._row_fg: list = []              # per-SOURCE-row text colours
         self._sort: tuple | None = None      # (col, 'asc'|'desc') - the header-click tri-state
         self._filters: list = []             # cascade filter specs ({col, text, regex, values})
@@ -103,9 +106,11 @@ class DataGrid(ttk.Frame):
             self.body.bind("<Double-Button-1>", self._cell_dclick)
         else:
             self.body.bind("<Double-Button-1>", self._row_detail)
+        # click-select is UNIVERSAL (user feedback): every grid highlights the clicked row + cell
+        # (Ctrl/Shift multi-select, drag extends); `selectable` gates only the host context menu.
+        self.body.bind("<Button-1>", self._body_press)
+        self.body.bind("<B1-Motion>", self._body_drag_select)
         if selectable:
-            self.body.bind("<Button-1>", self._body_press)
-            self.body.bind("<B1-Motion>", self._body_drag_select)
             self.body.bind("<Button-3>", self._body_context)
         # the keyboard surface: a click focuses the body so Ctrl+F / Ctrl+C reach the grid
         self.body.bind("<Button-1>", lambda _e: self.body.focus_set(), add="+")
@@ -120,8 +125,10 @@ class DataGrid(ttk.Frame):
         A new table resets the sort, the filters, the quick search, and the selection."""
         self._close_editbox()
         self._close_popup()
-        self._columns = [str(c) for c in columns]
         self._rows = core.sanitize_rows(rows)
+        # pad the header to the WIDEST row: a ragged file (InstanceDBs.csv opens with a 2-cell
+        # '#' comment row over 5-cell data rows) must not hide its extra data columns
+        self._columns = core.pad_columns(columns, self._rows)
         self._raw_rows = [["" if cell is None else str(cell) for cell in row] for row in rows]
         self._row_fg = list(row_fg or [])
         self._sort, self._filters, self._quick, self._frozen = None, [], "", 0
@@ -139,11 +146,11 @@ class DataGrid(ttk.Frame):
         return quick + self._filters
 
     def _refresh_view(self) -> None:
-        """Recompute the view (filters -> sort), drop the selection (the screen rows changed meaning),
-        rebuild the chips, and redraw."""
+        """Recompute the view (filters -> sort), drop the selection + the cell cursor (the screen rows
+        changed meaning), rebuild the chips, and redraw."""
         self._view = sorted_view(self._rows, core.apply_filters(self._rows, self.active_filters()),
                                  self._sort)
-        self._selected, self._anchor = set(), None
+        self._selected, self._anchor, self._cursor = set(), None, None
         self._update_chips()
         self.body.yview_moveto(0)
         self._apply_widths()
@@ -196,7 +203,7 @@ class DataGrid(ttk.Frame):
     def copy_view(self) -> None:
         """Ctrl+C: the SELECTED rows (view order) - or the whole filtered view when nothing is
         selected - to the clipboard as TSV (pastes into Excel as cells)."""
-        if self._selectable and self._selected:
+        if self._selected:
             picked = [self._view[i] for i in sorted(self._selected) if i < len(self._view)]
         else:
             picked = list(self._view)
@@ -275,9 +282,12 @@ class DataGrid(ttk.Frame):
         return None if hit is None else hit[0]
 
     def _body_press(self, event) -> None:
-        row = self._hit_row(event)
-        if row is None:
+        hit = cell_at(self._widths, self._row_h, len(self._view),
+                      self._hit_px(self.body, event.x), self.body.canvasy(event.y))
+        if hit is None:
             return
+        row, col, _x0 = hit
+        self._cursor = (row, col)                # the clicked CELL gets the accent outline
         self._selected, self._anchor = updated_selection(
             self._selected, self._anchor, row,
             ctrl=bool(event.state & 0x0004), shift=bool(event.state & 0x0001))
@@ -534,8 +544,11 @@ class DataGrid(ttk.Frame):
             for c, width in enumerate(widths):
                 if x + width >= x_left and x <= x_right:
                     cell = row[c] if c < len(row) else ""
-                    font = self._font_small if cell_kind(cell) == "small" else self._font_normal
                     if cell:
+                        # width-aware: a long cell re-expands to the normal font once it fits
+                        font = (self._font_small
+                                if render_kind(cell, width - 2 * PAD_X, self._font_normal.measure) == "small"
+                                else self._font_normal)
                         text = fit_text(cell, width - 2 * PAD_X, font.measure)
                         self.body.create_text(x + PAD_X, y + row_h / 2, text=text, anchor="w",
                                               font=font, fill=fg, tags="cells")
@@ -547,6 +560,15 @@ class DataGrid(ttk.Frame):
             x += width
             self.body.create_line(x, first * row_h, x, (last + 1) * row_h,
                                   fill=self._c_line, tags="cells")
+        # the CURSOR cell (the last clicked): an accent outline over the row highlight (drawn
+        # before the pinned strip, so a strip-covered cursor hides with its column)
+        if self._cursor is not None:
+            ri, ci = self._cursor
+            if first <= ri <= last and ci < len(widths):
+                cx = core.frozen_width(widths, ci)               # = sum of the widths before ci
+                self.body.create_rectangle(cx + 1, ri * row_h + 1,
+                                           cx + widths[ci] - 1, (ri + 1) * row_h - 1,
+                                           outline=self._c_accent, width=2, tags="cells")
         # the pinned strip: the first columns re-draw OVER the scrolled content at the viewport's
         # left edge (opaque row-slice backgrounds first, then the cells, then the strip borders)
         if self._frozen and x_left > 0:
@@ -567,7 +589,10 @@ class DataGrid(ttk.Frame):
                 for c in range(min(self._frozen, len(widths))):
                     cell = row[c] if c < len(row) else ""
                     if cell:
-                        font = self._font_small if cell_kind(cell) == "small" else self._font_normal
+                        font = (self._font_small
+                                if render_kind(cell, widths[c] - 2 * PAD_X,
+                                               self._font_normal.measure) == "small"
+                                else self._font_normal)
                         text = fit_text(cell, widths[c] - 2 * PAD_X, font.measure)
                         self.body.create_text(x + PAD_X, y + row_h / 2, text=text, anchor="w",
                                               font=font, fill=fg, tags="cells")
@@ -581,6 +606,13 @@ class DataGrid(ttk.Frame):
                                       fill=self._c_line, tags="cells")
             self.body.create_line(x_left + fw, first * row_h, x_left + fw, (last + 1) * row_h,
                                   fill=self._c_accent, width=2, tags="cells")
+            if self._cursor is not None:                          # a PINNED cursor cell: on the strip
+                ri, ci = self._cursor
+                if first <= ri <= last and ci < min(self._frozen, len(widths)):
+                    cx = x_left + core.frozen_width(widths, ci)
+                    self.body.create_rectangle(cx + 1, ri * row_h + 1,
+                                               cx + widths[ci] - 1, (ri + 1) * row_h - 1,
+                                               outline=self._c_accent, width=2, tags="cells")
 
 
 class _FilterPopup(tk.Toplevel):
