@@ -177,6 +177,33 @@ def test_freeze_arrays_post_process():
     wbx.close()
 
 
+def test_freeze_arrays_keeps_single_cell_arrays():
+    # Excel stores ORDINARY formulas as single-cell arrays (CSE / implicit intersection) - ref covers
+    # only the master, no slaves, no overlap possible: the live formula must SURVIVE the freeze pass
+    # (the production false positive: 'froze legacy array ...!P3 (spill P3)').
+    import os, tempfile, zipfile, warnings
+    warnings.simplefilter("ignore")
+    import openpyxl
+    from openpyxl.worksheet.formula import ArrayFormula
+    path = os.path.join(tempfile.mkdtemp(), "w.xlsx")
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "D"
+    ws["P3"] = ArrayFormula("P3", "=SUM(A1:A2)")     # a single-cell array (ref == the master cell)
+    ws["A5"] = ArrayFormula("A5:A6", "=A1")          # a REAL multi-cell array - still freezes
+    wb.save(path)
+    part = xe._sheet_name_to_part(open(path, "rb").read())["D"]
+
+    frozen = xe.freeze_arrays(path)
+    eq([f[2] for f in frozen], ["A5:A6"], "only the multi-cell array is reported/frozen")
+    with zipfile.ZipFile(path) as z:
+        xml = z.read(part).decode("utf-8")
+    ok('ref="P3"' in xml and "SUM(A1:A2)" in xml, "the single-cell array formula SURVIVES")
+    ok('ref="A5:A6"' not in xml, "the multi-cell array is frozen (formula gone)")
+    ok(xe._single_cell("P3") and xe._single_cell("P3:P3") and not xe._single_cell("A5:A6"),
+       "the single-cell predicate")
+
+
 def test_build_row_xml_cell_types():
     r = xe.build_row_xml(5, ["=text", 7, "", None, "plain", " sp "])
     _wf(r)                                                 # a <row> is a valid standalone element
@@ -258,6 +285,7 @@ if __name__ == "__main__":
         ("append_to_empty_and_self_closing_sheetdata", test_append_to_empty_and_self_closing_sheetdata),
         ("edit_workbook_append_rows_end_to_end", test_edit_workbook_append_rows_end_to_end),
         ("freeze_arrays_post_process", test_freeze_arrays_post_process),
+        ("freeze_arrays_keeps_single_cell_arrays", test_freeze_arrays_keeps_single_cell_arrays),
         ("edit_existing_cell_preserves_style_neighbours_and_unrelated_array",
          test_edit_existing_cell_preserves_style_neighbours_and_unrelated_array),
         ("edit_into_array_freezes_to_cached_values_no_overlap", test_edit_into_array_freezes_to_cached_values_no_overlap),

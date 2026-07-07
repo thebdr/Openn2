@@ -51,6 +51,17 @@ def _esc(s) -> str:
 _ARRAY_MASTER = re.compile(r'<c\s+r="([A-Z]+\d+)"[^>]*>\s*<f\b[^>]*\bt="array"[^>]*\bref="([^"]+)"', re.DOTALL)
 
 
+def _single_cell(rng: str) -> bool:
+    """True when an array ref covers exactly ONE cell (`P3` or `P3:P3`). Excel stores plenty of
+    ORDINARY formulas as single-cell arrays (CSE / implicit intersection) - they have no slave
+    cells, so the master+literal overlap `freeze_arrays` guards against cannot occur; freezing one
+    would only destroy a live formula (production false positive, 2026-07-07)."""
+    if ":" not in rng:
+        return True
+    a, b = rng.split(":", 1)
+    return a.strip() == b.strip()
+
+
 def _in_range(ref: str, rng: str) -> bool:
     a, b = (rng.split(":", 1) + [rng])[:2] if ":" in rng else (rng, rng)
     (ca, ra), (cb, rb) = _split(a), _split(b)
@@ -338,10 +349,15 @@ def freeze_arrays(path: str, *, dest: str | None = None) -> list:
             masters = _ARRAY_MASTER.findall(xml)
             if not masters:
                 continue
+            changed = False
             for mref, rng in masters:
+                if _single_cell(rng):     # no slaves -> nothing can overlap; keep the live formula
+                    continue
                 xml = _freeze_array_range(xml, rng)
                 frozen.append((part_to_name.get(part, part), mref, rng))
-            repl[part] = xml.encode("utf-8")
+                changed = True
+            if changed:
+                repl[part] = xml.encode("utf-8")
         deleted = set()
         if "xl/calcChain.xml" in present:
             deleted.add("xl/calcChain.xml")
