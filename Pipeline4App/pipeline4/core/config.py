@@ -719,6 +719,27 @@ def load_interface_elements() -> list:
     return out
 
 
+def load_tagtable_elements() -> list:
+    """The EXTRA-tag rules (phase 510, `chain_reactions/tagtable_elements.csv`) - the datablock_elements
+    logic aimed at TAG TABLES (user spec 2026-07-07): per for_each match, one additional PLC tag in
+    `tag_table`. `name` / `io_address` / `comment` are FULL expression templates over the matched row
+    ({expr} holes - io_address is where the engine earns its keep, e.g.
+    `{regex_replace($bit, /^I/, 'Q')}`); `datatype` defaults to Bool. Missing file -> [] (no extra tags)."""
+    out = []
+    for r in read_config_csv(os.path.join(chain_reactions_dir(), "tagtable_elements.csv")):
+        if not (r.get("tag_table") or "").strip():
+            continue
+        out.append({
+            "tag_table": (r.get("tag_table") or "").strip(),
+            "name": (r.get("name") or "").strip(),
+            "for_each": (r.get("for_each") or "").strip(),
+            "datatype": (r.get("datatype") or "").strip() or "Bool",
+            "io_address": (r.get("io_address") or "").strip(),
+            "comment": (r.get("comment") or "").strip(),
+        })
+    return out
+
+
 def load_interface_tagnames() -> dict:
     """type_id (upper) -> the interface_tagname template (Signal Name Side 1 base), relocated from PL3's
     `signal_types.csv` col 18. Keeps `{interface_name}`/`{interface_id}` for the phase-400 generator; in

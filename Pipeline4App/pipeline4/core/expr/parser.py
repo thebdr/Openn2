@@ -43,7 +43,7 @@ _TOKEN_RE = re.compile(
 # host / leaf funcs (non-data). Data funcs are dispatched separately (they take a table NAME word).
 _FUNCS = frozenset({
     "clean", "strip", "concat", "join", "numeric", "isdigit", "len", "present", "blank",
-    "startswith", "extract", "if", "coalesce", "let",
+    "startswith", "extract", "regex_replace", "if", "coalesce", "let",
 })
 _DATA_FUNCS = frozenset({"where", "first", "lookup", "unique", "count", "node_of"})
 _KEYWORDS = frozenset({"and", "or", "not", "in"})
@@ -212,6 +212,8 @@ class _Parser:
             raise ExprError(f"unknown function {name!r} in {self.src!r}")
         if name == "extract":
             return self._extract()
+        if name == "regex_replace":
+            return self._regex_replace()
         if name == "let":
             return self._let()
         if name == "if":
@@ -321,6 +323,22 @@ class _Parser:
             slice_spec = self._slice()
         self._eat(")")
         return lambda ctx: runtime.extract(field(ctx), pat, slice_spec)
+
+    def _regex_replace(self):
+        """regex_replace(value, /re/, replacement) - every match of the (implicit-IGNORECASE) regex in
+        `value` replaced by `replacement` (re.sub semantics: \\1 group backrefs work). `value` and
+        `replacement` are full expressions; the pattern is a /regex/ literal (like extract's)."""
+        self._eat("(")
+        value = self._or()
+        self._eat(",")
+        rk, rx = self._next()
+        if rk != "regex":
+            raise ExprError(f"regex_replace: 2nd arg must be a /regex/ in {self.src!r}")
+        pat = re.compile(rx[1:-1], re.IGNORECASE)
+        self._eat(",")
+        replacement = self._or()
+        self._eat(")")
+        return lambda ctx: runtime.regex_replace(value(ctx), pat, runtime.s(replacement(ctx)))
 
     def _slice(self):
         """Parse a slice/index: `a:b`, `:b`, `a:`, or a bare `a` (an index). Returns (lo, hi, is_index)."""

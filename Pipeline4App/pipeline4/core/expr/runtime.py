@@ -84,6 +84,17 @@ def extract(text, pattern, slice_spec) -> str:
     return out
 
 
+def regex_replace(text, pattern, replacement: str) -> str:
+    """Every match of `pattern` in `text` replaced by `replacement` (re.sub semantics - `\\1` group
+    backrefs work; implicit IGNORECASE is baked into `pattern` by the parser). No match -> the text
+    unchanged. A bad group reference in the replacement raises a located ExprError (fail-loud, like
+    a bad format spec)."""
+    try:
+        return pattern.sub(replacement, s(text))
+    except re.error as e:
+        raise ExprError(f"regex_replace: bad replacement {replacement!r}: {e}")
+
+
 # --- render-time format spec coercion ----------------------------------------------------------- #
 # Merge of identity._format_value (int via int(float(x))) + dbtemplate.format_field (the conversion sets).
 # Integer conversions coerce via int(float(value)); float conversions via float(value). A BLANK value

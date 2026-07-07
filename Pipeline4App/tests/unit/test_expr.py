@@ -64,6 +64,26 @@ def test_extract_capture_first():
     eq(expr.evaluate("extract($f, /CH(.)(.)/)", {"f": "CHab"}), "a", "capture-first uses group(1) only")
 
 
+def test_regex_replace():
+    eq(expr.evaluate("regex_replace($bit, /^I/, 'Q')", {"bit": "I13.5"}), "Q13.5", "prefix swap")
+    eq(expr.evaluate(r"regex_replace($bit, /I(\d+)\.(\d+)/, 'Q\1.\2')", {"bit": "I13.5"}),
+       "Q13.5", "\\1 group backrefs work (re.sub semantics)")
+    eq(expr.evaluate("regex_replace($t, /o/, '0')", {"t": "foo boo"}), "f00 b00", "EVERY match replaces")
+    eq(expr.evaluate("regex_replace($t, /BAR/, 'x')", {"t": "bar Bar"}), "x x", "implicit IGNORECASE")
+    eq(expr.evaluate("regex_replace($t, /nope/, 'x')", {"t": "abc"}), "abc", "no match -> unchanged")
+    eq(expr.evaluate("regex_replace(concat($a, '.', $b), /\\./, '_')", {"a": "1", "b": "2"}), "1_2",
+       "the value arg is a full expression")
+    eq(expr.evaluate("regex_replace($t, /x/, $r)", {"t": "x", "r": "Y"}), "Y",
+       "the replacement arg is a full expression too")
+    eq(expr.render("{regex_replace($bit, /^I/, 'Q')}", {"bit": "I2.0"}), "Q2.0",
+       "usable in a render hole (the tagtable_elements io_address case)")
+    try:
+        expr.evaluate(r"regex_replace($t, /x/, '\9')", {"t": "x"})
+        ok(False, "a bad group backref must raise")
+    except ExprError as e:
+        ok("regex_replace" in str(e), f"located error: {e}")
+
+
 def test_ignorecase_both():
     eq(expr.test("$d ~ /door/", {"d": "DOOR OPEN"}), True, "~ is IGNORECASE")
     eq(expr.evaluate("extract($d, /door(.)/)", {"d": "DOORX"}), "X", "extract is IGNORECASE")
@@ -242,6 +262,7 @@ if __name__ == "__main__":
         ("in_list", test_in_list),
         ("extract_last_slice_table", test_extract_last_slice_table),
         ("extract_capture_first", test_extract_capture_first),
+        ("regex_replace", test_regex_replace),
         ("ignorecase_both", test_ignorecase_both),
         ("field_basics_and_bareword", test_field_basics_and_bareword),
         ("scope_validation", test_scope_validation),

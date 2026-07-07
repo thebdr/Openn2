@@ -51,6 +51,8 @@ FUNCTIONS:
     blank($f)          True if the field is empty/whitespace                               -> bool
     startswith($f, "prefix")   True if str($f) starts with the prefix                     -> bool
     extract($f, /re/ [, SLICE])   capture-first extraction (see below)                    -> str
+    regex_replace(v, /re/, repl)  every match of /re/ in v replaced by repl (re.sub:      -> str
+                       \\1 backrefs work; implicit IGNORECASE; no match -> v unchanged)
     if(cond, then, else)        `then` if cond is truthy, else `else`                      -> value
     coalesce(a, b, ...)         the first value non-empty after string-coercion           -> value
     let(a := e1, b := f($a); body)   sequential BIND-ONCE locals (see below)              -> value

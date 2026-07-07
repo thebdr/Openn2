@@ -818,7 +818,8 @@ class App:
                 return
             self._render(iface_findings + res["findings"], label="510 I/O tags")
             self._emit("RSLT", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
-                               f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {config.io_tags_dir()}")
+                               f"{res['iface_count']} interface + {res.get('cfg_count', 0)} config) "
+                               f"across {len(res['tables'])} tables -> {config.io_tags_dir()}")
 
     def _run_interfaces(self, only=None):
         """Phase 400: stage -> 520 -> the interfaces/interface_elements tables -> the IF_*.xlsx projection
