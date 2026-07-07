@@ -229,6 +229,15 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
   regenerating them; NOT PL4 bugs. PL4 is also MORE correct than current PL3 on naming (PL3 still emits a literal
   `{db_element}` + the stale `Encoder Speed`; PL4 resolves both). Tests: `test_interfaces.py`
   `template_native_elements` + `test_interface_xlsx.py` `append_custom_rows_skips_template_source`.
+- **400g — the MachineInterfaces SCL projection** (`domain/interface_scl.py`): the `interface_elements`
+  table as ONE SCL FUNCTION in ImportReady - a REGION per interface, one assignment per element, the line
+  per direction from `generation_params.yaml` `interfaces.scl_line_templates` (expr-rendered; `_q` =
+  TIA-quoted), BOM + CRLF. **Renamed to `10_Machine Interfaces.scl` (user spec 2026-07-07)** - the file
+  comes from `interfaces.scl_file` and the FUNCTION is named after its stem (the config drives both); the
+  legacy `MachineInterfaces.scl` is swept from the output dir so it can't double-import. **A blank line
+  opens each new I/O BYTE** within a region (`io_address_side1` up to `.bit` - reads grouped like the IF_
+  sheet; skips don't break a group). WARN-only skips (`if_scl_blank_element` /
+  `if_scl_no_direction_template`). Tests: `test_interface_scl.py` (6).
 - **400c DONE — the `IF_*.xlsx` projection** (`interface_xlsx.py`, openpyxl - PL3 does the same; these files are
   documentation, not read back except via 400e): per `interfaces` row, copy the template → keep the chosen machine
   sheet → retitle `IF_<instance>` → `_plug` Base Address/Node/Index (Side rows, by header) + replace `<index>` →

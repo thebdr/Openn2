@@ -69,8 +69,23 @@ def test_blank_and_unknown_direction_warn_and_skip():
     eq(sum(1 for ln in lines if ln.strip().endswith(";")), 1, "only the good element renders")
 
 
+def test_byte_groups_get_blank_lines():
+    templates = interface_scl._scl_params()["templates"]
+    lines, _f = interface_scl.render_lines([
+        _element(signal_name="A", expression="E1", io_address_side1="I10010.0"),
+        _element(signal_name="B", expression="E2", io_address_side1="I10010.7"),
+        _element(signal_name="C", expression="E3", io_address_side1="I10011.0"),
+        _element(signal_name="D", expression="E4", io_address_side1="Q10026"),   # a WORD: its own byte
+    ], templates)
+    body = [ln for ln in lines if ln != "REGION SORTER-01" and ln != "END_REGION"]
+    eq(body, ['    "A" := "E1";', '    "B" := "E2";', "", '    "C" := "E3";', "", '    "D" := "E4";'],
+       "a blank line opens each NEW I/O byte; same-byte assignments stay together")
+
+
 def test_project_file_shape():
     with tempfile.TemporaryDirectory() as d:
+        legacy = os.path.join(d, "MachineInterfaces.scl")
+        open(legacy, "w").write("stale")                       # the pre-rename output must not survive
         res = interface_scl.project(_db([
             _element(signal_name="PNC_Q_S1 HEARTBEAT", expression='"Clock 1Hz"', direction="Q"),
             _element(signal_name="PNC_I_S1 RUN", expression="TARGET", direction="I"),
@@ -80,11 +95,13 @@ def test_project_file_shape():
         ok(raw.startswith(b"\xef\xbb\xbf"), "UTF-8 BOM")
         ok(b"\r\n" in raw and b"\n" == raw[-1:], "CRLF lines")
         text = raw.decode("utf-8-sig")
-        ok(text.startswith('FUNCTION "MachineInterfaces" : Void'), "the FUNCTION header")
+        ok(text.startswith('FUNCTION "10_Machine Interfaces" : Void'),
+           "the FUNCTION is named after the configured file's stem")
         ok(text.rstrip().endswith("END_FUNCTION"), "the FUNCTION footer")
         ok('    "TARGET" := "PNC_I_S1 RUN";' in text.replace("\r\n", "\n"),
            "a bare expression target gets TIA-quoted like the signal side")
-        eq(os.path.basename(res["path"]), "MachineInterfaces.scl", "the configured file name")
+        eq(os.path.basename(res["path"]), "10_Machine Interfaces.scl", "the configured file name")
+        ok(not os.path.exists(legacy), "the legacy MachineInterfaces.scl is swept (no double import)")
 
 
 def test_project_no_elements_writes_nothing():
@@ -100,6 +117,7 @@ if __name__ == "__main__":
         ("direction_templates_and_quoting", test_direction_templates_and_quoting),
         ("region_grouping_first_seen", test_region_grouping_first_seen),
         ("blank_and_unknown_direction_warn_and_skip", test_blank_and_unknown_direction_warn_and_skip),
+        ("byte_groups_get_blank_lines", test_byte_groups_get_blank_lines),
         ("project_file_shape", test_project_file_shape),
         ("project_no_elements_writes_nothing", test_project_no_elements_writes_nothing),
     ]))

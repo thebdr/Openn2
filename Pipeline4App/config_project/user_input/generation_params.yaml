@@ -16,7 +16,7 @@ interfaces:
   # interface_elements row: $signal_name / $expression are the SSOT columns ('Signal Name Side 1' /
   # 'Expression Side 1'); the _q variants are TIA-QUOTED (wrapped unless the value already starts
   # with a quote, e.g. a stored "db"."member" binding).
-  scl_file: MachineInterfaces.scl
+  scl_file: 10_Machine Interfaces.scl
   scl_line_templates:
     ">": "    {$signal_name_q} := {$expression_q};"
     "<": "    {$expression_q} := {$signal_name_q};"
