@@ -438,6 +438,15 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
   verbatim - except **06's iterator now emits the padded 8-slot bank TWICE** (16 cells, the second an exact
   copy: one bank per template side - user spec 2026-07-07, a deliberate PL3 deviation) ·
   `engine.py` (the serialization verbatim + `build`/`project`).
+  **NEW builder + emit kind (user spec, 2026-07-07): `03_Diagnostic Nodes`, `emit="scl"`.** The third
+  output surface: a builder registered `@builds(name, emit="scl")` ships a READY SCL FUNCTION source to
+  ImportReady (`domain/blocks/scl_emit.py`, UTF-8 BOM + CRLF like the 620 SCL; the stale CreationInfo CSV
+  drops, no template ships; `project` returns it in `scl_files`). The builder mirrors the PROFINET_NODES
+  member domains (the 520 config `row where $script_type = 'PA'|'PW'`): one assignment per node -
+  `"PROFINET_NODES_ALARM|_WARNING"."<profinet_name> <ip>" := "10_PN_NETWORK".SUBNET_<s>[<last octet>];` -
+  grouped one `REGION Subnet <s> <prefix>.xxx` per subnet (sorted; staged order within). `10_PN_NETWORK`
+  is the hand-maintained per-subnet network-status DB on the TIA side. Tests: `test_blocks.py`
+  (+3: the builder's PA/PW/malformed rows, the region/line rendering, the project routing + CSV drop).
   **08 door-network interlock (template evolution, user decisions 2026-07-07):** the 08 template's TT02
   (door) network now consumes the sorter interlock itself, so each door row fills
   `tagName:SorterRunningIOC` + the `05_EM_STATE` `SORTER_nn_NOT_RUNNING` member (nn via `sorter_nn`: the

@@ -22,7 +22,7 @@ from pipeline4.core.finding import Finding, record
 from pipeline4.core.table import Table as SsotTable
 from pipeline4.domain import datablock_xml
 from pipeline4.domain.blocks import builders as _builders  # noqa: F401  (import registers the builders)
-from pipeline4.domain.blocks import templates, xml_emit
+from pipeline4.domain.blocks import scl_emit, templates, xml_emit
 from pipeline4.domain.blocks.database import Database
 from pipeline4.domain.blocks.registry import emit_kind, registry
 from pipeline4.domain.blocks.table import Table
@@ -163,15 +163,23 @@ def _ship_template(template_ref: str, tpl_dir: str) -> str:
     return f"Templates/{base}"
 
 
+def _drop_stale_csv(out_dir: str, name: str) -> None:
+    """Remove a block's leftover CreationInfo CSV (a ready-emitted block - FC XML / SCL - ships no CSV;
+    a stale one from an earlier run must not survive as an apparent surface)."""
+    stale = os.path.join(out_dir, f"{name}.csv")
+    if os.path.exists(stale):
+        os.remove(stale)
+
+
 def project(database: DB | None = None, out_dir: str | None = None, import_dir: str | None = None) -> dict:
     """Project `software_blocks` + `software_block_members` -> the `$/#/%/@` CreationInfo CSVs in `out_dir`
     (defaults to `config.blocks_creation_dir()`), each block's template XML COPIED to `<out_dir>/Templates/`
     and referenced RELATIVELY (`$ template=Templates/<file>.xml` - the CreationInfo folder is
-    self-contained; an absolute PL path is meaningless on the OP machine). A block with a direct-XML
-    emitter (03) instead ships a ready `SW.Blocks.FC` XML to `import_dir` (defaults to
-    `config.blocks_import_dir()`) and its CSV is DROPPED (OP4 imports the XML, not a template-fill CSV;
-    no template ships either) - a stale CSV is removed. A pure projection (`findings: []`).
-    Returns {'dir', 'files', 'xml_files', 'count', 'findings'} ('count'/'files' = the CSVs only)."""
+    self-contained; an absolute PL path is meaningless on the OP machine). A block with a READY-emit
+    registration instead ships to `import_dir` (defaults to `config.blocks_import_dir()`) and its CSV is
+    DROPPED (a stale one removed; no template ships either): `emit="fc_xml"` -> a `SW.Blocks.FC` XML,
+    `emit="scl"` -> an SCL FUNCTION source (`scl_emit`). A pure projection (`findings: []`). Returns
+    {'dir', 'files', 'xml_files', 'scl_files', 'count', 'findings'} ('count'/'files' = the CSVs only)."""
     if database is None:
         database = DB([software_blocks_table(), software_block_members_table()]).load(config.database_dir())
     out_dir = out_dir or config.blocks_creation_dir()
@@ -183,20 +191,23 @@ def project(database: DB | None = None, out_dir: str | None = None, import_dir: 
         for m in database["software_block_members"]:
             members.setdefault(m["block"], []).append(m)
 
-    files, xml_files = [], []
+    files, xml_files, scl_files = [], [], []
     for b in (database["software_blocks"] if "software_blocks" in database else []):
         rows = [dict(m["values"]) for m in sorted(members.get(b["name"], []), key=lambda m: int(m["seq"]))]
         table = Table(b["name"], columns=list(b["columns"]), rows=rows)
+        if emit_kind(b["name"]) == "scl":                        # a ready SCL FUNCTION -> ImportReady
+            scl_files.append(scl_emit.write_scl(b["name"], table, import_dir))
+            _drop_stale_csv(out_dir, b["name"])
+            continue
         xml_path = xml_emit.write_fc_xml(b["name"], table, b["template_ref"], import_dir)
         if xml_path:                                             # 03 ships as FC XML -> drop its CSV (stale one too)
             xml_files.append(xml_path)
-            stale_csv = os.path.join(out_dir, f"{b['name']}.csv")
-            if os.path.exists(stale_csv):
-                os.remove(stale_csv)
+            _drop_stale_csv(out_dir, b["name"])
             continue
         rel_ref = _ship_template(b["template_ref"], tpl_dir)
         files.append(_write_creation_csv(out_dir, b["name"], rel_ref, table, b["keys"]))
-    return {"dir": out_dir, "files": files, "xml_files": xml_files, "count": len(files), "findings": []}
+    return {"dir": out_dir, "files": files, "xml_files": xml_files, "scl_files": scl_files,
+            "count": len(files), "findings": []}
 
 
 # --- InstanceDBs.csv (the cross-builder 800c surface) --------------------------------------------- #

@@ -8,6 +8,7 @@
 custom section) instead of a hardcoded name-set in the engine:
   * "csv"    - the default $/#/%/@ CreationInfo CSV (template-fill via OP4)
   * "fc_xml" - a ready SW.Blocks.FC XML emitted to ImportReady; the CreationInfo CSV is dropped
+  * "scl"    - a ready SCL FUNCTION source (scl_emit) emitted to ImportReady; no CSV either
 """
 from __future__ import annotations
 

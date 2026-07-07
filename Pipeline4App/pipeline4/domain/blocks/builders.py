@@ -194,6 +194,29 @@ def _area_nn(area) -> str:
     return f"{int(m.group(1)):02d}" if m else str(area)
 
 
+@builds("03_Diagnostic Nodes", emit="scl")
+def build_03_diagnostic_nodes(db: Database) -> Table:
+    """One SCL assignment per PROFINET node - the PROFINET_NODES member mirror (user spec 2026-07-07):
+    a PA head -> "PROFINET_NODES_ALARM", a PW head -> "PROFINET_NODES_WARNING" (the same `row where
+    $script_type` domains as the 520 config members), member = '<profinet_name> <profinet_ip>', source
+    = "10_PN_NETWORK".SUBNET_<subnet>[<last octet>]. `scl_emit` renders it as a ready SCL FUNCTION,
+    one REGION per subnet - the block ships as ImportReady/<name>.scl, no CreationInfo CSV."""
+    t = Table("03_Diagnostic Nodes")
+    for r in db.rows:
+        st = str(r.get("script_type", "")).strip().upper()
+        if st not in ("PA", "PW"):
+            continue
+        name = str(r.get("profinet_name", "") or "").strip()
+        ip = str(r.get("profinet_ip", "") or "").strip()
+        parts = ip.split(".")
+        if not name or len(parts) != 4 or not all(p.isdigit() for p in parts):
+            continue                                   # not a resolvable node address (110 flags it)
+        t.add(db="PROFINET_NODES_ALARM" if st == "PA" else "PROFINET_NODES_WARNING",
+              member=f"{name} {ip}", subnet=str(int(parts[2])),
+              prefix=".".join(parts[:3]), octet=str(int(parts[3])))
+    return t
+
+
 @builds("04_ESTOP")
 def build_04_estop(db: Database) -> Table:
     """One ESTOP network per AREA. A SORTER area (config sorter_areas) picks a door-capacity tier

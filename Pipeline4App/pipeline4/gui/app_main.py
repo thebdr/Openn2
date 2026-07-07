@@ -931,7 +931,8 @@ class App:
         database, blk_findings = engine.build(database)
         # the verbose per-block log (user spec): each generated block, its template (when a shipped
         # one exists), the declared output surface, and the builder function that produced it
-        surface = {"csv": "CreationInfo CSV", "fc_xml": "FC XML (ImportReady)"}
+        surface = {"csv": "CreationInfo CSV", "fc_xml": "FC XML (ImportReady)",
+                   "scl": "SCL (ImportReady)"}
         for r in engine.block_report(database):
             tmpl = f"  template={r['template_stem']}" if r["template_stem"] else ""
             inst_note = f" + {r['instances']} instance DBs" if r["instances"] else ""
@@ -945,7 +946,8 @@ class App:
         self._render(rendered, label="800 software")
         if res is not None:
             self._emit("RSLT", f"  820: {len(database['software_blocks'])} blocks -> {res['count']} "
-                               f"CreationInfo CSVs + {len(res['xml_files'])} FC XML -> {config.blocks_creation_dir()}")
+                               f"CreationInfo CSVs + {len(res['xml_files'])} FC XML + "
+                               f"{len(res.get('scl_files', []))} SCL -> {config.blocks_creation_dir()}")
         if inst is not None:
             self._emit("RSLT", f"  830 InstanceDBs: {inst['count']} instance DBs -> {inst['path']}")
 

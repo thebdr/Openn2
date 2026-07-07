@@ -6,7 +6,7 @@ import tempfile
 
 from _harness import run, eq, ok
 from pipeline4.core.database import Database as DB
-from pipeline4.domain.blocks import engine, xml_emit
+from pipeline4.domain.blocks import engine, scl_emit, xml_emit
 from pipeline4.domain.blocks.database import Database
 from pipeline4.domain.blocks.table import Table
 from pipeline4.domain.blocks import builders
@@ -334,6 +334,71 @@ def test_project_03_emits_xml_and_drops_csv():
 #  config DBs now - per-area element rows in datablock_elements.csv; see test_datablocks/test_dbtemplate)
 
 
+def test_builder_03_diagnostic_nodes_pa_pw_rows():
+    rows = [
+        {"script_type": "PA", "profinet_name": "n0005-ms1-cc1-k65001", "profinet_ip": "192.168.50.5"},
+        {"script_type": "PW", "profinet_name": "n0010-mc1-cc1-k66001", "profinet_ip": "192.168.51.10"},
+        {"script_type": "A", "profinet_name": "not-a-node", "profinet_ip": "192.168.50.9"},  # not P*
+        {"script_type": "PA", "profinet_name": "n-bad-ip", "profinet_ip": "not.an.ip"},      # malformed
+        {"script_type": "PA", "profinet_name": "", "profinet_ip": "192.168.50.7"},           # unnamed
+    ]
+    t = builders.build_03_diagnostic_nodes(Database(rows))
+    eq(len(t), 2, "one row per PA/PW node with a resolvable address")
+    a = t.rows[0]
+    eq(a["db"], "PROFINET_NODES_ALARM", "PA -> the ALARM DB (the 520 member domain)")
+    eq(a["member"], "n0005-ms1-cc1-k65001 192.168.50.5", "member = '<name> <ip>' (the DB member name)")
+    eq((a["subnet"], a["prefix"], a["octet"]), ("50", "192.168.50", "5"))
+    eq(t.rows[1]["db"], "PROFINET_NODES_WARNING", "PW -> the WARNING DB")
+
+
+def test_scl_emit_diagnostic_nodes_regions():
+    t = Table("03_Diagnostic Nodes")
+    t.add(db="PROFINET_NODES_ALARM", member="n0005-ms1-cc1-k65001 192.168.50.5",
+          subnet="50", prefix="192.168.50", octet="5")
+    t.add(db="PROFINET_NODES_WARNING", member="n0010-mc1-cc1-k66001 192.168.51.10",
+          subnet="51", prefix="192.168.51", octet="10")
+    t.add(db="PROFINET_NODES_ALARM", member="n0012-pc1-cc1-k65001 192.168.50.12",
+          subnet="50", prefix="192.168.50", octet="12")
+    text = scl_emit.diagnostic_nodes_scl(t, "03_Diagnostic Nodes")
+    lines = text.splitlines()
+    eq(lines[0], 'FUNCTION "03_Diagnostic Nodes" : Void')
+    eq(lines[1], "{ S7_Optimized_Access := 'TRUE' }")
+    ok("BEGIN" in lines, "the FUNCTION body opens")
+    eq(lines[-1], "END_FUNCTION")
+    ok("\tREGION Subnet 50 192.168.50.xxx" in lines, "one REGION per subnet, the user's title form")
+    ok("\tREGION Subnet 51 192.168.51.xxx" in lines)
+    ok('    "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5" := "10_PN_NETWORK".SUBNET_50[5];'
+       in lines, "the exact assignment line (the user's sample)")
+    ok('    "PROFINET_NODES_WARNING"."n0010-mc1-cc1-k66001 192.168.51.10" := "10_PN_NETWORK".SUBNET_51[10];'
+       in lines)
+    r50, r51 = lines.index("\tREGION Subnet 50 192.168.50.xxx"), lines.index("\tREGION Subnet 51 192.168.51.xxx")
+    ok(r50 < r51, "regions sorted by subnet number")
+    ok(lines.count("\tEND_REGION") == 2, "each region closes")
+    ok("\r\n" in text, "CRLF line endings")
+
+
+def test_project_scl_block_ships_and_drops_csv():
+    with tempfile.TemporaryDirectory() as d:
+        creation, imp = os.path.join(d, "creation"), os.path.join(d, "import")
+        os.makedirs(creation)
+        stale = os.path.join(creation, "03_Diagnostic Nodes.csv")
+        open(stale, "w").write("stale")
+        blk, mem = engine.software_blocks_table(), engine.software_block_members_table()
+        blk.add(name="03_Diagnostic Nodes", template_stem="03_Diagnostic Nodes", template_ref="r",
+                keys=["TemplateType"], columns=["db", "member", "subnet", "prefix", "octet"])
+        mem.add(block="03_Diagnostic Nodes", seq=0,
+                values={"db": "PROFINET_NODES_ALARM", "member": "n0005-ms1-cc1-k65001 192.168.50.5",
+                        "subnet": "50", "prefix": "192.168.50", "octet": "5"})
+        res = engine.project(DB([blk, mem]), out_dir=creation, import_dir=imp)
+        eq((res["count"], len(res["scl_files"])), (0, 1), "the scl block writes NO CSV")
+        path = os.path.join(imp, "03_Diagnostic Nodes.scl")
+        ok(os.path.exists(path), "the SCL ships to the import dir")
+        raw = open(path, "rb").read()
+        ok(raw.startswith(b"\xef\xbb\xbf"), "UTF-8 BOM (the 620 SCL convention)")
+        ok(b'"10_PN_NETWORK".SUBNET_50[5];' in raw)
+        ok(not os.path.exists(stale), "the stale CreationInfo CSV is removed")
+
+
 def test_project_ships_templates_with_relative_refs():
     # the CreationInfo folder is SELF-CONTAINED (user spec): the template XML copies to
     # Templates/ and the CSV references it relatively - an absolute PL path is dead on the OP machine
@@ -438,6 +503,9 @@ if __name__ == "__main__":
         ("and_coil_fc_one_network_per_row", test_and_coil_fc_one_network_per_row),
         ("write_fc_xml_bom_and_path", test_write_fc_xml_bom_and_path),
         ("project_03_emits_xml_and_drops_csv", test_project_03_emits_xml_and_drops_csv),
+        ("builder_03_diagnostic_nodes_pa_pw_rows", test_builder_03_diagnostic_nodes_pa_pw_rows),
+        ("scl_emit_diagnostic_nodes_regions", test_scl_emit_diagnostic_nodes_regions),
+        ("project_scl_block_ships_and_drops_csv", test_project_scl_block_ships_and_drops_csv),
         ("project_ships_templates_with_relative_refs", test_project_ships_templates_with_relative_refs),
         ("block_report_verbose_log_data", test_block_report_verbose_log_data),
         ("write_instance_dbs_merge_and_dedup", test_write_instance_dbs_merge_and_dedup),
