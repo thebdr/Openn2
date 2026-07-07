@@ -144,7 +144,7 @@ signals (decision: write-back after 520, the single evaluator — no drift; DESI
 consumers 400/600).
 - **`dbtemplate.py`** (520a) — faithful port of PL3's `render` (PEP-3101 + numeric coercion) + the `for_each`
   DSL (`row where P` / `<var> in unique(col) where P`; predicates `numeric()/=/!=/~/in[…]` + `and/or/not/()`).
-- **`datablocks.generate`** (520b) — port of PL3's validate-and-halt generator: seeds (`Always FALSE/TRUE`/
+- **`datablocks.generate`** (520b) — port of PL3's validate-and-halt generator: seeds (`AlwaysFALSE/AlwaysTRUE`/ [renamed from `Always FALSE/TRUE` 2026-07-07, user spec - the yaml `seed_members` + every builder literal]/
   `No Operation`), the `if_elements` seed-only-drop, **F_DB OPC-lock** + `f_db`→`F_DB`, dedup, instance
   families. PL4 additions per member: `source` (the producing signal `uid` / a `unique` bound value / `seed`),
   + `source_row`/`seq` bookkeeping the write-back uses.
@@ -512,7 +512,7 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
     ships its FC XML to ImportReady and its CreationInfo **CSV is DROPPED** (a stale one removed) - OP4 imports the
     XML, not a template-fill CSV. Returns `xml_files`; `count`/`files` are the CSVs only.
   - **`engine.write_com_db`** - the **02_COM** custom safe-DB (a fail-safe F_DB GlobalDB XML): members =
-    `DB_CONSTANTS` (Always FALSE/TRUE/No Operation) + the distinct `02_COM.{db_element}` cumulatives across all
+    `DB_CONSTANTS` (AlwaysFALSE/AlwaysTRUE/No Operation) + the distinct `02_COM.{db_element}` cumulatives across all
     builder rows (`_com_members`), deduped. **Reuses `datablock_xml.db_xml`** (so the bytes + the F_DB OPC-lock match
     the 520 DBs - no second XML emitter); written to `blocks_import_dir` (the 520 projector leaves it untouched -
     not a `db_blocks` DB). No cumulatives -> nothing written.

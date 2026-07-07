@@ -40,7 +40,7 @@ _QUALREF = re.compile(r'"([^"]+)"\."([^"]+)"')        # a TIA-qualified "<db>"."
 
 
 def _pads() -> set:
-    """The seed constants (Always FALSE/TRUE/No Operation) - from generation_params.yaml, the same
+    """The seed constants (AlwaysFALSE/AlwaysTRUE/No Operation) - from generation_params.yaml, the same
     values the 520 seeds and the builder-owned DBs prepend."""
     return set(datablocks.seed_members())
 

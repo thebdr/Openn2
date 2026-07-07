@@ -7,7 +7,7 @@ datablocks:
   # The seed members every `seed: true` DB starts with (Bool; space, not underscore). Prepended by
   # phase 520 to the config-declared DBs and by the 800 engine to the builder-owned ones
   # (datablock_definitions.csv rows with create_when: builders).
-  seed_members: [Always FALSE, Always TRUE, No Operation]
+  seed_members: [AlwaysFALSE, AlwaysTRUE, No Operation]
 
 interfaces:
   # The MachineInterfaces SCL projection (phase 400): one assignment per interfaced signal, grouped

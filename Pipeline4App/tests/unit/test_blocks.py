@@ -158,7 +158,7 @@ def test_builder_04_estop_sorter_tier_and_generic():
     eq(s["TemplateType"], "01", "3 doors -> the cap-4 tier")
     eq(s["ITERATOR_STRINGS"], ["DOOR0", "DOOR1", "DOOR2", builders.PAD], "doors padded to the tier")
     eq(s["01_PushButton.SafetyBreaker1"], "BRK1")
-    eq(s["01_PushButton.SafetyBreaker2"], "Always TRUE", "the missing 2nd breaker is AND-neutral")
+    eq(s["01_PushButton.SafetyBreaker2"], "AlwaysTRUE", "the missing 2nd breaker is AND-neutral")
     eq(s["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "SORTER_01_ENCODER_HEALTHY", "sorter-only")
     g = next(r for r in t.rows if r["instanceOf-F_ESTOP1"] == "ESTOP_AREA 2")
     eq((g["TemplateType"], g["ITERATOR_STRINGS"]), ("06", []), "generic: TT06, no door slots")
@@ -231,7 +231,7 @@ def test_builder_08_gate_manager_sorters_and_doors():
        "the door's sorter via the DI's area; 'SORTER- RUNNING' = the MachineInterfaces native tag")
     eq(d["05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING"], "SORTER_01_NOT_RUNNING",
        "the door row consumes the sorter interlock member itself (template TT02)")
-    eq((d["choice:IsSorterDoor"], d["choice:DoorResetNecessary"]), ("Always TRUE", "Always TRUE"))
+    eq((d["choice:IsSorterDoor"], d["choice:DoorResetNecessary"]), ("AlwaysTRUE", "AlwaysTRUE"))
 
 
 # --- build -> project round-trip (the SSOT tables -> CSV) -------------------------------------- #

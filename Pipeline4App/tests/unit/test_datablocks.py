@@ -50,7 +50,7 @@ def test_generate_seeds_and_members():
     g, inst, findings = datablocks.generate(_ROWS, defs, els, _TYPES)
     ok(_no_fail(findings), "a clean config -> no FAIL findings")
     names = [m["name"] for m in g["07_DOOR"]["members"]]
-    eq(names, ["Always FALSE", "Always TRUE", "No Operation",
+    eq(names, ["AlwaysFALSE", "AlwaysTRUE", "No Operation",
                "Door Closed [ S1-D1 ]", "Door Closed [ S2-D2 ]"], "seeds prepended, then a member per match")
     eq(g["07_DOOR"]["prog_lang"], "F_DB")
 
@@ -241,7 +241,7 @@ def test_project_writes_only_its_own_dbs():
         ok(raw.startswith(b"\xef\xbb\xbf"), "UTF-8 BOM")
         ok(b"\r\n" in raw and not raw.endswith(b"\r\n"), "CRLF line endings, no trailing newline")
         text = raw.decode("utf-8-sig")
-        ok("Always FALSE" in text and "Door Closed [ S1-D1 ]" in text, "seeds + member present")
+        ok("AlwaysFALSE" in text and "Door Closed [ S1-D1 ]" in text, "seeds + member present")
 
 
 if __name__ == "__main__":

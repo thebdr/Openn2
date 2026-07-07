@@ -223,7 +223,7 @@ def build_04_estop(db: Database) -> Table:
     (4/8/12/16/20 = TT01-05 by its DI1/2 door count, doors padded with PAD); a GENERIC area uses
     <ResetRequired> (TT06, no door slots). Per area: the 02_COM PB/FDB cumulatives (from 03, raw-area
     naming), the 05_EM_STATE state members (UNPADDED area, as 05 + 02_COM name them), the area's B1/2 breakers
-    (SafetyBreaker1/2, padded 'Always TRUE' - AND-neutral), the encoder-healthy SPEED_STATE_REC member,
+    (SafetyBreaker1/2, padded 'AlwaysTRUE' - AND-neutral), the encoder-healthy SPEED_STATE_REC member,
     and the DI1/2 doors iterator."""
     sorter = _sorter_areas(db)
     t = Table("04_ESTOP")
@@ -258,8 +258,8 @@ def build_04_estop(db: Database) -> Table:
             **{"05_EM_STATE.{matrix_area}_SAFETY_DOORS_COM": f"{area} SAFETY_DOORS_COM"},
             **{"05_EM_STATE.{matrix_area}_SORTER_POWER_CUT": power_cut},
             **{"SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY": encoder},
-            **{"01_PushButton.SafetyBreaker1": breakers[0] if len(breakers) > 0 else "Always TRUE"},
-            **{"01_PushButton.SafetyBreaker2": breakers[1] if len(breakers) > 1 else "Always TRUE"},
+            **{"01_PushButton.SafetyBreaker1": breakers[0] if len(breakers) > 0 else "AlwaysTRUE"},
+            **{"01_PushButton.SafetyBreaker2": breakers[1] if len(breakers) > 1 else "AlwaysTRUE"},
             ITERATOR_STRINGS=door_cells,
         )
     return t
@@ -499,7 +499,7 @@ def build_08_gate_manager(db: Database) -> Table:
             **{"07_DOOR.{db_element:DI1/2}": member(di1)},
             **{"07_DOOR.{db_element:DI2/2}": member(di2)},
             **{"07_DOOR.{db_element:DD}": member(dd)},
-            **{"choice:IsSorterDoor": "Always TRUE" if (di1 and di1.get("IsSorterArea") == "yes") else "Always FALSE"},
-            **{"choice:DoorResetNecessary": "Always TRUE" if dr else "Always FALSE"},
+            **{"choice:IsSorterDoor": "AlwaysTRUE" if (di1 and di1.get("IsSorterArea") == "yes") else "AlwaysFALSE"},
+            **{"choice:DoorResetNecessary": "AlwaysTRUE" if dr else "AlwaysFALSE"},
         )
     return t
