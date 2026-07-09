@@ -76,7 +76,7 @@ def test_regex_replace():
     eq(expr.evaluate("regex_replace($t, /x/, $r)", {"t": "x", "r": "Y"}), "Y",
        "the replacement arg is a full expression too")
     eq(expr.render("{regex_replace($bit, /^I/, 'Q')}", {"bit": "I2.0"}), "Q2.0",
-       "usable in a render hole (the tagtable_elements io_address case)")
+       "usable in a render hole (the I->Q address-derivation case)")
     try:
         expr.evaluate(r"regex_replace($t, /x/, '\9')", {"t": "x"})
         ok(False, "a bad group backref must raise")

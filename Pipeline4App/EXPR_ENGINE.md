@@ -123,7 +123,8 @@ let(n := node_of($bit), name := $n.profinet_name; ...)   # later bindings see ea
 
 **Functions (a registry — extensible; the one place to add capability):**
 - strings: `concat(…)`, `join(sep, …)`, `strip`, `upper`, `lower`, `replace`, `extract($f, /re/, SLICE)`
-  where SLICE is Python-style (`-1:`, `:3`, `1:3`, `2`).
+  where SLICE is Python-style (`-1:`, `:3`, `1:3`, `2`), `regex_replace(v, /re/, repl)` (re.sub
+  semantics: every match, `\1` backrefs, implicit IGNORECASE, no match -> unchanged).
 - predicates/util: `numeric`, `isdigit`, `len`, `present`, `blank`.
 - data access (read the SSOT/config): `where($table, <pred>)`, `first($table, <pred>)`,
   `unique($col [over $table])`, `lookup($table, key, value)`, `count(…)`, and domain helpers like

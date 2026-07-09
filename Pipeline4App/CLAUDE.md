@@ -90,9 +90,7 @@ Pipeline4App/
     `datablock_types`.
   - `diagnosis/`: `diagnosis_columns` · `diagnosis_logic_rules` (the **unified trigger-driven DiagList +
     `source` io|logic** + the per-type diag attrs land with the ph600 port).
-  - `chain_reactions/`: `object_families` · `interface_elements` (the follower/relationship rules) ·
-    `tagtable_elements` (the phase-510 EXTRA-tag rules - datablock_elements logic aimed at tag tables,
-    2026-07-07; header-only until a project authors rows).
+  - `chain_reactions/`: `object_families` · `interface_elements` (the follower/relationship rules).
   - DROPPED: `iolist_columns` (dead), `iolist_permanent_parts` (→ `validation_params.iolist.permanent_parts`),
     `datablock_elements_rules` (superseded). The device-types DB → `Shared/Database/`.
 
@@ -282,7 +280,7 @@ deferred); the per-type `interface_tagname` templates live in a **new `chain_rea
 findings. PARITY: the PLCTags tag list is content-identical to pre-S4 (verified new-vs-HEAD, 213 tags).
 `domain/io_tags.py` + `config.io_tags_dir()`. A PURE projection of the `signals` + `interface_elements` SSOT tables
 to **`PlcTags/PLCTags.xlsx`** (the OP4 BuilderData import surface — leaf `PlcTags` to match PL3's contract path).
-Three tag sources mixed into one workbook, sorted by Path (= tag table), all values text:
+Two tag sources mixed into one workbook, sorted by Path (= tag table), all values text:
 - **(a) resolved I/O signals** — one tag per `identity.is_io_signal` row with a non-empty `name_in_tagtable`:
   Name=`name_in_tagtable`, Path=`tagtable`, Data Type=`Bool` (PL3 hard-codes Bool for direct I/O — a future non-Bool
   needs a `signal_types` `data_type` col), Address=`%`-prefixed `bit`, Comment=`identity.tag_comment` (the type's
@@ -291,18 +289,11 @@ Three tag sources mixed into one workbook, sorted by Path (= tag table), all val
   decision): Name=`signal_name`, Path=`IF_<instance>`, Data Type=`_tia_dtype(data_type)` (BOOL→Bool/WORD→Word),
   Address=`%`+the STORED `io_address_side1`, Comment=`description`. A named element with no resolved address is
   skipped+warned (mirrors PL3); the addresses come from the SSOT column 400 stores (verified == the 400e seed).
-- **(c) config tags (user spec 2026-07-07)** — the **`chain_reactions/tagtable_elements.csv`** rules evaluated
-  over the signals (`io_tags.config_tags`): the datablock_elements LOGIC aimed at TAG TABLES — columns
-  `tag_table, name, for_each, datatype, io_address, comment`; the same `for_each` DSL
-  (`dbtemplate.compile_for_each`), but name/io_address/comment render through **`expr.render` STRICT with FULL
-  {expr} holes** (unlike the 520 member guard's `{$field}`-only) — io_address is the point:
-  `{regex_replace($bit, /^I/, 'Q')}`. **`regex_replace(v, /re/, repl)` added to core/expr** (re.sub semantics,
-  `\\1` backrefs, implicit IGNORECASE, no match -> unchanged; a bad backref = located ExprError). A bad
-  for_each/render = **`iotag_cfg_for_each`/`iotag_cfg_render` FAIL** (the raw-FAIL guard blocks the write, and
-  the record filter is now severity-based so config FAILs record too); a blank rendered name skips the tag;
-  the tags enter the duplicate gate with their producing row's link. `project` returns `cfg_count`; the
-  builtin + pilot ship a header-only csv (empty = no extra tags). Tests: `test_expr.py::regex_replace` +
-  `test_io_tags.py` (+2).
+(The 2026-07-07 `tagtable_elements.csv` third tag source was REVERTED 2026-07-09 — wrong direction; the
+replacement is GENERATED SIGNALS appended to the `signals` table itself, marked via `source_sheet`/
+`source_cell`/`source_row`, so 510 absorbs them through source (a) with no config of its own.
+**`regex_replace(v, /re/, repl)` STAYS in core/expr** — re.sub semantics, `\\1` backrefs, implicit
+IGNORECASE, no match -> unchanged; a bad backref = located ExprError; `test_expr.py::regex_replace`.)
 Two sheets: **"PLC Tags"** (10 cols: Name/Path/Data Type/Logical Address/Comment/3×Hmi `True`/Typeobject ID/Version
 ID) + **"TagTable Properties"** (3 cols: Path/BelongsToUnit/Accessibility, one row per distinct Path). Output via
 `write_plc_tags` (a fresh openpyxl workbook; `_append_text_row` forces a leading `=`/`+`/`-` to text). `project`

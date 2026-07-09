@@ -136,65 +136,6 @@ def test_return_contract_mixes_sources():
     ok(res["path"].endswith("PLCTags.xlsx"), "writes PLCTags.xlsx")
 
 
-def test_config_tags_from_tagtable_elements():
-    # source (c): the tagtable_elements rules over the signals - the datablock_elements logic aimed
-    # at tag tables, io_address as a FULL expression (regex_replace - the user's flagship case)
-    from pipeline4.core import config
-    sigs = [
-        {"script_type": "PA", "bit": "I13.5", "profinet_name": "n0005", "name_in_tagtable": "",
-         "source_cell": "NS!O5", "type": {"category": "Std"}},
-        {"script_type": "A", "bit": "I2.0", "profinet_name": "", "name_in_tagtable": "",
-         "source_cell": "NS!O9", "type": {"category": "Std"}},
-    ]
-    db = _db(signals=sigs)
-    rules = [
-        {"tag_table": "PN_Mirror", "name": "MIRROR {$profinet_name}",
-         "for_each": "row where $script_type = 'PA'", "datatype": "bool",
-         "io_address": "{regex_replace($bit, /^I/, 'Q')}", "comment": "node {$profinet_name}"},
-        {"tag_table": "Bad", "name": "{$x", "for_each": "nonsense(", "datatype": "", "io_address": "",
-         "comment": ""},
-    ]
-    orig = config.load_tagtable_elements
-    config.load_tagtable_elements = lambda: rules
-    try:
-        tags, findings = io_tags.config_tags(db)
-    finally:
-        config.load_tagtable_elements = orig
-    eq(len(tags), 1, "one tag per for_each match (the PA row)")
-    t = tags[0]
-    eq((t["name"], t["path"], t["data_type"]), ("MIRROR n0005", "PN_Mirror", "Bool"))
-    eq(t["address"], "%Q13.5", "io_address through the engine (regex_replace) + the % prefix")
-    eq(t["comment"], "node n0005")
-    eq((t["location"], t["source_uid"]), ("NS!O5", db["signals"].rows[0]["uid"]),
-       "the producing I/O-List row rides along (the duplicate gate links it)")
-    eq([f.type for f in findings], ["iotag_cfg_for_each"], "a broken for_each is a FAIL finding")
-    eq(findings[0].severity, "FAIL")
-
-
-def test_config_tags_render_error_fails_and_blocks_write():
-    from pipeline4.core import config
-    sigs = [{"script_type": "PA", "bit": "I1.0", "name_in_tagtable": "", "type": {"category": "Std"}}]
-    db = _db(signals=sigs)
-    rules = [{"tag_table": "T", "name": "{$missing_column}", "for_each": "row",
-              "datatype": "Bool", "io_address": "", "comment": ""}]
-    orig_rules, orig_params, orig_dbdir = (config.load_tagtable_elements, config.load_params,
-                                           config.database_dir)
-    with tempfile.TemporaryDirectory() as d:
-        config.load_tagtable_elements = lambda: rules
-        config.load_params = lambda *a, **k: {"iolist_path": os.path.join(d, "IO.xlsx")}
-        config.database_dir = lambda: d
-        try:
-            res = io_tags.project(db, out_dir=d)
-        finally:
-            config.load_tagtable_elements = orig_rules
-            config.load_params = orig_params
-            config.database_dir = orig_dbdir
-        eq(res["path"], "", "a config render FAIL blocks the write (raw-FAIL guard)")
-        ok(any(f.type == "iotag_cfg_render" and f.severity == "FAIL" for f in res["findings"]),
-           "strict render: the missing column is a located FAIL")
-        ok(not os.path.exists(os.path.join(d, io_tags.TAG_TABLE_FILE)), "PLCTags.xlsx NOT on disk")
-
-
 def test_duplicate_same_table_fails_links_rows_and_blocks_write():
     # the FVX_PL4_Pilot defect: I/O-List rows duplicated verbatim -> the same (tag table, name) twice.
     # Case-insensitive; each 2nd+ occurrence FAILs, location = ITS row, location2 = the FIRST row's.
@@ -292,9 +233,6 @@ if __name__ == "__main__":
         ("source_b_word_and_unresolved", test_source_b_word_and_unresolved),
         ("text_forcing_and_sort_and_props", test_text_forcing_and_sort_and_props),
         ("return_contract_mixes_sources", test_return_contract_mixes_sources),
-        ("config_tags_from_tagtable_elements", test_config_tags_from_tagtable_elements),
-        ("config_tags_render_error_fails_and_blocks_write",
-         test_config_tags_render_error_fails_and_blocks_write),
         ("duplicate_same_table_fails_links_rows_and_blocks_write",
          test_duplicate_same_table_fails_links_rows_and_blocks_write),
         ("duplicate_name_across_tables_is_by_design", test_duplicate_name_across_tables_is_by_design),

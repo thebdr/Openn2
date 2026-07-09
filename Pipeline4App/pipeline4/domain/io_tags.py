@@ -4,14 +4,11 @@ I/O List read-back: the interface addresses are the `io_address_side1` column ph
 (equal to the value 400e seeds into the inserted IF_ sheets - verified). Clean-room port of PL3's
 signals.generate_io_tags / build_io_tags / interface_tags / write_plc_tags.
 
-Three tag sources, mixed into one workbook (sorted by Path = tag table):
+Two tag sources, mixed into one workbook (sorted by Path = tag table):
   (a) resolved I/O signals  - Name=name_in_tagtable, Path=tagtable, Address=%-bit, Comment=io_comment,
       Data Type=Bool (PL3 hard-codes Bool for direct I/O points);
   (b) interface tags        - one per interface_elements row: Name=signal_name, Path=IF_<instance>,
-      Address=%io_address_side1, Comment=description, Data Type=Bool/Word;
-  (c) config tags           - the `chain_reactions/tagtable_elements.csv` rules evaluated over the
-      signals (the datablock_elements logic aimed at tag tables): one EXTRA tag per for_each match,
-      name/io_address/comment full expression templates (e.g. `{regex_replace($bit, /^I/, 'Q')}`).
+      Address=%io_address_side1, Comment=description, Data Type=Bool/Word.
 
 The DUPLICATE-TAG GATE: two tags landing on the same (tag table, name) [case-insensitive] break the TIA
 import, so each 2nd+ occurrence is an `iotag_duplicate` FAIL linking BOTH producing I/O-List rows
@@ -28,10 +25,10 @@ from collections import Counter
 
 from openpyxl import Workbook
 
-from pipeline4.core import config, expr, run
+from pipeline4.core import config, run
 from pipeline4.core.database import Database
 from pipeline4.core.finding import Finding, record_standalone
-from pipeline4.domain import dbtemplate, identity
+from pipeline4.domain import identity
 from pipeline4.domain.signals import signals_table
 
 
@@ -120,48 +117,6 @@ def interface_tags(database) -> tuple:
     return tags, findings
 
 
-def config_tags(database) -> tuple:
-    """Source (c) - the `tagtable_elements` config evaluated over the signals (the datablock_elements
-    logic aimed at TAG TABLES, user spec 2026-07-07): one EXTRA tag per for_each match, in the row's
-    `tag_table`. `name` / `io_address` / `comment` are FULL expression templates rendered STRICT over
-    the matched row (+ the `unique` binding) - `{regex_replace($bit, /^I/, 'Q')}`-style holes work,
-    unlike the 520 member templates whose guard allows only `{$field}` holes. A bad for_each is an
-    `iotag_cfg_for_each` FAIL, a bad/unresolvable template an `iotag_cfg_render` FAIL - the caller's
-    raw-FAIL guard keeps the workbook unwritten, like the duplicate gate. A blank rendered name skips
-    the tag; a blank address stays blank (the OP import owns flagging it). Returns (tags, findings)."""
-    tags, findings = [], []
-    rows = list(database["signals"]) if "signals" in database else []
-
-    def _render(template, ctx):
-        return expr.render(template, ctx, mode="strict") if template else ""
-
-    for el in config.load_tagtable_elements():
-        where = f"tag table {el['tag_table']}: {el['name']}"
-        try:
-            fe = dbtemplate.compile_for_each(el.get("for_each", ""))
-        except dbtemplate.DbTemplateError as e:
-            findings.append(_f("iotag_cfg_for_each", "FAIL", str(e), where))
-            continue
-        for binding, rep in fe.evaluate(rows):
-            ctx = {**(rep or {}), **(binding or {})}
-            try:
-                name = _render(el["name"], ctx).strip()
-                address = _render(el["io_address"], ctx).strip()
-                comment = _render(el["comment"], ctx)
-            except expr.ExprError as e:
-                findings.append(_f("iotag_cfg_render", "FAIL", str(e), where,
-                                   str((rep or {}).get("uid", ""))))
-                continue
-            if not name:
-                continue
-            tags.append({"name": name, "path": el["tag_table"],
-                         "data_type": _tia_dtype(el["datatype"]),
-                         "address": _logical_address(address), "comment": comment,
-                         "location": str((rep or {}).get("source_cell") or "").strip(),
-                         "source_uid": str((rep or {}).get("uid") or "")})
-    return tags, findings
-
-
 def duplicate_findings(tags) -> list:
     """One `iotag_duplicate` FAIL per 2nd+ tag landing on an already-used (Path, Name) - a tag table
     cannot hold two tags with the same name (case-insensitive, TIA's uniqueness rule: the import breaks),
@@ -232,27 +187,25 @@ def write_plc_tags(tags, out_dir) -> str:
 
 
 def project(database: Database | None = None, out_dir: str | None = None) -> dict:
-    """Project the three tag sources to `out_dir`/PLCTags.xlsx (out_dir defaults to `config.io_tags_dir()`).
-    Returns {'path', 'total', 'io_count', 'iface_count', 'cfg_count', 'tables', 'findings'} - `findings` =
-    the `iotag_no_address` WARNs + the `iotag_cfg_*` config FAILs + the `iotag_duplicate` FAILs (the caller
-    renders/gates them). On any raw FAIL (a duplicate tag / a broken tagtable_elements row) the workbook is
-    NOT written (`run.has_blocking` guard - never hand OP4 a broken import surface; 'path' comes back '')
-    and the FAILs are RECORDED to `validation_issues.csv` (`record_standalone`, the ph200 seam - the log's
-    [FAIL]->Findings jump needs the row); the WARNs stay render-only as before."""
+    """Project the two SSOT sources to `out_dir`/PLCTags.xlsx (out_dir defaults to `config.io_tags_dir()`).
+    Returns {'path', 'total', 'io_count', 'iface_count', 'tables', 'findings'} - `findings` = the
+    `iotag_no_address` WARNs + the `iotag_duplicate` FAILs (the caller renders/gates them). On a duplicate
+    tag the workbook is NOT written (`run.has_blocking` raw-FAIL guard - never hand OP4 a broken import
+    surface; 'path' comes back '') and the FAILs alone are RECORDED to `validation_issues.csv`
+    (`record_standalone`, the ph200 seam - the log's [FAIL]->Findings jump needs the row); the WARNs stay
+    render-only as before."""
     if database is None:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
     out_dir = out_dir or config.io_tags_dir()
     io = io_signal_tags(database)
     iface, findings = interface_tags(database)
-    cfg, cfg_findings = config_tags(database)
-    findings += cfg_findings
-    tags = io + iface + cfg
+    tags = io + iface
     findings += duplicate_findings(tags)
-    if run.has_blocking(findings):                    # dup tags / config errors -> record, write NOTHING
-        record_standalone([f for f in findings if f.severity == "FAIL"])
+    if run.has_blocking(findings):                    # duplicate tags -> record the FAILs, write NOTHING
+        record_standalone([f for f in findings if f.type == "iotag_duplicate"])
         path = ""
     else:
         path = write_plc_tags(tags, out_dir)
     return {"path": path, "total": len(tags), "io_count": len(io), "iface_count": len(iface),
-            "cfg_count": len(cfg), "tables": sorted({t["path"] for t in tags}), "findings": findings}
+            "tables": sorted({t["path"] for t in tags}), "findings": findings}
