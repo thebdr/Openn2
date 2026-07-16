@@ -17,7 +17,11 @@ from __future__ import annotations
 import re
 
 from pipeline5.phases.software_blocks.signals_view import Database, _as_list
-from pipeline5.phases.software_blocks.builder_registry import builds
+# The decorators register into THE SYSTEM's registry (system.py imports this module LAST, after
+# SYSTEM exists - the plugin composition; the PL4 module-global registry is retired).
+from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+
+builds = SYSTEM.builders.builds
 from pipeline5.phases.software_blocks.block_table import Table
 
 PAD = "No Operation"   # iterator filler for a template's unused fixed slots (a DB no-op member, ph520)

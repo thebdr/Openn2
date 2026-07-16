@@ -8,7 +8,7 @@ from openpyxl.worksheet.table import Table as XlTable
 from openpyxl.worksheet.table import Table, TableColumn, TableStyleInfo, TableFormula
 
 from _harness import run, eq, ok
-from pipeline5.phases.interfaces._siemens_s7 import xlsx as interface_xlsx
+from pipeline5.systems.plc_based.siemens_s7 import interface_xlsx_writer as interface_xlsx
 from pipeline5.phases.interfaces import builder as interfaces
 from pipeline5.documents import xlsx_surgical_writer as xlsx_edit
 

@@ -59,16 +59,16 @@ def run_pl5(db_dir: str, out_dir: str) -> None:
     from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
     from pipeline5.phases.staging import iolist as staging
     from pipeline5.phases.datablocks import generator as datablocks
-    from pipeline5.phases.datablocks._siemens_s7 import xml as datablock_xml
+    from pipeline5.systems.plc_based.siemens_s7 import globaldb_xml_emitter as datablock_xml
     from pipeline5.phases.interfaces import builder as interfaces
-    from pipeline5.phases.interfaces._siemens_s7 import xlsx as interface_xlsx
-    from pipeline5.phases.interfaces._siemens_s7 import scl as interface_scl
-    from pipeline5.phases.io_tags import tags as io_tags
+    from pipeline5.systems.plc_based.siemens_s7 import interface_xlsx_writer as interface_xlsx
+    from pipeline5.systems.plc_based.siemens_s7 import interface_scl_emitter as interface_scl
+    from pipeline5.systems.plc_based.siemens_s7 import plctags_xlsx_writer as io_tags
     from pipeline5.phases.diagnosis import builder as diagnosis
     from pipeline5.phases.diagnosis import diaglist as diaglist_csv
-    from pipeline5.phases.diagnosis._siemens_s7 import scl as diagnosis_scl
-    from pipeline5.phases.hardware import builder as hardware
-    from pipeline5.phases.hardware import csv as hardware_csv
+    from pipeline5.systems.plc_based.siemens_s7.safety import opc_diagnosis_scl as diagnosis_scl
+    from pipeline5.systems.plc_based.siemens_s7 import profinet_hardware as hardware
+    from pipeline5.systems.plc_based.siemens_s7 import hardware_csv_export as hardware_csv
     from pipeline5.phases.software_blocks import build_engine as engine
     from pipeline5.phases.coverage import coverage
     db, f = staging.stage(system=SYSTEM)
@@ -84,7 +84,7 @@ def run_pl5(db_dir: str, out_dir: str) -> None:
     diagnosis_scl.project(db)
     db, _ = hardware.build(db)
     hardware_csv.project(db)
-    db, _ = engine.build(db)
+    db, _ = engine.build(db, system=SYSTEM)
     engine.project(db, system=SYSTEM)
     engine.write_instance_dbs(db)
     db, _ = coverage.build(db, system=SYSTEM)

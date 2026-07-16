@@ -29,11 +29,11 @@ def test_tia_symbols_round_trip():
 def test_emitters_declare_ready_kinds():
     ok("scl" in SYSTEM.emitters and "fc_xml" in SYSTEM.emitters and "fdback_xml" in SYSTEM.emitters,
        "the three READY kinds are declared")
-    ok("csv" not in SYSTEM.emitters, "the CreationInfo csv default stays engine-internal until step 4")
+    ok("csv" in SYSTEM.emitters, "since step 4 the CreationInfo csv IS a declared emitter too")
 
 
 def test_builders_proxy_reflects_module_registry():
-    import pipeline5.phases.software_blocks._siemens_s7.builders  # noqa: F401  (registers on import)
+    import pipeline5.systems.plc_based.siemens_s7.safety.block_builders  # noqa: F401  (registers on import)
     names = SYSTEM.builders.registry()
     ok("03_Zone Cumulative" in names, "the proxy sees the module registrations")
     eq(SYSTEM.builders.emit_kind("03_Zone Cumulative"), "fc_xml", "and their declared kinds")
@@ -93,7 +93,7 @@ def test_engine_raises_on_undeclared_emitter_kind():
     import tempfile
     from pipeline5.truth.database import Database
     from pipeline5.phases.software_blocks import build_engine as engine
-    from pipeline5.phases.software_blocks import builder_registry as registry
+    registry = SYSTEM.builders
 
     @registry.builds("99_Refuter Block", emit="scl")            # a READY kind, declared for this test
     def _refuter_block(_db):  # noqa: ANN001
@@ -106,6 +106,7 @@ def test_engine_raises_on_undeclared_emitter_kind():
     class _EmitterlessSystem:
         id = "stub_without_emitters"
         emitters: dict = {}
+        builders = SYSTEM.builders          # the registry with the two test registrations
 
     def _one_block_db(name):
         blocks, members = engine.software_blocks_table(), engine.software_block_members_table()

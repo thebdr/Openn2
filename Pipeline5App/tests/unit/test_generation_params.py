@@ -4,8 +4,9 @@ declaration that replaced the hardcoded FC-XML name-set."""
 from _harness import run, eq, ok
 from pipeline5 import config
 from pipeline5.phases.diagnosis import builder as diagnosis
-from pipeline5.phases.diagnosis._siemens_s7 import scl as diagnosis_scl
-from pipeline5.phases.software_blocks import builder_registry as registry
+from pipeline5.systems.plc_based.siemens_s7.safety import opc_diagnosis_scl as diagnosis_scl
+from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM as _SIEMENS
+registry = _SIEMENS.builders
 
 
 def test_builtin_generation_params_load():
@@ -49,7 +50,6 @@ def test_missing_file_raises():
 
 
 def test_emit_kind_declaration():
-    import pipeline5.phases.software_blocks._siemens_s7.builders  # noqa: F401  (importing registers the builders)
     eq(registry.emit_kind("03_Zone Cumulative"), "fc_xml", "03 declares the FC-XML surface")
     eq(registry.emit_kind("06_Feedback Error"), "csv", "an undeclared builder defaults to csv")
     eq(registry.emit_kind("no such block"), "csv", "unregistered names default to csv")

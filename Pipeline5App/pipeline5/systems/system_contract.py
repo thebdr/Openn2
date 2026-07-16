@@ -124,6 +124,8 @@ class System:
     symbols: SymbolFormatter = None      # the system's symbol notation (coupling #1)
     emitters: dict = field(default_factory=dict)       # {emit_kind: writer_fn} (coupling #2)
     builders: BuilderRegistry = field(default_factory=BuilderRegistry)
+    templates: object = None             # the block-template inventory (template_keys/stem_ref_by_name/
+                                         # template_ref) the 800 engine reads - system truth, not kernel
     output_layout: OutputLayout = None   # the delivery tree (coupling #3)
     config_root: str = ""                # the system's BUILTIN config_project dir (4-tier resolver, tier 3)
 

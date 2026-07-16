@@ -426,11 +426,12 @@ def fdback_fc(table, template_path, block_name,
 EMIT_FUNCS = {"fc_xml": and_coil_fc, "fdback_xml": fdback_fc}
 
 
-def write_fc_xml(name, table, template_path, out_dir) -> str:
-    """Emit `name`'s FC XML (if its registration declares an emitter kind) into out_dir/<name>.xml as
-    UTF-8 BOM + CRLF (the exported-Openness convention). Returns the path or ''."""
-    from pipeline5.phases.software_blocks import builder_registry as registry
-    emit = EMIT_FUNCS.get(registry.emit_kind(name))
+def write_fc_xml(name, table, template_path, out_dir, kind) -> str:
+    """Emit `name`'s FC XML for the declared `kind` ('fc_xml' | 'fdback_xml') into out_dir/<name>.xml
+    as UTF-8 BOM + CRLF (the exported-Openness convention). The KIND arrives from the caller (the
+    system's emitter table routes it) - this module no longer consults any registry. Returns the
+    path, or '' when the template is missing."""
+    emit = EMIT_FUNCS.get(kind)
     if emit is None or not template_path or not os.path.exists(template_path):
         return ""
     xml = emit(table, template_path, name)

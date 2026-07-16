@@ -6,7 +6,7 @@ import tempfile
 from _harness import run, eq, ok
 from pipeline5.truth.database import Database
 from pipeline5.phases.datablocks import generator as datablocks
-from pipeline5.phases.datablocks._siemens_s7 import xml as datablock_xml
+from pipeline5.systems.plc_based.siemens_s7 import globaldb_xml_emitter as datablock_xml
 from pipeline5.truth.datablocks import db_blocks_table, db_members_table, instance_dbs_table
 
 

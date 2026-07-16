@@ -3,6 +3,7 @@
   system.py   SYSTEM - the descriptor the catalog registers; everything Siemens-Safety-specific
               the kernel must never hardcode hangs off it.
 
-The chapter code itself still lives in the phases' _siemens_s7/ quarantines until migration
-step 4 physically gathers it here.
+Since the step-4 extraction the Safety code lives HERE: block_builders (the 00-08 safety
+builders, registering into SYSTEM.builders) + opc_diagnosis_scl; the toolchain-shared
+emitters sit one level up.
 """

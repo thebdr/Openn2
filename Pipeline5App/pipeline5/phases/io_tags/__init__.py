@@ -1,5 +1,5 @@
-"""I/O tags - the PLC tag list projected from signals + interface elements (phase 510).
+"""I/O tags - the tag list implied by the staged truth (phase 510).
 
-  tags.py   collection (two sources, duplicate-tag gate) + the TIA workbook writer - splits into
-            shared collector vs per-system writer at step 4
+  collector.py   the SHARED half: the two tag sources merged + the duplicate-tag gate.
+                 The per-system WRITERS consume it (Siemens: systems/.../plctags_xlsx_writer).
 """

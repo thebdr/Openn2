@@ -7,11 +7,13 @@ import tempfile
 from _harness import run, eq, ok
 from pipeline5.truth.database import Database as DB
 from pipeline5.phases.software_blocks import build_engine as engine
-from pipeline5.phases.software_blocks._siemens_s7 import scl_emit
-from pipeline5.phases.software_blocks._siemens_s7 import xml_emit
+from pipeline5.systems.plc_based.siemens_s7 import creation_info_csv as creation_csv
+from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+from pipeline5.systems.plc_based.siemens_s7 import scl_emitter as scl_emit
+from pipeline5.systems.plc_based.siemens_s7 import fc_xml_emitter as xml_emit
 from pipeline5.phases.software_blocks.signals_view import Database
 from pipeline5.phases.software_blocks.block_table import Table
-from pipeline5.phases.software_blocks._siemens_s7 import builders
+from pipeline5.systems.plc_based.siemens_s7.safety import block_builders as builders
 from pipeline5.truth.datablocks import instance_dbs_table
 
 
@@ -39,21 +41,21 @@ def test_database_list_cell_filters():
 
 # --- the $/#/%/@ serialization ----------------------------------------------------------------- #
 def test_serialization_wrap_order_and_iterator():
-    eq(engine._wrap("TemplateType"), "TemplateType", "TemplateType unwrapped")
-    eq(engine._wrap("#meta"), "#meta", "a #meta column unwrapped")
-    eq(engine._wrap("NetworkComment"), "!!NetworkComment$$", "a placeholder wrapped")
+    eq(creation_csv._wrap("TemplateType"), "TemplateType", "TemplateType unwrapped")
+    eq(creation_csv._wrap("#meta"), "#meta", "a #meta column unwrapped")
+    eq(creation_csv._wrap("NetworkComment"), "!!NetworkComment$$", "a placeholder wrapped")
     t = Table("B")
     t.add(template_type="01", NetworkComment="hi", ITER=["a", "b", "c"])
-    ordered = engine._ordered_columns(["TemplateType", "NetworkComment"], t)
+    ordered = creation_csv._ordered_columns(["TemplateType", "NetworkComment"], t)
     eq(ordered, ["TemplateType", "NetworkComment", "ITER"], "inventory first, the ITERATOR last")
-    eq(engine._at_row_cells(t.rows[0], ordered), ["01", "hi", "a", "b", "c"], "the list spreads across cells")
+    eq(creation_csv._at_row_cells(t.rows[0], ordered), ["01", "hi", "a", "b", "c"], "the list spreads across cells")
 
 
 def test_write_creation_csv_layout():
     with tempfile.TemporaryDirectory() as d:
         t = Table("00_X")
         t.add(template_type="01", NetworkComment="n1", ITER=["a", "b"])
-        engine._write_creation_csv(d, "00_X", "C:/tpl/00_X.xml", t, ["TemplateType", "NetworkComment"])
+        creation_csv.write_creation_csv(d, "00_X", "C:/tpl/00_X.xml", t, ["TemplateType", "NetworkComment"])
         raw = open(os.path.join(d, "00_X.csv"), "rb").read()
         ok(not raw.startswith(b"\xef\xbb\xbf"), "no BOM")
         text = raw.decode("utf-8")
@@ -263,7 +265,7 @@ def test_project_reconstructs_from_tables():
     mem.add(block="00_X", seq=0, values={"TemplateType": "01", "NetworkComment": "n1", "ITER": ["a", "b"]})
     mem.add(block="00_X", seq=1, values={"TemplateType": "01", "NetworkComment": "n2", "ITER": ["c"]})
     with tempfile.TemporaryDirectory() as d:
-        res = engine.project(DB([blk, mem]), out_dir=d)
+        res = engine.project(DB([blk, mem]), system=SYSTEM, out_dir=d)
         eq((res["count"], res["findings"]), (1, []), "one CSV, pure projection")
         lines = open(res["files"][0], encoding="utf-8").read().splitlines()
         eq(lines[2], "%,TemplateType,!!NetworkComment$$,!!ITER$$")
@@ -320,12 +322,12 @@ def test_write_fc_xml_bom_and_path():
         t = Table("03_Zone Cumulative")
         t.add(template_type="01", nameOfDB="01_Pushbutton", NetworkComment="c",
               **{"02_COM.{db_element}": "AREA 1 PB"}, ITERATOR_STRINGS=["PB_A"])
-        path = xml_emit.write_fc_xml("03_Zone Cumulative", t, tpl, out)
+        path = xml_emit.write_fc_xml("03_Zone Cumulative", t, tpl, out, "fc_xml")
         eq(os.path.basename(path), "03_Zone Cumulative.xml")
         raw = open(path, "rb").read()
         ok(raw.startswith(b"\xef\xbb\xbf"), "the file carries a single UTF-8 BOM")
         ok(b"\r\n" in raw, "CRLF line endings")
-        eq(xml_emit.write_fc_xml("00_Only for Commissioning", t, tpl, out), "", "a non-emitter block -> '' (no XML)")
+        eq(xml_emit.write_fc_xml("00_Only for Commissioning", t, tpl, out, "csv"), "", "a non-fc kind -> '' (no XML)")
 
 
 def test_project_03_emits_xml_and_drops_csv():
@@ -344,7 +346,7 @@ def test_project_03_emits_xml_and_drops_csv():
                 values={"TemplateType": "01", "nameOfDB": "01_Pushbutton", "02_COM.{db_element}": "AREA 1 PB",
                         "NetworkComment": "c", "ITERATOR_STRINGS": ["PB_A", "PB_B"]})
         mem.add(block="00_X", seq=0, values={"TemplateType": "01", "NetworkComment": "n1"})
-        res = engine.project(DB([blk, mem]), out_dir=creation, import_dir=imp)
+        res = engine.project(DB([blk, mem]), system=SYSTEM, out_dir=creation, import_dir=imp)
         eq((res["count"], len(res["xml_files"])), (1, 1), "00_X -> CSV, 03 -> XML (count = CSVs only)")
         ok(not os.path.exists(stale), "the stale 03 CSV is removed")
         ok(os.path.exists(os.path.join(imp, "03_Zone Cumulative.xml")), "03 FC XML written to import dir")
@@ -410,7 +412,7 @@ def test_project_scl_block_ships_and_drops_csv():
         mem.add(block="03_Diagnostic Nodes", seq=0,
                 values={"db": "PROFINET_NODES_ALARM", "member": "n0005-ms1-cc1-k65001 192.168.50.5",
                         "subnet": "50", "prefix": "192.168.50", "octet": "5"})
-        res = engine.project(DB([blk, mem]), out_dir=creation, import_dir=imp)
+        res = engine.project(DB([blk, mem]), system=SYSTEM, out_dir=creation, import_dir=imp)
         eq((res["count"], len(res["scl_files"])), (0, 1), "the scl block writes NO CSV")
         path = os.path.join(imp, "03_Diagnostic Nodes.scl")
         ok(os.path.exists(path), "the SCL ships to the import dir")
@@ -432,7 +434,7 @@ def test_project_ships_templates_with_relative_refs():
         blk.add(name="00_X", template_stem="TEMPLATE--v1.0--00_X", template_ref=src,
                 keys=["TemplateType"], columns=["TemplateType"])
         mem.add(block="00_X", seq=0, values={"TemplateType": "01"})
-        res = engine.project(DB([blk, mem]), out_dir=creation)
+        res = engine.project(DB([blk, mem]), system=SYSTEM, out_dir=creation)
         lines = open(res["files"][0], encoding="utf-8").read().splitlines()
         eq(lines[0], "$,template=Templates/TEMPLATE--v1.0--00_X.xml",
            "the CSV references the SHIPPED template, relative to its own folder")
@@ -445,7 +447,7 @@ def test_project_ships_templates_with_relative_refs():
                  keys=["TemplateType"], columns=["TemplateType"])
         mem2.add(block="99_Y", seq=0, values={"TemplateType": "01"})
         creation2 = os.path.join(d, "creation2")
-        res2 = engine.project(DB([blk2, mem2]), out_dir=creation2)
+        res2 = engine.project(DB([blk2, mem2]), system=SYSTEM, out_dir=creation2)
         eq(open(res2["files"][0], encoding="utf-8").read().splitlines()[0],
            "$,template=Templates/99_Y.xml", "the ref stays relative even when the source is absent")
         ok(not os.path.exists(os.path.join(creation2, "Templates")),
@@ -463,12 +465,12 @@ def test_block_report_verbose_log_data():
             keys=["TemplateType"], columns=["TemplateType"])
     mem.add(block="05_Output Feedback", seq=0, values={"instanceOf-FDBACK": "FDBACK_A"})
     mem.add(block="05_Output Feedback", seq=1, values={"instanceOf-FDBACK": ""})   # blank -> no instance
-    rep = engine.block_report(DB([blk, mem]))
+    rep = engine.block_report(DB([blk, mem]), SYSTEM)
     eq([r["name"] for r in rep], ["05_Output Feedback", "03_Zone Cumulative", "99_Unknown"],
        "one report entry per built block, in table order")
     r5 = rep[0]
     eq(r5["template_stem"], "TEMPLATE--v1.0--05_Output Feedback")
-    eq(r5["builder"], "builders.build_05_output_feedback", "the registered builder function resolves")
+    eq(r5["builder"], "block_builders.build_05_output_feedback", "the registered builder function resolves")
     eq((r5["emit"], r5["rows"], r5["instances"]), ("csv", 2, 1),
        "declared surface + @-row count + only the NON-EMPTY instanceOf cells count")
     eq(rep[1]["emit"], "fc_xml", "03 declares the FC-XML surface at registration")

@@ -6,8 +6,8 @@ import tempfile
 
 from _harness import run, eq, ok
 from pipeline5.truth.database import Database
-from pipeline5.phases.hardware import builder as hardware
-from pipeline5.phases.hardware import csv as hardware_csv
+from pipeline5.systems.plc_based.siemens_s7 import profinet_hardware as hardware
+from pipeline5.systems.plc_based.siemens_s7 import hardware_csv_export as hardware_csv
 
 
 def _dtd_rec(model, dev_type="IoDeviceCard", comment="", params_by_type=None, io_addr="", parent=None):

@@ -805,9 +805,9 @@ class App:
         from pipeline5.findings import gate as run
         from pipeline5.phases.staging import iolist as staging
         from pipeline5.phases.datablocks import generator as datablocks
-        from pipeline5.phases.datablocks._siemens_s7 import xml as datablock_xml
+        from pipeline5.systems.plc_based.siemens_s7 import globaldb_xml_emitter as datablock_xml
         from pipeline5.phases.interfaces import builder as interfaces
-        from pipeline5.phases.io_tags import tags as io_tags
+        from pipeline5.systems.plc_based.siemens_s7 import plctags_xlsx_writer as io_tags
         label = {510: "510 Generate I/O Tags", 520: "520 Generate Data Blocks"}.get(
             only, "500 Signals Mapping  (520 Data Blocks + 510 I/O Tags)")
         self._emit("PHASE", label)
@@ -848,7 +848,7 @@ class App:
         from pipeline5.phases.staging import iolist as staging
         from pipeline5.phases.datablocks import generator as datablocks
         from pipeline5.phases.interfaces import builder as interfaces
-        from pipeline5.phases.interfaces._siemens_s7 import xlsx as interface_xlsx
+        from pipeline5.systems.plc_based.siemens_s7 import interface_xlsx_writer as interface_xlsx
         self._emit("PHASE", "410 Generate Interfaces" if only == 410 else "400 Interfaces Generation")
         self._status("interfaces…")
         findings = []
@@ -866,7 +866,7 @@ class App:
         n_if, n_el = len(database["interfaces"]), len(database["interface_elements"])
         self._emit("RSLT", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "
                            f"IF_*.xlsx in {config.interfaces_dir()}")
-        from pipeline5.phases.interfaces._siemens_s7 import scl as interface_scl
+        from pipeline5.systems.plc_based.siemens_s7 import interface_scl_emitter as interface_scl
         scl = interface_scl.project(database)
         self._render(scl["findings"], label="430 MachineInterfaces SCL")
         if scl["path"]:
@@ -890,7 +890,7 @@ class App:
         from pipeline5.phases.datablocks import generator as datablocks
         from pipeline5.phases.diagnosis import builder as diagnosis
         from pipeline5.phases.diagnosis import diaglist as diaglist_csv
-        from pipeline5.phases.diagnosis._siemens_s7 import scl as diagnosis_scl
+        from pipeline5.systems.plc_based.siemens_s7.safety import opc_diagnosis_scl as diagnosis_scl
         label = {610: "610 Generate Diag List", 620: "620 Generate Diag Software Blocks"}.get(
             only, "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL)")
         self._emit("PHASE", label)
@@ -922,8 +922,8 @@ class App:
         from pipeline5 import config
         from pipeline5.findings import gate as run
         from pipeline5.phases.staging import iolist as staging
-        from pipeline5.phases.hardware import builder as hardware
-        from pipeline5.phases.hardware import csv as hardware_csv
+        from pipeline5.systems.plc_based.siemens_s7 import profinet_hardware as hardware
+        from pipeline5.systems.plc_based.siemens_s7 import hardware_csv_export as hardware_csv
         label = {710: "710 Generate Stations", 720: "720 Generate Modules"}.get(
             only, "700 Hardware Generation  (710 Stations + 720 Modules)")
         self._emit("PHASE", label)
@@ -962,12 +962,12 @@ class App:
         if "db_blocks" not in database:
             self._emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
             return
-        database, blk_findings = engine.build(database)
+        database, blk_findings = engine.build(database, system=self._system)
         # the verbose per-block log (user spec): each generated block, its template (when a shipped
         # one exists), the declared output surface, and the builder function that produced it
         surface = {"csv": "CreationInfo CSV", "fc_xml": "FC XML (ImportReady)",
                    "scl": "SCL (ImportReady)"}
-        for r in engine.block_report(database):
+        for r in engine.block_report(database, self._system):
             tmpl = f"  template={r['template_stem']}" if r["template_stem"] else ""
             inst_note = f" + {r['instances']} instance DBs" if r["instances"] else ""
             self._emit("INFO", f"  {r['name']}  <-  {r['builder']}(){tmpl}  ->  "
@@ -998,7 +998,7 @@ class App:
         from pipeline5.phases.datablocks import generator as datablocks
         from pipeline5.phases.interfaces import builder as interfaces
         from pipeline5.phases.diagnosis import builder as diagnosis
-        from pipeline5.phases.hardware import builder as hardware
+        from pipeline5.systems.plc_based.siemens_s7 import profinet_hardware as hardware
         from pipeline5.phases.coverage import coverage
         from pipeline5.phases.software_blocks import build_engine as engine
         self._emit("PHASE", "910 Generate Pipeline Coverage Report" if only == 910 else "900 Reporting  (910 Pipeline Coverage)")

@@ -41,8 +41,6 @@ RATCHET = {
     # -- fillout's stage->fill->re-stage wiring + risky-index node_of (burn-down: steps 4/5) --
     ("phases.fillout.document_fill", "phases.staging"): "stage->fill->re-stage wiring; moves to the app run-plan (step 5)",
     ("phases.fillout.document_fill", "phases.diagnosis"): "risky-index uses diagnosis.node_of; node_of belongs in truth.addresses (step 4)",
-    # -- coupling truth #6: the engine drives the GlobalDB XML writer across chapters (step 4) --
-    ("phases.software_blocks.build_engine", "phases.datablocks._siemens_s7"): "truth#6 - write_com_db reuses db_xml; both emitters move behind system.emitters (step 4)",
 }
 
 

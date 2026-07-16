@@ -14,7 +14,7 @@ import os
 
 from pipeline5 import config
 from pipeline5.truth.database import Database
-from pipeline5.phases.hardware.builder import hardware_modules_table, hardware_stations_table
+from pipeline5.systems.plc_based.siemens_s7.profinet_hardware import hardware_modules_table, hardware_stations_table
 
 # The SSOT (snake_case) columns in format-2 ORDER, and the literal format-2 tag + descriptive-header lines
 # (from the committed reference; OP4 reads by position). PL4 CONTRACT EVOLUTION (2026-07-06, co-designed

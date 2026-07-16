@@ -260,7 +260,7 @@ def test_diaglist_crlf_no_bom():
 # =================================================================================================== #
 # Phase 600d - the OPC SCL projection (render_scl + tristate from template_type OR a per-type signal)
 # =================================================================================================== #
-from pipeline5.phases.diagnosis._siemens_s7 import scl as diagnosis_scl
+from pipeline5.systems.plc_based.siemens_s7.safety import opc_diagnosis_scl as diagnosis_scl
 
 _SCL_TEMPLATE = (
     'FUNCTION "TEMPLATE--v1.0--06_Diagnostic for OPC" : Void\n'

@@ -8,7 +8,8 @@ from openpyxl import load_workbook
 
 from _harness import run, eq, ok
 from pipeline5.truth.database import Database
-from pipeline5.phases.io_tags import tags as io_tags
+from pipeline5.systems.plc_based.siemens_s7 import plctags_xlsx_writer as io_tags
+from pipeline5.phases.io_tags import collector as tag_collector
 from pipeline5.phases.interfaces import builder as interfaces
 from pipeline5.truth.signals import signals_table
 
@@ -39,14 +40,14 @@ def _project(signals=(), elements=()):
 
 
 def test_tia_dtype_and_logical_address():
-    eq(io_tags._tia_dtype("bool"), "Bool")
-    eq(io_tags._tia_dtype("WORD"), "Word")
-    eq(io_tags._tia_dtype(""), "Bool", "blank -> Bool default")
-    eq(io_tags._tia_dtype("foo"), "Foo", "unknown type capitalizes")
-    eq(io_tags._logical_address("I1.0"), "%I1.0")
-    eq(io_tags._logical_address("%Q10000.0"), "%Q10000.0", "already %-prefixed -> unchanged")
-    eq(io_tags._logical_address(""), "")
-    eq(io_tags._logical_address(None), "")
+    eq(tag_collector._tia_dtype("bool"), "Bool")
+    eq(tag_collector._tia_dtype("WORD"), "Word")
+    eq(tag_collector._tia_dtype(""), "Bool", "blank -> Bool default")
+    eq(tag_collector._tia_dtype("foo"), "Foo", "unknown type capitalizes")
+    eq(tag_collector._logical_address("I1.0"), "%I1.0")
+    eq(tag_collector._logical_address("%Q10000.0"), "%Q10000.0", "already %-prefixed -> unchanged")
+    eq(tag_collector._logical_address(""), "")
+    eq(tag_collector._logical_address(None), "")
 
 
 def test_two_sheet_structure_and_headers():
