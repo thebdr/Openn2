@@ -45,21 +45,6 @@ Each table persists to one **CSV-with-JSON-cells** file in the **top-level `Data
 (`Shared/Database/` builtin, or `<project>/Database/`). Every created entity carries a content-hash
 **`uid`** and FKs to its source's uid; row order is preserved by insertion.
 
-## Package layout (current)
-```
-Pipeline4App/
-  DESIGN.md · CLAUDE.md · HANDOFF.md · launch_gui.py
-  config_project/                  (the restructured config — see "Config" below)
-  pipeline4/
-    core/  keys.py · table.py · database.py · config.py · severity.py · finding.py · treatments.py · run.py · model.py
-    io/    workbook.py · xlsx_edit.py · render.py
-    domain/ signals.py · identity.py · matrix.py · staging.py · dbtemplate.py · datablocks.py · db_members.py · datablock_xml.py · interfaces.py · interface_xlsx.py · io_tags.py · diagnosis_entries.py · diagnosis.py · diaglist_csv.py · diagnosis_scl.py · hardware.py · hardware_csv.py · coverage.py
-    domain/blocks/ (ph800) database.py · table.py · registry.py · templates.py · builders.py · engine.py · xml_emit.py
-    domain/validation/ (ph100) __init__.py · address.py · messages.py · model.py · iolist.py · matrix.py · ce_refs.py · crosscheck.py · phase.py
-    gui/   app_main.py · phasebar.py · logview.py · theme.py
-  tests/unit/  (plain-python, _harness.py — 88 tests, the green gate)
-```
-
 ## The spine (`core/`)
 - **`keys.uid(*parts)`** — the universal content hash: `sha1('|'.join, None→'')[:10]`. The STABLE
   identifying fields only (excludes workbook/seq/level → survives a document revision). Generalizes PL3's
@@ -1039,24 +1024,9 @@ The user-reviewed refresh before the first production test (the full spec + comm
 
 ## Testing
 Plain-`python` tests under `tests/unit/` via `_harness.py` (PASS/FAIL, non-zero exit). The
-**data-independent suite is the green gate** (currently **236**: keys/table/database, signals schema,
-sheets/workbook, params/config_loaders, staging identity+read (+ the S3 `stg_dup_signal_uid` finding + the
-no-match `load_io_list` branch), dbtemplate/datablocks (+ all 13 S2 finding slugs), interfaces (+ the S4
-`if_ioc_no_index`/`if_signal_not_mirrored` slugs) + interface_xlsx (incl. the 400e insertion/seed/freeze),
-the **`io/xlsx_edit` suite** (14, ported verbatim), the **510 `io_tags` suite** (8, + the S4 `iotag_no_address`
-slug), the **600 `diagnosis` suite** (18, + the S5 `diag_scl_template_missing` slug), the **severity/findings core**
-(`test_severity`/`test_finding`/`test_treatments`/`test_run` = 20, incl. S4's `run.render`), the **700 `hardware`
-suite** (10: the helpers, the extract incl. auto-plug/PotentialGroup/by-type/default-cards, the missing-DTD
-FAIL/switch-WARN, the table fill + int->str of slot/addr, the format-2 projection), the **800a+b+c `blocks` suite**
-(22: Table/Database list-cells, the $/#/%/@ serialization, the 00/06/07 simple builders, the 02/03/04/05/08 complex
-builders + `_area_descriptions`/`_of_variant`, the build->project round-trip, the 800c FC-XML emit + 03 CSV-drop +
-02_COM safe-DB + InstanceDBs merge/dedup), and the **900 `coverage` suite** (9, hermetic: the signal/channel/
-structural classification, the pure attribute placement + ORPHAN-only-for-signals, the interface defines/mirror +
-hardware station/module attribution, find_unplaced, collect_outputs over a synthetic Database, render + build->project),
-and the **100 validation suites** (`test_validation_render` 6: address + the rich renderer banner/line/InfoBlock/
-Cmp+dual-link/errors-filter/HTML; `test_validation_standalone` 9: 110+120 via a StubView + monkeypatched openers;
-`test_validation_crosscheck` 6: the io/ce indexes + the 130 two-search + the 140 decision tree; `test_validation_phase`
-1: the orchestrator's banner interleaving + the 4 reports + treatable-only recording)).
+**data-independent suite is the green gate** (currently **236** — the core spine, every backend-phase suite
+(300–900), the severity/findings core, and the 100 validation suites; each phase section above lists its own
+`test_*.py` cases).
 Data-dependent parity (staging/520/400/510/600/700/800 vs PL3, the byte-parity of `signals.csv`/GlobalDB XMLs/
 `interface_elements`/PLCTags/`diagnosis_entries`/DiagList/SCL + `Stations.csv`/`Modules.csv` + the CreationInfo CSVs
 vs PL3 `_format2`/`write_creation_csv`) is verified by a script (not in the gate). Each phase is committed with its gate + parity green.
