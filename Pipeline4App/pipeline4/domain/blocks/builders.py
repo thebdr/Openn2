@@ -286,7 +286,8 @@ def build_05_output_feedback(db: Database) -> Table:
       ContactorOutput = the unit's KQ(s) - 1 or a KQ1/2+KQ2/2 pair (Contactor{n}_Output = name_in_tagtable,
         QBadInput = 'QBAD_'+tag),
       FeedbackInput   = the unit's KI(s) incl. a KIx/n series, in row order (Contactor{n}_FeedbackInput),
-      OnCondition     = the union of the KQ matrix areas -> 05_EM_STATE."AREA nn Q_Delayed" / "..._RESET".
+      OnCondition     = the union of the KQ matrix areas -> 05_EM_STATE."AREA nn POWER_CUT" / "..._RESET"
+                        (the per-area power-cut coil the 04_ESTOP v1.1 block writes; was "AREA nn Q_Delayed").
     TemplateType = the smallest variant covering (OnCondition, FeedbackInput, ContactorOutput); unused
     FeedbackInput slots (a count between the 1/2/4 tiers) pad with PAD. Error member = the first KQ's
     name_in_db in 03_FDBACK_RAW; instanceOf-F_FDBACK = 'FDBACK_'+that KQ's FLD (+ '_<device>' per extra KQ)."""
@@ -338,7 +339,7 @@ def build_05_output_feedback(db: Database) -> Table:
             ki = kis[n - 1] if n - 1 < len(kis) else None
             row[f"tagName:Contactor{n}_FeedbackInput"] = ki.get("name_in_tagtable", "") if ki else PAD
         for i, area in enumerate(areas, start=1):                   # OnCondition: area number UNPADDED (-> "AREA 1")
-            row[f"05_EM_STATE.{{matrix_areas.{i}}}"] = f"{area} Q_Delayed"
+            row[f"05_EM_STATE.{{matrix_areas.{i}}}"] = f"{area} POWER_CUT"   # the per-area power-cut coil (04 v1.1)
             row[f"05_EM_STATE.{{matrix_areas.{i}}}_RESET"] = f"{area} RESET"
         t.add_row(row)
     return t

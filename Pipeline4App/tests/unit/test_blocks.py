@@ -207,7 +207,7 @@ def test_builder_05_output_feedback_source_row_orders_unit():
     eq(r["tagName:Contactor1_Output"], "TAGQ1")
     eq(r["tagName:Contactor1_QBadInput"], "QBAD_TAGQ1")
     eq(r["NetworkComment"], "AREA 1 Contactor Output FLDx L1", "matrix_areas |-joined, whitespace collapsed")
-    eq(r["05_EM_STATE.{matrix_areas.1}"], "AREA 1 Q_Delayed")
+    eq(r["05_EM_STATE.{matrix_areas.1}"], "AREA 1 POWER_CUT")
 
 
 def test_builder_05_output_feedback_pads_feedback_slots():
