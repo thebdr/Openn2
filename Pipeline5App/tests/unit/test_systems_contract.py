@@ -50,14 +50,16 @@ def test_system_is_frozen():
     raises(Exception, mutate)  # dataclasses.FrozenInstanceError
 
 
-def test_catalog_planned_rows_greyed():
-    """With nothing registered, every catalog row is a greyed PLANNED roadmap row."""
+def test_catalog_rows_reflect_registration():
+    """Since step 3, siemens_s7_safety is REGISTERED (available); the RTX rows stay greyed PLANNED."""
     rows = catalog.catalog()
-    eq(len(rows), len(catalog.PLANNED), "empty registry -> exactly the PLANNED rows")
-    ok(all(available is False for _, _, available in rows), "all greyed")
-    ids = [r[0] for r in rows]
-    ok("siemens_s7_safety" in ids and "intervalzero_rtx_sorter" in ids, "taxonomy ids present")
-    eq(catalog.by_id("siemens_s7_safety"), None, "planned-but-unregistered resolves to None")
+    eq(len(rows), len(catalog.PLANNED), "1 registered supersedes its PLANNED row; 3 stay planned")
+    by = {r[0]: r[2] for r in rows}
+    eq(by.get("siemens_s7_safety"), True, "the Siemens system is available")
+    eq(by.get("intervalzero_rtx_sorter"), False, "RTX sorter still greyed")
+    eq(by.get("intervalzero_rtx_induction"), False, "RTX induction still greyed")
+    eq(by.get("intervalzero_rtx_plant"), False, "RTX plant still greyed")
+    ok(catalog.by_id("siemens_s7_safety") is not None, "by_id resolves the registered system")
     eq(catalog.by_id("no_such_system"), None, "unknown resolves to None")
 
 
@@ -92,7 +94,7 @@ if __name__ == "__main__":
         ("builder_registry_isolation", test_builder_registry_isolation),
         ("system_descriptor_validates", test_system_descriptor_validates),
         ("system_is_frozen", test_system_is_frozen),
-        ("catalog_planned_rows_greyed", test_catalog_planned_rows_greyed),
+        ("catalog_rows_reflect_registration", test_catalog_rows_reflect_registration),
         ("catalog_registration_flips_availability", test_catalog_registration_flips_availability),
         ("catalog_duplicate_id_fails_loud", test_catalog_duplicate_id_fails_loud),
     ]))

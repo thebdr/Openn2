@@ -1,0 +1,35 @@
+{
+  "clause": "C-021",
+  "command": "bash Pipeline5App/scripts/verify_c021.sh",
+  "commandArgv": [
+    "bash",
+    "Pipeline5App/scripts/verify_c021.sh"
+  ],
+  "exitCode": 0,
+  "outputSha": "f69bfa8eb34f07638691b9a79afd2c0ede0d7f0993d4296dca9f32451aaf8cd5",
+  "outputTail": "== architecture_contracts ==\r\n  PASS  l1_layers_one_direction\r\n  PASS  l2_phases_are_filters\r\n  PASS  l3_systems_sealed\r\n  PASS  l4_headless_pipeline\r\n  PASS  l5_no_type_id_literals_below_workbench\r\n  PASS  ratchet_entries_still_real\r\n  PASS  parts_all_known\r\n  -> 7/7 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 38 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
+  "ranAt": "2026-07-16T23:18:49.982Z",
+  "headCommit": "d7a95823c8faa6316076d3c2fdc2bcc2e5d372c1",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_systems_contract.py",
+      "file": "Pipeline5App/tests/unit/test_systems_contract.py",
+      "fileSha": "ac9aeb4f1d98125e7d03d3f84279c83af2f88b625e469c42d7917d947545df98"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_system_siemens.py",
+      "file": "Pipeline5App/tests/unit/test_system_siemens.py",
+      "fileSha": "4b5501977c7d08be754c9e6d5402d5ea83b3f7de0c927c6e41fd8c0fdd90162d"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_architecture_contracts.py",
+      "file": "Pipeline5App/tests/unit/test_architecture_contracts.py",
+      "fileSha": "f7244a6efa1f32c1a60c59f46bfbc2d18b915396cfeb27374130ce7a3b6b85e5"
+    },
+    {
+      "name": "Pipeline5App/scripts/parity_vs_pl4.py",
+      "file": "Pipeline5App/scripts/parity_vs_pl4.py",
+      "fileSha": "2c2649afe3654f92e092ad41336614f0f3c5f41fb657d1706f4e985342d8693d"
+    }
+  ]
+}

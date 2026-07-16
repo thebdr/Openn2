@@ -217,11 +217,15 @@ def generate(rows, definitions, elements, types) -> tuple:
     return global_dbs, instance_dbs, findings
 
 
-def write_back(rows, global_dbs) -> None:
+def write_back(rows, global_dbs, system=None) -> None:
     """Denormalize each signal's DB membership back onto it: `datablocks` (the ordered DBs it joins),
-    `name_in_db` (its member in the LEFTMOST DB), `plc_binding` (`"<leftmost db>"."<name_in_db>"`, else the
-    tag `"<name_in_tagtable>"`, else ''). Only `row`-kind members (one signal -> one member) attribute to a
-    signal; seeds + `unique` aggregates do not. Leftmost = the earliest element row that matched (the `seq`)."""
+    `name_in_db` (its member in the LEFTMOST DB), `plc_binding` (the SYSTEM's symbol notation for
+    `<leftmost db>.<name_in_db>`, else the quoted tag, else ''). Only `row`-kind members (one signal ->
+    one member) attribute to a signal; seeds + `unique` aggregates do not. Leftmost = the earliest
+    element row that matched (the `seq`).
+
+    `system` supplies the symbol notation (PL4 coupling #1): `system.symbols.binding/quote`. None keeps
+    the PL4-faithful TIA literal - the default dies when step 4 makes the system mandatory."""
     contributions = []
     for db_name, g in global_dbs.items():
         for m in g["members"]:
@@ -241,12 +245,14 @@ def write_back(rows, global_dbs) -> None:
                     dbs.append(db_name)
             row["name_in_db"] = members[0][1]
             row["datablocks"] = dbs
-            row["plc_binding"] = f'"{dbs[0]}"."{members[0][1]}"'
+            row["plc_binding"] = (system.symbols.binding(dbs[0], members[0][1]) if system is not None
+                                  else f'"{dbs[0]}"."{members[0][1]}"')
         else:
             tag = (row.get("name_in_tagtable") or "").strip()
             row["name_in_db"] = ""
             row["datablocks"] = []
-            row["plc_binding"] = f'"{tag}"' if tag else ""
+            row["plc_binding"] = ((system.symbols.quote(tag) if system is not None else f'"{tag}"')
+                                  if tag else "")
 
 
 def _fill_db_members(table, global_dbs) -> None:
@@ -266,7 +272,7 @@ def _fill_db_blocks(table, global_dbs) -> None:
                   memory_reserve=g["memory_reserve"])
 
 
-def build(database: Database | None = None) -> tuple:
+def build(database: Database | None = None, system=None) -> tuple:
     """Phase 520 (SSOT): evaluate the registry over the signals table -> the `db_members` + `instance_dbs`
     tables + the write-back. Loads the staged Database from the Database folder when none is passed; on a
     raw-FAIL finding returns WITHOUT writing (`run.has_blocking` - the caller's `run.gate` logs + halts).
@@ -285,7 +291,7 @@ def build(database: Database | None = None) -> tuple:
     _fill_db_members(dbm, global_dbs)
     for name, fb in instance_dbs:
         idb.add(instance_name=name, fb=fb)
-    write_back(rows, global_dbs)
+    write_back(rows, global_dbs, system=system)
 
     for table in (dbb, dbm, idb):
         if table.name in database:

@@ -291,7 +291,7 @@ def _load_cabinets(io_path: str, cab_table) -> None:
                       template_type=c["template_type"], swp=c["swp"])
 
 
-def stage_iolist(params: dict | None = None, save: bool = True) -> tuple:
+def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> tuple:
     """Phase 310 - Stage I/O List: read the I/O List into the `signals` table WITHOUT the C&E enrichment
     (no matrix_areas / ce_* / numerazione_linea -> `combined_FLD` == `iol_FLD`, `IsSorterArea` ''), plus the
     `diagnosis_cabinets` table; save the Database and return (database, findings). A missing I/O sheet emits
@@ -316,7 +316,8 @@ def stage_iolist(params: dict | None = None, save: bool = True) -> tuple:
     _finalize_identity(params, rows)                  # the I/O-List identity (C&E fields still absent)
     for row in rows:
         table.add_row(row)
-    _load_cabinets(io_path, cab_table)
+    if system is None or system.capabilities.needs_diagnosis_blocks:   # capability gate, never a type-id
+        _load_cabinets(io_path, cab_table)
     if save:
         database.save(config.database_dir())
     return database, []
@@ -341,13 +342,20 @@ def annotate_cematrix(database, params: dict | None = None, save: bool = True) -
     return database, findings
 
 
-def stage(params: dict | None = None) -> tuple:
+def stage(params: dict | None = None, system=None) -> tuple:
     """Phase 300: the full staging - `stage_iolist` (310) then `annotate_cematrix` (320) - returning
     (database, findings) with `signals` + `diagnosis_cabinets` + `validation_issues` saved. The single
     staging entry point every downstream phase calls; BYTE-IDENTICAL to the pre-split monolith. A missing
-    I/O sheet halts after 310 WITHOUT writing (the `run.has_blocking` guard)."""
+    I/O sheet halts after 310 WITHOUT writing (the `run.has_blocking` guard).
+
+    `system` gates the shared legs by CAPABILITY, never by type id: a system without a C&E matrix
+    (`needs_ce_matrix=False`) stops after 310 (saved, no annotation); `needs_diagnosis_blocks=False`
+    skips the DiagnosisBlocks read. None (tests, transitional callers) keeps the full PL4 behavior."""
     params = params or config.load_params()
-    database, findings = stage_iolist(params, save=False)
+    database, findings = stage_iolist(params, save=False, system=system)
     if run.has_blocking(findings):                    # no I/O sheet -> halt before the C&E pass, nothing written
+        return database, findings
+    if system is not None and not system.capabilities.needs_ce_matrix:
+        database.save(config.database_dir())          # no C&E for this system: 310 IS the whole staging
         return database, findings
     return annotate_cematrix(database, params, save=True)

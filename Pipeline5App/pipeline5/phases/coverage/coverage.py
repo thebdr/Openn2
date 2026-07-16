@@ -78,10 +78,15 @@ def row_kind(row) -> str:
 
 
 # --- reading the SSOT tables into the emitted-identity sets (replaces PL3's on-disk readers) ------ #
-def collect_outputs(database) -> dict:
+def collect_outputs(database, system=None) -> dict:
     """Read every SSOT table into the emitted-identity sets the trace attributes against - the same dict
     shape PL3's `collect_outputs(out_root)` produced from disk. A missing table degrades to empty +
-    found=False (noted in the report)."""
+    found=False (noted in the report).
+
+    `system.symbols.find_bindings` supplies the symbol notation the consumed-refs scan parses
+    (PL4 coupling #1); None falls back to the TIA regex until step 4 makes the system mandatory."""
+    _refs = (system.symbols.find_bindings if system is not None
+             else lambda text: [(m.group(1), m.group(2)) for m in _QUALREF.finditer(text or "")])
     # (510) the tag names 510 would emit: io-signal name_in_tagtable + interface_elements signal_name.
     tags = set()
     for r in (database["signals"] if "signals" in database else []):
@@ -107,8 +112,8 @@ def collect_outputs(database) -> dict:
                   str((e.get("diag_columns") or {}).get("PLC_Binding") or "").strip()):
             if b:
                 diagb.add(b)
-                for mm in _QUALREF.finditer(b):
-                    consumed.append(("diagnosis", mm.group(1), mm.group(2)))
+                for db_name, member in _refs(b):
+                    consumed.append(("diagnosis", db_name, member))
 
     # (400) interface mirror Expressions + the interface instance names + consumed refs.
     ifx, ifi = set(), set()
@@ -116,8 +121,8 @@ def collect_outputs(database) -> dict:
         v = str(e.get("expression") or "").strip()
         if v:
             ifx.add(v)
-            for mm in _QUALREF.finditer(v):
-                consumed.append(("interface-mirror", mm.group(1), mm.group(2)))
+            for db_name, member in _refs(v):
+                consumed.append(("interface-mirror", db_name, member))
     for iface in (database["interfaces"] if "interfaces" in database else []):
         inst = str(iface.get("instance") or "").strip()
         if inst:
@@ -245,10 +250,10 @@ def attribute(rows, outputs) -> dict:
     return {"records": records, "orphans": orphans, "unplaced": unplaced, "stats": stats}
 
 
-def trace(database) -> dict:
+def trace(database, system=None) -> dict:
     """Read the SSOT tables and attribute every staged row against them."""
     rows = list(database["signals"]) if "signals" in database else []
-    return attribute(rows, collect_outputs(database))
+    return attribute(rows, collect_outputs(database, system=system))
 
 
 # --- report rendering (verbatim from PL3) ------------------------------------------------------- #
@@ -325,11 +330,11 @@ def _findings(result) -> list:
     return out
 
 
-def build(database) -> tuple:
+def build(database, system=None) -> tuple:
     """Phase 900 (SSOT): trace the signals across the tables -> the `coverage` table + the
     cov_orphan_signal / cov_unplaced_member WARN findings (recorded to validation_issues). Saves.
     Returns (database, findings)."""
-    result = trace(database)
+    result = trace(database, system=system)
     tbl = coverage_table()
     for rec in result["records"]:
         tbl.add(source_cell=rec["source"], kind=rec["kind"], script_type=rec["script_type"],
@@ -346,10 +351,10 @@ def build(database) -> tuple:
     return database, findings
 
 
-def project(database, out_dir: str | None = None) -> dict:
+def project(database, out_dir: str | None = None, system=None) -> dict:
     """Project the coverage trace -> `io_project_coverage_report.{csv,txt}` (documentation, NOT a
     BuilderData surface). A pure projection (`findings: []`). Returns {'csv','txt','stats','findings'}."""
-    result = trace(database)
+    result = trace(database, system=system)
     out_dir = out_dir or config.coverage_dir()
     os.makedirs(out_dir, exist_ok=True)
     base = os.path.join(out_dir, config.COVERAGE_REPORT_STEM)

@@ -174,7 +174,8 @@ def _drop_stale_csv(out_dir: str, name: str) -> None:
         os.remove(stale)
 
 
-def project(database: DB | None = None, out_dir: str | None = None, import_dir: str | None = None) -> dict:
+def project(database: DB | None = None, out_dir: str | None = None, import_dir: str | None = None,
+            system=None) -> dict:
     """Project `software_blocks` + `software_block_members` -> the `$/#/%/@` CreationInfo CSVs in `out_dir`
     (defaults to `config.blocks_creation_dir()`), each block's template XML COPIED to `<out_dir>/Templates/`
     and referenced RELATIVELY (`$ template=Templates/<file>.xml` - the CreationInfo folder is
@@ -198,11 +199,23 @@ def project(database: DB | None = None, out_dir: str | None = None, import_dir: 
     for b in (database["software_blocks"] if "software_blocks" in database else []):
         rows = [dict(m["values"]) for m in sorted(members.get(b["name"], []), key=lambda m: int(m["seq"]))]
         table = Table(b["name"], columns=list(b["columns"]), rows=rows)
-        if emit_kind(b["name"]) == "scl":                        # a ready SCL FUNCTION -> ImportReady
-            scl_files.append(scl_emit.write_scl(b["name"], table, import_dir))
+        # Emit-kind routing (PL4 coupling #2): with a `system`, the writer comes from its emitter
+        # table - an undeclared READY kind raises instead of silently defaulting; the "csv" default
+        # stays engine-internal until step 4. Without a system: the PL4-faithful direct calls.
+        kind = emit_kind(b["name"])
+        if system is not None and kind != "csv" and kind not in system.emitters:
+            raise KeyError(f"system {system.id!r} declares no emitter for kind {kind!r} "
+                           f"(block {b['name']!r})")
+        if kind == "scl":                                        # a ready SCL FUNCTION -> ImportReady
+            scl_files.append(system.emitters["scl"](b, table, {"import_dir": import_dir})
+                             if system is not None else scl_emit.write_scl(b["name"], table, import_dir))
             _drop_stale_csv(out_dir, b["name"])
             continue
-        xml_path = xml_emit.write_fc_xml(b["name"], table, b["template_ref"], import_dir)
+        if system is not None:
+            xml_path = (system.emitters[kind](b, table, {"import_dir": import_dir})
+                        if kind in ("fc_xml", "fdback_xml") else None)
+        else:
+            xml_path = xml_emit.write_fc_xml(b["name"], table, b["template_ref"], import_dir)
         if xml_path:                                             # 03 ships as FC XML -> drop its CSV (stale one too)
             xml_files.append(xml_path)
             _drop_stale_csv(out_dir, b["name"])

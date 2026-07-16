@@ -42,6 +42,10 @@ APP_TITLE = "Pipeline5 - SSOT database build"
 
 class App:
     def __init__(self, root):
+        # TRANSITIONAL (step 3): the one registered system, hardcoded until step 5 resolves the
+        # ACTIVE system from the project meta (types/multi_system) + the toolbar selector.
+        from pipeline5.systems import catalog as _systems_catalog
+        self._system = _systems_catalog.by_id("siemens_s7_safety")
         self.root = root
         self._busy = False
         self._run_halted = False              # set by _gate on a blocking FAIL -> Run-all stops the chain
@@ -689,7 +693,7 @@ class App:
             from pipeline5.findings import report_renderer as iorender
             self._emit("PHASE", f"100 {i18n.tr('ph_validation', self.lang)}  (110 + 120 + 130 + 140 + 150)")
             self._status("validation…")
-            database, _sf = staging.stage()
+            database, _sf = staging.stage(system=self._system)
             res = validation.run_validation(database, lang=self.lang)
             issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERRR", "WARN")]
             applied = treatments.apply_and_reconcile(issues)   # registry maintenance
@@ -714,10 +718,10 @@ class App:
             elif only == 120:
                 findings = matrix.run_ce_matrix(params)
             elif only == 150:                      # step 4: diagnosis checks over the staged SSOT
-                database, _sf = staging.stage(params)
+                database, _sf = staging.stage(params, system=self._system)
                 findings = diagcheck.run_diag_checks(database, params)
             else:                                  # 130 / 140 read the staged signals
-                database, _sf = staging.stage(params)
+                database, _sf = staging.stage(params, system=self._system)
                 runner = crosscheck.run_xcheck_cem_iol if only == 130 else crosscheck.run_xcheck_iol_cem
                 findings = runner(database, params)
         issues = [f for f in findings if f.severity in ("FAIL", "ERRR", "WARN")]
@@ -784,7 +788,7 @@ class App:
         else:
             key = "pb_stage_cematrix" if only == 320 else "ph_staging"
             self._emit("PHASE", f"{only or 300} {i18n.tr(key, self.lang)}")
-            database, findings = staging.stage()
+            database, findings = staging.stage(system=self._system)
             label = f"{only or 300} staging"
         if not self._gate(findings, label=label):
             return
@@ -809,9 +813,9 @@ class App:
         self._emit("PHASE", label)
         self._status("data blocks…")
         findings = []
-        database, f = staging.stage(); findings += f
+        database, f = staging.stage(system=self._system); findings += f
         if not run.has_blocking(f):
-            database, f = datablocks.build(database); findings += f
+            database, f = datablocks.build(database, system=self._system); findings += f
         if not self._gate(findings, label="500 (300 staging + 520 data blocks)"):
             return
         if "db_blocks" not in database:
@@ -848,9 +852,9 @@ class App:
         self._emit("PHASE", "410 Generate Interfaces" if only == 410 else "400 Interfaces Generation")
         self._status("interfaces…")
         findings = []
-        database, f = staging.stage(); findings += f
+        database, f = staging.stage(system=self._system); findings += f
         if not run.has_blocking(f):
-            database, f = datablocks.build(database); findings += f
+            database, f = datablocks.build(database, system=self._system); findings += f
         if not self._gate(findings, label="400 (300 staging + 520 prereq)"):
             return
         if "db_blocks" not in database:
@@ -892,9 +896,9 @@ class App:
         self._emit("PHASE", label)
         self._status("diagnosis…")
         findings = []
-        database, f = staging.stage(); findings += f
+        database, f = staging.stage(system=self._system); findings += f
         if not run.has_blocking(f):
-            database, f = datablocks.build(database); findings += f
+            database, f = datablocks.build(database, system=self._system); findings += f
         if not self._gate(findings, label="600 (300 staging + 520 prereq)"):
             return
         if "db_blocks" not in database:
@@ -925,7 +929,7 @@ class App:
         self._emit("PHASE", label)
         self._status("hardware…")
         findings = []
-        database, f = staging.stage(); findings += f
+        database, f = staging.stage(system=self._system); findings += f
         if not run.has_blocking(f):
             database, f = hardware.build(database); findings += f
         if not self._gate(findings, label="700 (300 staging + hardware)"):
@@ -950,9 +954,9 @@ class App:
         self._emit("PHASE", label)
         self._status("software…")
         findings = []
-        database, f = staging.stage(); findings += f
+        database, f = staging.stage(system=self._system); findings += f
         if not run.has_blocking(f):
-            database, f = datablocks.build(database); findings += f
+            database, f = datablocks.build(database, system=self._system); findings += f
         if not self._gate(findings, label="800 (300 staging + 520 prereq)"):
             return
         if "db_blocks" not in database:
@@ -970,7 +974,7 @@ class App:
                                f"{surface.get(r['emit'], r['emit'])}, {r['rows']} rows{inst_note}")
         rendered, res, inst = list(blk_findings), None, None
         if only in (None, 820):
-            res = engine.project(database); rendered += res["findings"]
+            res = engine.project(database, system=self._system); rendered += res["findings"]
         if only in (None, 830):
             inst = engine.write_instance_dbs(database)
         self._render(rendered, label="800 software")
@@ -1000,9 +1004,9 @@ class App:
         self._emit("PHASE", "910 Generate Pipeline Coverage Report" if only == 910 else "900 Reporting  (910 Pipeline Coverage)")
         self._status("coverage…")
         findings = []
-        database, f = staging.stage(); findings += f
+        database, f = staging.stage(system=self._system); findings += f
         if not run.has_blocking(findings):
-            database, f = datablocks.build(database); findings += f
+            database, f = datablocks.build(database, system=self._system); findings += f
         if not run.has_blocking(findings):
             database, f = hardware.build(database); findings += f
         if not self._gate(findings, label="900 (300 + 520 + 700 prereqs)"):
@@ -1014,7 +1018,7 @@ class App:
         database, fi = interfaces.build_interfaces(database); proj += fi
         database, fd = diagnosis.build(database); proj += fd
         database, fb = engine.build(database); proj += fb
-        database, fc = coverage.build(database); proj += fc
+        database, fc = coverage.build(database, system=self._system); proj += fc
         res = coverage.project(database)
         self._render(proj, label="900 coverage")
         st = res["stats"]

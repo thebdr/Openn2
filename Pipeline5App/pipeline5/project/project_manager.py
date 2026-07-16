@@ -28,14 +28,9 @@ from pipeline5.project import app_state as state
 CONFIG_DIRNAME = "config_project"
 _PARAMS_REL = os.path.join(CONFIG_DIRNAME, "project_params.yaml")
 
-# The creatable project types: (id, display label, available). The greyed RTX ones are declared for
-# the roadmap - the dialog shows them disabled until their pipelines exist.
-PROJECT_TYPES = (
-    ("siemens_plc_safety", "Siemens PLC: Safety", True),
-    ("rtx_cpci_sorter", "RTX cPCI: Sorter", False),
-    ("rtx_cpci_induction", "RTX cPCI: Induction", False),
-    ("rtx_cpci_plant", "RTX cPCI: Plant", False),
-)
+# The creatable project types now DERIVE from the systems registry (pipeline5.systems.catalog -
+# availability = membership, C-021); PL4's hardcoded PROJECT_TYPES tuple is retired. Project meta
+# written from here on carries the TAXONOMY ids (siemens_s7_safety, intervalzero_rtx_*).
 BACKUPS_KEPT_MAX = 20
 BACKUPS_KEPT_DEFAULT = 5
 DOCS_DIRNAME = "input_documents"          # where Import-documents copies the source docs (current/previous)

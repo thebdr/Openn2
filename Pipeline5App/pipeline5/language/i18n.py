@@ -125,6 +125,11 @@ STRINGS: dict = {
     # --- the New Project dialog ------------------------------------------------------------ #
     "np_title":     {"en": "New project", "it": "Nuovo progetto"},
     "np_type":      {"en": "Project type", "it": "Tipo di progetto"},
+    # the system display names (the catalog's name_key; rows derive from registry membership - C-021)
+    "sys_siemens_s7_safety":        {"en": "Siemens S7 · Safety", "it": "Siemens S7 · Safety"},
+    "sys_intervalzero_rtx_sorter":  {"en": "IntervalZero RTX · Sorter", "it": "IntervalZero RTX · Sorter"},
+    "sys_intervalzero_rtx_induction": {"en": "IntervalZero RTX · Induction", "it": "IntervalZero RTX · Induction"},
+    "sys_intervalzero_rtx_plant":   {"en": "IntervalZero RTX · Plant", "it": "IntervalZero RTX · Plant"},
     "np_multi":     {"en": "Multi-System Controller (select more than one type)",
                      "it": "Controllore multi-sistema (seleziona più di un tipo)"},
     "np_name":      {"en": "Project name", "it": "Nome progetto"},

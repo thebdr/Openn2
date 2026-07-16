@@ -12,6 +12,9 @@ THE LAWS
   L2 FILTERS     phases/<a> never imports phases/<b> - chapters meet only in the truth tables.
   L3 SEALED      only workbench / project / app (and systems itself) may import pipeline5.systems.
   L4 HEADLESS    tkinter is importable only from workbench and app.
+  L5 NO TYPE-ID  no module below workbench (except systems/ itself) may carry a SYSTEM-id string
+                 literal - kernel/phase code receives a System OBJECT and gates on capabilities;
+                 branching on who the system IS belongs to nobody.
 
 THE RATCHET (Kraken-style): known violations are quarantined here with their burn-down step.
 Shrink it; never grow it silently - adding an entry is an architecture decision, not a fix.
@@ -142,6 +145,28 @@ def test_ratchet_entries_still_real():
     eq(stale, [], "ratchet entries must match real edges - delete paid-off ones")
 
 
+_SYSTEM_ID_LITERALS = ("siemens_s7_safety", "intervalzero_rtx_", "siemens_plc_safety", "rtx_cpci_")
+_L5_ALLOWED_PARTS = ("systems", "workbench", "app")   # the registry, the (transitional) GUI wiring, the root
+_L5_ALLOWED_MODULES = {"language.i18n"}               # the DISPLAY-NAME catalog (sys_* keys) - data, not branching
+
+
+def test_l5_no_type_id_literals_below_workbench():
+    """The grep-gate the C-021 refuter demanded: a kernel/phase module mentioning a system id AT ALL
+    is one `==` away from type-branching - the System object and its capability flags are the only
+    sanctioned way to differ per system. Scans STRING LITERALS via ast (comments can say anything)."""
+    bad = []
+    for mod, path in _modules().items():
+        if _part(mod) in _L5_ALLOWED_PARTS or mod in _L5_ALLOWED_MODULES:
+            continue
+        tree = ast.parse(open(path, encoding="utf-8").read())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                hit = next((l for l in _SYSTEM_ID_LITERALS if l in node.value), None)
+                if hit:
+                    bad.append(f"{mod}:{node.lineno}: string literal contains {hit!r}")
+    eq(sorted(set(bad)), [], "L5: no system-id literals below the workbench")
+
+
 def test_parts_all_known():
     unknown = sorted({m.split(".")[0] for m in _modules()
                       if m.split(".")[0] not in LAYERS and m not in ("__init__", "__main__")})
@@ -155,6 +180,7 @@ if __name__ == "__main__":
         ("l2_phases_are_filters", test_l2_phases_are_filters),
         ("l3_systems_sealed", test_l3_systems_sealed),
         ("l4_headless_pipeline", test_l4_headless_pipeline),
+        ("l5_no_type_id_literals_below_workbench", test_l5_no_type_id_literals_below_workbench),
         ("ratchet_entries_still_real", test_ratchet_entries_still_real),
         ("parts_all_known", test_parts_all_known),
     ]))

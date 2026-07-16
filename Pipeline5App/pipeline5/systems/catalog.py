@@ -10,9 +10,9 @@ GUI/project layers. The grep-gate test enforces the direction.
 """
 from __future__ import annotations
 
-# Migration step 3 registers the first system:
-# from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM as SIEMENS_S7_SAFETY
-ALL_SYSTEMS: tuple = ()
+from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM as SIEMENS_S7_SAFETY
+
+ALL_SYSTEMS: tuple = (SIEMENS_S7_SAFETY,)
 
 # Roadmap rows (id, i18n name key) - shown greyed until their system.py is registered above.
 PLANNED: tuple = (

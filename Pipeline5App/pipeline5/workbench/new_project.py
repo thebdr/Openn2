@@ -18,6 +18,13 @@ from pipeline5.project import project_manager as project
 from pipeline5.project import app_state as state
 
 
+
+def _type_rows(lang: str) -> list:
+    """The project-type rows [(id, label, available)], DERIVED from the systems registry
+    (availability = catalog membership - C-021); labels via i18n from each row's name_key."""
+    from pipeline5.systems import catalog
+    return [(sid, i18n.tr(key, lang), available) for sid, key, available in catalog.catalog()]
+
 class NewProjectDialog(tk.Toplevel):
     def __init__(self, parent, lang: str = "en", on_created=lambda _root: None):
         super().__init__(parent)
@@ -34,9 +41,10 @@ class NewProjectDialog(tk.Toplevel):
 
         # --- project type(s) ---------------------------------------------------------------- #
         ttk.Label(body, text=i18n.tr("np_type", lang)).grid(row=0, column=0, sticky="nw", pady=(0, 2))
-        self._types = tk.Listbox(body, height=len(project.PROJECT_TYPES), exportselection=False,
+        self._type_rows = _type_rows(lang)
+        self._types = tk.Listbox(body, height=len(self._type_rows), exportselection=False,
                                  selectmode="browse", activestyle="none")
-        for type_id, label, available in project.PROJECT_TYPES:
+        for type_id, label, available in self._type_rows:
             self._types.insert("end", label)
             if not available:
                 self._types.itemconfig("end", foreground=theme.color("disabled_fg"))
@@ -95,7 +103,7 @@ class NewProjectDialog(tk.Toplevel):
         """Drop greyed (unavailable) picks; without Multi-System keep a single selection."""
         chosen = list(self._types.curselection())
         for index in chosen:
-            if not project.PROJECT_TYPES[index][2]:
+            if not self._type_rows[index][2]:
                 self._types.selection_clear(index)
         chosen = list(self._types.curselection())
         if not self._multi.get() and len(chosen) > 1:
@@ -126,8 +134,8 @@ class NewProjectDialog(tk.Toplevel):
         self._error.configure(text=problem)
 
     def _selected_types(self) -> list:
-        return [project.PROJECT_TYPES[i][0] for i in self._types.curselection()
-                if project.PROJECT_TYPES[i][2]]
+        return [self._type_rows[i][0] for i in self._types.curselection()
+                if self._type_rows[i][2]]
 
     # --- create ---------------------------------------------------------------------------------- #
     def _create(self) -> None:
