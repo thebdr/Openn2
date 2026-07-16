@@ -185,6 +185,24 @@ def test_load_io_list_no_match_returns_empty():
         eq(rows, [], "no rows read")
 
 
+def test_dup_type_index_findings():
+    """A (script_type, index) pair MUST be unique - a duplicate is a stg_dup_type_index FAIL (one per
+    occurrence). A distinct type OR a distinct index is fine; a blank index is skipped."""
+    cols = ["combined_FLD", "script_type", "source_cell", "index"]
+    t = signals_table(cols)
+    t.add_row({"combined_FLD": "A", "script_type": "KQ", "index": "5", "source_cell": "NET!O11"})
+    t.add_row({"combined_FLD": "B", "script_type": "KQ", "index": "5", "source_cell": "NET!O25"})   # dup (KQ,5)
+    t.add_row({"combined_FLD": "C", "script_type": "KI", "index": "5", "source_cell": "NET!I3"})    # KI,5 - distinct type
+    t.add_row({"combined_FLD": "D", "script_type": "KQ", "index": "6", "source_cell": "NET!O30"})   # KQ,6 - distinct index
+    t.add_row({"combined_FLD": "E", "script_type": "KQ", "index": "", "source_cell": "NET!O40"})    # blank index - skipped
+    fs = staging._dup_type_index_findings(t)
+    eq(len(fs), 2, "one FAIL per occurrence of the (KQ,5) duplicate; distinct/blank rows are clean")
+    eq((fs[0].phase, fs[0].type, fs[0].severity), (300, "stg_dup_type_index", "FAIL"), "the finding container")
+    eq(sorted(f.location for f in fs), ["NET!O11", "NET!O25"], "each duplicate row located at its own cell")
+    ok("KQ index 5" in fs[0].detail and "also at" in fs[0].detail, "loud: names the type/index + the sibling cell")
+    eq(staging._dup_type_index_findings(signals_table(cols)), [], "no rows -> no findings")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("staging", [
@@ -197,6 +215,7 @@ if __name__ == "__main__":
         ("node_address_ranges_positional", test_node_address_ranges_positional),
         ("node_address_range_empty_when_no_addressed_rows", test_node_address_range_empty_when_no_addressed_rows),
         ("dup_signal_uid_findings", test_dup_signal_uid_findings),
+        ("dup_type_index_findings", test_dup_type_index_findings),
         ("finalize_identity_ce_overwrite", test_finalize_identity_ce_overwrite),
         ("annotate_cematrix_records_and_restamps", test_annotate_cematrix_records_and_restamps),
         ("load_io_list_no_match_returns_empty", test_load_io_list_no_match_returns_empty),

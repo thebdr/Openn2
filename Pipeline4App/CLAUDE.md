@@ -114,7 +114,11 @@ one workbook reader (by column position per `column_map`), drops Skip-Reason + s
   `Database`. A missing I/O sheet emits the blocking **`stg_no_io_sheet`** FAIL (replacing the `raise SystemExit`;
   `load_io_list` now returns `([], matched)`) and `stage` returns WITHOUT writing (`run.has_blocking` guard); a
   duplicate signal uid emits **`stg_dup_signal_uid`** WARN (moved out of the GUI into `_dup_findings`, one per
-  shared uid). On success `stage` `finding.record`s into `validation_issues` + saves. **PARITY: `signals.csv` +
+  shared uid); a duplicate **`(script_type, index)`** pair emits **`stg_dup_type_index`** FAIL
+  (`_dup_type_index_findings`, one per occurrence, each located at its own I/O-List cell + naming the sibling
+  cell(s) - user spec 2026-07-16: the index-grouping builders 05/07/08 key units on `index`, so a duplicate would
+  be SILENTLY merged into one bogus unit; a raw FAIL HALTS generation via the gate). On success `stage`
+  `finding.record`s into `validation_issues` + saves. **PARITY: `signals.csv` +
   `diagnosis_cabinets.csv` byte-identical to pre-S3** (verified new-vs-HEAD; only `validation_issues.csv` is added,
   empty on clean data). The 4 GUI handlers accumulate staging + 520 findings and call `run.gate` ONCE (see GUI note).
 - **STEP 2 - the 310/320 split DONE** (parity-locked): `stage()` is now `stage_iolist()` (oracle **310 Stage

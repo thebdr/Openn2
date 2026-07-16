@@ -45,6 +45,31 @@ def _dup_findings(table) -> list:
             for dup in sorted(table.duplicate_uids())]
 
 
+def _dup_type_index_findings(table) -> list:
+    """One `stg_dup_type_index` FAIL per signal sharing its (script_type, index) with another - the pair
+    MUST be unique. The index-grouping builders (05 Output Feedback / 07 Speed Control / 08 Gate Manager)
+    key units on `index`, so a duplicate is silently MERGED into one unit (e.g. two KQ-5 become a bogus
+    2-contactor unit) instead of being flagged - so this HALTS (a raw FAIL) rather than corrupt generation.
+    A blank index is skipped (only indexed signals participate); one finding per occurrence, each located at
+    its own I/O-List cell + naming the sibling cell(s) so both/all duplicates are individually clickable."""
+    groups: dict = {}
+    for row in table.rows:
+        st, idx = _norm(row.get("script_type")), _norm(row.get("index"))
+        if st and idx:
+            groups.setdefault((st, idx), []).append(row)
+    out = []
+    for (st, idx), rows in sorted(groups.items()):
+        if len(rows) < 2:
+            continue
+        cells = [_norm(r.get("source_cell")) for r in rows]
+        for i, row in enumerate(rows):
+            others = ", ".join(c for j, c in enumerate(cells) if j != i and c)
+            out.append(_f("stg_dup_type_index", "FAIL",
+                          f"duplicated {st} index {idx} - a (script_type, index) pair must be unique"
+                          + (f" (also at {others})" if others else ""), _norm(row.get("source_cell"))))
+    return out
+
+
 def _skip_reason_present(value) -> bool:
     return str(value or "").strip() not in ("", "0", "0.0")
 
@@ -307,7 +332,7 @@ def annotate_cematrix(database, params: dict | None = None, save: bool = True) -
     _finalize_identity(params, table.rows)            # recompute the C&E-dependent identity (the rest idempotent)
     for row in table.rows:                            # combined_FLD (the uid key) changed -> re-stamp
         row["uid"] = content_uid(*(row.get(key) for key in table.key_columns))
-    findings = _dup_findings(table)                   # the post-stage dup check, on the final uids
+    findings = _dup_findings(table) + _dup_type_index_findings(table)   # dup uid WARN + (type,index) FAIL
     record(database, findings)                        # persist the facts to the validation_issues table
     if save:
         database.save(config.database_dir())
