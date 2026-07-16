@@ -1,0 +1,28 @@
+db_name,member,for_each,datatype,start_value,retain,ext_accessible,ext_visible,ext_writable,setpoint,comment
+DiagnosticTags,S1.CABINET{$cabinet:03d}.STATE,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),UDInt,,false,true,true,true,false,
+DiagnosticTags,S1.CABINET{$cabinet:03d}.ALARM1,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),UDInt,,false,true,true,true,false,
+DiagnosticTags,S1.CABINET{$cabinet:03d}.ALARM2,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),UDInt,,false,true,true,true,false,
+DiagnosticTags,S1.CABINET{$cabinet:03d}.WARNING1,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),UDInt,,false,true,true,true,false,
+DiagnosticTags,S1.CABINET{$cabinet:03d}.WARNING2,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),UDInt,,false,true,true,true,false,
+PROFINET_NODES_ALARM,{$profinet_name} {$profinet_ip},row where $script_type = 'PA',Bool,,false,true,true,true,false,
+00_Commissioning,{$profinet_name} {$profinet_ip},row where $script_type = 'PA',Bool,,false,true,true,true,false,
+PROFINET_NODES_WARNING,{$profinet_name} {$profinet_ip},row where $script_type = 'PW',Bool,,false,true,true,true,false,
+01_Pushbutton,Emergency Push Button [ {$combined_FLD} ],row where $script_type = 'E1/2',Bool,,false,true,true,true,false,
+01_Pushbutton,Safety Breaker [ {$combined_FLD} ],row where $script_type = 'B1/2',Bool,,false,true,true,true,false,
+04_SPEED,Safety Encoder {$index} Sensor 1 Healthy [ {$iol_FLD} ],row where $script_type = 'N1/2',Bool,,false,true,true,true,false,
+04_SPEED,Safety Encoder {$index} Sensor 2 Healthy [ {$iol_FLD} ],row where $script_type = 'N2/2',Bool,,false,true,true,true,false,
+04_SPEED,Safety Encoder {$index} Healthy [ {$iol_FLD} ],row where $script_type = 'N1/2',Bool,,false,true,true,true,false,
+07_DOOR,Door Closed SAFE_STATE [ {$combined_FLD} ],row where $script_type = 'DI1/2',Bool,,false,true,true,true,false,
+07_DOOR,Door Closed DIAGNOSIS [ {$combined_FLD} ],row where $script_type = 'DI2/2',Bool,,false,true,true,true,false,
+07_DOOR,Door Alarm [ {$combined_FLD} ],row where $script_type = 'DD',Bool,,false,true,true,true,false,
+03_FDBACK,Contactor Feedback Error [ {$combined_FLD} ],"row where $script_type in ['KQ','KQ1/2']",Bool,,false,true,true,true,false,
+03_FDBACK_RAW,Contactor Feedback Error [ {$combined_FLD} ],"row where $script_type in ['KQ','KQ1/2']",Bool,,false,true,true,true,false,
+02_COM,{$area} PB,area in unique($matrix_areas) where $script_type = 'E1/2',Bool,,false,true,true,true,false,Zone cumulative: emergency push buttons - one per area that HAS E1/2 members
+02_COM,{$area} FDB,area in unique($matrix_areas) where $script_type = 'KQ',Bool,,false,true,true,true,false,Zone cumulative: contactor feedback - one per area with KQ members
+02_COM,{$area} SAFETY_BREAKERS,area in unique($matrix_areas) where $script_type = 'B1/2',Bool,,false,true,true,true,false,Zone cumulative: safety breakers - one per area with B1/2 members
+02_COM,{$area} DOORS,area in unique($matrix_areas) where $script_type = 'DI1/2',Bool,,false,true,true,true,false,Zone cumulative: safety doors - one per area with DI1/2 members
+05_EM_STATE,{$area} Q,area in unique($matrix_areas),Bool,,false,true,true,true,false,Per-area emergency state (referenced by the 04/05/08 builders)
+05_EM_STATE,{$area} Q_Delayed,area in unique($matrix_areas),Bool,,false,true,true,true,false,
+05_EM_STATE,{$area} RESET,area in unique($matrix_areas),Bool,,false,true,true,true,false,
+05_EM_STATE,{$area} POWER_CUT,area in unique($matrix_areas),Bool,,false,true,true,true,false,Per-area emergency power-cut coil written by the 04_ESTOP block (v1.1: one per area - was the sorter-only literal AREA 1 POWER_CUT; the _SAFETY_BREAKERS_COM/_SAFETY_DOORS_COM intermediates moved to the 02_COM cumulatives)
+05_EM_STATE,SORTER_{$nn:02d}_NOT_RUNNING,nn in unique($index) where $script_type = 'N1/2',Bool,,false,true,true,true,false,One per sorter - nn = the safety-encoder index (as builders 07/08 number the sorters)

@@ -1,0 +1,17 @@
+db_name,db_type,db_programming_language,instance_of,for_each,memory_layout,opc_ua,webserver,only_load_memory,write_protected,retain_reserve,memory_reserve,seed,create_when,comment
+DiagnosticTags,Global,DB,,,Optimized,true,true,false,false,false,,false,if_elements,Per-cabinet diagnostic UDInt tags read by the 620 OPC SCL
+S1.CABINET{$cabinet:03d}.STATE,Instance,DB,CabState,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),Optimized,true,true,false,false,false,,false,always,
+S1.CABINET{$cabinet:03d}.ALARM1,Instance,DB,BoolToUDInt_Inverted_Filtered_Tristate,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),Optimized,true,true,false,false,false,,false,always,
+S1.CABINET{$cabinet:03d}.ALARM2,Instance,DB,BoolToUDInt_Inverted_Filtered_Tristate,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),Optimized,true,true,false,false,false,,false,always,
+S1.CABINET{$cabinet:03d}.WARNING1,Instance,DB,BoolToUDInt_Inverted_Filtered_Tristate,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),Optimized,true,true,false,false,false,,false,always,
+S1.CABINET{$cabinet:03d}.WARNING2,Instance,DB,BoolToUDInt_Inverted_Filtered_Tristate,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),Optimized,true,true,false,false,false,,false,always,
+00_Commissioning,Global,F_DB,,,Optimized,false,true,false,false,false,,true,if_elements,Profinet node commissioning bypass (mirrors PROFINET_NODES_ALARM members)
+01_Pushbutton,Global,F_DB,,,Optimized,false,true,false,false,false,,true,if_elements,Emergency push-buttons (E1/2) + safety breakers (B1/2)
+03_FDBACK,Global,F_DB,,,Optimized,false,true,false,false,false,,true,if_elements,Contactor feedback error
+03_FDBACK_RAW,Global,F_DB,,,Optimized,false,true,false,false,false,,true,if_elements,Contactor feedback error (raw)
+04_SPEED,Global,F_DB,,,Optimized,false,true,false,false,false,,true,if_elements,Safety encoder healthy + safety encoder failure
+07_DOOR,Global,F_DB,,,Optimized,false,true,false,false,false,,true,if_elements,Door closed / door alarm
+PROFINET_NODES_ALARM,Global,DB,,,Optimized,true,true,false,false,false,,true,if_elements,Profinet node alarm flags
+PROFINET_NODES_WARNING,Global,DB,,,Optimized,true,true,false,false,false,,true,if_elements,Profinet node warning flags
+02_COM,Global,F_DB,,,Optimized,false,true,false,false,false,,true,if_elements,Zone-cumulative safe outputs (members = per-area element rows over the signals table)
+05_EM_STATE,Global,F_DB,,,Optimized,false,true,false,false,false,,false,if_elements,Per-area emergency-state flags (members = per-area element rows; referenced by the 04/05/08 builders)

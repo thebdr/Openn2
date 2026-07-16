@@ -1,0 +1,37 @@
+# Generation parameters relocated OUT of code (UI_REFRESH_PLAN F): values a project may need to vary
+# without editing Python. The values below are EXACTLY the previous in-code constants - the migration
+# was byte-parity-verified on the real data. A project folder without this file inherits the app's
+# builtin copy (config.load_generation_params: active -> builtin; there are NO values baked in code).
+
+datablocks:
+  # The seed members every `seed: true` DB starts with (Bool; space, not underscore). Prepended by
+  # phase 520 to the config-declared DBs and by the 800 engine to the builder-owned ones
+  # (datablock_definitions.csv rows with create_when: builders).
+  seed_members: [AlwaysFALSE, AlwaysTRUE, No Operation]
+
+interfaces:
+  # The MachineInterfaces SCL projection (phase 400): one assignment per interfaced signal, grouped
+  # in a REGION per interface, the line chosen by the sheet's `Direction </>` glyph ('>' = Q, out
+  # toward the partner; '<' = I, in from the partner). Rendered through core/expr against the
+  # interface_elements row: $signal_name / $expression are the SSOT columns ('Signal Name Side 1' /
+  # 'Expression Side 1'); the _q variants are TIA-QUOTED (wrapped unless the value already starts
+  # with a quote, e.g. a stored "db"."member" binding).
+  scl_file: 10_Machine Interfaces.scl
+  scl_line_templates:
+    ">": "    {$signal_name_q} := {$expression_q};"
+    "<": "    {$expression_q} := {$signal_name_q};"
+
+diagnosis:
+  # The packed SCL DWord slot names - the BoolToUDInt instance per cabinet DWord (phase 620). Bit 0-31
+  # lands in the first entry, 32-63 in the second.
+  alarm_dwords: [ALARM1, ALARM2]
+  warning_dwords: [WARNING1, WARNING2]
+  # The SCL template variant used when a cabinet row carries no template_type.
+  default_scl_variant: 1
+  # The FB instance path per cabinet DWord (CabState uses role STATE), rendered through core/expr:
+  # {$index} = the 3-digit cabinet index, {$role} = STATE / the DWord name. MUST stay in sync with the
+  # instance naming in datablocks/datablock_definitions.csv (the S1.CABINETnnn.* instance DBs).
+  cabinet_instance_template: "S1.CABINET{$index}.{$role}"
+  # The DiagList CSV cell placeholder replaced by each entry's PLC binding - must match the expression
+  # cells in diagnosis/diagnosis_columns.csv.
+  plc_binding_placeholder: "$PLC_Binding$"

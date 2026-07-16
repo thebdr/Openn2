@@ -1,0 +1,4 @@
+priority,when,gate,comment
+10,$bit ~ /i/,In,address carries an I
+20,$bit ~ /O|Q/,Out,address carries an O or Q
+30,$id_node > 0,Node,a positive node id

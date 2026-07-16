@@ -1,4 +1,4 @@
-# Pipeline4App runtime dependencies (Python 3.10+; tkinter ships with the python.org installer).
+# Pipeline5App runtime dependencies (Python 3.10+; tkinter ships with the python.org installer).
 # Install:  pip install -r requirements.txt
 
 openpyxl>=3.1        # every workbook read/write (staging, projections, the file viewers)

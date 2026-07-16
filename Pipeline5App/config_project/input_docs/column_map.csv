@@ -1,0 +1,43 @@
+document,column,canonical,expected_header,required,preliminary_check_exclude
+IoList,A,description_module,Description Module,no,
+IoList,B,manufacturer,Manufacturer,no,
+IoList,C,part_no,Part No.,yes,
+IoList,D,cod_fives,Cod. Fives,no,
+IoList,E,slot,Slot,no,
+IoList,F,id_node,ID,yes,
+IoList,G,bit,Bit,no,
+IoList,H,normal_condition,Normal condition,no,
+IoList,I,connector,Connector,no,
+IoList,J,pin_no,Pin No.,no,
+IoList,K,desc_l1,Description language 1  (1° part) (permanent part),no,
+IoList,L,desc_l1b,Description language 1  (2° part) (variable part),no,
+IoList,M,desc_l2,Description language 2  (1° part) (permanent part),no,
+IoList,N,desc_l2b,Description language 2  (2° part) (variable part),no,
+IoList,O,functional_unit,Functional unit,yes,
+IoList,P,location,Location,yes,
+IoList,Q,device,Device,yes,
+IoList,R,type_hw,Type,no,
+IoList,S,drawing,Drawing name,no,
+IoList,T,sheet,Sheet,no,
+IoList,U,ts_ref,T.S. ref.,no,
+IoList,V,profinet_ip,Profinet IP,no,
+IoList,W,profinet_name,Profinet name,no,
+IoList,X,mnemonic,Mnemonic,no,
+IoList,Y,alarm_filter,Alarm filter,no,
+IoList,Z,tag_filter,Tag filter,no,
+IoList,AA,skip_reason,Skip Reason,no,yes
+IoList,AB,script_type,Script Type,yes,yes
+IoList,AC,suggested_type,Suggested Type,no,yes
+IoList,AD,index,Index,yes,yes
+IoList,AE,diag_cabinet,Diag Cabinet,no,yes
+IoList,AF,diag_bit,Diag Bit,no,yes
+IoList,AG,hardware_params,Hardware Parameters,no,yes
+IoList,AH,interface_mapping,Interface Mapping,no,yes
+CE,F,address,BIT (ADDRESS),yes,
+CE,J,functional_unit,FUNCTIONAL UNIT,yes,
+CE,K,location,LOCATION,yes,
+CE,L,device,DEVICE,yes,
+CE,M,concat_id,CONCATENATE ID,no,
+AREA,A,concat_id,SIGLA CONTATTORE,no,
+AREA,B,numerazione_linea,NUMERAZIONE LINEA,no,
+AREA,C,address,DIGITAL OUTPUT,no,

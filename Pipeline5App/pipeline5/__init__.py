@@ -9,3 +9,5 @@ root. Kernel code receives the System object - it NEVER branches on a type id.
 Architecture record: the approved PL5 plan (see `.zen/evidence/P-001.md`); contract clauses
 C-001..C-020 (the preserved PL4 baseline) + P-008..P-013 (the PL5 capability deltas).
 """
+
+__version__ = "5.0"          # stamped into each project's meta (project.app_version) at creation

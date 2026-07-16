@@ -1,0 +1,11 @@
+# The in-app guide TOC (docs/guide/): section id -> title, in display order.
+# A section id without a .md file renders the missing-section page (which links the source code -
+# the app ships with its source, so "read the code" is always a valid answer). Add a row + a .md to
+# grow the guide; scripts/list_guide_stubs.py lists the sections still missing a page.
+sections:
+  - {id: getting-started, title: Getting started}
+  - {id: phase-bar, title: The phase bar}
+  - {id: files-tab, title: The Files tab}
+  - {id: database-explorer, title: The Database Explorer}
+  - {id: expressions, title: Expressions (the fx language)}
+  - {id: treatments, title: Findings & treatments}
