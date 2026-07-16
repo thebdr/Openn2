@@ -5,7 +5,7 @@ from _harness import run, eq, ok
 from pipeline5.domain.changes import match
 from pipeline5.domain.changes import classify
 from pipeline5.domain.changes import report
-from pipeline5.domain.changes import run as changes_run
+from pipeline5.domain.changes import report_runner as changes_run
 
 
 def _row(_row=0, **kw):

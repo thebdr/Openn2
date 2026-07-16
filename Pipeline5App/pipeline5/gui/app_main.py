@@ -23,7 +23,7 @@ from pipeline5.core import config
 from pipeline5.core import i18n
 from pipeline5.core import severity
 from pipeline5.core import finding_treatments as treatments
-from pipeline5.gui import excel
+from pipeline5.gui import excel_goto
 from pipeline5.gui import files_view
 from pipeline5.gui import findings_view
 from pipeline5.gui import phase_model as phases
@@ -655,7 +655,7 @@ class App:
         if not path:
             self.log.append("WARN", f"  cannot locate workbook '{doc}'")
             return
-        threading.Thread(target=lambda: excel.goto(path, sheet, cell), daemon=True).start()
+        threading.Thread(target=lambda: excel_goto.goto(path, sheet, cell), daemon=True).start()
 
     def _on_errtreat(self, uid, level) -> None:
         """A right-click treat on a finding line -> set the treatment + refresh the Findings panel."""
@@ -732,7 +732,7 @@ class App:
         Reads the configured current + previous document revisions (`*_previous_path`), classifies the
         changes (matched / intact / corrected / upgrade / removed; systematic re-schemes netted out), and
         writes a graphical HTML dashboard + a CSV audit trail. Never halts; opens the report when done."""
-        from pipeline5.domain.changes import run as changes_run
+        from pipeline5.domain.changes import report_runner as changes_run
         label = f"940 {i18n.tr('pb_change_report', self.lang)}"
         self._emit("PHASE", label)
         self._status("quality report…")
@@ -1102,7 +1102,7 @@ class App:
             folder = config.gui_log_dir()
             os.makedirs(folder, exist_ok=True)
             stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            path = os.path.join(folder, f"pl4_log_{stamp}.txt")
+            path = os.path.join(folder, f"pl5_log_{stamp}.txt")
             self._log_sink = open(path, "w", encoding="utf-8")
             self.log.set_sink(self._log_sink)
             self.log.append("INFO", f"  log -> {path}")

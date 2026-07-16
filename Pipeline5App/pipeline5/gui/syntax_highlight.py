@@ -6,7 +6,7 @@ what moved in: the data-driven Notepad++-UDL-style languages (`langs.json`: scl/
 Object-explorer view)."""
 from __future__ import annotations
 
-from pipeline5.gui import _filexy  # noqa: F401  (sys.path + theme binding - must run first)
+from pipeline5.gui import filexy_shim  # noqa: F401  (sys.path + theme binding - must run first)
 
 from filexy.highlight import (  # noqa: E402,F401
     COLORS, LANGS, OBJECT_KINDS, apply, available_kinds, configure_tags, kind_of,

@@ -3,7 +3,7 @@ package; the logic moved there with the file-editor consolidation). Keeps the hi
 `pipeline5.gui.object_editor` surface (files_panel + the tests are untouched)."""
 from __future__ import annotations
 
-from pipeline5.gui import _filexy  # noqa: F401  (sys.path + theme binding - must run first)
+from pipeline5.gui import filexy_shim  # noqa: F401  (sys.path + theme binding - must run first)
 
 from filexy.objectview import (  # noqa: E402,F401
     ObjectEditor, _is_element, add_dict_neighbor, add_list_neighbor, coerce, dump_document,
