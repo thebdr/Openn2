@@ -263,12 +263,16 @@ def build_04_estop(db: Database) -> Table:
     return t
 
 
-# 05_Output Feedback: the 3-family capacity variants (mirrors the template's sidecar). Each tuple is
-# (OnCondition cap, FeedbackInput cap, ContactorOutput cap, TemplateType); the builder picks the
-# smallest variant whose capacities all cover the unit's counts.
+# 05_Output Feedback: the capacity variants of the template's 12 FDBACK networks. Each tuple is
+# (OnCondition cap, FeedbackInput cap, ContactorOutput cap, TemplateType); the builder picks the smallest
+# variant whose capacities all cover the unit's counts. The grid is oncond {1,2} x (fb,co) in
+# {(1,1),(2,1),(4,1),(1,2),(2,2),(4,2)}: TT1-6 the 1-area row, TT7-12 the 2-area row. NOTE: the shipped
+# sidecar CSV mislabeled TT9-12 as oncond=1 (a copy of TT3-6), but the actual template networks 9-12 have
+# TWO matrix_areas slots - so a 2-area unit with co=2 or fb=4 matched nothing -> an empty TemplateType.
+# Corrected here + in the sidecar to the real (2,4,1)/(2,1,2)/(2,2,2)/(2,4,2) (verified vs the XML).
 OUTPUT_FEEDBACK_VARIANTS = [
     (1, 1, 1, 1), (1, 2, 1, 2), (1, 4, 1, 3), (1, 1, 2, 4), (1, 2, 2, 5), (1, 4, 2, 6),
-    (2, 1, 1, 7), (2, 2, 1, 8), (1, 4, 1, 9), (1, 1, 2, 10), (1, 2, 2, 11), (1, 4, 2, 12),
+    (2, 1, 1, 7), (2, 2, 1, 8), (2, 4, 1, 9), (2, 1, 2, 10), (2, 2, 2, 11), (2, 4, 2, 12),
 ]
 
 

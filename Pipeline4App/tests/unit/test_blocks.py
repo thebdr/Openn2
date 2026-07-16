@@ -186,6 +186,8 @@ def test_of_variant_picks_smallest_cover():
     eq(builders._of_variant(1, 1, 1)[3], 1, "exact 1/1/1 -> TT01")
     eq(builders._of_variant(1, 3, 1)[3], 3, "fb=3 needs the cap-4 variant -> TT03")
     eq(builders._of_variant(2, 1, 1)[3], 7, "oncond=2 -> TT07")
+    eq(builders._of_variant(2, 2, 2)[3], 11, "2 areas + 2 contactors -> TT11 (sidecar mislabeled 9-12)")
+    eq(builders._of_variant(2, 4, 2)[3], 12, "2 areas, 4 fb, 2 co -> TT12")
     eq(builders._of_variant(9, 9, 9), None, "nothing covers it")
 
 
