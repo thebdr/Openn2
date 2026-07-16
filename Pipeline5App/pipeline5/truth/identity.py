@@ -88,3 +88,8 @@ def tagtable(row) -> str:
 def tag_comment(row) -> str:
     """The PLC tag comment (the type's `io_comment` template)."""
     return interp(_type_of(row).get("io_comment", ""), row)
+
+
+# The interface-trigger script type: an IOC row OPENS a machine interface (phase 400 builds from it;
+# coverage traces it). Identity vocabulary, shared across chapters.
+INTERFACE_TRIGGER_TYPE = "IOC"

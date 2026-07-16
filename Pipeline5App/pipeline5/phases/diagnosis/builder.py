@@ -55,33 +55,9 @@ def _int_or_none(value):
     return int(s) if s.lstrip("-").isdigit() else None
 
 
-def _addr_byte(bit):
-    b = str(bit or "").strip().upper()
-    if b[:1] in ("I", "Q") and "." in b:
-        try:
-            return b[0], int(b[1:b.index(".")])
-        except ValueError:
-            return None
-    return None
-
-
-def _nodes(rows):
-    return [r for r in rows or [] if r.get("profinet_name")]
-
-
-def node_of(rows, row):
-    """The Profinet node whose POSITIONAL I/Q byte range (staging `I_/Q_startByte/endByte`) contains this
-    signal's address; None otherwise."""
-    ab = _addr_byte(row.get("bit"))
-    if not ab:
-        return None
-    kind, byte = ab
-    sk, ek = f"{kind}_startByte", f"{kind}_endByte"
-    for n in _nodes(rows):
-        s, e = n.get(sk, ""), n.get(ek, "")
-        if str(s) != "" and int(s) <= byte <= int(e):
-            return n
-    return None
+# node_of + addr_byte moved to the truth (shared vocabulary: diagnosis, coverage, and the
+# risky-index fill all navigate by the positional node) - re-exported for this chapter's callers.
+from pipeline5.truth.addresses import addr_byte as _addr_byte, node_of  # noqa: E402
 
 
 def ml_value(row) -> str:

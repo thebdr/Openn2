@@ -458,7 +458,7 @@ def risky_index_fill(params: dict | None = None) -> dict:
     sheet. Doc-only; backup + drop-on-noop. Returns {output_path, backup, filled, leftover, findings}."""
     from collections import defaultdict
     from pipeline5.phases.staging import iolist as staging
-    from pipeline5.phases.diagnosis import builder as diagnosis
+    from pipeline5.truth.addresses import node_of
 
     params = params or config.load_params()
     io_path = params.get("iolist_path")
@@ -475,7 +475,7 @@ def risky_index_fill(params: dict | None = None) -> dict:
     ad = next((m["column"] for m in colmap if m["canonical"] == "index"), None)
 
     # the IO node per row = the node whose positional I/Q byte range contains the signal's address (node_of)
-    node_key = {r["uid"]: (lambda n: n["uid"] if n else None)(diagnosis.node_of(rows, r)) for r in rows}
+    node_key = {r["uid"]: (lambda n: n["uid"] if n else None)(node_of(rows, r)) for r in rows}
     assigns, leftover = risky_assignments(rows, families, node_key)
 
     findings = []

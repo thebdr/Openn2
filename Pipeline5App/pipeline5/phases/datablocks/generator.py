@@ -25,14 +25,9 @@ from pipeline5.truth.datablocks import db_blocks_table, db_members_table, instan
 from pipeline5.truth.signals import signals_table
 
 def seed_members() -> list:
-    """The seed members every `seed: true` DB starts with (Bool; space, not underscore) - relocated
-    to user_input/generation_params.yaml (datablocks.seed_members; UI_REFRESH_PLAN F item 2). STRICT:
-    a missing key is a located error, never an in-code default."""
-    section = (config.load_generation_params() or {}).get("datablocks") or {}
-    try:
-        return [str(x) for x in section["seed_members"]]
-    except KeyError:
-        raise RuntimeError("generation_params.yaml: datablocks.seed_members is missing") from None
+    """The seed members every `seed: true` DB starts with - the config accessor moved to
+    `config.load_seed_members` (coverage reads the same list without touching this chapter)."""
+    return config.load_seed_members()
 
 
 def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "") -> Finding:

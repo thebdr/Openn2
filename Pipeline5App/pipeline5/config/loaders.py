@@ -357,3 +357,15 @@ def load_db_types() -> list:
                     "kind": (r.get("kind") or "Elementary").strip() or "Elementary",
                     "comment": (r.get("comment") or "").strip()})
     return out
+
+
+def load_seed_members() -> list:
+    """generation_params.yaml `datablocks.seed_members` - the Bool seed members every `seed: true`
+    DB starts with. STRICT: a missing key is a located error, never an in-code default (the
+    config-completeness rule). Consumed by the 520 generator AND the 900 coverage pads."""
+    from pipeline5.config.params import load_generation_params
+    section = (load_generation_params() or {}).get("datablocks") or {}
+    try:
+        return [str(x) for x in section["seed_members"]]
+    except (KeyError, TypeError):
+        raise RuntimeError("generation_params.yaml: datablocks.seed_members is missing") from None

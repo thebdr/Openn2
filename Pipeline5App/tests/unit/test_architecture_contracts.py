@@ -32,15 +32,8 @@ LAYERS = ["language", "truth", "documents", "findings", "config",
 
 # (importer module, imported target-prefix as the AST records it) -> reason + the burn-down step
 RATCHET = {
-    # -- coupling truth #2: coverage reads sibling builders' helpers (burn-down: step 3/4 re-plumb) --
-    ("phases.coverage.coverage", "phases.datablocks"): "truth#2 - seed_members(); re-plumb to table reads (step 3/4)",
-    ("phases.coverage.coverage", "phases.diagnosis"): "truth#2 - node_of(); re-plumb to table reads (step 3/4)",
-    ("phases.coverage.coverage", "phases.interfaces"): "truth#2 - TRIGGER_TYPE; re-plumb to table reads (step 3/4)",
-    # -- coupling truth #3: validation re-runs staging (burn-down: step 4) --
-    ("phases.validation.runner", "phases.staging"): "truth#3 - re-runs stage(); consume staged tables instead (step 4)",
-    # -- fillout's stage->fill->re-stage wiring + risky-index node_of (burn-down: steps 4/5) --
+    # -- the LAST edge: fillout's stage->fill->re-stage wiring (burn-down: the step-5 run-plans) --
     ("phases.fillout.document_fill", "phases.staging"): "stage->fill->re-stage wiring; moves to the app run-plan (step 5)",
-    ("phases.fillout.document_fill", "phases.diagnosis"): "risky-index uses diagnosis.node_of; node_of belongs in truth.addresses (step 4)",
 }
 
 

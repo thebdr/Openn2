@@ -26,10 +26,8 @@ import os
 from pipeline5 import config
 from pipeline5.findings.finding import Finding, record
 from pipeline5.truth.table import Table
-from pipeline5.phases.datablocks import generator as datablocks
-from pipeline5.phases.diagnosis import builder as diagnosis
 from pipeline5.truth import identity
-from pipeline5.phases.interfaces import builder as interfaces
+from pipeline5.truth.addresses import addr_byte, node_of
 
 import re
 
@@ -45,7 +43,7 @@ _QUALREF = re.compile(r'"([^"]+)"\."([^"]+)"')        # a TIA-qualified "<db>"."
 def _pads() -> set:
     """The seed constants (AlwaysFALSE/AlwaysTRUE/No Operation) - from generation_params.yaml, the same
     values the 520 seeds and the builder-owned DBs prepend."""
-    return set(datablocks.seed_members())
+    return set(config.load_seed_members())
 
 
 # --- the SSOT table (the persisted per-signal trace) --------------------------------------------- #
@@ -203,15 +201,15 @@ def attribute(rows, outputs) -> dict:
             place["data_blocks"].update(d for d, ms in dbm.items() if member in ms)
         if binding and binding in diagb:
             place["diagnosis"].add("yes")
-        if str(r.get("script_type", "")).strip().upper() == interfaces.TRIGGER_TYPE \
+        if str(r.get("script_type", "")).strip().upper() == identity.INTERFACE_TRIGGER_TYPE \
                 and str(r.get("index", "") or "").strip() in ifi:
             place["interfaces"].add("defines")
         if binding and binding in ifx:
             place["interfaces"].add("mirror")
         if pname and pname in stations:
             place["hardware"].add("station")
-        elif diagnosis._addr_byte(r.get("bit")):
-            node = diagnosis.node_of(rows, r)
+        elif addr_byte(r.get("bit")):
+            node = node_of(rows, r)
             if node and str(node.get("profinet_name", "") or "").strip() in stations:
                 place["hardware"].add("module")
         for ident in {member, tag, binding}:

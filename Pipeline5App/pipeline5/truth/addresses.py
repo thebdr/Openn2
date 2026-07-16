@@ -53,3 +53,32 @@ def format_ok(value) -> bool:
     if len(parts) == 4:
         return all(p.isdigit() for p in parts[1:])
     return False
+
+
+# --- positional Profinet-node lookup (moved from the diagnosis chapter - coupling truths #2/#g) --- #
+def addr_byte(bit):
+    """('I'|'Q', byte) parsed from an I/Q dotted address (`I100.3` -> ('I', 100)); None otherwise.
+    Becomes config-regex-driven with the per-system address_format (P-010)."""
+    b = str(bit or "").strip().upper()
+    if b[:1] in ("I", "Q") and "." in b:
+        try:
+            return b[0], int(b[1:b.index(".")])
+        except ValueError:
+            return None
+    return None
+
+
+def node_of(rows, row):
+    """The Profinet node whose POSITIONAL I/Q byte range (staging `I_/Q_startByte/endByte`) contains
+    this signal's address; None otherwise. Shared vocabulary: diagnosis allocates by it, coverage
+    traces by it, the risky-index fill matches by it."""
+    ab = addr_byte(row.get("bit"))
+    if not ab:
+        return None
+    kind_, byte = ab
+    sk, ek = f"{kind_}_startByte", f"{kind_}_endByte"
+    for n in (r for r in rows or [] if r.get("profinet_name")):
+        s, e = n.get(sk, ""), n.get(ek, "")
+        if str(s) != "" and int(s) <= byte <= int(e):
+            return n
+    return None

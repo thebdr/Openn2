@@ -21,7 +21,8 @@ from pipeline5.findings import severity
 from pipeline5.findings import treatments
 from pipeline5.findings.finding import Finding, record
 from pipeline5.findings import report_renderer as render
-from pipeline5.phases.staging import iolist as staging
+from pipeline5.truth.database import Database
+from pipeline5.truth.signals import signals_table
 from pipeline5.phases.validation import crosscheck
 from pipeline5.phases.validation import diagcheck
 from pipeline5.phases.validation import iolist_checks as iolist
@@ -49,8 +50,9 @@ def run_validation(database=None, params: dict | None = None, out_dir: str | Non
     {'findings','applied','items','paths','counts','dir'} - `items` is the banner-interleaved
     effective-severity sequence the reports render (the GUI log renders the SAME items)."""
     params = params or config.load_params()
-    if database is None:
-        database, _staging_findings = staging.stage(params)
+    if database is None:                              # the staged truth from disk - validation never re-RUNS
+        colmap = config.load_column_map("IoList")     # another phase (coupling truth #3, paid off)
+        database = Database([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
 
     with messages.active_lang(lang):                                # findings build their detail in `lang`
         findings = []                                              # the 4-step workflow (user spec):

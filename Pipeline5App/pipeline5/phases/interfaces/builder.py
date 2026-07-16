@@ -26,7 +26,7 @@ from pipeline5.truth.table import Table
 from pipeline5.truth import identity
 from pipeline5.truth.signals import signals_table
 
-TRIGGER_TYPE = "IOC"
+from pipeline5.truth.identity import INTERFACE_TRIGGER_TYPE as TRIGGER_TYPE  # shared vocabulary
 
 
 def _f(type: str, severity: str, detail: str, location: str = "", source_uid: str = "", doc: str = "") -> Finding:

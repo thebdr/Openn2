@@ -93,6 +93,7 @@ from pipeline5.config.loaders import (  # noqa: F401
     load_interface_elements,
     load_interface_tagnames,
     load_db_definitions,
+    load_seed_members,
     load_db_elements,
     load_db_types,
 )
