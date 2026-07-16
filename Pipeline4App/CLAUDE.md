@@ -480,8 +480,8 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
   the serialization, the 3 builders, the build->project round-trip).
 - **800b DONE - the complex builders.** Added to `builders.py` (verbatim from PL3 except the two PL4 adaptations):
   **02** EM Push Button (E1/2 + B1/2 by node, chunked to 4, the padded quartet emitted twice) · **03** Zone Cumulative
-  (per AREA × signal group -> a 02_COM AND-coil; `ZONE_GROUPS`, `_area_descriptions`) · **04** ESTOP (per AREA; SORTER
-  door-capacity tier 01-05 vs GENERIC 06; `ESTOP_SORTER_TIERS`, `_sorter_areas`, `_area_nn`) · **05** Output Feedback
+  (per AREA × signal group -> a 02_COM AND-coil; `ZONE_GROUPS`, `_area_descriptions`) · **04** ESTOP (per AREA; template
+  **v1.1** feature-driven TT + NO iterator - see the v1.1 note below; `_sorter_areas`, `_area_nn`) · **05** Output Feedback
   (per K-family `index` group; the 3-family capacity variant `OUTPUT_FEEDBACK_VARIANTS`/`_of_variant`) · **08** Gate
   Manager (one TT01 per sorter + one TT02 per door DQ). The two adaptations vs PL3: the multi-valued cells
   (`matrix_areas`/`areas_description`/`datablocks`) are read via **`_as_list`** (not `.split("|")`) - `matrix_areas`/
@@ -492,6 +492,20 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
   PL3's builders+serializer** (modulo the `pipeline3`->`pipeline4` `#` line); all 5 new builders are **table-identical**
   to PL3's (03 verified at the table level - PL3 emits it as FC XML, 800c). Tests: `test_blocks.py` (+8: the 5 builders'
   grouping/variant/tier/list-cells/`source_row`-sort, `_area_descriptions`, `_of_variant`). 16 cases total.
+- **04_ESTOP template v1.1 (user spec, 2026-07-16) - a deliberate divergence from PL3.** The reviewed template
+  (`Shared/Templates/Tia Portal Software Blocks/TEMPLATE--v1.1--04_ESTOP.xml`; v1.0 xml+csv retired) drops the door
+  ITERATOR and the raw-breaker / `_COM`-intermediate wiring: the door/breaker AND-ing now lives in **02_COM** (block
+  03's `DOORS`/`SAFETY_BREAKERS` cumulatives), and the ESTOP block just references those coils. `build_04_estop` picks
+  the TemplateType by the area's **safety features** (feature PRESENCE, not door count): sorter -> **TT06** (E-STOP +
+  doors + breakers + encoder), doors+breakers -> **TT05**, breakers-only -> **TT04**, doors-only -> **TT03**, bare ->
+  **TT02** (Emergency STOP / reset-required); **TT01** ('Safety STOP' / reset-NOT-required, ACK_NEC=FALSE) is reserved
+  for the future. The FB's `TIME_DEL` is baked per-network IN THE TEMPLATE: **TT06 keeps T#10s, TT01-05 use T#150ms**
+  (the delay is a pure function of sorter-ness == TT06). **Datablock impact (`datablock_elements.csv`):** 05_EM_STATE's
+  `_SAFETY_BREAKERS_COM`/`_SAFETY_DOORS_COM` members are **removed** (they are the 02_COM cumulatives now), and the
+  old sorter-only config-literal `AREA 1 POWER_CUT` becomes a **per-area `{$area} POWER_CUT`** member.
+  `ESTOP_SORTER_TIERS`/`ESTOP_GENERIC_RESET` retired. **Verified real-data** (4 dev areas -> TT06/TT05/TT02x2; every
+  DOORS/SAFETY_BREAKERS ref resolves in 02_COM; 05_EM_STATE.xml has 4 per-area POWER_CUT + 0 `_COM` members). Test:
+  `test_blocks.py::builder_04_estop_feature_types`.
 - **800c DONE - the 03 FC XML + 02_COM safe-DB + InstanceDBs.csv + the GUI button.**
   - **`domain/blocks/xml_emit.py`** (verbatim port of PL3's): `and_coil_fc` emits **03_Zone Cumulative** as a ready
     `SW.Blocks.FC` XML - one `A`(AND)->`Coil` FlgNet network per @ row (the row's `nameOfDB.<member>` inputs ->

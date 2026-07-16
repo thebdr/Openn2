@@ -174,10 +174,6 @@ def build_03_zone_cumulative(db: Database) -> Table:
     return t
 
 
-ESTOP_SORTER_TIERS = [(4, "01"), (8, "02"), (12, "03"), (16, "04"), (20, "05")]   # (door cap, TemplateType)
-ESTOP_GENERIC_RESET = "06"   # <GENERIC>:<ResetRequired>
-
-
 def _sorter_areas(db: Database) -> set:
     """Areas that are sorter areas - inferred from single-area rows flagged IsSorterArea (the staged
     flag is per-row: a row touches a sorter area, so only a single-area row pins it to one area)."""
@@ -219,32 +215,37 @@ def build_03_diagnostic_nodes(db: Database) -> Table:
 
 @builds("04_ESTOP")
 def build_04_estop(db: Database) -> Table:
-    """One ESTOP network per AREA. A SORTER area (config sorter_areas) picks a door-capacity tier
-    (4/8/12/16/20 = TT01-05 by its DI1/2 door count, doors padded with PAD); a GENERIC area uses
-    <ResetRequired> (TT06, no door slots). Per area: the 02_COM PB/FDB cumulatives (from 03, raw-area
-    naming), the 05_EM_STATE state members (UNPADDED area, as 05 + 02_COM name them), the area's B1/2 breakers
-    (SafetyBreaker1/2, padded 'AlwaysTRUE' - AND-neutral), the encoder-healthy SPEED_STATE_REC member,
-    and the DI1/2 doors iterator."""
+    """One ESTOP network per AREA (template v1.1: the door/breaker cumulatives now live in 02_COM, so
+    there is NO iterator - the block references the finished 02_COM."<area> DOORS" / "<area>
+    SAFETY_BREAKERS" coils that block 03 builds). The TemplateType selects the network by the area's
+    SAFETY FEATURES (feature presence, not door count): a SORTER area -> TT06 (E-STOP + doors +
+    breakers + encoder; the template keeps this network's T#10s FB delay, vs T#150ms on the others);
+    else doors+breakers -> TT05, breakers-only -> TT04, doors-only -> TT03, bare -> TT02 (Emergency
+    STOP, reset required). TT01 ('Safety STOP', reset-not-required / ACK_NEC=FALSE) is reserved for the
+    future. Per area: the 02_COM PB/FDB cumulatives (always) + DOORS/SAFETY_BREAKERS (only when the
+    area has them), the 05_EM_STATE Q/Q_DELAYED/RESET state members + the per-area POWER_CUT coil, and
+    the sorter's encoder-healthy SPEED_STATE_REC member (TT06 only)."""
     sorter = _sorter_areas(db)
     t = Table("04_ESTOP")
     for area in db.areas():
-        nn = _area_nn(area)
-        is_sorter = area in sorter
         inarea = db.by_area(area)
-        doors = [r["name_in_db"] for r in inarea
-                 if str(r.get("script_type", "")).upper() == "DI1/2" and r.get("name_in_db")]
-        breakers = [r["name_in_db"] for r in inarea
-                    if str(r.get("script_type", "")).upper() == "B1/2" and r.get("name_in_db")]
-        if is_sorter or doors:                                   # SORTER tier when a sorter area OR it has doors
-            tier = next(((tt_, cap) for cap, tt_ in ESTOP_SORTER_TIERS if cap >= len(doors)), None)
-            tt, cap = tier or (ESTOP_SORTER_TIERS[-1][1], ESTOP_SORTER_TIERS[-1][0])
-            door_cells = doors + [PAD] * (cap - len(doors))      # pad the doors to the tier's slots
+        is_sorter = area in sorter
+        has_doors = any(str(r.get("script_type", "")).upper() == "DI1/2" and r.get("name_in_db")
+                        for r in inarea)
+        has_breakers = any(str(r.get("script_type", "")).upper() == "B1/2" and r.get("name_in_db")
+                           for r in inarea)
+        if is_sorter:                                            # E-STOP + doors + breakers + encoder
+            tt = "06"
+        elif has_doors and has_breakers:
+            tt = "05"
+        elif has_breakers:
+            tt = "04"
+        elif has_doors:
+            tt = "03"
         else:
-            tt, door_cells = ESTOP_GENERIC_RESET, doors          # GENERIC (no doors): TT06, no door slots
-        # the SORTER-specific fields apply only to a real sorter area (else there is no sorter encoder).
-        # nn (zero-padded) is the SORTER number (matches 07/08); the area number itself is UNPADDED below.
+            tt = "02"                                            # Emergency STOP (reset required); TT01 = future
+        nn = _area_nn(area)                                      # the SORTER number (zero-padded), TT06 only
         encoder = f"SORTER_{nn}_ENCODER_HEALTHY" if is_sorter else ""
-        power_cut = f"{area} POWER_CUT" if is_sorter else ""
         t.add(
             template_type=tt,
             **{"instanceOf-F_ESTOP1": f"ESTOP_{area}"},
@@ -254,13 +255,10 @@ def build_04_estop(db: Database) -> Table:
             **{"05_EM_STATE.{matrix_area}_Q": f"{area} Q"},       # UNPADDED area, consistent with 02_COM + 05
             **{"05_EM_STATE.{matrix_area}_Q_DELAYED": f"{area} Q_Delayed"},
             **{"05_EM_STATE.{matrix_areas.1}_RESET": f"{area} RESET"},
-            **{"05_EM_STATE.{matrix_area}_SAFETY_BREAKERS_COM": f"{area} SAFETY_BREAKERS_COM"},
-            **{"05_EM_STATE.{matrix_area}_SAFETY_DOORS_COM": f"{area} SAFETY_DOORS_COM"},
-            **{"05_EM_STATE.{matrix_area}_SORTER_POWER_CUT": power_cut},
+            **{"05_EM_STATE.{matrix_area}_POWER_CUT": f"{area} POWER_CUT"},   # per area now (was sorter-only)
+            **{"02_COM.{matrix_area} DOORS": f"{area} DOORS" if has_doors else ""},
+            **{"02_COM.{matrix_area} SAFETY_BREAKERS": f"{area} SAFETY_BREAKERS" if has_breakers else ""},
             **{"SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY": encoder},
-            **{"01_PushButton.SafetyBreaker1": breakers[0] if len(breakers) > 0 else "AlwaysTRUE"},
-            **{"01_PushButton.SafetyBreaker2": breakers[1] if len(breakers) > 1 else "AlwaysTRUE"},
-            ITERATOR_STRINGS=door_cells,
         )
     return t
 

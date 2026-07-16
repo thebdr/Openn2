@@ -24,7 +24,5 @@ PROFINET_NODES_WARNING,{$profinet_name} {$profinet_ip},row where $script_type = 
 05_EM_STATE,{$area} Q,area in unique($matrix_areas),Bool,,false,true,true,true,false,Per-area emergency state (referenced by the 04/05/08 builders)
 05_EM_STATE,{$area} Q_Delayed,area in unique($matrix_areas),Bool,,false,true,true,true,false,
 05_EM_STATE,{$area} RESET,area in unique($matrix_areas),Bool,,false,true,true,true,false,
-05_EM_STATE,{$area} SAFETY_BREAKERS_COM,area in unique($matrix_areas),Bool,,false,true,true,true,false,
-05_EM_STATE,{$area} SAFETY_DOORS_COM,area in unique($matrix_areas),Bool,,false,true,true,true,false,
-05_EM_STATE,AREA 1 POWER_CUT,,Bool,,false,true,true,true,false,The SORTER area's power-cut flag. CONFIG-LITERAL: sorter-ness comes from matrix_params.sorter_areas (the row-level IsSorterArea flag also marks multi-area rows so it cannot pin the area) - add one row per sorter area
+05_EM_STATE,{$area} POWER_CUT,area in unique($matrix_areas),Bool,,false,true,true,true,false,Per-area emergency power-cut coil written by the 04_ESTOP block (v1.1: one per area - was the sorter-only literal AREA 1 POWER_CUT; the _SAFETY_BREAKERS_COM/_SAFETY_DOORS_COM intermediates moved to the 02_COM cumulatives)
 05_EM_STATE,SORTER_{$nn:02d}_NOT_RUNNING,nn in unique($index) where $script_type = 'N1/2',Bool,,false,true,true,true,false,One per sorter - nn = the safety-encoder index (as builders 07/08 number the sorters)

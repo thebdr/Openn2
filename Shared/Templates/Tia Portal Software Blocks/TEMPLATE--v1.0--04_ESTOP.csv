@@ -1,8 +1,0 @@
-#Templates Machine Type,#Templates Capacity Doors,#Templates Index
-SORTER,4,1
-SORTER,8,2
-SORTER,12,3
-SORTER,16,4
-SORTER,20,5
-<GENERIC>:<ResetRequired>,,6
-<GENERIC>:<ResetNotRequired>,,7

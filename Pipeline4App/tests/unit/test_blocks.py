@@ -142,27 +142,44 @@ def test_builder_03_zone_cumulative_per_area_group():
     eq(t.rows[1]["02_COM.{db_element}"], "AREA 1 FDB")
 
 
-def test_builder_04_estop_sorter_tier_and_generic():
+def test_builder_04_estop_feature_types():
+    # v1.1: TemplateType is driven by the area's safety FEATURES (not door count); no door iterator.
     rows = [
-        # a SORTER area with 3 doors -> tier cap 4 (TT01), padded to 4
-        {"script_type": "DI1/2", "matrix_areas": ["AREA 1"], "IsSorterArea": "yes", "name_in_db": f"DOOR{n}"}
-        for n in range(3)
-    ] + [
+        # AREA 1: a SORTER area (single-area rows flagged) with doors + breakers -> TT06
+        {"script_type": "DI1/2", "matrix_areas": ["AREA 1"], "IsSorterArea": "yes", "name_in_db": "DOOR1"},
         {"script_type": "B1/2", "matrix_areas": ["AREA 1"], "IsSorterArea": "yes", "name_in_db": "BRK1"},
-        # a GENERIC area, no doors -> TT06
-        {"script_type": "E1/2", "matrix_areas": ["AREA 2"], "name_in_db": "PB2"},
+        # AREA 2: doors + breakers, NOT a sorter -> TT05
+        {"script_type": "DI1/2", "matrix_areas": ["AREA 2"], "name_in_db": "DOOR2"},
+        {"script_type": "B1/2", "matrix_areas": ["AREA 2"], "name_in_db": "BRK2"},
+        # AREA 3: breakers only -> TT04
+        {"script_type": "B1/2", "matrix_areas": ["AREA 3"], "name_in_db": "BRK3"},
+        # AREA 4: doors only -> TT03
+        {"script_type": "DI1/2", "matrix_areas": ["AREA 4"], "name_in_db": "DOOR4"},
+        # AREA 5: bare (just a push button) -> TT02 (Emergency STOP, reset required)
+        {"script_type": "E1/2", "matrix_areas": ["AREA 5"], "name_in_db": "PB5"},
     ]
     t = builders.build_04_estop(Database(rows))
-    eq(len(t), 2, "one network per area")
-    s = next(r for r in t.rows if r["instanceOf-F_ESTOP1"] == "ESTOP_AREA 1")
-    eq(s["TemplateType"], "01", "3 doors -> the cap-4 tier")
-    eq(s["ITERATOR_STRINGS"], ["DOOR0", "DOOR1", "DOOR2", builders.PAD], "doors padded to the tier")
-    eq(s["01_PushButton.SafetyBreaker1"], "BRK1")
-    eq(s["01_PushButton.SafetyBreaker2"], "AlwaysTRUE", "the missing 2nd breaker is AND-neutral")
+    eq(len(t), 5, "one network per area")
+    eq("ITERATOR_STRINGS" in t.columns, False, "v1.1 has no door iterator")
+    by = {r["instanceOf-F_ESTOP1"]: r for r in t.rows}
+
+    s = by["ESTOP_AREA 1"]                                         # sorter -> TT06
+    eq(s["TemplateType"], "06", "sorter area -> TT06")
+    eq(s["02_COM.{matrix_area} DOORS"], "AREA 1 DOORS")
+    eq(s["02_COM.{matrix_area} SAFETY_BREAKERS"], "AREA 1 SAFETY_BREAKERS")
     eq(s["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "SORTER_01_ENCODER_HEALTHY", "sorter-only")
-    g = next(r for r in t.rows if r["instanceOf-F_ESTOP1"] == "ESTOP_AREA 2")
-    eq((g["TemplateType"], g["ITERATOR_STRINGS"]), ("06", []), "generic: TT06, no door slots")
-    eq(g["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "", "no encoder on a generic area")
+    eq(s["05_EM_STATE.{matrix_area}_POWER_CUT"], "AREA 1 POWER_CUT", "power-cut is per area now")
+
+    eq(by["ESTOP_AREA 2"]["TemplateType"], "05", "doors + breakers, non-sorter -> TT05")
+    eq(by["ESTOP_AREA 3"]["TemplateType"], "04", "breakers only -> TT04")
+    eq(by["ESTOP_AREA 4"]["TemplateType"], "03", "doors only -> TT03")
+
+    g = by["ESTOP_AREA 5"]                                         # bare -> TT02
+    eq(g["TemplateType"], "02", "bare area -> TT02 (Emergency STOP)")
+    eq(g["02_COM.{matrix_area} DOORS"], "", "no doors cumulative on a bare area")
+    eq(g["02_COM.{matrix_area} SAFETY_BREAKERS"], "", "no breakers cumulative on a bare area")
+    eq(g["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "", "no encoder on a non-sorter area")
+    eq(g["05_EM_STATE.{matrix_area}_POWER_CUT"], "AREA 5 POWER_CUT", "every area gets a POWER_CUT")
 
 
 def test_of_variant_picks_smallest_cover():
@@ -494,7 +511,7 @@ if __name__ == "__main__":
         ("builder_02_em_push_button_groups_inputs", test_builder_02_em_push_button_groups_inputs),
         ("area_descriptions_reads_list_cells", test_area_descriptions_reads_list_cells),
         ("builder_03_zone_cumulative_per_area_group", test_builder_03_zone_cumulative_per_area_group),
-        ("builder_04_estop_sorter_tier_and_generic", test_builder_04_estop_sorter_tier_and_generic),
+        ("builder_04_estop_feature_types", test_builder_04_estop_feature_types),
         ("of_variant_picks_smallest_cover", test_of_variant_picks_smallest_cover),
         ("builder_05_output_feedback_source_row_orders_unit", test_builder_05_output_feedback_source_row_orders_unit),
         ("builder_05_output_feedback_pads_feedback_slots", test_builder_05_output_feedback_pads_feedback_slots),
