@@ -30,9 +30,13 @@ def test_diag_params_and_instance_render():
 
 def test_missing_file_raises():
     import os
-    orig_active, orig_builtin = config.generation_params_file, config.builtin_config_project_dir
-    config.generation_params_file = lambda: os.path.join("Z:\\", "no_such", "generation_params.yaml")
-    config.builtin_config_project_dir = lambda: os.path.join("Z:\\", "no_such_builtin")
+    # Patch where load_generation_params RESOLVES its candidates: the config.params module (the
+    # config/ package split re-exports the names, but the internal calls bind in params' namespace).
+    from pipeline5.core.config import params as config_params
+    orig_active = config_params.generation_params_file
+    orig_builtin = config_params.builtin_config_project_dir
+    config_params.generation_params_file = lambda: os.path.join("Z:\\", "no_such", "generation_params.yaml")
+    config_params.builtin_config_project_dir = lambda: os.path.join("Z:\\", "no_such_builtin")
     try:
         try:
             config.load_generation_params()
@@ -40,7 +44,8 @@ def test_missing_file_raises():
         except RuntimeError as error:
             ok("generation_params.yaml missing" in str(error), "the error names the file")
     finally:
-        config.generation_params_file, config.builtin_config_project_dir = orig_active, orig_builtin
+        config_params.generation_params_file = orig_active
+        config_params.builtin_config_project_dir = orig_builtin
 
 
 def test_emit_kind_declaration():
