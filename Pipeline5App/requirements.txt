@@ -1,0 +1,15 @@
+# Pipeline4App runtime dependencies (Python 3.10+; tkinter ships with the python.org installer).
+# Install:  pip install -r requirements.txt
+
+openpyxl>=3.1        # every workbook read/write (staging, projections, the file viewers)
+ruamel.yaml>=0.18    # config load/save (project_params.yaml round-trip, comments preserved)
+
+# Windows-only, OPTIONAL but recommended: the clickable Sheet!Cell log links (COM jump into an
+# open Excel) + foreground-window detection. Every import is guarded - without it the app runs
+# and those links degrade gracefully.
+pywin32>=306; sys_platform == "win32"
+
+# NOT listed on purpose:
+#   - the FileXY native engine (filexy_core) - an optional Rust speedup with an automatic
+#     pure-Python fallback; build it with `py rust/install_native.py` from ../FileXYApp
+#     (needs rustup; FILEXY_RUST=0 opts out at runtime).

@@ -1,0 +1,16 @@
+Phase-bar icons
+===============
+
+The following files are Twemoji graphics (https://github.com/twitter/twemoji),
+copyright Twitter, Inc and other contributors, licensed under CC-BY 4.0
+(https://creativecommons.org/licenses/by/4.0/):
+
+  high-voltage.png       (U+26A1)
+  check-mark-button.png  (U+2705)
+  pen.png                (U+1F58A)
+  handshake.png          (U+1F91D)
+  stethoscope.png        (U+1FA7A)
+  chart-increasing.png   (U+1F4C8)
+
+The remaining files (db-write.png, io-arrows.png, pcb-board.png, code-file.png) are
+project-drawn in the same flat style; see scripts/gen_custom_icons.py.
