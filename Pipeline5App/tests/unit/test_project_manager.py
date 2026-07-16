@@ -7,7 +7,7 @@ import tempfile
 from _harness import run, eq, ok
 from pipeline5.project import project_manager as project
 from pipeline5.project import app_state as state
-from pipeline5.core import config
+from pipeline5 import config
 
 
 def _make_project(root):

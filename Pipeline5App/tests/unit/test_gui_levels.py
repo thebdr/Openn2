@@ -7,7 +7,7 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core import config
+from pipeline5 import config
 
 
 def _with_temp_builtin_ui(fn):

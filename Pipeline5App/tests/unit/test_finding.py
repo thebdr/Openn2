@@ -1,9 +1,9 @@
 """The Finding model + the validation_issues table (core.finding): the uid scheme (stable across a
 severity change, churns on a detail change, whitespace-normalized), id, frozenness, and record()."""
 from _harness import run, eq, ok, raises
-from pipeline5.core import content_hash as keys
-from pipeline5.core.ssot_database import Database
-from pipeline5.core.finding import Finding, record, validation_issues_table
+from pipeline5.truth import content_hash as keys
+from pipeline5.truth.database import Database
+from pipeline5.findings.finding import Finding, record, validation_issues_table
 
 
 def test_uid_excludes_severity_includes_content():
@@ -51,8 +51,8 @@ def test_record_uses_finding_uid():
 def test_record_persists_report_context():
     """The phase-100 context (location2, bit/FLD, the flattened comparison) lands in the table so the
     Findings panel shows the SAME key details as the log line; other phases leave the tail empty."""
-    from pipeline5.core.finding import compared_text
-    from pipeline5.core.report_model import Cmp, InfoBlock
+    from pipeline5.findings.finding import compared_text
+    from pipeline5.findings.report_model import Cmp, InfoBlock
     cmp = Cmp("I110.0", "I110.0", True, "=S1 -S80001", "=S1 -X80101", False)
     eq(compared_text(cmp), "I110.0 === I110.0 | =S1 -S80001 =/= =S1 -X80101",
        "the Cmp flattens to the one-cell comparison")
@@ -75,7 +75,7 @@ def test_record_standalone_appends_only_issues():
     what a previous save left there, and touches NO other SSOT file."""
     import os
     import tempfile
-    from pipeline5.core.finding import record_standalone
+    from pipeline5.findings.finding import record_standalone
     with tempfile.TemporaryDirectory() as d:
         first = Finding(phase=300, type="stg_x", severity="WARN", detail="earlier", location="IO!A1")
         eq(record_standalone([first], d), 1, "creates the file on first record")

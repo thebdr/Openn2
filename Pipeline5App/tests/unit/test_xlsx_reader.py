@@ -6,7 +6,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from _harness import run, eq, ok, raises
-from pipeline5.io import xlsx_reader as workbook
+from pipeline5.documents import xlsx_reader as workbook
 
 
 def _make_iolist(path):

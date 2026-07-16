@@ -4,13 +4,13 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core import config
-from pipeline5.core.ssot_database import Database as DB
-from pipeline5.core.finding import Finding, validation_issues_table
-from pipeline5.domain.validation import crosscheck
-from pipeline5.domain.validation import iolist_checks as iolist
-from pipeline5.domain.validation import cematrix_checks as matrix
-from pipeline5.domain.validation import validation_runner as validation
+from pipeline5 import config
+from pipeline5.truth.database import Database as DB
+from pipeline5.findings.finding import Finding, validation_issues_table
+from pipeline5.phases.validation import crosscheck
+from pipeline5.phases.validation import iolist_checks as iolist
+from pipeline5.phases.validation import cematrix_checks as matrix
+from pipeline5.phases.validation import runner as validation
 
 
 def _f(phase, type_, sev, detail="d", loc=""):

@@ -7,8 +7,8 @@ inference, the Type-2 family `_family_offset` (door DI base+1 / DD base+2, encod
 number), an idempotent preserve of a pre-filled diag_bit, and stable-cabinet-id reuse via `existing`.
 """
 from _harness import run, eq, ok
-from pipeline5.domain.fillout import diag_allocation as diag_alloc
-from pipeline5.domain.fillout.type_families import ObjectFamily
+from pipeline5.phases.fillout import diag_allocation as diag_alloc
+from pipeline5.phases.fillout.type_families import ObjectFamily
 
 _PARAMS = {"iolist_params": {"diag_bits_range": [0, 62]}}
 

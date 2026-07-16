@@ -5,8 +5,8 @@ A `row` is a signals dict carrying the canonical columns the `$`-rules reference
 (`desc_l1`/`desc_l1b`/`bit`/`id_node`/`type_hw`/...); the rules clean/join those themselves.
 """
 from _harness import run, eq
-from pipeline5.core import config
-from pipeline5.domain.fillout import script_type_classify as classify
+from pipeline5 import config
+from pipeline5.phases.fillout import script_type_classify as classify
 
 _GATE = config.load_gate_rules()
 _TYPE = config.load_script_type_rules()

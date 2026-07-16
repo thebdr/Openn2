@@ -4,8 +4,8 @@ app-wide size is 13. (register()/family() need Tk + Windows, so they are exercis
 import os
 
 from _harness import run, eq, ok
-from pipeline5.gui import fonts
-from pipeline5.gui import theme
+from pipeline5.workbench import fonts
+from pipeline5.workbench import theme
 
 
 def test_font_path_points_at_bundled_asset():

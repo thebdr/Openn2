@@ -7,10 +7,10 @@ from openpyxl import Workbook
 from openpyxl.worksheet.table import Table as XlTable
 
 from _harness import run, eq, ok
-from pipeline5.core.ssot_database import Database
-from pipeline5.domain import signal_identity as identity
-from pipeline5.domain import interface_builder as interfaces
-from pipeline5.domain.signals_schema import signals_table
+from pipeline5.truth.database import Database
+from pipeline5.truth import identity
+from pipeline5.phases.interfaces import builder as interfaces
+from pipeline5.truth.signals import signals_table
 
 
 def test_interp_keep_keeps_unknown_tokens():

@@ -6,10 +6,10 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core import config
-from pipeline5.core.ssot_database import Database as DB
-from pipeline5.core.ssot_table import Table as CoreTable
-from pipeline5.domain import signal_coverage as coverage
+from pipeline5 import config
+from pipeline5.truth.database import Database as DB
+from pipeline5.truth.table import Table as CoreTable
+from pipeline5.phases.coverage import coverage
 
 
 def _sig(**kw):

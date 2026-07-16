@@ -2,10 +2,10 @@
 (banners, the aligned line, the InfoBlock middle, the cross-check Cmp + dual-workbook links, the
 errors-only filter, the HTML). Pure + data-independent."""
 from _harness import run, eq, ok
-from pipeline5.core.finding import Finding
-from pipeline5.core.report_model import Cmp, InfoBlock
-from pipeline5.domain.validation import address_parsing as address
-from pipeline5.io import report_renderer as render
+from pipeline5.findings.finding import Finding
+from pipeline5.findings.report_model import Cmp, InfoBlock
+from pipeline5.truth import addresses as address
+from pipeline5.findings import report_renderer as render
 
 
 def _banner(phase, title):

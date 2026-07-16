@@ -5,8 +5,8 @@ Covers the whole superset + the parity-critical cases vs rule_expr (extract -1: 
 the format-spec coercion, the sentinel verbatim, clean(), and the data funcs over a synthetic tables dict).
 """
 from _harness import run, eq, ok, raises
-from pipeline5.core import expr
-from pipeline5.core.expr import Scope, ExprError
+from pipeline5.language import expr
+from pipeline5.language.expr import Scope, ExprError
 
 
 # --- operators (rule_expr parity, $-fielded) ----------------------------------------------------- #

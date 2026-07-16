@@ -2,7 +2,7 @@
 missing-section machinery, and the help-id ancestor walk. The window/tooltip rendering is a manual +
 scripted check."""
 from _harness import run, eq, ok
-from pipeline5.gui import guide_window as helpwin
+from pipeline5.workbench import guide_window as helpwin
 
 
 def test_parse_markdown_blocks():
@@ -47,9 +47,9 @@ def test_index_and_sections_complete():
 
 
 def test_missing_page_names_source():
-    page = helpwin.missing_page("no-such-feature", source_hint="pipeline5/gui/phasebar.py")
+    page = helpwin.missing_page("no-such-feature", source_hint="pipeline5/workbench/phasebar.py")
     ok("No instructions provided" in page, "the user's fallback wording")
-    ok("src://pipeline5/gui/phasebar.py" in page, "the source hint becomes the link")
+    ok("src://pipeline5/workbench/phasebar.py" in page, "the source hint becomes the link")
     page2 = helpwin.missing_page("thing")
     ok("src://pipeline5" in page2, "no hint -> the package folder")
 

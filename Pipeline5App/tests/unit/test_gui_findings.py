@@ -3,9 +3,9 @@ join (effective severity), the filters, and the create-or-update 1-click treatme
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core import config
-from pipeline5.core import finding_treatments as treatments
-from pipeline5.gui import findings_view
+from pipeline5 import config
+from pipeline5.findings import treatments
+from pipeline5.workbench import findings_view
 
 
 def _issue(uid, phase, type_, sev, loc="IO!A1", detail="d"):
@@ -78,7 +78,7 @@ def test_apply_treatments_bulk():
 
 
 def test_apply_and_records():
-    from pipeline5.core.finding import Finding
+    from pipeline5.findings.finding import Finding
     with tempfile.TemporaryDirectory() as d:
         config.use_project(d)
         try:

@@ -3,9 +3,9 @@
 numeric-pair FAIL, the unknown-cabinet FAIL, slot uniqueness per ALARM/WARNING family (a legitimate
 alarm+warning pair on one slot is NOT a collision), and the summary."""
 from _harness import run, eq, ok
-from pipeline5.core.ssot_database import Database as DB
-from pipeline5.core.ssot_table import Table as CoreTable
-from pipeline5.domain.validation import diagcheck
+from pipeline5.truth.database import Database as DB
+from pipeline5.truth.table import Table as CoreTable
+from pipeline5.phases.validation import diagcheck
 
 _PARAMS = {"iolist_path": "io.xlsx"}
 

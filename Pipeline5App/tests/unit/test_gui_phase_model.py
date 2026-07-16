@@ -2,8 +2,8 @@
 transcribed from the operator oracle ButtonsLayout.xlsx. Pure + data-independent (the GUI itself is a
 manual `python launch_gui.py` check)."""
 from _harness import run, eq, ok
-from pipeline5.core import i18n
-from pipeline5.gui import phase_model as phases
+from pipeline5.language import i18n
+from pipeline5.workbench import phase_model as phases
 
 
 def test_registry_shape():

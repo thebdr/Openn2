@@ -6,7 +6,7 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.gui import database_query as dbquery
+from pipeline5.workbench import database_query as dbquery
 
 
 def _csv(path, header, rows):

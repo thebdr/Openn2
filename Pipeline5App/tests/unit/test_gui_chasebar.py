@@ -2,7 +2,7 @@
 jump arc, and the chase_step state machine (random lead drift + clamps, the border take-off, the
 frozen-coyote jump, the landing direction flip). The canvas rendering is a scripted+manual check."""
 from _harness import run, eq, ok
-from pipeline5.gui import chasebar as cb
+from pipeline5.workbench import chasebar as cb
 
 
 def test_sprites_well_formed():

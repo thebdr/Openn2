@@ -1,6 +1,6 @@
 """The universal content-hash key (core.keys.uid)."""
 from _harness import run, eq, ok
-from pipeline5.core.content_hash import uid
+from pipeline5.truth.content_hash import uid
 
 
 def test_uid_is_stable_and_short():

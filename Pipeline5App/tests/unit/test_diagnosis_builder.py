@@ -11,10 +11,10 @@ import tempfile
 from openpyxl import Workbook
 
 from _harness import run, eq, ok
-from pipeline5.core import config
-from pipeline5.domain import signal_identity as identity
-from pipeline5.domain import iolist_staging as staging
-from pipeline5.domain.diagnosis_schema import diagnosis_entries_table, diagnosis_cabinets_table
+from pipeline5 import config
+from pipeline5.truth import identity
+from pipeline5.phases.staging import iolist as staging
+from pipeline5.truth.diagnosis import diagnosis_entries_table, diagnosis_cabinets_table
 
 
 def _sandboxed(fn):
@@ -119,9 +119,9 @@ def test_load_diagnosis_blocks_absent():
 # =================================================================================================== #
 # Phase 600b - the builder (io_entries + the OR/per-row logic rules + ml/fl/node -> diagnosis_entries)
 # =================================================================================================== #
-from pipeline5.core.ssot_database import Database
-from pipeline5.domain import diagnosis_builder as diagnosis
-from pipeline5.domain.signals_schema import signals_table
+from pipeline5.truth.database import Database
+from pipeline5.phases.diagnosis import builder as diagnosis
+from pipeline5.truth.signals import signals_table
 
 
 def test_ml_value():
@@ -213,7 +213,7 @@ def test_build_unified_io_and_logic():
 # =================================================================================================== #
 import csv
 
-from pipeline5.domain import diaglist_csv
+from pipeline5.phases.diagnosis import diaglist as diaglist_csv
 
 
 def _built_db():
@@ -260,7 +260,7 @@ def test_diaglist_crlf_no_bom():
 # =================================================================================================== #
 # Phase 600d - the OPC SCL projection (render_scl + tristate from template_type OR a per-type signal)
 # =================================================================================================== #
-from pipeline5.domain import diagnosis_scl
+from pipeline5.phases.diagnosis._siemens_s7 import scl as diagnosis_scl
 
 _SCL_TEMPLATE = (
     'FUNCTION "TEMPLATE--v1.0--06_Diagnostic for OPC" : Void\n'

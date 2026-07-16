@@ -3,8 +3,8 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core.content_hash import uid
-from pipeline5.domain.signals_schema import signals_table
+from pipeline5.truth.content_hash import uid
+from pipeline5.truth.signals import signals_table
 
 # a small representative slice of the IoList canonical columns (interface_mapping is the AH '|'-list)
 _IOLIST = ["functional_unit", "location", "device", "script_type", "bit", "interface_mapping"]

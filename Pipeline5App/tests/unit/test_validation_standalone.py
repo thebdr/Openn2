@@ -6,9 +6,9 @@ import re
 from openpyxl.utils import column_index_from_string as _ci, get_column_letter
 
 from _harness import run, eq, ok
-from pipeline5.core import config
-from pipeline5.domain.validation import iolist_checks as iolist
-from pipeline5.domain.validation import cematrix_checks as matrix
+from pipeline5 import config
+from pipeline5.phases.validation import iolist_checks as iolist
+from pipeline5.phases.validation import cematrix_checks as matrix
 
 
 # --- a positional stub matching the SheetView surface the validators use ------------------------ #

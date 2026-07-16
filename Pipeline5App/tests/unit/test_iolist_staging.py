@@ -6,10 +6,10 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from _harness import run, eq, ok
-from pipeline5.domain import signal_identity as identity
-from pipeline5.domain import iolist_staging as staging
-from pipeline5.domain.signals_schema import signals_table
-from pipeline5.io import xlsx_reader as workbook
+from pipeline5.truth import identity
+from pipeline5.phases.staging import iolist as staging
+from pipeline5.truth.signals import signals_table
+from pipeline5.documents import xlsx_reader as workbook
 
 
 def test_identity_flds_and_tag():
@@ -157,8 +157,8 @@ def test_annotate_cematrix_records_and_restamps():
     """annotate_cematrix enriches the staged signals in place, re-stamps each uid from the (now C&E)
     combined_FLD, and records the duplicate-uid findings to validation_issues. With no C&E document the
     combined_FLD is unchanged (uid stable) and a shared key still surfaces one stg_dup_signal_uid WARN."""
-    from pipeline5.core.ssot_database import Database
-    from pipeline5.domain.diagnosis_schema import diagnosis_cabinets_table
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.diagnosis import diagnosis_cabinets_table
     table = signals_table(["functional_unit", "location", "device", "script_type", "bit"])
     for _ in range(2):                                             # two rows share the stable key -> one uid
         table.add_row({"functional_unit": "S1", "location": "+SG1", "device": "-B1", "script_type": "DI1/2",

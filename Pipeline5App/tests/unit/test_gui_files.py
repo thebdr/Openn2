@@ -6,8 +6,8 @@ import tempfile
 from openpyxl import Workbook
 
 from _harness import run, eq, ok
-from pipeline5.gui import external_editor as extedit
-from pipeline5.gui import files_view
+from pipeline5.workbench import external_editor as extedit
+from pipeline5.workbench import files_view
 
 # the shipped default excludes (mirrors app_config.yaml files_tab)
 _EXCLUDES = ["~\\$.*", ".*\\.pyc$", ".*\\.bak_.*", "__pycache__"]

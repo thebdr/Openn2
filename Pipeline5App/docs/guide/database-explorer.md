@@ -22,4 +22,4 @@ Object/list cells are stored as their JSON text. Query them with SQLite's JSON f
 SELECT json_extract(type, '$.type_id') AS t, COUNT(*) FROM signals GROUP BY t
 ```
 
-The engine lives in [pipeline5/gui/database_query.py](src://pipeline5/gui/database_query.py) (Tk-free, tested).
+The engine lives in [pipeline5/workbench/database_query.py](src://pipeline5/workbench/database_query.py) (Tk-free, tested).

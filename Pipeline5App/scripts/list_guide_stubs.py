@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pipeline5.gui import guide_window as helpwin  # noqa: E402
+from pipeline5.workbench import guide_window as helpwin  # noqa: E402
 
 missing = helpwin.missing_sections()
 print("\n".join(missing) if missing else "every indexed guide section has a page")

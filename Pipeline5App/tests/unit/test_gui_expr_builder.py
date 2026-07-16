@@ -6,7 +6,7 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.gui import expr_builder as eb
+from pipeline5.workbench import expr_builder as eb
 
 
 def _fixture(d):
@@ -42,7 +42,7 @@ def test_build_ctx_row_plus_db():
         ctx = eb.build_ctx(tables, "signals", 1)
         eq(ctx["combined_FLD"], "S2", "the chosen row's fields are top-level")
         ok("_db" in ctx and "db_members" in ctx["_db"], "_db carries every table for the data funcs")
-        from pipeline5.core import expr
+        from pipeline5.language import expr
         eq(expr.evaluate("$type.type_id", ctx), "KI", "dotted drill works on the decoded cell")
         eq(expr.evaluate("count(db_members)", ctx), 1, "data funcs see _db")
 

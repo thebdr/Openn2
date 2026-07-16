@@ -4,9 +4,9 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core import finding_treatments as treatments
-from pipeline5.core.finding import Finding
-from pipeline5.core.finding_treatments import Treatment
+from pipeline5.findings import treatments
+from pipeline5.findings.finding import Finding
+from pipeline5.findings.treatments import Treatment
 
 
 def _f(uid_phase, type_, sev, detail, loc=""):

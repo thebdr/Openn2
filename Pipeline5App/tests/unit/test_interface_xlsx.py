@@ -8,9 +8,9 @@ from openpyxl.worksheet.table import Table as XlTable
 from openpyxl.worksheet.table import Table, TableColumn, TableStyleInfo, TableFormula
 
 from _harness import run, eq, ok
-from pipeline5.domain import interface_xlsx
-from pipeline5.domain import interface_builder as interfaces
-from pipeline5.io import xlsx_surgical_writer as xlsx_edit
+from pipeline5.phases.interfaces._siemens_s7 import xlsx as interface_xlsx
+from pipeline5.phases.interfaces import builder as interfaces
+from pipeline5.documents import xlsx_surgical_writer as xlsx_edit
 
 
 def test_coerce_int_and_safe_name():

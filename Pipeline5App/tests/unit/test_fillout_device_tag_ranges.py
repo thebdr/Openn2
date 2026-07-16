@@ -1,10 +1,10 @@
 """ph200 device-tag RANGE notation: trailing-digit expansion, the channel `<n>/<N>` script_type suffix
 (a multi-channel family authored as independent component rows), and range-aware index grouping."""
 from _harness import run, eq, ok
-from pipeline5.domain.fillout import device_tag_ranges as ranges
-from pipeline5.domain.fillout import script_type_classify as classify
-from pipeline5.domain.fillout import index_assign
-from pipeline5.domain.fillout.type_families import ObjectFamily, LINK_SERIES
+from pipeline5.phases.fillout import device_tag_ranges as ranges
+from pipeline5.phases.fillout import script_type_classify as classify
+from pipeline5.phases.fillout import index_assign
+from pipeline5.phases.fillout.type_families import ObjectFamily, LINK_SERIES
 
 
 def test_range_parts_and_expand():

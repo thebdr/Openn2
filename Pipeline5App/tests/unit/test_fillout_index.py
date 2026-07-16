@@ -6,9 +6,9 @@ pattern (Z) shared index; an unresolved (channel_fld_mismatch) -> "<input requir
 room port verification of PL3's index_assign over PL4's signals-dict model.
 """
 from _harness import run, eq
-from pipeline5.domain.fillout import index_assign as ix
-from pipeline5.domain.fillout import type_families as fam
-from pipeline5.domain.fillout.type_families import (
+from pipeline5.phases.fillout import index_assign as ix
+from pipeline5.phases.fillout import type_families as fam
+from pipeline5.phases.fillout.type_families import (
     ObjectFamily, LINK_CHANNEL, LINK_SERIES, LINK_FLD, LINK_PATTERN, LINK_NONE,
 )
 

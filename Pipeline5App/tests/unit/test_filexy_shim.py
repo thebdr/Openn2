@@ -1,4 +1,4 @@
-"""The FileXY extraction seam: the `pipeline5.gui.datagrid` shim re-exports the extracted
+"""The FileXY extraction seam: the `pipeline5.workbench.datagrid` shim re-exports the extracted
 `filexy` package bound to PL4's theme, the NEW core capabilities (quick search / TSV export /
 column stats) work through it, and the package stands ALONE (imports + its own test file pass in a
 subprocess with no pipeline5 on the path)."""
@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 from _harness import run, eq, ok
-from pipeline5.gui import datagrid
+from pipeline5.workbench import datagrid
 
 _TV_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..",
                                         "FileXYApp"))
@@ -16,7 +16,7 @@ _TV_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "
 def test_shim_reexports_and_theme_binding():
     import filexy
     from filexy import grid as fx_grid, theme as fx_theme
-    from pipeline5.gui import theme as pl4_theme
+    from pipeline5.workbench import theme as pl4_theme
     ok(datagrid.DataGrid is fx_grid.DataGrid, "the shim's DataGrid IS the package widget")
     ok(fx_theme.TOKENS is pl4_theme.TOKENS, "the viewer renders with PL4's OWN tokens")
     eq(fx_theme.mono_family(None), pl4_theme.MONO_FONT[0], "…and PL4's bundled mono font")

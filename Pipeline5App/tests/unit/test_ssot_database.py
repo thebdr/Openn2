@@ -3,8 +3,8 @@ import os
 import tempfile
 
 from _harness import run, eq, ok, raises
-from pipeline5.core.ssot_database import Database
-from pipeline5.core.ssot_table import Table
+from pipeline5.truth.database import Database
+from pipeline5.truth.table import Table
 
 
 def _database():

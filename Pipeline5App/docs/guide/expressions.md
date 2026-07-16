@@ -38,4 +38,4 @@ coercion; a blank value stays blank). Text without holes is copied verbatim - a 
 `<input required>` is never parsed.
 
 The full syntax reference lives at the top of
-[pipeline5/core/expr/\_\_init\_\_.py](src://pipeline5/core/expr/__init__.py).
+[pipeline5/language/expr/\_\_init\_\_.py](src://pipeline5/language/expr/__init__.py).

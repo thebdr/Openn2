@@ -1,7 +1,7 @@
 """Tiny test harness for the plain-python unit tests (no pytest) - the PL4 harness carried forward.
 
 Each test module builds a list of (name, fn) and calls run(...). Importing this module also bootstraps
-the Pipeline5App root onto sys.path so `from pipeline5.core import ...` works when a test is launched
+the Pipeline5App root onto sys.path so `from pipeline5.truth import ...` works when a test is launched
 directly (python tests/unit/test_x.py).
 """
 from __future__ import annotations

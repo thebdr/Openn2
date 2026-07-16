@@ -2,10 +2,10 @@
 builtin fallback, raise when neither), the diagnosis knobs' strictness, and the @builds emit-kind
 declaration that replaced the hardcoded FC-XML name-set."""
 from _harness import run, eq, ok
-from pipeline5.core import config
-from pipeline5.domain import diagnosis_builder as diagnosis
-from pipeline5.domain import diagnosis_scl
-from pipeline5.domain.software_blocks import builder_registry as registry
+from pipeline5 import config
+from pipeline5.phases.diagnosis import builder as diagnosis
+from pipeline5.phases.diagnosis._siemens_s7 import scl as diagnosis_scl
+from pipeline5.phases.software_blocks import builder_registry as registry
 
 
 def test_builtin_generation_params_load():
@@ -32,7 +32,7 @@ def test_missing_file_raises():
     import os
     # Patch where load_generation_params RESOLVES its candidates: the config.params module (the
     # config/ package split re-exports the names, but the internal calls bind in params' namespace).
-    from pipeline5.core.config import params as config_params
+    from pipeline5.config import params as config_params
     orig_active = config_params.generation_params_file
     orig_builtin = config_params.builtin_config_project_dir
     config_params.generation_params_file = lambda: os.path.join("Z:\\", "no_such", "generation_params.yaml")
@@ -49,7 +49,7 @@ def test_missing_file_raises():
 
 
 def test_emit_kind_declaration():
-    import pipeline5.domain.software_blocks.builders  # noqa: F401  (importing registers the builders)
+    import pipeline5.phases.software_blocks._siemens_s7.builders  # noqa: F401  (importing registers the builders)
     eq(registry.emit_kind("03_Zone Cumulative"), "fc_xml", "03 declares the FC-XML surface")
     eq(registry.emit_kind("06_Feedback Error"), "csv", "an undeclared builder defaults to csv")
     eq(registry.emit_kind("no such block"), "csv", "unregistered names default to csv")

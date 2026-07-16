@@ -7,10 +7,10 @@ import tempfile
 from openpyxl import load_workbook
 
 from _harness import run, eq, ok
-from pipeline5.core.ssot_database import Database
-from pipeline5.domain import io_tags
-from pipeline5.domain import interface_builder as interfaces
-from pipeline5.domain.signals_schema import signals_table
+from pipeline5.truth.database import Database
+from pipeline5.phases.io_tags import tags as io_tags
+from pipeline5.phases.interfaces import builder as interfaces
+from pipeline5.truth.signals import signals_table
 
 _IOLIST = ["functional_unit", "location", "device", "script_type", "bit"]
 
@@ -140,7 +140,7 @@ def test_return_contract_mixes_sources():
 def test_duplicate_same_table_fails_links_rows_and_blocks_write():
     # the FVX_PL4_Pilot defect: I/O-List rows duplicated verbatim -> the same (tag table, name) twice.
     # Case-insensitive; each 2nd+ occurrence FAILs, location = ITS row, location2 = the FIRST row's.
-    from pipeline5.core import config
+    from pipeline5 import config
     sigs = [
         {"script_type": "A", "bit": "I13.0", "name_in_tagtable": "Fire Alarm", "tagtable": "Alarms",
          "source_cell": "NET SAFETY 50!O113", "type": {"category": "Std", "io_comment": ""}},
@@ -194,7 +194,7 @@ def test_duplicate_name_across_tables_is_by_design():
 def test_duplicate_interface_tag_links_the_source_signal_row():
     # a duplicate WITHIN one interface: the mirror element's link follows source_signal back to the
     # producing I/O-List row; an element with no source signal falls back to <interface>/<name>.
-    from pipeline5.core import config
+    from pipeline5 import config
     sig = {"script_type": "IOC", "bit": "I2.0", "name_in_tagtable": "", "source_cell": "IO!O44",
            "type": {"category": "Interface"}}
     db = _db(signals=[sig])

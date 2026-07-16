@@ -2,11 +2,11 @@
 index builders over synthetic rows, and the run_* functions with `ce_refs.read_ce_refs` monkeypatched to
 synthetic C&E refs + a synthetic `signals` Database (no workbook I/O)."""
 from _harness import run, eq, ok
-from pipeline5.core.ssot_database import Database as DB
-from pipeline5.core.ssot_table import Table as CoreTable
-from pipeline5.domain.validation import cematrix_refs as ce_refs
-from pipeline5.domain.validation import crosscheck
-from pipeline5.domain.validation import finding_factory as vm
+from pipeline5.truth.database import Database as DB
+from pipeline5.truth.table import Table as CoreTable
+from pipeline5.phases.validation import cematrix_refs as ce_refs
+from pipeline5.phases.validation import crosscheck
+from pipeline5.findings import factory as vm
 
 
 def _signals(rows):

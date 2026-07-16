@@ -3,7 +3,7 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core import config
+from pipeline5 import config
 
 
 def test_read_config_csv_decodes_json_and_skips_blanks():

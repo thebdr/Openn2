@@ -22,7 +22,7 @@ import re
 import shutil
 import zipfile
 
-from pipeline5.core import config
+from pipeline5 import config
 from pipeline5.project import app_state as state
 
 CONFIG_DIRNAME = "config_project"

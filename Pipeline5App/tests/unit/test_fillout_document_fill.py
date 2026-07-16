@@ -5,8 +5,8 @@ import tempfile
 from openpyxl import Workbook, load_workbook
 
 from _harness import run, eq, ok
-from pipeline5.core import config
-from pipeline5.domain.fillout import document_fill as fill
+from pipeline5 import config
+from pipeline5.phases.fillout import document_fill as fill
 
 
 def _sandboxed(fn):

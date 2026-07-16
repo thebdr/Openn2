@@ -1,6 +1,6 @@
 """core/i18n.py - the EN/IT string table for the GUI chrome. Pure + data-independent."""
 from _harness import run, eq, ok
-from pipeline5.core import i18n
+from pipeline5.language import i18n
 
 
 def test_tr_basics():

@@ -5,7 +5,7 @@ dropping the formula) instead of leaving a master+literal overlap (the openpyxl-
 corrupted the I/O List). Pure-string, data-independent. (Ported from PL3 verbatim - the module is.)"""
 import xml.etree.ElementTree as ET
 from _harness import run, ok, eq
-from pipeline5.io import xlsx_surgical_writer as xe
+from pipeline5.documents import xlsx_surgical_writer as xe
 
 # a worksheet with: a header row, an ARRAY master A2:A4 (spill cells A3/A4 carry cached values), a
 # SHARED formula B2:B3, and styled cells.

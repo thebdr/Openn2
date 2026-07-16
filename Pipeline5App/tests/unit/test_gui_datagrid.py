@@ -2,7 +2,7 @@
 column widths (measure functions injected), the ellipsis fit, and the one-line cell sanitizer.
 The canvas rendering (gridlines/zebra/virtual slice) is a scripted + manual check."""
 from _harness import run, eq, ok
-from pipeline5.gui import datagrid
+from pipeline5.workbench import datagrid
 
 
 def _measure(px_per_char):

@@ -4,8 +4,8 @@ and the fail-soft missing-file warning. The PhotoImage layer + on-screen look ar
 import os
 
 from _harness import run, eq, ok
-from pipeline5.gui import icons
-from pipeline5.gui import phase_model as phases
+from pipeline5.workbench import icons
+from pipeline5.workbench import phase_model as phases
 
 
 def test_registry_covers_every_phase():

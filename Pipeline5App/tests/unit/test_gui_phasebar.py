@@ -2,8 +2,8 @@
 shade (the chevron dropdown + the composite-button grid are a manual `python launch_gui.py` check).
 Importing `phasebar` headless is safe: tkinter is imported but no `Tk()` is created."""
 from _harness import run, eq, ok
-from pipeline5.gui import phasebar
-from pipeline5.gui import theme
+from pipeline5.workbench import phasebar
+from pipeline5.workbench import theme
 
 
 def test_wrap_short_text_one_line():

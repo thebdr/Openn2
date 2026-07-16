@@ -5,9 +5,9 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core.ssot_database import Database
-from pipeline5.domain import hardware
-from pipeline5.domain import hardware_csv
+from pipeline5.truth.database import Database
+from pipeline5.phases.hardware import builder as hardware
+from pipeline5.phases.hardware import csv as hardware_csv
 
 
 def _dtd_rec(model, dev_type="IoDeviceCard", comment="", params_by_type=None, io_addr="", parent=None):

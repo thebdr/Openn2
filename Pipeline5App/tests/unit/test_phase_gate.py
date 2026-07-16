@@ -4,9 +4,9 @@ import os
 import tempfile
 
 from _harness import run as run_suite, eq, ok
-from pipeline5.core import phase_gate as run
-from pipeline5.core.finding import Finding
-from pipeline5.core.finding_treatments import set_treatment, apply_and_reconcile
+from pipeline5.findings import gate as run
+from pipeline5.findings.finding import Finding
+from pipeline5.findings.treatments import set_treatment, apply_and_reconcile
 
 
 def _sink():

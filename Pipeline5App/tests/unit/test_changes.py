@@ -2,10 +2,10 @@
 regression tagging, the node-aware upgrade rule, and the HTML renderer. Hermetic (synthetic rows)."""
 from _harness import run, eq, ok
 
-from pipeline5.domain.changes import match
-from pipeline5.domain.changes import classify
-from pipeline5.domain.changes import report
-from pipeline5.domain.changes import report_runner as changes_run
+from pipeline5.phases.changes import match
+from pipeline5.phases.changes import classify
+from pipeline5.phases.changes import report
+from pipeline5.phases.changes import report_runner as changes_run
 
 
 def _row(_row=0, **kw):

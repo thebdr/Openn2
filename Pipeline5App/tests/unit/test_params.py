@@ -3,7 +3,7 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core import config
+from pipeline5 import config
 
 _YAML = """project_code: "8XXX"
 iolist_path: "docs/io.xlsx"

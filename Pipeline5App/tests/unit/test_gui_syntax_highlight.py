@@ -1,7 +1,7 @@
 """The Files-tab syntax highlighter (gui/highlight.py) - the Tk-free span tokenizer for YAML + JSON.
 (The tag application on a Tk Text is a manual launch_gui check.)"""
 from _harness import run, eq, ok
-from pipeline5.gui import syntax_highlight as highlight
+from pipeline5.workbench import syntax_highlight as highlight
 
 
 def _tags(kind, text):

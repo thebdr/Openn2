@@ -5,14 +5,14 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core.ssot_database import Database as DB
-from pipeline5.domain.software_blocks import build_engine as engine
-from pipeline5.domain.software_blocks import scl_emit
-from pipeline5.domain.software_blocks import xml_emit
-from pipeline5.domain.software_blocks.signals_view import Database
-from pipeline5.domain.software_blocks.block_table import Table
-from pipeline5.domain.software_blocks import builders
-from pipeline5.domain.datablock_schema import instance_dbs_table
+from pipeline5.truth.database import Database as DB
+from pipeline5.phases.software_blocks import build_engine as engine
+from pipeline5.phases.software_blocks._siemens_s7 import scl_emit
+from pipeline5.phases.software_blocks._siemens_s7 import xml_emit
+from pipeline5.phases.software_blocks.signals_view import Database
+from pipeline5.phases.software_blocks.block_table import Table
+from pipeline5.phases.software_blocks._siemens_s7 import builders
+from pipeline5.truth.datablocks import instance_dbs_table
 
 
 # --- Table + Database -------------------------------------------------------------------------- #
@@ -506,7 +506,7 @@ def test_fdback_reproduces_12_template_networks():
     # THE SAFETY PROOF: the parametric emitter reproduces EACH of the template's 12 hand-made FDBACK
     # networks exactly (whitespace-normalized), so the wiring is correct at every (A,F,C) it covers -
     # and the same rules extend to any larger size.
-    from pipeline5.core import config
+    from pipeline5 import config
     tpl = os.path.join(config.BLOCK_TEMPLATES_DIR, "TEMPLATE--v1.1--05_Output Feedback.xml")
     units = open(tpl, encoding="utf-8-sig").read().split("<SW.Blocks.CompileUnit")[1:]
     sizes = [(1, 1, 1), (1, 2, 1), (1, 4, 1), (1, 1, 2), (1, 2, 2), (1, 4, 2),
@@ -546,7 +546,7 @@ def test_fdback_row_reconstructs_and_drops_pad():
 
 
 def test_fdback_fc_emits_oversized_and_flag_wired():
-    from pipeline5.core import config
+    from pipeline5 import config
     tpl = os.path.join(config.BLOCK_TEMPLATES_DIR, "TEMPLATE--v1.1--05_Output Feedback.xml")
     t = Table("05_Output Feedback")
     row = {"instanceOf-F_FDBACK": "FDBACK_BIG", "NetworkComment": "big",   # 3 areas x 3 contactors x 3 fb:

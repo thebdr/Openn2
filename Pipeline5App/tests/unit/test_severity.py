@@ -1,8 +1,8 @@
 """The severity taxonomy (core.severity) + the GUI log-level display filter (config.load_app_ui reading
 app_config.yaml). First-char level resolution; the shown-set; the DEBG rename (4-letter codes)."""
 from _harness import run, eq, ok
-from pipeline5.core import config
-from pipeline5.core import severity
+from pipeline5 import config
+from pipeline5.findings import severity
 
 
 def test_levels_set():

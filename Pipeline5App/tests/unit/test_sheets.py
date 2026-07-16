@@ -1,6 +1,6 @@
 """Sheet-name resolution (core.config.js_to_re / resolve_sheets / resolve_sheet)."""
 from _harness import run, eq, ok
-from pipeline5.core import config
+from pipeline5 import config
 
 _AVAILABLE = ["NET SAFETY 50", "NET SAFETY 51", "CAUSE&EFFECT MATRIX", "AREA 1", "DiagnosisBlocks"]
 

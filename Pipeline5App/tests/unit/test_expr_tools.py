@@ -1,7 +1,7 @@
 """The expr editor tooling (core/expr/tools.py - UI_REFRESH_PLAN G1): position tokens, the
 compile-only lint (expressions + render templates), and the autocomplete word lists."""
 from _harness import run, eq, ok
-from pipeline5.core import expr
+from pipeline5.language import expr
 
 
 def _kinds(text):

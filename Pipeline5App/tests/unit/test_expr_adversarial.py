@@ -13,8 +13,8 @@ Probes the parity-critical + tricky areas the implementer flagged:
 import re as _re
 
 from _harness import run, eq, ok, raises
-from pipeline5.core import expr
-from pipeline5.core.expr import Scope, ExprError
+from pipeline5.language import expr
+from pipeline5.language.expr import Scope, ExprError
 
 
 def _last(pat, sv):

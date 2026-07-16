@@ -1,6 +1,6 @@
 """The phase-520 template + for_each DSL engine (domain.dbtemplate) - pure, data-independent."""
 from _harness import run, eq, ok, raises
-from pipeline5.domain.datablock_templates import (
+from pipeline5.phases.datablocks.templates import (
     DbTemplateError, render, template_fields, compile_for_each,
 )
 

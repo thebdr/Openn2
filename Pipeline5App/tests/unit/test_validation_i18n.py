@@ -2,8 +2,8 @@
 in the ACTIVE language (the whole reason i18n exists - an IT operator reads IT findings). EN stays verbatim
 (parity), IT comes from PL3. Pure + data-independent."""
 from _harness import run, eq, ok
-from pipeline5.domain.validation import messages
-from pipeline5.domain.validation.finding_factory import entry
+from pipeline5.findings import messages
+from pipeline5.findings.factory import entry
 
 
 def test_messages_bilingual():

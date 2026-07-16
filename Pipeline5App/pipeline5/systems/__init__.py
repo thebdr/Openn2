@@ -6,4 +6,5 @@ them. Import surface for the GUI/project layers:
     from pipeline5.systems import catalog          # by_id() / catalog() / ALL_SYSTEMS
     from pipeline5.systems import system_contract  # System, SystemCapabilities, ...
 """
-from pipeline5.systems import catalog, system_contract  # noqa: F401  (re-export)
+from pipeline5.systems import catalog  # noqa: F401  (re-export)
+from pipeline5.systems import system_contract

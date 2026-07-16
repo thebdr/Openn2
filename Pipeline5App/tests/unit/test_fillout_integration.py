@@ -10,10 +10,10 @@ import tempfile
 from openpyxl import Workbook, load_workbook
 
 from _harness import run, eq, ok
-from pipeline5.core import config
-from pipeline5.domain.fillout import document_fill as fill
-from pipeline5.domain.fillout import diagnosis_blocks_sheet as diag_blocks
-from pipeline5.domain.fillout import diag_allocation as diag_alloc
+from pipeline5 import config
+from pipeline5.phases.fillout import document_fill as fill
+from pipeline5.phases.fillout import diagnosis_blocks_sheet as diag_blocks
+from pipeline5.phases.fillout import diag_allocation as diag_alloc
 
 
 def _sandboxed(fn):
@@ -190,8 +190,8 @@ def test_range_component_suffix_and_shared_index():
 def test_risky_assignments_by_node_type_and_row_order():
     # the manual "risky index fill" heuristic: per (node, family, script_type), the i-th <input required>
     # (row order) takes the i-th existing object index in that node/family; leftover stays unresolved.
-    from pipeline5.domain.fillout import document_fill as fill
-    from pipeline5.domain.fillout.type_families import ObjectFamily, LINK_FLD
+    from pipeline5.phases.fillout import document_fill as fill
+    from pipeline5.phases.fillout.type_families import ObjectFamily, LINK_FLD
     door = ObjectFamily(family="door", key="D", member_types=("DI", "DD", "DL", "DR"), anchor="DI1/2",
                         link=LINK_FLD, index_stride=1, bits=2, diag_block="+SafetyDoors")
 
@@ -215,8 +215,8 @@ def test_risky_assignments_by_node_type_and_row_order():
 
 
 def test_risky_assignments_leftover_when_more_than_objects():
-    from pipeline5.domain.fillout import document_fill as fill
-    from pipeline5.domain.fillout.type_families import ObjectFamily, LINK_FLD
+    from pipeline5.phases.fillout import document_fill as fill
+    from pipeline5.phases.fillout.type_families import ObjectFamily, LINK_FLD
     door = ObjectFamily(family="door", key="D", member_types=("DI", "DL"), anchor="DI1/2", link=LINK_FLD,
                         index_stride=1, bits=2, diag_block="+SafetyDoors")
 

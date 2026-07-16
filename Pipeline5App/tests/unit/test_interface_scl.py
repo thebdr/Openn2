@@ -6,9 +6,9 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.core.ssot_database import Database
-from pipeline5.domain import interface_scl
-from pipeline5.domain.interface_builder import interface_elements_table, interfaces_table
+from pipeline5.truth.database import Database
+from pipeline5.phases.interfaces._siemens_s7 import scl as interface_scl
+from pipeline5.phases.interfaces.builder import interface_elements_table, interfaces_table
 
 
 def _element(**kw):

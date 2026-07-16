@@ -3,8 +3,8 @@ import os
 import tempfile
 
 from _harness import run, eq, ok, raises
-from pipeline5.core.content_hash import uid
-from pipeline5.core.ssot_table import Table, encode_cell
+from pipeline5.truth.content_hash import uid
+from pipeline5.truth.table import Table, encode_cell
 
 
 def _signals_table():

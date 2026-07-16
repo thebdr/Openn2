@@ -6,7 +6,7 @@ import os
 import tempfile
 
 from _harness import run, eq, ok
-from pipeline5.gui import object_editor as oe
+from pipeline5.workbench import object_editor as oe
 
 _YAML = """\
 # header comment stays
