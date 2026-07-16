@@ -500,6 +500,72 @@ def test_write_instance_dbs_merge_and_dedup():
         ok(not raw.startswith(b"\xef\xbb\xbf"), "InstanceDBs.csv is plain UTF-8 (no BOM)")
 
 
+def test_fdback_reproduces_12_template_networks():
+    # THE SAFETY PROOF: the parametric emitter reproduces EACH of the template's 12 hand-made FDBACK
+    # networks exactly (whitespace-normalized), so the wiring is correct at every (A,F,C) it covers -
+    # and the same rules extend to any larger size.
+    from pipeline4.core import config
+    tpl = os.path.join(config.BLOCK_TEMPLATES_DIR, "TEMPLATE--v1.1--05_Output Feedback.xml")
+    units = open(tpl, encoding="utf-8-sig").read().split("<SW.Blocks.CompileUnit")[1:]
+    sizes = [(1, 1, 1), (1, 2, 1), (1, 4, 1), (1, 1, 2), (1, 2, 2), (1, 4, 2),
+             (2, 1, 1), (2, 2, 1), (2, 4, 1), (2, 1, 2), (2, 2, 2), (2, 4, 2)]
+
+    def norm(s):
+        return "\n".join(ln.strip() for ln in s.strip().splitlines() if ln.strip())
+
+    eq(len(units), 12, "the template ships 12 FDBACK networks")
+    for ti, (u, (A, F, C)) in enumerate(zip(units, sizes), start=1):
+        tpl_flg = u[u.index("<Parts>"):u.index("</Wires>") + len("</Wires>")]
+        got = "\n".join(xml_emit._fdback_flgnet_lines(
+            [f"!!05_EM_STATE.{{matrix_areas.{k}}}$$" for k in range(1, A + 1)],
+            [f"!!tagName:Contactor{k}_FeedbackInput$$" for k in range(1, F + 1)],
+            [f"!!tagName:Contactor{k}_QBadInput$$" for k in range(1, C + 1)],
+            [f"!!05_EM_STATE.{{matrix_areas.{k}}}_RESET$$" for k in range(1, A + 1)],
+            [f"!!tagName:Contactor{k}_Output$$" for k in range(1, C + 1)],
+            "!!03_FDBACK_RAW.{db_element}$$", "!!instanceOf-F_FDBACK$$", ""))
+        eq(norm(got), norm(tpl_flg), f"TT{ti:02d} (A{A} F{F} C{C}) reproduced exactly")
+
+
+def test_fdback_row_reconstructs_and_drops_pad():
+    row = {"03_FDBACK_RAW.{db_element}": "ERR", "instanceOf-F_FDBACK": "FDBACK_X"}
+    for k, v in [(1, "f1"), (2, "f2"), (3, "f3"), (4, builders.PAD)]:   # 3 real + 1 pad slot
+        row[f"tagName:Contactor{k}_FeedbackInput"] = v
+    for k in (1, 2):
+        row[f"tagName:Contactor{k}_Output"] = f"o{k}"
+        row[f"tagName:Contactor{k}_QBadInput"] = f"q{k}"
+        row[f"05_EM_STATE.{{matrix_areas.{k}}}"] = f"AREA {k} POWER_CUT"
+        row[f"05_EM_STATE.{{matrix_areas.{k}}}_RESET"] = f"AREA {k} RESET"
+    u = xml_emit._fdback_row(row)
+    eq(u["feedbacks"], ["f1", "f2", "f3"], "the 'No Operation' pad is dropped -> the EXACT feedback count")
+    eq((u["outputs"], u["qbads"]), (["o1", "o2"], ["q1", "q2"]), "C outputs + C qbads")
+    eq(u["areas"], ["AREA 1 POWER_CUT", "AREA 2 POWER_CUT"])
+    eq((u["error_member"], u["instance"]), ("ERR", "FDBACK_X"))
+    eq(xml_emit._fdback_row({"NetworkComment": "c"}), None, "no contactor output -> None (skipped)")
+
+
+def test_fdback_fc_emits_oversized_and_flag_wired():
+    from pipeline4.core import config
+    tpl = os.path.join(config.BLOCK_TEMPLATES_DIR, "TEMPLATE--v1.1--05_Output Feedback.xml")
+    t = Table("05_Output Feedback")
+    row = {"instanceOf-F_FDBACK": "FDBACK_BIG", "NetworkComment": "big",   # 3 areas x 3 contactors x 3 fb:
+           "03_FDBACK_RAW.{db_element}": "ERRBIG"}                          # beyond the 12 template variants
+    for k in (1, 2, 3):
+        row[f"tagName:Contactor{k}_Output"] = f"O{k}"
+        row[f"tagName:Contactor{k}_QBadInput"] = f"Q{k}"
+        row[f"tagName:Contactor{k}_FeedbackInput"] = f"FB{k}"
+        row[f"05_EM_STATE.{{matrix_areas.{k}}}"] = f"AREA {k} POWER_CUT"
+        row[f"05_EM_STATE.{{matrix_areas.{k}}}_RESET"] = f"AREA {k} RESET"
+    t.add_row(row)
+    xml = xml_emit.fdback_fc(t, tpl, "05_Output Feedback")
+    ok("<Name>05_Output Feedback</Name>" in xml, "the block <Name> is swapped")
+    eq(xml.count("<SW.Blocks.CompileUnit"), 1, "one network per unit")
+    ok('<Part Name="FDBACK" Version="1.5"' in xml, "the F_FDBACK FB is instanced")
+    ok('<TemplateValue Name="Card" Type="Cardinality">3</TemplateValue>' in xml, "3-wide AND/OR gates (no cap)")
+    eq(xml.count('<Part Name="Coil"'), 3, "3 contactor outputs -> a 3-coil chain")
+    ok("\r\n" in xml and not xml.startswith("﻿"), "CRLF, no BOM in the body")
+    eq(xml_emit.EMIT_FUNCS.get("fdback_xml"), xml_emit.fdback_fc, "the 'fdback_xml' emit kind is wired")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("blocks", [
@@ -528,4 +594,7 @@ if __name__ == "__main__":
         ("project_ships_templates_with_relative_refs", test_project_ships_templates_with_relative_refs),
         ("block_report_verbose_log_data", test_block_report_verbose_log_data),
         ("write_instance_dbs_merge_and_dedup", test_write_instance_dbs_merge_and_dedup),
+        ("fdback_reproduces_12_template_networks", test_fdback_reproduces_12_template_networks),
+        ("fdback_row_reconstructs_and_drops_pad", test_fdback_row_reconstructs_and_drops_pad),
+        ("fdback_fc_emits_oversized_and_flag_wired", test_fdback_fc_emits_oversized_and_flag_wired),
     ]))

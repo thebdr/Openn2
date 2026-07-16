@@ -506,6 +506,27 @@ depends on 520** (the builders read the write-back fields `name_in_db`/`databloc
   `ESTOP_SORTER_TIERS`/`ESTOP_GENERIC_RESET` retired. **Verified real-data** (4 dev areas -> TT06/TT05/TT02x2; every
   DOORS/SAFETY_BREAKERS ref resolves in 02_COM; 05_EM_STATE.xml has 4 per-area POWER_CUT + 0 `_COM` members). Test:
   `test_blocks.py::builder_04_estop_feature_types`.
+- **05_Output Feedback fix + a DYNAMIC FDBACK FC XML alternative (user spec, 2026-07-16).** (1) FIX: the shipped
+  `TEMPLATE--v1.1--05_Output Feedback.csv` sidecar mislabeled the template's 2-area networks TT9-12 as
+  `OnCondition=1` (a copy of TT3-6), so a 2-area unit with 2 contactors / 4 feedbacks matched no
+  `OUTPUT_FEEDBACK_VARIANTS` entry -> an **empty TemplateType**. Corrected the builder table + the sidecar to the
+  real `(2,4,1)/(2,1,2)/(2,2,2)/(2,4,2)` (verified vs the XML network shapes) - the FVZ 2-area/2-contactor units
+  now pick TT11. (2) NEW SURFACE: besides the corrected 12-variant template CSV (default), 05 can emit a **ready
+  `SW.Blocks.FC` XML built to each unit's EXACT element counts** - no fixed-capacity ceiling (a unit with >2 areas
+  / >4 feedbacks / >2 contactors is expressible; the overflow-empty-TT can't happen). A **code flag
+  `builders.FDBACK_XML`** (user decision - a code setting) picks the surface: `False` -> CSV, `True` -> XML
+  (`@builds("05_Output Feedback", emit="fdback_xml" if FDBACK_XML else "csv")`; `xml_emit.EMIT_FUNCS["fdback_xml"]
+  = fdback_fc`). The builder Table is IDENTICAL either way - `xml_emit._fdback_row` reconstructs each unit's
+  element lists from the same flat @ cells (dropping the AND-neutral `No Operation` pad, so a fitting unit yields
+  its exact-size network, not a padded one). `_fdback_flgnet_lines` is a **parametric reproduction of the
+  template's own 12 networks** (1 F_FDBACK FB per unit; ON=AND(areas), FEEDBACK=AND(feedbacks), ACK=OR(resets),
+  QBAD_FIO=[C=1 direct + FB-pin-Negated | C>1 AND of NEGATED qbads], Q->outputs=[C=1 direct | C>1 FB.Q-open +
+  a instanceOf-F_FDBACK.Q read-back driving a chain of C coils]; ACK_NEC=true, FDB_TIME=T#300ms,
+  ERROR->03_FDBACK_RAW, en/ACK_REQ/DIAG open). **PROVEN: every one of the 12 (A,F,C) template networks is
+  reproduced byte-exact (whitespace-normalized)**; real-data (FVZ, flag on) 05 ships a well-formed FC XML (5 units,
+  the 2-area/2-contactor units get the OR gate + 2-coil chain), CSV dropped. Tests: `test_blocks.py`
+  (`of_variant_picks_smallest_cover` +TT11/TT12, `fdback_reproduces_12_template_networks`,
+  `fdback_row_reconstructs_and_drops_pad`, `fdback_fc_emits_oversized_and_flag_wired`).
 - **800c DONE - the 03 FC XML + 02_COM safe-DB + InstanceDBs.csv + the GUI button.**
   - **`domain/blocks/xml_emit.py`** (verbatim port of PL3's): `and_coil_fc` emits **03_Zone Cumulative** as a ready
     `SW.Blocks.FC` XML - one `A`(AND)->`Coil` FlgNet network per @ row (the row's `nameOfDB.<member>` inputs ->

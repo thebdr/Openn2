@@ -283,7 +283,16 @@ def _of_variant(oncond, fb, co):
     return min(cands, key=lambda v: (v[0] + v[1] + v[2], v[3])) if cands else None
 
 
-@builds("05_Output Feedback")
+# SURFACE FLAG (user decision - a code setting). False -> the fixed-capacity template CSV (the corrected
+# 12-variant path above); True -> the DYNAMIC FDBACK FC XML (xml_emit.fdback_fc), one network sized to each
+# unit's EXACT element counts (no 12-variant ceiling - a unit with >2 areas / >4 feedbacks / >2 contactors
+# is expressible). Flip + re-run to switch the whole 05 block's output surface: the builder Table is
+# IDENTICAL either way (the emitter reconstructs each unit's element lists from the same flat @ cells,
+# dropping the AND-neutral 'No Operation' pad, so a fitting unit still yields its exact-size network).
+FDBACK_XML = False
+
+
+@builds("05_Output Feedback", emit="fdback_xml" if FDBACK_XML else "csv")
 def build_05_output_feedback(db: Database) -> Table:
     """One 03_FDBACK (FDBACK) FB instance per contactor unit = the K-family signals sharing one
     (global) index: all KQ outputs + KI feedback inputs of that index. Three fixed-slot families:

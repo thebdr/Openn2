@@ -173,10 +173,257 @@ def and_coil_fc(table, template_path, block_name,
     return head + NL + NL.join(L)
 
 
+# --- FDBACK (05_Output Feedback) dynamic network -------------------------------------------------- #
+# The alternative to the 12 fixed-capacity template variants: build each unit's FDBACK network sized to
+# its EXACT element counts (any number of on-conditions / feedbacks / contactors), so a unit that
+# overflows the template (>2 areas, >4 feedbacks, >2 contactors) is expressible. The wiring is a verified
+# parametric reproduction of the template's own 12 networks (each of the 12 (A,F,C) sizes is byte-exact),
+# extrapolated by the same rules. One `F_FDBACK` FB per unit: ON = AND(areas), FEEDBACK = AND(feedbacks),
+# ACK = OR(resets), QBAD_FIO = the qbad(s) [C=1: direct + FB pin Negated; C>1: AND of NEGATED qbads],
+# Q -> the contactor output(s) [C=1: direct; C>1: FB.Q open + a instanceOf-F_FDBACK.Q read-back driving a
+# chain of C coils]. ACK_NEC=true, FDB_TIME=T#300ms, ERROR->03_FDBACK_RAW, en/ACK_REQ/DIAG open.
+_NOOP = "No Operation"   # the AND-neutral DB filler a CSV variant pads unused fixed slots with (dropped here)
+
+
+def _fdback_flgnet_lines(areas, feedbacks, qbads, resets, outputs, error_member, instance, ind) -> list:
+    """FlgNet inner (Parts + Wires) for ONE FDBACK unit at indent `ind`. areas/resets: 05_EM_STATE members
+    (A of each); feedbacks/qbads/outputs: tags (F, C, C); error_member: the 03_FDBACK_RAW member; instance:
+    the F_FDBACK instance name. Reproduces the template's exact UId scheme + part/wire order for any (A,F,C)."""
+    A, F, C = len(areas), len(feedbacks), len(qbads)
+    P, Wl = [], []
+    uid = 21
+
+    def sym2(db, member):                                    # a 2-component Access (DB.member)
+        nonlocal uid
+        u = uid; uid += 1
+        P.extend([f'{ind}    <Access Scope="GlobalVariable" UId="{u}">', f"{ind}      <Symbol>",
+                  f'{ind}        <Component Name="{_attr(db)}" />',
+                  f'{ind}        <Component Name="{_attr(member)}" />',
+                  f"{ind}      </Symbol>", f"{ind}    </Access>"])
+        return u
+
+    def sym1(tag):                                           # a 1-component Access (a tag)
+        nonlocal uid
+        u = uid; uid += 1
+        P.extend([f'{ind}    <Access Scope="GlobalVariable" UId="{u}">', f"{ind}      <Symbol>",
+                  f'{ind}        <Component Name="{_attr(tag)}" />',
+                  f"{ind}      </Symbol>", f"{ind}    </Access>"])
+        return u
+
+    def const(scope, lines):
+        nonlocal uid
+        u = uid; uid += 1
+        P.append(f'{ind}    <Access Scope="{scope}" UId="{u}">')
+        P.append(f"{ind}      <Constant>")
+        P.extend(f"{ind}        {ln}" for ln in lines)
+        P.append(f"{ind}      </Constant>")
+        P.append(f"{ind}    </Access>")
+        return u
+
+    # Access parts, in the template's exact order
+    area_u = [sym2("05_EM_STATE", m) for m in areas]
+    fb_u = [sym1(t) for t in feedbacks]
+    qbad_u = [sym1(t) for t in qbads]
+    true_u = const("LiteralConstant", ["<ConstantType>Bool</ConstantType>", "<ConstantValue>true</ConstantValue>"])
+    reset_u = [sym2("05_EM_STATE", m) for m in resets]
+    time_u = const("TypedConstant", ["<ConstantValue>T#300ms</ConstantValue>"])
+    if C == 1:
+        out_u = [sym1(outputs[0])]
+        err_u = sym2("03_FDBACK_RAW", error_member)
+        q_read_u = None
+    else:
+        err_u = sym2("03_FDBACK_RAW", error_member)
+        q_read_u = sym2(instance, "Q")
+        out_u = [sym1(t) for t in outputs]
+
+    # instruction Parts: ON-A, FB-A, QBAD-A(neg), ACK-O, FDBACK(+Instance), Coils
+    def and_part(card, negated=False):
+        nonlocal uid
+        u = uid; uid += 1
+        P.append(f'{ind}    <Part Name="A" UId="{u}">')
+        P.append(f'{ind}      <TemplateValue Name="Card" Type="Cardinality">{card}</TemplateValue>')
+        if negated:
+            P.extend(f'{ind}      <Negated Name="in{k}" />' for k in range(1, card + 1))
+        P.append(f"{ind}    </Part>")
+        return u
+
+    def or_part(card):
+        nonlocal uid
+        u = uid; uid += 1
+        P.extend([f'{ind}    <Part Name="O" UId="{u}">',
+                  f'{ind}      <TemplateValue Name="Card" Type="Cardinality">{card}</TemplateValue>',
+                  f"{ind}    </Part>"])
+        return u
+
+    on_and = and_part(A) if A > 1 else None
+    fb_and = and_part(F) if F > 1 else None
+    qbad_and = and_part(C, negated=True) if C > 1 else None
+    ack_or = or_part(A) if A > 1 else None
+
+    fb_uid = uid; uid += 1
+    inst_uid = uid; uid += 1
+    P.append(f'{ind}    <Part Name="FDBACK" Version="1.5" UId="{fb_uid}">')
+    P.append(f'{ind}      <Instance Scope="GlobalVariable" UId="{inst_uid}">')
+    P.append(f'{ind}        <Component Name="{_attr(instance)}" />')
+    P.append(f"{ind}      </Instance>")
+    P.append(f'{ind}      <TemplateValue Name="f_user_card" Type="Cardinality">1</TemplateValue>')
+    P.append(f'{ind}      <TemplateValue Name="f_image_card" Type="Cardinality">0</TemplateValue>')
+    if C == 1:
+        P.append(f'{ind}      <Negated Name="QBAD_FIO" />')
+    P.append(f"{ind}    </Part>")
+
+    coil_u = []
+    if C > 1:
+        for _ in range(C):
+            u = uid; uid += 1
+            P.append(f'{ind}    <Part Name="Coil" UId="{u}" />')
+            coil_u.append(u)
+
+    # OpenCons: en, [Q if C>1], ACK_REQ, DIAG
+    en_open = uid; uid += 1
+    q_open = None
+    if C > 1:
+        q_open = uid; uid += 1
+    ackreq_open = uid; uid += 1
+    diag_open = uid; uid += 1
+
+    wuid = [uid]                                              # wire UIds continue after all parts/opencons
+
+    def wire(a, b):
+        Wl.append(f'{ind}    <Wire UId="{wuid[0]}">')
+        Wl.append(f"{ind}      {a}")
+        Wl.append(f"{ind}      {b}")
+        Wl.append(f"{ind}    </Wire>")
+        wuid[0] += 1
+
+    def ident(u):
+        return f'<IdentCon UId="{u}" />'
+
+    def ncon(u, pin):
+        return f'<NameCon UId="{u}" Name="{pin}" />'
+
+    def opencon(u):
+        return f'<OpenCon UId="{u}" />'
+
+    # combine gates first (inputs, then gate.out -> FB.pin), in part order ON, FEEDBACK, QBAD, ACK
+    if on_and is not None:
+        for k, au in enumerate(area_u, 1):
+            wire(ident(au), ncon(on_and, f"in{k}"))
+        wire(ncon(on_and, "out"), ncon(fb_uid, "ON"))
+    if fb_and is not None:
+        for k, fu in enumerate(fb_u, 1):
+            wire(ident(fu), ncon(fb_and, f"in{k}"))
+        wire(ncon(fb_and, "out"), ncon(fb_uid, "FEEDBACK"))
+    if qbad_and is not None:
+        for k, qu in enumerate(qbad_u, 1):
+            wire(ident(qu), ncon(qbad_and, f"in{k}"))
+        wire(ncon(qbad_and, "out"), ncon(fb_uid, "QBAD_FIO"))
+    if ack_or is not None:
+        for k, ru in enumerate(reset_u, 1):
+            wire(ident(ru), ncon(ack_or, f"in{k}"))
+        wire(ncon(ack_or, "out"), ncon(fb_uid, "ACK"))
+
+    # FB direct pin wires, in pin order, skipping combine-driven pins
+    wire(opencon(en_open), ncon(fb_uid, "en"))
+    if on_and is None:
+        wire(ident(area_u[0]), ncon(fb_uid, "ON"))
+    if fb_and is None:
+        wire(ident(fb_u[0]), ncon(fb_uid, "FEEDBACK"))
+    if qbad_and is None:
+        wire(ident(qbad_u[0]), ncon(fb_uid, "QBAD_FIO"))
+    wire(ident(true_u), ncon(fb_uid, "ACK_NEC"))
+    if ack_or is None:
+        wire(ident(reset_u[0]), ncon(fb_uid, "ACK"))
+    wire(ident(time_u), ncon(fb_uid, "FDB_TIME"))
+    if C == 1:
+        wire(ncon(fb_uid, "Q"), ident(out_u[0]))
+    else:
+        wire(ncon(fb_uid, "Q"), opencon(q_open))
+    wire(ncon(fb_uid, "ERROR"), ident(err_u))
+    wire(ncon(fb_uid, "ACK_REQ"), opencon(ackreq_open))
+    wire(ncon(fb_uid, "DIAG"), opencon(diag_open))
+
+    # coil chain (C>1): Q-readback -> coil1.in, out_k -> coil_k.operand, coil_k.out -> coil_{k+1}.in
+    for k, cu in enumerate(coil_u):
+        src = ncon(coil_u[k - 1], "out") if k > 0 else ident(q_read_u)
+        wire(src, ncon(cu, "in"))
+        wire(ident(out_u[k]), ncon(cu, "operand"))
+
+    return [f"{ind}  <Parts>"] + P + [f"{ind}  </Parts>", f"{ind}  <Wires>"] + Wl + [f"{ind}  </Wires>"]
+
+
+def _fdback_row(row):
+    """Reconstruct one unit's element lists from the builder's flat @ cells (the same template
+    placeholders the CSV fills), dropping the AND-neutral 'No Operation' pad. None if no contactor output."""
+    def scan(make):
+        out, k = [], 1
+        while make(k) in row:
+            v = str(row.get(make(k), "") or "").strip()
+            if v and v != _NOOP:
+                out.append(v)
+            k += 1
+        return out
+    outputs = scan(lambda k: f"tagName:Contactor{k}_Output")
+    if not outputs:
+        return None
+    return {
+        "areas": scan(lambda k: f"05_EM_STATE.{{matrix_areas.{k}}}"),
+        "resets": scan(lambda k: f"05_EM_STATE.{{matrix_areas.{k}}}_RESET"),
+        "feedbacks": scan(lambda k: f"tagName:Contactor{k}_FeedbackInput"),
+        "qbads": scan(lambda k: f"tagName:Contactor{k}_QBadInput"),
+        "outputs": outputs,
+        "error_member": str(row.get("03_FDBACK_RAW.{db_element}", "") or ""),
+        "instance": str(row.get("instanceOf-F_FDBACK", "") or ""),
+    }
+
+
+def fdback_fc(table, template_path, block_name,
+              block_comment="v1.1 Dynamic FDBACK (one network sized to each unit)",
+              block_title="Output Feedback") -> str:
+    """Build the SW.Blocks.FC XML for 05_Output Feedback - one FDBACK CompileUnit per @ row, each sized to
+    the unit's exact element counts (`_fdback_row` + `_fdback_flgnet_lines`). Reuses the template head like
+    `and_coil_fc`; CRLF multi-line, no BOM (added on write)."""
+    with open(template_path, encoding="utf-8-sig", newline="") as f:
+        src = f.read()
+    head = src[: src.index(_ATTR_END) + len(_ATTR_END)]
+    i, j = head.index("<Name>"), head.index("</Name>") + len("</Name>")
+    head = head[:i] + f"<Name>{_text(block_name)}</Name>" + head[j:]
+
+    n = [0]
+
+    def ids():
+        n[0] += 1
+        return n[0]
+
+    L = ["    <ObjectList>"]
+    L += _mltext_lines("Comment", block_comment, ids, "      ")
+    for row in table.rows:
+        u = _fdback_row(row)
+        if u is None:
+            continue
+        comment = str(row.get("NetworkComment", "") or "")
+        L.append(f'      <SW.Blocks.CompileUnit ID="{ids()}" CompositionName="CompileUnits">')
+        L.append("        <AttributeList>")
+        L.append(f'          <NetworkSource><FlgNet xmlns="{FLGNET_NS}">')
+        L += _fdback_flgnet_lines(u["areas"], u["feedbacks"], u["qbads"], u["resets"], u["outputs"],
+                                  u["error_member"], u["instance"], "          ")
+        L.append("          </FlgNet></NetworkSource>")
+        L.append("          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>")
+        L.append("        </AttributeList>")
+        L.append("        <ObjectList>")
+        L += _mltext_lines("Comment", "", ids, "          ")
+        L += _mltext_lines("Title", comment, ids, "          ")
+        L.append("        </ObjectList>")
+        L.append("      </SW.Blocks.CompileUnit>")
+    L += _mltext_lines("Title", block_title, ids, "      ")
+    L += ["    </ObjectList>", "  </SW.Blocks.FC>", "</Document>"]
+    return head + NL + NL.join(L)
+
+
 # emit KIND -> renderer. WHICH blocks use an emitter is declared at registration
-# (`@builds(name, emit="fc_xml")` in the user-coded builders.py) - the hardcoded name-set is retired
-# (UI_REFRESH_PLAN F). The engine emits these to blocks_import_dir (UTF-8 BOM + CRLF) and drops the CSV.
-EMIT_FUNCS = {"fc_xml": and_coil_fc}
+# (`@builds(name, emit="fc_xml"|"fdback_xml")` in the user-coded builders.py) - the hardcoded name-set is
+# retired (UI_REFRESH_PLAN F). The engine emits these to blocks_import_dir (UTF-8 BOM + CRLF) and drops the CSV.
+EMIT_FUNCS = {"fc_xml": and_coil_fc, "fdback_xml": fdback_fc}
 
 
 def write_fc_xml(name, table, template_path, out_dir) -> str:
