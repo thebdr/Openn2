@@ -1,0 +1,758 @@
+<title>Five Shapes for One Pipeline — the PL5 structure gallery</title>
+<style>
+  :root{
+    --paper:#F7F8F6; --panel:#FFFFFF; --ink:#1C2321; --ink-2:#5C6663; --ink-3:#8A938F;
+    --line:#DDE2DF; --accent:#0E7C86; --accent-ink:#0A5A62; --warn:#B3261E;
+    --code-bg:#F1F4F2; --code-line:#E2E7E4; --hi:#0E7C86; --mid:#C97B12; --lo:#B3261E;
+    --hi-bg:#E4F0F1; --mid-bg:#FBF3E4; --lo-bg:#F9E9E8;
+  }
+  @media (prefers-color-scheme: dark){:root{
+    --paper:#101514; --panel:#161C1A; --ink:#E4E8E5; --ink-2:#9AA5A0; --ink-3:#6E7873;
+    --line:#28312E; --accent:#2FA8B0; --accent-ink:#7FD0D6; --warn:#F09590;
+    --code-bg:#141A18; --code-line:#232B28; --hi:#2FA8B0; --mid:#E0A33E; --lo:#F09590;
+    --hi-bg:#153A3E; --mid-bg:#2A2418; --lo-bg:#3A1F1D;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#101514; --panel:#161C1A; --ink:#E4E8E5; --ink-2:#9AA5A0; --ink-3:#6E7873;
+    --line:#28312E; --accent:#2FA8B0; --accent-ink:#7FD0D6; --warn:#F09590;
+    --code-bg:#141A18; --code-line:#232B28; --hi:#2FA8B0; --mid:#E0A33E; --lo:#F09590;
+    --hi-bg:#153A3E; --mid-bg:#2A2418; --lo-bg:#3A1F1D;
+  }
+  :root[data-theme="light"]{
+    --paper:#F7F8F6; --panel:#FFFFFF; --ink:#1C2321; --ink-2:#5C6663; --ink-3:#8A938F;
+    --line:#DDE2DF; --accent:#0E7C86; --accent-ink:#0A5A62; --warn:#B3261E;
+    --code-bg:#F1F4F2; --code-line:#E2E7E4; --hi:#0E7C86; --mid:#C97B12; --lo:#B3261E;
+    --hi-bg:#E4F0F1; --mid-bg:#FBF3E4; --lo-bg:#F9E9E8;
+  }
+  html{background:var(--paper);scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+  body{margin:0;color:var(--ink);font-family:Georgia,'Times New Roman',serif;line-height:1.6;font-size:16px}
+  .wrap{max-width:880px;margin:0 auto;padding:48px 24px 96px}
+  .eyebrow{font-family:'Segoe UI',system-ui,sans-serif;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+  h1{font-weight:700;font-size:clamp(28px,4.6vw,40px);line-height:1.12;margin:10px 0 12px;text-wrap:balance}
+  .dek{font-size:18px;color:var(--ink-2);margin:0 0 6px;max-width:64ch}
+  .byline{font-family:'Segoe UI',system-ui,sans-serif;font-size:12.5px;color:var(--ink-3);margin-bottom:36px}
+  h2{font-family:'Segoe UI',system-ui,sans-serif;font-weight:650;font-size:22px;margin:6px 0 2px}
+  h3{font-family:'Segoe UI',system-ui,sans-serif;font-weight:650;font-size:14px;margin:22px 0 8px;color:var(--ink-2);letter-spacing:.04em;text-transform:uppercase}
+  h4{font-family:'Segoe UI',system-ui,sans-serif;font-weight:650;font-size:13px;margin:14px 0 6px}
+  p{max-width:70ch}
+  .matrix{border:1px solid var(--line);border-radius:8px;overflow-x:auto;background:var(--panel);margin:20px 0 8px}
+  table{border-collapse:collapse;width:100%;font-family:'Segoe UI',system-ui,sans-serif;font-size:13px}
+  .matrix th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:9px 10px;text-align:center;border-bottom:1px solid var(--line)}
+  .matrix td{padding:8px 10px;text-align:center;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  .matrix tr:last-child td{border-bottom:none}
+  .matrix .nm{text-align:left;font-weight:600}
+  .matrix .nm a{color:var(--accent-ink);text-decoration:none}
+  .matrix .tot{font-weight:700}
+  td.hi{color:var(--hi);font-weight:700} td.mid{color:var(--mid);font-weight:600} td.lo{color:var(--lo);font-weight:600}
+  .truths{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin:18px 0}
+  .truth{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:6px;background:var(--panel);padding:10px 14px;font-size:13.5px}
+  .truth b{font-family:'Segoe UI',system-ui,sans-serif;font-size:13px}
+  .truth p{margin:6px 0 0;color:var(--ink-2);font-size:12.8px;line-height:1.5}
+  .cand{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:22px 24px;margin:26px 0}
+  .ch{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;justify-content:space-between}
+  .school{font-family:'Segoe UI',system-ui,sans-serif;font-size:12.5px;color:var(--ink-3);margin-top:2px}
+  .principle{font-size:16.5px;font-style:italic;color:var(--ink);border-left:3px solid var(--accent);padding-left:14px;margin:16px 0}
+  .scorebar{min-width:170px;height:22px;border:1px solid var(--line);border-radius:11px;position:relative;overflow:hidden;background:var(--code-bg);font-family:'Segoe UI',system-ui,sans-serif}
+  .scorebar .fill{position:absolute;inset:0;background:var(--accent);opacity:.25}
+  .scorebar span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}
+  .chip{font-family:'Segoe UI',system-ui,sans-serif;font-size:11px;font-weight:600;border-radius:4px;padding:2px 8px}
+  .chip.hi{color:var(--hi);background:var(--hi-bg)} .chip.mid{color:var(--mid);background:var(--mid-bg)} .chip.lo{color:var(--lo);background:var(--lo-bg)}
+  pre.tree{background:var(--code-bg);border:1px solid var(--code-line);border-radius:8px;padding:16px 18px;overflow-x:auto;font-family:'Cascadia Code',Consolas,'Courier New',monospace;font-size:11.8px;line-height:1.55;margin:0}
+  ul.laws{font-size:13.5px;line-height:1.55;padding-left:20px;font-family:'Segoe UI',system-ui,sans-serif}
+  ul.laws li{margin-bottom:6px}
+  details{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:12px 0;font-family:'Segoe UI',system-ui,sans-serif;font-size:13px}
+  details summary{cursor:pointer;font-weight:600;color:var(--accent-ink)}
+  details summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .tblwrap{overflow-x:auto;margin-top:10px}
+  .tblwrap table td,.tblwrap table th{border-bottom:1px solid var(--line);padding:5px 10px;text-align:left;font-size:12px;vertical-align:top}
+  .tblwrap th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+  ul.breaks li{margin-bottom:8px;line-height:1.5;font-size:12.8px}
+  ul.strengths li{margin-bottom:6px;line-height:1.5;font-size:12.8px;color:var(--ink-2)}
+  .mig,.vis,.grow{font-size:13.5px;color:var(--ink-2);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.55}
+  .mig b,.vis b,.grow b{color:var(--ink)}
+  .foot{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-family:'Segoe UI',system-ui,sans-serif;font-size:12.5px;color:var(--ink-3)}
+</style>
+<div class="wrap">
+  <div class="eyebrow">Pipeline5 · structure gallery · companion to “The Code Is the Manual”</div>
+  <h1>Five Shapes for One Pipeline</h1>
+  <p class="dek">Each candidate pushes one researched school to its honest conclusion over the real PL5 inventory —
+  then an adversarial critic, armed with the actual code, hunts for where it breaks.</p>
+  <div class="byline">5 design agents + 5 code-grounded critics · every current module placed · chain-reactions, Tempemplator,
+  and the peek-code explorer all homed · scores are the critics', 1–5 per dimension</div>
+
+  <h2 style="margin-top:34px">The scoreboard</h2>
+  <div class="matrix"><table>
+    <tr><th style="text-align:left">Candidate</th><th>Flat domain</th><th>Boundaries</th><th>Ownership</th><th>Phase growth</th><th>Vision fit</th><th>Migration</th><th>Total</th></tr>
+    <tr><td class="nm"><a href="#components">Chaptered Pipeline</a></td><td class="hi">5</td><td class="hi">4</td><td class="hi">4</td><td class="hi">4</td><td class="hi">4</td><td class="mid">3</td><td class="tot">24</td></tr><tr><td class="nm"><a href="#slices">Phasebook</a></td><td class="hi">5</td><td class="hi">4</td><td class="mid">3</td><td class="hi">4</td><td class="hi">4</td><td class="lo">2</td><td class="tot">22</td></tr><tr><td class="nm"><a href="#manual">The Shop Manual</a></td><td class="hi">4</td><td class="mid">3</td><td class="hi">4</td><td class="hi">4</td><td class="hi">5</td><td class="lo">2</td><td class="tot">22</td></tr><tr><td class="nm"><a href="#stream">Streamworks</a></td><td class="hi">4</td><td class="mid">3</td><td class="mid">3</td><td class="hi">4</td><td class="hi">4</td><td class="lo">2</td><td class="tot">20</td></tr><tr><td class="nm"><a href="#hexagon">The Hexagon with Three Sockets</a></td><td class="hi">4</td><td class="mid">3</td><td class="mid">3</td><td class="hi">4</td><td class="mid">3</td><td class="mid">3</td><td class="tot">20</td></tr>
+  </table></div>
+  <p style="font-family:'Segoe UI',system-ui,sans-serif;font-size:12.5px;color:var(--ink-3)">Scores are adversarial — a 3 means the critic found real friction, not that the idea is bad. Migration: 5 = cheapest from today's tree.</p>
+
+  <h2>Eight truths every choice must face</h2>
+  <p style="font-size:14.5px;color:var(--ink-2)">The critics converged on the same real coupling in today's code — these get solved under <em>any</em> winner, so they are the actual work list of the restructure:</p>
+  <div class="truths"><div class="truth"><b>The GUI is the secret orchestrator</b><p>app_main's phase handlers chain staging → 520 → 400 → … per button; every candidate must extract this run-plan out of Tk code into a registry/composition root before any phase-independence law can hold. (Found by the components + slices critics.)</p></div><div class="truth"><b>signal_coverage imports three sibling phases</b><p>It calls functions of datablock_generator, diagnosis_builder, interface_builder (seed_members(), TRIGGER_TYPE, node_of). Coverage must be re-plumbed to read the SSOT tables it audits — the exact spirit of the phases-are-filters law. (stream critic, verified lines.)</p></div><div class="truth"><b>validation_runner re-runs staging</b><p>domain/validation/validation_runner.py literally calls staging.stage(params) — the validate phase re-executes another phase. Either validation consumes staged tables, or staging exposure becomes a kernel service. (stream + manual critics.)</p></div><div class="truth"><b>cematrix_annotation is not a standalone phase today</b><p>staging calls annotate() inline; the oracle 310/320 split exists at the API, not in module independence. Any candidate that separates them must accept the edge or merge the folder. (stream critic.)</p></div><div class="truth"><b>Table schemas live inside builder modules</b><p>interface/hardware/block tables are defined in the modules that write them; several phases import a sibling just for its schema. Every candidate converged on the same cure: a data dictionary — schemas owned centrally (stream/truth/shared-tables) or fetched by name from the SSOT registry. (all five critics, various forms.)</p></div><div class="truth"><b>software_blocks ↔ Siemens emitters are one cluster today</b><p>build_engine imports datablock_xml + builders/scl_emit/xml_emit directly; until step 4 moves them behind system.emitters, every candidate needs a declared, shrinking allowlist for these edges. (slices + manual + hexagon critics.)</p></div><div class="truth"><b>finding ↔ report_model ↔ report_renderer form a mini-cycle</b><p>finding imports Cmp/InfoBlock from report_model while report_renderer imports finding — any layering of 'findings' vs 'reports' must keep them in one layer or split the value objects. (manual critic, verified lines.)</p></div><div class="truth"><b>Import-side-effect registries are fragile</b><p>Check/table registration at import time only works if the composition root imports everything first; headless runs and tests bypass it. Registration must be explicit (called, not import-triggered) whatever the shape. (components critic.)</p></div></div>
+
+  
+<section class="cand" id="components">
+  <div class="ch">
+    <div><div class="eyebrow">Candidate 1 · components</div>
+    <h2>Chaptered Pipeline</h2>
+    <div class="school">Modular Monolith / package-by-component (Simon Brown; Shopify component-based monolith)</div></div>
+    <div class="scorebar"><div class="fill" style="width:80%"></div><span>24/30</span></div>
+  </div>
+  <p class="principle">Every business capability is one sealed component that owns the SSOT tables it writes, carries its own checks and system-specific quarantine, and exposes a one-page public API — the only thing that ever crosses a component boundary is data, fetched by table name from the kernel's registry.</p>
+  <div class="chips"><span class="chip hi" title="Flat domain cured">Flat 5</span><span class="chip hi" title="Boundaries enforceable">Boundaries 4</span><span class="chip hi" title="Clear ownership">Clear 4</span><span class="chip hi" title="Phase growth">Phase 4</span><span class="chip hi" title="Vision fit">Vision 4</span><span class="chip mid" title="Migration ease">Migration 3</span></div>
+  <h3>The map</h3>
+  <pre class="tree">pipeline5/
+├─ __main__.py                      # `python -m pipeline5` → app.main (launch_gui.py becomes a shim)
+├─ app/                             # COMPOSITION ROOT — the only package allowed to know everything
+│  ├─ main.py                       # entrypoint: build kernel services, open project, start GUI shell
+│  ├─ registry.py                   # THE PHASE REGISTRY: operator phase numbers → component entrypoints + check sweeps (numbers live here, never in folder names — adding/renumbering a phase touches only this file)
+│  └─ wiring.py                     # plugs the project's selected system (via systems.catalog) into component sockets; imports all components once so tables/checks register
+├─ kernel/                          # PLATFORM LAYER (was core/ + io/): imports nothing above itself, never tkinter
+│  ├─ ssot/
+│  │  ├─ table.py                   # ssot_table — table descriptor primitive
+│  │  ├─ database.py                # ssot_database + THE TABLE REGISTRY: components register the schemas they own; everyone else fetches db.table("signals") by NAME — the pipe is the contract, imports are not
+│  │  └─ content_hash.py            # content hashing for change detection
+│  ├─ findings/
+│  │  ├─ model.py                   # finding, severity
+│  │  ├─ treatments.py              # finding_treatments
+│  │  ├─ factory.py                 # finding_factory (sunk from domain/validation — every component's checks.py needs it)
+│  │  ├─ messages.py                # i18n finding-text catalog (sunk from domain/validation, same reason)
+│  │  └─ checks.py                  # CHECK REGISTRY: components register named checks at import; the quality phase sweeps it — validation_runner stops importing phases
+│  ├─ gate.py                       # phase_gate
+│  ├─ report/
+│  │  ├─ model.py                   # report_model
+│  │  └─ render.py                  # report_renderer (from io/)
+│  ├─ config/                       # paths.py, params.py, loaders.py — project/app config
+│  ├─ expr/                         # parser, render, runtime, scope, tools, data, errors — the expression language service (unchanged internally)
+│  ├─ templating/                   # tempemplator renderer (P-009) — a language service beside expr, shared by chain_reactions + any component's templates
+│  ├─ provenance/                   # P-014 substrate: stamp.py (every SSOT write / artifact emit records component+module+qualname+rule id), resolve.py (stamp → file:line)
+│  ├─ vocab/                        # THE UBIQUITOUS-LANGUAGE SHELF — deliberately tiny, anyone may import, imports only kernel
+│  │  ├─ signal_identity.py         # FLD/tag-name identity (5 components call it today; prefer materializing results into signals columns, this is the residue)
+│  │  └─ addresses.py               # address_parsing (needed by checks now living in 2+ components)
+│  ├─ xlsx/
+│  │  ├─ reader.py                  # xlsx_reader
+│  │  └─ surgical_writer.py         # xlsx_surgical_writer
+│  └─ i18n.py                       # UI/i18n primitives
+├─ components/                      # ONE PACKAGE PER CAPABILITY — mutually independent (LAW), each owns exactly the tables it writes; __init__.py is the whole public API: run_*(), register_tables(), register_checks(), optional ui
+│  ├─ intake/                       # documents → signals SSOT (owns: signals, cabinets tables — writer-owns-schema)
+│  │  ├─ __init__.py                # public API + M1 chapter docstring
+│  │  ├─ tables.py                  # signals_schema + the cabinets table staging writes (moved from diagnosis_schema — staging is the writer)
+│  │  ├─ staging.py                 # iolist_staging
+│  │  ├─ cematrix.py                # cematrix_annotation (staging already imports it — same capability, so same component)
+│  │  └─ checks.py                  # iolist_checks, cematrix_checks, cematrix_refs — the capability owns its own validation
+│  ├─ fillout/                      # fill missing document content (owns fillout tables)
+│  │  ├─ __init__.py, document_fill.py, script_type_classify.py, index_assign.py, type_families.py, device_tag_ranges.py, diag_allocation.py, diagnosis_blocks_sheet.py, iolist_reader.py
+│  ├─ hardware/                     # hardware topology (owns: hardware_stations, hardware_modules)
+│  │  ├─ __init__.py, tables.py + builder.py (hardware.py split), csv.py (hardware_csv)
+│  │  └─ _siemens_s7/               # TIA-specific hardware bits — quarantine until migration step 4
+│  ├─ datablocks/                   # datablock generation (owns: db_blocks, db_members, instance_dbs)
+│  │  ├─ __init__.py, tables.py (datablock_schema), generator.py, templates.py
+│  │  └─ _siemens_s7/xml.py         # datablock_xml — quarantine; software_blocks stops importing it directly (wired via socket in app/wiring.py)
+│  ├─ diagnosis/                    # diagnosis build (owns: diagnosis_entries; READS intake's cabinets by table name)
+│  │  ├─ __init__.py, tables.py, builder.py (diagnosis_builder), diaglist.py (diaglist_csv), checks.py (diagcheck)
+│  │  └─ _siemens_s7/scl.py         # diagnosis_scl — quarantine
+│  ├─ interface/                    # interface build (owns: interfaces, interface_elements)
+│  │  ├─ __init__.py, builder.py (interface_builder)
+│  │  └─ _siemens_s7/scl.py, xlsx.py  # interface_scl, interface_xlsx — quarantine
+│  ├─ software_blocks/              # software block build (owns block-build tables)
+│  │  ├─ __init__.py, block_table.py, signals_view.py, engine.py (build_engine), sockets.py (builder_registry — THE extension socket systems plug into), builders.py (shared builders)
+│  │  └─ _siemens_s7/scl_emit.py, xml_emit.py, templates.py  # quarantine
+│  ├─ quality/                      # cross-component validation &amp; coverage (owns findings runs, no fact tables — reads everyone via SSOT)
+│  │  ├─ __init__.py, runner.py (validation_runner → sweeps kernel check registry), crosscheck.py, coverage.py (signal_coverage, re-plumbed to read tables instead of importing three builders)
+│  ├─ changes/                      # before/after change reports (already component-shaped)
+│  │  ├─ __init__.py, reader.py, match.py, classify.py, report.py, report_runner.py
+│  └─ chain_reactions/              # P-009 reaction engine (owns reaction-rule + reaction-log tables; renders via kernel/templating)
+│     ├─ __init__.py, engine.py, tables.py
+├─ systems/                         # APPROVED plugin tree, position unchanged: platform → toolchain → system
+│  ├─ contract.py                   # system_contract: what a system plugin provides (manifest interface, used by catalog + app — never by components)
+│  ├─ catalog.py                    # explicit registry of available systems
+│  ├─ plc_based/
+│  │  └─ siemens_s7/                # step 3-4 landing zone, MIRRORS component names: safety/, datablocks/ (xml), diagnosis/ (scl), interface/ (scl, xlsx), software_blocks/ (scl_emit, xml_emit, templates), hardware/, io_tags.py (moves here NOW — wholly Siemens, no shared half, deps already kernel-legal)
+│  └─ ipc_based/
+│     └─ intervalzero_rtx/          # step 7: sorter/, induction/, plant/
+├─ project/                         # workspace layer between gui and systems
+│  ├─ manager.py                    # project_manager — open/create/save project folders
+│  └─ state.py                      # app_state — session state the shell binds to
+└─ gui/                             # GENERIC WORKBENCH SHELL — drives components only via app registry data + public APIs
+   ├─ shell/                        # app_main.py, phase_model.py, phasebar.py, chasebar.py, theme.py, fonts.py, icons.py, darktitle.py — the chrome
+   ├─ panels/                       # log_view, findings_panel, findings_view, files_panel, files_view, documents_panel, database_explorer, database_query — generic workbench panels
+   ├─ widgets/                      # datagrid.py, syntax_highlight.py, object_editor.py — shared building blocks
+   ├─ tools/                        # expr_builder (UI over kernel/expr), template_builder (P-012, UI over kernel/templating), excel_goto, external_editor, filexy_shim, new_project, guide_window
+   └─ explorer/                     # P-014: map_gen.py (AST/docstring walk + SSOT-registry read → interactive map), map_view.py, code_view.py (M1-M6 renderer), peek.py (provenance stamp → source jump)
+
+tests/ mirrors 1:1: tests/kernel/..., tests/components/intake/..., tests/gui/..., tests/systems/... — the 61 files move mechanically with their subjects.</pre>
+  <h3>The laws (each an import-linter contract)</h3>
+  <ul class="laws"><li>LAYERS (import-linter 'layers'): app → gui → project → systems → components → kernel; each layer imports only layers below it. Kernel at the bottom, composition root at the top — one dependency direction, no exceptions.</li><li>COMPONENT INDEPENDENCE (import-linter 'independence' on pipeline5.components.*): components never import each other — not even each other's schema modules. Data crosses component boundaries only as SSOT tables fetched by name from kernel.ssot.database's registry. This is the pipes-and-filters constraint made a static import contract.</li><li>COMPONENT PRIVACY (import-linter 'forbidden', one per component or wildcarded): from outside a component, only pipeline5.components.&lt;x&gt; (its __init__ public API) and components.&lt;x&gt;.ui may be imported; components.&lt;x&gt;.* internals are forbidden to gui, systems, and app alike.</li><li>KERNEL PURITY (import-linter 'forbidden'): pipeline5.kernel imports nothing from pipeline5 outside kernel, and never imports tkinter. kernel.vocab is part of kernel and bound by the same law — it can never grow upward dependencies.</li><li>HEADLESS PIPELINE (import-linter 'forbidden' with narrow exception): pipeline5.components.* and pipeline5.systems.* never import tkinter or pipeline5.gui — except a component's dedicated 'ui' submodule (e.g. components.diagnosis.ui), which only the gui shell may import, discovered via the registry.</li><li>PLUG DIRECTION (import-linter 'forbidden'): pipeline5.components.* never import pipeline5.systems. Systems implement component-owned sockets (software_blocks.sockets pattern) and are wired exclusively in app/wiring.py via systems.catalog; systems may import components' public APIs and kernel.</li><li>SYSTEM ISOLATION (import-linter 'independence' on pipeline5.systems.&lt;platform&gt;.&lt;toolchain&gt;.*): system plugins never import one another — siemens_s7 and intervalzero_rtx share only kernel and component public APIs.</li></ul>
+  <details><summary>Where the 19 representative modules land</summary>
+    <div class="tblwrap"><table><tr><th>today</th><th>proposed</th><th>note</th></tr><tr><td>domain/iolist_staging.py</td><td>components/intake/staging.py</td><td>intake = iolist staging + cematrix annotation merged into one capability (staging already imports cematrix_annotation today — same component kills that sibling import). Its diagnosis_schema import (cabinets) resolves by intake OWNING the cabinets table it writes.</td></tr><tr><td>domain/signals_schema.py</td><td>components/intake/tables.py</td><td>Writer-owns-schema: staging writes the signals table, so intake owns its declaration and registers it with the kernel SSOT registry. The 9 modules importing signals_table today switch to db.table('signals') — the largest single decoupling of the migration.</td></tr><tr><td>domain/signal_identity.py</td><td>kernel/vocab/signal_identity.py</td><td>5 components import it (grep-verified) — it is ubiquitous language, not a capability. Sunk to the kernel vocab shelf; the long-term pressure is to materialize identity into signals columns and shrink this file.</td></tr><tr><td>domain/datablock_generator.py</td><td>components/datablocks/generator.py</td><td>Its signals_schema import becomes a registry lookup; its datablock_schema import becomes intra-component (tables.py).</td></tr><tr><td>domain/datablock_xml.py</td><td>components/datablocks/_siemens_s7/xml.py (now) → systems/plc_based/siemens_s7/datablocks/xml.py (step 4)</td><td>Quarantined inside its owning component until step 4. software_blocks/build_engine's direct import of it is a law-2 violation and is rewired NOW through a socket registration in app/wiring.py.</td></tr><tr><td>domain/io_tags.py</td><td>systems/plc_based/siemens_s7/io_tags.py (immediately)</td><td>Wholly Siemens with no shared remainder — skips the quarantine. Its two dependencies (signal_identity → kernel/vocab, signals_table → registry lookup) are already legal for a systems module.</td></tr><tr><td>domain/software_blocks/builders.py</td><td>components/software_blocks/builders.py</td><td>System-agnostic builders stay; SCL/XML emitters and TIA templates split into _siemens_s7/ then systems/ at step 4, plugging back through sockets.py (the renamed builder_registry).</td></tr><tr><td>domain/software_blocks/build_engine.py</td><td>components/software_blocks/engine.py</td><td>Loses its direct datablock_xml and signals_schema imports (socket + registry lookup); keeps intra-component imports of block_table, signals_view, sockets.</td></tr><tr><td>domain/fillout/document_fill.py</td><td>components/fillout/document_fill.py</td><td>Package moves intact — but its lazy imports of iolist_staging and diagnosis_builder (lines 158/460 today) violate law 2 and are re-routed to SSOT table reads.</td></tr><tr><td>domain/validation/validation_runner.py</td><td>components/quality/runner.py</td><td>Becomes a sweep of the kernel check registry; per-capability checks (iolist_checks, cematrix_checks/refs, diagcheck) move INTO their owning components as checks.py; finding_factory/messages/address_parsing sink to kernel. quality keeps only what is genuinely cross-component: crosscheck + signal_coverage.</td></tr><tr><td>domain/changes/report_runner.py</td><td>components/changes/report_runner.py</td><td>The changes package is already a perfect component (all imports internal, grep-verified) — renames only.</td></tr><tr><td>(future) chain_reactions engine</td><td>components/chain_reactions/engine.py</td><td>A first-class component owning reaction-rule and reaction-log tables; its tempemplator renderer lands in kernel/templating as a language service beside expr, so P-012's template builder and any component's templates share it.</td></tr><tr><td>gui/app_main.py</td><td>gui/shell/app_main.py</td><td>The shell stays generic: it renders phases from app/registry data and component public APIs, never component internals (law 3).</td></tr><tr><td>gui/database_explorer.py</td><td>gui/panels/database_explorer.py</td><td>A workbench panel over the kernel SSOT database — capability-agnostic, so it lives in the shell, not a component.</td></tr><tr><td>gui/expr_builder.py</td><td>gui/tools/expr_builder.py</td><td>Establishes the pattern 'kernel language service ↔ gui tool': expr↔expr_builder, templating↔template_builder (P-012).</td></tr><tr><td>systems/system_contract.py</td><td>systems/contract.py</td><td>Approved tree position unchanged. Imported only by catalog and app/wiring — never by components (law 6); fine-grained extension points live in components as sockets.</td></tr><tr><td>core/expr/</td><td>kernel/expr/</td><td>Internally unchanged; core renames to kernel to state its role (the platform layer nothing above may be imported by).</td></tr><tr><td>core/config/</td><td>kernel/config/</td><td>paths/params/loaders unchanged; project-level selection of the target system reads this config but wiring happens in app.</td></tr><tr><td>(future) P-014 code explorer + generated map</td><td>gui/explorer/ (map_gen, map_view, code_view, peek) + kernel/provenance/ (stamp, resolve)</td><td>Provenance stamping is kernel (every component writes stamps on SSOT writes); the explorer walks source via AST — no import-direction issues, and the map's edges come from the SSOT registry, not the import graph.</td></tr></table></div>
+  </details>
+  <details><summary>The critic's verdict — breaks (9) and strengths (8)</summary>
+    <h4>Breaks found (code-grounded)</h4><ul class="breaks"><li>Schema-registration-at-import collides with project-parameterized schemas (VERIFIED): signals_table(iolist_columns) builds its column list from the project's colmap at every one of its 10 call sites (e.g. pipeline4/domain/datablocks.py:275, staging.py:304). A component cannot 'register the schemas it owns at import' because the signals schema does not exist until a project is open and load_column_map has run. The registry needs a factory-registration + resolve-at-project-open lifecycle the candidate never specifies, and db.table('signals') is undefined during the import-time window app/wiring.py relies on. This complicates exactly the move the candidate calls 'the largest single decoupling'.</li><li>Component UIs have no legal access to shared tkinter widgets — a module with no honest home: law 5 sanctions components.&lt;x&gt;.ui as the one tkinter spot inside a component, but the LAYERS law forbids components importing gui, so components.diagnosis.ui cannot import gui/widgets/datagrid.py, object_editor.py, or theme.py. Widgets cannot sink to kernel either (KERNEL PURITY: never tkinter). Every capability panel will want the datagrid; the structure forces either duplication, runtime injection of widget classes (invisible to the linter), or a law violation. The growth story's 'bespoke tool lands as components/&lt;x&gt;/ui.py' breaks on its first real panel.</li><li>The pipes-and-filters contract becomes machine-UNenforceable in the dimension the import laws stop covering: replacing 'from domain.signals import signals_table' with db.table('signals') moves coupling from the import graph (import-linter-checkable, greppable) to string keys. The registry records WRITERS (registration) but READERS are statically invisible — a component reading a downstream table, or reading before its writer runs, trips no law. Pipeline ordering now lives only in app/registry.py's run sequence, checkable by nothing. The 'map cannot lie' claim is overstated: read-edges require either fragile string-literal grepping or a declared-reads manifest the candidate does not have.</li><li>app/registry.py is not 'one line per phase' — it inherits the orchestrator (VERIFIED): gui/app_main.py's handlers chain multiple phases per button (line 962 imports staging, datablocks, interfaces, diagnosis, hardware, coverage plus blocks.engine in ONE handler; similar chains at 790, 827, 864, 894, 916). Since components may not import each other, every prerequisite chain must move into app/registry.py, which accretes the inter-phase run-DAG knowledge components no longer hold — a growing hotspot file at the top. Adding a typical phase edits component code AND a run-plan there, weakening 'no other file changes anywhere'.</li><li>The migration_cost narrative omits its largest semantic edit: extracting ~15 handler bodies out of the 1000+-line gui/app_main.py into component run_*() entrypoints plus registry run-plans, and splitting gui/phases.py (the current registry: numbers + sub-buttons + handler references bound to App methods) into app/registry vs gui/shell/phase_model. None of the five listed decoupling clusters covers this; 'gui regroup' is called mechanical but app_main is the god-object being dismantled.</li><li>Check-registry wiring by import side effect is fragile and invisible to every machine check: kernel/findings/checks.py is populated only if app/wiring.py imported all components first. A headless run or test that imports components/quality alone sweeps an EMPTY registry and passes vacuously — import-linter cannot see it, and the 61-file suite only catches it if tests import the app layer. Today's validation/phase.py imports its checks explicitly and fails loudly; the candidate trades that for silent under-validation.</li><li>components.&lt;x&gt;.ui discovery is necessarily dynamic (gui sits above nothing that knows the registry — app is ABOVE gui, so the shell cannot import app/registry.py): discovery must be importlib-by-string or injected callables, which import-linter cannot observe. Law 3/5's 'only the gui shell may import components.&lt;x&gt;.ui' is enforced against an import that never appears statically — a hole in the machine-enforced story the candidate presents as airtight.</li><li>kernel/vocab has no machine-enforced size bound: law 2's independence will keep convicting shared vocabulary (identity and addresses today; type_families/family_for, area vocab, script-type constants tomorrow) and the only home is the 'deliberately tiny' shelf — the flat-domain dump can reconstitute itself there with no law resisting, only convention.</li><li>Factual nit that survived 'grep-verified': changes/ is NOT 'all imports internal' — reader.py imports core.config and io.workbook, run.py imports core.config. Both land legally in kernel, so migration is still renames, but the candidate's verification claims should be trusted proportionally.</li></ul>
+    <h4>Strengths</h4><ul class="strengths"><li>Placement coverage is essentially total — I mapped all ~105 current pipeline4 files against the candidate and every module has exactly one home, including the unglamorous ones (core/keys.py→kernel/ssot/content_hash.py, core/run.py→kernel/gate.py, core/model.py→kernel/report/model.py, blocks/database.py→software_blocks/signals_view.py, io/xlsx_edit.py→kernel/xlsx/surgical_writer.py). No orphan found.</li><li>The five convicted coupling clusters are real and precisely identified (VERIFIED): blocks/engine.py:23 imports datablock_xml and :30 signals_table; fillout/fill.py:154 and :456 lazy-import staging/diagnosis; coverage.py:29 imports three builders plus identity; validation/phase.py:21-22 imports staging plus four check modules; exactly 9 modules import signals_table. The candidate's grep claims check out almost everywhere — this is a structure argued from the actual code, not from vibes.</li><li>Writer-owns-schema for cabinets is grounded in a subtle fact the candidate got right: staging.py:283-292 WRITES diagnosis_cabinets from the DiagnosisBlocks sheet 'so phase 600 is a pure table read', and diagnosis.py only reads it — moving the table's declaration from diagnosis_entries.py into intake is correct ownership, not guesswork.</li><li>GUI panels are already kernel-only (VERIFIED: db_explorer, expr_builder, findings_panel, documents_panel import only core/gui/project), so the gui/ shell-panels-widgets-tools regroup and the tests/ mirror genuinely are mechanical moves.</li><li>All seven laws are expressible in import-linter (layers, two independence contracts, four forbidden contracts with wildcard ignore_imports for the ui/tkinter exception) — the static-contract constraint is satisfied as written, and the hard constraints are all honored: systems tree preserved and repositioned only, no phase numbers in folders (registry binds them), one dependency direction, kernel never imports tkinter.</li><li>The plug direction rides an existing seam: blocks/registry.py (builder_registry) already exists as the socket pattern, and io_tags.py's two dependencies (identity, signals_table) really are the only ones, making its immediate move to systems/ legal as claimed.</li><li>The vision story is the strongest of the constraints' fits: component __init__ as the chapter page (public API = M1 docstring = map node), kernel as 'the language of the system', systems as per-target volumes, and kernel/provenance as the peek-code substrate is a coherent, cheap-to-generate manual ToC — provided the read-edge manifest gap (breaks #3) is patched.</li><li>Quarantine _siemens_s7/ folders give the Siemens extraction a two-step landing that mirrors component names into systems/plc_based/siemens_s7/, so step 3-4 of the already-tasked migration plan maps 1:1 onto this structure.</li></ul>
+  </details>
+  <p class="mig"><b>Migration:</b> medium — roughly 80% of the move is mechanical (core→kernel, io→kernel, gui regroup, changes/ and fillout/ move intact, tests mirror), but the independence law immediately convicts five real coupling clusters found by grep: ~15 schema-object imports (signals_table and friends) must become kernel table-registry lookups, validation checks distribute to their owning components via a new check registry (sinking finding_factory/messages/address_parsing to kernel), and signal_coverage, document_fill, and build_engine must be re-plumbed through tables/sockets instead of importing sibling phases. These are semantic edits beyond renames, though each runs along a seam the code already half-has (builder_registry exists, ssot_database exists) — expect the 61-file suite to pass after the mechanical wave and the five decouplings to be a second, testable wave.</p>
+  <p class="vis"><b>With the locked vision:</b> The tree IS the manual's table of contents almost for free: kernel/ is 'the language of the system' (expr, templating, findings, the table registry, provenance), components/ is the chapter list — one chapter per pipeline capability in the operator's mental model — systems/ is the per-target volumes, gui/ the workbench appendix, app/ the binding. Each component's __init__.py carries the M1 chapter docstring and IS the chapter summary box, because law 3 makes it the entire public surface: the generated map renders a component node from nothing but its __init__ (purpose), tables.py (owned data ports), and checks.py (guarantees). The map's edges are TABLE reads/writes harvested from the kernel SSOT registry plus provenance stamps — and because law 2 guarantees ZERO import edges between components, those data-flow arrows are the complete and honest truth of coupling; the map cannot lie. Peek-code works through kernel/provenance: every table write and artifact emit is stamped (component, module, qualname, rule id), and gui/explorer/peek.py resolves a stamp to file:line and renders the M1-M6 docstring — and since a capability's code lives in exactly one folder, every peek lands inside the owning chapter, with system-specific emitters appearing as clearly-labeled plug-in overlays on their host component's socket.</p>
+  <p class="grow"><b>Growth story:</b> New phase: mkdir components/&lt;name&gt;/ with tables.py (register owned tables), run(), checks.py, and an M1 __init__ docstring; add one line to app/registry.py binding its operator phase number. No other file changes anywhere; the wildcard import-linter contracts cover it automatically, tests mirror at tests/components/&lt;name&gt;/, and the generated map grows a chapter on the next build. New target system: new folder under systems/&lt;platform&gt;/&lt;toolchain&gt;/&lt;system&gt;/ implementing systems/contract.py plus registrations into the component sockets it serves, and one entry in systems/catalog.py — zero component edits, zero GUI edits; the map shows it as an overlay on the components it plugs. New GUI tool: gui/tools/&lt;tool&gt;.py plus a menu hookup in gui/shell (pattern: expr_builder, template_builder); if the tool is bespoke to one capability, it instead lands as components/&lt;x&gt;/ui.py — the one sanctioned tkinter spot inside a component — discovered by the shell via the registry, keeping capability UI shipped with its capability.</p>
+</section>
+<section class="cand" id="slices">
+  <div class="ch">
+    <div><div class="eyebrow">Candidate 2 · slices</div>
+    <h2>Phasebook</h2>
+    <div class="school">Vertical Slice Architecture / package-by-feature (Jimmy Bogard; Philipp Hauer)</div></div>
+    <div class="scorebar"><div class="fill" style="width:73%"></div><span>22/30</span></div>
+  </div>
+  <p class="principle">Every user-meaningful capability — a pipeline phase or a workbench tool — is one self-contained folder that owns its logic, its checks, its UI declaration, and its provenance; the only things shared are the pipes (SSOT table contracts), the engines that pass the Rule of Three, and a thin composition-root shell.</p>
+  <div class="chips"><span class="chip hi" title="Flat domain cured">Flat 5</span><span class="chip hi" title="Boundaries enforceable">Boundaries 4</span><span class="chip mid" title="Clear ownership">Clear 3</span><span class="chip hi" title="Phase growth">Phase 4</span><span class="chip hi" title="Vision fit">Vision 4</span><span class="chip lo" title="Migration ease">Migration 2</span></div>
+  <h3>The map</h3>
+  <pre class="tree">pipeline5/
+  app/                         # THIN SHELL — the composition root; the only code that knows all slices
+    main.py                    # entry point; builds window, loads registry, wires everything (was gui/app_main)
+    window.py                  # main window frame: menus, docking, statusbar (split out of app_main)
+    registry.py                # THE wiring file: explicit PhaseSpec + ToolSpec list; operator phase numbers bind to project config here, never to folder names
+    phasebar.py                # phase strip UI, driven purely by registry PhaseSpecs (was gui/phasebar)
+    chasebar.py                # run/progress strip (was gui/chasebar)
+    phase_model.py             # runtime phase state machine consumed by phasebar (was gui/phase_model)
+    project_manager.py         # open/create/save project session (was project/project_manager)
+    app_state.py               # window + session persistence (was project/app_state)
+    new_project.py             # new-project wizard — project lifecycle is shell concern (was gui/new_project)
+  phases/                      # PIPELINE SLICES — one folder per phase family; SSOT tables are the ONLY pipe between them; uniform anatomy: phase.py / checks.py / panel.py / provenance.py
+    iolist_intake/
+      phase.py                 # phase entry: IO-list documents -&gt; iolist SSOT tables; runs own checks at staging
+      staging.py               # was domain/iolist_staging
+      checks.py                # was domain/validation/iolist_checks — the table's own gate lives with its producer
+      panel.py                 # slice UI declaration: grid columns, findings views, actions (composes shared/ui widgets)
+      provenance.py            # peek-code resolvers for artifacts this slice produces (P-014 contract impl)
+    cematrix/
+      phase.py                 # cematrix documents -&gt; annotated cematrix SSOT
+      annotation.py            # was domain/cematrix_annotation
+      checks.py                # was validation/cematrix_checks
+      refs.py                  # was validation/cematrix_refs
+      panel.py / provenance.py
+    fillout/
+      phase.py                 # document-fill phase entry (drives document_fill)
+      document_fill.py         # was fillout/document_fill
+      iolist_reader.py         # slice-local reader — VSA tolerates this duplication with iolist_intake
+      script_type_classify.py / index_assign.py / type_families.py / device_tag_ranges.py / diag_allocation.py / diagnosis_blocks_sheet.py
+      panel.py / provenance.py
+    crosscheck/
+      phase.py                 # cross-table quality gate phase (absorbs validation_runner's orchestration role)
+      crosscheck.py            # was validation/crosscheck — spans tables, so cannot belong to any one producer
+      diagcheck.py             # was validation/diagcheck — post-diagnosis cross validation
+      coverage.py              # was domain/signal_coverage — cross-table coverage analysis
+      panel.py                 # gate results view declaration
+    datablocks/
+      phase.py                 # signals SSOT -&gt; datablock SSOT + artifacts
+      generator.py             # was domain/datablock_generator
+      templates.py             # was domain/datablock_templates
+      siemens/                 # INTERIM home for starred code; migration step 4 = `git mv phases/datablocks/siemens systems/plc_based/siemens_s7/datablocks`
+        xml_doc.py             # was domain/datablock_xml
+      panel.py / provenance.py
+    diagnosis/
+      phase.py                 # diagnosis phase entry
+      builder.py               # was domain/diagnosis_builder
+      diaglist_csv.py          # was domain/diaglist_csv
+      siemens/scl_emit.py      # was domain/diagnosis_scl -&gt; systems at step 4
+      panel.py / provenance.py
+    hardware/
+      phase.py                 # hardware phase entry (thin until step 4; slice mostly Siemens today)
+      siemens/hardware.py      # was domain/hardware
+      siemens/hardware_csv.py  # was domain/hardware_csv
+      panel.py / provenance.py
+    interface/
+      phase.py
+      builder.py               # was domain/interface_builder
+      siemens/scl_emit.py      # was domain/interface_scl
+      siemens/xlsx_emit.py     # was domain/interface_xlsx
+      panel.py / provenance.py
+    io_tags/
+      phase.py                 # thin system-neutral entry; body is Siemens today
+      siemens/tags.py          # was domain/io_tags -&gt; systems/plc_based/siemens_s7/io_tags/ at step 4
+      panel.py / provenance.py
+    software_blocks/
+      phase.py                 # block-build phase entry
+      block_table.py           # was software_blocks/block_table
+      signals_view.py          # was software_blocks/signals_view
+      engine.py                # was software_blocks/build_engine — system-neutral, STAYS after step 4
+      contract.py              # builder contract + registry (was builder_registry); the plugin seam systems plug into
+      siemens/                 # builders.py, scl_emit.py, xml_emit.py, templates.py -&gt; systems/.../software_blocks/ at step 4
+      panel.py / provenance.py
+    changes/
+      phase.py                 # before/after change-report phase entry (was changes/report_runner)
+      classify.py / match.py / reader.py / report.py   # was domain/changes/*
+      panel.py / provenance.py
+  workbench/                   # TOOL SLICES — cross-phase GUI features; each deletable as one folder; talk to data only via shared/ (SSOT, findings, expr)
+    database_explorer/
+      explorer.py              # was gui/database_explorer
+      query.py                 # was gui/database_query
+    findings/
+      panel.py                 # was gui/findings_panel — renders any slice's findings via shared/findings model
+      view.py                  # was gui/findings_view
+    files/
+      panel.py / view.py       # was gui/files_panel, gui/files_view
+    documents/
+      panel.py                 # was gui/documents_panel
+    object_editor/
+      editor.py                # was gui/object_editor
+    expr_builder/
+      builder.py               # was gui/expr_builder — GUI over shared/expr
+    log/
+      view.py                  # was gui/log_view
+    guide/
+      window.py                # was gui/guide_window
+    template_builder/          # FUTURE (P-012): GUI for authoring tempemplator templates — a new tool = a new folder, zero shared edits
+    code_explorer/             # FUTURE (P-014): the manual's home
+      map_view.py              # renders the GENERATED interactive map
+      source_browser.py        # in-app code explorer (M1-M6 docstring rendering)
+      peek.py                  # artifact -&gt; producing code jump, resolved via shared/provenance registry
+      mapgen.py                # generates the map by walking phases/, workbench/, systems/ — the uniform slice anatomy IS the map schema
+  systems/                     # TARGET-SYSTEM SLICES — approved platform-&gt;toolchain-&gt;system taxonomy, unchanged position; a system = one deletable folder + one catalog line
+    system_contract.py         # the seam: what a system provides per phase family (incl. software-block builder provisions)
+    catalog.py                 # explicit registry — the ONLY import door into systems from outside
+    plc_based/
+      siemens_s7/
+        safety/                # lands at step 3-4
+        datablocks/ diagnosis/ hardware/ interface/ io_tags/ software_blocks/   # step-4 landing zones, names MIRROR phase slices so the map reads system chapters with the same TOC
+    ipc_based/
+      intervalzero_rtx/
+        sorter/ induction/ plant/   # step 7
+  shared/                      # RULE-OF-THREE KERNEL — pipe contracts + engines + UI toolkit; every module here must name &gt;=3 consuming slices at review
+    tables/                    # THE PIPES: SSOT machinery + per-table schema contracts (schemas MUST live here: a consumer importing a producer's schema would be a phase-&gt;phase import)
+      ssot_table.py / ssot_database.py / content_hash.py   # was core/*
+      signals_schema.py        # was domain/signals_schema
+      signal_identity.py       # was domain/signal_identity — canonical signal naming used by 5+ slices
+      datablock_schema.py      # was domain/datablock_schema
+      diagnosis_schema.py      # was domain/diagnosis_schema
+    findings/                  # finding.py, severity.py, finding_treatments.py (was core/*), finding_factory.py, messages.py (was validation/*), report_model.py
+    phases/                    # the phase PROTOCOL, not the phases: phase_gate.py (was core), spec.py (PhaseSpec/PhaseContext types the registry and slices share)
+    expr/                      # parser/render/runtime/scope/tools/data/errors — was core/expr, rename only
+    chain_reactions/           # FUTURE (P-009): reaction engine — kernel engine beside expr, consumed by phase slices
+    tempemplator/              # FUTURE (P-009): template renderer — consumed by phase slices and systems emitters
+    config/                    # paths.py, params.py, loaders.py — was core/config
+    i18n.py                    # was core/i18n
+    parsing/address.py         # was validation/address_parsing — used by checks in 3+ slices
+    xlsx/                      # xlsx_reader.py, xlsx_surgical_writer.py — was io/
+    reports/renderer.py        # was io/report_renderer
+    provenance.py              # FUTURE (P-014): resolver contract + registry that each slice's provenance.py implements
+    ui/                        # the tkinter TOOLKIT (widgets, not features): datagrid.py, syntax_highlight.py, excel_goto.py, external_editor.py, filexy_shim.py, theme.py, fonts.py, icons.py, darktitle.py, navigation.py (protocol for "open X in tool Y", implemented by app)
+tests/                         # mirrors the tree 1:1: tests/phases/iolist_intake/test_staging.py etc. — the 61 files mirror-move mechanically</pre>
+  <h3>The laws (each an import-linter contract)</h3>
+  <ul class="laws"><li>L1 LAYERS (import-linter 'layers'): app | (phases, workbench) | systems | shared — app may import everything below; phases and workbench may import systems and shared; systems may import only shared; shared imports nothing above it. The same contract makes phases and workbench mutually independent: a phase panel never imports a workbench tool and vice versa (they meet only through shared/ui/navigation and shared data models).</li><li>L2 PHASE INDEPENDENCE (import-linter 'independence' across pipeline5.phases.*): no phase slice imports another phase slice — phases communicate ONLY through SSOT tables whose schemas live in shared/tables. This is the pipes-and-filters constraint made static.</li><li>L3 SYSTEMS DOOR (import-linter 'forbidden'): pipeline5.app, pipeline5.phases, pipeline5.workbench must not import pipeline5.systems.plc_based.* or pipeline5.systems.ipc_based.* — the only door is systems.catalog + systems.system_contract. Active from day one, so the step-4 Siemens move changes nothing for consumers.</li><li>L4 KERNEL PURITY (import-linter 'forbidden', belt-and-braces with L1): pipeline5.shared must not import pipeline5.app, pipeline5.phases, pipeline5.workbench, pipeline5.systems — the kernel never knows the features or the targets.</li><li>L5 TOOL AND SYSTEM INDEPENDENCE (import-linter 'independence' across pipeline5.workbench.* and across pipeline5.systems.plc_based.*, pipeline5.systems.ipc_based.* subtrees): deleting a workbench tool or a target system deletes exactly one folder plus one registry/catalog line.</li><li>L6 TKINTER CONTAINMENT (import-linter 'forbidden' + one 15-line AST test): tkinter is importable only from app, workbench, shared.ui, and phases/*/panel.py. Enforced by a forbidden contract barring tkinter from shared.tables/expr/findings/phases/config/xlsx/tempemplator/chain_reactions and from pipeline5.systems, plus a plain-python test that walks phases/ and fails on tkinter imports outside panel.py (the per-file exception import-linter cannot express).</li></ul>
+  <details><summary>Where the 19 representative modules land</summary>
+    <div class="tblwrap"><table><tr><th>today</th><th>proposed</th><th>note</th></tr><tr><td>domain/iolist_staging.py</td><td>phases/iolist_intake/staging.py</td><td>Slice also absorbs validation/iolist_checks.py as checks.py — a table's gate lives with its producer.</td></tr><tr><td>domain/signals_schema.py</td><td>shared/tables/signals_schema.py</td><td>Pipe contract: if it stayed in a producing slice, every consumer would violate phase independence importing it.</td></tr><tr><td>domain/signal_identity.py</td><td>shared/tables/signal_identity.py</td><td>Canonical identity used by datablocks, io_tags, software_blocks, crosscheck — Rule of Three exceeded.</td></tr><tr><td>domain/datablock_generator.py</td><td>phases/datablocks/generator.py</td><td>System-neutral heart of the datablocks slice; stays after step 4.</td></tr><tr><td>domain/datablock_xml.py</td><td>phases/datablocks/siemens/xml_doc.py</td><td>Interim home; step 4 is one `git mv` of the siemens/ subfolder to systems/plc_based/siemens_s7/datablocks/.</td></tr><tr><td>domain/io_tags.py</td><td>phases/io_tags/siemens/tags.py</td><td>Fully Siemens today: slice keeps only a thin phase.py + panel + provenance after the step-4 move; tag-table schema, if shared, goes to shared/tables.</td></tr><tr><td>domain/software_blocks/builders.py</td><td>phases/software_blocks/siemens/builders.py</td><td>Step 4 -&gt; systems/plc_based/siemens_s7/software_blocks/builders.py, plugging into the slice's contract.py registry.</td></tr><tr><td>domain/software_blocks/build_engine.py</td><td>phases/software_blocks/engine.py</td><td>System-neutral engine stays in the slice permanently; builder_registry becomes contract.py — the seam systems implement.</td></tr><tr><td>domain/fillout/document_fill.py</td><td>phases/fillout/document_fill.py</td><td>Fillout maps 1:1 to a slice; the whole subfolder moves as-is plus new phase.py/panel.py.</td></tr><tr><td>domain/validation/validation_runner.py</td><td>DISSOLVES: phases/crosscheck/phase.py (cross-table gate) + per-table checks redistributed to producing slices</td><td>The one non-mechanical migration item: iolist_checks -&gt; iolist_intake, cematrix_checks/refs -&gt; cematrix, crosscheck/diagcheck/signal_coverage -&gt; phases/crosscheck; finding_factory + messages -&gt; shared/findings; address_parsing -&gt; shared/parsing.</td></tr><tr><td>domain/changes/report_runner.py</td><td>phases/changes/phase.py</td><td>Changes is already slice-shaped; the runner is its phase entry, renamed to the uniform anatomy.</td></tr><tr><td>chain_reactions engine (future, P-009)</td><td>shared/chain_reactions/</td><td>A kernel engine beside expr/ — consumed by phase slices; the FEATURES that use it are slices, the engine is shared on Rule of Three.</td></tr><tr><td>gui/app_main.py</td><td>app/main.py (+ window.py split)</td><td>The shell shrinks to composition root: main, window, registry, phasebar/chasebar, project lifecycle.</td></tr><tr><td>gui/database_explorer.py</td><td>workbench/database_explorer/explorer.py</td><td>A cross-phase tool slice; reads any SSOT table via shared/tables — never imports a phase (L1).</td></tr><tr><td>gui/expr_builder.py</td><td>workbench/expr_builder/builder.py</td><td>GUI over shared/expr; deleting the tool deletes one folder.</td></tr><tr><td>systems/system_contract.py</td><td>systems/system_contract.py (unchanged)</td><td>Approved seam stays put; contract grows a software-block builder provision so systems plug into phases/software_blocks/contract.py without importing phases (L1).</td></tr><tr><td>core/expr/</td><td>shared/expr/ (rename only)</td><td>Mechanical move; expr trivially passes Rule of Three (fillout, crosscheck, software_blocks, expr_builder, changes).</td></tr><tr><td>core/config/</td><td>shared/config/ (rename only)</td><td>paths/params/loaders are consumed by shell and every slice; kernel by definition.</td></tr><tr><td>code-explorer + generated map (future, P-014)</td><td>workbench/code_explorer/ (map_view, source_browser, peek, mapgen) + shared/provenance.py contract + per-slice provenance.py</td><td>The explorer is itself a tool slice; provenance knowledge is distributed to the slices that own the producing code.</td></tr></table></div>
+  </details>
+  <details><summary>The critic's verdict — breaks (8) and strengths (7)</summary>
+    <h4>Breaks found (code-grounded)</h4><ul class="breaks"><li>Step-4 systems move breaks L1 as designed, verified in real code: pipeline5/domain/software_blocks/builders.py imports signals_view, builder_registry (-&gt;contract.py) and block_table - all of which the candidate keeps in phases/software_blocks/ permanently. Once builders.py lands in systems/plc_based/siemens_s7/, every one of those becomes a systems-&gt;phases import, forbidden by L1 ('systems may import only shared'). Step 4 is therefore not 'one git mv' - it requires re-homing block_table/signals_view/the builder contract to shared/ or inverting the builder API. The same pattern threatens diagnosis/siemens/scl_emit and the interface emitters.</li><li>'L3 active from day one, so the step-4 move changes nothing for consumers' is false: before step 4, phases/datablocks/phase.py imports its own siemens/xml_doc.py directly (legal intra-slice import); after step 4 that exact call must route through systems.catalog + system_contract, which today has no datablock/hardware/interface/io_tags emission provisions. Step 4 is an interface-design event hidden inside a 'mv', and it churns the mirrored test tree a second time (tests/phases/datablocks/siemens/* -&gt; tests/systems/*).</li><li>Two placement rules self-contradict, leaving a module with no honest home: L2's corollary forces EVERY SSOT schema into shared/tables ('a consumer importing a producer's schema would be a phase-&gt;phase import'), while shared/'s admission gate demands &gt;=3 consuming slices. diagnosis_schema has producer (diagnosis) + diagcheck (crosscheck) = 2 slices. It cannot stay in the producer (L2) and fails the Rule-of-Three review for shared/. Either gate must bend, and the candidate doesn't say which.</li><li>Split-brain plugin seam: phases/software_blocks/contract.py is named 'the seam systems plug into', but under L1 systems cannot import it - so a Siemens builder can only satisfy it structurally (duck typing; the ABC is unenforceable on its own implementers), while systems/system_contract.py 'grows a software-block builder provision' duplicating the same seam. One contract, two homes; a builder author must consult both.</li><li>L6 violates the locked 'all laws import-linter/tach expressible' constraint as written: the per-file exception (tkinter allowed only in phases/*/panel.py) is admitted to need a custom AST-walking test that import-linter cannot express. Fixable by making the panel a subpackage (phases/&lt;slice&gt;/ui/) so a plain forbidden contract covers it - but as submitted, one of the six laws lives outside the demanded enforcement toolchain.</li><li>The 'mechanical mirror-move' of the test suite is not mechanical: the suite is currently FLAT (tests/unit/test_*.py, ~63 files), so mirroring means re-nesting plus rewriting imports in every file; and verified tests/unit/test_validation_standalone.py imports both iolist_checks and cematrix_checks, which land in two DIFFERENT slices - that file (and test_validation_i18n.py) must be split by hand. Also validation_runner.py:24 imports iolist_staging directly, so the crosscheck slice needs a genuine rewrite to consume the SSOT table instead of calling another phase's staging code - the 'one non-mechanical item' is bigger than admitted.</li><li>app/ vs workbench/ ownership ambiguity for GUI features: new_project.py (a wizard window) lives in app/ while guide/window.py (a window) lives in workbench/ - same shape of thing, two different homes. And app/ is the only package with no internal laws (it may import everything), already 9+ modules; awkward modules will gravitate there, re-forming the dump the structure set out to cure. Where does a future settings dialog or recent-projects feature go? Two defensible answers.</li><li>Post-step-4 hollow chapters: phases/hardware/ and phases/io_tags/ reduce to phase.py + panel.py + provenance.py with ALL logic in systems/ - the manual's 'Hardware' chapter has no body and just points at the Systems chapter, weakening 'the tree reads as the ToC' for exactly the phases that are fully target-specific.</li></ul>
+    <h4>Strengths</h4><ul class="strengths"><li>L1-L5 are genuinely expressible as import-linter contracts (layers, independence, forbidden) - the pipes-and-filters rule (L2) and the systems door (L3) become static, machine-enforced facts, which is precisely the user's second pain cured.</li><li>The flat domain/ dump is fully cured, and cheaply mapped: I verified the candidate's 'was' list against the real current tree and it matches ~1:1 - every one of the ~25 flat domain files gets exactly one slice home, and domain/fillout, domain/changes, domain/software_blocks move as whole folders.</li><li>Phase growth is honestly additive: mkdir phases/&lt;name&gt;/ + one PhaseSpec line in app/registry.py; operator phase numbers bind in the registry per the locked no-prefix decision; L2 statically proves the new slice touched nothing else.</li><li>Uniform slice anatomy (phase/checks/panel/provenance) makes mapgen a single template and peek-code a deterministic artifact-&gt;slice-&gt;file lookup; because deleting a feature deletes its folder, the generated manual cannot describe a dead feature - the strongest vision_fit mechanism among plausible designs.</li><li>The approved systems/ taxonomy is preserved verbatim in position, with system subfolder names mirroring phase-slice names so the manual reads 'neutral phase / what each target adds'.</li><li>checks.py co-located with the producing table documents each gate beside its maker, and workbench tools are one-folder deletable under L5 - both directly serve the code-is-the-manual vision.</li><li>The registry/composition-root concession is honest and minimal: exactly one wiring file (app/registry.py) knows all slices, instead of centralized gui wiring smeared across app_main.</li></ul>
+  </details>
+  <p class="mig"><b>Migration:</b> medium — the heaviest mechanical move of the plausible candidates, but ~90% of it is scripted `git mv` plus import rewriting (core+io -&gt; shared, domain subfolders -&gt; phase slices 1:1, flat domain files grouped into ~7 slices, gui split three ways), and the 61-file test suite mirror-moves with the same script. The genuinely non-mechanical residue is three bounded items: dissolving validation/ (runner -&gt; crosscheck slice, per-table checks -&gt; their producers), minting shared/tables schema modules as the explicit pipe contracts, and writing the thin per-phase panel.py declarations that today live implicitly in centralized gui wiring — new code, but small declarative files composing existing shared/ui widgets.</p>
+  <p class="vis"><b>With the locked vision:</b> The generated map falls out of the tree because the tree IS a table of contents: five top-level chapters (App — the frame; Phases — what the pipeline does; Workbench — the tools you use; Systems — the targets it speaks; Shared — the language everything speaks). Every phase slice has identical anatomy — phase.py (what goes in, what comes out), checks.py (what must hold), panel.py (how it shows itself), provenance.py (which artifacts it signs) — so mapgen renders every phase chapter from ONE template and M1-M6 docstrings slot per-file with no per-slice special-casing. Peek-code becomes a folder lookup: a generated artifact's producing code lives in exactly one slice, each slice's provenance.py implements the shared/provenance contract, and the code explorer resolves artifact -&gt; slice -&gt; file -&gt; rule through the registry. The systems chapters mirror phase-slice names (systems/.../siemens_s7/datablocks/ answers phases/datablocks/), so the manual reads 'here is the neutral phase, here is what each target adds'. And because deleting a feature deletes its folder, the manual can never describe a feature that no longer exists.</p>
+  <p class="grow"><b>Growth story:</b> NEW PHASE: mkdir phases/&lt;name&gt;/ with phase.py + checks.py + panel.py + provenance.py, mirror tests/phases/&lt;name&gt;/, add ONE PhaseSpec line in app/registry.py (the honest VSA concession: one composition-root line, no shared-code modification); the operator phase number binds in project config via the registry, so no folder churn ever. import-linter L2 proves the new slice touched nothing else. NEW TARGET SYSTEM: mkdir systems/&lt;platform&gt;/&lt;toolchain&gt;/&lt;system&gt;/ with subfolders mirroring the phase slices it serves, implement system_contract, add one catalog.py line; L3 guarantees no one couples to its internals. NEW GUI TOOL: mkdir workbench/&lt;tool&gt;/ with its panel + service, one ToolSpec line in app/registry.py — the P-012 template builder is exactly this and validates the pattern; L5 keeps it deletable as a unit.</p>
+</section>
+<section class="cand" id="manual">
+  <div class="ch">
+    <div><div class="eyebrow">Candidate 3 · manual</div>
+    <h2>The Shop Manual</h2>
+    <div class="school">Screaming Architecture / "the codebase is the manual" — the locked P-014 vision taken to its structural conclusion: the tree IS the shipped manual's table of contents, in operator language.</div></div>
+    <div class="scorebar"><div class="fill" style="width:73%"></div><span>22/30</span></div>
+  </div>
+  <p class="principle">Ten top-level parts read like a shop manual's table of contents — the truth (SSOT data dictionary), the phases (one chapter per operator phase, verb-named), the systems (each target system a mirrored 'translation' of the chapters it writes), the language, the workbench — so the generated map needs zero curation: rendering the tree with M1 docstrings IS the manual.</p>
+  <div class="chips"><span class="chip hi" title="Flat domain cured">Flat 4</span><span class="chip mid" title="Boundaries enforceable">Boundaries 3</span><span class="chip hi" title="Clear ownership">Clear 4</span><span class="chip hi" title="Phase growth">Phase 4</span><span class="chip hi" title="Vision fit">Vision 5</span><span class="chip lo" title="Migration ease">Migration 2</span></div>
+  <h3>The map</h3>
+  <pre class="tree">pipeline5/
+├── __main__.py                     # "python -m pipeline5" — the one entry; opens the workbench
+├── appendix/                       # PART X (bottom of the book): reference plumbing everyone may cite, cites no one
+│   ├── config/
+│   │   ├── paths.py                # where projects, documents, artifacts live on disk
+│   │   ├── params.py               # typed pipeline parameters
+│   │   └── loaders.py              # config file loading/merging
+│   ├── i18n.py                     # translation catalog access — every user-facing string flows through here
+│   └── platform.py                 # OS quirks (win paths, encodings) — new home for strays, may start empty
+├── findings/                       # PART IX: what the pipeline tells you when something is wrong
+│   ├── finding.py                  # the Finding record (was core/finding)
+│   ├── severity.py                 # BLOCK/WARN/INFO ladder (was core/severity)
+│   └── treatments.py               # suppress/acknowledge/waive treatments (was core/finding_treatments)
+├── truth/                          # PART I: the SSOT — every table your project's data lives in (the data dictionary)
+│   ├── table.py                    # SSOT table primitive (was core/ssot_table)
+│   ├── database.py                 # the CSV-table database (was core/ssot_database)
+│   ├── hashing.py                  # content hashing of table state (was core/content_hash)
+│   ├── identity.py                 # signal identity keys — the shared vocabulary chapters agree on (was domain/signal_identity)
+│   ├── provenance.py               # NEW (P-014): the stamp every producer leaves on rows/artifacts; peek-code resolves these
+│   └── tables/                     # one module per table family = the manual's data dictionary pages
+│       ├── signals.py              # signals table schema (was domain/signals_schema)
+│       ├── datablocks.py           # datablock table schema (was domain/datablock_schema)
+│       └── diagnosis.py            # diagnosis table schema (was domain/diagnosis_schema)
+├── documents/                      # PART II: the papers — reading customer documents, writing reports
+│   ├── xlsx_reader.py              # xlsx ingestion (was io/xlsx_reader)
+│   ├── xlsx_surgical_writer.py     # in-place xlsx edits that preserve the customer's file (was io/xlsx_surgical_writer)
+│   └── reports/
+│       ├── model.py                # report data model (was core/report_model)
+│       └── render.py               # report rendering (was io/report_renderer)
+├── language/                       # PART III: the expression language rules and templates are written in
+│   ├── parser.py                   # (was core/expr/parser)
+│   ├── runtime.py                  # (was core/expr/runtime)
+│   ├── render.py                   # (was core/expr/render)
+│   ├── scope.py                    # (was core/expr/scope)
+│   ├── data.py                     # (was core/expr/data)
+│   ├── tools.py                    # (was core/expr/tools)
+│   ├── errors.py                   # (was core/expr/errors)
+│   ├── chains/                     # NEW (P-009): the chain-reactions engine — rule cascades over truth tables
+│   │   └── engine.py
+│   └── templates/                  # NEW (P-009): tempemplator — template rendering built on the language
+│       └── renderer.py
+├── systems/                        # PART IV: the target systems — each system 'translates' the chapters it writes (APPROVED taxonomy, kept)
+│   ├── contract.py                 # what any target system must provide (was systems/system_contract)
+│   ├── catalog.py                  # explicit plugin registry — the only door chapters knock on
+│   ├── plc_based/
+│   │   └── siemens_s7/             # TIA Portal / S7 — subfolders MIRROR chapter names so the map pairs them
+│   │       ├── register.py         # NEW: catalog registration — uniform plugin entry
+│   │       ├── datablocks/xml_emit.py        # (was domain/datablock_xml)
+│   │       ├── diagnosis/scl_emit.py         # (was domain/diagnosis_scl)
+│   │       ├── interface/scl_emit.py         # (was domain/interface_scl)
+│   │       ├── interface/xlsx_emit.py        # (was domain/interface_xlsx)
+│   │       ├── io_tags/tags.py               # (was domain/io_tags — wholly Siemens)
+│   │       ├── hardware/config.py            # (was domain/hardware — wholly Siemens)
+│   │       ├── hardware/csv_io.py            # (was domain/hardware_csv)
+│   │       ├── software_blocks/builders.py   # (was domain/software_blocks/builders)
+│   │       ├── software_blocks/scl_emit.py   # (was domain/software_blocks/scl_emit)
+│   │       ├── software_blocks/xml_emit.py   # (was domain/software_blocks/xml_emit)
+│   │       ├── software_blocks/templates.py  # (was domain/software_blocks/templates)
+│   │       └── safety/             # lands per migration step 3-4 (unchanged position)
+│   └── ipc_based/
+│       └── intervalzero_rtx/       # step 7: sorter/, induction/, plant/ (unchanged position)
+├── phases/                         # PART V: the pipeline — one chapter per operator phase; chapters NEVER cite each other
+│   ├── contents.py                 # THE table of contents: binds operator phase numbers -&gt; chapters -&gt; capability keys (phasebar + map both render this)
+│   ├── gate.py                     # phase gating mechanism (was core/phase_gate) — front matter, not a chapter
+│   ├── stage_iolist/               # CH: stage the IO List into truth
+│   │   ├── run.py                  # uniform chapter entry (every chapter has one)
+│   │   └── staging.py              # (was domain/iolist_staging)
+│   ├── annotate_cematrix/          # CH: annotate the CE Matrix
+│   │   ├── run.py
+│   │   └── annotation.py           # (was domain/cematrix_annotation)
+│   ├── fill_documents/             # CH: fill out the customer documents
+│   │   ├── run.py                  # orchestrates the fill
+│   │   ├── fill.py                 # (was fillout/document_fill)
+│   │   ├── iolist_reader.py        # (was fillout/iolist_reader)
+│   │   ├── script_type_classify.py # (was fillout/script_type_classify)
+│   │   ├── index_assign.py         # (was fillout/index_assign)
+│   │   ├── type_families.py        # (was fillout/type_families)
+│   │   ├── device_tag_ranges.py    # (was fillout/device_tag_ranges)
+│   │   ├── diag_allocation.py      # (was fillout/diag_allocation)
+│   │   └── diagnosis_blocks_sheet.py # (was fillout/diagnosis_blocks_sheet)
+│   ├── validate/                   # CH: validate the documents against truth
+│   │   ├── run.py                  # (was validation/validation_runner)
+│   │   ├── messages.py, finding_factory.py, iolist_checks.py, cematrix_checks.py,
+│   │   ├── cematrix_refs.py, crosscheck.py, diagcheck.py
+│   │   └── address_parsing.py      # (promote to truth/addresses.py IF a second chapter ever needs it)
+│   ├── audit_coverage/             # CH: audit signal coverage
+│   │   ├── run.py
+│   │   └── coverage.py             # (was domain/signal_coverage)
+│   ├── generate_datablocks/        # CH: generate datablocks from truth
+│   │   ├── run.py
+│   │   ├── generator.py            # (was domain/datablock_generator)
+│   │   └── templates.py            # (was domain/datablock_templates)
+│   ├── build_diagnosis/            # CH: build the diagnosis artifacts
+│   │   ├── run.py
+│   │   ├── builder.py              # (was domain/diagnosis_builder)
+│   │   └── diaglist_csv.py         # (was domain/diaglist_csv)
+│   ├── build_interface/            # CH: build the interface
+│   │   ├── run.py
+│   │   └── builder.py              # (was domain/interface_builder)
+│   ├── build_software_blocks/      # CH: build the software blocks
+│   │   ├── run.py
+│   │   ├── engine.py               # (was software_blocks/build_engine)
+│   │   ├── registry.py             # (was software_blocks/builder_registry)
+│   │   ├── block_table.py          # (was software_blocks/block_table)
+│   │   └── signals_view.py         # (was software_blocks/signals_view)
+│   ├── map_io_tags/                # CH (one-page): "this chapter is written by your target system" — delegates via contract
+│   │   └── run.py
+│   ├── configure_hardware/         # CH (one-page): delegates hardware config to the target system via contract
+│   │   └── run.py
+│   └── report_changes/             # CH: report what changed between document revisions
+│       ├── run.py                  # (was changes/report_runner)
+│       ├── classify.py, match.py, reader.py, report.py  # (was changes/*)
+├── project/                        # PART VI: your project — opening, saving, session state
+│   ├── manager.py                  # (was project/project_manager)
+│   └── state.py                    # (was project/app_state)
+├── manual/                         # PART VII (P-014): the book about the book — builds the map, resolves peek-code
+│   ├── docstrings.py               # M1-M6 docstring standard parser
+│   ├── map.py                      # generates the interactive map FROM this tree + contents.py + catalog.py
+│   ├── peek.py                     # provenance resolvers: artifact stamp -&gt; producing module/rule/template
+│   └── index.py                    # cross-reference index (symbols, tables, phases, systems)
+└── workbench/                      # PART VIII: the app you are looking at — ALL Tkinter lives here
+    ├── shell/                      # window frame: app.py (was gui/app_main), phase_model, phasebar, chasebar, log_view, theme, fonts, icons, darktitle
+    ├── panels/                     # docked panels: findings_panel, findings_view, files_panel, files_view, documents_panel
+    ├── explore/                    # looking at data: database_explorer, database_query, datagrid, excel_goto, external_editor, filexy_shim
+    ├── edit/                       # changing things: object_editor, expr_builder, syntax_highlight, template_builder (P-012)
+    ├── manual/                     # reading the manual: guide.py (was guide_window), explorer.py + map_view.py (P-014 GUI over pipeline5.manual)
+    └── start/                      # new_project.py
+
+tests/                              # mirrors pipeline5/ part-for-part, chapter-for-chapter (61 files move mechanically)</pre>
+  <h3>The laws (each an import-linter contract)</h3>
+  <ul class="laws"><li>LAYERS (import-linter 'layers'): workbench &gt; manual &gt; project &gt; phases &gt; systems &gt; language &gt; documents &gt; truth &gt; findings &gt; appendix. Higher parts may import lower, never the reverse; kernel parts (truth and below) can therefore never see systems or GUI.</li><li>CHAPTER INDEPENDENCE (import-linter 'independence'): every package directly under pipeline5.phases is independent of every other — chapters share only via truth/language/documents/findings; phases/contents.py and phases/gate.py are the only shared front-matter modules and hold no domain logic. The chapter list in the contract is regenerated and cross-checked by manual/map.py so a new chapter cannot silently escape the law.</li><li>PLUGIN DOOR (import-linter 'forbidden'): pipeline5.phases must not import pipeline5.systems.plc_based or pipeline5.systems.ipc_based — chapters may import only systems.contract and systems.catalog; concrete systems are reached exclusively through the catalog registry.</li><li>PLUGIN ISOLATION (import-linter 'forbidden' + 'independence'): pipeline5.systems must not import pipeline5.phases or pipeline5.workbench, and concrete system packages (siemens_s7, intervalzero_rtx.*) are mutually independent — a system translates truth; it never calls a chapter or another system.</li><li>SINGLE ENTRY (import-linter 'forbidden'): nothing imports pipeline5.workbench except pipeline5.__main__, and nothing imports pipeline5.manual except pipeline5.workbench — the manual machinery reads the whole book but only the workbench opens it.</li><li>GUI QUARANTINE (import-linter 'forbidden', include_external_packages=true): tkinter is importable only from pipeline5.workbench — no widget code can leak into phases, systems, or kernel.</li><li>BOTTOM OF THE BOOK (import-linter 'forbidden'): pipeline5.appendix and pipeline5.findings import no other pipeline5 package — they are pure reference material every part may cite.</li></ul>
+  <details><summary>Where the 19 representative modules land</summary>
+    <div class="tblwrap"><table><tr><th>today</th><th>proposed</th><th>note</th></tr><tr><td>domain/iolist_staging</td><td>pipeline5/phases/stage_iolist/staging.py</td><td>chapter 'stage_iolist'; run.py is the uniform phase entry the registry calls</td></tr><tr><td>domain/signals_schema</td><td>pipeline5/truth/tables/signals.py</td><td>schemas ARE the data dictionary — moving them into truth lets Siemens emitters import them without touching any chapter</td></tr><tr><td>domain/signal_identity</td><td>pipeline5/truth/identity.py</td><td>shared identity vocabulary; the only legal way chapters 'agree' without importing each other</td></tr><tr><td>domain/datablock_generator</td><td>pipeline5/phases/generate_datablocks/generator.py</td><td></td></tr><tr><td>domain/datablock_xml</td><td>pipeline5/systems/plc_based/siemens_s7/datablocks/xml_emit.py</td><td>goes to its final home NOW; the siemens subtree mirrors chapter names so the map pairs chapter and translation</td></tr><tr><td>domain/io_tags</td><td>pipeline5/systems/plc_based/siemens_s7/io_tags/tags.py</td><td>wholly Siemens; a one-page chapter phases/map_io_tags/run.py delegates via contract so every operator phase still has a chapter</td></tr><tr><td>domain/software_blocks/builders</td><td>pipeline5/systems/plc_based/siemens_s7/software_blocks/builders.py</td><td>starred = Siemens; joins scl_emit/xml_emit/templates in the mirror</td></tr><tr><td>domain/software_blocks/build_engine</td><td>pipeline5/phases/build_software_blocks/engine.py</td><td>shared engine stays in the chapter; concrete builders arrive through systems.catalog</td></tr><tr><td>domain/fillout/document_fill</td><td>pipeline5/phases/fill_documents/fill.py</td><td></td></tr><tr><td>domain/validation/validation_runner</td><td>pipeline5/phases/validate/run.py</td><td>the runner IS the chapter entry — rename cures 'unclear entry'</td></tr><tr><td>domain/changes/report_runner</td><td>pipeline5/phases/report_changes/run.py</td><td></td></tr><tr><td>(future) chain_reactions engine</td><td>pipeline5/language/chains/engine.py</td><td>a feature of the rule language, next to tempemplator at language/templates/</td></tr><tr><td>gui/app_main</td><td>pipeline5/workbench/shell/app.py</td><td></td></tr><tr><td>gui/database_explorer</td><td>pipeline5/workbench/explore/database_explorer.py</td><td></td></tr><tr><td>gui/expr_builder</td><td>pipeline5/workbench/edit/expr_builder.py</td><td>beside syntax_highlight and the future template_builder (P-012)</td></tr><tr><td>systems/system_contract</td><td>pipeline5/systems/contract.py</td><td>rename only; contract + catalog are the sole modules chapters may import from systems/</td></tr><tr><td>core/expr</td><td>pipeline5/language/ (parser.py, runtime.py, render.py, scope.py, tools.py, data.py, errors.py)</td><td>promoted from core sub-package to a named part — operators talk about 'the language' in expr_builder</td></tr><tr><td>core/config</td><td>pipeline5/appendix/config/{paths,params,loaders}.py</td><td>config reference is literally an appendix in a shop manual; bottom layer, imports nothing</td></tr><tr><td>(future) code-explorer + generated map (P-014)</td><td>machinery in pipeline5/manual/{map.py,peek.py,docstrings.py,index.py}; GUI in pipeline5/workbench/manual/{explorer.py,map_view.py}; stamps in pipeline5/truth/provenance.py</td><td>manual/ may read every part; only workbench may open manual/</td></tr></table></div>
+  </details>
+  <details><summary>The critic's verdict — breaks (10) and strengths (8)</summary>
+    <h4>Breaks found (code-grounded)</h4><ul class="breaks"><li>LAYERS inversion on day one: pipeline5/domain/signal_identity.py:11 does 'from pipeline5.core import expr'. The candidate homes identity in truth/ and expr in language/ with language &gt; truth, so truth imports upward. Worse, the future language/chains engine is defined as 'rule cascades over truth tables' (language-&gt;truth), so with identity in truth the part-level cycle language&lt;-&gt;truth is guaranteed the day chains lands. Either identity leaves truth or language drops below truth (which chains forbids) - the placement is self-defeating.</li><li>findings&lt;-&gt;documents part cycle no layer order can fix: pipeline5/core/finding.py:19 imports Cmp/InfoBlock from core.report_model (candidate: documents/reports/model.py), while pipeline5/io/report_renderer.py:27-28 (candidate: documents/reports/render.py) imports core.severity (candidate: findings/severity.py). findings needs documents AND documents needs findings; with report_model placed in documents the LAYERS contract is unsatisfiable regardless of ordering. report_model must move to findings/ or truth/ - an unplanned re-homing.</li><li>BOTTOM OF THE BOOK is both false and self-contradictory: pipeline5/core/finding.py:18,20 imports content_hash and ssot_table (candidate: truth/) and lazily config + ssot_database (finding.py:88-89); pipeline5/core/finding_treatments.py:26 imports config (candidate: appendix/). The law says findings imports NO other pipeline5 package, while the LAYERS law simultaneously permits findings-&gt;appendix. The contract set contradicts itself as written and the code violates the strict version in four edges.</li><li>CHAPTER INDEPENDENCE fails on five real edges that are logic coupling, not schema sharing: validation_runner.py:24+53 imports iolist_staging and literally calls staging.stage(params) - the validate chapter RE-RUNS the stage_iolist chapter instead of reading SSOT; fillout/document_fill.py:158,460-461 imports iolist_staging AND diagnosis_builder; iolist_staging.py:28 imports cematrix_annotation; signal_coverage.py:29-32 imports datablock_generator, diagnosis_builder, interface_builder and uses datablocks.seed_members(), interfaces.TRIGGER_TYPE, and the PRIVATE diagnosis._addr_byte/node_of. These are exactly the phases-communicate-only-via-SSOT seams; the candidate asserts the law with zero resolution plan.</li><li>PLUGIN DOOR fails structurally, not textually: pipeline5/domain/software_blocks/build_engine.py:24-31 (candidate: phases/build_software_blocks/engine.py) directly imports datablock_xml and software_blocks builders/scl_emit/xml_emit (all candidate: systems/plc_based/siemens_s7/). Line 25's comment - 'import registers the builders' - means builder registration is an import side effect; routing through systems.catalog is a registration-mechanism redesign, not a scripted import rewrite.</li><li>PLUGIN ISOLATION fails in reverse (systems-&gt;phases) wherever the mirror splits a today-cohesive package: interface_scl.py:109 and interface_xlsx.py:31 import interface_builder (candidate: phases/build_interface/builder.py); diagnosis_scl.py:22 imports the private _int_or_none from diagnosis_builder; software_blocks/xml_emit.py:432 imports builder_registry (candidate: phases/.../registry.py); software_blocks/builders.py:19-21 imports block_table and signals_view (both candidate: phases/build_software_blocks/).</li><li>Modules with no honest home: the interfaces table family (interfaces_table, interface_elements_table) lives inside interface_builder and is required by the Siemens emitters, but the candidate's truth/tables/ has only signals.py, datablocks.py, diagnosis.py - no interfaces.py. Likewise block_table.py and signals_view.py are shared data structures needed by both the chapter engine and the Siemens builders, yet are homed in the chapter where systems code cannot legally import them under the candidate's own laws.</li><li>systems-&gt;phases.gate: pipeline5/domain/io_tags.py:29 and pipeline5/domain/hardware.py:42 import core.phase_gate (candidate: phases/gate.py). The one-page delegating chapters (map_io_tags, configure_hardware) require surgically splitting gating and finding-recording out of these Siemens modules into chapter run.py files - code surgery the 'mechanical git mv' story omits entirely.</li><li>The migration claim is false: 'every move is a mechanical git mv plus a scripted import rewrite (no logic changes)' cannot coexist with enabling the seven laws - at least ten violating import edges (items above) require genuine refactoring, so the 62-file test suite will NOT keep passing after a purely mechanical move with contracts on. It also big-bangs planned steps 3-6 while the live migration plan sits at step 2 of 7 (kernel just moved), abandoning the incremental sequence the project is mid-way through.</li><li>Vision wrinkle: on-disk trees render alphabetically, so the shipped tree reads appendix, documents, findings, language, manual, phases, project, systems, truth, workbench - NOT Part I..X. The 'zero curation' claim is oversold; Part ordering must come from contents.py/map metadata (acceptable, but it is curation). Two sibling packages are both named 'manual' (pipeline5/manual and pipeline5/workbench/manual), giving the generated map two identically-named nodes for the P-014 machinery vs its GUI.</li></ul>
+    <h4>Strengths</h4><ul class="strengths"><li>Total, explicit coverage: every one of the ~117 current pipeline5 modules has exactly one enumerated destination - core/, domain/, io/, gui/ all dissolve with nothing left homeless except the omitted interfaces-table split; the 25-file gui/ maps cleanly into shell/panels/explore/edit/manual/start.</li><li>All seven laws are expressible in stock import-linter contract types (layers, independence, forbidden, include_external_packages for tkinter) - nothing requires a custom checker except the deliberate map.py cross-check of the chapter list, which is a sound belt-and-suspenders addition.</li><li>GUI QUARANTINE and SINGLE ENTRY verified to hold against the current code with ZERO changes: no module outside gui/ imports gui, and no tkinter import exists outside gui/ (project_manager.py's docstring even declares 'no tkinter - the GUI wires these').</li><li>Uniform run.py per chapter plus phases/contents.py directly cures the 'unclear entry' pain (validation_runner -&gt; validate/run.py is exactly right) and satisfies the no-phase-number-prefix constraint: operator numbers bind in the registry, growth is mkdir + one registry row.</li><li>truth/tables/ as the data dictionary legalizes the code's actual dominant import pattern - both chapters and Siemens emitters already import *_schema modules (io_tags.py:33, diagnosis_scl.py:23-24, hardware.py:46, build_engine.py:32-33) - so the schemas-into-truth cut is empirically the right shared vocabulary.</li><li>The systems mirror-of-chapter-names plus register.py strengthens the approved plugin taxonomy rather than dissolving it, and makes the map's per-chapter 'translations' tab a genuinely renderable, zero-curation feature.</li><li>findings/ as its own part matches the real clustering (finding/severity/treatments/phase_gate form a tight group today), and truth/provenance.py gives P-014 peek-code a concrete structural anchor: stamp at produce time, resolve via manual/peek.py.</li><li>Best-in-class vision fit: verb-named chapters, one-page delegating chapters ('this chapter is written by your target system'), appendix at the bottom - the tree genuinely reads as a shop manual's table of contents, which is the locked P-014 bet.</li></ul>
+  </details>
+  <p class="mig"><b>Migration:</b> medium — every move is a mechanical git mv plus a scripted import rewrite (no logic changes, tests mirror one-to-one), but it is the widest possible mechanical move: core/, io/, domain/, and gui/ all dissolve, so essentially every import line in the 117-module package and the 61-file suite is touched in one pass. It also deliberately front-loads migration step 4 (the ~10 starred Siemens modules go to systems/plc_based/siemens_s7/ now), which buys the mirror-structure payoff early but makes this a bigger single step than the currently planned sequence.</p>
+  <p class="vis"><b>With the locked vision:</b> The map generator (manual/map.py) does no curation: the manual's Parts page IS the ten top-level packages, each Part page IS the package's M1 docstring, each chapter page IS phases/&lt;chapter&gt;/__init__.py's docstring plus its file list — so writing M1-M6 docstrings and keeping the tree honest are the same act. phases/contents.py is simultaneously the phasebar's data, the pipeline's reading order in the map, and the operator-number binding (numbers live in the registry, never in folder names). The siemens_s7 subtree mirrors chapter names, so the map renders each generation chapter with a 'translations' tab per target system — an engineer reading 'generate_datablocks' sees exactly where the Siemens XML dialect begins. Peek-code closes the loop structurally: every producer stamps truth/provenance.py records; manual/peek.py resolves a stamp to (part, chapter, file, rule/template), and because every chapter has run.py and every system has register.py, every resolved location lands on a page the map already has. The one-page delegating chapters (map_io_tags, configure_hardware) read as intended in a manual: 'this chapter is written by your target system.'</p>
+  <p class="grow"><b>Growth story:</b> New phase: mkdir phases/&lt;verb_noun&gt;/ with __init__ (M1 docstring) + run.py, register it in phases/contents.py with its operator number, add the package to the independence contract (manual/map.py lints that the contract list equals the folder set), mirror a tests/phases/&lt;verb_noun&gt;/ — zero renumbering, zero folder churn, and the manual gains a chapter automatically. New target system: mkdir systems/&lt;platform&gt;_based/&lt;vendor_toolchain&gt;/ with register.py implementing systems/contract.py, one subfolder per chapter it translates (mirroring chapter names), add a catalog entry; the laws already guarantee it cannot reach into phases, other systems, or the GUI, and the map grows a 'translations' tab per mirrored chapter. New GUI tool: one file under the matching workbench area (edit/ for the P-012 template builder, explore/ for viewers, manual/ for reading aids) plus menu wiring in shell/app.py — no law changes ever needed for GUI growth since workbench is the top layer.</p>
+</section>
+<section class="cand" id="stream">
+  <div class="ch">
+    <div><div class="eyebrow">Candidate 4 · stream</div>
+    <h2>Streamworks</h2>
+    <div class="school">Pipes-and-Filters made structural (POSA Vol.1, Buschmann et al.)</div></div>
+    <div class="scorebar"><div class="fill" style="width:67%"></div><span>20/30</span></div>
+  </div>
+  <p class="principle">The SSOT stream is the first-class citizen: one stream/ package owns the standardized data format (tables, findings, expression language, store), pipes only transport, and every phase is a self-contained filter folder placed by which edge of the stream it touches — sources, filters, sinks — meeting nowhere but the tables.</p>
+  <div class="chips"><span class="chip hi" title="Flat domain cured">Flat 4</span><span class="chip mid" title="Boundaries enforceable">Boundaries 3</span><span class="chip mid" title="Clear ownership">Clear 3</span><span class="chip hi" title="Phase growth">Phase 4</span><span class="chip hi" title="Vision fit">Vision 4</span><span class="chip lo" title="Migration ease">Migration 2</span></div>
+  <h3>The map</h3>
+  <pre class="tree">Pipeline5App/
+├─ launch_gui.py                     # thin entry: imports pipeline5.gui.shell.app_main and runs it
+├─ tests/                            # mirrors pipeline5/ one-to-one; the 61-file suite moves mechanically with the code
+└─ pipeline5/
+   ├─ runtime/                       # KERNEL SUBSTRATE — zero domain knowledge, stdlib-only imports
+   │  ├─ config/
+   │  │  ├─ paths.py                 # project/app path resolution (was core/config/paths)
+   │  │  ├─ params.py                # typed parameter access (was core/config/params)
+   │  │  └─ loaders.py               # config-file loaders: column maps, params (was core/config/loaders)
+   │  └─ i18n.py                     # translation catalog + tr() (was core/i18n)
+   ├─ stream/                        # THE STREAM — the SSOT data format; the map's center page
+   │  ├─ phase.py                    # NEW: the uniform filter interface — Phase protocol: declares reads=[...]/writes=[...], run(store, ctx) -&gt; PhaseResult
+   │  ├─ store/                      # the pipe inside the app: persistence + transport of tables
+   │  │  ├─ ssot_table.py            # table object: rows, columns, provenance (was core/ssot_table)
+   │  │  ├─ ssot_database.py         # CSV-backed table store (was core/ssot_database)
+   │  │  └─ content_hash.py          # content lineage hashes — the raw material of peek-code (was core/content_hash)
+   │  ├─ tables/                     # the standardized data format: one module per table family — the DATA DICTIONARY
+   │  │  ├─ registry.py              # NEW: catalog of all table schemas (mapgen + database_explorer read this)
+   │  │  ├─ signals.py               # signals schema (was domain/signals_schema)
+   │  │  ├─ signal_identity.py       # canonical signal-key semantics — shared meaning lives IN the format (was domain/signal_identity)
+   │  │  ├─ datablocks.py            # datablock schema (was domain/datablock_schema)
+   │  │  └─ diagnosis.py             # diagnosis_entries schema (was domain/diagnosis_schema)
+   │  ├─ findings/                   # the second stream: findings flowing out of every phase
+   │  │  ├─ finding.py               # finding record (was core/finding)
+   │  │  ├─ severity.py              # severity scale (was core/severity)
+   │  │  ├─ treatments.py            # finding treatments (was core/finding_treatments)
+   │  │  ├─ factory.py               # shared finding constructor — used by staging AND validation, so it belongs to the format (was domain/validation/finding_factory)
+   │  │  └─ report_model.py          # report document model (was core/report_model)
+   │  └─ expr/                       # the stream's rule language — lives with the stream like SQL lives with the database
+   │     ├─ parser.py, render.py, runtime.py, scope.py, tools.py, data.py, errors.py   # (was core/expr/*, internals unchanged)
+   ├─ pipes/                         # TRANSPORT ONLY — reading/writing the outside world; zero decisions
+   │  ├─ xlsx_reader.py              # workbook -&gt; sheet views, the one workbook reader (was io/xlsx_reader)
+   │  ├─ xlsx_writer.py              # surgical in-place xlsx write-back (was io/xlsx_surgical_writer)
+   │  └─ report_renderer.py          # report_model -&gt; rendered report file (was io/report_renderer)
+   ├─ engines/                       # shared GENERATION machinery — computes, doesn't transport; parameterized by systems
+   │  ├─ tempemplator/               # P-009 template renderer (also powers gui/workshop template-builder previews)
+   │  └─ blockforge/
+   │     ├─ build_engine.py          # block build engine (was domain/software_blocks/build_engine)
+   │     └─ builder_registry.py      # builder registration point systems plug into (was domain/software_blocks/builder_registry)
+   ├─ sources/                       # PHASES facing the input documents (doc-&gt;stream ingest, doc-&gt;doc conditioning)
+   │  ├─ iolist/
+   │  │  ├─ staging.py               # IoList documents -&gt; staging tables, the SSOT build (was domain/iolist_staging)
+   │  │  └─ reader.py                # raw per-row IoList reader, shared with fillout (was domain/fillout/iolist_reader)
+   │  ├─ fillout/                    # ph200 family: classify + fill the source document IN PLACE (doc round-trip, kept whole)
+   │  │  ├─ script_type_classify.py, index_assign.py, type_families.py, device_tag_ranges.py, diag_allocation.py, diagnosis_blocks_sheet.py, document_fill.py
+   │  └─ changes/                    # ph100: before/after document quality report (doc-facing, renders via pipes/report_renderer)
+   │     ├─ reader.py, match.py, classify.py, report.py, report_runner.py
+   ├─ filters/                       # PHASES table-&gt;table — the pure middle of the pipeline; each folder one phase
+   │  ├─ annotate_cematrix/          # CE-matrix annotation (was domain/cematrix_annotation)
+   │  ├─ validate/                   # validation phase: iolist_checks, cematrix_checks, cematrix_refs, crosscheck, diagcheck, address_parsing, messages.py, runner.py (was domain/validation/*)
+   │  ├─ coverage/                   # signal coverage checks (was domain/signal_coverage)
+   │  ├─ build_datablocks/           # generator.py + templates.py -&gt; datablock tables (was datablock_generator, datablock_templates)
+   │  ├─ build_diagnosis/            # diagnosis_builder -&gt; diagnosis_entries tables (was domain/diagnosis_builder)
+   │  ├─ build_interface/            # interface_builder -&gt; interface tables (was domain/interface_builder)
+   │  ├─ build_blocks/               # block_table.py + signals_view.py -&gt; software-block tables in SSOT (was domain/software_blocks/{block_table,signals_view})
+   │  └─ chain_reactions/            # P-009 engine: rule-driven change propagation across tables (pure table-&gt;table)
+   ├─ sinks/                         # PHASES tables -&gt; external artifacts
+   │  ├─ diaglist/                   # ph610: diagnosis_entries -&gt; DiagList_IO/Logic CSVs (was domain/diaglist_csv)
+   │  └─ siemens_s7/                 # INTERIM home until migration step 4 — already at the sink edge so step 4 is ONE git mv into systems/
+   │     ├─ datablock_xml.py, diagnosis_scl.py, interface_scl.py, interface_xlsx.py, hardware.py, hardware_csv.py, io_tags.py, scl_emit.py, xml_emit.py, builders.py, templates.py
+   ├─ systems/                       # APPROVED plugin taxonomy: pluggable target-system sink bundles (repositioned in the layer order, not dissolved)
+   │  ├─ contract.py                 # what a system provides (was systems/system_contract)
+   │  ├─ catalog.py                  # explicit registry of installed systems — the ONLY module naming the leaves
+   │  ├─ plc_based/
+   │  │  └─ siemens_s7/
+   │  │     ├─ safety/               # safety logic (lands migration step 3-4)
+   │  │     └─ emit/                 # step-4 destination of sinks/siemens_s7/* (TIA XML/SCL emit phases + builders + templates)
+   │  └─ ipc_based/
+   │     └─ intervalzero_rtx/
+   │        ├─ sorter/, induction/, plant/   # step-7 IPC systems
+   ├─ flow/                          # PIPELINE ASSEMBLY — the only place that knows all phases
+   │  ├─ registry.py                 # operator phase numbers -&gt; Phase objects; numbers bind HERE, never in folder names
+   │  ├─ runner.py                   # executes registered phases over the store
+   │  └─ gate.py                     # gating policy from findings/treatments (was core/phase_gate)
+   ├─ explorer/                      # P-014 ENGINE — code-is-the-manual machinery, no Tkinter here
+   │  ├─ mapgen.py                   # generates the interactive map from flow.registry + Phase reads/writes + AST/M1-M6 docstrings
+   │  └─ peek.py                     # provenance resolvers: artifact/table-cell -&gt; producing phase -&gt; rule/template source (via content_hash lineage)
+   ├─ project/
+   │  ├─ project_manager.py          # project lifecycle; imports systems/catalog for target selection
+   │  └─ app_state.py                # persisted app/session state
+   └─ gui/                           # THE CONTROL ROOM — observes the stream, drives the flow; never imports a phase
+      ├─ shell/                      # app_main.py, theme.py, fonts.py, icons.py, darktitle.py, log_view.py, files_panel.py, files_view.py, documents_panel.py, new_project.py, guide_window.py, external_editor.py, filexy_shim.py
+      ├─ flowdeck/                   # phasebar.py, chasebar.py, phase_model.py — the pipeline dashboard (talks to flow/)
+      ├─ data/                       # database_explorer.py, database_query.py, datagrid.py, findings_panel.py, findings_view.py, excel_goto.py, syntax_highlight.py — windows onto stream/
+      ├─ workshop/                   # expr_builder.py, object_editor.py, template_builder.py (P-012) — authoring tools for stream/expr and engines/tempemplator
+      └─ manual/                     # P-014 in-app explorer window + interactive map view (renders the explorer/ engine)</pre>
+  <h3>The laws (each an import-linter contract)</h3>
+  <ul class="laws"><li>Layers (import-linter 'layers' contract): gui -&gt; (project | explorer) -&gt; flow -&gt; systems -&gt; (sources | filters | sinks) -&gt; (pipes | engines) -&gt; stream -&gt; runtime; a lower layer never imports a higher one.</li><li>Phase independence (import-linter 'independence' contract): every direct subpackage of sources/, filters/, and sinks/ is independent of every other, across families too — a phase NEVER imports another phase; phases meet only at the SSOT tables. This is the signature pipes-and-filters law, machine-checked.</li><li>Meeting-point law (import-linter 'forbidden' contracts): sources/, filters/, sinks/ may import only stream, pipes, engines, runtime — never systems, flow, project, gui, or each other's families; a filter knows its pipes and its data format, not its neighbors.</li><li>Stream purity ('forbidden'): stream/ imports only runtime/ and stdlib; runtime/ imports stdlib only; pipes/ and engines/ import only stream + runtime — pipes transport, they never decide; nothing kernel-ish can ever see a system or a window.</li><li>Control-room law ('forbidden'): gui/ never imports sources, filters, sinks, systems, or pipes — the GUI reaches the pipeline exclusively through flow/ (registry, runner), stream/ (tables, findings, expr), engines/ (workshop previews), project/, and explorer/; target-system selection routes through project/, which may import systems/catalog.</li><li>Plugin containment ('independence' + 'forbidden'): each systems/&lt;platform&gt;/&lt;toolchain&gt;/&lt;system&gt; leaf is independent of every other leaf; systems/ imports only stream, pipes, engines, runtime; only systems/catalog.py names the leaves, and only flow/ and project/ may import systems/.</li></ul>
+  <details><summary>Where the 19 representative modules land</summary>
+    <div class="tblwrap"><table><tr><th>today</th><th>proposed</th><th>note</th></tr><tr><td>domain/iolist_staging.py</td><td>sources/iolist/staging.py</td><td>Ingest phase: documents -&gt; staging tables; lives at the source edge, one folder per phase.</td></tr><tr><td>domain/signals_schema.py</td><td>stream/tables/signals.py</td><td>Schemas ARE the standardized stream format (the school's core rule); all *_schema modules move to the center.</td></tr><tr><td>domain/signal_identity.py</td><td>stream/tables/signal_identity.py</td><td>Shared row semantics that multiple phases must agree on live IN the format — P&amp;F forbids shared state outside the stream, so identity is stream, not filter.</td></tr><tr><td>domain/datablock_generator.py</td><td>filters/build_datablocks/generator.py</td><td>Pure table-&gt;table transform; its Siemens XML emission is a separate sink phase — the SSOT datablock tables are the only interface between them.</td></tr><tr><td>domain/datablock_xml.py (Siemens)</td><td>sinks/siemens_s7/datablock_xml.py -&gt; systems/plc_based/siemens_s7/emit/datablock_xml.py at step 4</td><td>Interim home is already the sink edge, so step 4 is a single git mv of sinks/siemens_s7/ into the plugin; laws don't change.</td></tr><tr><td>domain/io_tags.py (Siemens)</td><td>sinks/siemens_s7/io_tags.py -&gt; systems/plc_based/siemens_s7/emit/io_tags.py at step 4</td><td>Same wholesale-move pattern as datablock_xml.</td></tr><tr><td>domain/software_blocks/builders.py (Siemens)</td><td>sinks/siemens_s7/builders.py -&gt; systems/plc_based/siemens_s7/builders.py at step 4</td><td>System-specific builders register into engines/blockforge/builder_registry via the systems catalog — inversion keeps the engine shared.</td></tr><tr><td>domain/software_blocks/build_engine.py</td><td>engines/blockforge/build_engine.py</td><td>Not a phase: shared generation MACHINERY parameterized by system-supplied builders; engines are the one honest home for compute shared across sinks and plugins.</td></tr><tr><td>domain/fillout/document_fill.py</td><td>sources/fillout/document_fill.py</td><td>Fillout is a document round-trip conditioning phase (reads the IoList doc, classifies, writes values back in place, upstream of staging) — it faces the input documents, so the whole package sits at the source edge, kept intact (mechanical move, no split).</td></tr><tr><td>domain/validation/validation_runner.py</td><td>filters/validate/runner.py</td><td>Table-&gt;table phase emitting findings; finding_factory leaves for stream/findings/factory.py because staging needs it too — the only file that changes package family for a semantic reason.</td></tr><tr><td>domain/changes/report_runner.py</td><td>sources/changes/report_runner.py</td><td>Reads before/after documents, produces a report_model rendered via pipes/report_renderer — a self-contained document-facing phase; placed by its input edge.</td></tr><tr><td>chain_reactions engine (future, P-009)</td><td>filters/chain_reactions/engine.py</td><td>Pure table-&gt;table propagation filter; its tempemplator renderer is machinery and lands in engines/tempemplator/.</td></tr><tr><td>gui/app_main.py</td><td>gui/shell/app_main.py</td><td>Control-room root; gui gains four subpackages (shell/flowdeck/data/workshop) plus manual/ so the map's GUI region reads by function.</td></tr><tr><td>gui/database_explorer.py</td><td>gui/data/database_explorer.py</td><td>A window onto stream/store + stream/tables/registry; legal under the control-room law (gui -&gt; stream).</td></tr><tr><td>gui/expr_builder.py</td><td>gui/workshop/expr_builder.py</td><td>Authoring tool for stream/expr; the workshop is where gui touches the stream's languages and engines.</td></tr><tr><td>systems/system_contract.py</td><td>systems/contract.py</td><td>Position unchanged (approved architecture); systems is repositioned in the layer order as the plug-in sink bay above the phase families.</td></tr><tr><td>core/expr/</td><td>stream/expr/</td><td>The stream's rule language lives with the stream, like SQL lives with the database; gui/workshop and all phases import it from the center.</td></tr><tr><td>core/config/</td><td>runtime/config/</td><td>Kernel substrate below the stream; runtime holds exactly what has zero domain knowledge (config + i18n).</td></tr><tr><td>code-explorer + map + peek-code (future, P-014)</td><td>explorer/ (mapgen.py + peek.py engine, no Tkinter) + gui/manual/ (viewer window)</td><td>The engine reads flow.registry, Phase reads/writes declarations, content_hash lineage, and source AST — it needs no import edge into any phase.</td></tr></table></div>
+  </details>
+  <details><summary>The critic's verdict — breaks (10) and strengths (6)</summary>
+    <h4>Breaks found (code-grounded)</h4><ul class="breaks"><li>PHASE-INDEPENDENCE LAW IS FALSE TODAY, BY FUNCTION CALLS NOT JUST IMPORTS: domain/validation/validation_runner.py:24,53 literally re-runs staging ('database, _ = staging.stage(params)') — after the move that is filters/validate importing AND executing sources/iolist. Fixing it requires the flow/runner to orchestrate stage-then-validate and hand over the store — an orchestration redesign, not a git mv. The signature law reds CI on day one.</li><li>iolist_staging.py:23,28 imports flow-and-filter layers UPWARD: it calls cematrix_annotation.annotate() INLINE (lines 225/333 — annotation is not a standalone filter today, it's a step inside staging), so sources/iolist -&gt; filters/annotate_cematrix; and it imports core/phase_gate, which the candidate homes at flow/gate.py — a phase importing flow/. phase_gate is imported by FIVE phases (iolist_staging, io_tags, hardware, datablock_generator, build_engine); as phase-callable machinery it has no honest home in flow/ (it only imports severity+treatments, so it belongs in stream/findings) — the candidate placed it by its name, not its consumers.</li><li>THE software_blocks CLUSTER IS SLICED AGAINST ITS IMPORT GRAPH: engines/blockforge/build_engine.py would import sinks/siemens_s7/{datablock_xml, builders, scl_emit, templates, xml_emit} (engine-&gt;sink, five upward edges — line 25 even says 'import registers the builders', i.e. the catalog inversion the candidate relies on is NOT implemented) plus filters/build_blocks/{block_table, signals_view} (engine-&gt;filter); and sinks/siemens_s7/builders.py imports filters/build_blocks (sink-&gt;filter). ~8 forbidden edges from one package; the 'laws don't change at step 4' claim hides that the laws cannot PASS at the interim stage without first building the registration inversion.</li><li>signal_coverage.py:29-31 (filters/coverage) imports THREE sibling filters — datablock_generator, diagnosis_builder, interface_builder — and calls their functions (seed_members(), TRIGGER_TYPE, _addr_byte, node_of). One filter depending on three siblings' code, not their tables. Independence contract red.</li><li>THE stream/tables DATA DICTIONARY IS INCOMPLETE, WHICH IS WHY PHASES IMPORT PHASES: interface tables live inside interface_builder.py, hardware tables inside hardware.py, the block table inside block_table.py. Hence interface_xlsx.py:31 (sink) imports interface_builder (filter) for _to_int/_find_data_table/table defs, and diagnosis_scl.py:22 (sink) imports diagnosis_builder._int_or_none (filter). Honoring 'phases meet only at the stream' requires EXTRACTING those schemas and helpers into stream/ — file splits the migration story claims are zero.</li><li>THE iolist_reader PLACEMENT IS BUILT ON A FALSE FACT: its ONLY consumer is fillout/document_fill.py:26 (staging.py reads via io/xlsx_reader directly, never via iolist_reader). Moving it to sources/iolist/reader.py (a) splits the fillout package the same sentence promises to 'keep whole', and (b) creates sources/fillout -&gt; sources/iolist, violating the candidate's own phase-independence law. Similarly, the finding_factory note is wrong: staging does NOT use it — only the five validation check modules do (it uses core.finding.record); the 'one semantic relocation' is justified by an incorrect premise.</li><li>THE CONTROL-ROOM LAW IS UNSATISFIABLE BY MECHANICAL MOVE: gui/app_main.py (1150 lines) has ~30 inline imports of domain phases (its handlers ARE the runner today), and gui/findings_view.py:14 imports io/report_renderer (gui-&gt;pipes, explicitly forbidden). Satisfying the law requires building flow/registry+runner and stream/phase.py Phase protocol (both NEW), wrapping ~20 phases in reads/writes declarations, and rewriting app_main's entire handler layer — the largest work item in the whole migration, absent from the 'single scripted git-mv + import-rewrite sweep, zero splits' cost estimate. The mapgen/vision story depends on this same unbuilt Phase protocol.</li><li>TESTS ARE NOT CURRENTLY A MIRRORED TREE: the 61 files are FLAT under tests/unit/test_*.py (name-mirrored, not tree-mirrored). The 'tests/ mirrors pipeline5/ one-to-one and moves mechanically' claim requires re-homing all 61 files into a new hierarchy and rewriting every import — and tests that pin today's orchestration shape (test_validation_phase, test_gui_phase_model) will break when validation stops calling staging.stage() and app_main routes through flow/runner, so 'the suite survives mechanically' is optimistic.</li><li>GROWTH IS NOT QUITE 'ADD CODE ONLY': import-linter independence contracts enumerate modules explicitly, so every new phase folder also edits the contract config (the candidate admits this for systems leaves but claims 'no other file changes' for phases — inconsistent). Minor, mechanical, but the stated law-form guarantees it.</li><li>MINOR VISION FRICTION: 'pipes = transport only, zero decisions' mislabels report_renderer (report_model -&gt; rendered document is a formatting transform, not transport), and the systems/catalog.py docstring already in-tree says its consumers are 'the GUI/project layers' while the candidate law allows only flow/ and project/ — one of the two must change.</li></ul>
+    <h4>Strengths</h4><ul class="strengths"><li>The stream/ package is a genuinely strong center: SSOT tables, findings, expr, and store unified as 'the standardized data format' gives the flat domain/ dump a principled dissolution rule (place by which edge of the stream you touch) rather than an aesthetic one, and stream/tables/ as a data dictionary is exactly what the manual needs.</li><li>All six laws ARE expressible as static import-linter contracts (layers + independence + forbidden) — no runtime-only rule sneaked in; the 'the map prints a machine-verified fact' story is structurally sound once the graph is cleaned.</li><li>sources/filters/sinks by stream edge, with operator numbers bound in flow/registry.py, honestly satisfies the no-folder-prefix constraint and gives a real add-a-folder growth story for phases once the Phase protocol exists.</li><li>The interim sinks/siemens_s7/ parking spot is clever: it pre-sorts the Siemens emitters to the sink edge so migration step 4 shrinks to one directory move into the approved systems/ taxonomy, which is preserved intact (contract.py + catalog.py as the only leaf-namer matches the catalog already written in-tree).</li><li>explorer/ (mapgen + peek) needing zero import edges into phases — reading flow.registry, reads/writes declarations, content_hash lineage, and AST as data — is the right architecture for P-014, and the runtime/ vs stream/ split of core/ is an honest kernel boundary (config+i18n really are the only zero-domain modules).</li><li>The vision integration is the best part: the top level of the tree literally IS the dataflow map's home screen, and the uniform Phase page shape (Inputs/Transform/Outputs/Findings) gives the M1-M6 manual one recurring chapter anatomy.</li></ul>
+  </details>
+  <p class="mig"><b>Migration:</b> high — nearly every module changes its import path: core/ splits into runtime/ + stream/, io/ becomes pipes/, the flat domain/ fans out across sources/filters/sinks/engines/stream, and gui/ gains five subpackages, so roughly 100 of ~117 files move. But it is a single scripted git-mv + import-rewrite sweep with exactly one semantic relocation (finding_factory to stream/findings) and zero file splits — fillout, changes, and validation stay whole — so the 61-file mirrored test suite survives mechanically; the later step-4 Siemens move shrinks to one directory move because the interim home is already the sink edge.</p>
+  <p class="vis"><b>With the locked vision:</b> The generated map's home screen IS the top level of the tree: a dataflow diagram with stream/ as the center node, sources/ on the left, filters/ around the middle, sinks/ and the systems/ plug bays on the right, gui/ as the control room above — mapgen draws it without executing anything because the Phase protocol (stream/phase.py) makes every phase statically declare reads=[tables/docs] and writes=[tables/artifacts], and flow/registry.py gives the operator numbering. That uniform filter interface also gives the M1-M6 manual ONE recurring page shape — Inputs (tables) / Transform / Outputs / Findings — so every phase folder's __init__ is an M1 chapter with identical anatomy, and stream/tables/*.py are the data-dictionary chapters. Peek-code composes three things this structure keeps adjacent: content_hash lineage stamps (stream/store) identify which phase wrote a cell/artifact, flow/registry resolves the phase to its folder, and expr/tempemplator sources resolve the rule or template — explorer/peek.py needs zero imports into phases (it reads code as data). Finally, the import-linter laws make the manual's central claim machine-true: the map can print 'phases meet only at the stream' as a verified fact, because CI enforces it as a static contract, not a convention.</p>
+  <p class="grow"><b>Growth story:</b> New phase: create one folder under sources/, filters/, or sinks/ (chosen by which edge of the stream it touches), implement the Phase protocol with declared reads/writes, add one line in flow/registry.py binding its operator number — no other file changes, no folder renumbering (numbers live in the registry), the map and manual regenerate, and the mirrored tests folder appears alongside. New target system: add one leaf under systems/&lt;platform&gt;/&lt;toolchain&gt;/&lt;name&gt;/ implementing systems/contract.py, register it with one line in systems/catalog.py; it may use engines/ (blockforge builders, tempemplator), pipes/, and stream/, and the plugin-independence contract extends by adding the leaf to the independence list. New GUI tool (e.g., P-012 template-builder): one module in gui/workshop/ importing engines/tempemplator for live preview plus stream/ for data — legal under the control-room law with no law changes; if it must run phases, it goes through flow/runner like everything else.</p>
+</section>
+<section class="cand" id="hexagon">
+  <div class="ch">
+    <div><div class="eyebrow">Candidate 5 · hexagon</div>
+    <h2>The Hexagon with Three Sockets</h2>
+    <div class="school">Hexagonal / Ports &amp; Adapters (Cockburn), applied with restraint</div></div>
+    <div class="scorebar"><div class="fill" style="width:67%"></div><span>20/30</span></div>
+  </div>
+  <p class="principle">Everything that computes the SSOT and its derived artifacts lives inside one hexagon (core + pipeline + app); the world reaches it only through exactly three ports — target-system, document, operator — each implemented by adapters that the inside can never see.</p>
+  <div class="chips"><span class="chip hi" title="Flat domain cured">Flat 4</span><span class="chip mid" title="Boundaries enforceable">Boundaries 3</span><span class="chip mid" title="Clear ownership">Clear 3</span><span class="chip hi" title="Phase growth">Phase 4</span><span class="chip mid" title="Vision fit">Vision 3</span><span class="chip mid" title="Migration ease">Migration 3</span></div>
+  <h3>The map</h3>
+  <pre class="tree">pipeline5/
+  __main__.py                    # python -m pipeline5 -&gt; boot (GUI by default, --headless for CLI)
+  boot/                          # composition root (Cockburn's "configurator") — the ONLY package allowed to import everything
+    composition.py               # loads systems catalog, binds document + system adapters to ports, builds the App object
+    main.py                      # argv -&gt; launch shell.gui or shell.headless with the composed App
+
+  core/                          # KERNEL — pure vocabulary + engines; imports nothing outside core
+    ssot/
+      table.py                   # ssot_table — the SSOT table type
+      database.py                # ssot_database — CSV-on-disk persistence (stdlib csv; deliberately NOT a port: one impl, restraint)
+      content_hash.py            # content hashing for change detection
+    tables/                      # SSOT table SCHEMAS — the shared language phases speak through the pipes
+      signals_schema.py          # signal table contract
+      signal_identity.py         # canonical signal identity keys
+      datablock_schema.py        # datablock table contract
+      diagnosis_schema.py        # diagnosis table contract
+    findings/
+      finding.py                 # finding record
+      severity.py                # severity scale
+      treatments.py              # finding_treatments — suppress/ack policy
+      report_model.py            # report data model
+    expr/                        # unified expression engine (parser, render, runtime, scope, tools, data, errors)
+    chain_reactions/             # (P-009) engine.py — rule-driven cascade of updates across SSOT tables; kernel engine beside expr
+    templating/                  # (P-009) tempemplator.py — pure text-template renderer used by report rendering and system emitters
+    provenance.py                # (P-014) produced-by record every generated row/artifact carries — the peek-code anchor type
+    phase.py                     # phase_gate + phase result types (pure gating logic)
+    i18n.py                      # message catalog access
+    config/
+      paths.py                   # project folder layout
+      params.py                  # typed parameter model
+      loaders.py                 # config file loading (stdlib only; no config port — single source, restraint)
+
+  ports/                         # the three sockets: Protocol/ABC files ONLY; may import core ONLY
+    system.py                    # TARGET-SYSTEM PORT (from systems/system_contract): System descriptor, builder/emitter hooks, system-contributed steps
+    documents.py                 # DOCUMENT PORT: workbook read, surgical write-back, rendered report out (quarantines openpyxl behind it)
+    operator.py                  # OPERATOR PORT: the use-case API surface + progress/log/finding sinks a shell consumes (headless rule)
+
+  pipeline/                      # THE PIPELINE — phases as filters over the SSOT; a phase NEVER imports another phase
+    staging/
+      iolist_staging.py          # IO-list -&gt; staging tables
+      cematrix_annotation.py     # CE-matrix annotation
+    fillout/
+      iolist_reader.py           # source document reading (via document port)
+      script_type_classify.py    # script-type classification
+      index_assign.py            # index assignment
+      type_families.py           # type family rules
+      device_tag_ranges.py       # device tag range allocation
+      diag_allocation.py         # diagnosis allocation
+      diagnosis_blocks_sheet.py  # diagnosis blocks sheet fill
+      document_fill.py           # write results back into the source document (via document port)
+    validation/
+      validation_runner.py       # phase entry: runs all checks
+      messages.py, finding_factory.py
+      iolist_checks.py, cematrix_checks.py, cematrix_refs.py
+      crosscheck.py, diagcheck.py, address_parsing.py
+    changes/
+      report_runner.py           # phase entry: before/after change report
+      classify.py, match.py, reader.py, report.py
+    datablocks/
+      generator.py               # datablock_generator — system-neutral datablock derivation
+      templates.py               # datablock_templates — shared template tables
+    diagnosis/
+      builder.py                 # diagnosis_builder
+      diaglist_csv.py            # diagnosis list ingestion
+    interface/
+      builder.py                 # interface_builder — system-neutral interface derivation
+    software_blocks/
+      block_table.py, signals_view.py
+      builder_registry.py        # the seam where system adapters plug their builders in (port-shaped)
+      build_engine.py            # shared build engine driving registered builders
+    coverage/
+      signal_coverage.py         # signal coverage analysis
+
+  app/                           # application services — everything an operator can DO, headless-complete
+    project_manager.py           # open/create/save project folders
+    app_state.py                 # observable session/run state both GUI and CLI bind to
+    phase_registry.py            # OPERATOR PHASE NUMBERS bind here to pipeline entry points (numbers never in folder names)
+    runner.py                    # run orchestration: gates, phase execution, finding collection
+
+  manual/                        # (P-014) code-is-the-manual machinery; reads source as DATA (ast), imports core only
+    map_generator.py             # builds the generated interactive map from this tree + M1-M6 docstrings
+    provenance_resolvers.py      # peek-code: artifact/row -&gt; producing module/rule via core.provenance records
+
+  adapters/                      # OUTSIDE the hexagon; importable only by boot (and within adapters)
+    documents/                   # driven adapter: document port impl
+      xlsx/
+        reader.py                # xlsx_reader (openpyxl lives here and nowhere else)
+        surgical_writer.py       # xlsx_surgical_writer
+      report/
+        renderer.py              # report_renderer — findings/report_model -&gt; rendered output
+    systems/                     # driven adapters: APPROVED plugin tree, repositioned as the system port's adapters
+      catalog.py                 # explicit registry of available systems (read by boot, handed to app)
+      plc_based/
+        siemens_s7/
+          system.py              # descriptor implementing ports/system
+          safety/                # (step 3-4)
+          datablock_xml.py       # TIA datablock XML emission
+          diagnosis_scl.py       # diagnosis SCL emission
+          interface_scl.py, interface_xlsx.py
+          io_tags.py             # IO tag generation (wholly Siemens)
+          hardware/              # hardware.py, hardware_csv.py (wholly Siemens)
+          software_blocks/       # builders.py, scl_emit.py, xml_emit.py, templates/
+      ipc_based/
+        intervalzero_rtx/        # (step 7)
+          sorter/, induction/, plant/
+    shell/                       # driving adapter: the operator's ways in; calls app/ via ports/operator
+      gui/                       # Tk shell — app_main, phase_model, phasebar, chasebar, log_view,
+                                 #   excel_goto, findings_panel, findings_view, files_panel, files_view,
+                                 #   documents_panel, database_explorer, database_query, datagrid,
+                                 #   syntax_highlight, object_editor, expr_builder, guide_window,
+                                 #   external_editor, filexy_shim, new_project, theme, fonts, icons, darktitle
+        gui/code_explorer.py     # (P-014) in-app explorer homed on manual/map_generator output
+        gui/template_builder/    # (P-012) template-builder GUI tool over core/templating + app API
+      headless/
+        cli.py                   # same operator port, no Tk — Cockburn's headless rule made runnable
+
+tests/                           # mirrors pipeline5/ one-to-one; the 61 files move by path rename only</pre>
+  <h3>The laws (each an import-linter contract)</h3>
+  <ul class="laws"><li>L1 Layers (import-linter 'layers'): boot &gt; adapters &gt; app &gt; manual &gt; pipeline &gt; ports &gt; core — each package imports only packages below it, never above.</li><li>L2 Phase independence (import-linter 'independence'): all pipeline/* subpackages are mutually independent — a phase never imports another phase; they meet only in the SSOT tables.</li><li>L3 Adapter quarantine (import-linter 'forbidden'): core, ports, pipeline, app, manual may not import adapters.* — with an explicit ignore_imports allowlist for the six starred Siemens edges (pipeline.datablocks-&gt;siemens_s7.datablock_xml, etc.) that MUST shrink to zero at migration step 4; the allowlist file is the visible debt meter.</li><li>L4 System isolation (import-linter 'independence' + 'forbidden'): adapters.systems system packages are mutually independent, and adapters.shell may not import adapters.systems or adapters.documents — the shell sees systems only as descriptors handed over by boot.</li><li>L5 Port purity (import-linter 'forbidden'): ports may import only core — port files are Protocols, never implementations.</li><li>L6 Library quarantine (import-linter 'forbidden' on externals): openpyxl (and any document library) importable only under adapters.documents; core/pipeline/app stay stdlib-pure.</li><li>L7 Headless rule (import-linter 'forbidden' on externals + packages): tkinter importable only under adapters.shell.gui, and adapters.shell.gui importable only from boot — statically guarantees the app runs without a display.</li></ul>
+  <details><summary>Where the 19 representative modules land</summary>
+    <div class="tblwrap"><table><tr><th>today</th><th>proposed</th><th>note</th></tr><tr><td>domain/iolist_staging</td><td>pipeline/staging/iolist_staging.py</td><td>first filter: documents -&gt; staging tables via the document port</td></tr><tr><td>domain/signals_schema</td><td>core/tables/signals_schema.py</td><td>SSOT table schema = the pipe format = shared kernel vocabulary, not phase code</td></tr><tr><td>domain/signal_identity</td><td>core/tables/signal_identity.py</td><td>identity keys are language, used by many phases; kernel</td></tr><tr><td>domain/datablock_generator</td><td>pipeline/datablocks/generator.py</td><td>system-neutral derivation stays inside the hexagon</td></tr><tr><td>domain/datablock_xml</td><td>adapters/systems/plc_based/siemens_s7/datablock_xml.py</td><td>moved into the adapter NOW; its import from pipeline/datablocks is an L3 allowlisted edge until the step-4 port cutover</td></tr><tr><td>domain/io_tags</td><td>adapters/systems/plc_based/siemens_s7/io_tags.py</td><td>wholly Siemens — an entire system-contributed step registered via ports/system</td></tr><tr><td>domain/software_blocks/builders</td><td>adapters/systems/plc_based/siemens_s7/software_blocks/builders.py</td><td>SCL/XML-emitting builders are adapter code by definition</td></tr><tr><td>domain/software_blocks/build_engine</td><td>pipeline/software_blocks/build_engine.py</td><td>shared engine inside; builder_registry beside it is the port-shaped seam adapters plug into</td></tr><tr><td>domain/fillout/document_fill</td><td>pipeline/fillout/document_fill.py</td><td>inside; writes back only through ports/documents -&gt; xlsx surgical writer</td></tr><tr><td>domain/validation/validation_runner</td><td>pipeline/validation/validation_runner.py</td><td>phase entry point; registered in app/phase_registry with its operator number</td></tr><tr><td>domain/changes/report_runner</td><td>pipeline/changes/report_runner.py</td><td>phase entry point; rendered output leaves via ports/documents (report renderer)</td></tr><tr><td>(future) chain_reactions engine</td><td>core/chain_reactions/engine.py</td><td>kernel engine beside core/expr — single implementation, so no port (restraint); phases invoke it</td></tr><tr><td>gui/app_main</td><td>adapters/shell/gui/app_main.py</td><td>must shed bootstrapping to boot/ — the one real refactor L7 forces</td></tr><tr><td>gui/database_explorer</td><td>adapters/shell/gui/database_explorer.py</td><td>reads SSOT via app/ API and core types; never touches adapters.documents (L4)</td></tr><tr><td>gui/expr_builder</td><td>adapters/shell/gui/expr_builder.py</td><td>shell -&gt; core.expr is a legal downward import under L1</td></tr><tr><td>systems/system_contract</td><td>ports/system.py</td><td>the contract file literally IS the target-system port; catalog stays adapters/systems/catalog.py</td></tr><tr><td>core/expr</td><td>core/expr/ (unchanged)</td><td>already kernel-pure; zero movement</td></tr><tr><td>core/config</td><td>core/config/ (unchanged)</td><td>deliberately NOT ported — one config source; a config port would be pure indirection tax</td></tr><tr><td>(future) code-explorer / map (P-014)</td><td>manual/ (map_generator, provenance_resolvers) + adapters/shell/gui/code_explorer.py</td><td>manual/ introspects source as data (ast), so it needs no import edges into what it documents; core/provenance.py is the record type everything stamps</td></tr></table></div>
+  </details>
+  <details><summary>The critic's verdict — breaks (8) and strengths (8)</summary>
+    <h4>Breaks found (code-grounded)</h4><ul class="breaks"><li>Operator socket is decorative, not enforced: L1 places adapters ABOVE app and pipeline, and no law (L2-L7) forbids adapters.shell -&gt; app or adapters.shell -&gt; pipeline. The GUI can legally import pipeline/validation/validation_runner.py directly, bypassing both app/ and ports/operator.py entirely. The flagship 'three sockets' principle is machine-enforced for documents (L6) and half-enforced for systems (L3/L4), but the operator port — the one the growth story and headless story lean on — is pure convention. This recreates today's unclear-entry pain with a hexagon painted over it.</li><li>L7 overclaims what a static import contract can prove: import-linter can verify tkinter is importable only under adapters.shell.gui and that only boot imports the gui package, but it CANNOT verify that boot/composition.py imports the Tk shell lazily. If composition.py imports the gui module at top level (the natural way to 'bind adapters to ports'), `python -m pipeline5 --headless` crashes on a display-less machine while every contract passes green. The claim 'statically guarantees the app runs without a display' is not expressible as a static import contract.</li><li>The L3 allowlist contradicts L1 mechanically and the hard constraint temporally: the six starred pipeline-&gt;adapters.systems.siemens_s7 edges violate BOTH the L3 forbidden contract and the L1 layers contract (adapters sits above pipeline), so the 'visible debt meter' must be duplicated as ignore_imports in two contracts that can drift apart. Worse, until migration step 4 the single most load-bearing edge in the product (pipeline/datablocks -&gt; siemens_s7/datablock_xml) runs UPWARD against the one-dependency-direction hard constraint — the boundary is machine-documented, not machine-enforced, exactly where it matters most.</li><li>Migration is not the promised rename: routing pipeline/fillout/document_fill.py and iolist_reader.py through a new ports/documents Protocol means every phase entry point grows an injected port parameter and every test that invokes a phase (currently passing file paths / openpyxl workbooks directly to io/xlsx_edit-backed code) needs a fake document adapter — behavior-touching surgery across a meaningful slice of the 61-file suite, not 'path rename only'. Also unlisted: current core/run.py (run orchestration lives in core today) must be split into core/phase.py + app/runner.py, and gui/app_main.py must shed its bootstrap into boot/ — three genuine refactors hiding inside the '85% git mv' figure.</li><li>System-contributed steps break both the ToC and the add-only growth story: io_tags, hardware, datablock_xml emission are whole operator-visible pipeline steps that live in adapters/systems/plc_based/siemens_s7/, so the manual's claimed narrative 'pipeline = the work: one chapter per phase' is false — an operator browsing the generated map for the IO-tags phase finds it two rings away under 'the world'. And adding a new KIND of system-contributed step means editing ports/system.py (the port Protocol accretes builder/emitter/step hooks forever) plus touching every existing system adapter to satisfy or stub the new hook — that is churn in existing folders, not 'add code only'. In this product most future phases ARE system-flavored; the pure-neutral growth case is the minority.</li><li>The system-extension contract has two homes: the system descriptor Protocol lives in ports/system.py, but the builder plug-in seam is 'port-shaped' inside pipeline/software_blocks/builder_registry.py. Siemens builders in the adapter must import a phase's internals (legal under L1, adapters &gt; pipeline) to implement the interface, making pipeline/software_blocks a de-facto public API for every target system — refactor build_engine and every system adapter breaks, and L2 offers no protection because adapters aren't phases. No single honest home for 'what a system must implement'.</li><li>The three-ports principle is applied inconsistently, so the map would teach an architecture the code doesn't follow: openpyxl is quarantined behind ports/documents, but CSV file I/O happens freely inside the hexagon in at least three places — core/ssot/database.py (persistence in the KERNEL), pipeline/diagnosis/diaglist_csv.py (input ingestion inside a phase), adapters/systems/.../hardware_csv.py (input ingestion in a system adapter). Meanwhile changes-report RENDERING is exiled to adapters/documents/report/renderer.py, cutting one cohesive operator feature (pipeline/changes classify/match/report + the renderer) across the ring boundary. The honest law is 'openpyxl quarantine' (L6); the drawn principle 'the world reaches inside only through three ports' is fiction the M1-M6 manual would then canonize.</li><li>Vision-language mismatch in the generated ToC: top-level chapters read boot/, ports/, adapters/, shell/, composition.py — Cockburn's vocabulary, not the tool's. The center-outward ring narrative serves architects; the operator's manual wants phase-execution order (staging -&gt; fillout -&gt; validation -&gt; datablocks -&gt; ... -&gt; TIA export), which this tree scatters between pipeline/ and adapters/systems/. Each phase also has a second home for its table schema in core/tables/ (signals logic in pipeline/, signals_schema far away in core/tables/), so 'one chapter per phase' is really 'one chapter plus two appendices in other rings'.</li></ul>
+    <h4>Strengths</h4><ul class="strengths"><li>Genuinely cures the flat domain/ dump: the current ~23-module pipeline5/domain flat pile decomposes into cohesive per-phase pipeline/ packages + core/tables schemas + the Siemens adapter, with every representative module given an argued placement — no leftover misc bucket.</li><li>L2 (import-linter 'independence' across pipeline/*) is the best law in any candidate: it makes the SSOT-only pipes-and-filters constraint self-enforcing for every FUTURE phase with zero contract edits — a new phase is covered the moment its folder exists.</li><li>The library quarantines are cheap, fully expressible, and cure real pain: L6 (openpyxl only under adapters.documents) and L7's enforceable half (tkinter only under adapters.shell.gui) are exactly the machine-enforced boundaries the user demanded, and import-linter supports both via external-package forbidden contracts.</li><li>Strongest P-014 story of the field: core/provenance.py as the stamped produced-by record type, manual/provenance_resolvers for peek-code landing in 'pipeline/&lt;phase&gt; or adapters/systems/&lt;system&gt;', and manual/ reading source as ast DATA so it needs no import edges into what it documents — concrete, buildable, and the 'is this rule mine or the system's?' framing matches the operator's actual question.</li><li>Respects the approved systems plugin tree: platform -&gt; toolchain -&gt; system taxonomy and explicit catalog.py survive intact (repositioned under adapters/, which the constraint permits), and L4 adds mutual system independence for free.</li><li>Neutral-phase growth is truly add-only: pipeline/&lt;name&gt;/ + one line in app/phase_registry.py, with operator numbers bound in the registry, never in folder names — exactly honoring the no-prefix decision.</li><li>Honest debt accounting instinct: the shrink-to-zero allowlist makes the remaining Siemens coupling a visible, countable artifact instead of hidden coupling — the right instinct even though its two-contract implementation is flawed.</li><li>Restraint on port count (no config port, no ssot-persistence port) correctly avoids indirection tax for single-implementation seams — the candidate resists the classic hexagonal failure mode of a Protocol for everything, even if the restraint is applied inconsistently (see the operator port and report renderer breaks).</li></ul>
+  </details>
+  <p class="mig"><b>Migration:</b> medium. Roughly 85% is git mv with import-path rewrites and the mirrored test-path renames (domain/ splits into pipeline/&lt;phase&gt; + core/tables + the Siemens adapter; io/-&gt;adapters/documents; gui/-&gt;adapters/shell/gui; project/-&gt;app; systems/-&gt;adapters/systems with system_contract becoming ports/system.py). The genuinely new work is small but real: writing two port Protocol files (documents, operator), extracting boot/composition.py out of gui/app_main to satisfy L1/L7, and pulling the ~12 starred Siemens files into the adapter now — which front-loads step 4's file churn while deferring its hard decoupling behind L3's explicit, shrink-to-zero allowlist.</p>
+  <p class="vis"><b>With the locked vision:</b> The hexagon gives the generated map its narrative for free: chapters read center-outward — core ("the language: tables, findings, expressions, templates"), pipeline ("the work: one chapter per phase"), ports ("the three sockets"), adapters ("the world: your target systems, your documents, your screen"). Each package __init__ carries the M1-M6 chapter docstring, so map_generator renders the tree as the manual's table of contents and can draw the hexagon literally — inner ring vs adapter ring — as the map's home diagram. Peek-code becomes a one-of-two-rings answer: every generated row/artifact carries a core/provenance record, and manual/provenance_resolvers lands it either in pipeline/&lt;phase&gt; (shared logic) or adapters/systems/&lt;system&gt; (your target's emitter) — exactly the question an operator asks ("is this rule mine or the system's?"). The code explorer GUI is itself a shell tool consuming the operator port, which means headless map generation for CI/doc builds comes free under L7.</p>
+  <p class="grow"><b>Growth story:</b> New phase: add pipeline/&lt;phase_name&gt;/ with its runner, register the operator number in app/phase_registry.py — no other folder changes, and L2 (independence) covers the new phase automatically with zero contract edits. New target system: add adapters/systems/&lt;platform&gt;/&lt;toolchain&gt;/&lt;system&gt;/ implementing ports/system.py and one line in catalog.py — zero inside changes; L3/L4 already forbid it from touching the pipeline or sibling systems. New GUI tool: add adapters/shell/gui/&lt;tool&gt;/ calling the app/ use-case API; because the operator port is the only doorway, a headless twin in shell/headless/ is a small wrapper, not a rewrite — the template-builder (P-012) is the first proof.</p>
+</section>
+
+  <div class="foot">Generated from the structure-candidate workflow (wf_06f25724-a2d) · candidates are proposals — nothing is built ·
+  sources: .zen/evidence/P-008.md (literature, verified) + P-014 (the locked vision) · pick one, or name the blend.</div>
+</div>

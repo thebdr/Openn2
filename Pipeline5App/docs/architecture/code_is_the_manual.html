@@ -1,0 +1,217 @@
+<title>The Code Is the Manual — a PL5 vision</title>
+<style>
+  :root{
+    --paper:#F7F8F6; --panel:#FFFFFF; --ink:#1C2321; --ink-2:#5C6663; --ink-3:#8A938F;
+    --line:#DDE2DF; --accent:#0E7C86; --accent-ink:#0A5A62; --peek:#C97B12; --peek-bg:#FBF3E4;
+    --code-bg:#F1F4F2; --code-line:#E2E7E4; --kw:#0E7C86; --str:#8A5A00; --com:#7A8580; --def:#1C2321;
+    --sel:#DCEDEF;
+  }
+  @media (prefers-color-scheme: dark){:root{
+    --paper:#101514; --panel:#161C1A; --ink:#E4E8E5; --ink-2:#9AA5A0; --ink-3:#6E7873;
+    --line:#28312E; --accent:#2FA8B0; --accent-ink:#7FD0D6; --peek:#E0A33E; --peek-bg:#2A2418;
+    --code-bg:#141A18; --code-line:#232B28; --kw:#5BC0C8; --str:#D8B36A; --com:#6E7873; --def:#E4E8E5;
+    --sel:#153A3E;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#101514; --panel:#161C1A; --ink:#E4E8E5; --ink-2:#9AA5A0; --ink-3:#6E7873;
+    --line:#28312E; --accent:#2FA8B0; --accent-ink:#7FD0D6; --peek:#E0A33E; --peek-bg:#2A2418;
+    --code-bg:#141A18; --code-line:#232B28; --kw:#5BC0C8; --str:#D8B36A; --com:#6E7873; --def:#E4E8E5;
+    --sel:#153A3E;
+  }
+  :root[data-theme="light"]{
+    --paper:#F7F8F6; --panel:#FFFFFF; --ink:#1C2321; --ink-2:#5C6663; --ink-3:#8A938F;
+    --line:#DDE2DF; --accent:#0E7C86; --accent-ink:#0A5A62; --peek:#C97B12; --peek-bg:#FBF3E4;
+    --code-bg:#F1F4F2; --code-line:#E2E7E4; --kw:#0E7C86; --str:#8A5A00; --com:#7A8580; --def:#1C2321;
+    --sel:#DCEDEF;
+  }
+  html{background:var(--paper)}
+  body{margin:0;color:var(--ink);font-family:Georgia,'Times New Roman',serif;line-height:1.62;font-size:16.5px}
+  .wrap{max-width:760px;margin:0 auto;padding:52px 24px 96px}
+  .eyebrow{font-family:'Segoe UI',system-ui,sans-serif;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+  h1{font-family:Georgia,serif;font-weight:700;font-size:clamp(30px,5vw,42px);line-height:1.12;margin:10px 0 14px;text-wrap:balance}
+  .dek{font-size:19px;color:var(--ink-2);margin:0 0 8px;line-height:1.5}
+  .byline{font-family:'Segoe UI',system-ui,sans-serif;font-size:12.5px;color:var(--ink-3);margin-bottom:44px}
+  h2{font-family:'Segoe UI',system-ui,sans-serif;font-weight:650;font-size:21px;margin:56px 0 12px;line-height:1.25;text-wrap:balance}
+  h2 .n{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
+  p{margin:0 0 16px;max-width:68ch}
+  em{font-style:italic}
+  .pull{border-left:3px solid var(--accent);padding:4px 0 4px 18px;margin:26px 0;font-size:18.5px;line-height:1.5;color:var(--ink);font-style:italic}
+  .pull b{font-style:normal}
+  code{font-family:'Cascadia Code',Consolas,'Courier New',monospace;font-size:.85em;background:var(--code-bg);border:1px solid var(--code-line);border-radius:3px;padding:0 4px}
+  /* ---- the module-as-manual frame ---- */
+  .explorer{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:26px 0;background:var(--panel)}
+  .exp-bar{display:flex;align-items:center;gap:10px;background:var(--code-bg);border-bottom:1px solid var(--line);padding:8px 14px;font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:var(--ink-2)}
+  .exp-bar .crumb{font-family:'Cascadia Code',Consolas,monospace;font-size:11.5px}
+  .exp-bar .crumb b{color:var(--accent-ink);font-weight:600}
+  .exp-bar .badge{margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:1px 7px;white-space:nowrap}
+  pre{margin:0;padding:18px 20px;overflow-x:auto;font-family:'Cascadia Code',Consolas,'Courier New',monospace;font-size:12.8px;line-height:1.6;color:var(--def);tab-size:4}
+  pre .c{color:var(--com)} pre .k{color:var(--kw);font-weight:600} pre .s{color:var(--str)} pre .d{color:var(--accent-ink);font-weight:600}
+  pre .hl{background:var(--sel);display:inline-block;width:100%}
+  /* ---- peek demo ---- */
+  .peek-demo{border:1px solid var(--line);border-radius:8px;background:var(--panel);margin:26px 0;overflow:hidden}
+  .pd-title{font-family:'Segoe UI',system-ui,sans-serif;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);padding:10px 16px;border-bottom:1px solid var(--line)}
+  .logline{display:flex;gap:10px;align-items:center;padding:10px 16px;font-family:'Cascadia Code',Consolas,monospace;font-size:12.5px;flex-wrap:wrap}
+  .logline .sev{color:#B3261E;font-weight:700}
+  .logline .loc{color:var(--accent-ink);text-decoration:underline;text-underline-offset:2px}
+  .peek-btn{font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;font-weight:600;color:var(--peek);background:var(--peek-bg);border:1px solid var(--peek);border-radius:4px;padding:3px 12px;cursor:pointer;margin-left:auto}
+  .peek-btn:focus-visible{outline:2px solid var(--peek);outline-offset:2px}
+  .peek-target{display:none;border-top:1px dashed var(--peek)}
+  .peek-target.open{display:block}
+  .peek-note{font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:var(--ink-2);padding:8px 16px;background:var(--peek-bg);border-top:1px solid var(--code-line)}
+  .peek-note b{color:var(--peek)}
+  /* ---- rules table ---- */
+  .rules{margin:22px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .rule{display:grid;grid-template-columns:56px 1fr;border-bottom:1px solid var(--line);background:var(--panel)}
+  .rule:last-child{border-bottom:none}
+  .rule .id{font-family:'Segoe UI',system-ui,sans-serif;font-weight:700;font-size:13px;color:var(--accent);padding:13px 0 0 16px}
+  .rule .tx{padding:12px 18px 12px 0;font-size:14.5px;line-height:1.55}
+  .rule .tx b{font-family:'Segoe UI',system-ui,sans-serif;font-size:13.5px}
+  .tree{font-family:'Cascadia Code',Consolas,monospace;font-size:12.5px;line-height:1.75;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 20px;overflow-x:auto;margin:22px 0;color:var(--ink-2)}
+  .tree b{color:var(--ink);font-weight:600}
+  .tree i{font-style:normal;color:var(--ink-3)}
+  .foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);font-family:'Segoe UI',system-ui,sans-serif;font-size:12.5px;color:var(--ink-3)}
+  .kbd{font-family:'Segoe UI',system-ui,sans-serif;font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 6px;background:var(--panel)}
+  @media (prefers-reduced-motion: no-preference){
+    .peek-target.open{animation:reveal .25s ease}
+    @keyframes reveal{from{opacity:0}to{opacity:1}}
+  }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Pipeline5 · a vision piece</div>
+  <h1>The Code Is the Manual</h1>
+  <p class="dek">A fully open application, shipped with its own source — where every button, log line, and
+  generated file can show you exactly how it came to be.</p>
+  <div class="byline">Drafted from the P-008/P-014 evidence · real PL5 modules used throughout · nothing here is built yet</div>
+
+  <p>The executable exists so nobody has to install Python. That is its <em>entire</em> job. The product is
+  the open codebase — and if the codebase is the product, then the codebase must be readable the way a
+  manual is readable: it opens where your question is, it explains itself in your language, and it never
+  makes you guess where to look.</p>
+
+  <div class="pull">Help systems rot because they describe the code from outside. <b>A manual written inside
+  the code cannot drift from it.</b></div>
+
+  <h2><span class="n">1</span>What a shipped module reads like</h2>
+  <p>This is <code>kernel/content_hash.py</code> — the real module, its docstring rewritten as the chapter
+  it actually is. Note the three moves: it opens with <em>what the thing is for you</em>, it offers a
+  <em>try-it</em>, and it names <em>where you meet it in the app</em> — the anchors peek-code jumps through.</p>
+
+  <div class="explorer">
+    <div class="exp-bar"><span class="crumb">pipeline5 / kernel / <b>content_hash.py</b></span><span class="badge">shipped source</span></div>
+    <pre><span class="c">"""Chapter: Identity — how every signal, row, and finding gets its name.</span>
+
+<span class="c">Everything the pipeline creates carries a `uid`: a short fingerprint of the fields
+that say WHAT THE THING IS — and nothing else. Not the workbook it came from, not
+the row number, not the moment it was made. That restraint is the feature: re-save
+the I/O List, reorder its rows, rename the file — the same signal keeps the same
+uid, so everything attached to it (a treatment you set, a generated DB member,
+a diagnosis bit) survives the document revision.</span>
+
+<span class="c">Try it:
+    &gt;&gt;&gt; uid("DI1/2", "K23", "door channel input")
+    'e3a1f09b2c'
+    &gt;&gt;&gt; uid("DI1/2", "K23", "door channel input")   # same parts → same uid, always</span>
+
+<span class="c">Where you meet it in the app:
+  · the Findings tab — every row's ID column is one of these
+  · error_management.csv — your treatments are keyed by uid
+  · every SSOT table — the uid column, stamped at add()</span>
+
+<span class="c">Rule of use: pass ONLY identifying fields. If a value would change when the
+document is merely re-saved or rearranged, it does not belong in a uid.
+"""</span>
+<span class="k">import</span> hashlib
+
+UID_HEX_LENGTH = <span class="s">10</span>   <span class="c"># hex chars; ample for these data volumes (inherited from PL3)</span>
+
+
+<span class="k">def</span> <span class="d">uid</span>(*parts) -&gt; str:
+    <span class="c">"""A stable 10-char fingerprint of `parts`, joined by '|'. None becomes ''.
+    Change or add any part and the uid changes; repeat the parts and it never does."""</span>
+    basis = <span class="s">"|"</span>.join(<span class="s">""</span> <span class="k">if</span> part <span class="k">is</span> <span class="k">None</span> <span class="k">else</span> str(part) <span class="k">for</span> part <span class="k">in</span> parts)
+    <span class="k">return</span> hashlib.sha1(basis.encode(<span class="s">"utf-8"</span>)).hexdigest()[:UID_HEX_LENGTH]</pre>
+  </div>
+
+  <p>Nothing was dumbed down — the maintainer's precision is intact. What changed is the <em>addressee</em>:
+  the docstring speaks to the person reading it inside the app, connects to what they can see on screen,
+  and hands them something to run. Multiply by every module and the manual has written itself.</p>
+
+  <h2><span class="n">2</span>Peek code: the manual opens where your question is</h2>
+  <p>Right-click anything the app produced, and it shows you the producer. Try the log line below —
+  this is the real staging check, with its real comment.</p>
+
+  <div class="peek-demo">
+    <div class="pd-title">The Log — a blocking finding, as the operator sees it</div>
+    <div class="logline">
+      <span class="sev">[FAIL]</span><span>300 stg_dup_type_index</span>
+      <span class="loc">NET SAFETY 50!G114</span>
+      <span>duplicate (KQ, 5) — also at G122</span>
+      <button class="peek-btn" id="peekBtn" onclick="var t=document.getElementById('peekT');t.classList.toggle('open');this.textContent=t.classList.contains('open')?'Close':'Peek code';">Peek code</button>
+    </div>
+    <div class="peek-target" id="peekT">
+      <div class="peek-note"><b>↳ resolves through provenance:</b> the finding carries <code>phase=300</code> + slug <code>stg_dup_type_index</code> → the registry lands you here, in <code>pipeline/staging/checks.py</code></div>
+      <pre><span class="k">def</span> <span class="d">_dup_type_index_findings</span>(table) -&gt; list:
+    <span class="c">"""Why this HALTS instead of warning: the index-grouping builders (05 Output
+    Feedback, 07 Speed Control, 08 Gate Manager) treat `index` as the unit key.
+    Two signals sharing (script_type, index) would be silently MERGED into one
+    bogus unit — two KQ-5 contactors become a single two-contactor unit, and the
+    generated logic is wrong with no error anywhere downstream. So the pair must
+    be unique, and a duplicate is a raw FAIL: generation stops here, where the
+    mistake is visible and clickable, not three phases later where it isn't.</span>
+
+<span class="c">    Each duplicate gets its own finding at its own I/O-List cell, naming the
+    sibling cell(s) — so every one of them is individually clickable above."""</span></pre>
+    </div>
+  </div>
+
+  <p>The provenance to answer every right-click already exists or is planned work: the phase registry binds
+  buttons to handlers; findings carry their phase and slug; every SSOT table has one owning phase, and
+  generated rows will carry <code>spawned_by</code>; emitters and reaction rules are registered by name.
+  Peek-code is mostly <em>plumbing between things PL5 already knows about itself</em> — and when a row was
+  spawned by a chain reaction, the peek lands on the <em>rule in your config</em>, not on Python at all.</p>
+
+  <h2><span class="n">3</span>The commenting standard — six rules for manual-grade code</h2>
+  <div class="rules">
+    <div class="rule"><div class="id">M1</div><div class="tx"><b>The module docstring is a chapter.</b> What this is <em>for the reader</em>, why it exists, where they meet it in the app. If the module can't say this, it isn't a module yet.</div></div>
+    <div class="rule"><div class="id">M2</div><div class="tx"><b>Every public function is a recipe.</b> What you get, what to pass, one runnable example when behavior isn't obvious from the signature.</div></div>
+    <div class="rule"><div class="id">M3</div><div class="tx"><b>Comments answer <em>why</em>, in domain language.</b> "Two KQ-5 contactors become a bogus unit" — never "loop over the rows". The domain is the vocabulary; syntax needs no narration.</div></div>
+    <div class="rule"><div class="id">M4</div><div class="tx"><b>Every module declares its place in the flow.</b> Which SSOT tables it reads, which it writes, which phase button runs it — the anchors peek-code and the map are generated from.</div></div>
+    <div class="rule"><div class="id">M5</div><div class="tx"><b>Cross-references are links, not prose.</b> One <code>src://</code> / <code>guide://</code> scheme everywhere: docstrings, the F1 guide, the log, the map — all the same resolver, already shipped in PL4.</div></div>
+    <div class="rule"><div class="id">M6</div><div class="tx"><b>Decisions carry their history.</b> When code embodies a choice ("blank index skipped — only indexed signals participate"), the comment says what was decided and why, so the reader never re-litigates it blind.</div></div>
+  </div>
+
+  <h2><span class="n">4</span>The reading experience, top to bottom</h2>
+  <p>Opening the code explorer lands on the <em>map</em> — generated from the real package tree and the
+  signpost docstrings, so it cannot go stale. Every node opens the folder; every folder's
+  <code>__init__</code> is its table of contents; every module is a chapter. Three levels, no dead ends:</p>
+
+  <div class="tree">
+<b>The Map</b>  <i>← generated, clickable, always current</i>
+ ├─ <b>kernel/</b>      the primitives every phase stands on          <i>(9 chapters)</i>
+ ├─ <b>pipeline/</b>    the phases, in the order the buttons run      <i>(13 chapters)</i>
+ ├─ <b>systems/</b>     what makes Siemens Siemens and RTX RTX        <i>(per-system books)</i>
+ └─ <b>shell/</b>       the window you are looking at                 <i>(how the GUI works)</i>
+  </div>
+
+  <p>Under this vision the F1 guide keeps only the <em>operator</em> path — how to run a project, what a
+  finding means. Everything deeper stops being separate documentation: the guide's "see source" links were
+  always the honest part, and now the source is worth arriving at. The P-006 "complete the guide" mountain
+  shrinks to a hill.</p>
+
+  <h2><span class="n">5</span>What this costs — said plainly</h2>
+  <p>Three honest prices. <em>First</em>: manual-grade docstrings are written and maintained by hand; the
+  standard (M1–M6) makes them checkable in review, but nothing generates them. <em>Second</em>: peek-code
+  needs the slug→site and config→consumer indexes built (small, and the registries carry most of it).
+  <em>Third</em>: fully open means fully open — anyone can read, copy, and learn from the source. In this
+  vision that is not a leak; it is the distribution model. The one guard worth keeping: the exe build
+  pins a version stamp, so a modified copy is distinguishable from a release.</p>
+
+  <p>And what it saves: the structure debate deflates. When navigation happens by right-click and map,
+  folders only need to be <em>honest</em>, not perfect — the enforcement contracts (phases don't import
+  each other; one dependency direction; sealed plugins) keep the architecture sound underneath, invisibly.</p>
+
+  <div class="foot">PL5 vision piece · sources: .zen/evidence/P-008.md (architecture literature, verified) + P-014
+  (shipped source / peek-code) · the two code samples are real PL5 modules, docstrings restyled per M1–M6 ·
+  press <span class="kbd">F1</span> in the app for the operator guide — someday it will answer by opening code.</div>
+</div>
