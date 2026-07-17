@@ -8,8 +8,8 @@
   "exitCode": 0,
   "outputSha": "f69bfa8eb34f07638691b9a79afd2c0ede0d7f0993d4296dca9f32451aaf8cd5",
   "outputTail": "== architecture_contracts ==\r\n  PASS  l1_layers_one_direction\r\n  PASS  l2_phases_are_filters\r\n  PASS  l3_systems_sealed\r\n  PASS  l4_headless_pipeline\r\n  PASS  l5_no_type_id_literals_below_workbench\r\n  PASS  ratchet_entries_still_real\r\n  PASS  parts_all_known\r\n  -> 7/7 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 38 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-07-16T23:46:50.414Z",
-  "headCommit": "b1dc7a073deb2d5f09d2f550284c661326d6f982",
+  "ranAt": "2026-07-17T00:05:46.037Z",
+  "headCommit": "3be1e5e99a26e057e6b5091b3d28fdaa166f3a1a",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_systems_contract.py",
@@ -29,7 +29,7 @@
     {
       "name": "Pipeline5App/scripts/parity_vs_pl4.py",
       "file": "Pipeline5App/scripts/parity_vs_pl4.py",
-      "fileSha": "bf359fa6267602932b5caf4785bc9d22c8df3b7fb99d0789819f5abd1412f696"
+      "fileSha": "52017f42ee2b3943e9050e94a1df05e52e75393edc20aeda2ea7d0a462e72f18"
     }
   ]
 }
