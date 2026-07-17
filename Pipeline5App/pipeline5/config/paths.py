@@ -38,9 +38,11 @@ _ACTIVE_SYSTEM: tuple | None = None
 
 
 def use_system(system) -> None:
-    """Point the config resolver's SYSTEM tiers at `system` (a System descriptor); None clears them."""
+    """Point the config resolver's SYSTEM tiers at `system` (a System descriptor); None clears them.
+    Refreshes the injected address notation (truth.addresses) - the tiers just changed."""
     global _ACTIVE_SYSTEM
     _ACTIVE_SYSTEM = None if system is None else (system.id, system.config_root or "")
+    _refresh_address_format()
 
 
 def active_system() -> tuple | None:
@@ -53,9 +55,25 @@ def builtin_shared_config_dir() -> str:
 
 
 def use_project(root: str | None) -> None:
-    """Point the config loaders + the Database + the Output tree at <root>/...; None reverts to builtin."""
+    """Point the config loaders + the Database + the Output tree at <root>/...; None reverts to builtin.
+    Refreshes the injected address notation (truth.addresses) - the tiers just changed."""
     global _PROJECT_ROOT
     _PROJECT_ROOT = root or None
+    _refresh_address_format()
+
+
+def _refresh_address_format() -> None:
+    """Resolve `address_format.yaml` through the 4-tier walk and inject it into truth.addresses
+    (P-010). No tier shipping one -> the TIA default. Lazy imports: paths sits below resolver."""
+    from pipeline5.config.resolver import find
+    from pipeline5.truth.addresses import configure_address_format
+    path = find("address_format.yaml")
+    if not path:
+        configure_address_format(None, None)
+        return
+    from pipeline5.config.params import _read_yaml
+    data = _read_yaml(path) or {}
+    configure_address_format(data.get("pattern"), data.get("direction_tokens"))
 
 
 def use_builtin() -> None:

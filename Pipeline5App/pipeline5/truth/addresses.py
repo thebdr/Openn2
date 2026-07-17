@@ -55,17 +55,62 @@ def format_ok(value) -> bool:
     return False
 
 
+# --- the configurable I/O address NOTATION (P-010) ------------------------------------------------ #
+# Every system spells addresses its own way; the KERNEL only ever sees the canonical direction
+# ('I' input / 'Q' output) + byte. The active system's `address_format.yaml` is INJECTED here by
+# `config.use_project/use_system` (config imports truth, never the reverse - the L1 law). The
+# default is the TIA notation, byte/bit-exact with the PL4 literal parser.
+_DEFAULT_PATTERN = r"(?P<direction>[IQ])(?P<byte>\d+)\.(?P<bit>\d+)"
+_DEFAULT_TOKENS = {"input": ("I",), "output": ("Q",)}
+_format = {"rx": re.compile(_DEFAULT_PATTERN, re.IGNORECASE), "tokens": dict(_DEFAULT_TOKENS)}
+
+
+def configure_address_format(pattern: str | None, direction_tokens: dict | None) -> None:
+    """Install the ACTIVE system's notation (None/None reverts to the TIA default). Called by
+    config.use_project/use_system after resolving `address_format.yaml` through the 4-tier walk."""
+    if not pattern:
+        _format["rx"] = re.compile(_DEFAULT_PATTERN, re.IGNORECASE)
+        _format["tokens"] = dict(_DEFAULT_TOKENS)
+        return
+    _format["rx"] = re.compile(pattern, re.IGNORECASE)
+    tokens = direction_tokens or {}
+    _format["tokens"] = {
+        "input": tuple(str(x).upper() for x in (tokens.get("input") or ("I",))),
+        "output": tuple(str(x).upper() for x in (tokens.get("output") or ("Q",))),
+    }
+
+
+def _canonical(direction: str):
+    d = str(direction or "").upper()
+    if d in _format["tokens"]["input"]:
+        return "I"
+    if d in _format["tokens"]["output"]:
+        return "Q"
+    return None
+
+
+def has_io_prefix(bit) -> bool:
+    """True when the cell STARTS with one of the notation's direction tokens - the taggable-I/O
+    predicate (`identity.is_io_signal`), deliberately looser than a full address parse."""
+    first = str(bit or "").strip().upper()[:1]
+    return first in _format["tokens"]["input"] or first in _format["tokens"]["output"]
+
+
 # --- positional Profinet-node lookup (moved from the diagnosis chapter - coupling truths #2/#g) --- #
 def addr_byte(bit):
-    """('I'|'Q', byte) parsed from an I/Q dotted address (`I100.3` -> ('I', 100)); None otherwise.
-    Becomes config-regex-driven with the per-system address_format (P-010)."""
-    b = str(bit or "").strip().upper()
-    if b[:1] in ("I", "Q") and "." in b:
-        try:
-            return b[0], int(b[1:b.index(".")])
-        except ValueError:
-            return None
-    return None
+    """(canonical 'I'|'Q', byte) parsed from the ACTIVE notation's full address (`I100.3` ->
+    ('I', 100) under the TIA default); None when the cell is not an address. The kernel's node
+    ranges (I_/Q_ startByte/endByte) key on the CANONICAL direction, whatever the system spells."""
+    m = _format["rx"].fullmatch(str(bit or "").strip())
+    if not m:
+        return None
+    kind_ = _canonical(m.group("direction"))
+    if kind_ is None:
+        return None
+    try:
+        return kind_, int(m.group("byte"))
+    except (ValueError, IndexError):
+        return None
 
 
 def node_of(rows, row):

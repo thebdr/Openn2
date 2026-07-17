@@ -34,7 +34,7 @@ release) live as `P-xxx` deltas under **Pending Contract Deltas**. Legacy apps (
 ## C-004: Config loading & project isolation
 - **Date:** 2026-07-16
 - **Source:** discovery
-- **Description:** `use_project()` repoints the loaders, the `Database/` folder, and the `Output/` tree at a chosen project or the builtin `Shared/`. Nested `project_params.yaml` schema with a safe dotted `get_param` accessor; `generation_params.yaml` and `app_config.yaml`; tolerant config-CSV readers over the table codec. Missing config surfaces a pointed WARN, never a code-baked default.
+- **Description:** `use_project()` repoints the loaders, the `Database/` folder, and the `Output/` tree at a chosen project or the builtin `Shared/`. Nested `project_params.yaml` schema with a safe dotted `get_param` accessor; `generation_params.yaml` and `app_config.yaml`; tolerant config-CSV readers over the table codec. Missing config surfaces a pointed WARN, never a code-baked default. PL5 (step 4e, landed): ONE 4-tier resolver (project-system -> project-shared -> system-builtin -> builtin-shared; find tolerant / resolve fail-loud), `use_system()` beside `use_project()`, tiered scaffolding + per-meta completeness checks.
 - **Verification:** automated → Pipeline4App/tests/unit/test_config_loaders.py, Pipeline4App/tests/unit/test_params.py, Pipeline4App/tests/unit/test_generation_params.py, Pipeline4App/tests/unit/test_app_config.py, Pipeline4App/tests/unit/test_project.py | loaders, dotted params, generation/app config, project state
 - **Status:** pending verification
 
@@ -48,7 +48,7 @@ release) live as `P-xxx` deltas under **Pending Contract Deltas**. Legacy apps (
 ## C-006: Phase 300 — Staging (the signals table)
 - **Date:** 2026-07-16
 - **Source:** discovery
-- **Description:** Read the configured I/O List and C&E matrix into the `signals` fact table: resolve each row's `type` (object cell), annotate C&E areas, derive document-side identity (FLDs, tag names), positional node address ranges, and `IsSorterArea`; also stage the `diagnosis_cabinets` table. Split into `stage_iolist` (310, no C&E) then `annotate_cematrix` (320) composing byte-identically. Blocking findings on missing I/O sheet / duplicate `(script_type, index)`.
+- **Description:** Read the configured I/O List and C&E matrix into the `signals` fact table: resolve each row's `type` (object cell), annotate C&E areas, derive document-side identity (FLDs, tag names), positional node address ranges, and `IsSorterArea`; also stage the `diagnosis_cabinets` table. Split into `stage_iolist` (310, no C&E) then `annotate_cematrix` (320) composing byte-identically. Blocking findings on missing I/O sheet / duplicate `(script_type, index)`. PL5 (steps 3-4, landed): capability-gated legs (needs_ce_matrix / needs_diagnosis_blocks - flags, never type ids) and the CONFIG-DRIVEN address notation ([[C-022]]).
 - **Verification:** automated → Pipeline4App/tests/unit/test_staging.py | 310/320 split idempotence, uid re-stamp, dup-index FAIL, node ranges
 - **Status:** pending verification
 
@@ -160,6 +160,13 @@ release) live as `P-xxx` deltas under **Pending Contract Deltas**. Legacy apps (
 Parked ideas and not-yet-built workstreams. Promote a `P-xxx` to a `C-xxx` once agreed and underway.
 - **Status:** verified
 
+## C-022: Config-driven I/O address format (regex)
+- **Date:** 2026-07-16
+- **Source:** ingest (another-big-step-now-curried-pnueli.md#coupling7)
+- **Description:** The I/O address NOTATION differs per system and must be config, not code (user correction 2026-07-16). The %I10.3-style parsing hardcoded in staging (_addr_byte, _add_node_address_ranges) and identity (is_io_signal) becomes a regex-style address_format config entry (named groups: direction/byte/bit + which direction tokens mean input vs output), shipped as each system's default in its config_root (Siemens: %I/%Q; RTX: its own), project-overridable via the 4-tier resolver. Staging itself stays 100% shared. Extends C-006 - merge at promotion.
+- **Verification:** automated → Pipeline5App/tests/unit/test_address_format.py
+- **Status:** pending verification
+
 ## Pending Contract Deltas
 
 ### P-014: Shipped source + peek-code provenance navigation + in-app code explorer
@@ -186,12 +193,6 @@ Parked ideas and not-yet-built workstreams. Promote a `P-xxx` to a `C-xxx` once 
 - **Source:** ingest (another-big-step-now-curried-pnueli.md#gui-integration,step5)
 - **Description:** The GUI becomes a projection of the active System: gui/phase_model.py PhaseSet per system (the global PHASES tuple dies), Phase.handler strings key system.handlers (handlers live in the system's main.py, receiving a PhaseContext), icons/i18n stay add-a-row. Project creation: systems.catalog() replaces PROJECT_TYPES (availability = registry membership); project meta types/multi_system finally CONSUMED at open (old PL4 ids get a pointed this-is-a-PL4-project error, no migration). Multi-system v1 = active-system selector (toolbar, visible when >1 type): switches phase bar + config resolver + Database/<sid>/ + Output/<sid>/; Run-all = active system only; single-system projects keep flat Database/ + Output/ (OP4 path compatibility). Extends C-018 - merge at promotion.
 - **Proposed verification:** GUI phase-model tests (PhaseSet helpers, handler dispatch via system.handlers, catalog-driven dialog, meta-consuming open with pointed unknown-id error) + a real-data run of every phase button + Run-all output parity vs PL4
-
-### P-010: Config-driven I/O address format (regex)
-- **Date:** 2026-07-16
-- **Source:** ingest (another-big-step-now-curried-pnueli.md#coupling7)
-- **Description:** The I/O address NOTATION differs per system and must be config, not code (user correction 2026-07-16). The %I10.3-style parsing hardcoded in staging (_addr_byte, _add_node_address_ranges) and identity (is_io_signal) becomes a regex-style address_format config entry (named groups: direction/byte/bit + which direction tokens mean input vs output), shipped as each system's default in its config_root (Siemens: %I/%Q; RTX: its own), project-overridable via the 4-tier resolver. Staging itself stays 100% shared. Extends C-006 - merge at promotion.
-- **Proposed verification:** address_format regex parsing tests: the Siemens %I/%Q pattern byte/bit-exact vs PL4 over the builtin fixture + a synthetic alternate pattern proving a non-Siemens notation parses without code change
 
 ### P-009: Chain-reaction engine + Tempemplator text renderer
 - **Date:** 2026-07-16

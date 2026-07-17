@@ -70,8 +70,8 @@ def is_io_signal(row) -> bool:
     t = _type_of(row)
     if not t or t.get("category") == "Interface":
         return False
-    bit = str(row.get("bit") or "").strip().upper()
-    return bit[:1] in ("I", "Q")
+    from pipeline5.truth.addresses import has_io_prefix   # the ACTIVE system notation (P-010)
+    return has_io_prefix(row.get("bit"))
 
 
 def tag_name(row) -> str:

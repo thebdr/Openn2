@@ -240,15 +240,9 @@ def _is_sorter_area(row: dict, sorter_names: set) -> str:
     return "yes" if (set(row.get("matrix_areas") or []) & sorter_names) else ""
 
 
-def _addr_byte(bit):
-    """('I'|'Q', byte:int) for an I/Q `.bit` address (e.g. 'I12.3' -> ('I', 12)); None otherwise."""
-    b = str(bit or "").strip().upper()
-    if b[:1] in ("I", "Q") and "." in b:
-        try:
-            return b[0], int(b[1:b.index(".")])
-        except ValueError:
-            return None
-    return None
+# the configurable per-system notation (P-010) - one parser for staging, diagnosis,
+# coverage, and the risky-index fill.
+from pipeline5.truth.addresses import addr_byte as _addr_byte  # noqa: E402
 
 
 def _add_node_address_ranges(rows) -> None:

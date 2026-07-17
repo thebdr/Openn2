@@ -1,0 +1,12 @@
+# How this system spells an I/O address in the I/O List's Bit column (P-010).
+#
+# `pattern` is a regex over the WHOLE cell (matched case-insensitively) exposing the named groups
+#   direction   the I/O direction token (mapped to the kernel's canonical input/output below)
+#   byte        the byte number        bit   the bit number
+# `direction_tokens` maps each direction letter to canonical input/output - the kernel's positional
+# node ranges (I_/Q_ startByte/endByte) and tag predicates key on the CANONICAL direction, so a
+# system may spell directions any way it likes (e.g. E/A) without touching kernel code.
+pattern: '(?P<direction>[IQ])(?P<byte>\d+)\.(?P<bit>\d+)'
+direction_tokens:
+  input: [I]
+  output: [Q]
