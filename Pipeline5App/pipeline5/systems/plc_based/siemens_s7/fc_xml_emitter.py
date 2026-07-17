@@ -16,6 +16,17 @@ Output format MATCHES the exported-template byte conventions: **UTF-8 BOM + CRLF
 double BOM / LF-only / single-line file fails the Openness importer at line 1). The PL4 `blocks.table.Table`
 has the same interface PL3's emitter expects (rows are plain dicts; `ITERATOR_STRINGS` is a real list), so the
 emitter body is a verbatim port. The engine emits these to `blocks_import_dir` and DROPS the block's CSV.
+
+Place in the flow: phase 800 / 820 "Generate Blocks" (run_software in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) - the build engine
+(src://pipeline5/phases/software_blocks/build_engine.py) routes any builder registered
+`@builds(name, emit="fc_xml"|"fdback_xml")` in
+src://pipeline5/systems/plc_based/siemens_s7/safety/block_builders.py through the system's emitter
+table (src://pipeline5/systems/plc_based/siemens_s7/safety/system.py) to `write_fc_xml`. Reads the
+reconstructed builder Table (from the `software_blocks` + `software_block_members` SSOT tables);
+writes BuilderData/SoftwareBlocks/ImportReady/<name>.xml (`blocks_import_dir` in
+src://pipeline5/config/paths.py). Template XMLs live in `Shared/Templates/Tia Portal Software
+Blocks/` (resolved by src://pipeline5/systems/plc_based/siemens_s7/template_scanner.py).
 """
 from __future__ import annotations
 
@@ -174,7 +185,10 @@ def and_coil_fc(table, template_path, block_name,
 
 
 # --- FDBACK (05_Output Feedback) dynamic network -------------------------------------------------- #
-# The alternative to the 12 fixed-capacity template variants: build each unit's FDBACK network sized to
+# The alternative to the 12 fixed-capacity template variants (user spec 2026-07-16; the surface is
+# chosen by the `FDBACK_XML` code flag at the 05 registration site - see
+# src://pipeline5/systems/plc_based/siemens_s7/safety/block_builders.py): build each unit's FDBACK
+# network sized to
 # its EXACT element counts (any number of on-conditions / feedbacks / contactors), so a unit that
 # overflows the template (>2 areas, >4 feedbacks, >2 contactors) is expressible. The wiring is a verified
 # parametric reproduction of the template's own 12 networks (each of the 12 (A,F,C) sizes is byte-exact),

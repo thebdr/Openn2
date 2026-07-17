@@ -10,6 +10,17 @@ ITERATOR). The block's template XML is COPIED into `Templates/` beside the CSVs.
 Where you meet it in the app: the 800 phase log's "CreationInfo CSV" surface lines; the files under
 BuilderData/SoftwareBlocks/CreationInfo. Registered as `SYSTEM.emitters["csv"]` - the build engine
 routes every non-ready block here and never knows the format (PL4 coupling #2/#6, resolved).
+
+Place in the flow: phase 800 / 820 "Generate Blocks" (run_software in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) - the build engine
+(src://pipeline5/phases/software_blocks/build_engine.py) calls `write` for every block registered
+`emit="csv"` in src://pipeline5/systems/plc_based/siemens_s7/safety/block_builders.py. Reads the
+reconstructed builder Table; writes BuilderData/SoftwareBlocks/CreationInfo/<name>.csv +
+Templates/<file>.xml (`blocks_creation_dir` in src://pipeline5/config/paths.py).
+
+Decision history: the RELATIVE `$ template=Templates/<file>.xml` reference is a contract evolution
+(2026-07-07, user report: the absolute PL-side path was dead on the OP machine) - the CreationInfo
+folder became self-contained and OP4 resolves `template=` against the CSV's own folder.
 """
 from __future__ import annotations
 

@@ -17,6 +17,17 @@ import, so each 2nd+ occurrence is an `iotag_duplicate` FAIL linking BOTH produc
 tables by design.
 
 Output -> `config.io_tags_dir()`/PLCTags.xlsx (sheets "PLC Tags" + "TagTable Properties"; all values text).
+
+Place in the flow: the 500 header / 510 "Generate I/O Tags" (run_data_blocks only=510 in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py), after the 520 build + the interface
+build. Reads the `signals` + `interface_elements` SSOT tables; the tag assembly + duplicate
+detection are the system-neutral src://pipeline5/phases/io_tags/collector.py; writes
+BuilderData/PlcTags/PLCTags.xlsx (`io_tags_dir` in src://pipeline5/config/paths.py).
+
+Decision history: the duplicate-tag gate is a production fix (2026-07-06, the FVX pilot) - TIA
+rejects the WHOLE import on one duplicate, so shipping a broken workbook silently was worse than
+not shipping; the raw-FAIL guard means even a registry downgrade never writes the file (fix the
+I/O-List rows instead).
 """
 from __future__ import annotations
 

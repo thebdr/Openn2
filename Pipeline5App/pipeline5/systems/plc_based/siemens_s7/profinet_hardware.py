@@ -32,6 +32,17 @@ build-side skip is where the redundant-CPU pair is handled.
 
 DTD col-5 "Parameters" are applied by OP4 itself and are NEVER written here; only col-6 "Parameters by
 Signal Type", col-7 "I/O Addresses Parameter", and I/O List col-AG are written, AG last.
+
+Place in the flow: the 700 header / 710 "Generate Stations" / 720 "Generate Modules" (run_hardware
+in src://pipeline5/systems/plc_based/siemens_s7/safety/main.py; both subs share this one build -
+only the label differs, like PL3). Reads the `signals` SSOT table + the DeviceTypesDatabase
+(`load_device_types_db` in src://pipeline5/config/loaders.py); writes the `hardware_stations` +
+`hardware_modules` SSOT tables and records the findings to `validation_issues`. The CSV projection
+is src://pipeline5/systems/plc_based/siemens_s7/hardware_csv_export.py (700b).
+
+Decision history: the duplicate-IP skip and the Connector column are both production fixes from
+the FVX pilot (2026-07-06, user spec) - the skip handles the documented redundant-CPU Master+Backup
+pair on one address, the Connector carries the col-I port designation (`X1-P1 R`) OP4 extracts.
 """
 from __future__ import annotations
 
@@ -115,6 +126,8 @@ def _role(row):
 
 
 def parse_address(value):
+    """An I/O-List `bit` cell -> the ('I'|'Q', byte, bit) triple, e.g. 'I 12.3' -> ('I', 12, 3);
+    None when the cell isn't an I/Q dotted address (a blank / a head row)."""
     m = _ADDR.match(str(value or ""))
     return (m.group(1).upper(), int(m.group(2)), int(m.group(3))) if m else None
 

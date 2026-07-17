@@ -11,6 +11,16 @@ complex builders 02/03/04/05/08). The two PL4 adaptations vs PL3: the multi-valu
 The Database helpers: `db.rows` · `db.by_type("KQ")` · `db.by_db("03_FDBACK")` · `db.by_area("AREA 1")` ·
 `db.by_tagtable(...)` · `db.where(pred)` · `db.areas()`. The Table: `t.add(template_type="01", <key>=<value>,
 ...)` per @ row (a placeholder key -> `!!<key>$$`, a list value -> the horizontal ITERATOR, placed last).
+
+Place in the flow: phase 800 / 820 "Generate Blocks" (run_software in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) - the build engine
+(src://pipeline5/phases/software_blocks/build_engine.py) runs every builder registered here over
+the staged `signals` (with the 520 write-back fields `name_in_db`/`datablocks`/`plc_binding`, which
+is why 800 requires 520), records the results to the `software_blocks` + `software_block_members`
+SSOT tables, and projects each Table through the emit kind declared at registration:
+  csv    -> src://pipeline5/systems/plc_based/siemens_s7/creation_info_csv.py   (CreationInfo)
+  scl    -> src://pipeline5/systems/plc_based/siemens_s7/scl_emitter.py          (ImportReady .scl)
+  fc_xml | fdback_xml -> src://pipeline5/systems/plc_based/siemens_s7/fc_xml_emitter.py (ready FC XML)
 """
 from __future__ import annotations
 

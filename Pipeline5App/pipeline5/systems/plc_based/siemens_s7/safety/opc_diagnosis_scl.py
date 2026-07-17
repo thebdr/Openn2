@@ -7,8 +7,18 @@ entry's STORED `in_binding`/`ml_value`/`fl_value` (computed at 600b - so this pr
 0-31 -> DWord 1, 32-63 -> DWord 2, channel = bit % 32. The cabinet variant (01-04) is the
 `diagnosis_cabinets.template_type`; TRISTATE (pair each alarm DWord with its warning DWord) is enabled when
 the template_type is 02/04 OR the cabinet contains a signal whose type has `tristate=yes` (the user's
-per-type flag - an additional trigger). UTF-8 BOM + CRLF; the FUNCTION is renamed to drop the
-`TEMPLATE--vX.Y--` prefix. Clean-room port of PL3's diagnosis.py SCL section.
+per-type flag - an additional trigger, the user's decision at the PL4 600d port). UTF-8 BOM + CRLF; the
+FUNCTION is renamed to drop the `TEMPLATE--vX.Y--` prefix. Clean-room port of PL3's diagnosis.py SCL
+section - verified BYTE-IDENTICAL to the PL3 reference SCL at that port, because OP4 imports it (the
+format-preserving parity contract).
+
+Place in the flow: the 600 header / 620 "Generate Diag Software Blocks" (run_diagnosis in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) calls `project` after the 600 build
+(src://pipeline5/phases/diagnosis/builder.py). Reads the `diagnosis_entries` + `diagnosis_cabinets`
+SSOT tables + the signals' per-type tristate flag; fills the `06_Diagnostic for OPC.scl` template
+(`DIAG_SCL_TEMPLATE` in src://pipeline5/config/paths.py); writes
+BuilderData/SoftwareBlocks/ImportReady/Diagnostic_for_OPC.scl (`blocks_import_dir`). The generation
+knobs come from `generation_params.yaml` via the 4-tier walk (src://pipeline5/config/resolver.py).
 """
 from __future__ import annotations
 

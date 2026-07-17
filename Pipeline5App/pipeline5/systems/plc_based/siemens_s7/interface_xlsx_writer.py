@@ -11,6 +11,17 @@ the BOOL-block padding (a full 2-byte block per script_type group: the real sign
 blank addressed rows for the engineer + a separator; a WORD = one row + a separator). openpyxl is fine
 here (PL3 does the same): these IF_ files are documentation, not read back by a data_only reader except via
 `insert_interface_sheets` (phase 400e). Output -> `config.interfaces_dir()` (NOT a BuilderData surface).
+
+Place in the flow: the 400 header / 410 "Generate Interfaces" (run_interfaces in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) runs `project` after
+src://pipeline5/phases/interfaces/builder.py builds the tables, then - gated by
+`iolist_params.insert_interface_sheets` - `insert_interface_sheets` (400e). Reads the `interfaces`
++ `interface_elements` SSOT tables; writes
+ProjectDocumentation/InformationDatabase/Interfaces/IF_<instance>.xlsx (`interfaces_dir` in
+src://pipeline5/config/paths.py) and, in 400e, edits the configured I/O List IN PLACE (timestamped
+.bak first). Phase 510 does NOT read these files - it projects the stored `io_address_side1`
+column, the same value 400e seeds into the inserted sheets (verified; see
+src://pipeline5/systems/plc_based/siemens_s7/plctags_xlsx_writer.py).
 """
 from __future__ import annotations
 

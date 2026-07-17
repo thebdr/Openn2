@@ -7,9 +7,16 @@ knows that - a different controller registers a different SymbolFormatter and th
 notices (PL4 coupling #1, resolved).
 
 Where you meet it in the app:
-  - the signals table's `plc_binding` column (written back by the datablocks chapter)
-  - every DiagList `PLC_Binding` cell and OPC SCL channel
-  - the coverage report's placement references
+  - the signals table's `plc_binding` column (written back by the 520 datablocks chapter,
+    src://pipeline5/phases/datablocks/generator.py)
+  - every DiagList `PLC_Binding` cell and OPC SCL channel (phases 610/620,
+    src://pipeline5/phases/diagnosis/builder.py)
+  - the coverage report's placement references (phase 900,
+    src://pipeline5/phases/coverage/coverage.py - `find_bindings` feeds its scan)
+
+Place in the flow: no phase button runs THIS module - it is the `System.symbols` seam
+(src://pipeline5/systems/system_contract.py) the kernel calls whenever a binding is spelled or
+parsed. It reads/writes no SSOT table and produces no file of its own.
 """
 from __future__ import annotations
 

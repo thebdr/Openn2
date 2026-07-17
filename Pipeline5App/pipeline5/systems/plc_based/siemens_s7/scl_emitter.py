@@ -8,6 +8,16 @@ CreationInfo CSV; the engine drops the block's stale CSV like it does for the FC
     REGION Subnet 50 192.168.50.xxx
 The source array is indexed by the node's LAST IP octet; `10_PN_NETWORK` is the hand-maintained
 per-subnet network-status DB on the TIA side.
+
+Place in the flow: phase 800 / 820 "Generate Blocks" (run_software in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) - the build engine
+(src://pipeline5/phases/software_blocks/build_engine.py) routes a block registered
+`@builds(name, emit="scl")` (today only `03_Diagnostic Nodes`, in
+src://pipeline5/systems/plc_based/siemens_s7/safety/block_builders.py) through
+`SYSTEM.emitters["scl"]` (src://pipeline5/systems/plc_based/siemens_s7/safety/system.py) to
+`write_scl`. Reads the builder's Table (reconstructed from `software_blocks` +
+`software_block_members`); writes BuilderData/SoftwareBlocks/ImportReady/<name>.scl
+(`blocks_import_dir` in src://pipeline5/config/paths.py).
 """
 from __future__ import annotations
 

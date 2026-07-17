@@ -14,6 +14,13 @@ floor - an OPC write to a fail-safe DB can fault the CPU to STOP).
 The projector writes ONLY the DBs in `db_blocks` (520's own SSOT record) - it never blanket-sweeps the
 output dir, so a file another phase owns (e.g. the phase-800 `02_COM.xml`) is preserved simply by not being
 one of 520's DBs. Ownership is driven by the database, not a hardcoded name list.
+
+Place in the flow: the 500 header / 520 "Generate Data Blocks" button (run_data_blocks in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) calls `project` right after the 520
+build (src://pipeline5/phases/datablocks/generator.py). Reads the `db_blocks` + `db_members` SSOT
+tables; writes BuilderData/SoftwareBlocks/ImportReady/<DB>.xml (`blocks_import_dir` in
+src://pipeline5/config/paths.py) - kept byte-stable to PL3's ImportReady because OP4 imports it
+(the format-preserving parity contract; verified per member + per DB attribute at the PL4 port).
 """
 from __future__ import annotations
 

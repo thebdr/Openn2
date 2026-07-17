@@ -5,6 +5,13 @@
 Output matches the committed reference: **comma format-2, no BOM, CRLF**, a `#!format=2` tag line + a
 descriptive `# <headers>` comment (the header is a comment - OP4 reads by POSITION). The table's snake_case
 columns are emitted in the format-2 column order (`_STATIONS_KEYS`/`_MODULES_KEYS`).
+
+Place in the flow: the 700 header / 710 / 720 (run_hardware in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) calls `project` after the build
+(src://pipeline5/systems/plc_based/siemens_s7/profinet_hardware.py). Reads the `hardware_stations`
++ `hardware_modules` SSOT tables; writes BuilderData/HardwareConfiguration/Stations.csv +
+Modules.csv (`hardware_dir` in src://pipeline5/config/paths.py) - Modules stays PL3-byte-identical
+because OP4 imports it; Stations carries the one sanctioned deviation (the Connector column, below).
 """
 from __future__ import annotations
 

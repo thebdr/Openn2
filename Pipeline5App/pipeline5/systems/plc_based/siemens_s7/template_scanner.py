@@ -5,6 +5,18 @@ shell - an operator surface, NOT part of the OP4 import contract - is deferred).
 template `*.xml` for `!!key$$` placeholders gives each block's full ordered key set; the engine uses it as
 the `%` header so the CSV carries the template's full placeholder inventory (matching PL3's shipped output),
 not just the columns a builder happened to fill.
+
+Place in the flow: phase 800 build - the engine
+(src://pipeline5/phases/software_blocks/build_engine.py) reaches this inventory as
+`SYSTEM.templates` (src://pipeline5/systems/plc_based/siemens_s7/safety/system.py) to resolve each
+builder's template stem, the absolute `$ template=` copy source, and the CreationInfo `%` header
+key set (src://pipeline5/systems/plc_based/siemens_s7/creation_info_csv.py). Reads
+`Shared/Templates/Tia Portal Software Blocks/*.xml` (`BLOCK_TEMPLATES_DIR` in
+src://pipeline5/config/paths.py); writes no table and no file.
+
+Decision history: the template XML itself is the key-inventory source of truth - PL3's
+`block_templates.json` sidecar is deprecated, because an inventory scanned from the shipped
+template cannot drift from it the way a hand-maintained sidecar can.
 """
 from __future__ import annotations
 

@@ -18,6 +18,18 @@ quote, e.g. a stored `"db"."member"` binding or the template's `"Clock 1Hz"`). T
 named after the configured file's stem, so the config rename drives both.
 
 UTF-8 BOM + CRLF like every SCL surface. A pure projection - returns findings, records nothing.
+
+Place in the flow: the 400 header / 410 "Generate Interfaces" (run_interfaces in
+src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) calls `project` after the 400 build
+(src://pipeline5/phases/interfaces/builder.py). Reads the `interface_elements` SSOT table; writes
+BuilderData/SoftwareBlocks/ImportReady/<the configured scl_file> (`blocks_import_dir` in
+src://pipeline5/config/paths.py). `generation_params.yaml` resolves through the 4-tier walk
+(src://pipeline5/config/resolver.py).
+
+Decision history: renamed from `MachineInterfaces.scl` to the configured `10_Machine
+Interfaces.scl` (user spec 2026-07-07) - the file name AND the FUNCTION name both follow
+`interfaces.scl_file`, and the legacy file is swept from the output dir so it cannot survive as a
+second TIA import beside the renamed one.
 """
 from __future__ import annotations
 
