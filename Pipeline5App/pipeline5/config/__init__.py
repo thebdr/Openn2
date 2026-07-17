@@ -29,6 +29,7 @@ from pipeline5.config.paths import (  # noqa: F401
     use_builtin,
     use_system,
     active_system,
+    set_multi_system,
     builtin_shared_config_dir,
     active_project,
     config_project_dir,

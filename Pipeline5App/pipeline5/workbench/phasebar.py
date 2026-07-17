@@ -1,5 +1,7 @@
-"""The phase-button bar: a 2-row grid of composite phase buttons driven by the phase REGISTRY
-(`gui/phases.py`, transcribed from the operator oracle `ButtonsLayout.xlsx`).
+"""The phase-button bar: a 2-row grid of composite phase buttons driven by the ACTIVE SYSTEM's
+PhaseSet (`system.phases`, authored in the system's main.py - Siemens: transcribed from the
+operator oracle `ButtonsLayout.xlsx`). `set_phases()` rebuilds the bar in place when the active
+system switches (the multi-system selector).
 
 Layout (the reviewed icon/layout redesign over the PL3 oracle): the pink "Run Pipeline" master on the
 left (spans both rows), then a row of EQUAL-WIDTH phase HEADERS (row 0, each RUNS its phase) separated
@@ -27,7 +29,6 @@ from tkinter import ttk
 
 from pipeline5.language import i18n
 from pipeline5.workbench import icons
-from pipeline5.workbench import phase_model as phases
 from pipeline5.workbench import theme
 
 _CHEVRON = "▾"           # opens a phase's sub-button dropdown (small glyph - the strip is ~60% height)
@@ -296,14 +297,15 @@ def _section(sub) -> str:
 
 
 class PhaseBar(tk.Frame):
-    """The 2-row, equal-width phase-button bar (composite header + chevron strip) driven by the registry.
-    `on_phase(number, title)` runs a whole phase (or Run-all for number 0); `resolve_sub(phase, sub)`
-    returns a sub-button's command (None = disabled/greyed)."""
+    """The 2-row, equal-width phase-button bar (composite header + chevron strip) driven by the active
+    system's PhaseSet. `on_phase(number, title)` runs a whole phase (or Run-all for number 0);
+    `resolve_sub(phase, sub)` returns a sub-button's command (None = disabled/greyed)."""
 
-    def __init__(self, parent, on_phase, resolve_sub, lang="en", mode="dark"):
+    def __init__(self, parent, on_phase, resolve_sub, phase_set, lang="en", mode="dark"):
         super().__init__(parent, bg=theme.phasebar_bg(mode))
         self._on_phase = on_phase
         self._resolve_sub = resolve_sub
+        self._phases = phase_set
         self._lang = i18n.normalize(lang)
         self._mode = mode
         self._buttons: list = []              # the run master + phase headers (greyed during a run)
@@ -324,11 +326,27 @@ class PhaseBar(tk.Frame):
         self._desc_font = (narrow, 9)
         desc_ls = tkfont.Font(root=self, family=narrow, size=9).metrics("linespace")
         num_ls = tkfont.Font(root=self, family=narrow, size=12, weight="bold").metrics("linespace")
-        btn_h = max(_ICON_PX, num_ls) + 2 * desc_ls + 12      # icon/number line + a 2-line description
+        self._btn_h = max(_ICON_PX, num_ls) + 2 * desc_ls + 12   # icon/number line + 2-line description
+        self._build()
 
+    def set_phases(self, phase_set) -> None:
+        """Re-drive the bar from a DIFFERENT PhaseSet (the active-system switch): tear every button
+        down and rebuild in place - the frame keeps its pack slot, so the window layout is stable."""
+        self.close()
+        self._phases = phase_set
+        for child in self.winfo_children():
+            child.destroy()
+        self._buttons, self._headers = [], []
+        self._chevrons, self._separators, self._spacers = [], [], []
+        self._build()
+
+    def _build(self) -> None:
+        """Lay the bar out from `self._phases` (fresh construction and every set_phases rebuild)."""
+        on_phase = self._on_phase
+        btn_h = self._btn_h
         col = 0
         phase_seen = 0
-        for phase in phases.PHASES:
+        for phase in self._phases:
             key = "run" if phase.number == 0 else str(phase.number)
             icon = self._icons.get(key)
             if phase.number == 0:             # the pink Run master, spanning both rows on the left

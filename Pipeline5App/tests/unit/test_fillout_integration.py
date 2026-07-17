@@ -1,5 +1,7 @@
-"""ph200 integrated fill (domain/fillout/fill.fill_out) - the in-memory re-typing after 210, the
-AD/AE/AF write-back cells, the DiagnosisBlocks append + derived recompute, and the no-op backup drop.
+"""ph200 integrated fill (phases/fillout/document_fill.fill_out) - the in-memory re-typing after 210,
+the AD/AE/AF write-back cells, the DiagnosisBlocks append + derived recompute, and the no-op backup
+drop. Since step 5 the fill takes the CALLER's staged database (the run-plan owns stage->fill->
+re-stage) - `_fill` below mirrors safety/main.run_fill's wiring.
 
 Hermetic: a tiny synthetic raw I/O List via openpyxl + a real staging read (the config CSVs ship with
 the package), so the whole stage->fill->re-read flow exercises the integration without the real docs.
@@ -14,11 +16,13 @@ from pipeline5 import config
 from pipeline5.phases.fillout import document_fill as fill
 from pipeline5.phases.fillout import diagnosis_blocks_sheet as diag_blocks
 from pipeline5.phases.fillout import diag_allocation as diag_alloc
+from pipeline5.phases.staging import iolist as staging
+from pipeline5.systems import catalog
 
 
 def _sandboxed(fn):
-    """Run `fn` with `config.database_dir` pointed at a throwaway dir: fill_out's staging leg SAVES
-    the SSOT, and un-redirected that OVERWROTE the builtin Shared/Database (the parity environment)
+    """Run `fn` with `config.database_dir` pointed at a throwaway dir: the staging leg SAVES the
+    SSOT, and un-redirected that OVERWROTE the builtin Shared/Database (the parity environment)
     with this module's tiny synthetic staging on every gate run - the '4-signal builtin' pollution."""
     def wrapped():
         original = config.database_dir
@@ -29,6 +33,14 @@ def _sandboxed(fn):
             finally:
                 config.database_dir = original
     return wrapped
+
+
+def _fill(params, only=None):
+    """The run-plan wiring under test (mirrors safety/main.run_fill): stage the source document,
+    hand the staged database to the doc-only fill."""
+    database, _ = staging.stage(params, system=catalog.by_id("siemens_s7_safety"))
+    return fill.fill_out(database, params, only=only)
+
 
 _SHEET = "NETSAFETY"
 
@@ -57,7 +69,7 @@ def test_full_fill_writes_index_and_diag_cells():
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "io.xlsx")
         _raw_iolist(p)
-        res = fill.fill_out(_params(p))
+        res = _fill(_params(p))
         wb = load_workbook(p)
         ws = wb[_SHEET]
         # 220 wrote AD (index) for the door anchor; the door member inherits the same index by FLD
@@ -75,7 +87,7 @@ def test_diagnosisblocks_sheet_created_with_derived():
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "io.xlsx")
         _raw_iolist(p)
-        fill.fill_out(_params(p))
+        _fill(_params(p))
         wb = load_workbook(p)
         ok("DiagnosisBlocks" in wb.sheetnames, "a fresh DiagnosisBlocks sheet was created")
         ws = wb["DiagnosisBlocks"]
@@ -91,8 +103,8 @@ def test_noop_drops_backup_on_prefilled_doc():
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "io.xlsx")
         _raw_iolist(p)
-        fill.fill_out(_params(p))                              # first run fills everything
-        res2 = fill.fill_out(_params(p))                       # second run changes nothing
+        _fill(_params(p))                              # first run fills everything
+        res2 = _fill(_params(p))                       # second run changes nothing
         eq(res2["backup"], "", "value-identical re-run drops its backup (no-op)")
         eq((res2["filled"], res2["index"], res2["diag"]), (0, 0, 0),
            "nothing re-filled (AB/AD/AE/AF already present)")
@@ -111,7 +123,7 @@ def test_retyping_after_210_feeds_220_230():
         ws["G3"] = "I0.0"; ws["K3"] = "SAFETY DOOR OPEN"; ws["L3"] = "CH1"
         ws["O3"] = "=S1"; ws["P3"] = "+Z1"; ws["Q3"] = "-D9"
         wb.save(p)
-        fill.fill_out(_params(p))
+        _fill(_params(p))
         ws2 = load_workbook(p)[_SHEET]
         ab = str(ws2["AB3"].value or "").strip()
         ok(ab and ab != "<input required>", f"AB classified from the rules (got {ab!r})")
@@ -123,12 +135,12 @@ def test_only_arg_restricts_writeback():
         p = os.path.join(d, "io.xlsx")
         _raw_iolist(p)
         # only=210 writes AB/AC but NOT AD/AE/AF
-        fill.fill_out(_params(p), only=210)
+        _fill(_params(p), only=210)
         ws = load_workbook(p)[_SHEET]
         eq(str(ws["AD3"].value or "").strip(), "", "only=210 leaves AD (index) blank")
         eq(str(ws["AE3"].value or "").strip(), "", "only=210 leaves AE (diag_cabinet) blank")
         # now only=220 fills AD but still not the diag cells
-        fill.fill_out(_params(p), only=220)
+        _fill(_params(p), only=220)
         ws = load_workbook(p)[_SHEET]
         ok(str(ws["AD3"].value or "").strip(), "only=220 fills AD (index)")
         eq(str(ws["AE3"].value or "").strip(), "", "only=220 still leaves AE blank")
@@ -148,7 +160,7 @@ def test_index_unresolved_is_reported():
         ws["G3"] = "Q0.0"; ws["K3"] = "DOOR OPEN LAMP"
         ws["O3"] = "=S1"; ws["P3"] = "+Z1"; ws["Q3"] = "-D9"; ws["AB3"] = "DL"
         wb.save(p)
-        res = fill.fill_out(_params(p), only=220)
+        res = _fill(_params(p), only=220)
         ok(res["unresolved"] >= 1, f"the ungroupable DL index is reported unresolved (got {res['unresolved']})")
         ok(any(f.type == "fill_unresolved" for f in res["findings"]), "a fill_unresolved FAIL finding is emitted")
         ws2 = load_workbook(p)["_UnresolvedIndex"]
@@ -176,7 +188,7 @@ def test_range_component_suffix_and_shared_index():
         ws["G5"] = "I0.1"; ws["K5"] = "FEEDBACK OF SAFETY RELAY"
         ws["O5"] = "=S1"; ws["P5"] = "+DL1.CC1"; ws["Q5"] = "-K66702"
         wb.save(p)
-        fill.fill_out(_params(p))
+        _fill(_params(p))
         ws2 = load_workbook(p)[_SHEET]
         eq(str(ws2["AB3"].value or "").strip(), "KQ", "the range KQ output keeps its base type")
         eq(str(ws2["AB4"].value or "").strip(), "KI1/2", "independent component 1 -> KI1/2")

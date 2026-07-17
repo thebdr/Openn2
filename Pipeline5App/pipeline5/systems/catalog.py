@@ -22,6 +22,11 @@ PLANNED: tuple = (
     ("intervalzero_rtx_plant", "sys_intervalzero_rtx_plant"),
 )
 
+# The PL4-era type ids (PROJECT_TYPES in the frozen Pipeline4App): a project meta carrying one of
+# these is a PIPELINE4 project - PL5 does not migrate it in place. The REGISTRY keeps this
+# knowledge so the project layer's pointed open error needs no id literals of its own (law L5).
+PL4_LEGACY_IDS: tuple = ("siemens_plc_safety", "rtx_cpci_sorter", "rtx_cpci_induction", "rtx_cpci_plant")
+
 
 def _validate() -> None:
     """Fail loudly at import on a duplicate system id - a silent shadow would be a config nightmare."""

@@ -30,11 +30,10 @@ PKG = os.path.join(APP_ROOT, "pipeline5")
 LAYERS = ["language", "truth", "documents", "findings", "config",
           "phases", "systems", "project", "workbench", "app"]
 
-# (importer module, imported target-prefix as the AST records it) -> reason + the burn-down step
-RATCHET = {
-    # -- the LAST edge: fillout's stage->fill->re-stage wiring (burn-down: the step-5 run-plans) --
-    ("phases.fillout.document_fill", "phases.staging"): "stage->fill->re-stage wiring; moves to the app run-plan (step 5)",
-}
+# (importer module, imported target-prefix as the AST records it) -> reason + the burn-down step.
+# EMPTY since step 5 (the last edge - fillout's stage->fill->re-stage wiring - moved to the system
+# run-plan, safety/main.py). Adding an entry is an architecture decision, not a fix.
+RATCHET: dict = {}
 
 
 def _part(mod: str):

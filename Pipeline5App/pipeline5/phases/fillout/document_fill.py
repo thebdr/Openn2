@@ -136,27 +136,27 @@ def _unresolved_sheet(entries: list) -> dict:
     return {"name": _UNRESOLVED_SHEET, "rows": rows, "hyperlinks": links}
 
 
-def fill_script_type(params: dict | None = None) -> dict:
+def fill_script_type(database, params: dict | None = None) -> dict:
     """Fill AB/AC in the source I/O List in place (the 210-only leg). Kept for call-site compatibility -
     delegates to the integrated `fill_out(only=210)`. Returns the same shape as before
     ({output_path, backup, findings, filled, mismatch, unresolved})."""
-    return fill_out(params, only=210)
+    return fill_out(database, params, only=210)
 
 
 # --------------------------------------------------------------------------------------------- #
 # the INTEGRATED ph200 fill: 210 (script_type/suggested) + 220 (index) + 230/240 (diag) in one
-# write-back to the source I/O List, then staging re-reads the now-filled doc (doc-only; the SSOT is
-# the re-stage). NON-DESTRUCTIVE: a timestamped backup is taken before the surgical write and dropped
-# when the fill changed nothing (value-identical no-op).
+# write-back to the source I/O List. DOC-ONLY: the CALLER (the system run-plan, safety/main.py)
+# stages the source document and hands the staged database in; the SSOT truth is the NEXT staging
+# pass over the re-written doc (L2: this chapter never reaches into phases/staging).
+# NON-DESTRUCTIVE: a timestamped backup is taken before the surgical write and dropped when the
+# fill changed nothing (value-identical no-op).
 # --------------------------------------------------------------------------------------------- #
-def _compute_fill(params: dict, only) -> tuple:
-    """The COMPUTATION half (no I/O write): stage the source, run 210/220/230/240 over the staged rows
+def _compute_fill(database, params: dict, only) -> tuple:
+    """The COMPUTATION half (no I/O write): run 210/220/230/240 over the staged rows of `database`
     (each leg re-resolving the type so the next leg sees it), and return
     (rows, blocks, place, gate_rules, type_rules) where `rows` carry the computed script_type/suggested/
     index/diag_cabinet/diag_bit fields and `blocks` is the ordered DiagBlock list (the DiagnosisBlocks
     write-back). `only` restricts the WRITE-BACK leg (each leg still computes its prerequisites)."""
-    from pipeline5.phases.staging import iolist as staging
-
     gate_rules, type_rules = config.load_gate_rules(), config.load_script_type_rules()
     families = load_object_families()
     # merge the per-type diagnosis attrs onto each type record BEFORE re-resolving (mirrors staging's
@@ -170,8 +170,7 @@ def _compute_fill(params: dict, only) -> tuple:
         t["tristate"] = d.get("tristate", False)
         t["tristate_desc"] = d.get("tristate_desc", "")
 
-    db, _ = staging.stage(params)                                   # stage #1 - the read of the source doc
-    rows = list(db.table("signals"))
+    rows = list(database.table("signals"))                          # the caller's staged read of the source doc
 
     # stash each row's ORIGINAL (as-read) write-back cells BEFORE the legs overwrite them - the surgical
     # write-back is non-destructive (Mode-1 blank-only) and the derived DiagnosisBlocks columns read the
@@ -216,7 +215,7 @@ def _compute_fill(params: dict, only) -> tuple:
 
     # 230/240 - diagnosis allocation. `existing` = {full_name -> cabinet_id} from the staged
     # diagnosis_cabinets table (stable-id idempotency); `place` = {uid -> (diag_cabinet, diag_bit)}.
-    existing = {c["fld"]: int(c["cabinet_id"]) for c in db.table("diagnosis_cabinets")
+    existing = {c["fld"]: int(c["cabinet_id"]) for c in database.table("diagnosis_cabinets")
                 if str(c.get("fld") or "").strip()}
     blocks, place = diag_alloc.allocate(rows, families, params, existing)
     for row in rows:
@@ -236,13 +235,14 @@ def _legs(only) -> set:
     return {210, 220, 230, 240}
 
 
-def fill_out(params: dict | None = None, only=None) -> dict:
-    """The integrated ph200 fill: compute 210/220/230/240 over a staging read of the source I/O List,
-    then write AB(script_type)/AC(suggested)/AD(index)/AE(diag_cabinet)/AF(diag_bit) back into the doc by
-    source_sheet/source_row, refresh the output-col headers + the _UnresolvedIndex sheet, and APPEND the
-    new DiagnosisBlocks cabinets + refresh its derived columns. Doc-only (the SSOT is the re-stage). A
-    timestamped backup is taken first and dropped on a value-identical no-op. `only` in {210,220,230,240}
-    runs just that leg's write-back (still computing its prerequisites). Returns
+def fill_out(database, params: dict | None = None, only=None) -> dict:
+    """The integrated ph200 fill: compute 210/220/230/240 over `database` (the CALLER's staging read of
+    the source I/O List - the run-plan owns stage->fill->re-stage), then write AB(script_type)/
+    AC(suggested)/AD(index)/AE(diag_cabinet)/AF(diag_bit) back into the doc by source_sheet/source_row,
+    refresh the output-col headers + the _UnresolvedIndex sheet, and APPEND the new DiagnosisBlocks
+    cabinets + refresh its derived columns. Doc-only (the SSOT is the re-stage). A timestamped backup is
+    taken first and dropped on a value-identical no-op. `only` in {210,220,230,240} runs just that leg's
+    write-back (still computing its prerequisites). Returns
     {output_path, backup, findings, filled, index, diag, unresolved, mismatch}."""
     params = params or config.load_params()
     io_path = params.get("iolist_path")
@@ -258,7 +258,7 @@ def fill_out(params: dict | None = None, only=None) -> dict:
     header_row = int(config.get_param(params, "iolist_params.header_row", 1) or 1)
     min_b, max_b = diag_alloc.diag_bit_range(params)
 
-    rows, blocks, place, findings, mismatch = _compute_fill(params, only)
+    rows, blocks, place, findings, mismatch = _compute_fill(database, params, only)
 
     def _letter(canon):
         return next((m["column"] for m in colmap if m["canonical"] == canon), None)
@@ -453,11 +453,11 @@ def risky_assignments(rows: list, families: list, node_key: dict) -> tuple:
     return assigns, leftover
 
 
-def risky_index_fill(params: dict | None = None) -> dict:
+def risky_index_fill(database, params: dict | None = None) -> dict:
     """Fill `<input required>` index cells (AD) by the family/node row-order heuristic, RED + a _RiskyIndex
-    sheet. Doc-only; backup + drop-on-noop. Returns {output_path, backup, filled, leftover, findings}."""
+    sheet. `database` is the CALLER's staging read of the (already-filled) source doc. Doc-only; backup +
+    drop-on-noop. Returns {output_path, backup, filled, leftover, findings}."""
     from collections import defaultdict
-    from pipeline5.phases.staging import iolist as staging
     from pipeline5.truth.addresses import node_of
 
     params = params or config.load_params()
@@ -468,8 +468,7 @@ def risky_index_fill(params: dict | None = None) -> dict:
                     [_f("fill_no_iolist", "FAIL", f"I/O List not found: {io_path!r}", io_path or "")],
                     io_path)}
 
-    db, _ = staging.stage(params)
-    rows = list(db.table("signals"))
+    rows = list(database.table("signals"))
     families = load_object_families()
     colmap = config.load_column_map("IoList")
     ad = next((m["column"] for m in colmap if m["canonical"] == "index"), None)

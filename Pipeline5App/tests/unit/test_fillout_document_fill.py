@@ -1,4 +1,5 @@
-"""ph200 / 210 - the in-place AB/AC fill (domain/fillout/fill) over a synthetic raw I/O List."""
+"""ph200 / 210 - the in-place AB/AC fill (phases/fillout/document_fill) over a synthetic raw I/O
+List. The fill takes the CALLER's staged database since step 5 - `_fill_210` mirrors the run-plan."""
 import os
 import tempfile
 
@@ -7,6 +8,14 @@ from openpyxl import Workbook, load_workbook
 from _harness import run, eq, ok
 from pipeline5 import config
 from pipeline5.phases.fillout import document_fill as fill
+from pipeline5.phases.staging import iolist as staging
+from pipeline5.systems import catalog
+
+
+def _fill_210(params):
+    """The 210-only run-plan wiring: stage the source doc, hand the database to fill_script_type."""
+    database, _ = staging.stage(params, system=catalog.by_id("siemens_s7_safety"))
+    return fill.fill_script_type(database, params)
 
 
 def _sandboxed(fn):
@@ -48,7 +57,7 @@ def test_fill_ab_ac_modes_and_unresolved():
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "io.xlsx")
         _raw_iolist(p)
-        res = fill.fill_script_type(_params(p))
+        res = _fill_210(_params(p))
         wb = load_workbook(p)
         ws = wb[_SHEET]
         eq(ws["AB2"].value, "E1/2", "Mode-1: AB written from the rules")
@@ -80,8 +89,8 @@ def test_fill_is_idempotent_noop_drops_backup():
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "io.xlsx")
         _raw_iolist(p)
-        fill.fill_script_type(_params(p))                      # first run fills it
-        res2 = fill.fill_script_type(_params(p))               # second run changes nothing
+        _fill_210(_params(p))                                  # first run fills it
+        res2 = _fill_210(_params(p))                           # second run changes nothing
         eq(res2["backup"], "", "no-op re-run deletes its backup")
         eq(res2["filled"], 0, "nothing re-filled (AB already present)")
 

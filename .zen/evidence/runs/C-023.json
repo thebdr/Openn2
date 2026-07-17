@@ -1,25 +1,30 @@
 {
-  "clause": "C-021",
-  "command": "bash Pipeline5App/scripts/verify_c021.sh",
+  "clause": "C-023",
+  "command": "bash Pipeline5App/scripts/verify_c023.sh",
   "commandArgv": [
     "bash",
-    "Pipeline5App/scripts/verify_c021.sh"
+    "Pipeline5App/scripts/verify_c023.sh"
   ],
   "exitCode": 0,
-  "outputSha": "f69bfa8eb34f07638691b9a79afd2c0ede0d7f0993d4296dca9f32451aaf8cd5",
+  "outputSha": "f3cf400867c009fa108a16994938c03b92cf52f80f34c041d891f0a382bdc852",
   "outputTail": "== architecture_contracts ==\r\n  PASS  l1_layers_one_direction\r\n  PASS  l2_phases_are_filters\r\n  PASS  l3_systems_sealed\r\n  PASS  l4_headless_pipeline\r\n  PASS  l5_no_type_id_literals_below_workbench\r\n  PASS  ratchet_entries_still_real\r\n  PASS  parts_all_known\r\n  -> 7/7 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 38 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-07-17T14:00:49.551Z",
+  "ranAt": "2026-07-17T14:01:08.928Z",
   "headCommit": "376422383773e86443ed93d3499642dd76167100",
   "tests": [
     {
-      "name": "Pipeline5App/tests/unit/test_systems_contract.py",
-      "file": "Pipeline5App/tests/unit/test_systems_contract.py",
-      "fileSha": "ac9aeb4f1d98125e7d03d3f84279c83af2f88b625e469c42d7917d947545df98"
+      "name": "Pipeline5App/tests/unit/test_gui_phase_model.py",
+      "file": "Pipeline5App/tests/unit/test_gui_phase_model.py",
+      "fileSha": "5d69992f06ade478e76d61ede0c81786e976a440e844bee51b66fd7ab6e2f83f"
     },
     {
-      "name": "Pipeline5App/tests/unit/test_system_siemens.py",
-      "file": "Pipeline5App/tests/unit/test_system_siemens.py",
-      "fileSha": "d9688ed4ba3a1d4560b730b933f0f89ef6e879edf0451a5b2a56050d62ab3f19"
+      "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "fileSha": "2d07575bc4f1d60e584711159de2ece24cd49333dd5f72bbc3c02ed412e0c302"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_project_manager.py",
+      "file": "Pipeline5App/tests/unit/test_project_manager.py",
+      "fileSha": "10b4748b374fb0cd2d618f38c2eac8d0081254cfbdb39ad39b40bae3c4e7ef11"
     },
     {
       "name": "Pipeline5App/tests/unit/test_architecture_contracts.py",

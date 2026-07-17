@@ -152,12 +152,12 @@ def test_validate_name():
 def test_create_project_double_nested_with_meta():
     def body(d):
         config.use_builtin()
-        root = project.create_project(d, "Nest", ["siemens_plc_safety"], False, 99)
+        root = project.create_project(d, "Nest", ["siemens_s7_safety"], False, 99)
         eq(root, os.path.abspath(os.path.join(d, "Nest", "Nest")),
            "the <base>/<name>/<name> DOUBLE-NESTED layout (backups live in the outer root)")
         meta = project.load_project_meta(root)
         eq(meta.get("name"), "Nest")
-        eq(meta.get("types"), ["siemens_plc_safety"])
+        eq(meta.get("types"), ["siemens_s7_safety"])
         eq(meta.get("multi_system"), False)
         eq(meta.get("backups_kept"), project.BACKUPS_KEPT_MAX, "backups_kept clamps to the 20 limit")
         eq(meta.get("schema_version"), project.SCHEMA_VERSION, "the meta format is stamped")
@@ -165,7 +165,7 @@ def test_create_project_double_nested_with_meta():
         eq(meta.get("notes"), "", "the € notes field starts empty")
         eq(config.active_project(), root, "created + opened")
         try:
-            project.create_project(d, "bad/name", ["siemens_plc_safety"], False, 5)
+            project.create_project(d, "bad/name", ["siemens_s7_safety"], False, 5)
             ok(False, "a bad name must raise")
         except ValueError:
             ok(True, "ValueError on a bad name")
@@ -175,7 +175,7 @@ def test_create_project_double_nested_with_meta():
 def test_backup_rotation_and_zip():
     def body(d):
         config.use_builtin()
-        root = project.create_project(d, "Bk", ["siemens_plc_safety"], False, 5)
+        root = project.create_project(d, "Bk", ["siemens_s7_safety"], False, 5)
         open(os.path.join(root, "Database", "~$lock.xlsx"), "w").close()   # must be skipped
         first = project.make_backup(root, "300", keep=2)
         ok(first.endswith(".zip") and os.path.isfile(first), "the timestamped zip exists")
@@ -198,7 +198,7 @@ def test_backup_rotation_and_zip():
 def test_archive_and_import_documents():
     def body(d):
         config.use_builtin()
-        root = project.create_project(d, "Self", ["siemens_plc_safety"], False, 5)
+        root = project.create_project(d, "Self", ["siemens_s7_safety"], False, 5)
         src_a = os.path.join(d, "docs_a"); os.makedirs(src_a)
         src_b = os.path.join(d, "docs_b"); os.makedirs(src_b)
         cur = os.path.join(src_a, "io.xlsx")
@@ -239,7 +239,7 @@ def test_stale_import_detection_and_refresh():
     stale_imports (the GUI open-time WARN); the next Import REFRESHES the project copy from it."""
     def body(d):
         config.use_builtin()
-        root = project.create_project(d, "Stale", ["siemens_plc_safety"], False, 5)
+        root = project.create_project(d, "Stale", ["siemens_s7_safety"], False, 5)
         src = os.path.join(d, "ext"); os.makedirs(src)
         doc = os.path.join(src, "io.xlsx")
         with open(doc, "wb") as h:
@@ -264,10 +264,77 @@ def test_stale_import_detection_and_refresh():
     _with_temp_localappdata(body)
 
 
+def test_open_rejects_unknown_and_pl4_system_ids():
+    """Step 5: open_project CONSUMES the meta types - an id the registry can't resolve refuses the
+    open with a pointed error, and the PL4-era ids get the 'this is a PL4 project' message. auto_reopen
+    skips such a project instead of crashing the launch."""
+    def body(d):
+        config.use_builtin()
+        root = project.create_project(d, "Meta", ["siemens_s7_safety"], False, 5)
+        project.close_project()
+        project._update_meta(root, {"types": ["no_such_system"]})
+        try:
+            project.open_project(root)
+            ok(False, "an unknown system id must refuse the open")
+        except project.UnknownSystemError as error:
+            eq(error.sid, "no_such_system", "the error names the offending id")
+            eq(error.is_pl4, False, "a typo'd id is not flagged as PL4")
+        eq(config.active_project(), None, "config was NOT switched")
+        project._update_meta(root, {"types": ["siemens_plc_safety"]})
+        try:
+            project.open_project(root)
+            ok(False, "a PL4-era id must refuse the open")
+        except project.UnknownSystemError as error:
+            ok(error.is_pl4, "the PL4-era id is recognized")
+            ok("PIPELINE4" in str(error), "the message says it is a PL4 project")
+        state.push_recent(root)                 # pretend it was the last-opened project
+        config.use_builtin()
+        eq(project.auto_reopen(), None, "auto_reopen SKIPS a project with an unknown system id")
+        project._update_meta(root, {"types": ["siemens_s7_safety"]})
+        ok(project.open_project(root), "the fixed meta opens again")
+        eq([s.id for s in project.project_systems(root)], ["siemens_s7_safety"],
+           "project_systems resolves the meta types to System objects")
+    _with_temp_localappdata(body)
+
+
+def test_multi_system_projects_namespace_database_and_output():
+    """Step 5: a project declaring MORE than one system routes Database/<sid> + Output/<sid> per the
+    ACTIVE system; a single-system project keeps the FLAT layout (the OP4 path contract)."""
+    def body(d):
+        from pipeline5.systems import catalog
+        from pipeline5.systems.system_contract import System
+        config.use_builtin()
+        root = project.create_project(d, "Multi", ["siemens_s7_safety"], True, 5)
+        eq(os.path.basename(config.database_dir()), "Database",
+           "ONE declared type -> flat Database/ even with the multi_system dialog flag on")
+        siemens = catalog.by_id("siemens_s7_safety")
+        stub = System(id="stub_second_system", name_key="sys_stub", taxonomy=("T",))
+        original_all = catalog.ALL_SYSTEMS
+        catalog.ALL_SYSTEMS = original_all + (stub,)
+        try:
+            project._update_meta(root, {"types": ["siemens_s7_safety", "stub_second_system"]})
+            project.open_project(root)
+            config.use_system(siemens)
+            eq(config.database_dir(), os.path.join(root, "Database", "siemens_s7_safety"),
+               ">1 type -> Database/<active sid>")
+            ok(config.output_root().endswith(os.path.join("Output", "siemens_s7_safety")),
+               ">1 type -> Output/<active sid>")
+            config.use_system(stub)
+            eq(os.path.basename(config.database_dir()), "stub_second_system",
+               "switching the active system switches the tree")
+        finally:
+            catalog.ALL_SYSTEMS = original_all
+            project.close_project()
+            config.use_system(siemens)
+        eq(os.path.basename(config.database_dir()), "Database",
+           "close resets to the FLAT builtin Database/ (the /<sid> level is gone)")
+    _with_temp_localappdata(body)
+
+
 def test_restore_backup_and_save_as():
     def body(d):
         config.use_builtin()
-        root = project.create_project(d, "Rst", ["siemens_plc_safety"], False, 5)
+        root = project.create_project(d, "Rst", ["siemens_s7_safety"], False, 5)
         marker = os.path.join(root, "Database", "marker.txt")
         with open(marker, "w") as h:
             h.write("SNAPSHOT")
@@ -313,5 +380,7 @@ if __name__ == "__main__":
         ("backup_rotation_and_zip", test_backup_rotation_and_zip),
         ("archive_and_import_documents", test_archive_and_import_documents),
         ("stale_import_detection_and_refresh", test_stale_import_detection_and_refresh),
+        ("open_rejects_unknown_and_pl4_system_ids", test_open_rejects_unknown_and_pl4_system_ids),
+        ("multi_system_projects_namespace_database_and_output", test_multi_system_projects_namespace_database_and_output),
         ("restore_backup_and_save_as", test_restore_backup_and_save_as),
     ]))

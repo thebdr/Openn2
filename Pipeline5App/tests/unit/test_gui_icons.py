@@ -4,14 +4,14 @@ and the fail-soft missing-file warning. The PhotoImage layer + on-screen look ar
 import os
 
 from _harness import run, eq, ok
+from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
 from pipeline5.workbench import icons
-from pipeline5.workbench import phase_model as phases
 
 
 def test_registry_covers_every_phase():
     reg = icons.load_registry()
     ok(reg, "registry loads non-empty")
-    for phase in phases.PHASES:
+    for phase in SYSTEM.phases:
         key = "run" if phase.number == 0 else str(phase.number)
         ok(key in reg, f"phase {key} has an icon row")
 

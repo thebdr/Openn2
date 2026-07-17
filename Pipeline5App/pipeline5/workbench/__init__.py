@@ -1,9 +1,11 @@
 """The operator GUI (Tkinter). Launch: `python launch_gui.py`.
 
 WHERE TO LOOK (_panel = a whole tab · _view = a reusable widget inside one):
-  app_main.py            the window: worker thread, Run-all loop, tab wiring, open-targets
-  phase_model.py         the Phase/Sub registry the phase bar renders (per-system at step 5)
-  phasebar.py            the phase buttons + chevron sub-phase dropdowns
+  app_main.py            the HOST window: worker thread, handler dispatch via the active System,
+                         the multi-system selector, tab wiring, open-targets. The phase registry +
+                         handlers live with each SYSTEM (systems/<...>/<system>/main.py); the
+                         Phase/Sub/PhaseSet types are contract types (systems/system_contract.py)
+  phasebar.py            the phase buttons + chevron sub-phase dropdowns (driven by system.phases)
   chasebar.py            the Run-all progress strip
   log_view.py            the structured clickable log + severity filter
   excel_goto.py          jump to Sheet!Cell in Excel (COM) for the log's document links

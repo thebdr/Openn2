@@ -1,0 +1,33 @@
+{
+  "clause": "C-023",
+  "verdict": "holds",
+  "ranAt": "2026-07-17T14:14:13.484Z",
+  "headCommit": "376422383773e86443ed93d3499642dd76167100",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_gui_phase_model.py",
+      "file": "Pipeline5App/tests/unit/test_gui_phase_model.py",
+      "symbolSha": "5d69992f06ade478e76d61ede0c81786e976a440e844bee51b66fd7ab6e2f83f"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "symbolSha": "2d07575bc4f1d60e584711159de2ece24cd49333dd5f72bbc3c02ed412e0c302"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_project_manager.py",
+      "file": "Pipeline5App/tests/unit/test_project_manager.py",
+      "symbolSha": "10b4748b374fb0cd2d618f38c2eac8d0081254cfbdb39ad39b40bae3c4e7ef11"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_architecture_contracts.py",
+      "file": "Pipeline5App/tests/unit/test_architecture_contracts.py",
+      "symbolSha": "5c90c82b45cebe23dae384b445694b564f8e43e2ba5abb4e2d42b34300c7404e"
+    },
+    {
+      "name": "Pipeline5App/scripts/parity_vs_pl4.py",
+      "file": "Pipeline5App/scripts/parity_vs_pl4.py",
+      "symbolSha": "52017f42ee2b3943e9050e94a1df05e52e75393edc20aeda2ea7d0a462e72f18"
+    }
+  ]
+}

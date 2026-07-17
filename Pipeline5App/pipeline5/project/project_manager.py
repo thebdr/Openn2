@@ -63,6 +63,35 @@ class ProjectConfigError(Exception):
         super().__init__(f"project config incomplete ({project_name(root)}): missing {', '.join(self.missing)}")
 
 
+class UnknownSystemError(Exception):
+    """A project's meta declares a system type the registry doesn't know - either a PL4-era id (this
+    is a PL4 project; open it with Pipeline4) or a typo'd/future id. Opening STOPS: running a project
+    against the wrong system's config/handlers would silently build wrong output."""
+
+    def __init__(self, root: str, sid: str):
+        from pipeline5.systems import catalog
+        self.root, self.sid = root, str(sid)
+        self.is_pl4 = self.sid in catalog.PL4_LEGACY_IDS
+        detail = ("this is a PIPELINE4 project - PL5 does not migrate it; open it with Pipeline4App"
+                  if self.is_pl4 else "no REGISTERED system carries this id (a planned-but-unbuilt "
+                                      "type cannot open)")
+        super().__init__(f"unknown system type {self.sid!r} in {project_name(root)}: {detail}")
+
+
+def project_systems(root: str) -> list:
+    """The System objects a project's meta declares (meta `types`, registry-resolved, order kept).
+    Raises UnknownSystemError on an id the catalog can't resolve (incl. the pointed PL4-legacy case).
+    A pre-meta/typeless project returns [] - the GUI falls back to its default system."""
+    from pipeline5.systems import catalog
+    systems = []
+    for sid in load_project_meta(root).get("types") or []:
+        system = catalog.by_id(sid)
+        if system is None:
+            raise UnknownSystemError(root, sid)
+        systems.append(system)
+    return systems
+
+
 def is_project(root: str) -> bool:
     """True when `root` is a PL4 project folder (it carries config_project/project_params.yaml)."""
     return bool(root) and os.path.isfile(os.path.join(root, _PARAMS_REL))
@@ -111,13 +140,18 @@ def project_name(root: str) -> str:
 
 
 def open_project(root: str) -> str:
-    """Make `root` the active project: validate it, point `config` at it, record it recent/last-opened.
-    Returns the absolute root. Raises FileNotFoundError when `root` isn't a project folder."""
+    """Make `root` the active project: validate it (folder shape, meta types vs the registry, config
+    completeness), point `config` at it - including the multi-system Database/Output routing when the
+    meta declares >1 type - and record it recent/last-opened. Returns the absolute root. Raises
+    FileNotFoundError when `root` isn't a project folder, UnknownSystemError on an unresolvable meta
+    type (pointed message for PL4-era ids), ProjectConfigError on missing canonical config."""
     root = os.path.abspath(root)
     if not is_project(root):
         raise FileNotFoundError(os.path.join(root, _PARAMS_REL))
+    systems = project_systems(root)         # meta types -> System objects; unknown id -> pointed raise
     assert_config_complete(root)            # fail loud + stop if the project's config is incomplete
     config.use_project(root)
+    config.set_multi_system(len(systems) > 1)
     state.push_recent(root)
     return root
 
@@ -125,6 +159,7 @@ def open_project(root: str) -> str:
 def close_project() -> None:
     """Revert to the builtin app config + Shared/ (no project open) and forget the auto-reopen target."""
     config.use_builtin()
+    config.set_multi_system(False)
     state.clear_last_opened()
 
 
@@ -397,9 +432,18 @@ def import_documents(root: str) -> list:
 
 def auto_reopen() -> str | None:
     """Re-point `config` at the last-opened project (launch-time). Returns the root, or None when there's
-    no valid last project (then the builtin config stays active). Does NOT re-push recents."""
+    no valid last project (then the builtin config stays active). Does NOT re-push recents. A project
+    with an unknown meta type or incomplete config is NOT auto-reopened (open it explicitly to see the
+    pointed error)."""
     root = state.last_opened()
-    if root and is_project(root) and not config_gaps(root):   # an incomplete project is NOT auto-reopened
-        config.use_project(os.path.abspath(root))
-        return os.path.abspath(root)
-    return None
+    if not (root and is_project(root)):
+        return None
+    try:
+        systems = project_systems(root)
+    except UnknownSystemError:
+        return None
+    if config_gaps(root):
+        return None
+    config.use_project(os.path.abspath(root))
+    config.set_multi_system(len(systems) > 1)
+    return os.path.abspath(root)

@@ -36,6 +36,18 @@ _PROJECT_ROOT: str | None = None
 # alongside use_project(); None = no system tier (kernel-only flows, some tests).
 _ACTIVE_SYSTEM: tuple | None = None
 
+# Multi-system project layout (PL5 plan, GUI integration): a project declaring MORE than one system
+# type namespaces its data per system - Database/<sid>/ + Output/<sid>/ - so switching the active
+# system switches the trees. Single-system projects keep the FLAT layout (the OP4 path contract).
+# Set by the project layer (open_project reads the meta); the builtin config is never multi.
+_MULTI_SYSTEM: bool = False
+
+
+def set_multi_system(multi: bool) -> None:
+    """Declare the active project multi-system (>1 meta type): Database/Output gain a /<sid> level."""
+    global _MULTI_SYSTEM
+    _MULTI_SYSTEM = bool(multi)
+
 
 def use_system(system) -> None:
     """Point the config resolver's SYSTEM tiers at `system` (a System descriptor); None clears them.
@@ -95,8 +107,12 @@ def builtin_config_project_dir() -> str:
 
 
 def database_dir() -> str:
-    """The top-level Database/ folder - the SSOT (one CSV-with-JSON-cells per table)."""
-    return os.path.join(_PROJECT_ROOT, "Database") if _PROJECT_ROOT else _BUILTIN_DATABASE
+    """The Database/ folder - the SSOT (one CSV-with-JSON-cells per table). A MULTI-system project
+    namespaces it per active system (Database/<sid>/); single-system stays flat (OP4 contract)."""
+    base = os.path.join(_PROJECT_ROOT, "Database") if _PROJECT_ROOT else _BUILTIN_DATABASE
+    if _PROJECT_ROOT and _MULTI_SYSTEM and _ACTIVE_SYSTEM:
+        return os.path.join(base, _ACTIVE_SYSTEM[0])
+    return base
 
 
 def user_input_dir() -> str:
@@ -107,8 +123,12 @@ def user_input_dir() -> str:
 
 
 def output_root() -> str:
-    """The BuilderData/ export root - what OPn imports."""
-    return os.path.join(_PROJECT_ROOT, "Output") if _PROJECT_ROOT else _BUILTIN_OUTPUT
+    """The BuilderData/ export root - what OPn imports. A MULTI-system project namespaces it per
+    active system (Output/<sid>/); single-system stays flat (OP4 contract)."""
+    base = os.path.join(_PROJECT_ROOT, "Output") if _PROJECT_ROOT else _BUILTIN_OUTPUT
+    if _PROJECT_ROOT and _MULTI_SYSTEM and _ACTIVE_SYSTEM:
+        return os.path.join(base, _ACTIVE_SYSTEM[0])
+    return base
 
 
 def blocks_import_dir() -> str:
