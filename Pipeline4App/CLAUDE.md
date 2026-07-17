@@ -314,7 +314,10 @@ sort+distinct-props, the skip+warn, the return contract).
   FLD, different bits) → 6 same-table pairs; staging is silent by design (the signal uid includes
   `source_cell`), so the PLCTags surface is where the collision exists. The builtin fixture's own 2
   `Fire Alarm` pairs now FAIL the dev 500 run too — a real defect in the dev I/O List, previously shipped
-  silently (the old "213 tags / 211 unique keys" note). Tests: `test_io_tags.py` (11 — +3: the same-table
+  silently (the old "213 tags / 211 unique keys" note). [Re-ruled 2026-07-17 (PL5 step 5, user): the DOC
+  was correct — the defect was the F1/2+F2/2 `signal_types.csv` rows sharing one tag rule over one shared
+  device; fixed on this branch with a `{$script_type}` disambiguator (PL4 + PL5 config copies), so the
+  pairs no longer FAIL and PLCTags is written again.] Tests: `test_io_tags.py` (11 — +3: the same-table
   FAIL with both links + no-write + record, the cross-table by-design pass, the mirror source-row link).
 
 ## Phase 600 — Diagnosis — DONE (600a + 600b + 600c + 600d; + severity S5)

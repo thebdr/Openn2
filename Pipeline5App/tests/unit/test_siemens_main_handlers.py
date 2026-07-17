@@ -108,13 +108,13 @@ def _sandboxed(fn):
 def test_run_plan_executes_end_to_end():
     """Every run_plan phase through HANDLERS[phase.handler](ctx), each with a fresh host (handlers
     are self-contained) - exactly the dispatch the App performs. Each handler must complete (a
-    crash = red) and report a RSLT line (the success marker - a silent no-op handler is a bug).
+    crash = red), report a RSLT line (the success marker - a silent no-op handler is a bug), and
+    NEVER halt on the clean fixture.
 
-    The halt picture is pinned to the FIXTURE'S TRUTH: the builtin playground carries two genuine
-    duplicate I/O tags the shipped registry does not treat, so phase 500's 510 leg halts (PLCTags is
-    never written on a raw FAIL - the severity contract; PL4 behaved identically). Every OTHER phase
-    must not halt; a new halt anywhere else is a regression, and 500 NOT halting means the fixture
-    or the registry changed - re-pin deliberately."""
+    RE-PINNED 2026-07-17 (the fire-alarm ruling): the two historic `iotag_duplicate` FAILs were a
+    CONFIG defect - the F1/2+F2/2 rows shared one tag rule over one shared device - not a fixture
+    defect; the rule now disambiguates with {$script_type}, so phase 500's 510 leg WRITES PLCTags
+    (asserted below). A halt anywhere in the chain is a regression."""
     doc_path = config.load_params()["iolist_path"]
     doc_mtime = os.path.getmtime(doc_path)
     for number in SYSTEM.phases.run_order():
@@ -123,13 +123,10 @@ def test_run_plan_executes_end_to_end():
         SYSTEM.handlers[phase.handler](host.ctx())
         ok("RSLT" in host.levels(), f"phase {number} ({phase.handler}) emitted a RSLT line "
                                     f"(got {host.levels()})")
+        eq(host.halted, False, f"phase {number} must not halt on the clean fixture")
         if number == 500:
-            eq(host.halted, True, "500 halts: the fixture's duplicate I/O tags are untreated FAILs")
-            dups = [f for batch in host.rendered for f in batch
-                    if getattr(f, "type", "") == "iotag_duplicate"]
-            eq(len(dups), 2, "the halt is the two known duplicate-tag findings, nothing else")
-        else:
-            eq(host.halted, False, f"phase {number} must not halt on the fixture")
+            ok(any("510:" in msg for lvl, msg in host.lines if lvl == "RSLT"),
+               "the 510 leg reports its written tag surface (PLCTags is a real output again)")
     eq(os.path.getmtime(doc_path), doc_mtime,
        "the source I/O List was NOT modified by the run_plan chain")
 

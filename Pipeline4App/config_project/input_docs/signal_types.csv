@@ -31,6 +31,6 @@ KQ2/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {$combin
 R*,Emergency Reset GLOBAL,Safety,,,no,RESET,Emergency Reset GLOBAL Command [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn
 R#,Emergency Reset Area #,Safety,,,yes,RESET,Emergency Reset Command Area {$desc_1b} [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn
 Z#,Emergency Status Feedback Area #,Safety,,,yes,SAFETY_Status,Emergency Status Feedback Area {$desc_1b} [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
-F1/2,Fire Alarm,Safety,F,1,no,SAFETY_Status,Fire Alarm [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
-F2/2,Fire Alarm,Safety,F,2,no,SAFETY_Status,Fire Alarm [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+F1/2,Fire Alarm,Safety,F,1,no,SAFETY_Status,Fire Alarm [ {$iol_FLD} ] {$script_type},[ {$script_type} {$index}  {$drawing} ],no
+F2/2,Fire Alarm,Safety,F,2,no,SAFETY_Status,Fire Alarm [ {$iol_FLD} ] {$script_type},[ {$script_type} {$index}  {$drawing} ],no
 IOC,Machine Interface (I/O Controller),Interface,,,no,IOCouplers_Interfaces,,[ {$script_type} {$index}  {$drawing} ],no
