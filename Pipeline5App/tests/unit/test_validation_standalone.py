@@ -73,7 +73,7 @@ def _run_iolist(views, params=None, available=None):
         p.update(params)
     orig_os, orig_ss, orig_as = iolist.os.path.exists, iolist.wbk.open_sheets, iolist.wbk.available_sheets
     try:
-        iolist.os.path.exists = lambda _p: True
+        iolist.os.path.exists = lambda _p, _o=orig_os: True if _p == "X.xlsx" else _o(_p)
         iolist.wbk.open_sheets = lambda *a, **k: list(views)
         iolist.wbk.available_sheets = lambda _p: available if available is not None else [v.name for v in views]
         return iolist.run_iolist(p)
@@ -146,7 +146,7 @@ def _run_ce(matrix_view, area_views, params=None):
         p.update(params)
     orig_os, orig_o1, orig_os2 = matrix.os.path.exists, matrix.wbk.open_sheet, matrix.wbk.open_sheets
     try:
-        matrix.os.path.exists = lambda _p: True
+        matrix.os.path.exists = lambda _p, _o=orig_os: True if str(_p).endswith(".xlsx") else _o(_p)
         matrix.wbk.open_sheet = lambda *a, **k: matrix_view
         matrix.wbk.open_sheets = lambda *a, **k: list(area_views)
         return matrix.run_ce_matrix(p)

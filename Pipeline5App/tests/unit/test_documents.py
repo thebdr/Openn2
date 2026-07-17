@@ -23,8 +23,8 @@ matrix_params:
 
 def _with_temp_project(fn):
     root = tempfile.mkdtemp(prefix="pl4doc_")
-    os.makedirs(os.path.join(root, "config_project"), exist_ok=True)
-    with open(os.path.join(root, "config_project", "project_params.yaml"), "w", encoding="utf-8") as handle:
+    os.makedirs(os.path.join(root, "config_project", "shared"), exist_ok=True)
+    with open(os.path.join(root, "config_project", "shared", "project_params.yaml"), "w", encoding="utf-8") as handle:
         handle.write(_YAML)
     try:
         config.use_project(root)
@@ -47,7 +47,7 @@ def test_save_and_clear():
         config.save_document_path("matrix_path", "C:/docs/ce_current.xlsx")
         eq(config.load_document_paths()["matrix_path"], "C:/docs/ce_current.xlsx", "a saved path round-trips")
         # the comment + the other params survive (round-trip mode)
-        text = open(os.path.join(root, "config_project", "project_params.yaml"), encoding="utf-8").read()
+        text = open(os.path.join(root, "config_project", "shared", "project_params.yaml"), encoding="utf-8").read()
         ok("this comment must survive" in text, "comments are preserved on save")
         ok("sorter_areas" in text, "unrelated params are preserved")
         eq(config.load_params()["project_code"], "TST", "the rest of the params still load")

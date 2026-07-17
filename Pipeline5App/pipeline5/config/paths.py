@@ -32,6 +32,25 @@ DEVICE_TYPES_DB_DEFAULT = os.path.join(SHARED, "HardwareConfigBuilderData", "Dev
 # use_project() so the config loaders, the Database folder, and the Output tree all follow the project.
 _PROJECT_ROOT: str | None = None
 
+# The ACTIVE system (id, builtin config_root) - the resolver's system tiers. Set by use_system()
+# alongside use_project(); None = no system tier (kernel-only flows, some tests).
+_ACTIVE_SYSTEM: tuple | None = None
+
+
+def use_system(system) -> None:
+    """Point the config resolver's SYSTEM tiers at `system` (a System descriptor); None clears them."""
+    global _ACTIVE_SYSTEM
+    _ACTIVE_SYSTEM = None if system is None else (system.id, system.config_root or "")
+
+
+def active_system() -> tuple | None:
+    return _ACTIVE_SYSTEM
+
+
+def builtin_shared_config_dir() -> str:
+    """The app's builtin SHARED config tier (tier 4): config_project/shared."""
+    return os.path.join(_BUILTIN_CONFIG_PROJECT, "shared")
+
 
 def use_project(root: str | None) -> None:
     """Point the config loaders + the Database + the Output tree at <root>/...; None reverts to builtin."""
@@ -63,9 +82,10 @@ def database_dir() -> str:
 
 
 def user_input_dir() -> str:
-    """The USER-LOCAL inputs (the treatment registry error_management.csv) - per project when one is open,
-    else the builtin config_project's. Co-located with the active config so each project owns its treatments."""
-    return os.path.join(config_project_dir(), "user_input")
+    """The USER-LOCAL inputs (the treatment registry finding_treatments.csv) - the SHARED tier's
+    user_input/, per project when one is open, else the builtin's. Co-located with the active config
+    so each project owns its treatments."""
+    return os.path.join(config_project_dir(), "shared", "user_input")
 
 
 def output_root() -> str:
@@ -144,21 +164,4 @@ def changes_report_dir() -> str:
 CHANGES_REPORT_STEM = "io_documents_quality_report"      # the ph100 before/after report base (+ .html / .csv)
 
 
-# --- config-area subdirs (consumed by the CSV loaders in config/loaders.py) ---------------------- #
-def input_docs_dir() -> str:
-    return os.path.join(config_project_dir(), "input_docs")
 
-
-def chain_reactions_dir() -> str:
-    """The phase-400 chain-reaction CSVs (object_families / interface_elements / interface_tagnames)."""
-    return os.path.join(config_project_dir(), "chain_reactions")
-
-
-def diagnosis_dir() -> str:
-    """The diagnosis config CSVs (diagnosis_columns / diagnosis_logic_rules)."""
-    return os.path.join(config_project_dir(), "diagnosis")
-
-
-def datablocks_dir() -> str:
-    """The phase-520 data-block registry CSVs (datablock_definitions / _elements / _types)."""
-    return os.path.join(config_project_dir(), "datablocks")

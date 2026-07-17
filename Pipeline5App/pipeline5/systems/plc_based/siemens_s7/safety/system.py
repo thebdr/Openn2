@@ -14,6 +14,8 @@ tier, this step's config-regroup leg).
 """
 from __future__ import annotations
 
+import os
+
 from pipeline5.systems.plc_based.siemens_s7 import creation_info_csv as _creation_csv
 from pipeline5.systems.plc_based.siemens_s7 import fc_xml_emitter as _fc_xml
 from pipeline5.systems.plc_based.siemens_s7 import scl_emitter as _scl
@@ -51,7 +53,7 @@ SYSTEM = System(
     builders=BuilderRegistry(),
     templates=_templates,
     output_layout=LAYOUT,
-    config_root="",   # the per-system config tier arrives with the step-4 config regroup
+    config_root=os.path.join(os.path.dirname(os.path.abspath(__file__)), "config_project"),
 )
 
 # Registration (deliberately LAST - see the module docstring): the builders decorate themselves

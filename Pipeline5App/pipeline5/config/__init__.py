@@ -27,6 +27,9 @@ from pipeline5.config.paths import (  # noqa: F401
     CHANGES_REPORT_STEM,
     use_project,
     use_builtin,
+    use_system,
+    active_system,
+    builtin_shared_config_dir,
     active_project,
     config_project_dir,
     builtin_config_project_dir,
@@ -43,10 +46,6 @@ from pipeline5.config.paths import (  # noqa: F401
     validation_report_dir,
     gui_log_dir,
     changes_report_dir,
-    input_docs_dir,
-    chain_reactions_dir,
-    diagnosis_dir,
-    datablocks_dir,
 )
 from pipeline5.config.params import (  # noqa: F401
     APP_FONT_SIZES,
@@ -76,6 +75,7 @@ from pipeline5.config.params import (  # noqa: F401
     _resolve_theme,
     _resolve_dim,
 )
+from pipeline5.config import resolver  # noqa: F401
 from pipeline5.config.loaders import (  # noqa: F401
     INTERFACE_CUSTOM_GAP,
     read_config_csv,

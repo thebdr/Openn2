@@ -27,7 +27,7 @@ def _patch_refs(refs):
     """Monkeypatch the C&E reader + the file-present guard; returns a restore() callable."""
     orig_read, orig_exists = crosscheck.ce_refs.read_ce_refs, crosscheck.os.path.exists
     crosscheck.ce_refs.read_ce_refs = lambda _p: (list(refs), 1)
-    crosscheck.os.path.exists = lambda _p: True
+    crosscheck.os.path.exists = lambda _p, _o=orig_exists: True if str(_p).endswith(".xlsx") else _o(_p)
 
     def restore():
         crosscheck.ce_refs.read_ce_refs, crosscheck.os.path.exists = orig_read, orig_exists

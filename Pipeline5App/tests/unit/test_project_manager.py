@@ -12,7 +12,7 @@ from pipeline5 import config
 
 def _make_project(root):
     """A MINIMAL project stub (only project_params.yaml) - `is_project` true, but config INCOMPLETE."""
-    cp = os.path.join(root, "config_project")
+    cp = os.path.join(root, "config_project", "shared")
     os.makedirs(cp, exist_ok=True)
     open(os.path.join(cp, "project_params.yaml"), "w").close()
 
@@ -92,7 +92,7 @@ def test_new_project_scaffolds():
     def body(d):
         config.use_builtin()
         root = project.new_project(d, "Fresh")
-        ok(os.path.isfile(os.path.join(root, "config_project", "project_params.yaml")), "config copied")
+        ok(os.path.isfile(os.path.join(root, "config_project", "shared", "project_params.yaml")), "config copied")
         ok(os.path.isdir(os.path.join(root, "Database")), "Database/ made")
         ok(os.path.isdir(os.path.join(root, "Output")), "Output/ made")
         eq(config.active_project(), os.path.abspath(root), "new_project opens it")
@@ -107,13 +107,15 @@ def test_incomplete_project_fails_loud():
         config.use_builtin()
         root = os.path.join(d, "Drifted"); _make_complete_project(root)
         eq(project.config_gaps(root), [], "complete to start")
-        os.remove(os.path.join(root, "config_project", "input_docs", "change_weights.csv"))
-        eq(project.config_gaps(root), ["input_docs/change_weights.csv"], "the removed file is reported missing")
+        os.remove(os.path.join(root, "config_project", "shared", "documents", "change_report_weights.csv"))
+        eq(project.config_gaps(root), [os.path.join("shared", "documents/change_report_weights.csv")],
+           "the removed file is reported missing")
         try:
             project.assert_config_complete(root)
             ok(False, "assert_config_complete must raise on an incomplete project")
         except project.ProjectConfigError as error:
-            ok("input_docs/change_weights.csv" in error.missing, "the error carries the missing path")
+            ok(os.path.join("shared", "documents/change_report_weights.csv") in error.missing,
+               "the error carries the missing path")
         try:
             project.open_project(root)
             ok(False, "open_project must fail loud on an incomplete project")
@@ -208,9 +210,9 @@ def test_archive_and_import_documents():
         config.save_document_path("iolist_path", cur)
         config.save_document_path("iolist_previous_path", prev)
         actions = {k: (a, v) for k, a, v in project.import_documents(root)}
-        eq(actions["iolist_path"], ("imported", "../input_documents/current/io.xlsx"),
+        eq(actions["iolist_path"], ("imported", "../../input_documents/current/io.xlsx"),
            "copied + rewritten RELATIVE to config_project")
-        eq(actions["iolist_previous_path"], ("imported", "../input_documents/previous/io.xlsx"),
+        eq(actions["iolist_previous_path"], ("imported", "../../input_documents/previous/io.xlsx"),
            "the previous revision lands in its own subfolder (no basename collision)")
         params = config.load_params()
         with open(params["iolist_path"], "rb") as h:
@@ -221,7 +223,8 @@ def test_archive_and_import_documents():
         eq(actions2["iolist_path"][0], "up-to-date", "a second run with an unchanged source only normalizes")
         dest = os.path.join(d, "arch.zip")
         count = project.archive_project(root, dest)
-        ok(count > 10 and os.path.isfile(dest), "Archive Project writes one compressed zip")
+        ok(count >= 5 and os.path.isfile(dest),   # the regrouped scaffold: the shared tier + the imported docs
+           "Archive Project writes one compressed zip")
         project.close_project()
         try:
             project.import_documents(root)

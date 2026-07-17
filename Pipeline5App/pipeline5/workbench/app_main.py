@@ -46,6 +46,7 @@ class App:
         # ACTIVE system from the project meta (types/multi_system) + the toolbar selector.
         from pipeline5.systems import catalog as _systems_catalog
         self._system = _systems_catalog.by_id("siemens_s7_safety")
+        config.use_system(self._system)   # the resolver system tiers follow
         self.root = root
         self._busy = False
         self._run_halted = False              # set by _gate on a blocking FAIL -> Run-all stops the chain

@@ -57,6 +57,7 @@ def run_pl5(db_dir: str, out_dir: str) -> None:
     from pipeline5.config import paths as p5paths
     p5paths._BUILTIN_DATABASE, p5paths._BUILTIN_OUTPUT = db_dir, out_dir
     from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    p5paths.use_system(SYSTEM)
     from pipeline5.phases.staging import iolist as staging
     from pipeline5.phases.datablocks import generator as datablocks
     from pipeline5.systems.plc_based.siemens_s7 import globaldb_xml_emitter as datablock_xml

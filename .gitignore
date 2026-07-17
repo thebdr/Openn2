@@ -23,7 +23,7 @@ Shared/OutputTree/
 # Per-user phase-100 treatment registry / suppressions (auto-managed, user-local)
 Pipeline3App/user_input/*.csv
 Pipeline4App/config_project/user_input/*.csv
-Pipeline5App/config_project/user_input/*.csv
+Pipeline5App/config_project/shared/user_input/*.csv
 
 # Rust build output (FileXY core port) + the installed native engine (rebuild: rust/install_native.py)
 # filexy_core* also covers the .pyd.old/.pyd.new files the installer parks beside a locked module

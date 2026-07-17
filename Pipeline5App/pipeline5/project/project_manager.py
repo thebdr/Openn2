@@ -26,7 +26,7 @@ from pipeline5 import config
 from pipeline5.project import app_state as state
 
 CONFIG_DIRNAME = "config_project"
-_PARAMS_REL = os.path.join(CONFIG_DIRNAME, "project_params.yaml")
+_PARAMS_REL = os.path.join(CONFIG_DIRNAME, "shared", "project_params.yaml")
 
 # The creatable project types now DERIVE from the systems registry (pipeline5.systems.catalog -
 # availability = membership, C-021); PL4's hardcoded PROJECT_TYPES tuple is retired. Project meta
@@ -78,12 +78,24 @@ def _config_file_set(config_dir: str) -> set:
 
 
 def config_gaps(root: str) -> list:
-    """The canonical config files (present in the BUILTIN config_project) that are MISSING from
-    `<root>/config_project`. Empty -> complete. The bundled builtin is the single source of truth - there
-    is NO baked manifest. Project-specific extra files are fine; only missing canonical files are gaps."""
-    builtin = _config_file_set(config.builtin_config_project_dir())
-    have = _config_file_set(os.path.join(root, CONFIG_DIRNAME))
-    return sorted(builtin - have)
+    """The canonical config files MISSING from the project, per TIER (the step-4 regroup): the app's
+    builtin SHARED tier vs `<root>/config_project/shared`, plus - for each system the project declares
+    in its meta - that system's builtin config_root vs `<root>/config_project/systems/<sid>`. Empty ->
+    complete. The bundled builtins are the single source of truth - there is NO baked manifest.
+    Project-specific extra files are fine; only missing canonical files are gaps."""
+    gaps = []
+    builtin_shared = _config_file_set(config.builtin_shared_config_dir())
+    have_shared = _config_file_set(os.path.join(root, CONFIG_DIRNAME, "shared"))
+    gaps += [os.path.join("shared", g) for g in sorted(builtin_shared - have_shared)]
+    from pipeline5.systems import catalog
+    for sid in (load_project_meta(root) or {}).get("types") or []:
+        system = catalog.by_id(sid)
+        if system is None or not system.config_root:
+            continue
+        want = _config_file_set(system.config_root)
+        have = _config_file_set(os.path.join(root, CONFIG_DIRNAME, "systems", sid))
+        gaps += [os.path.join("systems", sid, g) for g in sorted(want - have)]
+    return gaps
 
 
 def assert_config_complete(root: str) -> None:
@@ -123,9 +135,12 @@ def new_project(parent: str, name: str) -> str:
     if os.path.exists(root):
         raise FileExistsError(root)
     os.makedirs(root)
-    shutil.copytree(config.builtin_config_project_dir(), os.path.join(root, CONFIG_DIRNAME))
-    for sub in ("Database", "Output"):
-        os.makedirs(os.path.join(root, sub), exist_ok=True)
+    shutil.copytree(config.builtin_shared_config_dir(), os.path.join(root, CONFIG_DIRNAME, "shared"))
+    for folder in ("Database", "Output"):
+        os.makedirs(os.path.join(root, folder), exist_ok=True)
+    # NOTE: the per-system tier (`config_project/systems/<sid>/`) is scaffolded by create_project
+    # AFTER the meta records the selected types (scaffold_system_tiers) - new_project alone is
+    # type-agnostic. assert_config_complete checks per the meta, so a bare new_project passes.
     assert_config_complete(root)            # the scaffold MUST be complete vs the builtin - fail loud if not
     return open_project(root)
 
@@ -184,7 +199,22 @@ def create_project(base_folder: str, name: str, types, multi_system: bool, backu
     name = str(name).strip()
     root = new_project(os.path.join(base_folder, name), name)
     write_project_meta(root, name, types, multi_system, backups_kept)
+    scaffold_system_tiers(root)             # copy each selected system's builtin config tier
+    assert_config_complete(root)            # now WITH the system tiers - fail loud on scaffold drift
     return root
+
+
+def scaffold_system_tiers(root: str) -> None:
+    """Copy each meta-declared system's builtin config_root to `<root>/config_project/systems/<sid>`
+    (skipping systems already scaffolded - reopening/upgrading a project only ADDS)."""
+    from pipeline5.systems import catalog
+    for sid in (load_project_meta(root) or {}).get("types") or []:
+        system = catalog.by_id(sid)
+        if system is None or not system.config_root:
+            continue
+        dest = os.path.join(root, CONFIG_DIRNAME, "systems", sid)
+        if not os.path.isdir(dest):
+            shutil.copytree(system.config_root, dest)
 
 
 def save_as(root: str, base_folder: str, new_name: str) -> str:
@@ -323,7 +353,9 @@ def import_documents(root: str) -> list:
     if not active or os.path.abspath(active) != os.path.abspath(root):
         raise ValueError("import_documents requires the target to be the ACTIVE project")
     params = config.load_params(os.path.join(root, _PARAMS_REL))
-    config_dir = os.path.join(os.path.abspath(root), CONFIG_DIRNAME)
+    # relative doc paths are stored AGAINST THE PARAMS FILE's dir (load_params resolves there) -
+    # since the regroup that is the shared tier, one level deeper than config_project/.
+    config_dir = os.path.dirname(os.path.join(os.path.abspath(root), _PARAMS_REL))
     remembered = load_project_meta(root).get("imported") or {}
     records: dict = {}
     actions = []

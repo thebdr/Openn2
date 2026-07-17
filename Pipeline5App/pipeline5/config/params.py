@@ -86,8 +86,9 @@ def _resolve_path(base: str, value) -> str:
 
 
 def params_file() -> str:
-    """The active project params file (the builtin config_project/ or the open project's)."""
-    return os.path.join(config_project_dir(), "project_params.yaml")
+    """The active project params file - the SHARED tier's project_params.yaml (the open project's,
+    else the app's builtin)."""
+    return os.path.join(config_project_dir(), "shared", "project_params.yaml")
 
 
 def app_config_file() -> str:
@@ -104,21 +105,21 @@ def builtin_app_config_file() -> str:
     return os.path.join(builtin_config_project_dir(), "app_config.yaml")
 
 
-def generation_params_file() -> str:
-    """The relocated generation constants (user_input/generation_params.yaml; UI_REFRESH_PLAN F)."""
-    return os.path.join(user_input_dir(), "generation_params.yaml")
+def generation_params_file():
+    """The generation constants - a SYSTEM-tier file since the step-4 regroup, resolved through the
+    4-tier walk (project-system -> project-shared -> system-builtin -> builtin-shared)."""
+    from pipeline5.config.resolver import find
+    return find("generation_params.yaml")
 
 
 def load_generation_params() -> dict:
-    """user_input/generation_params.yaml - the ACTIVE project's copy, falling back to the BUILTIN one
-    (an older project folder inherits the app's values). Raises when NEITHER exists: generation
+    """generation_params.yaml through the resolver. Raises when NO tier holds it: generation
     constants are config, never code defaults (the config-completeness rule)."""
-    candidates = (generation_params_file(),
-                  os.path.join(builtin_config_project_dir(), "user_input", "generation_params.yaml"))
-    for path in candidates:
-        if os.path.exists(path):
-            return _read_yaml(path)
-    raise RuntimeError("generation_params.yaml missing (looked in: " + "; ".join(candidates) + ")")
+    path = generation_params_file()
+    if path:
+        return _read_yaml(path)
+    from pipeline5.config.resolver import tiers
+    raise RuntimeError("generation_params.yaml missing (looked in: " + "; ".join(tiers()) + ")")
 
 
 def load_files_tab():

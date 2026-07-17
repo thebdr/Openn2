@@ -11,13 +11,8 @@ import csv
 import os
 import re
 
-from pipeline5.config.paths import (
-    DEVICE_TYPES_DB_DEFAULT,
-    chain_reactions_dir,
-    datablocks_dir,
-    diagnosis_dir,
-    input_docs_dir,
-)
+from pipeline5.config.paths import DEVICE_TYPES_DB_DEFAULT
+from pipeline5.config.resolver import find
 
 
 def _as_bool(value, default: bool = False) -> bool:
@@ -35,7 +30,7 @@ def read_config_csv(path: str, json_columns=()) -> list:
     every other column stays a string. Blank rows are skipped (config files are hand-edited). Missing
     file -> []."""
     from pipeline5.truth.table import decode_cell
-    if not os.path.exists(path):
+    if not path or not os.path.exists(path):
         return []
     wanted = set(json_columns)
     rows = []
@@ -58,7 +53,7 @@ def load_column_map(document: str) -> list:
         "expected_header": (r.get("expected_header") or "").strip(),
         "required": _as_bool(r.get("required")),
         "preliminary_check_exclude": _as_bool(r.get("preliminary_check_exclude")),
-    } for r in read_config_csv(os.path.join(input_docs_dir(), "column_map.csv"))
+    } for r in read_config_csv(find("documents/column_map.csv"))
         if (r.get("document") or "").strip() == document]
 
 
@@ -69,7 +64,7 @@ def load_change_weights() -> dict:
     specially - a lost effect is a regression, a new one an upgrade roll-out). A present field absent from
     the file defaults to `minor` at compare time. Missing file -> {} (everything defaults to minor)."""
     out: dict = {}
-    for r in read_config_csv(os.path.join(input_docs_dir(), "change_weights.csv")):
+    for r in read_config_csv(find("documents/change_report_weights.csv")):
         document = (r.get("document") or "").strip()
         field = (r.get("field") or "").strip()
         if not document or not field:
@@ -82,7 +77,7 @@ def _load_rules(filename: str) -> list:
     """Load a priority-ordered ruleset CSV (ph200 classification): rows of {priority, when, type/gate, ...}
     sorted ascending by `priority` (first-match-wins). Cells stay raw strings - the `when`/`type` cells are
     expressions evaluated by `core.expr`. Missing file -> []."""
-    rows = read_config_csv(os.path.join(input_docs_dir(), filename))
+    rows = read_config_csv(find("classification/" + filename))
     rows.sort(key=lambda r: int((r.get("priority") or "0").strip() or 0))
     return rows
 
@@ -104,7 +99,7 @@ def load_signal_types() -> dict:
     DB / diagnosis / interface attributes now live in their own registries). A paired channel-2 type
     inherits the sibling's tagtable_name (linked by pair_key)."""
     types = {}
-    for r in read_config_csv(os.path.join(input_docs_dir(), "signal_types.csv")):
+    for r in read_config_csv(find("signal_types.csv")):
         tid = (r.get("type_id") or "").strip()
         if not tid:
             continue
@@ -163,7 +158,7 @@ def load_diagnosis_logic_rules() -> list:
     ('|'-OR trigger script_types), dev_type, db_name, member (a `{canonical}` template), interface_tagname,
     diag_desc. A rule fires once per row whose script_type is ANY of `required_types`."""
     out = []
-    for r in read_config_csv(os.path.join(diagnosis_dir(), "diagnosis_logic_rules.csv")):
+    for r in read_config_csv(find("diagnosis/logic_rules.csv")):
         if not (r.get("name") or "").strip():
             continue
         out.append({
@@ -185,7 +180,7 @@ def load_signal_diagnosis() -> dict:
     Merged onto the staged `type` object (in_diag/diag_logic/tristate/tristate_desc) + resolved onto the
     row (`diag_desc`). A type absent from the CSV defaults to in_diag=False (not a diagnosis signal)."""
     out = {}
-    for r in read_config_csv(os.path.join(diagnosis_dir(), "signal_diagnosis.csv")):
+    for r in read_config_csv(find("diagnosis/type_diagnosis.csv")):
         tid = (r.get("type_id") or "").strip()
         if not tid:
             continue
@@ -204,7 +199,7 @@ def load_diagnosis_columns() -> list:
     `{canonical}` template (the one sentinel `$PLC_Binding$` resolves to the signal's plc_binding). Drives
     BOTH DiagList_IO.csv and DiagList_Logic.csv."""
     return [{"header": (r.get("header") or "").strip(), "expression": (r.get("expression") or "")}
-            for r in read_config_csv(os.path.join(diagnosis_dir(), "diagnosis_columns.csv"))
+            for r in read_config_csv(find("diagnosis/diaglist_columns.csv"))
             if (r.get("header") or "").strip()]
 
 
@@ -256,7 +251,7 @@ def load_interface_elements() -> list:
     source that may add an INPUT row), data_type (BOOL/WORD), script_type (byte-grouping label; defaults to
     name), member (mirror-name `{canonical}` template), interface_tagname."""
     out = []
-    for r in read_config_csv(os.path.join(chain_reactions_dir(), "interface_elements.csv")):
+    for r in read_config_csv(find("interfaces/follower_elements.csv")):
         if not (r.get("name") or "").strip():
             continue
         out.append({
@@ -277,7 +272,7 @@ def load_interface_tagnames() -> dict:
     `signal_types.csv` col 18. Keeps `{interface_name}`/`{interface_id}` for the phase-400 generator; in
     PL4 `{tag_name}`/`{db_element}` resolve to the staged `name_in_tagtable` / 520 `name_in_db`."""
     out = {}
-    for r in read_config_csv(os.path.join(chain_reactions_dir(), "interface_tagnames.csv")):
+    for r in read_config_csv(find("interfaces/tagname_templates.csv")):
         tid = (r.get("type_id") or "").strip()
         if tid:
             out[tid.upper()] = (r.get("interface_tagname") or "").strip()
@@ -298,7 +293,7 @@ def load_db_definitions() -> list:
     (Optimized|Standard), opc_ua/webserver/only_load_memory/write_protected/retain_reserve (bool),
     memory_reserve, seed (bool), create_when (always|if_elements|never), comment. Missing file -> []."""
     out = []
-    for r in read_config_csv(os.path.join(datablocks_dir(), "datablock_definitions.csv")):
+    for r in read_config_csv(find("datablocks/datablock_definitions.csv")):
         if not (r.get("db_name") or "").strip():
             continue
         pl = (r.get("db_programming_language") or "DB").strip() or "DB"
@@ -327,7 +322,7 @@ def load_db_elements() -> list:
     iteration DSL), datatype, start_value, retain (bool), ext_accessible/ext_visible/ext_writable (bool),
     setpoint (bool), comment. Missing file -> []."""
     out = []
-    for r in read_config_csv(os.path.join(datablocks_dir(), "datablock_elements.csv")):
+    for r in read_config_csv(find("datablocks/datablock_members.csv")):
         if not (r.get("db_name") or "").strip():
             continue
         out.append({
@@ -350,7 +345,7 @@ def load_db_types() -> list:
     """The valid member data types (phase 520 validation). Columns: name, kind (Elementary|UDT), comment.
     Missing file -> []."""
     out = []
-    for r in read_config_csv(os.path.join(datablocks_dir(), "datablock_types.csv")):
+    for r in read_config_csv(find("datablocks/datablock_datatypes.csv")):
         if not (r.get("name") or "").strip():
             continue
         out.append({"name": (r.get("name") or "").strip(),

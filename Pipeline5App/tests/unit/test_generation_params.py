@@ -30,23 +30,18 @@ def test_diag_params_and_instance_render():
 
 
 def test_missing_file_raises():
-    import os
-    # Patch where load_generation_params RESOLVES its candidates: the config.params module (the
-    # config/ package split re-exports the names, but the internal calls bind in params' namespace).
-    from pipeline5.config import params as config_params
-    orig_active = config_params.generation_params_file
-    orig_builtin = config_params.builtin_config_project_dir
-    config_params.generation_params_file = lambda: os.path.join("Z:\\", "no_such", "generation_params.yaml")
-    config_params.builtin_config_project_dir = lambda: os.path.join("Z:\\", "no_such_builtin")
+    # Patch the RESOLVER (the lookup authority since the step-4 regroup): no tier holds the file.
+    from pipeline5.config import resolver
+    orig = resolver.find
+    resolver.find = lambda rel, _o=orig: None if rel == "generation_params.yaml" else _o(rel)
     try:
         try:
             config.load_generation_params()
-            ok(False, "a missing file (both candidates) must raise")
+            ok(False, "no tier holding the file must raise")
         except RuntimeError as error:
             ok("generation_params.yaml missing" in str(error), "the error names the file")
     finally:
-        config_params.generation_params_file = orig_active
-        config_params.builtin_config_project_dir = orig_builtin
+        resolver.find = orig
 
 
 def test_emit_kind_declaration():

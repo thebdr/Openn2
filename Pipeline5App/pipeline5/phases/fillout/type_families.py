@@ -1,6 +1,6 @@
 """ph200 / 220 - object families (the §7 INDEX grouping strategy).
 
-Loads `config_project/chain_reactions/object_families.csv` into `ObjectFamily` records + provides
+Loads the classification tier's `object_families.csv` into `ObjectFamily` records + provides
 `family_for(script_type)` (LONGEST-key prefix match, so `DI` wins over `D`). A faithful clean-room
 port of PL3's `domain/iolist_diag/families.py` into PL4's SSOT model: the CSV cols are
 `family,key,member_types(|-split),anchor,link(lowercased),index_stride,bits,diag_block`.
@@ -33,10 +33,10 @@ class ObjectFamily:
 
 
 def load_object_families() -> list:
-    """Load object_families.csv into ObjectFamily records (config.chain_reactions_dir)."""
+    """Load object_families.csv into ObjectFamily records (the 4-tier config resolver)."""
     fams = []
     for r in config.read_config_csv(
-        os.path.join(config.chain_reactions_dir(), "object_families.csv")
+        config.resolver.find("classification/object_families.csv")
     ):
         if not (r.get("family") or "").strip():
             continue

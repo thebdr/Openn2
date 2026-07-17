@@ -45,7 +45,7 @@ class Treatment:
 
 
 def registry_path() -> str:
-    return os.path.join(config.user_input_dir(), "error_management.csv")
+    return os.path.join(config.user_input_dir(), "finding_treatments.csv")
 
 
 def load(path: str | None = None) -> dict:

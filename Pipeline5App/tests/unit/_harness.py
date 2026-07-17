@@ -14,6 +14,13 @@ APP_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if APP_ROOT not in sys.path:
     sys.path.insert(0, APP_ROOT)
 
+# The 4-tier config resolver needs an ACTIVE SYSTEM for the system-tier files (signal_types, the
+# rule CSVs, generation params). Tests exercise the Siemens data flows, so the harness activates
+# the one registered system app-wide - exactly what app startup does.
+from pipeline5 import config as _config             # noqa: E402
+from pipeline5.systems import catalog as _catalog   # noqa: E402
+_config.use_system(_catalog.by_id("siemens_s7_safety"))
+
 
 def run(title: str, tests) -> int:
     print(f"== {title} ==")
