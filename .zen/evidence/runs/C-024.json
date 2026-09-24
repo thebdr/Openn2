@@ -6,30 +6,30 @@
     "Pipeline5App/scripts/verify_c024.sh"
   ],
   "exitCode": 0,
-  "outputSha": "46bff9e28cc236979ba434f869e8ac76ba87e87a2e913b794008d3d4c29f21be",
+  "outputSha": "7b30b0ce5d0b5b678e71806536b9b8b568dbcff42a25b6150dd2b6912c246372",
   "outputTail": "  PASS  render_literal_braces_and_empty\r\n  PASS  render_spec_split_with_colon_in_extract_slice\r\n  PASS  coalesce_edge_values\r\n  PASS  if_truthiness_edge\r\n  PASS  where_pred_references_row_column\r\n  PASS  node_of_boundaries\r\n  PASS  node_of_bad_byte_columns_skipped\r\n  PASS  lookup_and_unique_edges\r\n  -> 26/26 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-09-24T21:45:02.131Z",
-  "headCommit": "ca4fac7b92bcb91a5cbd90c5149cf6f4750c4bd0",
+  "ranAt": "2026-09-24T22:23:58.380Z",
+  "headCommit": "83f7da84b7a46403bc2f25aff2c1ed0be2439a07",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_tempemplator.py",
       "file": "Pipeline5App/tests/unit/test_tempemplator.py",
-      "fileSha": "6f964c6aeb789415bb9c25b105713bcbf22d51f4dd10e1a7af55271d3bf76bd2"
+      "fileSha": "9e2a3fb8a05ae0ca9deaf75e50bfa487d0dd05d448e8dfe0f2f49452adaa9481"
     },
     {
       "name": "Pipeline5App/tests/unit/test_chain_reactions.py",
       "file": "Pipeline5App/tests/unit/test_chain_reactions.py",
-      "fileSha": "23758134d73efb3ab2aa4da26fb94d91240407193eb44797f6893f28b41e851d"
+      "fileSha": "878f06ef966883398fda96a7d1da24a6837373146aaff77d581270159233ce5d"
     },
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
       "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
-      "fileSha": "20a5539202e19c00b1782f42dc1795bb89cc50baa0c8ee7fec08060c91a30c5c"
+      "fileSha": "d3a9d83ec61ba0bd2160260b61bfffa52440a15d4396862a22d3018f64df60b8"
     },
     {
       "name": "Pipeline5App/tests/unit/test_expr_adversarial.py",
       "file": "Pipeline5App/tests/unit/test_expr_adversarial.py",
-      "fileSha": "24ec15aa51373cf87f11ac3352d5b5f66bcfdaaa0ba56c81b8585232dd65863f"
+      "fileSha": "25d5093f98be95185ecc13d40dc1dfca649784442a6676b9dc0e745513248b29"
     },
     {
       "name": "Pipeline5App/scripts/parity_vs_pl4.py",
