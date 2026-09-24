@@ -6,19 +6,23 @@ import tempfile
 
 from _harness import run, eq, ok
 from pipeline5 import config
+from pipeline5.config import params as p5params
 
 
 def _with_temp_app_config(fn):
-    """Run fn() with the UI-pref home (config.builtin_app_config_file - the loaders AND savers are
-    pinned to the BUILTIN file, app-scoped) redirected to a fresh temp file, so the tracked builtin
-    is untouched."""
-    orig = config.builtin_app_config_file
+    """Run fn() with the UI-pref home (builtin_app_config_file - the loaders AND savers are pinned to
+    the BUILTIN file, app-scoped) redirected to a fresh temp file, so the tracked builtin is untouched.
+    The seam is `config.params` - where the loaders/savers RESOLVE the name; patching only the
+    `config` re-export (as this helper did since the step-2 config split) never took effect, and
+    every run wrote the tracked app_config.yaml (found 2026-09-24: it reverted a user's GUI prefs)."""
+    orig, orig_params = config.builtin_app_config_file, p5params.builtin_app_config_file
     with tempfile.TemporaryDirectory() as d:
-        config.builtin_app_config_file = lambda: os.path.join(d, "app_config.yaml")
+        temp = lambda: os.path.join(d, "app_config.yaml")    # noqa: E731
+        config.builtin_app_config_file = p5params.builtin_app_config_file = temp
         try:
             fn()
         finally:
-            config.builtin_app_config_file = orig
+            config.builtin_app_config_file, p5params.builtin_app_config_file = orig, orig_params
 
 
 def test_resolve_font_size():

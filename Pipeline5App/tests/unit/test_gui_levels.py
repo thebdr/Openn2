@@ -8,18 +8,22 @@ import tempfile
 
 from _harness import run, eq, ok
 from pipeline5 import config
+from pipeline5.config import params as p5params
 
 
 def _with_temp_builtin_ui(fn):
-    """Run fn(dir) with config.builtin_app_config_file (the app-scoped UI-pref home, used by BOTH
-    the loaders and the savers) redirected into a temp dir - the tracked builtin stays untouched."""
-    orig = config.builtin_app_config_file
+    """Run fn(dir) with builtin_app_config_file (the app-scoped UI-pref home, used by BOTH the
+    loaders and the savers) redirected into a temp dir - the tracked builtin stays untouched. The
+    seam is `config.params`, where the loaders/savers RESOLVE the name (patching only the `config`
+    re-export never took effect - every run wrote the tracked file; found 2026-09-24)."""
+    orig, orig_params = config.builtin_app_config_file, p5params.builtin_app_config_file
     with tempfile.TemporaryDirectory() as d:
-        config.builtin_app_config_file = lambda: os.path.join(d, "app_config.yaml")
+        temp = lambda: os.path.join(d, "app_config.yaml")    # noqa: E731
+        config.builtin_app_config_file = p5params.builtin_app_config_file = temp
         try:
             fn(d)
         finally:
-            config.builtin_app_config_file = orig
+            config.builtin_app_config_file, p5params.builtin_app_config_file = orig, orig_params
 
 
 def test_save_and_load_log_levels():
