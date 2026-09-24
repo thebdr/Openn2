@@ -21,6 +21,53 @@ def test_plain_lines_and_strict_holes():
         eq((error.template, error.line), ("t", 1), "the error is located")
 
 
+def test_loop_row_columns_are_schema_checked():
+    """B5 (refuter round 6), resolved against C-002 by the implications check: inside a TABLE loop,
+    `{$r.column}` must name a column the table's rows carry - `{$r.tagg}` used to render a silent
+    blank, so every row-field typo in an E3 loop was invisible. It is a SCHEMA check, not a data
+    check: a column that is EMPTY on some rows is fine, and deeper JSON sub-keys / `_params` keys
+    stay optional (C-002 silent-empty) so the guard idioms keep working."""
+    db = {"signals": [{"script_type": "PEC", "tag": "P1", "type": {"type_id": "PEC"}},
+                      {"script_type": "", "tag": "", "type": None}]}               # a node row: empty cells
+    eq(_render("@for $r in signals: -{$r.tag}-", {"_db": db}), "-P1-\n--", "a real column renders (blank on the node row)")
+    try:
+        _render("line one\n@for $r in signals: -{$r.tagg}-", {"_db": db})
+        ok(False, "a misspelled column must raise")
+    except TempemplatorError as error:
+        eq(error.line, 2, "the column typo locates its line")
+        ok("'tagg'" in error.message and "tag" in error.message, "…names it and lists the real columns")
+    eq(_render("@for $r in signals: [{$r.type.type_id}]", {"_db": db}), "[PEC]\n[]",
+       "a JSON sub-key is OPTIONAL (blank on the node row whose `type` is empty)")
+    eq(_render('@for $r in signals: {coalesce($r.type.tristate, "0")}', {"_db": db}), "0\n0",
+       "the guard functions still work on optional sub-keys")
+    body = "@for $r in signals\n@if present($r.type.type_id)\nT={$r.type.type_id}\n@end\n@end"
+    eq(_render(body, {"_db": db}), "T=PEC", "the @if present(...) guard idiom")
+    raises(TempemplatorError, lambda: _render("@for $i in 1..2: {$i.x}", {}))       # a range var has no columns
+    eq(_render("@for $r in signals: @use leaf", {"_db": db}, extra={"leaf": "{$r.tag}"}), "P1\n",
+       "the schema travels into an @use'd template")
+    raises(TempemplatorError, lambda: _render("@for $r in signals: @use leaf", {"_db": db},
+                                              extra={"leaf": "{$r.tagg}"}))
+    eq(_render("@for $r in signals: x\n{$r.anything}", {"_db": db, "r": {"k": 1}}), "x\nx\n",
+       "after the loop the outer `r` is plain data again (the schema shadowed, then restored)")
+    layered = {"_params": {"project_code": "8XXX"}, "_rule": {"name": "r", "hook": "after_300"}}
+    eq(_render("[{$_params.project_code}] [{$_params.optional.key}]", layered), "[8XXX] []",
+       "`_params` keys are optional by design (C-004 get_param) - absent reads blank")
+
+
+def test_raw_errors_become_located():
+    """B1 (refuter round 6): inputs that raised RAW exceptions (OverflowError, ValueError,
+    re.PatternError) out of the renderer - each a located TempemplatorError now."""
+    for n in ("inf", "-inf", "nan"):
+        raises(TempemplatorError, lambda: _render("@for $i in 1..{$n}: x{$i}", {"n": n}))
+    eq(_render("@for $i\tin 1..2: x{$i}", {}), "x1\nx2", "a TAB before `in` is whitespace like any other")
+    eq(_render("@for $i in\t1..2: x{$i}", {}), "x1\nx2", "…after `in` too")
+    raises(TempemplatorError, lambda: _render("@for $1x in 1..2: x", {}))   # not a referenceable var
+    db = {"signals": [{"tag": "P1"}]}
+    raises(TempemplatorError, lambda: _render("{extract($tag, /(P/)}", {"tag": "P1"}))
+    raises(TempemplatorError, lambda: _render("@for $r in signals where $tag ~ /(/: x", {"_db": db}))
+    raises(TempemplatorError, lambda: _render("@if $tag ~ /[/\nx\n@end", {"tag": "P1"}))
+
+
 def test_use_recursion_unknown_and_cycle():
     eq(_render("head\n@use inner\ntail", {}, extra={"inner": "IN"}), "head\nIN\ntail", "@use splices")
     eq(_render("@use a", {}, extra={"a": "@use b", "b": "deep"}), "deep", "@use nests")
@@ -33,6 +80,8 @@ def test_use_recursion_unknown_and_cycle():
 def test_for_range_inline_and_block():
     eq(_render("@for $i in 1..3: n{$i}", {}), "n1\nn2\nn3", "inline range loop, inclusive")
     eq(_render("@for $i in 1..{$n}: x{$i}", {"n": "2"}), "x1\nx2", "rendered range end")
+    eq(_render("@for $i in {$a}..3: x{$i}", {"a": "2"}), "x2\nx3",
+       "rendered range START too (refuter round 6 E5: an unrendered start survived)")
     eq(_render("@for $i in 2..1: x{$i}", {}), "", "an empty range emits nothing")
     body = "@for $i in 1..2\nA{$i}\nB{$i}\n@end\ndone"
     eq(_render(body, {}), "A1\nB1\nA2\nB2\ndone", "block form loops its whole body")
@@ -51,6 +100,11 @@ def test_for_table_query():
     eq(_render("@for $r in signals: {$r.tag}", {"_db": db}), "P1\nM1\nP2", "no where = every row")
     raises(TempemplatorError, lambda: _render("@for $r in nope: x", {"_db": db}))
     raises(TempemplatorError, lambda: _render("@for $r in signals maybe: x", {"_db": db}))
+    # where() semantics: the predicate sees the ROW ONLY - an outer field is NOT in its scope, so
+    # `$wanted` evaluates blank there (refuter round 6 E5: a leaking scope survived every test)
+    rows = {"signals": [{"script_type": "", "tag": "E1"}, {"script_type": "PEC", "tag": "P1"}]}
+    eq(_render("@for $r in signals where $script_type = $wanted: {$r.tag}", {"_db": rows, "wanted": "PEC"}),
+       "E1", "the outer $wanted is invisible to the row predicate (it matched the blank row, not P1)")
 
 
 def test_if_else_and_lazy_branches():
@@ -99,6 +153,16 @@ def test_errors_locate_true_template_lines():
        "an inline @for body error points at the @for line itself")
     eq(_error_line('@if $a = "1"\n@if $b = "1"\nok\n{$missing}\n@end\n@end', {"a": "1", "b": "1"}), 4,
        "doubly nested blocks still locate the absolute line")
+    # refuter round 6 E4: every OTHER offset site, nested (at top level their offset is 0, so the
+    # dropped-offset mutants survived) - each case below kills one surviving mutant
+    eq(_error_line('@if $a = "1"\n@if $b = "1"\nX\n@else\n{$missing}\n@end\n@end', {"a": "1", "b": "0"}), 5,
+       "a NESTED @else branch (M7)")
+    eq(_error_line('@if $a = "1"\n@for $i in 1..1\nok\n{$missing}\n@end\n@end', {"a": "1"}), 4,
+       "a @for BLOCK nested in an @if - the StandardBelt shape (M8)")
+    eq(_error_line('@if $a = "1"\nx\n@for $i in 1..1: {$missing}\n@end', {"a": "1"}), 3,
+       "an INLINE @for nested in an @if (M9)")
+    eq(_error_line('@if $a = "1"\n@if $b = "1"\nX\n@else\nY\n@else\n@end\n@end', {"a": "1", "b": "1"}), 6,
+       "a second @else found by the NESTED block scan (M10)")
 
 
 def test_shipped_worked_examples_render():
@@ -124,6 +188,8 @@ if __name__ == "__main__":
     import sys
     sys.exit(run("tempemplator", [
         ("plain_lines_and_strict_holes", test_plain_lines_and_strict_holes),
+        ("loop_row_columns_are_schema_checked", test_loop_row_columns_are_schema_checked),
+        ("raw_errors_become_located", test_raw_errors_become_located),
         ("use_recursion_unknown_and_cycle", test_use_recursion_unknown_and_cycle),
         ("for_range_inline_and_block", test_for_range_inline_and_block),
         ("for_table_query", test_for_table_query),

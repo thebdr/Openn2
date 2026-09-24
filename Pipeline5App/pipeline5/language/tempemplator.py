@@ -36,22 +36,35 @@ THE GRAMMAR (line-based; a directive line's own indentation is consumed, body li
     @if <pred> / @else / @end            block conditional (expr.test); nests freely
     anything else                        a literal line - {expr} holes rendered STRICT
 
+WHAT "STRICT" CATCHES (refuter round 6, resolved against C-002): a missing TOP-LEVEL field, and -
+inside a TABLE loop - a `$row.column` naming a column no row of that table carries (a SCHEMA check:
+`{$r.tagg}` over `signals` is a located error; a range var has no columns at all). Deeper sub-keys
+of a JSON cell (`$r.type.type_id`) and `{$_params...}` keys stay OPTIONAL per C-002 - blank when
+absent, like get_param - so guard or default them (`@if present($r.type.type_id)`, `coalesce(...)`).
+Predicates (@if, `where`) are LENIENT by design (the guard idiom): a misspelled name reads blank.
+
 SCOPE (the chain-reaction E1 layering, built by the CALLER - see
 src://pipeline5/phases/chain_reactions/engine.py): the matched source row's fields at top level,
-`_params` = the project params (dotted access: {$_params.project.name}), `_rule` = {name, hook},
+`_params` = the project params (dotted access: {$_params.project_code}), `_rule` = {name, hook},
 `_db` = {table: rows} for the query loops and expr's data functions. Loop vars stack on top,
 shadowing while their loop runs.
 
 Every failure - unknown template, template cycle, unbalanced @if/@for, a bad expression, an
-unknown loop table - raises a LOCATED `TempemplatorError` (template name + line number); the
-reaction engine turns it into a finding, never a crash.
+unknown loop table or column, a non-finite range end - raises a LOCATED `TempemplatorError`
+(template name + line number); the reaction engine turns it into a finding, never a crash.
 """
 from __future__ import annotations
+
+import re
 
 from pipeline5.language import expr
 from pipeline5.language.expr import ExprError
 
 _MAX_DEPTH = 32          # @use nesting backstop (the cycle guard catches loops; this catches towers)
+# `$var in <iterable>` - ANY whitespace around `in` (a tab too - refuter round 6); the var must be
+# a name a {$var} hole can reference (expr's field-name shape)
+_FOR_HEAD = re.compile(r"^\$([A-Za-z_]\w*)\s+in\s+(\S.*)$", re.IGNORECASE | re.DOTALL)
+_HOLE = re.compile(r"\{([^{}]*)\}")      # the {expr} hole shape expr.render substitutes
 
 
 class TempemplatorError(Exception):
@@ -67,7 +80,7 @@ def render_template(name: str, templates: dict, ctx: dict) -> str:
     trailing newline - the file action adds it). `templates` is the {name: body} mapping from
     templates.yaml; only STRING entries are text templates (a list entry is a ROW template - the
     add_rows action's shape - and is not renderable here)."""
-    return "\n".join(_render_named(name, templates, ctx, stack=(), site=("<call>", 0)))
+    return "\n".join(_render_named(name, templates, ctx, stack=(), site=("<call>", 0), schemas={}))
 
 
 def _template_lines(name: str, templates: dict, stack: tuple, site: tuple) -> list:
@@ -89,9 +102,9 @@ def _template_lines(name: str, templates: dict, stack: tuple, site: tuple) -> li
     return body.splitlines()
 
 
-def _render_named(name: str, templates: dict, ctx: dict, stack: tuple, site: tuple) -> list:
+def _render_named(name: str, templates: dict, ctx: dict, stack: tuple, site: tuple, schemas: dict) -> list:
     lines = _template_lines(name, templates, stack, site)
-    out, _next = _render_block(lines, 0, name, templates, ctx, (*stack, name))
+    out, _next = _render_block(lines, 0, name, templates, ctx, (*stack, name), schemas)
     return out
 
 
@@ -117,26 +130,61 @@ def _split_top(text: str, marker: str) -> tuple:
     return text, None
 
 
-def _render_line(line: str, template: str, line_no: int, ctx: dict) -> str:
+def _check_loop_columns(line: str, template: str, line_no: int, schemas: dict) -> None:
+    """The table-loop SCHEMA check: a `$var.column` hole whose `$var` is an active loop variable must
+    name a column of that loop's table (a range var has none). Only the FIRST level is a column -
+    deeper keys live inside a JSON cell and stay optional (C-002)."""
+    for body in _HOLE.findall(line):
+        for kind, start, end in expr.tokens(body):
+            if kind != "field":
+                continue
+            head, _dot, rest = body[start + 1:end].partition(".")
+            if rest and head in schemas:
+                column = rest.split(".", 1)[0]
+                if column not in schemas[head]:
+                    known = ", ".join(sorted(schemas[head])) or "none - a range variable is a number"
+                    raise TempemplatorError(template, line_no,
+                                            f"${head}.{column}: the loop's table has no column "
+                                            f"{column!r} (columns: {known})")
+
+
+def _render_line(line: str, template: str, line_no: int, ctx: dict, schemas: dict) -> str:
     """A literal line: render its {expr} holes STRICT (a missing field / bad expr is an authoring
     error the engine must surface as a finding, never a silent blank)."""
+    if schemas:
+        _check_loop_columns(line, template, line_no, schemas)
     try:
         return expr.render(line, ctx, mode="strict")
     except ExprError as error:
         raise TempemplatorError(template, line_no, str(error)) from error
+    except Exception as error:                              # the backstop: still LOCATED, never raw
+        raise TempemplatorError(template, line_no, f"{type(error).__name__}: {error}") from error
 
 
-def _iterate(spec: str, template: str, line_no: int, ctx: dict):
-    """The @for iterable: an inclusive `<a>..<b>` integer range (rendered ends) or a
-    `<table> [where <pred>]` row query over ctx['_db'] (the E3 upgrade)."""
+def _test(pred: str, scope: dict, template: str, line_no: int) -> bool:
+    """An @if / `where` predicate (expr.test - lenient on missing fields: the GUARD idiom), every
+    failure located."""
+    try:
+        return expr.test(pred, scope)
+    except ExprError as error:
+        raise TempemplatorError(template, line_no, str(error)) from error
+    except Exception as error:                              # the backstop: still LOCATED, never raw
+        raise TempemplatorError(template, line_no, f"{type(error).__name__}: {error}") from error
+
+
+def _iterate(spec: str, template: str, line_no: int, ctx: dict, schemas: dict) -> tuple:
+    """The @for iterable -> (values, columns): an inclusive `<a>..<b>` integer range (rendered ends;
+    no columns) or a `<table> [where <pred>]` row query over ctx['_db'] (the E3 upgrade; columns =
+    every key the table's rows carry - the loop var's schema)."""
     head, tail = _split_top(spec, "..")
     if tail is not None:                                    # range: a..b, both rendered fragments
         try:
-            lo = int(float(_render_line(head.strip(), template, line_no, ctx) or "0"))
-            hi = int(float(_render_line(tail.strip(), template, line_no, ctx) or "0"))
-        except ValueError as error:
-            raise TempemplatorError(template, line_no, f"range end is not a number: {spec!r}") from error
-        return list(range(lo, hi + 1))
+            lo = int(float(_render_line(head.strip(), template, line_no, ctx, schemas) or "0"))
+            hi = int(float(_render_line(tail.strip(), template, line_no, ctx, schemas) or "0"))
+        except (ValueError, OverflowError) as error:        # 'abc' / 'nan' -> ValueError, 'inf' -> OverflowError
+            raise TempemplatorError(template, line_no,
+                                    f"range ends must be finite numbers: {spec!r}") from error
+        return list(range(lo, hi + 1)), frozenset()
     words = spec.split(None, 1)
     table = words[0].strip()
     pred = ""
@@ -151,12 +199,11 @@ def _iterate(spec: str, template: str, line_no: int, ctx: dict):
         raise TempemplatorError(template, line_no,
                                 f"unknown table {table!r} in @for (ctx['_db'] has {sorted(tables)})")
     rows = list(tables[table])
+    columns = frozenset(key for row in rows if isinstance(row, dict) for key in row)
     if not pred:
-        return rows
-    try:                                                    # the row IS the predicate's scope (where() semantics)
-        return [row for row in rows if expr.test(pred, dict(row))]
-    except ExprError as error:
-        raise TempemplatorError(template, line_no, str(error)) from error
+        return rows, columns
+    # the row IS the predicate's scope (where() semantics - outer fields are NOT visible)
+    return [row for row in rows if _test(pred, dict(row), template, line_no)], columns
 
 
 def _line_word(line: str) -> str:
@@ -201,11 +248,12 @@ def _scan_block(lines, start, template, opener_line, *, want_else: bool, base: i
     raise TempemplatorError(template, opener_line, "block never closed (@end missing)")
 
 
-def _render_block(lines, i, template, templates, ctx, stack, base: int = 0):
+def _render_block(lines, i, template, templates, ctx, stack, schemas, base: int = 0):
     """Render `lines` from index `i` to the end (block bodies arrive pre-sliced, so terminators
     never appear here). `base` = this slice's offset into the WHOLE template, so every reported
     line number is template-absolute - a typo inside a nested block locates its REAL line
     (refuter round 5: the relative-line bug the shipped worked examples would have hit).
+    `schemas` = {loop var: its table's columns} for the active loops (the column check).
     Returns (out_lines, index_after)."""
     out: list = []
     while i < len(lines):
@@ -222,15 +270,12 @@ def _render_block(lines, i, template, templates, ctx, stack, base: int = 0):
             if word == "@use":
                 if not rest:
                     raise TempemplatorError(template, line_no, "@use needs a template name")
-                out.extend(_render_named(rest, templates, ctx, stack, (template, line_no)))
+                out.extend(_render_named(rest, templates, ctx, stack, (template, line_no), schemas))
                 i += 1
                 continue
 
             if word == "@if":
-                try:
-                    cond = expr.test(rest, ctx)
-                except ExprError as error:
-                    raise TempemplatorError(template, line_no, str(error)) from error
+                cond = _test(rest, ctx, template, line_no)
                 else_at, end_at = _scan_block(lines, i + 1, template, line_no, want_else=True, base=base)
                 if cond:
                     branch = lines[i + 1:else_at if else_at is not None else end_at]
@@ -238,19 +283,19 @@ def _render_block(lines, i, template, templates, ctx, stack, base: int = 0):
                 else:
                     branch = lines[else_at + 1:end_at] if else_at is not None else []
                     branch_base = base + (else_at + 1 if else_at is not None else 0)
-                rendered, _ = _render_block(branch, 0, template, templates, ctx, stack, base=branch_base)
+                rendered, _ = _render_block(branch, 0, template, templates, ctx, stack, schemas,
+                                            base=branch_base)
                 out.extend(rendered)
                 i = end_at + 1
                 continue
 
             if word == "@for":
                 spec, inline = _split_top(rest, ":")
-                words = spec.split(None, 2)
-                if len(words) < 3 or not words[0].startswith("$") or words[1].lower() != "in":
+                head = _FOR_HEAD.match(spec.strip())
+                if head is None:
                     raise TempemplatorError(template, line_no,
                                             "@for needs `$var in <a>..<b> | <table> [where <pred>]`")
-                var = words[0][1:]
-                iterable_spec = spec[spec.lower().index(" in ") + 4:].strip()
+                var, iterable_spec = head.group(1), head.group(2).strip()
                 if inline is not None and not inline.strip():
                     raise TempemplatorError(template, line_no, "@for inline `:` with an empty body")
                 if inline is not None:
@@ -259,25 +304,31 @@ def _render_block(lines, i, template, templates, ctx, stack, base: int = 0):
                 else:
                     _none, end_at = _scan_block(lines, i + 1, template, line_no, want_else=False, base=base)
                     body_lines, after, body_base = lines[i + 1:end_at], end_at + 1, base + i + 1
-                values = _iterate(iterable_spec, template, line_no, ctx)
+                values, columns = _iterate(iterable_spec, template, line_no, ctx, schemas)
                 had, old = (var in ctx), ctx.get(var)
+                had_schema, old_schema = (var in schemas), schemas.get(var)
+                schemas[var] = columns                      # the loop var's schema shadows like the var
                 try:
                     for value in values:
                         ctx[var] = value
                         rendered, _ = _render_block(body_lines, 0, template, templates, ctx, stack,
-                                                    base=body_base)
+                                                    schemas, base=body_base)
                         out.extend(rendered)
                 finally:
                     if had:
                         ctx[var] = old
                     else:
                         ctx.pop(var, None)
+                    if had_schema:
+                        schemas[var] = old_schema
+                    else:
+                        schemas.pop(var, None)
                 i = after
                 continue
 
             raise TempemplatorError(template, line_no, f"unknown directive {word!r}")
 
-        out.append(_render_line(raw, template, line_no, ctx))
+        out.append(_render_line(raw, template, line_no, ctx, schemas))
         i += 1
 
     return out, i

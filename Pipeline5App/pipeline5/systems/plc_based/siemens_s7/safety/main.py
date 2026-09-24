@@ -226,19 +226,27 @@ def run_risky_index(ctx, only=None):
                      f"{os.path.basename(res['output_path'])}{backup}. REVIEW the _RiskyIndex sheet.")
 
 
+# Every chain-reaction hook THIS run-plan fires - handed to each fire so a rule naming any other
+# hook (it would never run) is reported instead of silently waiting forever.
+_REACTION_HOOKS = ("before_300", "after_300")
+
+
 def run_staging(ctx, only=None):
     """Phase 300: stage the configured I/O List -> the signals table -> Database/signals.csv. The oracle
     splits it: 310 Stage I/O List (`stage_iolist` - I/O List only, no C&E) / 320 Stage C&E Matrix (the
     full staging = I/O List + the Cause&Effect enrichment). 300/320 are byte-identical to the monolith.
 
     The RUN-PLAN fires the chain-reaction hooks here (so a phase button and Run-all react
-    identically): `before_300` ahead of the read (no database yet - file rules only) and
-    `after_300` over the freshly staged database. With no configured rules both are strict no-ops."""
+    identically): `before_300` ahead of the read (no database yet - file rules only; its audit rows
+    + findings come back DEFERRED and are settled into the staged record) and `after_300` over the
+    freshly staged database. With no configured rules both are strict no-ops. A HALTED staging
+    commits no reaction record: the deferred before_300 firings are listed in the log instead
+    (their findings were already rendered)."""
     from pipeline5 import config
     from pipeline5.phases.chain_reactions import engine as reactions
     from pipeline5.phases.staging import iolist as staging
     ctx.status("staging…")
-    _none, rx = reactions.fire("before_300", None)
+    deferred, rx = reactions.fire("before_300", None, hooks=_REACTION_HOOKS)
     if rx:
         ctx.render(rx, label="before_300 reactions")
     if only == 310:
@@ -251,8 +259,12 @@ def run_staging(ctx, only=None):
         database, findings = staging.stage(system=ctx.system)
         label = f"{only or 300} staging"
     if not ctx.gate(findings, label=label):
+        for row in getattr(deferred, "log_rows", ()):   # halted: no record to settle into - list them
+            ctx.emit("INFO", f"  before_300 reaction {row['rule']}: {row['outcome']} "
+                             f"({row['created']} created) - not recorded, staging halted")
         return
-    database, rx = reactions.fire("after_300", database)
+    reactions.settle(database, deferred)          # before_300's audit + findings join the staged record
+    database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS)
     if rx:
         ctx.render(rx, label="after_300 reactions")
     signals = database["signals"]

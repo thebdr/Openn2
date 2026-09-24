@@ -6,8 +6,9 @@ live highlighting, error squiggles, autocomplete, and a preview evaluated agains
 
 ## Field references
 
-- `$name` reads a field of the current row (`""` when missing).
-- `$obj.key` drills into a JSON-object cell, e.g. `$type.type_id`.
+- `$name` reads a field of the current row (`""` when missing - but see *Strict templates* below).
+- `$obj.key` drills into a JSON-object cell, e.g. `$type.type_id` (`""` when the key is absent, or
+  when the cell is empty - `type` is empty on node rows).
 - Barewords are only function names, table names, and `and` / `or` / `not` / `in`.
 
 ## Operators (no arithmetic - by design)
@@ -36,6 +37,15 @@ P and Q or not R   boolean composition, ( ) groups
 A template is literal text with `{expr}` holes: `{$n:03d}` formats with a Python spec (numeric
 coercion; a blank value stays blank). Text without holes is copied verbatim - a literal sentinel like
 `<input required>` is never parsed.
+
+## Strict templates
+
+The pipeline's own templates - DB member templates, interface and diagnosis SCL lines, and the
+chain-reaction templates - render **strict**: a missing top-level `$field` is an error (a phase FAIL,
+or an `rx_bad_template` reaction finding), never a silent blank. Sub-keys stay optional: guard them
+with `present(...)` / `coalesce(...)`. In a chain-reaction `@for $row in <table>` loop, `$row.column`
+must name a real column of that table. Predicates (conditions, `where`, `@if`) stay lenient: a
+misspelled name there simply reads blank. A malformed `/regex/` is always reported as an error.
 
 The full syntax reference lives at the top of
 [pipeline5/language/expr/\_\_init\_\_.py](src://pipeline5/language/expr/__init__.py).

@@ -156,6 +156,127 @@ def test_staging_fires_reaction_hooks():
     eq(host.halted, False, "the dark engine never perturbs the run")
 
 
+def _reaction_project(project, params):
+    """A PROJECT (tier 1 of the 4-tier walk) carrying its own chain-reaction rule pair: a before_300
+    header, a before_300 add_rows that can only fail (no database yet), an after_300 line drilling
+    the real params, an after_300 rule on a typo'd table, and a rule on a hook the run-plan never fires."""
+    from ruamel.yaml import YAML
+    shared = os.path.join(project, "config_project", "shared")
+    rx_dir = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions")
+    os.makedirs(shared)
+    os.makedirs(rx_dir)
+    with open(os.path.join(shared, "project_params.yaml"), "w", encoding="utf-8") as handle:
+        YAML(typ="safe").dump(params, handle)
+    with open(os.path.join(rx_dir, "reactions.csv"), "w", encoding="utf-8", newline="") as handle:
+        handle.write("name,fire_when,source_table,condition,action,target,template,comment\n"
+                     "probe_hdr,before_300,,,file,rx/probe.txt,hdr_txt,a header before staging\n"
+                     "probe_early,before_300,,,add_rows,signals,rows_tpl,no database exists yet\n"
+                     "probe_file,after_300,,,file,rx/probe.txt,probe_txt,one line per run\n"
+                     "probe_bad,after_300,no_such_table,,file,rx/bad.txt,probe_txt,a typo'd table\n"
+                     "probe_cold,after_520,,,file,rx/cold.txt,probe_txt,a hook nobody fires\n")
+    with open(os.path.join(rx_dir, "templates.yaml"), "w", encoding="utf-8") as handle:
+        handle.write("hdr_txt: |-\n  HEADER {$_rule.hook}\n"
+                     "probe_txt: |-\n  [{$_params.project_code}] {$_rule.hook} {$_rule.name}\n"
+                     "rows_tpl:\n  - label: \"x\"\n")
+
+
+def _read_csv(path):
+    import csv
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _rx_rendered(host):
+    return {(f.type, f.location) for batch in host.rendered for f in batch
+            if getattr(f, "type", "").startswith("rx_")}
+
+
+def test_configured_rules_fire_through_the_real_run_plan():
+    """E1 + E3 (refuter round 6): a PROJECT carrying its own rule pair (tier 1 of the 4-tier walk)
+    through the REAL run_staging - the real loaders, the real params / templates / output-root
+    defaults, the before_300 Deferred settled into the staged record, the run-plan's declared hooks,
+    and every failure RENDERED. The unit tests inject all of these by hand; the empty shipped CSV
+    makes the other smoke a no-op - so dropping a loader, a default, the settle, the hooks, or a
+    ctx.render call dies only HERE."""
+    params = config.load_params()                   # the builtin fixture params (doc paths absolute)
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _reaction_project(project, params)
+        host = _Host()
+        config.use_project(project)
+        try:
+            SYSTEM.handlers["staging"](host.ctx())
+            out_root, db_dir = config.output_root(), config.database_dir()
+            ok("RSLT" in host.levels(), "staging completed with configured rules live")
+            eq(host.halted, False, "ERRR reactions never halt the run")
+            with open(os.path.join(out_root, "rx", "probe.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), f"HEADER before_300\n[{params['project_code']}] after_300 probe_file\n",
+                   "the real loaders fired both hooks: the before_300 header, then the after_300 line "
+                   "drilling the REAL project params - written under the REAL output root")
+            ok(not os.path.exists(os.path.join(out_root, "rx", "bad.txt")), "the failing rule wrote nothing")
+            ok(not os.path.exists(os.path.join(out_root, "rx", "cold.txt")), "the unfired-hook rule never ran")
+            log = sorted((r["hook"], r["rule"], r["outcome"])
+                         for r in _read_csv(os.path.join(db_dir, "chain_reactions_log.csv")))
+            eq(log, [("after_300", "probe_bad", "rx_unknown_table"), ("after_300", "probe_file", "ok"),
+                     ("before_300", "probe_early", "rx_unknown_table"), ("before_300", "probe_hdr", "ok")],
+               "every firing audited - the database-less before_300 ones SETTLED into the staged record")
+            recorded = [(r["type"], r["location"])
+                        for r in _read_csv(os.path.join(db_dir, "validation_issues.csv"))
+                        if r["type"].startswith("rx_")]
+            eq(sorted(recorded), [("rx_unfired_hook", "probe_cold"), ("rx_unknown_table", "probe_bad"),
+                                  ("rx_unknown_table", "probe_early")],
+               "every reaction finding recorded ONCE (the unfired-hook one surfaced at both hooks)")
+        finally:
+            config.use_project(previous_project)
+    eq(_rx_rendered(host), {("rx_unknown_table", "probe_early"), ("rx_unknown_table", "probe_bad"),
+                            ("rx_unfired_hook", "probe_cold")},
+       "each finding was RENDERED through ctx.render - never silent")
+
+
+def test_halted_staging_lists_the_deferred_trail_and_records_nothing():
+    """Round-6 implications: when staging HALTS (a blocking FAIL - the dup type/index case saves its
+    database, the no-I/O-sheet case writes NOTHING), the before_300 Deferred must not be settled
+    into a half-committed record - and must not vanish either: its findings were rendered, and its
+    firings are listed in the log (INFO, never hidden). after_300 never fires."""
+    from pipeline5.findings.finding import Finding
+    from pipeline5.phases.staging import iolist
+    params = config.load_params()
+    previous_project = config.active_project()
+    real_stage = iolist.stage
+
+    def halting_stage(*args, **kwargs):
+        database, findings = real_stage(*args, **kwargs)
+        return database, findings + [Finding(phase=300, type="probe_forced_fail", severity="FAIL",
+                                             detail="forced halt", location="probe")]
+    with tempfile.TemporaryDirectory() as project:
+        _reaction_project(project, params)
+        host = _Host()
+        config.use_project(project)
+        iolist.stage = halting_stage
+        try:
+            SYSTEM.handlers["staging"](host.ctx())
+            out_root, db_dir = config.output_root(), config.database_dir()
+            eq(host.halted, True, "the forced FAIL halted staging")
+            with open(os.path.join(out_root, "rx", "probe.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "HEADER before_300\n",
+                   "before_300 ran (its append-only side effect stays); after_300 never fired")
+            eq(_read_csv(os.path.join(db_dir, "chain_reactions_log.csv")), [],
+               "no reaction audit was committed into the halted run's record")
+            ok(not any(r["type"].startswith("rx_")
+                       for r in _read_csv(os.path.join(db_dir, "validation_issues.csv"))),
+               "...and no reaction finding either")
+        finally:
+            iolist.stage = real_stage
+            config.use_project(previous_project)
+    listed = [msg for level, msg in host.lines if level == "INFO" and "not recorded, staging halted" in msg]
+    eq(len(listed), 2, "both deferred before_300 firings are LISTED in the log")
+    ok(any("probe_hdr: ok (1 created)" in msg for msg in listed), "...the header's success")
+    ok(any("probe_early: rx_unknown_table" in msg for msg in listed), "...and the failure's outcome")
+    ok(("rx_unknown_table", "probe_early") in _rx_rendered(host), "the before_300 finding was rendered")
+
+
 def test_sub_phase_dispatch():
     """A dropdown action: the parent handler with only=<sub> - the 310 stage-I/O-List leg, plus a
     validation sub (110), through the same dispatch the App's _sub_worker performs."""
@@ -175,5 +296,9 @@ if __name__ == "__main__":
     sys.exit(run("siemens_main_handlers", [
         ("run_plan_executes_end_to_end", _sandboxed(test_run_plan_executes_end_to_end)),
         ("staging_fires_reaction_hooks", _sandboxed(test_staging_fires_reaction_hooks)),
+        ("configured_rules_fire_through_the_real_run_plan",
+         _sandboxed(test_configured_rules_fire_through_the_real_run_plan)),
+        ("halted_staging_lists_the_deferred_trail_and_records_nothing",
+         _sandboxed(test_halted_staging_lists_the_deferred_trail_and_records_nothing)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),
     ]))

@@ -7,7 +7,7 @@ registry, never in folder names - adding or renumbering a phase touches the regi
 
 CHAPTERS: staging (300/310/320) - fillout (200) - validation (100) - changes (100b) -
 interfaces (400) - io_tags (510, the shared collector) - datablocks (520) - diagnosis (600) -
-software_blocks (800) - coverage (900) - chain_reactions (arrives with P-009). Hardware (700) is
+software_blocks (800) - coverage (900) - chain_reactions (the reaction-rule engine, C-024). Hardware (700) is
 wholly system-owned: see systems/plc_based/siemens_s7/profinet_hardware.
 
 The Siemens-specific projections now live in systems/plc_based/siemens_s7/ (extracted at

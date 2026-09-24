@@ -67,6 +67,16 @@ def _unescape(s: str) -> str:
     return s.replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
 
 
+def _compile_regex(rx: str, src: str):
+    """A `/regex/` literal -> its compiled (implicit-IGNORECASE) pattern. A malformed pattern is a
+    LOCATED ExprError, never a raw re.error escaping the ExprError contract (chain-reaction refuter
+    round 6: `$name ~ /(D/` in a rule condition crashed the staging handler)."""
+    try:
+        return re.compile(rx[1:-1], re.IGNORECASE)
+    except re.error as error:
+        raise ExprError(f"bad regex {rx} ({error}) in {src!r}") from None
+
+
 def _field_thunk(name: str):
     """A `$field` reference. `name` is without the leading '$'. Dotted -> a dict drill that is
     SILENT-EMPTY on a missing sub-key (returns "" at EVAL, never throws)."""
@@ -145,7 +155,7 @@ class _Parser:
             rk, rx = self._next()
             if rk != "regex":
                 raise ExprError(f"'~' needs a /regex/ in {self.src!r}")
-            pat = re.compile(rx[1:-1], re.IGNORECASE)
+            pat = _compile_regex(rx, self.src)
             return lambda ctx: bool(pat.search(runtime.s(left(ctx))))
         if val in ("=", "!="):
             self._next()
@@ -320,7 +330,7 @@ class _Parser:
         rk, rx = self._next()
         if rk != "regex":
             raise ExprError(f"extract: 2nd arg must be a /regex/ in {self.src!r}")
-        pat = re.compile(rx[1:-1], re.IGNORECASE)
+        pat = _compile_regex(rx, self.src)
         slice_spec = None
         if self._peek()[1] == ",":
             self._next()
@@ -338,7 +348,7 @@ class _Parser:
         rk, rx = self._next()
         if rk != "regex":
             raise ExprError(f"regex_replace: 2nd arg must be a /regex/ in {self.src!r}")
-        pat = re.compile(rx[1:-1], re.IGNORECASE)
+        pat = _compile_regex(rx, self.src)
         self._eat(",")
         replacement = self._or()
         self._eat(")")

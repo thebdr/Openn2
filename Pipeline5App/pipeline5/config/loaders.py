@@ -371,9 +371,10 @@ def load_reactions() -> list:
     """The chain-reaction RULE rows (`chain_reactions/reactions.csv`, 4-tier resolved): one dict per
     rule - {name, fire_when, source_table, condition, action, target, template, comment}, strings
     verbatim (the engine compiles + validates them into located findings, never a crash here). A
-    system that ships no reactions file simply has no rules ([] - absence of rules is not an error)."""
-    return [r for r in read_config_csv(find("chain_reactions/reactions.csv"))
-            if (r.get("name") or "").strip()]
+    system that ships no reactions file simply has no rules ([] - absence of rules is not an error).
+    Only fully BLANK lines are skipped (read_config_csv); a row with content but no `name` is passed
+    through so the compiler reports it (refuter round 6: it used to vanish here, silently)."""
+    return read_config_csv(find("chain_reactions/reactions.csv"))
 
 
 def load_reaction_templates() -> dict:

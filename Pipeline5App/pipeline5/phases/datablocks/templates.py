@@ -131,7 +131,7 @@ def compile_for_each(expr_text) -> ForEach:
     if pred:
         try:
             expr.compile_expr(pred, None)                       # validate the predicate syntax now
-        except (expr.ExprError, re.error) as e:                 # re.error: a bad /regex/ compiled by `~`
+        except expr.ExprError as e:                             # a bad /regex/ is an ExprError too
             raise DbTemplateError(f"for_each: bad predicate {pred!r}: {e}")
         cols = {c.lstrip("$") for c in referenced_fields(pred)}  # the $cols it names (matches-nothing WARN)
     if _HEAD_ROW.fullmatch(head):

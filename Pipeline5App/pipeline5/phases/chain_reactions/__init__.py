@@ -14,5 +14,8 @@ Config (per-system tier, 4-tier resolved): `chain_reactions/reactions.csv` (the 
 renderer itself is src://pipeline5/language/tempemplator.py (values = expr, structure = @directives).
 Hooks are fired by the SYSTEM RUN-PLAN (e.g. src://pipeline5/systems/plc_based/siemens_s7/safety/main.py
 around its staging leg) - phase buttons and Run-all fire identically because the hook lives in the
-handler, not the GUI.
+handler, not the GUI. A run-plan's duties (every system's, the RTX ones included): pass its `hooks`
+to each `fire` (a rule on any other hook is reported, never silently idle), and hand a
+database-less hook's `Deferred` to `engine.settle` once its phase gate passes (a halted phase lists
+the deferred firings in the log instead). The failure-finding catalog lives in engine.py.
 """

@@ -182,6 +182,38 @@ def test_render_missing_modes_precise():
     raises(ExprError, lambda: expr.render("{$x}", {}, mode="bogus"))
 
 
+def test_render_strict_is_top_level_only():
+    """STRICT render checks the TOP-LEVEL names; a dotted SUB-key stays optional (C-002: silent-empty)
+    in every mode. Pinned after the chain-reaction round-6 implications check: a pre-scan that
+    demanded every dotted path resolve broke the guard functions (coalesce/present/if), misread
+    data-function predicates (their `$col` is the ITERATED row), failed on node rows with an empty
+    JSON cell, and would have halted a project-tier datablock template (C-008). Row-field typos in
+    table loops are caught by the Tempemplator's column SCHEMA check instead (test_tempemplator)."""
+    raises(ExprError, lambda: expr.render("{$obj.k}", {}, mode="strict"))            # top-level missing
+    eq(expr.render("{$obj.k}", {"obj": {"k": "v"}}, mode="strict"), "v", "a resolving path -> value")
+    eq(expr.render("{$obj.kk}", {"obj": {"k": "v"}}, mode="strict"), "", "a missing sub-key -> '' (optional)")
+    eq(expr.render("{$obj.k}", {"obj": None}, mode="strict"), "", "an empty JSON cell -> '' (node rows)")
+    eq(expr.render('{coalesce($type.tristate, "0")}', {"type": {"type_id": "A"}}, mode="strict"), "0",
+       "the guard functions work on an optional sub-key")
+    eq(expr.render('{if(present($type.tristate), "y", "n")}', {"type": {}}, mode="strict"), "n",
+       "present() guards an optional sub-key")
+    eq(expr.evaluate("$obj.kk", {"obj": {"k": "v"}}), "", "the evaluator: silent-empty")
+
+
+def test_bad_regex_is_a_located_error():
+    """Chain-reaction refuter round 6 (B1): a malformed /regex/ raised a RAW re.error out of the
+    compiler - escaping the ExprError contract at all three regex sites."""
+    raises(ExprError, lambda: expr.test("$name ~ /(D/", {"name": "D1"}))
+    raises(ExprError, lambda: expr.evaluate("extract($tag, /(P/)", {"tag": "P1"}))
+    raises(ExprError, lambda: expr.evaluate('regex_replace($tag, /[/, "x")', {"tag": "P1"}))
+    try:
+        expr.test("$name ~ /(D/", {"name": "D1"})
+    except ExprError as error:
+        ok("/(D/" in str(error), "the error names the offending pattern")
+    ok(expr.check("$name ~ /(D/") != [], "the editor lint reports it too (compile-only)")
+    eq(expr.test("$name ~ /d\\d/", {"name": "D1"}), True, "a VALID pattern still matches (IGNORECASE)")
+
+
 def test_render_non_simple_hole_modes():
     # M-E5 strict-fidelity fix: keep/strict now check EVERY top-level $field in a hole, incl. ones nested
     # in a function call - so a missing field in {concat($x, $y)} is caught (keep -> the literal token).
@@ -299,6 +331,8 @@ if __name__ == "__main__":
         ("let_shadow_and_bind_once", test_let_shadow_and_bind_once),
         ("let_out_of_scope_binding_expr_rejected", test_let_out_of_scope_binding_expr_rejected),
         ("truncated_expression_is_a_located_error", test_truncated_expression_is_a_located_error),
+        ("render_strict_is_top_level_only", test_render_strict_is_top_level_only),
+        ("bad_regex_is_a_located_error", test_bad_regex_is_a_located_error),
         ("let_earlier_binding_not_visible_to_prior", test_let_earlier_binding_not_visible_to_prior),
         ("let_nested_inner_sees_outer", test_let_nested_inner_sees_outer),
         ("let_permissive_scope_admits_anything", test_let_permissive_scope_admits_anything),

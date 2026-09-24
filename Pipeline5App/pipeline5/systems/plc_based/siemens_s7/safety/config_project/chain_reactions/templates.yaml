@@ -22,6 +22,18 @@
 #       @for $i in 1..{$count}: @use <name>  inclusive range loop (inline body form)
 #       @for $row in <table> where <pred>    loop over SSOT rows ({$row.field} inside)
 #       @if <pred> / @else / @end            block conditional
+#   Write a TEXT template as a block scalar (`name: |-` then the indented body, as below): YAML
+#   reserves `@` at the START of a plain value, so `name: @use other` does not even load (the
+#   engine reports rx_templates_unreadable and blocks the hook's rules - never a crash).
+#
+# Holes render STRICT: a missing top-level {$field} is an error, and inside a table loop
+# {$row.column} must name a column of that table ({$r.tagg} over signals is an error, not a blank).
+# Deeper JSON sub-keys ({$r.type.type_id}) and {$_params...} keys are OPTIONAL - blank when absent
+# (e.g. on node rows) - so guard them: `@if present($r.type.type_id)` / `coalesce($x.key, "0")`.
+# A ROW template or a file target has no @if: filter such rows in the rule's `condition` instead.
+# Predicates (@if, where, conditions) are lenient: a misspelled name there just reads blank.
+# A rule fires only on a hook the system's run-plan fires (Siemens: before_300 / after_300) -
+# any other hook is reported as rx_unfired_hook.
 #
 # The expression scope: the matched row's fields, {$_params...} (project params, dotted),
 # {$_rule.name}/{$_rule.hook}, and every SSOT table for @for queries + expr data functions.
