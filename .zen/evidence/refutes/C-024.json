@@ -1,0 +1,33 @@
+{
+  "clause": "C-024",
+  "verdict": "refuted",
+  "ranAt": "2026-09-24T20:38:54.535Z",
+  "headCommit": "31b5ec7adbdd4af3828155b059fbd9dae3700a49",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_tempemplator.py",
+      "file": "Pipeline5App/tests/unit/test_tempemplator.py",
+      "symbolSha": "f3ab51c4825a114ff8f91275cd9b8dc827ea41384cfba35a3462f9f406914f19"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_chain_reactions.py",
+      "file": "Pipeline5App/tests/unit/test_chain_reactions.py",
+      "symbolSha": "185dba650cbab96aa829879d110934a7101f6e0bace94d37054fc36998cd7e08"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "symbolSha": "a945b9cf216641b8d9b59436c42948919d8dccf80aa05859933f3d740d479cd9"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_expr_adversarial.py",
+      "file": "Pipeline5App/tests/unit/test_expr_adversarial.py",
+      "symbolSha": "ae6daccca4340fe947256a2db780bf3d88024a6c870d12847e76275f6fd4b36b"
+    },
+    {
+      "name": "Pipeline5App/scripts/parity_vs_pl4.py",
+      "file": "Pipeline5App/scripts/parity_vs_pl4.py",
+      "symbolSha": "596ad6a2232936d851d7abd01bebe88bd31fbd544ef3141e81828adeee4e00bd"
+    }
+  ]
+}

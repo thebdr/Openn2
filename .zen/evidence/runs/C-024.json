@@ -8,33 +8,33 @@
   "exitCode": 0,
   "outputSha": "1e857abb52ecc340ccfc48d0086745099181625cbfd13166f798015d8cd653e2",
   "outputTail": "  PASS  render_literal_braces_and_empty\r\n  PASS  render_spec_split_with_colon_in_extract_slice\r\n  PASS  coalesce_edge_values\r\n  PASS  if_truthiness_edge\r\n  PASS  where_pred_references_row_column\r\n  PASS  node_of_boundaries\r\n  PASS  node_of_bad_byte_columns_skipped\r\n  PASS  lookup_and_unique_edges\r\n  -> 24/24 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-07-17T15:58:24.364Z",
-  "headCommit": "13bad07a6a205de7474ca1794eaad4c2365f0fd9",
+  "ranAt": "2026-09-24T20:20:18.065Z",
+  "headCommit": "31b5ec7adbdd4af3828155b059fbd9dae3700a49",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_tempemplator.py",
       "file": "Pipeline5App/tests/unit/test_tempemplator.py",
-      "fileSha": "61d36e8d73f44db1b7e622b25c2ab5bb8601295f66b85e372794b830fdb70749"
+      "fileSha": "f3ab51c4825a114ff8f91275cd9b8dc827ea41384cfba35a3462f9f406914f19"
     },
     {
       "name": "Pipeline5App/tests/unit/test_chain_reactions.py",
       "file": "Pipeline5App/tests/unit/test_chain_reactions.py",
-      "fileSha": "68b24824569859be3122070077b32f47e6b27285126757e932e0e1351f420e90"
+      "fileSha": "185dba650cbab96aa829879d110934a7101f6e0bace94d37054fc36998cd7e08"
     },
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
       "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
-      "fileSha": "31ef531c70d4070d64d26e996709c8d298c7296f112f818d22e52ad162cd9f9f"
+      "fileSha": "a945b9cf216641b8d9b59436c42948919d8dccf80aa05859933f3d740d479cd9"
     },
     {
       "name": "Pipeline5App/tests/unit/test_expr_adversarial.py",
       "file": "Pipeline5App/tests/unit/test_expr_adversarial.py",
-      "fileSha": "8d8a55c974773b9ad0312790d795a7e1295e605d925e0b2e7a9e3f0bc15557de"
+      "fileSha": "ae6daccca4340fe947256a2db780bf3d88024a6c870d12847e76275f6fd4b36b"
     },
     {
       "name": "Pipeline5App/scripts/parity_vs_pl4.py",
       "file": "Pipeline5App/scripts/parity_vs_pl4.py",
-      "fileSha": "52017f42ee2b3943e9050e94a1df05e52e75393edc20aeda2ea7d0a462e72f18"
+      "fileSha": "596ad6a2232936d851d7abd01bebe88bd31fbd544ef3141e81828adeee4e00bd"
     }
   ]
 }

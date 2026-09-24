@@ -6,35 +6,35 @@
     "Pipeline5App/scripts/verify_c023.sh"
   ],
   "exitCode": 0,
-  "outputSha": "2693f0ff4c3ca6d4e12f598503555256c2c3261f9b124d26cb4ddf7e84a14abd",
+  "outputSha": "a88f82615608f37f3efc2f288c658531cb6eb816bf3a3afece9eb67aedba001a",
   "outputTail": "== architecture_contracts ==\r\n  PASS  l1_layers_one_direction\r\n  PASS  l2_phases_are_filters\r\n  PASS  l3_systems_sealed\r\n  PASS  l4_headless_pipeline\r\n  PASS  l5_no_type_id_literals_below_workbench\r\n  PASS  ratchet_entries_still_real\r\n  PASS  parts_all_known\r\n  -> 7/7 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-07-17T14:46:11.457Z",
-  "headCommit": "88478d35b4f3ed29c70f6f439682a845bdf38a07",
+  "ranAt": "2026-09-24T20:21:25.727Z",
+  "headCommit": "31b5ec7adbdd4af3828155b059fbd9dae3700a49",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_gui_phase_model.py",
       "file": "Pipeline5App/tests/unit/test_gui_phase_model.py",
-      "fileSha": "5d69992f06ade478e76d61ede0c81786e976a440e844bee51b66fd7ab6e2f83f"
+      "fileSha": "217e068119c388c14fe85cf3630d7315b02dcb8666d41e855e8eadab4dc40c32"
     },
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
       "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
-      "fileSha": "bf5c90afb7bb39239fc2220b1895a3a20ee954a9fe9d9c8625699d714311dbf7"
+      "fileSha": "a945b9cf216641b8d9b59436c42948919d8dccf80aa05859933f3d740d479cd9"
     },
     {
       "name": "Pipeline5App/tests/unit/test_project_manager.py",
       "file": "Pipeline5App/tests/unit/test_project_manager.py",
-      "fileSha": "10b4748b374fb0cd2d618f38c2eac8d0081254cfbdb39ad39b40bae3c4e7ef11"
+      "fileSha": "6112350a1c6faff208ba094146afb3cb9fcd4158175ba802e4c418ca6275501b"
     },
     {
       "name": "Pipeline5App/tests/unit/test_architecture_contracts.py",
       "file": "Pipeline5App/tests/unit/test_architecture_contracts.py",
-      "fileSha": "5c90c82b45cebe23dae384b445694b564f8e43e2ba5abb4e2d42b34300c7404e"
+      "fileSha": "4a0c4626bfd5c32714b4867dbc9b241ca5ddf6d0911dca09d6e3a0b95950eb9d"
     },
     {
       "name": "Pipeline5App/scripts/parity_vs_pl4.py",
       "file": "Pipeline5App/scripts/parity_vs_pl4.py",
-      "fileSha": "52017f42ee2b3943e9050e94a1df05e52e75393edc20aeda2ea7d0a462e72f18"
+      "fileSha": "596ad6a2232936d851d7abd01bebe88bd31fbd544ef3141e81828adeee4e00bd"
     }
   ]
 }

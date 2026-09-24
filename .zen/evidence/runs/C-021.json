@@ -6,30 +6,30 @@
     "Pipeline5App/scripts/verify_c021.sh"
   ],
   "exitCode": 0,
-  "outputSha": "f69bfa8eb34f07638691b9a79afd2c0ede0d7f0993d4296dca9f32451aaf8cd5",
-  "outputTail": "== architecture_contracts ==\r\n  PASS  l1_layers_one_direction\r\n  PASS  l2_phases_are_filters\r\n  PASS  l3_systems_sealed\r\n  PASS  l4_headless_pipeline\r\n  PASS  l5_no_type_id_literals_below_workbench\r\n  PASS  ratchet_entries_still_real\r\n  PASS  parts_all_known\r\n  -> 7/7 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 38 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-07-17T14:00:49.551Z",
-  "headCommit": "376422383773e86443ed93d3499642dd76167100",
+  "outputSha": "f26a8e0831ee952043a8d776220d0759d9ab0e83ba15d818d5f29f276a813f73",
+  "outputTail": "== architecture_contracts ==\r\n  PASS  l1_layers_one_direction\r\n  PASS  l2_phases_are_filters\r\n  PASS  l3_systems_sealed\r\n  PASS  l4_headless_pipeline\r\n  PASS  l5_no_type_id_literals_below_workbench\r\n  PASS  ratchet_entries_still_real\r\n  PASS  parts_all_known\r\n  -> 7/7 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
+  "ranAt": "2026-09-24T20:20:47.491Z",
+  "headCommit": "31b5ec7adbdd4af3828155b059fbd9dae3700a49",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_systems_contract.py",
       "file": "Pipeline5App/tests/unit/test_systems_contract.py",
-      "fileSha": "ac9aeb4f1d98125e7d03d3f84279c83af2f88b625e469c42d7917d947545df98"
+      "fileSha": "8b8e984ce0a87022f8bea3d8c1d744f7f736e031b5e2a0c432c8f187d99ac6e7"
     },
     {
       "name": "Pipeline5App/tests/unit/test_system_siemens.py",
       "file": "Pipeline5App/tests/unit/test_system_siemens.py",
-      "fileSha": "d9688ed4ba3a1d4560b730b933f0f89ef6e879edf0451a5b2a56050d62ab3f19"
+      "fileSha": "5ee970e462848e6bb565c44756835d903aa13e37bf844343d6f13582e2e7fc21"
     },
     {
       "name": "Pipeline5App/tests/unit/test_architecture_contracts.py",
       "file": "Pipeline5App/tests/unit/test_architecture_contracts.py",
-      "fileSha": "5c90c82b45cebe23dae384b445694b564f8e43e2ba5abb4e2d42b34300c7404e"
+      "fileSha": "4a0c4626bfd5c32714b4867dbc9b241ca5ddf6d0911dca09d6e3a0b95950eb9d"
     },
     {
       "name": "Pipeline5App/scripts/parity_vs_pl4.py",
       "file": "Pipeline5App/scripts/parity_vs_pl4.py",
-      "fileSha": "52017f42ee2b3943e9050e94a1df05e52e75393edc20aeda2ea7d0a462e72f18"
+      "fileSha": "596ad6a2232936d851d7abd01bebe88bd31fbd544ef3141e81828adeee4e00bd"
     }
   ]
 }
