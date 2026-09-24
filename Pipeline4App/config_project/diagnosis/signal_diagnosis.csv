@@ -11,5 +11,5 @@ DI1/2,yes,invert,SAFETY DOOR OPEN {$combined_FLD},no,
 DD,yes,invert,SAFETY DOOR ALARM - NOT PROPERLY CLOSED {$combined_FLD},no,
 KQ,yes,invert,FEEDBACK OF SAFETY RELAY FAULT {$desc_l1b} {$combined_FLD},no,
 KQ1/2,yes,invert,FEEDBACK OF SAFETY RELAY FAULT {$desc_l1b} {$combined_FLD},no,
-Z#,yes,invert,,no,
-F1/2,yes,invert,,no,
+Z#,yes,invert,{$desc_l1b} {$combined_FLD}
+F1/2,yes,invert,{$desc_l1b} {$combined_FLD},no
