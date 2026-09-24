@@ -6,30 +6,30 @@
     "Pipeline5App/scripts/verify_c024.sh"
   ],
   "exitCode": 0,
-  "outputSha": "1e857abb52ecc340ccfc48d0086745099181625cbfd13166f798015d8cd653e2",
-  "outputTail": "  PASS  render_literal_braces_and_empty\r\n  PASS  render_spec_split_with_colon_in_extract_slice\r\n  PASS  coalesce_edge_values\r\n  PASS  if_truthiness_edge\r\n  PASS  where_pred_references_row_column\r\n  PASS  node_of_boundaries\r\n  PASS  node_of_bad_byte_columns_skipped\r\n  PASS  lookup_and_unique_edges\r\n  -> 24/24 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-09-24T20:20:18.065Z",
-  "headCommit": "31b5ec7adbdd4af3828155b059fbd9dae3700a49",
+  "outputSha": "46bff9e28cc236979ba434f869e8ac76ba87e87a2e913b794008d3d4c29f21be",
+  "outputTail": "  PASS  render_literal_braces_and_empty\r\n  PASS  render_spec_split_with_colon_in_extract_slice\r\n  PASS  coalesce_edge_values\r\n  PASS  if_truthiness_edge\r\n  PASS  where_pred_references_row_column\r\n  PASS  node_of_boundaries\r\n  PASS  node_of_bad_byte_columns_skipped\r\n  PASS  lookup_and_unique_edges\r\n  -> 26/26 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
+  "ranAt": "2026-09-24T21:45:02.131Z",
+  "headCommit": "ca4fac7b92bcb91a5cbd90c5149cf6f4750c4bd0",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_tempemplator.py",
       "file": "Pipeline5App/tests/unit/test_tempemplator.py",
-      "fileSha": "f3ab51c4825a114ff8f91275cd9b8dc827ea41384cfba35a3462f9f406914f19"
+      "fileSha": "6f964c6aeb789415bb9c25b105713bcbf22d51f4dd10e1a7af55271d3bf76bd2"
     },
     {
       "name": "Pipeline5App/tests/unit/test_chain_reactions.py",
       "file": "Pipeline5App/tests/unit/test_chain_reactions.py",
-      "fileSha": "185dba650cbab96aa829879d110934a7101f6e0bace94d37054fc36998cd7e08"
+      "fileSha": "23758134d73efb3ab2aa4da26fb94d91240407193eb44797f6893f28b41e851d"
     },
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
       "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
-      "fileSha": "a945b9cf216641b8d9b59436c42948919d8dccf80aa05859933f3d740d479cd9"
+      "fileSha": "20a5539202e19c00b1782f42dc1795bb89cc50baa0c8ee7fec08060c91a30c5c"
     },
     {
       "name": "Pipeline5App/tests/unit/test_expr_adversarial.py",
       "file": "Pipeline5App/tests/unit/test_expr_adversarial.py",
-      "fileSha": "ae6daccca4340fe947256a2db780bf3d88024a6c870d12847e76275f6fd4b36b"
+      "fileSha": "24ec15aa51373cf87f11ac3352d5b5f66bcfdaaa0ba56c81b8585232dd65863f"
     },
     {
       "name": "Pipeline5App/scripts/parity_vs_pl4.py",
