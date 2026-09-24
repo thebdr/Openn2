@@ -116,5 +116,5 @@ def format_spec(value, spec: str) -> str:
         if last and last in _FLOAT_CONV:
             return format(float(value), spec)
         return format(value, spec)
-    except (ValueError, TypeError) as e:
+    except (ValueError, TypeError, OverflowError) as e:     # OverflowError: {$n:d} on 'inf' (refuter round 7)
         raise ExprError(f"bad format spec {spec!r} for value {value!r}: {e}")

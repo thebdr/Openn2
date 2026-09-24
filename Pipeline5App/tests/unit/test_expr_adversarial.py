@@ -211,6 +211,11 @@ def test_bad_regex_is_a_located_error():
     except ExprError as error:
         ok("/(D/" in str(error), "the error names the offending pattern")
     ok(expr.check("$name ~ /(D/") != [], "the editor lint reports it too (compile-only)")
+    # chain-reaction refuter round 7: two more raw exceptions escaping the ExprError contract
+    raises(ExprError, lambda: expr.evaluate("extract($t, /(\\d+)/, 1.3)", {"t": "P12"}))   # `1.3` for `1:3`
+    ok(expr.check("extract($t, /(\\d+)/, 1.3)") != [], "the checker reports the decimal slice, never raises")
+    eq(expr.evaluate("extract($t, /(\\d+)/, 0:1)", {"t": "P12"}), "1", "an integer slice still works")
+    raises(ExprError, lambda: expr.render("{$n:03d}", {"n": "inf"}))                       # OverflowError before
     eq(expr.test("$name ~ /d\\d/", {"name": "D1"}), True, "a VALID pattern still matches (IGNORECASE)")
 
 

@@ -25,16 +25,20 @@ THE RULE (one row of `chain_reactions/reactions.csv` - per-system config, 4-tier
 
 THE SCOPE an expression sees (the E1 layering): the matched source row's fields at top level,
 `_params` = the project params (dotted: {$_params.project_code}), `_rule` = {name, hook},
-`_db` = every SSOT table (expr's data functions + the @for table queries read it).
+`_db` = every SSOT table (expr's data functions + the @for table queries read it), each row carrying
+EVERY column of its table (an absent cell as "") - a freshly staged row lacks the columns later
+phases fill, yet the renderer's loop-column check must see the table's real schema.
 
 APPEND is the file action's ONLY mode (user decision 2026-07-16): the file is created if absent and
 APPENDED otherwise - the USER is responsible for lifecycle handling (e.g. a `before_<phase>` rule
 that opens a fresh header, or deleting the file between runs).
 
 THE AUDIT TRAIL is the `chain_reactions_log` SSOT table: one row per rule FIRED at a hook (hook,
-rule, action, target, match count, rows-or-lines created, `outcome` = "ok" or the failure's finding
-type), REPLACED per hook on each firing so the Explorer shows the LAST run - a failed re-fire
-replaces the previous run's success row too. A hook with NO database yet (before_300: nothing is
+rule, action, target, match count, rows-or-lines created - counted as they are made, so a mid-action
+failure keeps the true partial count - and `outcome` = "ok" or the failure's finding type), REPLACED
+per hook on each firing so the Explorer shows the LAST run - a failed re-fire replaces the previous
+run's success row too. A Database that never loaded the audit or the findings record (the 310 leg
+stages only signals + diagnosis_cabinets) APPENDS to the on-disk one - never overwrites it. A hook with NO database yet (before_300: nothing is
 staged) cannot persist anything: its fire returns a `Deferred` (the audit rows + findings) that the
 run-plan hands to `settle` once the phase has staged its database.
 
@@ -43,7 +47,9 @@ the run continues; ERRR = possibly-incomplete output, per the severity contract)
 the handler's `ctx.render` and recorded (uid-deduplicated) to `validation_issues`:
 
     rx_bad_rule         a malformed reactions.csv row (no name / bad hook / action / target /
-                        template) - dropped at compile
+                        template) - dropped at compile; a row the compiler cannot even read is
+                        named by its position (`<row n>`) - compiling NEVER raises, since the
+                        whole index compiles at every hook's fire
     rx_bad_condition    the condition does not compile (dropped at compile) or fails to evaluate
     rx_bad_template     the template is missing, the wrong kind for the action, malformed, or fails
                         to render (a strict hole, a template error)
@@ -72,11 +78,12 @@ import re
 from dataclasses import dataclass, field
 
 from pipeline5 import config
-from pipeline5.findings.finding import Finding, record
+from pipeline5.findings.finding import Finding, record, validation_issues_table
 from pipeline5.language import expr
 from pipeline5.language import tempemplator
 from pipeline5.language.expr import ExprError
 from pipeline5.language.tempemplator import TempemplatorError
+from pipeline5.truth.database import Database
 from pipeline5.truth.table import Table
 
 _HOOK = re.compile(r"^(before|after)_(\d+)$")
@@ -132,43 +139,58 @@ def _hook_phase(hook: str) -> int:
 
 def _compile(rows) -> tuple:
     """reactions.csv rows -> (rules, [(hook_or_None, finding)]): each finding tagged with the hook
-    its row names (None when unparseable), so `fire` knows which hook OWNS it."""
+    its row names (None when unparseable), so `fire` knows which hook OWNS it. The rule index is
+    compiled at EVERY hook's fire, so compiling must never raise: a row the compiler cannot even
+    read is an index problem (owner None), never a crash of every hook (refuter round 7)."""
     rules, tagged = [], []
-    for row in rows:
-        name = (row.get("name") or "").strip()
-        fire_when = (row.get("fire_when") or "").strip().lower()
-        action = (row.get("action") or "").strip().lower()
-        target = (row.get("target") or "").strip()
-        template = (row.get("template") or "").strip()
-        condition = (row.get("condition") or "").strip()
-        hook = _HOOK.match(fire_when)
-        owner = fire_when if hook else None
-        phase = int(hook.group(2)) if hook else 0
-        problems = []
-        if not name:
-            problems.append("name is empty (the rule's id - row: "
-                            f"fire_when={fire_when!r}, action={action!r}, target={target!r})")
-        if not hook:
-            problems.append(f"fire_when {fire_when!r} is not before_<phase>/after_<phase>")
-        if action not in _ACTIONS:
-            problems.append(f"action {action!r} is not one of {_ACTIONS}")
-        if not target:
-            problems.append("target is empty (a table name or a file path)")
-        if not template:
-            problems.append("template is empty (a templates.yaml entry name)")
-        if problems:
-            tagged.append((owner, _f(phase, "rx_bad_rule", "; ".join(problems), name or "<unnamed rule>")))
-            continue
-        issues = expr.check(condition)                # compile-only: a typo is caught even when
-        if issues:                                    # no row would ever reach the condition
-            tagged.append((owner, _f(phase, "rx_bad_condition",
-                                     f"condition {condition!r}: {issues[0].message}", name)))
-            continue
-        rules.append(Rule(name=name, fire_when=fire_when,
-                          source_table=(row.get("source_table") or "").strip(),
-                          condition=condition, action=action, target=target, template=template,
-                          comment=(row.get("comment") or "").strip()))
+    for number, row in enumerate(rows, start=1):
+        try:
+            rule, problem = _compile_row(row)
+        except Exception as error:                    # the backstop - named by position, not content
+            rule, problem = None, (None, _f(0, "rx_bad_rule", f"reactions.csv row {number} cannot be "
+                                            f"compiled: {type(error).__name__}: {error}", f"<row {number}>"))
+        if rule is not None:
+            rules.append(rule)
+        if problem is not None:
+            tagged.append(problem)
     return rules, tagged
+
+
+def _compile_row(row) -> tuple:
+    """One reactions.csv row -> (Rule, None) or (None, (owner_hook_or_None, finding))."""
+    name = (row.get("name") or "").strip()
+    fire_when = (row.get("fire_when") or "").strip().lower()
+    action = (row.get("action") or "").strip().lower()
+    target = (row.get("target") or "").strip()
+    template = (row.get("template") or "").strip()
+    condition = (row.get("condition") or "").strip()
+    hook = _HOOK.match(fire_when)
+    owner = fire_when if hook else None
+    phase = int(hook.group(2)) if hook else 0
+    problems = []
+    if not name:
+        problems.append("name is empty (the rule's id - row: "
+                        f"fire_when={fire_when!r}, action={action!r}, target={target!r})")
+    if not hook:
+        problems.append(f"fire_when {fire_when!r} is not before_<phase>/after_<phase>")
+    if action not in _ACTIONS:
+        problems.append(f"action {action!r} is not one of {_ACTIONS}")
+    if not target:
+        problems.append("target is empty (a table name or a file path)")
+    if not template:
+        problems.append("template is empty (a templates.yaml entry name)")
+    if problems:
+        return None, (owner, _f(phase, "rx_bad_rule", "; ".join(problems), name or "<unnamed rule>"))
+    try:                                              # compile-only: a typo is caught even when
+        issues = expr.check(condition)                # no row would ever reach the condition
+        message = issues[0].message if issues else ""
+    except Exception as error:                        # a checker defect is still THIS rule's finding
+        message = f"{type(error).__name__}: {error}"
+    if message:
+        return None, (owner, _f(phase, "rx_bad_condition", f"condition {condition!r}: {message}", name))
+    return Rule(name=name, fire_when=fire_when, source_table=(row.get("source_table") or "").strip(),
+                condition=condition, action=action, target=target, template=template,
+                comment=(row.get("comment") or "").strip()), None
 
 
 def compile_rules(rows) -> tuple:
@@ -229,15 +251,15 @@ def _matches(rule: Rule, database, params: dict, db_tables: dict) -> tuple:
 
 
 def _spawn_rows(rule: Rule, matched: list, database, templates: dict,
-                params: dict, db_tables: dict) -> tuple:
+                params: dict, db_tables: dict, tally: dict) -> list:
     """The add_rows action: per matched row, per row-spec of the ROW template, spawn one expr-filled
     row into the target table WITH provenance (spawned_by = the rule, source_uid = the trigger).
-    Returns (created_count, findings)."""
+    Counts into `tally["created"]` AS IT GOES (a mid-action failure keeps the true partial count).
+    Returns the findings."""
     if database is None or rule.target not in database:
-        return 0, [_f(rule.phase, "rx_unknown_table",
-                      f"target table {rule.target!r} is not in the database at this hook", rule.name)]
+        return [_f(rule.phase, "rx_unknown_table",
+                   f"target table {rule.target!r} is not in the database at this hook", rule.name)]
     table = database[rule.target]
-    created = 0
     for row in matched:
         scope = _scope(row, rule, params, db_tables)
         for row_spec in templates[rule.template]:
@@ -245,27 +267,26 @@ def _spawn_rows(rule: Rule, matched: list, database, templates: dict,
                 values = {str(name): expr.render(str(tpl), scope, mode="strict")
                           for name, tpl in row_spec.items()}
             except ExprError as error:
-                return created, [_f(rule.phase, "rx_bad_template",
-                                    f"row template {rule.template!r}: {error}", rule.name)]
+                return [_f(rule.phase, "rx_bad_template", f"row template {rule.template!r}: {error}", rule.name)]
             values["spawned_by"] = rule.name
             values.setdefault("source_uid", str(row.get("uid") or ""))
             table.add(**values)
-            created += 1
-    return created, []
+            tally["created"] += 1
+    return []
 
 
 def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
-                 db_tables: dict, files_root: str) -> tuple:
+                 db_tables: dict, files_root: str, tally: dict) -> list:
     """The file action: per matched row, render the TEXT template and APPEND it (+ newline) to the
-    expr-rendered target path (relative -> under `files_root`). Returns (lines_written, findings)."""
-    written = 0
+    expr-rendered target path (relative -> under `files_root`). Counts the lines written into
+    `tally["created"]` as it goes. Returns the findings."""
     for row in matched:
         scope = _scope(row, rule, params, db_tables)
         try:
             path = expr.render(rule.target, scope, mode="strict")
             text = tempemplator.render_template(rule.template, templates, scope)
         except (ExprError, TempemplatorError) as error:
-            return written, [_f(rule.phase, "rx_bad_template", str(error), rule.name)]
+            return [_f(rule.phase, "rx_bad_template", str(error), rule.name)]
         if not os.path.isabs(path):
             path = os.path.join(files_root, path)
         try:
@@ -273,10 +294,10 @@ def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
             with open(path, "a", encoding="utf-8") as handle:      # APPEND is the only mode (user decision)
                 handle.write(text + "\n")
         except OSError as error:                                   # e.g. a `"` a quoted tag rendered in
-            return written, [_f(rule.phase, "rx_file_write",
-                                f"cannot write {path!r}: {error.strerror or error}", rule.name)]
-        written += text.count("\n") + 1
-    return written, []
+            return [_f(rule.phase, "rx_file_write", f"cannot write {path!r}: {error.strerror or error}",
+                       rule.name)]
+        tally["created"] += text.count("\n") + 1
+    return []
 
 
 def _load(loader, type_: str, what: str, phase: int):
@@ -288,10 +309,32 @@ def _load(loader, type_: str, what: str, phase: int):
         return None, _f(phase, type_, f"{what} does not load: {error}", what)
 
 
+def _db_tables(database) -> dict:
+    """The E1 `_db` layer: {table: rows}, every row carrying EVERY column of its table (an absent cell
+    as "" - exactly how expr reads a missing key), so the renderer's loop-column check sees the
+    table's real schema: a freshly STAGED row lacks the columns later phases fill, yet they are the
+    table's columns all the same (refuter round 7: `{$r.name_in_db}` failed at after_300 only)."""
+    tables = {}
+    for name in database.names():
+        table = database[name]
+        columns = table.effective_columns()
+        tables[name] = [{column: row.get(column, "") for column in columns} for row in table]
+    return tables
+
+
+def _attach(database, factory, name: str):
+    """The database's `name` table - or, when this Database never loaded one (the 310 leg stages only
+    signals + diagnosis_cabinets), the ON-DISK record, so appending and saving never overwrite what
+    earlier phases recorded (refuter round 7: a reaction finding wiped a phase-110 record)."""
+    if name not in database:
+        database.add_table(Database([factory()]).load(config.database_dir())[name])
+    return database[name]
+
+
 def _record_new(database, findings) -> int:
     """Record the findings not yet in `validation_issues` (by uid - a malformed rule surfaces at every
     hook's fire, but lands in the record ONCE). Returns the count recorded; the caller saves."""
-    known = {r.get("uid") for r in database["validation_issues"]} if "validation_issues" in database else set()
+    known = {r.get("uid") for r in _attach(database, validation_issues_table, "validation_issues")}
     fresh = []
     for finding in findings:
         if finding.uid not in known:
@@ -304,7 +347,7 @@ def _record_new(database, findings) -> int:
 
 def _persist(database, hook: str, log_rows: list, findings: list) -> None:
     """Replace `hook`'s audit rows with this firing's, record its findings, save the database."""
-    log = database[LOG_TABLE] if LOG_TABLE in database else database.add_table(chain_reactions_log_table())
+    log = _attach(database, chain_reactions_log_table, LOG_TABLE)
     log.rows = [r for r in log.rows if r.get("hook") != hook]   # this hook's audit reflects THE LAST run
     log.extend(log_rows)
     _record_new(database, findings)
@@ -379,11 +422,11 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
         if blocked is not None:
             findings.append(blocked)
     files_root = config.output_root() if files_root is None else files_root
-    db_tables = {name: list(database[name]) for name in database.names()} if database is not None else {}
+    db_tables = _db_tables(database) if database is not None and active else {}
 
     log_rows = []
     for rule in active:
-        matched, created, problems = [], 0, []
+        matched, problems, tally = [], [], {"created": 0}
         if blocked is None:
             try:
                 reason = _template_problem(rule, templates)
@@ -394,15 +437,14 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
                     if problem is not None:
                         problems = [problem]
                     elif rule.action == "add_rows":
-                        created, problems = _spawn_rows(rule, matched, database, templates, params, db_tables)
+                        problems = _spawn_rows(rule, matched, database, templates, params, db_tables, tally)
                     else:
-                        created, problems = _append_file(rule, matched, templates, params, db_tables,
-                                                         files_root)
+                        problems = _append_file(rule, matched, templates, params, db_tables, files_root, tally)
             except Exception as error:   # the backstop: an unforeseen defect is a finding, never a crash
                 problems = [_f(rule.phase, "rx_rule_crashed", f"{type(error).__name__}: {error}", rule.name)]
         findings.extend(problems)
         outcome = blocked.type if blocked is not None else (problems[0].type if problems else "ok")
         log_rows.append({"hook": rule.fire_when, "rule": rule.name, "action": rule.action,
-                         "target": rule.target, "matches": len(matched), "created": created,
+                         "target": rule.target, "matches": len(matched), "created": tally["created"],
                          "outcome": outcome})
     return _finish(hook, database, log_rows, findings)

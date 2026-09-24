@@ -31,13 +31,15 @@ THE GRAMMAR (line-based; a directive line's own indentation is consumed, body li
     @for $var in <table> [where <pred>]  one iteration per (matching) row of ctx["_db"][<table>];
                                          $var = the row dict (fields via $var.field); <pred> is an
                                          expr predicate evaluated with the ROW as its scope -
-                                         exactly expr's where() semantics
+                                         exactly expr's where() semantics (a /regex/ in it is
+                                         one literal: its `..` or `:` never splits the line)
     @for ... : <one line>                the inline body form (the line may itself be a directive)
     @if <pred> / @else / @end            block conditional (expr.test); nests freely
     anything else                        a literal line - {expr} holes rendered STRICT
 
 WHAT "STRICT" CATCHES (refuter round 6, resolved against C-002): a missing TOP-LEVEL field, and -
-inside a TABLE loop - a `$row.column` naming a column no row of that table carries (a SCHEMA check:
+inside a TABLE loop - a `$row.column` naming no column of that table (a SCHEMA check - the columns
+are every key its rows carry; the reaction engine hands over rows carrying every DECLARED column:
 `{$r.tagg}` over `signals` is a located error; a range var has no columns at all). Deeper sub-keys
 of a JSON cell (`$r.type.type_id`) and `{$_params...}` keys stay OPTIONAL per C-002 - blank when
 absent, like get_param - so guard or default them (`@if present($r.type.type_id)`, `coalesce(...)`).
@@ -109,16 +111,21 @@ def _render_named(name: str, templates: dict, ctx: dict, stack: tuple, site: tup
 
 
 def _split_top(text: str, marker: str) -> tuple:
-    """Split `text` at the FIRST top-level occurrence of `marker` (outside {...} holes and quotes).
-    Returns (head, tail) or (text, None) when absent - how the @for inline `:` and the range `..`
-    are found without tripping over colons/dots inside expressions."""
+    """Split `text` at the FIRST top-level occurrence of `marker` (outside {...} holes, quotes and
+    /regex/ literals). Returns (head, tail) or (text, None) when absent - how the @for inline `:` and
+    the range `..` are found without tripping over colons/dots inside expressions (a `where $tag ~
+    /^P..1$/` predicate is one regex, not a range - refuter round 7; expr has no `/` operator, so an
+    unquoted `/` always opens a regex, exactly as render's hole splitter reads it)."""
     depth, i, in_q = 0, 0, ""
     while i < len(text):
         ch = text[i]
         if in_q:
+            if ch == "\\":                                  # an escaped char inside a string/regex
+                i += 2
+                continue
             if ch == in_q:
                 in_q = ""
-        elif ch in "\"'":
+        elif ch in "\"'/":
             in_q = ch
         elif ch == "{":
             depth += 1

@@ -159,7 +159,11 @@ def test_staging_fires_reaction_hooks():
 def _reaction_project(project, params):
     """A PROJECT (tier 1 of the 4-tier walk) carrying its own chain-reaction rule pair: a before_300
     header, a before_300 add_rows that can only fail (no database yet), an after_300 line drilling
-    the real params, an after_300 rule on a typo'd table, and a rule on a hook the run-plan never fires."""
+    the real params, an after_300 rule on a typo'd table, a rule on a hook the run-plan never fires,
+    an after_300 rule whose condition does not compile (a decimal slice - it used to crash every
+    hook), and an after_300 loop over the STAGED signals reading a declared column staging leaves
+    unfilled (the loop-schema check used to reject it)."""
+    import csv
     from ruamel.yaml import YAML
     shared = os.path.join(project, "config_project", "shared")
     rx_dir = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions")
@@ -167,16 +171,23 @@ def _reaction_project(project, params):
     os.makedirs(rx_dir)
     with open(os.path.join(shared, "project_params.yaml"), "w", encoding="utf-8") as handle:
         YAML(typ="safe").dump(params, handle)
+    rules = [
+        ["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
+        ["probe_hdr", "before_300", "", "", "file", "rx/probe.txt", "hdr_txt", "a header before staging"],
+        ["probe_early", "before_300", "", "", "add_rows", "signals", "rows_tpl", "no database exists yet"],
+        ["probe_file", "after_300", "", "", "file", "rx/probe.txt", "probe_txt", "one line per run"],
+        ["probe_bad", "after_300", "no_such_table", "", "file", "rx/bad.txt", "probe_txt", "a typo'd table"],
+        ["probe_cold", "after_520", "", "", "file", "rx/cold.txt", "probe_txt", "a hook nobody fires"],
+        ["probe_mal", "after_300", "signals", 'extract($mnemonic, /(\\d+)/, 1.3) = "1"', "file", "rx/mal.txt",
+         "probe_txt", "1.3 typed for the slice 1:3"],
+        ["probe_cols", "after_300", "", "", "file", "rx/cols.txt", "cols_txt", "a declared, unfilled column"],
+    ]
     with open(os.path.join(rx_dir, "reactions.csv"), "w", encoding="utf-8", newline="") as handle:
-        handle.write("name,fire_when,source_table,condition,action,target,template,comment\n"
-                     "probe_hdr,before_300,,,file,rx/probe.txt,hdr_txt,a header before staging\n"
-                     "probe_early,before_300,,,add_rows,signals,rows_tpl,no database exists yet\n"
-                     "probe_file,after_300,,,file,rx/probe.txt,probe_txt,one line per run\n"
-                     "probe_bad,after_300,no_such_table,,file,rx/bad.txt,probe_txt,a typo'd table\n"
-                     "probe_cold,after_520,,,file,rx/cold.txt,probe_txt,a hook nobody fires\n")
+        csv.writer(handle).writerows(rules)
     with open(os.path.join(rx_dir, "templates.yaml"), "w", encoding="utf-8") as handle:
         handle.write("hdr_txt: |-\n  HEADER {$_rule.hook}\n"
                      "probe_txt: |-\n  [{$_params.project_code}] {$_rule.hook} {$_rule.name}\n"
+                     "cols_txt: |-\n  @for $r in signals: [{$r.name_in_db}]\n"
                      "rows_tpl:\n  - label: \"x\"\n")
 
 
@@ -217,21 +228,28 @@ def test_configured_rules_fire_through_the_real_run_plan():
                    "drilling the REAL project params - written under the REAL output root")
             ok(not os.path.exists(os.path.join(out_root, "rx", "bad.txt")), "the failing rule wrote nothing")
             ok(not os.path.exists(os.path.join(out_root, "rx", "cold.txt")), "the unfired-hook rule never ran")
+            ok(not os.path.exists(os.path.join(out_root, "rx", "mal.txt")), "the uncompilable rule never ran")
+            staged = _read_csv(os.path.join(db_dir, "signals.csv"))
+            with open(os.path.join(out_root, "rx", "cols.txt"), encoding="utf-8") as handle:
+                cols = handle.read().splitlines()
+            ok(len(staged) > 0 and len(cols) == len(staged) and all(c[:1] == "[" and c[-1:] == "]" for c in cols),
+               f"one line per STAGED signal reading the declared-but-unfilled column ({len(cols)} vs {len(staged)})")
             log = sorted((r["hook"], r["rule"], r["outcome"])
                          for r in _read_csv(os.path.join(db_dir, "chain_reactions_log.csv")))
-            eq(log, [("after_300", "probe_bad", "rx_unknown_table"), ("after_300", "probe_file", "ok"),
+            eq(log, [("after_300", "probe_bad", "rx_unknown_table"), ("after_300", "probe_cols", "ok"),
+                     ("after_300", "probe_file", "ok"),
                      ("before_300", "probe_early", "rx_unknown_table"), ("before_300", "probe_hdr", "ok")],
                "every firing audited - the database-less before_300 ones SETTLED into the staged record")
             recorded = [(r["type"], r["location"])
                         for r in _read_csv(os.path.join(db_dir, "validation_issues.csv"))
                         if r["type"].startswith("rx_")]
-            eq(sorted(recorded), [("rx_unfired_hook", "probe_cold"), ("rx_unknown_table", "probe_bad"),
-                                  ("rx_unknown_table", "probe_early")],
-               "every reaction finding recorded ONCE (the unfired-hook one surfaced at both hooks)")
+            eq(sorted(recorded), [("rx_bad_condition", "probe_mal"), ("rx_unfired_hook", "probe_cold"),
+                                  ("rx_unknown_table", "probe_bad"), ("rx_unknown_table", "probe_early")],
+               "every reaction finding recorded ONCE (the index-wide ones surfaced at both hooks)")
         finally:
             config.use_project(previous_project)
     eq(_rx_rendered(host), {("rx_unknown_table", "probe_early"), ("rx_unknown_table", "probe_bad"),
-                            ("rx_unfired_hook", "probe_cold")},
+                            ("rx_unfired_hook", "probe_cold"), ("rx_bad_condition", "probe_mal")},
        "each finding was RENDERED through ctx.render - never silent")
 
 
@@ -274,7 +292,35 @@ def test_halted_staging_lists_the_deferred_trail_and_records_nothing():
     eq(len(listed), 2, "both deferred before_300 firings are LISTED in the log")
     ok(any("probe_hdr: ok (1 created)" in msg for msg in listed), "...the header's success")
     ok(any("probe_early: rx_unknown_table" in msg for msg in listed), "...and the failure's outcome")
-    ok(("rx_unknown_table", "probe_early") in _rx_rendered(host), "the before_300 finding was rendered")
+    eq(_rx_rendered(host), {("rx_unknown_table", "probe_early"), ("rx_unfired_hook", "probe_cold"),
+                            ("rx_bad_condition", "probe_mal")},
+       "before_300 - the ONLY fire of a halted run - rendered its own finding, the unfired hook (it "
+       "passes the run-plan's hooks), and after_300's malformed rule (another hook's rule still "
+       "surfaces): refuter round 7 E1/E2")
+
+
+def test_310_leg_appends_reaction_findings_to_the_existing_record():
+    """Refuter round 7 B3 through the real run-plan: the 310 leg (Stage I/O List) stages a Database
+    WITHOUT validation_issues; a reaction finding used to create an empty table and save it OVER the
+    record an earlier phase wrote. It is appended to the on-disk record now."""
+    from pipeline5.findings.finding import Finding, record_standalone
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _reaction_project(project, params)
+        host = _Host()
+        config.use_project(project)
+        try:
+            db_dir = config.database_dir()
+            record_standalone([Finding(phase=110, type="probe_prior", severity="FAIL",
+                                       detail="from phase 110", location="X1")], directory=db_dir)
+            SYSTEM.handlers["staging"](host.ctx(), only=310)
+            recorded = {(r["type"], r["location"]) for r in _read_csv(os.path.join(db_dir, "validation_issues.csv"))}
+            ok(("probe_prior", "X1") in recorded, "the earlier phase's record SURVIVED the 310 leg")
+            ok({("rx_unknown_table", "probe_bad"), ("rx_unknown_table", "probe_early")} <= recorded,
+               "...with the reaction findings appended")
+        finally:
+            config.use_project(previous_project)
 
 
 def test_sub_phase_dispatch():
@@ -300,5 +346,7 @@ if __name__ == "__main__":
          _sandboxed(test_configured_rules_fire_through_the_real_run_plan)),
         ("halted_staging_lists_the_deferred_trail_and_records_nothing",
          _sandboxed(test_halted_staging_lists_the_deferred_trail_and_records_nothing)),
+        ("310_leg_appends_reaction_findings_to_the_existing_record",
+         _sandboxed(test_310_leg_appends_reaction_findings_to_the_existing_record)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),
     ]))

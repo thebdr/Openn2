@@ -151,18 +151,170 @@ def test_rules_on_hooks_the_run_plan_never_fires_are_reported():
         eq(_log(database), [("after_300", "r1", 2, 2, "ok")], "the declared hook's rule still fires")
         eq(sorted(r["type"] for r in database["validation_issues"]), ["rx_bad_rule", "rx_unfired_hook"],
            "an undeclared hook's malformed rule is an index problem too - recorded here")
-        # …even when the fired hook has NO rule of its own (only the index problem makes it business:
-        # the orchestrator's mutation check found this case unpinned - U3)
+        # without `hooks` (a caller that declares nothing) there is no unfired check
+        _, findings = engine.fire("after_300", _db(), rules=[_rule(name="cold", fire_when="after_520")],
+                                  templates=_ROW_TPL, params={})
+        eq(findings, [], "no declared hooks -> nothing to compare against")
+    _sandboxed(body)()
+
+
+def test_compile_never_crashes_a_hook():
+    """Refuter round 7 B1: the rule index is compiled at EVERY hook's fire, and a condition the expr
+    checker could not digest (`1.3` typed for the slice `1:3` - a raw ValueError) crashed every hook,
+    even rule-less ones, and run_staging with them. It is a rx_bad_condition now; a row the compiler
+    cannot even read is an index-problem rx_bad_rule named by its position."""
+    rules, findings = engine.compile_rules([
+        _rule(name="slice", condition='extract($name, /(\\d+)/, 1.3) = "1"'),
+        None,                                             # an unreadable row (not a mapping at all)
+        _rule(name="ok1"),
+    ])
+    eq([r.name for r in rules], ["ok1"], "the uncompilable rule and the unreadable row are dropped")
+    eq(sorted((f.type, f.location) for f in findings),
+       [("rx_bad_condition", "slice"), ("rx_bad_rule", "<row 2>")], "each is a located finding")
+    deferred, findings = engine.fire("before_300", None, rules=[_rule(name="slice", fire_when="after_300",
+                                     condition='extract($name, /(\\d+)/, 1.3) = "1"')],
+                                     hooks=("before_300", "after_300"))
+    eq([x.type for x in findings], ["rx_bad_condition"], "another hook's fire surfaces it - no crash")
+    ok(deferred is None, "…and stays a no-op (the rule is after_300's business)")
+
+
+def test_loop_schema_is_the_tables_declared_columns():
+    """Refuter round 7 B2: the loop-column check read the schema off the ROWS, and a freshly staged
+    row lacks the columns later phases fill (name_in_db, ...) - a real column failed at after_300 only.
+    The engine's `_db` rows now carry every declared column (absent cells as "")."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            src = Table("src", columns=["uid", "kind", "name", "later_filled"], key_columns=["name"])
+            src.add(kind="door", name="D1")                # NO row carries `later_filled`
+            database = Database([src])
+            rule = _rule(action="file", source_table="", condition="", target="cols.txt", template="txt")
+            database, findings = engine.fire("after_300", database, rules=[rule],
+                                             templates={"txt": "@for $r in src: [{$r.name}|{$r.later_filled}]"},
+                                             params={}, files_root=out_root)
+            eq(findings, [], "a declared-but-unfilled column is a real column")
+            with open(os.path.join(out_root, "cols.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "[D1|]\n", "…rendered blank")
+            _, findings = engine.fire("after_300", database, rules=[rule],
+                                      templates={"txt": "@for $r in src: [{$r.later_filed}]"},
+                                      params={}, files_root=out_root)
+            eq([x.type for x in findings], ["rx_bad_template"], "a misspelled column still fails")
+    _sandboxed(body)()
+
+
+def test_recording_appends_to_the_on_disk_record():
+    """Refuter round 7 B3: the 310 leg stages a Database WITHOUT validation_issues; recording a
+    reaction finding created an empty table and SAVED it over the file - wiping what an earlier
+    phase recorded. A database that never loaded the record appends to the on-disk one (and the
+    audit keeps the other hooks' rows), exactly like record_standalone."""
+    from pipeline5.findings.finding import Finding, record_standalone
+    def body(sandbox):
+        prior = Finding(phase=110, type="probe_prior", severity="FAIL", detail="from phase 110", location="X1")
+        record_standalone([prior], directory=sandbox)
+        seed = Database([engine.chain_reactions_log_table()])
+        seed[engine.LOG_TABLE].add(hook="after_500", rule="later", action="file", target="t",
+                                   matches=1, created=1, outcome="ok")
+        seed.save(sandbox)
+        staged_310 = Database([Table("src", columns=["uid", "kind", "name"], key_columns=["name"])])
+        staged_310, findings = engine.fire("after_300", staged_310, rules=[_rule(source_table="nope")],
+                                           templates=_ROW_TPL, params={})
+        from pipeline5.truth.database import Database as _Db
+        from pipeline5.findings.finding import validation_issues_table
+        on_disk = _Db([validation_issues_table(), engine.chain_reactions_log_table()]).load(sandbox)
+        eq(sorted(r["type"] for r in on_disk["validation_issues"]), ["probe_prior", "rx_unknown_table"],
+           "the earlier phase's record survived; the reaction finding was appended")
+        eq(sorted((r["hook"], r["rule"]) for r in on_disk[engine.LOG_TABLE]),
+           [("after_300", "r1"), ("after_500", "later")], "…and the other hook's audit row survived too")
+    _sandboxed(body)()
+
+
+def test_created_counts_survive_a_mid_action_failure():
+    """Refuter round 7 B4: `created` was assigned only on a clean return, so a failure after some
+    rows/lines were written audited created=0; and `{$n:03d}` on 'inf' leaked a raw OverflowError
+    (filed as a code crash instead of a template finding)."""
+    def body(sandbox):
+        src = Table("src", columns=["uid", "n"], key_columns=["n"])
+        for n in ("1", "2", "inf"):
+            src.add(n=n)
+        dst = Table("dst", columns=["uid", "label"], key_columns=["label"])
+        database = Database([src, dst])
+        database, findings = engine.fire("after_300", database, rules=[_rule(condition="")],
+                                         templates={"rows": [{"label": "x{$n:03d}"}]}, params={})
+        eq([x.type for x in findings], ["rx_bad_template"], "a data overflow is a TEMPLATE finding")
+        eq([r["label"] for r in database["dst"]], ["x001", "x002"], "two rows were spawned before it")
+        eq(_log(database), [("after_300", "r1", 3, 2, "rx_bad_template")], "…and the audit says so")
+        # an UNFORESEEN defect mid-action (the backstop path) keeps the partial count as well
+        with tempfile.TemporaryDirectory() as out_root:
+            calls = {"n": 0}
+            real = engine.tempemplator.render_template
+
+            def flaky(*args, **kwargs):
+                calls["n"] += 1
+                if calls["n"] == 2:
+                    raise RuntimeError("disk on fire")
+                return real(*args, **kwargs)
+            engine.tempemplator.render_template = flaky
+            try:
+                database, findings = engine.fire("after_300", _db(),
+                                                 rules=[_rule(action="file", target="f.txt", template="txt")],
+                                                 templates={"txt": "line {$name}"}, params={}, files_root=out_root)
+            finally:
+                engine.tempemplator.render_template = real
+            eq([x.type for x in findings], ["rx_rule_crashed"])
+            eq(_log(database), [("after_300", "r1", 2, 1, "rx_rule_crashed")],
+               "the first match's line was written and is counted despite the crash")
+    _sandboxed(body)()
+
+
+def test_another_declared_hooks_malformed_rule_surfaces_without_writing():
+    """Refuter round 7 E2: a malformed rule on ANOTHER declared hook must still surface here (it
+    would otherwise stay silent whenever its own hook never fires - a halted staging) - while this
+    rule-less hook stays a no-op that writes nothing (its own hook records it)."""
+    def body(sandbox):
+        database = _db()
+        out, findings = engine.fire("after_300", database,
+                                    rules=[_rule(name="m5", fire_when="after_500", action="explode")],
+                                    templates=_ROW_TPL, params={}, hooks=("after_300", "after_500"))
+        eq([(x.type, x.location) for x in findings], [("rx_bad_rule", "m5")], "it surfaces here")
+        ok("validation_issues" not in database and engine.LOG_TABLE not in database, "nothing recorded here")
+        eq(os.listdir(sandbox), [], "…nothing written")
+    _sandboxed(body)()
+
+
+def test_config_load_failures_block_on_the_default_path():
+    """Refuter round 7 E3: the templates-block pin injected `params`, so the default path the
+    run-plan uses was never tried: a params load must not run (and clobber the block) once the
+    templates failed; and an unreadable params file is its own finding (rx_params_unreadable)."""
+    def body(sandbox):
+        def unreadable():
+            raise ValueError("does not parse")
+        saved = (config.load_reaction_templates, config.load_params)
+        try:
+            config.load_reaction_templates = unreadable
+            config.load_params = lambda: (_ for _ in ()).throw(AssertionError("params must not load"))
+            database, findings = engine.fire("after_300", _db(), rules=[_rule()])     # params left default
+            eq([x.type for x in findings], ["rx_templates_unreadable"], "the templates block stands")
+            eq([row[-1] for row in _log(database)], ["rx_templates_unreadable"])
+            config.load_reaction_templates = lambda: dict(_ROW_TPL)
+            config.load_params = unreadable
+            database, findings = engine.fire("after_300", _db(), rules=[_rule()])
+            eq([x.type for x in findings], ["rx_params_unreadable"], "an unreadable params file is a finding")
+            eq([row[-1] for row in _log(database)], ["rx_params_unreadable"], "…blocking the hook's rules")
+        finally:
+            config.load_reaction_templates, config.load_params = saved
+    _sandboxed(body)()
+
+
+def test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook():
+    """U3 (the orchestrator's mutation check): a malformed rule on a hook the run-plan never fires can
+    never be recorded at its own hook - so it is an INDEX problem, recorded even by a hook that has no
+    rule of its own. (Its own sandbox: an earlier record on disk would mask the case.)"""
+    def body(sandbox):
         lone, findings = engine.fire("after_300", _db(),
                                      rules=[_rule(name="mal", fire_when="after_520", action="explode")],
                                      templates=_ROW_TPL, params={}, hooks=("before_300", "after_300"))
         eq([x.type for x in findings], ["rx_bad_rule"])
         eq([r["type"] for r in lone["validation_issues"]], ["rx_bad_rule"],
            "recorded although this hook has no rules - it can never be recorded at its own (unfired) hook")
-        # without `hooks` (a caller that declares nothing) there is no unfired check
-        _, findings = engine.fire("after_300", _db(), rules=[_rule(name="cold", fire_when="after_520")],
-                                  templates=_ROW_TPL, params={})
-        eq(findings, [], "no declared hooks -> nothing to compare against")
     _sandboxed(body)()
 
 
@@ -268,8 +420,9 @@ def test_failures_are_located_findings():
         empty, f3 = engine.fire("after_300", empty, rules=[_rule(condition="let(")],
                                 templates=_ROW_TPL, params={})
         eq([x.type for x in f3], ["rx_bad_condition"])
-        eq([r["type"] for r in empty["validation_issues"]], ["rx_bad_condition"],
-           "the hook OWNS its malformed rule, so the finding is recorded, not only rendered")
+        eq([r["type"] for r in empty["validation_issues"]], ["rx_unknown_table", "rx_unknown_table", "rx_bad_condition"],
+           "the hook OWNS its malformed rule, so the finding is recorded - APPENDED to the on-disk record "
+           "this fresh database never loaded (the earlier fires' findings survive: refuter round 7 B3)")
         # text-template-for-add_rows / bad field expr / a file rule naming a MISSING template
         # (caught before matching - B4b: nothing matched, and it was silent)
         _, f4 = engine.fire("after_300", _db(), rules=[_rule()],
@@ -523,6 +676,15 @@ if __name__ == "__main__":
         ("noop_loads_nothing_beyond_the_rule_index", test_noop_loads_nothing_beyond_the_rule_index),
         ("rules_on_hooks_the_run_plan_never_fires_are_reported",
          test_rules_on_hooks_the_run_plan_never_fires_are_reported),
+        ("compile_never_crashes_a_hook", test_compile_never_crashes_a_hook),
+        ("loop_schema_is_the_tables_declared_columns", test_loop_schema_is_the_tables_declared_columns),
+        ("recording_appends_to_the_on_disk_record", test_recording_appends_to_the_on_disk_record),
+        ("created_counts_survive_a_mid_action_failure", test_created_counts_survive_a_mid_action_failure),
+        ("another_declared_hooks_malformed_rule_surfaces_without_writing",
+         test_another_declared_hooks_malformed_rule_surfaces_without_writing),
+        ("config_load_failures_block_on_the_default_path", test_config_load_failures_block_on_the_default_path),
+        ("undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook",
+         test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook),
         ("unreadable_rules_file_is_recorded_not_just_rendered",
          test_unreadable_rules_file_is_recorded_not_just_rendered),
         ("add_rows_spawns_with_provenance", test_add_rows_spawns_with_provenance),

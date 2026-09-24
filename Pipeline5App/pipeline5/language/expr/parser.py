@@ -360,17 +360,27 @@ class _Parser:
         has_colon = False
         kind, val = self._peek()
         if kind == "number":
-            lo = int(self._next()[1])
+            lo = self._slice_bound()
         if self._peek()[1] == ":":
             self._next()
             has_colon = True
             if self._peek()[0] == "number":
-                hi = int(self._next()[1])
+                hi = self._slice_bound()
         if not has_colon:
             if lo is None:
                 raise ExprError(f"extract: bad SLICE in {self.src!r}")
             return (lo, None, True)                          # a bare index
         return (lo, hi, False)                               # a real slice [lo:hi]
+
+    def _slice_bound(self) -> int:
+        """One slice bound - an INTEGER. A number token may carry decimals (`1.3` typed for `1:3`):
+        that is a located ExprError, never a raw ValueError escaping the contract (chain-reaction
+        refuter round 7: it crashed every hook's rule compile)."""
+        text = self._next()[1]
+        try:
+            return int(text)
+        except ValueError:
+            raise ExprError(f"extract: a SLICE bound must be an integer, got {text!r} in {self.src!r}") from None
 
     # --- let(a := e1, b := f($a); body) --- #
     def _let(self):

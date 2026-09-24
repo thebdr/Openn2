@@ -100,6 +100,15 @@ def test_for_table_query():
     eq(_render("@for $r in signals: {$r.tag}", {"_db": db}), "P1\nM1\nP2", "no where = every row")
     raises(TempemplatorError, lambda: _render("@for $r in nope: x", {"_db": db}))
     raises(TempemplatorError, lambda: _render("@for $r in signals maybe: x", {"_db": db}))
+    # a /regex/ in the predicate is ONE literal - its `..` is not a range, its `:` not the inline
+    # body (refuter round 7 B5: `/^P..1$/` failed as "range ends must be finite numbers")
+    tags = {"signals": [{"tag": "PEC1"}, {"tag": "PXY1"}, {"tag": "M1"}, {"tag": "a:b"}]}
+    eq(_render("@for $r in signals where $tag ~ /^P..1$/: {$r.tag}", {"_db": tags}), "PEC1\nPXY1",
+       "a `..` inside the regex (inline form)")
+    eq(_render("@for $r in signals where $tag ~ /^P..1$/\n={$r.tag}\n@end", {"_db": tags}), "=PEC1\n=PXY1",
+       "…and in the block form")
+    eq(_render("@for $r in signals where $tag ~ /a:b/: {$r.tag}", {"_db": tags}), "a:b",
+       "a `:` inside the regex is not the inline-body colon")
     # where() semantics: the predicate sees the ROW ONLY - an outer field is NOT in its scope, so
     # `$wanted` evaluates blank there (refuter round 6 E5: a leaking scope survived every test)
     rows = {"signals": [{"script_type": "", "tag": "E1"}, {"script_type": "PEC", "tag": "P1"}]}
