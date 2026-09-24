@@ -181,6 +181,8 @@ def _reaction_project(project, params):
         ["probe_mal", "after_300", "signals", 'extract($mnemonic, /(\\d+)/, 1.3) = "1"', "file", "rx/mal.txt",
          "probe_txt", "1.3 typed for the slice 1:3"],
         ["probe_cols", "after_300", "", "", "file", "rx/cols.txt", "cols_txt", "a declared, unfilled column"],
+        ["probe_top", "after_300", "signals", "", "file", "rx/top.txt", "top_txt", "the same, as a MATCHED row"],
+        ["probe_count", "after_300", "", "", "file", "rx/count.txt", "count_txt", "a predicate in a strict hole"],
     ]
     with open(os.path.join(rx_dir, "reactions.csv"), "w", encoding="utf-8", newline="") as handle:
         csv.writer(handle).writerows(rules)
@@ -188,6 +190,8 @@ def _reaction_project(project, params):
         handle.write("hdr_txt: |-\n  HEADER {$_rule.hook}\n"
                      "probe_txt: |-\n  [{$_params.project_code}] {$_rule.hook} {$_rule.name}\n"
                      "cols_txt: |-\n  @for $r in signals: [{$r.name_in_db}]\n"
+                     "top_txt: |-\n  [{$name_in_db}]\n"
+                     "count_txt: |-\n  PEC {count(signals, $script_type = \"PEC\")}\n"
                      "rows_tpl:\n  - label: \"x\"\n")
 
 
@@ -234,10 +238,17 @@ def test_configured_rules_fire_through_the_real_run_plan():
                 cols = handle.read().splitlines()
             ok(len(staged) > 0 and len(cols) == len(staged) and all(c[:1] == "[" and c[-1:] == "]" for c in cols),
                f"one line per STAGED signal reading the declared-but-unfilled column ({len(cols)} vs {len(staged)})")
+            with open(os.path.join(out_root, "rx", "top.txt"), encoding="utf-8") as handle:
+                top = handle.read().splitlines()
+            eq(len(top), len(staged), "…and as a MATCHED row's top-level field: one line per staged signal")
+            pec = sum(1 for row in staged if row.get("script_type") == "PEC")
+            with open(os.path.join(out_root, "rx", "count.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), f"PEC {float(pec)}\n", "a data-function predicate in a strict hole counts the staged rows")
             log = sorted((r["hook"], r["rule"], r["outcome"])
                          for r in _read_csv(os.path.join(db_dir, "chain_reactions_log.csv")))
             eq(log, [("after_300", "probe_bad", "rx_unknown_table"), ("after_300", "probe_cols", "ok"),
-                     ("after_300", "probe_file", "ok"),
+                     ("after_300", "probe_count", "ok"), ("after_300", "probe_file", "ok"),
+                     ("after_300", "probe_top", "ok"),
                      ("before_300", "probe_early", "rx_unknown_table"), ("before_300", "probe_hdr", "ok")],
                "every firing audited - the database-less before_300 ones SETTLED into the staged record")
             recorded = [(r["type"], r["location"])
@@ -299,6 +310,36 @@ def test_halted_staging_lists_the_deferred_trail_and_records_nothing():
        "surfaces): refuter round 7 E1/E2")
 
 
+def test_a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten():
+    """Refuter round 8 R4 through the real run-plan: a hand-edited chain_reactions_log.csv gone ragged
+    used to crash run_staging (after staging had saved and before_300 had appended) - no RSLT, the
+    trail lost. It is a RENDERED finding now, the run completes, and the ragged file is untouched."""
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _reaction_project(project, params)
+        host = _Host()
+        config.use_project(project)
+        try:
+            db_dir = config.database_dir()
+            os.makedirs(db_dir, exist_ok=True)
+            ragged = os.path.join(db_dir, "chain_reactions_log.csv")
+            with open(ragged, "w", encoding="utf-8", newline="") as handle:
+                handle.write("uid,hook,rule,action,target,matches,created,outcome\n"
+                             "u1,after_500,x,file,t,1,1,ok,EXTRA-CELL\n")
+            with open(ragged, "rb") as handle:
+                before = handle.read()
+            SYSTEM.handlers["staging"](host.ctx())
+            ok("RSLT" in host.levels(), "staging completed - the corrupt record did not crash it")
+            eq(host.halted, False, "an ERRR never halts")
+            with open(ragged, "rb") as handle:
+                eq(handle.read(), before, "the ragged record was left untouched")
+        finally:
+            config.use_project(previous_project)
+    eq(sum(1 for batch in host.rendered for f in batch if getattr(f, "type", "") == "rx_record_unreadable"), 2,
+       "RENDERED twice - by the before_300 settle AND the after_300 fire: neither path is silent")
+
+
 def test_310_leg_appends_reaction_findings_to_the_existing_record():
     """Refuter round 7 B3 through the real run-plan: the 310 leg (Stage I/O List) stages a Database
     WITHOUT validation_issues; a reaction finding used to create an empty table and save it OVER the
@@ -346,6 +387,8 @@ if __name__ == "__main__":
          _sandboxed(test_configured_rules_fire_through_the_real_run_plan)),
         ("halted_staging_lists_the_deferred_trail_and_records_nothing",
          _sandboxed(test_halted_staging_lists_the_deferred_trail_and_records_nothing)),
+        ("a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten",
+         _sandboxed(test_a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten)),
         ("310_leg_appends_reaction_findings_to_the_existing_record",
          _sandboxed(test_310_leg_appends_reaction_findings_to_the_existing_record)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),

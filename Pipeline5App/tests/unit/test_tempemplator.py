@@ -66,6 +66,10 @@ def test_raw_errors_become_located():
     raises(TempemplatorError, lambda: _render("{extract($tag, /(P/)}", {"tag": "P1"}))
     raises(TempemplatorError, lambda: _render("@for $r in signals where $tag ~ /(/: x", {"_db": db}))
     raises(TempemplatorError, lambda: _render("@if $tag ~ /[/\nx\n@end", {"tag": "P1"}))
+    # the evaluation backstops: an input that blows expr's recursion is still LOCATED (round 8 EH4)
+    deep = "not " * 1500 + '"x"'
+    raises(TempemplatorError, lambda: _render("{" + deep + "}", {}))
+    raises(TempemplatorError, lambda: _render("@if " + deep + "\nx\n@end", {}))
 
 
 def test_use_recursion_unknown_and_cycle():
@@ -109,6 +113,22 @@ def test_for_table_query():
        "…and in the block form")
     eq(_render("@for $r in signals where $tag ~ /a:b/: {$r.tag}", {"_db": tags}), "a:b",
        "a `:` inside the regex is not the inline-body colon")
+    # call arguments are opaque too - a slice `0:1`, a `let(n := ...)` (refuter round 8 R1)
+    num = {"signals": [{"tag": "P12"}, {"tag": "M21"}, {"tag": "P13"}]}
+    sliced = 'where extract($tag, /(\\d+)/, 0:1) = "1"'
+    eq(_render(f"@for $r in signals {sliced}: {{$r.tag}}", {"_db": num}), "P12\nP13", "a slice colon (inline)")
+    eq(_render(f"@for $r in signals {sliced}\n={{$r.tag}}\n@end", {"_db": num}), "=P12\n=P13", "…(block)")
+    eq(_render(f'@if $x = "1"\n@for $r in signals {sliced}\n={{$r.tag}}\n@end\n@end', {"_db": num, "x": "1"}),
+       "=P12\n=P13", "…(block, nested in an @if - the scan must not misread it as inline)")
+    eq(_render('@for $r in signals where let(n := extract($tag, /(\\d+)/); $n = "21"): {$r.tag}', {"_db": num}),
+       "M21", "a let binding's `:=`")
+    # quotes, escapes and {holes} stay opaque (refuter round 8 EH1 - each was an unpinned mutant)
+    quoted = {"signals": [{"tag": "a:b"}, {"tag": "a/b"}, {"tag": 'a"b'}]}
+    eq(_render('@for $r in signals where $tag = "a:b": [{$r.tag}]', {"_db": quoted}), "[a:b]", "a double-quoted colon")
+    eq(_render("@for $r in signals where $tag = 'a:b': [{$r.tag}]", {"_db": quoted}), "[a:b]", "a single-quoted colon")
+    eq(_render("@for $r in signals where $tag ~ /a\\/b/: [{$r.tag}]", {"_db": quoted}), "[a/b]", "an escaped `/` in a regex")
+    eq(_render('@for $r in signals where $tag = "a\\"b": [{$r.tag}]', {"_db": quoted}), '[a"b]', 'an escaped `"` in a string')
+    eq(_render("@for $i in 1..{$n:d}: x{$i}", {"n": "2"}), "x1\nx2", "a format-spec colon inside a {hole}")
     # where() semantics: the predicate sees the ROW ONLY - an outer field is NOT in its scope, so
     # `$wanted` evaluates blank there (refuter round 6 E5: a leaking scope survived every test)
     rows = {"signals": [{"script_type": "", "tag": "E1"}, {"script_type": "PEC", "tag": "P1"}]}

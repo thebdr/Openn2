@@ -59,11 +59,16 @@ the handler's `ctx.render` and recorded (uid-deduplicated) to `validation_issues
                         a config file does not load (e.g. a YAML syntax error) - the hook's rules
                         are all blocked, each audited with that outcome
     rx_unfired_hook     a rule on a hook the run-plan never fires (it would never run) - dropped
+    rx_record_unreadable / rx_record_unwritable
+                        the reaction record (audit / validation_issues) does not load - a hand-edited
+                        CSV gone ragged: left UNTOUCHED, nothing recorded over it - or does not save
+                        (a file held open, e.g. by Excel); rendered, never a crash
     rx_rule_crashed     the backstop - an unforeseen defect, reported with its exception type
 
 A problem of the rule INDEX itself (a row naming no hook, an unfired hook, an unreadable
 reactions.csv) belongs to no single hook: it is every hook's business - rendered at each fire,
-recorded once. A HALTED staging commits no reaction record (the run-plan lists the deferred
+recorded once (the file-level findings carry phase 0, so the uid is the same whichever hook - and
+whichever PHASE - meets the file). A HALTED staging commits no reaction record (the run-plan lists the deferred
 before_300 firings in the log instead - a half-committed record would mix runs).
 
 KNOWN BOUNDARY (deliberate, until the generated-signals spec review): an `after_300` `add_rows`
@@ -240,7 +245,7 @@ def _matches(rule: Rule, database, params: dict, db_tables: dict) -> tuple:
             return [], _f(rule.phase, "rx_unknown_table",
                           f"source table {rule.source_table!r} is not in the database at this hook",
                           rule.name)
-        candidates = [dict(r) for r in database[rule.source_table]]
+        candidates = _complete_rows(database[rule.source_table])
     if not rule.condition:
         return candidates, None
     try:
@@ -300,26 +305,29 @@ def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
     return []
 
 
-def _load(loader, type_: str, what: str, phase: int):
+def _load(loader, type_: str, what: str):
     """(value, None) or (None, the located finding) - a config file that does not load (a YAML
-    syntax error, e.g. a plain value starting with `@`) is a finding, never a crash."""
+    syntax error, e.g. a plain value starting with `@`) is a finding, never a crash. FILE-level, so
+    phase 0: the same broken file is ONE finding whichever hook meets it (refuter round 8)."""
     try:
         return loader(), None
     except Exception as error:
-        return None, _f(phase, type_, f"{what} does not load: {error}", what)
+        return None, _f(0, type_, f"{what} does not load: {error}", what)
+
+
+def _complete_rows(table) -> list:
+    """The table's rows as fresh dicts, each carrying EVERY column of the table (declared + extras; an
+    absent cell as "" - exactly how expr reads a missing key). A freshly STAGED row lacks the columns
+    later phases fill, yet they are the table's columns all the same - so a matched row's top-level
+    `{$name_in_db}` and a loop's `{$r.name_in_db}` both see them (refuter rounds 7 + 8)."""
+    columns = table.effective_columns()
+    return [{column: row.get(column, "") for column in columns} for row in table]
 
 
 def _db_tables(database) -> dict:
-    """The E1 `_db` layer: {table: rows}, every row carrying EVERY column of its table (an absent cell
-    as "" - exactly how expr reads a missing key), so the renderer's loop-column check sees the
-    table's real schema: a freshly STAGED row lacks the columns later phases fill, yet they are the
-    table's columns all the same (refuter round 7: `{$r.name_in_db}` failed at after_300 only)."""
-    tables = {}
-    for name in database.names():
-        table = database[name]
-        columns = table.effective_columns()
-        tables[name] = [{column: row.get(column, "") for column in columns} for row in table]
-    return tables
+    """The E1 `_db` layer: {table: complete rows} (see `_complete_rows`) - so the renderer's
+    loop-column check sees each table's real schema."""
+    return {name: _complete_rows(database[name]) for name in database.names()}
 
 
 def _attach(database, factory, name: str):
@@ -345,29 +353,43 @@ def _record_new(database, findings) -> int:
     return len(fresh)
 
 
-def _persist(database, hook: str, log_rows: list, findings: list) -> None:
-    """Replace `hook`'s audit rows with this firing's, record its findings, save the database."""
-    log = _attach(database, chain_reactions_log_table, LOG_TABLE)
+def _persist(database, hook: str, log_rows: list, findings: list) -> list:
+    """Replace `hook`'s audit rows with this firing's, record its findings, save the database. A record
+    that will not LOAD (a hand-edited CSV gone ragged) is left untouched - nothing is recorded over it;
+    one that will not SAVE (a file held open, e.g. by Excel) is reported. Either is a located finding,
+    never a crash (refuter round 8). Returns those findings for the caller to surface."""
+    phase, where = _hook_phase(hook), config.database_dir()
+    try:
+        log = _attach(database, chain_reactions_log_table, LOG_TABLE)
+        _attach(database, validation_issues_table, "validation_issues")
+    except Exception as error:
+        return [_f(phase, "rx_record_unreadable",
+                   f"the reaction record does not load - left untouched, nothing recorded: {error}", where)]
     log.rows = [r for r in log.rows if r.get("hook") != hook]   # this hook's audit reflects THE LAST run
     log.extend(log_rows)
     _record_new(database, findings)
-    database.save(config.database_dir())
+    try:
+        database.save(where)
+    except OSError as error:
+        return [_f(phase, "rx_record_unwritable",
+                   f"the record could not be saved (a file held open by another program?): {error}", where)]
+    return []
 
 
-def settle(database, deferred) -> None:
+def settle(database, deferred) -> list:
     """Persist a database-less hook's `Deferred` (its audit rows + findings) into the database the
-    phase has now staged. None (the hook had no rules) is a no-op."""
+    phase has now staged. None (the hook had no rules) is a no-op. Returns the persistence findings
+    (see `_persist`) for the run-plan to render."""
     if deferred is None or database is None:
-        return
-    _persist(database, deferred.hook, deferred.log_rows, deferred.findings)
+        return []
+    return _persist(database, deferred.hook, deferred.log_rows, deferred.findings)
 
 
 def _finish(hook: str, database, log_rows: list, findings: list) -> tuple:
     """Persist this firing - or, with no database yet, hand it back as a `Deferred`."""
     if database is None:
         return Deferred(hook=hook, log_rows=log_rows, findings=list(findings)), findings
-    _persist(database, hook, log_rows, findings)
-    return database, findings
+    return database, findings + _persist(database, hook, log_rows, findings)
 
 
 def fire(hook: str, database, *, rules=None, templates=None, params=None,
@@ -387,12 +409,11 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
     empty-config byte-parity guarantee. Index-wide problems are every hook's business: rendered at
     each fire, recorded once (uid dedupe)."""
     hook = hook.strip().lower()
-    phase = _hook_phase(hook)
     if isinstance(rules, list) and rules and isinstance(rules[0], Rule):
         compiled, tagged = list(rules), []
     else:
         if rules is None:
-            rules, problem = _load(config.load_reactions, "rx_rules_unreadable", RULES_FILE, phase)
+            rules, problem = _load(config.load_reactions, "rx_rules_unreadable", RULES_FILE)
             if problem is not None:      # a broken rule index is every hook's business - never silent
                 return _finish(hook, database, [], [problem])
         compiled, tagged = _compile(rules)
@@ -416,9 +437,9 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
     if active:
         if templates is None:
             templates, blocked = _load(config.load_reaction_templates, "rx_templates_unreadable",
-                                       TEMPLATES_FILE, phase)
+                                       TEMPLATES_FILE)
         if params is None and blocked is None:
-            params, blocked = _load(config.load_params, "rx_params_unreadable", "project_params.yaml", phase)
+            params, blocked = _load(config.load_params, "rx_params_unreadable", "project_params.yaml")
         if blocked is not None:
             findings.append(blocked)
     files_root = config.output_root() if files_root is None else files_root

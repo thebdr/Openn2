@@ -8,6 +8,8 @@ missing-key modes (port of identity.interp / interp_keep + a strict mode):
   "keep"   - a hole whose TOP-LEVEL field is not in ctx is left as the literal {token}; a present-but-empty
              field substitutes to "" (interp_keep semantics)
   "strict" - a missing field raises ExprError
+Both decide over the hole's FREE fields (parser.free_fields - parsed, not scanned): a data-function
+predicate's `$col` (the ITERATED row's column) and a let-bound name are not fields of the caller's ctx.
 
 The format-spec (`{expr:spec}`) coercion lives in runtime.format_spec (blank stays blank).
 """
@@ -16,7 +18,7 @@ from __future__ import annotations
 import re
 
 from .errors import ExprError
-from .parser import referenced_fields
+from .parser import free_fields
 from .runtime import format_spec, s
 from .scope import Scope
 
@@ -77,10 +79,11 @@ def render(template: str, ctx: dict, scope: Scope | None = None, mode: str = "em
             return ""                                       # {} or { } -> ""
 
         expr_text, spec = _split_spec(body)
-        # keep / strict: decide missing-ness over EVERY top-level $field in the hole (incl. ones nested in
-        # function-call args), not just a bare `$field` hole - so a missing field in {concat($x)} is caught.
+        # keep / strict: decide missing-ness over EVERY free top-level $field in the hole (incl. ones nested
+        # in function-call args) - so a missing field in {concat($x)} is caught - but NOT a data-function
+        # predicate's row column or a let-bound name (parsed, not scanned: parser.free_fields).
         if mode in ("keep", "strict"):
-            missing = [f for f in referenced_fields(expr_text) if f not in ctx]
+            missing = sorted(f for f in free_fields(expr_text.strip()) if f not in ctx)
             if missing:
                 if mode == "keep":
                     return m.group(0)                       # leave {token} intact

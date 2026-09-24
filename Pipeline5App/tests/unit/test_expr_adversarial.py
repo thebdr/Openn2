@@ -200,6 +200,26 @@ def test_render_strict_is_top_level_only():
     eq(expr.evaluate("$obj.kk", {"obj": {"k": "v"}}), "", "the evaluator: silent-empty")
 
 
+def test_render_missing_check_reads_only_free_fields():
+    """The keep/strict missing-field check runs over the FREE fields of a hole - parsed, not scanned
+    (chain-reaction refuter round 8 R3): a data-function predicate's `$col` is the ITERATED row's
+    column and a let-bound name is local, neither is a field of the caller's ctx."""
+    from pipeline5.language.expr.parser import free_fields
+    db = {"_db": {"signals": [{"script_type": "PEC"}, {"script_type": "MOT"}]}}
+    eq(expr.render('{count(signals, $script_type = "PEC")}', db, mode="strict"), "1.0",
+       "a predicate's row column is not a missing field")
+    raises(ExprError, lambda: expr.render('{concat(count(signals, $script_type = "PEC"), $missing)}', db,
+                                          mode="strict"))                          # a real free field still raises
+    eq(expr.render('{let(a := "x"; concat($a, "!"))}', {}, mode="strict"), "x!", "a let-bound name is local")
+    eq(expr.render("{let(a := $x; $a)}", {}, mode="keep"), "{let(a := $x; $a)}", "keep: the FREE $x is missing")
+    eq(expr.render("{let(a := $x; $a)}", {"x": "v"}, mode="keep"), "v", "keep: …present -> evaluated")
+    eq(sorted(free_fields('lookup(t, k, $key, v)')), ["key"], "lookup's key VALUE is a free field")
+    eq(sorted(free_fields('where(t, $a = $b)')), [], "a where() predicate's fields are row columns")
+    eq(sorted(free_fields('node_of($bit, t)')), ["bit"], "node_of's bit is a free field")
+    eq(sorted(free_fields("let(a := $x, b := $a; $b)")), ["x"], "sequential lets bind their names")
+    eq(free_fields("concat($a,"), frozenset(), "a malformed expression -> {} (the compile reports it)")
+
+
 def test_bad_regex_is_a_located_error():
     """Chain-reaction refuter round 6 (B1): a malformed /regex/ raised a RAW re.error out of the
     compiler - escaping the ExprError contract at all three regex sites."""
@@ -337,6 +357,7 @@ if __name__ == "__main__":
         ("let_out_of_scope_binding_expr_rejected", test_let_out_of_scope_binding_expr_rejected),
         ("truncated_expression_is_a_located_error", test_truncated_expression_is_a_located_error),
         ("render_strict_is_top_level_only", test_render_strict_is_top_level_only),
+        ("render_missing_check_reads_only_free_fields", test_render_missing_check_reads_only_free_fields),
         ("bad_regex_is_a_located_error", test_bad_regex_is_a_located_error),
         ("let_earlier_binding_not_visible_to_prior", test_let_earlier_binding_not_visible_to_prior),
         ("let_nested_inner_sees_outer", test_let_nested_inner_sees_outer),

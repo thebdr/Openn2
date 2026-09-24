@@ -304,6 +304,114 @@ def test_config_load_failures_block_on_the_default_path():
     _sandboxed(body)()
 
 
+def test_matched_rows_carry_every_declared_column():
+    """Refuter round 8 R2: only the `_db` rows were completed - a MATCHED row still lacked the
+    columns staging leaves unfilled, so a top-level `{$later_filled}` failed (in the text, the row
+    template and the target path) while the same column worked inside a loop."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            src = Table("src", columns=["uid", "kind", "name", "later_filled"], key_columns=["name"])
+            src.add(kind="door", name="D1")                # NO row carries `later_filled`
+            dst = Table("dst", columns=["uid", "label"], key_columns=["label"])
+            database = Database([src, dst])
+            file_rule = _rule(name="f", action="file", condition="", target="{$later_filled}top.txt", template="txt")
+            rows_rule = _rule(name="r", condition="", template="rows")
+            database, findings = engine.fire("after_300", database, rules=[file_rule, rows_rule],
+                                             templates={"txt": "[{$name}|{$later_filled}]",
+                                                        "rows": [{"label": "{$later_filled}x"}]},
+                                             params={}, files_root=out_root)
+            eq(findings, [], "a declared-but-unfilled column is a field of the matched row")
+            with open(os.path.join(out_root, "top.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "[D1|]\n", "…in the text AND the target path")
+            eq([r["label"] for r in database["dst"]], ["x"], "…and in a row template")
+    _sandboxed(body)()
+
+
+def test_data_function_predicates_work_in_strict_holes():
+    """Refuter round 8 R3: a predicate's `$col` is the ITERATED row's column, yet the strict hole
+    check demanded it of the CURRENT row - a fire-once `{count(src, $kind = "door")}` failed."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            rule = _rule(action="file", source_table="", condition="", target="n.txt", template="txt")
+            _, findings = engine.fire("after_300", _db(), rules=[rule],
+                                      templates={"txt": 'doors={count(src, $kind = "door")}'},
+                                      params={}, files_root=out_root)
+            eq(findings, [], "the predicate's row column is not a missing field of the hole")
+            with open(os.path.join(out_root, "n.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "doors=2.0\n", "…and the count renders")
+    _sandboxed(body)()
+
+
+def test_a_record_that_cannot_load_or_save_is_a_finding():
+    """Refuter round 8 R4: round 7's on-disk attach made a ragged hand-edited CSV crash fire()/settle()
+    - and a file held open (Excel's deny-write) crashed the save. Both are located findings now; a
+    record that does not load is NOT overwritten."""
+    def body(sandbox):
+        log_path = os.path.join(sandbox, f"{engine.LOG_TABLE}.csv")
+        with open(log_path, "w", encoding="utf-8", newline="") as handle:
+            handle.write("uid,hook,rule,action,target,matches,created,outcome\n"
+                         "u1,after_500,x,file,t,1,1,ok,EXTRA-CELL\n")
+        with open(log_path, "rb") as handle:
+            before = handle.read()
+        database, findings = engine.fire("after_300", _db(), rules=[_rule(source_table="nope")],
+                                         templates=_ROW_TPL, params={})
+        eq([x.type for x in findings], ["rx_unknown_table", "rx_record_unreadable"], "no crash - reported")
+        with open(log_path, "rb") as handle:
+            eq(handle.read(), before, "the ragged record was left untouched")
+        deferred, _ = engine.fire("before_300", None, rules=[_rule(fire_when="before_300")],
+                                  templates=_ROW_TPL, params={})
+        eq([x.type for x in engine.settle(_db(), deferred)], ["rx_record_unreadable"], "settle reports it too")
+        os.remove(log_path)
+        locked = _db()
+
+        def held_open(directory):
+            raise PermissionError(13, "Permission denied", os.path.join(directory, "dst.csv"))
+        locked.save = held_open
+        _, findings = engine.fire("after_300", locked, rules=[_rule()], templates=_ROW_TPL, params={})
+        eq([x.type for x in findings], ["rx_record_unwritable"], "a save that fails is a finding")
+    _sandboxed(body)()
+
+
+def test_file_level_findings_are_one_record_across_phases():
+    """Refuter round 8 R5: an unreadable reactions.csv took the FIRING hook's phase, so a run-plan
+    whose hooks span phases recorded it once per phase (different uids). File-level = phase 0."""
+    def body(sandbox):
+        def unreadable():
+            raise UnicodeDecodeError("utf-8", b"\x92", 0, 1, "invalid start byte")
+        original = config.load_reactions
+        config.load_reactions = unreadable
+        try:
+            database, _ = engine.fire("before_300", _db())
+            database, _ = engine.fire("after_500", database)
+        finally:
+            config.load_reactions = original
+        eq([(r["type"], str(r["phase"])) for r in database["validation_issues"]], [("rx_rules_unreadable", "0")],
+           "ONE record, phase 0, whichever hook met the broken file")
+    _sandboxed(body)()
+
+
+def test_recording_dedupes_within_one_fire_and_reads_extra_columns():
+    """Refuter round 8 EH2/EH3: a rule row pasted twice fails twice with the SAME uid in one fire -
+    recorded once; and a table's EXTRA (undeclared) column - e.g. a spawned row's `spawned_by` - is
+    one of its columns for the loop schema."""
+    def body(sandbox):
+        database, findings = engine.fire("after_300", _db(), rules=[_rule(source_table="nope")] * 2,
+                                         templates=_ROW_TPL, params={})
+        eq(len(findings), 2, "both copies surface")
+        eq([r["type"] for r in database["validation_issues"]], ["rx_unknown_table"], "…recorded ONCE")
+        with tempfile.TemporaryDirectory() as out_root:
+            dst = Table("dst", columns=["uid", "label"], key_columns=["label"])
+            dst.add(label="L1", spawned_by="r0")          # an undeclared extra column
+            rule = _rule(action="file", source_table="", condition="", target="x.txt", template="txt")
+            _, findings = engine.fire("after_300", Database([dst]), rules=[rule],
+                                      templates={"txt": "@for $r in dst: {$r.label} by {$r.spawned_by}"},
+                                      params={}, files_root=out_root)
+            eq(findings, [], "an extra column is a column")
+            with open(os.path.join(out_root, "x.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "L1 by r0\n")
+    _sandboxed(body)()
+
+
 def test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook():
     """U3 (the orchestrator's mutation check): a malformed rule on a hook the run-plan never fires can
     never be recorded at its own hook - so it is an INDEX problem, recorded even by a hook that has no
@@ -683,6 +791,12 @@ if __name__ == "__main__":
         ("another_declared_hooks_malformed_rule_surfaces_without_writing",
          test_another_declared_hooks_malformed_rule_surfaces_without_writing),
         ("config_load_failures_block_on_the_default_path", test_config_load_failures_block_on_the_default_path),
+        ("matched_rows_carry_every_declared_column", test_matched_rows_carry_every_declared_column),
+        ("data_function_predicates_work_in_strict_holes", test_data_function_predicates_work_in_strict_holes),
+        ("a_record_that_cannot_load_or_save_is_a_finding", test_a_record_that_cannot_load_or_save_is_a_finding),
+        ("file_level_findings_are_one_record_across_phases", test_file_level_findings_are_one_record_across_phases),
+        ("recording_dedupes_within_one_fire_and_reads_extra_columns",
+         test_recording_dedupes_within_one_fire_and_reads_extra_columns),
         ("undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook",
          test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook),
         ("unreadable_rules_file_is_recorded_not_just_rendered",

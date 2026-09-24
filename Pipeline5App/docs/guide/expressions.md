@@ -42,7 +42,9 @@ coercion; a blank value stays blank). Text without holes is copied verbatim - a 
 
 The pipeline's own templates - DB member templates, interface and diagnosis SCL lines, and the
 chain-reaction templates - render **strict**: a missing top-level `$field` is an error (a phase FAIL,
-or an `rx_bad_template` reaction finding), never a silent blank. Sub-keys stay optional: guard them
+or an `rx_bad_template` reaction finding), never a silent blank - a data function's predicate
+(`count(signals, $script_type = "PEC")`) reads the table's rows, so its `$col` is not a field of the
+template, and neither is a `let` name. Sub-keys stay optional: guard them
 with `present(...)` / `coalesce(...)`. In a chain-reaction `@for $row in <table>` loop, `$row.column`
 must name a real column of that table. Predicates (conditions, `where`, `@if`) stay lenient: a
 misspelled name there simply reads blank. A malformed `/regex/` is always reported as an error.

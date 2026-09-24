@@ -17,6 +17,7 @@ re-entrant for `let` (it threads a Scope through a per-binding compile so a body
 """
 from __future__ import annotations
 
+import functools
 import re
 
 from . import data, runtime
@@ -97,8 +98,12 @@ def _field_thunk(name: str):
 
 # --- parser (compiles to a thunk fn(ctx) -> value) ---------------------------------------------- #
 class _Parser:
-    def __init__(self, toks, src, scope: Scope | None):
+    def __init__(self, toks, src, scope: Scope | None, free: set | None = None, bound=frozenset()):
         self.toks, self.i, self.src, self.scope = toks, 0, src, scope
+        # the FREE top-level fields (read from the caller's ctx) - a data-function predicate's `$col`
+        # (the iterated ROW's column) and a let-bound name are NOT free (see `free_fields`)
+        self.free = free if free is not None else set()
+        self.bound = bound
 
     def _peek(self):
         return self.toks[self.i] if self.i < len(self.toks) else (None, None)
@@ -201,6 +206,8 @@ class _Parser:
             top = name.split(".", 1)[0]
             if self.scope is not None and top not in self.scope:
                 raise ExprError(f"unknown field ${top} (not in scope) in {self.src!r}")
+            if top not in self.bound:
+                self.free.add(top)
             return _field_thunk(name)
         if kind == "regex":
             raise ExprError(f"a /regex/ is only valid after '~' or in extract(), in {self.src!r}")
@@ -394,7 +401,7 @@ class _Parser:
                 raise ExprError(f"let: expected a binding name in {self.src!r}")
             self._eat(":=")
             # compile the binding expr in the CURRENT (accumulating) scope
-            sub = _Parser(self.toks, self.src, scope)
+            sub = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names))
             sub.i = self.i
             expr_fn = sub._or()
             self.i = sub.i
@@ -407,7 +414,7 @@ class _Parser:
                 break
             self._eat(",")
         # body compiled in the scope extended with all bound names
-        body_parser = _Parser(self.toks, self.src, scope)
+        body_parser = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names))
         body_parser.i = self.i
         body_fn = body_parser._or()
         self.i = body_parser.i
@@ -430,8 +437,9 @@ class _Parser:
         raise ExprError(f"expected a table name in {self.src!r}")
 
     def _pred_in_row_scope(self):
-        """Compile a predicate against a PER-ROW scope (scope=None so any $col resolves to the row cell)."""
-        sub = _Parser(self.toks, self.src, None)
+        """Compile a predicate against a PER-ROW scope (scope=None so any $col resolves to the row cell).
+        Its fields go to a PRIVATE set: a row column is not a free field of the enclosing hole."""
+        sub = _Parser(self.toks, self.src, None, set())
         sub.i = self.i
         fn = sub._or()
         self.i = sub.i
@@ -500,6 +508,22 @@ def _binder(pred_fn):
 def compile_expr(text: str, scope: Scope | None):
     """Tokenize + parse `text` into a thunk fn(ctx) -> value. Raises a located ExprError."""
     return _Parser(_tokenize(text), text, scope).parse()
+
+
+@functools.lru_cache(maxsize=4096)
+def free_fields(text: str) -> frozenset:
+    """The top-level `$field` names an expression reads from the CALLER's ctx - parsed, not scanned:
+    a data-function predicate's `$col` (evaluated against each ROW of the table) and a let-bound
+    name are excluded. Render's keep/strict modes decide missing-ness over THIS set (chain-reaction
+    refuter round 8: `{count(signals, $script_type = "PEC")}` raised "missing field $script_type"
+    in a strict hole whose own row lacked that column). A malformed expression -> {} (the compile
+    step reports the real error)."""
+    try:
+        parser = _Parser(_tokenize(text), text, None)
+        parser.parse()
+    except ExprError:
+        return frozenset()
+    return frozenset(parser.free)
 
 
 def referenced_fields(text: str) -> set:

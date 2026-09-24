@@ -263,7 +263,9 @@ def run_staging(ctx, only=None):
             ctx.emit("INFO", f"  before_300 reaction {row['rule']}: {row['outcome']} "
                              f"({row['created']} created) - not recorded, staging halted")
         return
-    reactions.settle(database, deferred)          # before_300's audit + findings join the staged record
+    settled = reactions.settle(database, deferred)   # before_300's audit + findings join the staged record
+    if settled:                                       # (a record that cannot load/save is reported)
+        ctx.render(settled, label="before_300 reactions")
     database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS)
     if rx:
         ctx.render(rx, label="after_300 reactions")

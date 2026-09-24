@@ -111,12 +111,12 @@ def _render_named(name: str, templates: dict, ctx: dict, stack: tuple, site: tup
 
 
 def _split_top(text: str, marker: str) -> tuple:
-    """Split `text` at the FIRST top-level occurrence of `marker` (outside {...} holes, quotes and
-    /regex/ literals). Returns (head, tail) or (text, None) when absent - how the @for inline `:` and
+    """Split `text` at the FIRST top-level occurrence of `marker` (outside {...} holes, (...)/[...]
+    call arguments, quotes and /regex/ literals). Returns (head, tail) or (text, None) when absent - how the @for inline `:` and
     the range `..` are found without tripping over colons/dots inside expressions (a `where $tag ~
     /^P..1$/` predicate is one regex, not a range - refuter round 7; expr has no `/` operator, so an
     unquoted `/` always opens a regex, exactly as render's hole splitter reads it)."""
-    depth, i, in_q = 0, 0, ""
+    depth, parens, i, in_q = 0, 0, 0, ""
     while i < len(text):
         ch = text[i]
         if in_q:
@@ -131,7 +131,11 @@ def _split_top(text: str, marker: str) -> tuple:
             depth += 1
         elif ch == "}":
             depth = max(0, depth - 1)
-        elif depth == 0 and text.startswith(marker, i):
+        elif ch in "([":                                    # a call's args: a slice `0:1`, a `let(n := ...)`
+            parens += 1                                     # (refuter round 8)
+        elif ch in ")]":
+            parens = max(0, parens - 1)
+        elif depth == 0 and parens == 0 and text.startswith(marker, i):
             return text[:i], text[i + len(marker):]
         i += 1
     return text, None
