@@ -106,12 +106,12 @@ from __future__ import annotations
 
 from .errors import ExprError
 from .parser import compile_expr
-from .render import render
+from .render import hole_paths, render
 from .scope import Scope
 from .runtime import truthy
 from .tools import Issue, check, check_template, function_names, tokens
 
-__all__ = ["test", "evaluate", "render", "Scope", "ExprError",
+__all__ = ["test", "evaluate", "render", "hole_paths", "Scope", "ExprError",
            "tokens", "check", "check_template", "Issue", "function_names"]
 
 # compiled-expr cache keyed by (text, scope-identity)

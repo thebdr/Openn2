@@ -207,7 +207,7 @@ class _Parser:
             if self.scope is not None and top not in self.scope:
                 raise ExprError(f"unknown field ${top} (not in scope) in {self.src!r}")
             if top not in self.bound:
-                self.free.add(top)
+                self.free.add(name)                          # the full dotted path ($r.tag -> "r.tag")
             return _field_thunk(name)
         if kind == "regex":
             raise ExprError(f"a /regex/ is only valid after '~' or in extract(), in {self.src!r}")
@@ -511,19 +511,26 @@ def compile_expr(text: str, scope: Scope | None):
 
 
 @functools.lru_cache(maxsize=4096)
-def free_fields(text: str) -> frozenset:
-    """The top-level `$field` names an expression reads from the CALLER's ctx - parsed, not scanned:
-    a data-function predicate's `$col` (evaluated against each ROW of the table) and a let-bound
-    name are excluded. Render's keep/strict modes decide missing-ness over THIS set (chain-reaction
-    refuter round 8: `{count(signals, $script_type = "PEC")}` raised "missing field $script_type"
-    in a strict hole whose own row lacked that column). A malformed expression -> {} (the compile
-    step reports the real error)."""
+def free_paths(text: str):
+    """The `$field` paths (full dotted: `$r.tag` -> "r.tag") an expression reads from the CALLER's
+    ctx - parsed, not scanned: a data-function predicate's `$col` (evaluated against each ROW of the
+    table) and a let-bound name are excluded. None when the text does not parse (the compile step
+    reports the real error). The shared truth behind `free_fields` and the Tempemplator's
+    loop-column check (chain-reaction refuter rounds 8 + 9)."""
     try:
         parser = _Parser(_tokenize(text), text, None)
         parser.parse()
     except ExprError:
-        return frozenset()
+        return None
     return frozenset(parser.free)
+
+
+def free_fields(text: str):
+    """The TOP-LEVEL names of `free_paths` - what render's keep/strict modes decide missing-ness over
+    (refuter round 8: `{count(signals, $script_type = "PEC")}` raised "missing field $script_type" in
+    a strict hole whose own row lacked that column). None when the text does not parse."""
+    paths = free_paths(text)
+    return None if paths is None else frozenset(path.split(".", 1)[0] for path in paths)
 
 
 def referenced_fields(text: str) -> set:

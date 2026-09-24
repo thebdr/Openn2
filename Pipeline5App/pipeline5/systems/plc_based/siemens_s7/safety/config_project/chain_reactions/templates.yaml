@@ -6,9 +6,11 @@
 # TWO KINDS share this file (the rule's `action` picks which its `template` must be):
 #
 #   ROW template (action: add_rows) - a LIST of field maps; each map spawns ONE row into the
-#   rule's target TABLE per matched source row. Every value is an expr template ({$field} holes,
-#   full function set). Spawned rows automatically carry spawned_by (the rule) + source_uid
-#   (the triggering row).
+#   rule's target TABLE per matched source row. Every value is an expr template STRING ({$field}
+#   holes, full function set) - QUOTE it: a bare 007 / true / [a, b] is rejected, never coerced.
+#   Spawned rows automatically carry spawned_by (the rule) + source_uid (the triggering row).
+#   Rules fire in reactions.csv order, and a later rule SEES an earlier rule's spawns (the chain
+#   reaction within one hook - e.g. spawn rows, then count or list them).
 #
 #     my_row_template:
 #       - script_type: "DIAG"

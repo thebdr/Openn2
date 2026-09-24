@@ -340,6 +340,93 @@ def test_a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten():
        "RENDERED twice - by the before_300 settle AND the after_300 fire: neither path is silent")
 
 
+def _spawn_project(project, params):
+    """A project whose after_300 rules CASCADE within one hook: the templates.yaml manual's own
+    example (spawn a DIAG signal per `A` row), then a rule that counts and lists those spawns."""
+    import csv
+    from ruamel.yaml import YAML
+    shared = os.path.join(project, "config_project", "shared")
+    rx_dir = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions")
+    os.makedirs(shared)
+    os.makedirs(rx_dir)
+    with open(os.path.join(shared, "project_params.yaml"), "w", encoding="utf-8") as handle:
+        YAML(typ="safe").dump(params, handle)
+    with open(os.path.join(rx_dir, "reactions.csv"), "w", encoding="utf-8", newline="") as handle:
+        csv.writer(handle).writerows([
+            ["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
+            ["probe_spawn", "after_300", "signals", '$script_type = "A"', "add_rows", "signals", "diag_rows", ""],
+            ["probe_read", "after_300", "", "", "file", "rx/diag.txt", "diag_txt", "reads the spawns"],
+        ])
+    with open(os.path.join(rx_dir, "templates.yaml"), "w", encoding="utf-8") as handle:
+        handle.write("diag_rows:\n  - script_type: \"DIAG\"\n    mnemonic: \"DIAG-{$mnemonic}\"\n"
+                     "diag_txt: |-\n  DIAG rows: {count(signals, $script_type = \"DIAG\")}\n"
+                     "  @for $s in signals where $script_type = \"DIAG\": {$s.spawned_by}\n")
+
+
+def _staged_count(host):
+    """The RSLT line's `staged N signals` N (what the run REPORTS it saved)."""
+    import re
+    for level, msg in host.lines:
+        match = re.search(r"staged (\d+) signals", msg) if level == "RSLT" else None
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def test_a_cascade_within_one_hook_through_the_real_run_plan():
+    """Refuter round 9 (medium) through run_staging: the manual's own example spawned 24 DIAG signals,
+    yet the next rule in the same hook counted 0.0 and listed none - every rule audited `ok`, nothing
+    rendered: a SILENT wrong answer in the engine's core use (a chain reaction within one hook)."""
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _spawn_project(project, params)
+        host = _Host()
+        config.use_project(project)
+        try:
+            SYSTEM.handlers["staging"](host.ctx())
+            saved = _read_csv(os.path.join(config.database_dir(), "signals.csv"))
+            sources = sum(1 for row in saved if row.get("script_type") == "A")
+            spawned = sum(1 for row in saved if row.get("script_type") == "DIAG")
+            ok(sources > 0 and spawned == sources, f"one DIAG spawn per A row, saved ({spawned} vs {sources})")
+            with open(os.path.join(config.output_root(), "rx", "diag.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), f"DIAG rows: {float(sources)}\n" + "probe_spawn\n" * sources,
+                   "the later rule COUNTED and LISTED the earlier rule's spawns")
+            eq(_staged_count(host), len(saved), "the RSLT count matches the saved signals")
+        finally:
+            config.use_project(previous_project)
+
+
+def test_spawns_are_saved_beside_a_ragged_record():
+    """Refuter round 9: with a ragged chain_reactions_log.csv the engine skipped the WHOLE save - the
+    after_300 spawns silently never reached signals.csv while RSLT reported them. The rest of the
+    Database is saved now; only the unreadable record is left untouched (and reported)."""
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _spawn_project(project, params)
+        host = _Host()
+        config.use_project(project)
+        try:
+            db_dir = config.database_dir()
+            os.makedirs(db_dir, exist_ok=True)
+            ragged = os.path.join(db_dir, "chain_reactions_log.csv")
+            with open(ragged, "w", encoding="utf-8", newline="") as handle:
+                handle.write("uid,hook,rule,action,target,matches,created,outcome\nu1,after_500,x,f,t,1,1,ok,EXTRA\n")
+            with open(ragged, "rb") as handle:
+                before = handle.read()
+            SYSTEM.handlers["staging"](host.ctx())
+            saved = _read_csv(os.path.join(db_dir, "signals.csv"))
+            ok(any(row.get("script_type") == "DIAG" for row in saved), "the spawns were SAVED")
+            eq(_staged_count(host), len(saved), "the RSLT count matches the saved signals")
+            with open(ragged, "rb") as handle:
+                eq(handle.read(), before, "the ragged record is untouched")
+        finally:
+            config.use_project(previous_project)
+    ok(any(getattr(f, "type", "") == "rx_record_unreadable" for batch in host.rendered for f in batch),
+       "the unreadable record was rendered")
+
+
 def test_310_leg_appends_reaction_findings_to_the_existing_record():
     """Refuter round 7 B3 through the real run-plan: the 310 leg (Stage I/O List) stages a Database
     WITHOUT validation_issues; a reaction finding used to create an empty table and save it OVER the
@@ -389,6 +476,9 @@ if __name__ == "__main__":
          _sandboxed(test_halted_staging_lists_the_deferred_trail_and_records_nothing)),
         ("a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten",
          _sandboxed(test_a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten)),
+        ("a_cascade_within_one_hook_through_the_real_run_plan",
+         _sandboxed(test_a_cascade_within_one_hook_through_the_real_run_plan)),
+        ("spawns_are_saved_beside_a_ragged_record", _sandboxed(test_spawns_are_saved_beside_a_ragged_record)),
         ("310_leg_appends_reaction_findings_to_the_existing_record",
          _sandboxed(test_310_leg_appends_reaction_findings_to_the_existing_record)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),

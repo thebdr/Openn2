@@ -49,6 +49,15 @@ def test_loop_row_columns_are_schema_checked():
                                               extra={"leaf": "{$r.tagg}"}))
     eq(_render("@for $r in signals: x\n{$r.anything}", {"_db": db, "r": {"k": 1}}), "x\nx\n",
        "after the loop the outer `r` is plain data again (the schema shadowed, then restored)")
+    # the check is PARSED (refuter round 9): a data-function predicate's `$type.type_id` is the SIGNALS
+    # row's column, and a let-bound `$r` is local - neither is the loop row, whatever their names
+    both = {"types": [{"type": "PEC", "desc": "photocell"}],          # NO type_id column in `types`
+            "signals": [{"tag": "S1", "type": {"type_id": "P"}}]}
+    eq(_render('@for $type in types: {count(signals, $type.type_id = "P")}', {"_db": both}), "1.0",
+       "a predicate column that shares the loop var's name is not a loop-row column")
+    eq(_render('@for $r in signals: {let(r := first(types, $type = "PEC"); $r.desc)}', {"_db": both}),
+       "photocell", "a let binding that shadows the loop var is not the loop row")
+    raises(TempemplatorError, lambda: _render("@for $r in signals: {$r.tagg}", {"_db": both}))   # still caught
     layered = {"_params": {"project_code": "8XXX"}, "_rule": {"name": "r", "hook": "after_300"}}
     eq(_render("[{$_params.project_code}] [{$_params.optional.key}]", layered), "[8XXX] []",
        "`_params` keys are optional by design (C-004 get_param) - absent reads blank")
@@ -60,6 +69,11 @@ def test_raw_errors_become_located():
     for n in ("inf", "-inf", "nan"):
         raises(TempemplatorError, lambda: _render("@for $i in 1..{$n}: x{$i}", {"n": n}))
     eq(_render("@for $i\tin 1..2: x{$i}", {}), "x1\nx2", "a TAB before `in` is whitespace like any other")
+    # range ends are WHOLE numbers (refuter round 9): a `1...3` typo (-> '.3') used to render nothing,
+    # a 2.7 was silently truncated, and 1..1e308 escaped raw
+    eq(_render("@for $i in 1..{$n}: x{$i}", {"n": "2.0"}), "x1\nx2", "an integer-valued float (Excel's 2.0) is fine")
+    for bad in ("1...3", "1..2.7", "1..1e308"):
+        raises(TempemplatorError, lambda: _render(f"@for $i in {bad}: x", {}))
     eq(_render("@for $i in\t1..2: x{$i}", {}), "x1\nx2", "…after `in` too")
     raises(TempemplatorError, lambda: _render("@for $1x in 1..2: x", {}))   # not a referenceable var
     db = {"signals": [{"tag": "P1"}]}

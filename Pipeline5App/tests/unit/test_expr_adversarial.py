@@ -217,7 +217,10 @@ def test_render_missing_check_reads_only_free_fields():
     eq(sorted(free_fields('where(t, $a = $b)')), [], "a where() predicate's fields are row columns")
     eq(sorted(free_fields('node_of($bit, t)')), ["bit"], "node_of's bit is a free field")
     eq(sorted(free_fields("let(a := $x, b := $a; $b)")), ["x"], "sequential lets bind their names")
-    eq(free_fields("concat($a,"), frozenset(), "a malformed expression -> {} (the compile reports it)")
+    eq(free_fields("concat($a,"), None, "a malformed expression -> None (the compile reports it)")
+    # keep mode still KEEPS a malformed hole whose field is missing (the pre-round-8 token scan is the
+    # fallback - truth/identity.py's two-stage interface tagnames rely on keep; refuter round 9)
+    eq(expr.render("{concat($a,}", {}, mode="keep"), "{concat($a,}", "keep: a malformed hole with a missing field is kept")
 
 
 def test_bad_regex_is_a_located_error():

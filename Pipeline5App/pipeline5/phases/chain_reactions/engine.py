@@ -27,7 +27,9 @@ THE SCOPE an expression sees (the E1 layering): the matched source row's fields 
 `_params` = the project params (dotted: {$_params.project_code}), `_rule` = {name, hook},
 `_db` = every SSOT table (expr's data functions + the @for table queries read it), each row carrying
 EVERY column of its table (an absent cell as "") - a freshly staged row lacks the columns later
-phases fill, yet the renderer's loop-column check must see the table's real schema.
+phases fill, yet the renderer's loop-column check must see the table's real schema. Rules fire in
+CSV order and `_db` is REBUILT after a rule spawns rows, so a later rule sees the spawns exactly as
+its matching does (the chain reaction within one hook - refuter round 9).
 
 APPEND is the file action's ONLY mode (user decision 2026-07-16): the file is created if absent and
 APPENDED otherwise - the USER is responsible for lifecycle handling (e.g. a `before_<phase>` rule
@@ -61,8 +63,9 @@ the handler's `ctx.render` and recorded (uid-deduplicated) to `validation_issues
     rx_unfired_hook     a rule on a hook the run-plan never fires (it would never run) - dropped
     rx_record_unreadable / rx_record_unwritable
                         the reaction record (audit / validation_issues) does not load - a hand-edited
-                        CSV gone ragged: left UNTOUCHED, nothing recorded over it - or does not save
-                        (a file held open, e.g. by Excel); rendered, never a crash
+                        CSV gone ragged: left UNTOUCHED, nothing recorded over it, while the rest of
+                        the Database (a spawn) is still saved - or does not save (a file held open,
+                        e.g. by Excel); rendered, never a crash
     rx_rule_crashed     the backstop - an unforeseen defect, reported with its exception type
 
 A problem of the rule INDEX itself (a row naming no hook, an unfired hook, an unreadable
@@ -226,6 +229,9 @@ def _template_problem(rule: Rule, templates: dict):
             if value is None:
                 return (f"row template {rule.template!r} entry {number}: field {name!r} has no "
                         "value (write '' for an empty field)")
+            if not isinstance(value, str):                   # YAML typed it: a list would be stored as
+                return (f"row template {rule.template!r} entry {number}: field {name!r} is a "  # its repr,
+                        f"{type(value).__name__} ({value!r}), not a template string - quote it")  # 007 as 7
     return None
 
 
@@ -330,19 +336,26 @@ def _db_tables(database) -> dict:
     return {name: _complete_rows(database[name]) for name in database.names()}
 
 
-def _attach(database, factory, name: str):
-    """The database's `name` table - or, when this Database never loaded one (the 310 leg stages only
-    signals + diagnosis_cabinets), the ON-DISK record, so appending and saving never overwrite what
-    earlier phases recorded (refuter round 7: a reaction finding wiped a phase-110 record)."""
-    if name not in database:
-        database.add_table(Database([factory()]).load(config.database_dir())[name])
-    return database[name]
+_RECORD = ((LOG_TABLE, chain_reactions_log_table), ("validation_issues", validation_issues_table))
+
+
+def _attach_record(database, directory: str) -> None:
+    """Attach the reaction-record tables (the audit + validation_issues) this Database never loaded -
+    from the ON-DISK record (the 310 leg stages only signals + diagnosis_cabinets), so appending and
+    saving never overwrite what earlier phases recorded (refuter round 7). BOTH load or NEITHER is
+    attached: a table that fails to load must never half-attach, since whatever is attached is saved
+    (refuter round 9). Raises when a record file does not load."""
+    missing = [(name, factory) for name, factory in _RECORD if name not in database]
+    if missing:
+        loaded = Database([factory() for _name, factory in missing]).load(directory)
+        for name, _factory in missing:
+            database.add_table(loaded[name])
 
 
 def _record_new(database, findings) -> int:
     """Record the findings not yet in `validation_issues` (by uid - a malformed rule surfaces at every
     hook's fire, but lands in the record ONCE). Returns the count recorded; the caller saves."""
-    known = {r.get("uid") for r in _attach(database, validation_issues_table, "validation_issues")}
+    known = {r.get("uid") for r in database["validation_issues"]}
     fresh = []
     for finding in findings:
         if finding.uid not in known:
@@ -355,25 +368,30 @@ def _record_new(database, findings) -> int:
 
 def _persist(database, hook: str, log_rows: list, findings: list) -> list:
     """Replace `hook`'s audit rows with this firing's, record its findings, save the database. A record
-    that will not LOAD (a hand-edited CSV gone ragged) is left untouched - nothing is recorded over it;
-    one that will not SAVE (a file held open, e.g. by Excel) is reported. Either is a located finding,
-    never a crash (refuter round 8). Returns those findings for the caller to surface."""
+    that will not LOAD (a hand-edited CSV gone ragged) is left untouched - this firing's audit and
+    findings are not recorded over it - yet the REST of the Database is still saved (an add_rows spawn
+    must not vanish with it - refuter round 9); one that will not SAVE (a file held open, e.g. by
+    Excel) is reported. Either is a located finding, never a crash (refuter round 8). Returns those
+    findings for the caller to surface."""
     phase, where = _hook_phase(hook), config.database_dir()
+    problems = []
     try:
-        log = _attach(database, chain_reactions_log_table, LOG_TABLE)
-        _attach(database, validation_issues_table, "validation_issues")
+        _attach_record(database, where)
     except Exception as error:
-        return [_f(phase, "rx_record_unreadable",
-                   f"the reaction record does not load - left untouched, nothing recorded: {error}", where)]
-    log.rows = [r for r in log.rows if r.get("hook") != hook]   # this hook's audit reflects THE LAST run
-    log.extend(log_rows)
-    _record_new(database, findings)
+        problems.append(_f(phase, "rx_record_unreadable",
+                           "the reaction record does not load - left untouched: this firing's audit and "
+                           f"findings were NOT recorded (the rest of the Database was saved): {error}", where))
+    else:
+        log = database[LOG_TABLE]
+        log.rows = [r for r in log.rows if r.get("hook") != hook]   # this hook's audit reflects THE LAST run
+        log.extend(log_rows)
+        _record_new(database, findings)
     try:
         database.save(where)
     except OSError as error:
-        return [_f(phase, "rx_record_unwritable",
-                   f"the record could not be saved (a file held open by another program?): {error}", where)]
-    return []
+        problems.append(_f(phase, "rx_record_unwritable",
+                           f"the record could not be saved (a file held open by another program?): {error}", where))
+    return problems
 
 
 def settle(database, deferred) -> list:
@@ -463,7 +481,9 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
                         problems = _append_file(rule, matched, templates, params, db_tables, files_root, tally)
             except Exception as error:   # the backstop: an unforeseen defect is a finding, never a crash
                 problems = [_f(rule.phase, "rx_rule_crashed", f"{type(error).__name__}: {error}", rule.name)]
-        findings.extend(problems)
+        if rule.action == "add_rows" and tally["created"]:
+            db_tables = _db_tables(database)                 # the CASCADE: a later rule's `_db` sees this
+        findings.extend(problems)                            # rule's spawns, as its matching does (round 9)
         outcome = blocked.type if blocked is not None else (problems[0].type if problems else "ok")
         log_rows.append({"hook": rule.fire_when, "rule": rule.name, "action": rule.action,
                          "target": rule.target, "matches": len(matched), "created": tally["created"],

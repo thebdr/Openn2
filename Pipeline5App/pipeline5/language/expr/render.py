@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 
 from .errors import ExprError
-from .parser import free_fields
+from .parser import free_fields, free_paths, referenced_fields
 from .runtime import format_spec, s
 from .scope import Scope
 
@@ -67,6 +67,15 @@ def _split_spec(body: str):
     return body[:last_colon], body[last_colon + 1:]
 
 
+def hole_paths(body: str):
+    """The free `$field` paths of ONE hole body (`expr` or `expr:spec`, braces excluded) - see
+    parser.free_paths; None when the expression does not parse. The Tempemplator's loop-column check
+    reads it, so a predicate's row column or a let-bound name is never mistaken for a loop row's
+    column (refuter round 9)."""
+    expr_text, _spec = _split_spec(body)
+    return free_paths(expr_text.strip())
+
+
 def render(template: str, ctx: dict, scope: Scope | None = None, mode: str = "empty") -> str:
     """Interpolate `{expr}` holes in `template` against `ctx`. `mode` in {empty, keep, strict}."""
     if mode not in ("empty", "keep", "strict"):
@@ -83,7 +92,10 @@ def render(template: str, ctx: dict, scope: Scope | None = None, mode: str = "em
         # in function-call args) - so a missing field in {concat($x)} is caught - but NOT a data-function
         # predicate's row column or a let-bound name (parsed, not scanned: parser.free_fields).
         if mode in ("keep", "strict"):
-            missing = sorted(f for f in free_fields(expr_text.strip()) if f not in ctx)
+            fields = free_fields(expr_text.strip())
+            if fields is None:                              # malformed: the token scan (as before round 8 -
+                fields = referenced_fields(expr_text)       # keep still keeps it; the compile reports it)
+            missing = sorted(f for f in fields if f not in ctx)
             if missing:
                 if mode == "keep":
                     return m.group(0)                       # leave {token} intact

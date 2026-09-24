@@ -146,11 +146,9 @@ def _check_loop_columns(line: str, template: str, line_no: int, schemas: dict) -
     name a column of that loop's table (a range var has none). Only the FIRST level is a column -
     deeper keys live inside a JSON cell and stay optional (C-002)."""
     for body in _HOLE.findall(line):
-        for kind, start, end in expr.tokens(body):
-            if kind != "field":
-                continue
-            head, _dot, rest = body[start + 1:end].partition(".")
-            if rest and head in schemas:
+        for path in expr.hole_paths(body) or ():            # PARSED: a data-function predicate's row
+            head, _dot, rest = path.partition(".")          # column / a let-bound name is not a loop
+            if rest and head in schemas:                    # row's column (refuter round 9)
                 column = rest.split(".", 1)[0]
                 if column not in schemas[head]:
                     known = ", ".join(sorted(schemas[head])) or "none - a range variable is a number"
@@ -162,10 +160,12 @@ def _check_loop_columns(line: str, template: str, line_no: int, schemas: dict) -
 def _render_line(line: str, template: str, line_no: int, ctx: dict, schemas: dict) -> str:
     """A literal line: render its {expr} holes STRICT (a missing field / bad expr is an authoring
     error the engine must surface as a finding, never a silent blank)."""
-    if schemas:
-        _check_loop_columns(line, template, line_no, schemas)
     try:
+        if schemas:
+            _check_loop_columns(line, template, line_no, schemas)
         return expr.render(line, ctx, mode="strict")
+    except TempemplatorError:
+        raise                                               # already located (the column check)
     except ExprError as error:
         raise TempemplatorError(template, line_no, str(error)) from error
     except Exception as error:                              # the backstop: still LOCATED, never raw
@@ -189,13 +189,21 @@ def _iterate(spec: str, template: str, line_no: int, ctx: dict, schemas: dict) -
     every key the table's rows carry - the loop var's schema)."""
     head, tail = _split_top(spec, "..")
     if tail is not None:                                    # range: a..b, both rendered fragments
+        ends = []
+        for fragment in (head, tail):
+            text = _render_line(fragment.strip(), template, line_no, ctx, schemas) or "0"
+            try:
+                value = float(text)
+            except ValueError as error:                     # 'abc'
+                raise TempemplatorError(template, line_no, f"range ends must be numbers: {spec!r}") from error
+            if not value.is_integer():                      # nan / inf / 2.7 / a '1...3' typo (-> '.3')
+                raise TempemplatorError(template, line_no,
+                                        f"range ends must be whole, finite numbers: {spec!r} ({text!r})")
+            ends.append(int(value))
         try:
-            lo = int(float(_render_line(head.strip(), template, line_no, ctx, schemas) or "0"))
-            hi = int(float(_render_line(tail.strip(), template, line_no, ctx, schemas) or "0"))
-        except (ValueError, OverflowError) as error:        # 'abc' / 'nan' -> ValueError, 'inf' -> OverflowError
-            raise TempemplatorError(template, line_no,
-                                    f"range ends must be finite numbers: {spec!r}") from error
-        return list(range(lo, hi + 1)), frozenset()
+            return list(range(ends[0], ends[1] + 1)), frozenset()
+        except (OverflowError, MemoryError) as error:       # `1..1e308` (refuter round 9)
+            raise TempemplatorError(template, line_no, f"range too large to iterate: {spec!r}") from error
     words = spec.split(None, 1)
     table = words[0].strip()
     pred = ""

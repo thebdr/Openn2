@@ -412,6 +412,75 @@ def test_recording_dedupes_within_one_fire_and_reads_extra_columns():
     _sandboxed(body)()
 
 
+def test_a_cascade_within_one_hook_sees_the_earlier_spawns():
+    """Refuter round 9 (medium): `_db` was snapshotted ONCE per fire, while matching read the live
+    table - a rule after an add_rows rule in the same hook counted/looped over a table WITHOUT the
+    spawns (a silent wrong answer, audited `ok`), and even failed the schema of a spawned column.
+    The chain reaction within one hook is the engine's core use: `_db` is rebuilt after a spawn."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            src = Table("src", columns=["uid", "kind", "name"], key_columns=["name"])
+            src.add(kind="door", name="D1")
+            src.add(kind="door", name="D2")
+            dst = Table("dst", columns=["uid", "label"], key_columns=["label"])   # spawned_by NOT declared
+            spawn = _rule(name="spawn", template="rows")
+            read = _rule(name="read", action="file", source_table="", condition="", target="c.txt", template="txt")
+            database, findings = engine.fire("after_300", Database([src, dst]), rules=[spawn, read],
+                                             templates={"rows": [{"label": "spawn-{$name}"}],
+                                                        "txt": "n={count(dst, present($spawned_by))}\n"
+                                                               "@for $d in dst: {$d.label} by {$d.spawned_by}"},
+                                             params={}, files_root=out_root)
+            eq(findings, [], "the later rule sees the spawned column")
+            with open(os.path.join(out_root, "c.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "n=2.0\nspawn-D1 by spawn\nspawn-D2 by spawn\n",
+                   "…and the spawned ROWS - count and loop alike")
+    _sandboxed(body)()
+
+
+def test_record_attaches_atomically_and_spawns_survive_a_ragged_record():
+    """Refuter round 9: (a) a ragged validation_issues.csv (the 310 leg - the database never loaded
+    it) is the same rx_record_unreadable, bytes untouched, NEITHER record table attached (a half-
+    attached one would be saved); (b) with a ragged audit, the engine used to skip the WHOLE save -
+    an add_rows spawn silently vanished while the run reported it. The rest of the Database is saved."""
+    def body(sandbox):
+        ragged_issues = os.path.join(sandbox, "validation_issues.csv")
+        with open(ragged_issues, "w", encoding="utf-8", newline="") as handle:
+            handle.write("uid,id,phase,type\nu1,1,110,x,EXTRA-CELL\n")
+        with open(ragged_issues, "rb") as handle:
+            before = handle.read()
+        staged_310 = Database([Table("src", columns=["uid", "kind", "name"], key_columns=["name"])])
+        _, findings = engine.fire("after_300", staged_310, rules=[_rule(source_table="nope")],
+                                  templates=_ROW_TPL, params={})
+        eq([x.type for x in findings], ["rx_unknown_table", "rx_record_unreadable"], "no crash - reported")
+        with open(ragged_issues, "rb") as handle:
+            eq(handle.read(), before, "the ragged findings record is untouched")
+        ok(not os.path.exists(os.path.join(sandbox, f"{engine.LOG_TABLE}.csv")),
+           "the audit was NOT half-attached (it would have been saved)")
+        os.remove(ragged_issues)
+        with open(os.path.join(sandbox, f"{engine.LOG_TABLE}.csv"), "w", encoding="utf-8", newline="") as handle:
+            handle.write("uid,hook,rule,action,target,matches,created,outcome\nu1,after_500,x,f,t,1,1,ok,EXTRA\n")
+        database, findings = engine.fire("after_300", _db(), rules=[_rule()], templates=_ROW_TPL, params={})
+        eq([x.type for x in findings], ["rx_record_unreadable"])
+        ok("the rest of the Database was saved" in findings[0].detail, "the finding says what WAS kept")
+        from pipeline5.truth.database import Database as _Db
+        saved = _Db([Table("dst", columns=["uid", "label", "spawned_by", "source_uid"], key_columns=["label"])]).load(sandbox)
+        eq(sorted(r["label"] for r in saved["dst"]), ["spawn-D1", "spawn-D2"], "the spawns were SAVED")
+    _sandboxed(body)()
+
+
+def test_a_condition_failing_at_evaluation_is_a_bad_condition():
+    """Refuter round 9: every rx_bad_condition pin failed at COMPILE; a condition that compiles but
+    raises a located ExprError when EVALUATED (a bad group reference) must still be rx_bad_condition,
+    never relabelled rx_rule_crashed (a different audit outcome and treatment uid)."""
+    def body(sandbox):
+        database, findings = engine.fire("after_300", _db(),
+                                         rules=[_rule(condition='regex_replace($name, /(D)/, "\\\\9") = "x"')],
+                                         templates=_ROW_TPL, params={})
+        eq([x.type for x in findings], ["rx_bad_condition"], "an evaluation-time ExprError")
+        eq(_log(database), [("after_300", "r1", 0, 0, "rx_bad_condition")])
+    _sandboxed(body)()
+
+
 def test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook():
     """U3 (the orchestrator's mutation check): a malformed rule on a hook the run-plan never fires can
     never be recorded at its own hook - so it is an INDEX problem, recorded even by a hook that has no
@@ -553,7 +622,11 @@ def test_malformed_row_templates_are_findings_not_crashes():
     def body(sandbox):
         for label, spec in (("a list of strings", ["label"]), ("a null entry", [None]),
                             ("an empty list", []), ("an empty map", [{}]),
-                            ("a null field value", [{"label": None}])):
+                            ("a null field value", [{"label": None}]),
+                            # YAML-typed values used to be COERCED silently (a list stored as its repr,
+                            # 007 as 7, true as True) - refuter round 9: every value is a template STRING
+                            ("a list value", [{"label": ["a", "b"]}]), ("an int value", [{"label": 7}]),
+                            ("a bool value", [{"label": True}])):
             database, findings = engine.fire("after_300", _db(), rules=[_rule()],
                                              templates={"rows": spec}, params={})
             eq([(x.type, x.location) for x in findings], [("rx_bad_template", "r1")], label)
@@ -797,6 +870,10 @@ if __name__ == "__main__":
         ("file_level_findings_are_one_record_across_phases", test_file_level_findings_are_one_record_across_phases),
         ("recording_dedupes_within_one_fire_and_reads_extra_columns",
          test_recording_dedupes_within_one_fire_and_reads_extra_columns),
+        ("a_cascade_within_one_hook_sees_the_earlier_spawns", test_a_cascade_within_one_hook_sees_the_earlier_spawns),
+        ("record_attaches_atomically_and_spawns_survive_a_ragged_record",
+         test_record_attaches_atomically_and_spawns_survive_a_ragged_record),
+        ("a_condition_failing_at_evaluation_is_a_bad_condition", test_a_condition_failing_at_evaluation_is_a_bad_condition),
         ("undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook",
          test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook),
         ("unreadable_rules_file_is_recorded_not_just_rendered",
