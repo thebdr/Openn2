@@ -131,6 +131,31 @@ def test_run_plan_executes_end_to_end():
        "the source I/O List was NOT modified by the run_plan chain")
 
 
+def test_staging_fires_reaction_hooks():
+    """The C-024 run-plan wiring: run_staging fires `before_300` (no database yet) then `after_300`
+    (the freshly staged database) through the REAL rule loaders - deleting or typo'ing a hook call
+    in safety/main.py dies HERE (the parity oracle drives staging directly and cannot see it).
+    With the shipped EMPTY rules the fire is a no-op, so the staged output stays untouched."""
+    from pipeline5.phases.chain_reactions import engine as reactions
+    calls = []
+    real_fire = reactions.fire
+
+    def recording_fire(hook, database, **kw):
+        calls.append((hook, database is not None and "signals" in database))
+        return real_fire(hook, database, **kw)
+
+    host = _Host()
+    reactions.fire = recording_fire
+    try:
+        SYSTEM.handlers["staging"](host.ctx())
+    finally:
+        reactions.fire = real_fire
+    eq(calls, [("before_300", False), ("after_300", True)],
+       "before fires with no database, after with the staged one - in that order")
+    ok("RSLT" in host.levels(), "staging completed with the hooks live")
+    eq(host.halted, False, "the dark engine never perturbs the run")
+
+
 def test_sub_phase_dispatch():
     """A dropdown action: the parent handler with only=<sub> - the 310 stage-I/O-List leg, plus a
     validation sub (110), through the same dispatch the App's _sub_worker performs."""
@@ -149,5 +174,6 @@ if __name__ == "__main__":
     import sys
     sys.exit(run("siemens_main_handlers", [
         ("run_plan_executes_end_to_end", _sandboxed(test_run_plan_executes_end_to_end)),
+        ("staging_fires_reaction_hooks", _sandboxed(test_staging_fires_reaction_hooks)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),
     ]))

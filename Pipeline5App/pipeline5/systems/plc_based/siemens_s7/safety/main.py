@@ -229,10 +229,18 @@ def run_risky_index(ctx, only=None):
 def run_staging(ctx, only=None):
     """Phase 300: stage the configured I/O List -> the signals table -> Database/signals.csv. The oracle
     splits it: 310 Stage I/O List (`stage_iolist` - I/O List only, no C&E) / 320 Stage C&E Matrix (the
-    full staging = I/O List + the Cause&Effect enrichment). 300/320 are byte-identical to the monolith."""
+    full staging = I/O List + the Cause&Effect enrichment). 300/320 are byte-identical to the monolith.
+
+    The RUN-PLAN fires the chain-reaction hooks here (so a phase button and Run-all react
+    identically): `before_300` ahead of the read (no database yet - file rules only) and
+    `after_300` over the freshly staged database. With no configured rules both are strict no-ops."""
     from pipeline5 import config
+    from pipeline5.phases.chain_reactions import engine as reactions
     from pipeline5.phases.staging import iolist as staging
     ctx.status("staging…")
+    _none, rx = reactions.fire("before_300", None)
+    if rx:
+        ctx.render(rx, label="before_300 reactions")
     if only == 310:
         ctx.emit("PHASE", f"310 {i18n.tr('pb_stage_iolist', ctx.lang)}")
         database, findings = staging.stage_iolist(system=ctx.system)
@@ -244,6 +252,9 @@ def run_staging(ctx, only=None):
         label = f"{only or 300} staging"
     if not ctx.gate(findings, label=label):
         return
+    database, rx = reactions.fire("after_300", database)
+    if rx:
+        ctx.render(rx, label="after_300 reactions")
     signals = database["signals"]
     suffix = "  (I/O List only - run 320 for the C&E)" if only == 310 else ""
     ctx.emit("RSLT", f"  staged {len(signals)} signals{suffix} "

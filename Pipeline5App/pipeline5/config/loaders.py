@@ -364,3 +364,22 @@ def load_seed_members() -> list:
         return [str(x) for x in section["seed_members"]]
     except (KeyError, TypeError):
         raise RuntimeError("generation_params.yaml: datablocks.seed_members is missing") from None
+
+
+# --- chain reactions (the rule engine's config pair - see phases/chain_reactions/engine.py) ------- #
+def load_reactions() -> list:
+    """The chain-reaction RULE rows (`chain_reactions/reactions.csv`, 4-tier resolved): one dict per
+    rule - {name, fire_when, source_table, condition, action, target, template, comment}, strings
+    verbatim (the engine compiles + validates them into located findings, never a crash here). A
+    system that ships no reactions file simply has no rules ([] - absence of rules is not an error)."""
+    return [r for r in read_config_csv(find("chain_reactions/reactions.csv"))
+            if (r.get("name") or "").strip()]
+
+
+def load_reaction_templates() -> dict:
+    """The UNIFIED named-template mapping (`chain_reactions/templates.yaml`, 4-tier resolved):
+    name -> a multi-line STRING (a Tempemplator text template - the `file` action) or a LIST of
+    {field: expr-template} dicts (a ROW template - the `add_rows` action). {} when no file ships."""
+    from pipeline5.config.params import _read_yaml
+    path = find("chain_reactions/templates.yaml")
+    return (_read_yaml(path) or {}) if path else {}

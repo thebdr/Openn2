@@ -97,4 +97,6 @@ from pipeline5.config.loaders import (  # noqa: F401
     load_seed_members,
     load_db_elements,
     load_db_types,
+    load_reactions,
+    load_reaction_templates,
 )

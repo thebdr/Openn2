@@ -94,6 +94,10 @@ class _Parser:
         return self.toks[self.i] if self.i < len(self.toks) else (None, None)
 
     def _next(self):
+        # a truncated expression (e.g. `let(`) must be a LOCATED authoring error, never an IndexError
+        # escaping the ExprError contract (found by the chain-reaction engine's bad-condition test)
+        if self.i >= len(self.toks):
+            raise ExprError(f"unexpected end of expression in {self.src!r}")
         tok = self.toks[self.i]
         self.i += 1
         return tok

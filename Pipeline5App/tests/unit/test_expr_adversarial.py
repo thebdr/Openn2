@@ -103,6 +103,13 @@ def test_let_out_of_scope_binding_expr_rejected():
     raises(ExprError, lambda: expr.evaluate("let(a := $x ; $b)", {"x": "1"}, scope=Scope(["x"])))
 
 
+def test_truncated_expression_is_a_located_error():
+    # an expression cut off mid-construct must raise ExprError, never a raw IndexError escaping the
+    # contract (the parser's _next EOF guard - found by the chain-reaction bad-condition test)
+    for bad in ("let(", "concat(", "let(a := ", "$f in [", "not"):
+        raises(ExprError, lambda b=bad: expr.evaluate(b, {}))
+
+
 def test_let_earlier_binding_not_visible_to_prior():
     # 'a' is NOT yet bound when compiling 'b'... wait, b is AFTER a, so a IS visible. Test the reverse:
     # the FIRST binding cannot see a LATER one (forward ref) -> $b unknown under strict scope
@@ -291,6 +298,7 @@ if __name__ == "__main__":
         ("extract_ignorecase_both_sides", test_extract_ignorecase_both_sides),
         ("let_shadow_and_bind_once", test_let_shadow_and_bind_once),
         ("let_out_of_scope_binding_expr_rejected", test_let_out_of_scope_binding_expr_rejected),
+        ("truncated_expression_is_a_located_error", test_truncated_expression_is_a_located_error),
         ("let_earlier_binding_not_visible_to_prior", test_let_earlier_binding_not_visible_to_prior),
         ("let_nested_inner_sees_outer", test_let_nested_inner_sees_outer),
         ("let_permissive_scope_admits_anything", test_let_permissive_scope_admits_anything),

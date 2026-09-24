@@ -1,0 +1,49 @@
+# ================================================================================================
+# CHAIN-REACTION TEMPLATES - the reusable named templates reactions.csv rules reference.
+# (engine: src://pipeline5/phases/chain_reactions/engine.py · text renderer ("tempemplator"):
+#  src://pipeline5/language/tempemplator.py)
+#
+# TWO KINDS share this file (the rule's `action` picks which its `template` must be):
+#
+#   ROW template (action: add_rows) - a LIST of field maps; each map spawns ONE row into the
+#   rule's target TABLE per matched source row. Every value is an expr template ({$field} holes,
+#   full function set). Spawned rows automatically carry spawned_by (the rule) + source_uid
+#   (the triggering row).
+#
+#     my_row_template:
+#       - script_type: "DIAG"
+#         desc_l1: "auto diagnosis for {$combined_FLD}"
+#
+#   TEXT template (action: file) - a multi-line STRING rendered per matched row and APPENDED to
+#   the rule's target file (append is the ONLY mode - you own the file's lifecycle, e.g. via a
+#   before_<phase> header rule or deleting it between runs). Values are {expr} holes; structure
+#   is @-directives:
+#       @use <name>                          splice another template here (recursive)
+#       @for $i in 1..{$count}: @use <name>  inclusive range loop (inline body form)
+#       @for $row in <table> where <pred>    loop over SSOT rows ({$row.field} inside)
+#       @if <pred> / @else / @end            block conditional
+#
+# The expression scope: the matched row's fields, {$_params...} (project params, dotted),
+# {$_rule.name}/{$_rule.hook}, and every SSOT table for @for queries + expr data functions.
+#
+# The three templates below are the REFERENCE WORKED EXAMPLES - the user's original Excel/VBA
+# Tempemplator belt suite (FUH_DHL), translated construct-for-construct. No shipped rule
+# references them; they are the authoring manual in executable form.
+# ================================================================================================
+
+# Ex.1 - a leaf line with a loop variable (VBA: $Param$ + $IterableIndex$).
+IN_Photocell: |-
+  "CONFIGURATION_IO".{$LineName}.{$BeltName}.PEC{$i}."PEC-Input" := {$PecInputTag};
+
+# Ex.2 - a structure template: a counted loop + nested template calls
+# (VBA: «for{$NumPhotocells$:«Call_PhotocellManager»}» + two «calls»).
+StandardBelt: |-
+  REGION {$BeltName}
+  @for $i in 1..{$NumPhotocells}: @use IN_Photocell
+  @use Call_ConveyorManager
+  END_REGION
+
+# Ex.3 - an inline conditional hole (VBA: «if{$ConveyorPecA$<>"" ? ... : FALSE}») - plain expr
+# if()/present()/concat(), no directive needed for a value-level branch.
+Call_ConveyorManager: |-
+  PecA := {if(present($ConveyorPecA), concat('"CONFIGURATION_IO".', $ConveyorPecA, '."PEC-Control-Out"'), 'FALSE')},
