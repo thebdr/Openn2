@@ -18,8 +18,9 @@
 #
 #   TEXT template (action: file) - a multi-line STRING rendered per matched row and APPENDED to
 #   the rule's target file (append is the ONLY mode - you own the file's lifecycle, e.g. via a
-#   before_<phase> header rule or deleting it between runs). A ':' in the rendered file NAME is
-#   refused (Windows would hide the text in an NTFS stream) - e.g. a `-X1:3` terminal designation. Values are {expr} holes; structure
+#   before_<phase> header rule or deleting it between runs). A ':' in the rendered file NAME (or
+#   anywhere in a RELATIVE target - `X:3.txt` would read as drive X:) is refused (Windows would
+#   hide the text in an NTFS stream) - e.g. a `-X1:3` terminal designation. Values are {expr} holes; structure
 #   is @-directives:
 #       @use <name>                          splice another template here (recursive)
 #       @for $i in 1..{$count}: @use <name>  inclusive range loop (inline body form); a BLANK end
@@ -30,7 +31,8 @@
 #                                            nest an @if inside the @else (a slip is an error)
 #   Write a TEXT template as a block scalar (`name: |-` then the indented body, as below): YAML
 #   reserves `@` at the START of a plain value, so `name: @use other` does not even load (the
-#   engine reports rx_templates_unreadable and blocks the hook's rules - never a crash).
+#   engine reports rx_templates_unreadable and blocks the hook's rules - never a crash), and a
+#   PLAIN multi-line value is FOLDED into one line - its @-directives would become literal text.
 #
 # Holes render STRICT: a missing top-level {$field} is an error, and inside a table loop
 # {$row.column} must name a column of that table ({$r.tagg} over signals is an error, not a blank).

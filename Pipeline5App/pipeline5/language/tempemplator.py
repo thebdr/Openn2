@@ -278,7 +278,7 @@ def _check_directive(raw: str, word: str, template: str, line_no: int) -> None:
             words = iterable.split(None, 1)
             if len(words) > 1:
                 tail = words[1].strip()
-                if not tail.lower().startswith("where"):
+                if not re.match(r"where(\s|$)", tail, re.IGNORECASE):   # the WORD `where` (not `wherever`)
                     raise TempemplatorError(template, line_no, f"@for iterable must be `a..b` or "
                                             f"`<table> [where <pred>]`, got {iterable!r}")
                 if not tail[5:].strip():                     # a dangling `where` - not "every row"
@@ -288,6 +288,9 @@ def _check_directive(raw: str, word: str, template: str, line_no: int) -> None:
             if not body:
                 raise TempemplatorError(template, line_no, "@for inline `:` with an empty body")
             inner = _line_word(body)
+            if inner in ("@if", "@else", "@end") or (inner == "@for" and _opens_block(body)):
+                raise TempemplatorError(template, line_no, f"an inline @for body cannot be a block "
+                                        f"directive ({inner}) - use the block form with @end")
             if inner:                                        # an inline body that is itself a directive
                 _check_directive(body, inner, template, line_no)
 

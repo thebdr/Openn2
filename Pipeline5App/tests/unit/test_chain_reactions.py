@@ -557,9 +557,27 @@ def test_round_13_colon_target_and_utf8_text():
                                              rules=[_rule(action="file", target="scl/{$name}.scl", template="txt")],
                                              templates={"txt": "x"}, params={}, files_root=out_root)
             eq([x.type for x in findings], ["rx_file_write"], "(a) a colon in the file name is refused")
-            ok("hidden NTFS stream" in findings[0].detail, "…saying why")
+            ok("NTFS stream" in findings[0].detail, "…saying why")
             eq(os.listdir(out_root), [], "…and NOTHING was written (not even a 0-byte decoy)")
             eq(_log(database), [("after_300", "r1", 1, 0, "rx_file_write")])
+            # …an ABSOLUTE target with a colon after its drive too (the stream guard itself)
+            absolute = os.path.join(out_root, "{$name}.scl").replace("\\", "/")
+            _, findings = engine.fire("after_300", Database([src]),
+                                      rules=[_rule(action="file", target=absolute, template="txt")],
+                                      templates={"txt": "x"}, params={}, files_root=out_root)
+            eq([x.type for x in findings], ["rx_file_write"], "an absolute colon target is refused")
+            ok("hidden NTFS stream" in findings[0].detail, "…by the stream guard")
+            eq(os.listdir(out_root), [], "…nothing written")
+            # round 14: a ':' in a RELATIVE target read as a drive letter (`X:3.txt` -> drive X:) - an
+            # escape past the guard; refused too
+            _, findings = engine.fire("after_300", Database([src]),
+                                      rules=[_rule(action="file", target="X:{$kind}.txt", template="txt")],
+                                      templates={"txt": "x"}, params={}, files_root=out_root)
+            eq([x.type for x in findings], ["rx_file_write"], "a drive-relative target is refused")
+            ok("relative target" in findings[0].detail,
+               "…by the relative-target check itself - not by luck (an UNMAPPED X: fails to open anyway;"
+               " on a machine where X: is mapped, only this check stops the write)")
+            eq(os.listdir(out_root), [], "…nothing written")
             _, findings = engine.fire("after_300", _db(),
                                       rules=[_rule(action="file", target="u.txt", template="txt")],
                                       templates={"txt": "Δ ±5°C {$name}"}, params={}, files_root=out_root)

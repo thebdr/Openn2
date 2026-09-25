@@ -300,6 +300,10 @@ def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
         except (ExprError, TempemplatorError) as error:
             return [_f(rule.phase, "rx_bad_template", str(error), rule.name)]
         if not os.path.isabs(path):
+            if ":" in path:                                        # `X:3.txt` would read as drive X: (a
+                return [_f(rule.phase, "rx_file_write",            # drive-relative escape - round 14)
+                           f"cannot write {path!r}: a ':' in a relative target (a drive letter, or a hidden "
+                           "NTFS stream) - use an absolute path for another drive", rule.name)]
             path = os.path.join(files_root, path)
         if ":" in os.path.splitdrive(os.path.abspath(path))[1]:   # NTFS would write a HIDDEN alternate data
             return [_f(rule.phase, "rx_file_write",                # stream - silent (refuter round 13: a

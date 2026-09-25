@@ -228,6 +228,19 @@ def test_if_else_and_lazy_branches():
                  '@if $x = "1"\n@if $y = "1"\nA\n@else\nB\n@else\nC\n@end\n@end'):   # a nested SECOND @else
         raises(TempemplatorError, lambda: _render(slip, {"x": "0", "y": "0"}))
     raises(TempemplatorError, lambda: _render("@for $i in 1..{$n}: @usee leaf", {"n": ""}))   # zero iterations too
+    # refuter round 14: the TOP-level structure checks lost their pins when the nested ones moved to
+    # the outer scan - a double @else at depth 1 (a pasted branch: the middle one silently dropped) and
+    # an @else directly inside a @for block with ZERO iterations (a Jinja-style for/else)
+    try:
+        _render('@if $x = "1"\nA\n@else\nB\n@else\nC\n@end', {"x": "0"})
+        ok(False, "a top-level second @else must raise")
+    except TempemplatorError as error:
+        eq(error.line, 5, "…at the second @else")
+    raises(TempemplatorError, lambda: _render("@for $i in 1..{$n}\nA\n@else\nB\n@end", {"n": ""}))
+    # an inline body cannot be a BLOCK directive; `where` is a whole word (not `wherever`)
+    for slip in ("@for $i in 1..{$n}: @else", "@for $i in 1..{$n}: @end", '@for $i in 1..{$n}: @if $x = "1"',
+                 "@for $r in signals wherever $x: {$r.tag}"):
+        raises(TempemplatorError, lambda: _render(slip, {"n": "", "_db": {"signals": []}}))
     raises(TempemplatorError, lambda: _render("@for $r in signals where: {$r.tag}", {"_db": {"signals": []}}))
     # a misplaced @else in a NESTED block of an untaken branch (a forgotten inner @end): located at the
     # @else, never a silently dropped branch
