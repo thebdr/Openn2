@@ -27,7 +27,9 @@ THE GRAMMAR (line-based; a directive line's own indentation is consumed, body li
 
     @use <name>                          splice the named template here, in the CURRENT scope
     @for $var in <a>..<b>                inclusive integer range; both ends are rendered fragments
-                                         (so `1..{$NumPhotocells}` works); $var = the integer
+                                         (so `1..{$NumPhotocells}` works); $var = the integer; a
+                                         BLANK end (an empty cell) means an EMPTY range - no
+                                         iterations, no invented 0 (user decision 2026-09-25)
     @for $var in <table> [where <pred>]  one iteration per (matching) row of ctx["_db"][<table>];
                                          $var = the row dict (fields via $var.field); <pred> is an
                                          expr predicate evaluated with the ROW as its scope -
@@ -189,9 +191,13 @@ def _iterate(spec: str, template: str, line_no: int, ctx: dict, schemas: dict) -
     every key the table's rows carry - the loop var's schema)."""
     head, tail = _split_top(spec, "..")
     if tail is not None:                                    # range: a..b, both rendered fragments
-        ends = []
-        for fragment in (head, tail):
-            text = _render_line(fragment.strip(), template, line_no, ctx, schemas) or "0"
+        if not head.strip() or not tail.strip():            # `..3` - a syntax slip, not blank data
+            raise TempemplatorError(template, line_no, f"a range end is missing: {spec!r}")
+        texts = [_render_line(fragment.strip(), template, line_no, ctx, schemas).strip() for fragment in (head, tail)]
+        if not all(texts):                                  # a BLANK end (an empty cell) = an EMPTY range - no
+            return [], frozenset()                          # iterations (user decision 2026-09-25; it used to
+        ends = []                                           # read as 0 and invent an iteration - refuter round 10)
+        for text in texts:
             try:
                 value = float(text)
             except ValueError as error:                     # 'abc'

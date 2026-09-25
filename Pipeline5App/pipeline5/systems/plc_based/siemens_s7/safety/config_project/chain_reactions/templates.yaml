@@ -21,7 +21,8 @@
 #   before_<phase> header rule or deleting it between runs). Values are {expr} holes; structure
 #   is @-directives:
 #       @use <name>                          splice another template here (recursive)
-#       @for $i in 1..{$count}: @use <name>  inclusive range loop (inline body form)
+#       @for $i in 1..{$count}: @use <name>  inclusive range loop (inline body form); a BLANK end
+#                                            (an empty cell) = no iterations at all
 #       @for $row in <table> where <pred>    loop over SSOT rows ({$row.field} inside)
 #       @if <pred> / @else / @end            block conditional
 #   Write a TEXT template as a block scalar (`name: |-` then the indented body, as below): YAML

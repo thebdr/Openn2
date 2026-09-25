@@ -427,6 +427,57 @@ def test_spawns_are_saved_beside_a_ragged_record():
        "the unreadable record was rendered")
 
 
+def _rules_project(project, params, rules, templates_text):
+    """A minimal project carrying exactly `rules` (reactions.csv rows, header first) + `templates_text`."""
+    import csv
+    from ruamel.yaml import YAML
+    shared = os.path.join(project, "config_project", "shared")
+    rx_dir = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions")
+    os.makedirs(shared)
+    os.makedirs(rx_dir)
+    with open(os.path.join(shared, "project_params.yaml"), "w", encoding="utf-8") as handle:
+        YAML(typ="safe").dump(params, handle)
+    with open(os.path.join(rx_dir, "reactions.csv"), "w", encoding="utf-8", newline="") as handle:
+        csv.writer(handle).writerows(rules)
+    with open(os.path.join(rx_dir, "templates.yaml"), "w", encoding="utf-8") as handle:
+        handle.write(templates_text)
+
+
+def test_a_blank_range_end_invents_nothing_on_the_real_fixture():
+    """Refuter round 10 + the user's decision (2026-09-25: a BLANK range end is an EMPTY range):
+    a byte map over the staged node rows used to invent a `QB0` line for every input-only node (its Q
+    start/end are blank - they read as 0), audited ok. The file must hold exactly the REAL Q bytes."""
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _rules_project(project, params, [
+            ["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
+            ["byte_map", "after_300", "signals", "present($I_startByte) or present($Q_startByte)", "file",
+             "rx/bytes.txt", "bytes_txt", "the refuter's byte map"],
+        ], "bytes_txt: |-\n  @for $b in {$Q_startByte}..{$Q_endByte}: QB{$b}\n")
+        host = _Host()
+        config.use_project(project)
+        try:
+            SYSTEM.handlers["staging"](host.ctx())
+            staged = _read_csv(os.path.join(config.database_dir(), "signals.csv"))
+            with open(os.path.join(config.output_root(), "rx", "bytes.txt"), encoding="utf-8") as handle:
+                got = handle.read()
+        finally:
+            config.use_project(previous_project)
+    expected, blank_q = "", 0
+    for row in staged:
+        start, stop = (row.get("Q_startByte") or "").strip(), (row.get("Q_endByte") or "").strip()
+        if not ((row.get("I_startByte") or "").strip() or start):
+            continue                                                   # not matched by the condition
+        if start and stop:
+            expected += "\n".join(f"QB{b}" for b in range(int(float(start)), int(float(stop)) + 1)) + "\n"
+        else:
+            expected += "\n"                                           # blank Q: an EMPTY range
+            blank_q += 1
+    ok(blank_q > 0, f"the fixture has input-only nodes with blank Q bytes ({blank_q})")
+    eq(got, expected, "exactly the real Q bytes - no invented QB0 for a blank end")
+
+
 def test_310_leg_appends_reaction_findings_to_the_existing_record():
     """Refuter round 7 B3 through the real run-plan: the 310 leg (Stage I/O List) stages a Database
     WITHOUT validation_issues; a reaction finding used to create an empty table and save it OVER the
@@ -479,6 +530,8 @@ if __name__ == "__main__":
         ("a_cascade_within_one_hook_through_the_real_run_plan",
          _sandboxed(test_a_cascade_within_one_hook_through_the_real_run_plan)),
         ("spawns_are_saved_beside_a_ragged_record", _sandboxed(test_spawns_are_saved_beside_a_ragged_record)),
+        ("a_blank_range_end_invents_nothing_on_the_real_fixture",
+         _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),
         ("310_leg_appends_reaction_findings_to_the_existing_record",
          _sandboxed(test_310_leg_appends_reaction_findings_to_the_existing_record)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),

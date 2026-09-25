@@ -72,6 +72,14 @@ def test_raw_errors_become_located():
     # range ends are WHOLE numbers (refuter round 9): a `1...3` typo (-> '.3') used to render nothing,
     # a 2.7 was silently truncated, and 1..1e308 escaped raw
     eq(_render("@for $i in 1..{$n}: x{$i}", {"n": "2.0"}), "x1\nx2", "an integer-valued float (Excel's 2.0) is fine")
+    # a BLANK end (an empty cell) is an EMPTY range - user decision 2026-09-25 (refuter round 10: it read
+    # as 0, and a byte map invented a `QB0` for input-only nodes whose Q start/end are blank)
+    eq(_render("@for $b in {$a}..{$z}: QB{$b}", {"a": "", "z": ""}), "", "blank..blank: no invented QB0")
+    eq(_render("@for $i in 1..{$n}: x{$i}", {"n": ""}), "", "a blank count (Ex.2's NumPhotocells) emits nothing")
+    eq(_render("@for $i in {$a}..3: x{$i}", {"a": ""}), "", "a blank START is empty too - not 0..3")
+    eq(_render("@for $i in 1..{$n}: x{$i}", {"n": "  "}), "", "whitespace is blank")
+    raises(TempemplatorError, lambda: _render("@for $i in ..3: x", {}))       # a MISSING end is a syntax slip
+    eq(_render("@for $b in {$a}..{$z}: QB{$b}", {"a": "0", "z": "1"}), "QB0\nQB1", "real ends still iterate")
     for bad in ("1...3", "1..2.7", "1..1e308"):
         raises(TempemplatorError, lambda: _render(f"@for $i in {bad}: x", {}))
     eq(_render("@for $i in\t1..2: x{$i}", {}), "x1\nx2", "…after `in` too")
