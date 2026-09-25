@@ -4,7 +4,8 @@ the THREE WORKED EXAMPLES from the user's original VBA tool, rendered from the S
 chain_reactions/templates.yaml (the reference templates must actually work)."""
 from _harness import run, eq, ok, raises
 from pipeline5 import config
-from pipeline5.language.tempemplator import TempemplatorError, render_template
+from pipeline5.language.expr import ExprError
+from pipeline5.language.tempemplator import TempemplatorError, render_template, render_text
 
 
 def _render(body, ctx, extra=None):
@@ -328,6 +329,20 @@ def test_literal_braces():
             eq(error.line, 2, f"{typo!r} is located")
             ok(f"column {column}" in error.message and "doubled" in error.message, f"…and explained: {error.message}")
     raises(TempemplatorError, lambda: _render("@for $r in signals: {$r.tag}}", {"_db": db}))   # inside a table loop
+    # refuter round 17's notes: the empty hole is expr's documented "" (a literal {} is doubled), the
+    # advice text is exact, and a multi-line value (a row template's block scalar) is located by line
+    eq((render_text("{}", {}), render_text("{{}}", {})), ("", "{}"), "the empty hole vs a literal {}")
+    try:
+        render_text("A {$x}} B", {"x": "v"})
+        ok(False, "a lone brace must raise")
+    except ExprError as error:
+        eq(str(error), "a lone '}' at column 7 of 'A {$x}} B' - write a literal brace doubled ('}}'); "
+                       "a {hole} cannot contain a brace", "the exact advice")
+    try:
+        render_text("line1\n  {$x}}", {"x": "v"})
+        ok(False, "a lone brace must raise")
+    except ExprError as error:
+        ok(str(error).startswith("a lone '}' at line 2, column 7 of "), f"line + column: {error}")
 
 
 def test_shipped_worked_examples_render():

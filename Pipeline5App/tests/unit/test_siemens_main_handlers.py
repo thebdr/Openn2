@@ -140,8 +140,11 @@ def test_staging_fires_reaction_hooks():
     calls = []
     real_fire = reactions.fire
 
+    seen = {}
+
     def recording_fire(hook, database, **kw):
         calls.append((hook, database is not None and "signals" in database))
+        seen[hook] = None if database is None else {name: database[name].columns for name in database.names()}
         return real_fire(hook, database, **kw)
 
     host = _Host()
@@ -152,6 +155,13 @@ def test_staging_fires_reaction_hooks():
         reactions.fire = real_fire
     eq(calls, [("before_300", False), ("after_300", True)],
        "before fires with no database, after with the staged one - in that order")
+    # P-012: the DECLARED hooks (System.reaction_hooks - what the template builder previews against)
+    # are the fired ones, in order, each loading exactly the tables (+ declared columns) it saw
+    eq(list(SYSTEM.reaction_hooks), [hook for hook, _db in calls], "the declared hooks = the fired ones")
+    for hook, loader in SYSTEM.reaction_hooks.items():
+        loaded = None if loader is None else loader()
+        eq(None if loaded is None else {name: loaded[name].columns for name in loaded.names()}, seen[hook],
+           f"{hook}: the declared Database = the one the fire saw")
     ok("RSLT" in host.levels(), "staging completed with the hooks live")
     eq(host.halted, False, "the dark engine never perturbs the run")
 

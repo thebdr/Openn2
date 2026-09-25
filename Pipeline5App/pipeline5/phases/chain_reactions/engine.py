@@ -75,6 +75,13 @@ recorded once (the file-level findings carry phase 0, so the uid is the same whi
 whichever PHASE - meets the file). A HALTED staging commits no reaction record (the run-plan lists the deferred
 before_300 firings in the log instead - a half-committed record would mix runs).
 
+THE TEMPLATE BUILDER (P-012 - the Files tab's templates.yaml mode) reads the engine through two
+side-effect-free doors: `lint(templates, rule, database, hooks)` - what a fire would report, found
+WITHOUT firing (every branch of every template; with a chosen rule, its E1 scope and its hook's
+tables) - and `preview(rule, row_index, ...)` - one fire for one source row through the fire path's
+OWN render steps (`_spawned`, `_file_output`), nothing added, nothing written. So the builder can
+never approve a template a fire rejects.
+
 KNOWN BOUNDARY (deliberate, until the generated-signals spec review): an `after_300` `add_rows`
 spawn persists into the SAVED Database - visible in the Explorer - but downstream phases RE-STAGE
 from the source document, so spawned `signals` rows do not yet flow into generation. The flagship
@@ -221,19 +228,29 @@ def _template_problem(rule: Rule, templates: dict):
             return (f"template {rule.template!r} is a ROW template (a list) - "
                     "the file action needs a TEXT template")
         return None
+    return _row_template_problem(rule.template, body)
+
+
+def _row_template_problem(name: str, body):
+    """Why `body` cannot serve add_rows (None = it can): a non-empty list of {field: template STRING}
+    maps - the fire path's check, and the builder's lint of every row template."""
     if not isinstance(body, list) or not body:
-        return f"template {rule.template!r} is not a ROW template (a non-empty list of field maps)"
+        return f"template {name!r} is not a ROW template (a non-empty list of field maps)"
     for number, spec in enumerate(body, start=1):
         if not isinstance(spec, dict) or not spec:
-            return f"row template {rule.template!r} entry {number} is not a {{field: expr}} map"
-        for name, value in spec.items():
+            return f"row template {name!r} entry {number} is not a {{field: expr}} map"
+        for column, value in spec.items():
             if value is None:
-                return (f"row template {rule.template!r} entry {number}: field {name!r} has no "
+                return (f"row template {name!r} entry {number}: field {column!r} has no "
                         "value (write '' for an empty field)")
             if not isinstance(value, str):                   # YAML typed it: a list would be stored as
-                return (f"row template {rule.template!r} entry {number}: field {name!r} is a "  # its repr,
+                return (f"row template {name!r} entry {number}: field {column!r} is a "  # its repr,
                         f"{type(value).__name__} ({value!r}), not a template string - quote it")  # 007 as 7
     return None
+
+
+def _unknown_table(role: str, table: str) -> str:
+    return f"{role} table {table!r} is not in the database at this hook"
 
 
 def _scope(row: dict, rule: Rule, params: dict, db_tables: dict) -> dict:
@@ -249,8 +266,7 @@ def _matches(rule: Rule, database, params: dict, db_tables: dict) -> tuple:
         candidates = [{}]
     else:
         if database is None or rule.source_table not in database:
-            return [], _f(rule.phase, "rx_unknown_table",
-                          f"source table {rule.source_table!r} is not in the database at this hook",
+            return [], _f(rule.phase, "rx_unknown_table", _unknown_table("source", rule.source_table),
                           rule.name)
         candidates = _complete_rows(database[rule.source_table])
     if not rule.condition:
@@ -269,22 +285,36 @@ def _spawn_rows(rule: Rule, matched: list, database, templates: dict,
     Counts into `tally["created"]` AS IT GOES (a mid-action failure keeps the true partial count).
     Returns the findings."""
     if database is None or rule.target not in database:
-        return [_f(rule.phase, "rx_unknown_table",
-                   f"target table {rule.target!r} is not in the database at this hook", rule.name)]
+        return [_f(rule.phase, "rx_unknown_table", _unknown_table("target", rule.target), rule.name)]
     table = database[rule.target]
     for row in matched:
-        scope = _scope(row, rule, params, db_tables)
-        for row_spec in templates[rule.template]:
-            try:
-                values = {str(name): tempemplator.render_text(str(tpl), scope)
-                          for name, tpl in row_spec.items()}
-            except ExprError as error:
-                return [_f(rule.phase, "rx_bad_template", f"row template {rule.template!r}: {error}", rule.name)]
-            values["spawned_by"] = rule.name
-            values.setdefault("source_uid", str(row.get("uid") or ""))
-            table.add(**values)
-            tally["created"] += 1
+        try:
+            for values in _spawned(rule, templates, _scope(row, rule, params, db_tables), row):
+                table.add(**values)                            # added as rendered: a later spec's failure
+                tally["created"] += 1                          # keeps the true partial count
+        except ExprError as error:
+            return [_f(rule.phase, "rx_bad_template", _bad_rows(rule, error), rule.name)]
     return []
+
+
+def _spawned(rule: Rule, templates: dict, scope: dict, row: dict):
+    """Yield the rows ONE matched source row spawns - one per row spec, rendered (strict), NOT added;
+    a value that fails raises ExprError at its spec. The fire adds each as it comes; the preview
+    collects them."""
+    for number, row_spec in enumerate(templates[rule.template], start=1):
+        values = {}
+        for name, tpl in row_spec.items():
+            try:
+                values[str(name)] = tempemplator.render_text(str(tpl), scope)
+            except ExprError as error:                     # located: which entry, which field
+                raise ExprError(f"entry {number} field {str(name)!r}: {error}") from error
+        values["spawned_by"] = rule.name
+        values.setdefault("source_uid", str(row.get("uid") or ""))
+        yield values
+
+
+def _bad_rows(rule: Rule, error) -> str:
+    return f"row template {rule.template!r}: {error}"
 
 
 def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
@@ -293,22 +323,9 @@ def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
     expr-rendered target path (relative -> under `files_root`). Counts the lines written into
     `tally["created"]` as it goes. Returns the findings."""
     for row in matched:
-        scope = _scope(row, rule, params, db_tables)
-        try:
-            path = tempemplator.render_text(rule.target, scope)
-            text = tempemplator.render_template(rule.template, templates, scope)
-        except (ExprError, TempemplatorError) as error:
-            return [_f(rule.phase, "rx_bad_template", str(error), rule.name)]
-        if not os.path.isabs(path):
-            if ":" in path:                                        # `X:3.txt` would read as drive X: (a
-                return [_f(rule.phase, "rx_file_write",            # drive-relative escape - round 14)
-                           f"cannot write {path!r}: a ':' in a relative target (a drive letter, or a hidden "
-                           "NTFS stream) - use an absolute path for another drive", rule.name)]
-            path = os.path.join(files_root, path)
-        if ":" in os.path.splitdrive(os.path.abspath(path))[1]:   # NTFS would write a HIDDEN alternate data
-            return [_f(rule.phase, "rx_file_write",                # stream - silent (refuter round 13: a
-                       f"cannot write {path!r}: a ':' in a file name would write a hidden NTFS stream",
-                       rule.name)]                                 # `-X1:3` terminal name)
+        path, text, problem = _file_output(rule, templates, _scope(row, rule, params, db_tables), files_root)
+        if problem is not None:
+            return [_f(rule.phase, *problem, rule.name)]
         try:
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
             with open(path, "a", encoding="utf-8") as handle:      # APPEND is the only mode (user decision)
@@ -318,6 +335,29 @@ def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
                        rule.name)]
         tally["created"] += text.count("\n") + 1
     return []
+
+
+def _file_output(rule: Rule, templates: dict, scope: dict, files_root: str) -> tuple:
+    """ONE matched row's file output as a fire makes it - rendered (strict) and guarded, NOT written:
+    (path, text, None), or (None, None, (finding type, detail)) when the fire would refuse it."""
+    try:
+        path = tempemplator.render_text(rule.target, scope)
+    except ExprError as error:                                     # the holes render one by one - so
+        return None, None, ("rx_bad_template", f"target {rule.target!r}: {error}")   # name the target
+    try:
+        text = tempemplator.render_template(rule.template, templates, scope)
+    except (ExprError, TempemplatorError) as error:
+        return None, None, ("rx_bad_template", str(error))
+    if not os.path.isabs(path):
+        if ":" in path:                                            # `X:3.txt` would read as drive X: (a
+            return None, None, ("rx_file_write",                   # drive-relative escape - round 14)
+                                f"cannot write {path!r}: a ':' in a relative target (a drive letter, or a "
+                                "hidden NTFS stream) - use an absolute path for another drive")
+        path = os.path.join(files_root, path)
+    if ":" in os.path.splitdrive(os.path.abspath(path))[1]:       # NTFS would write a HIDDEN alternate data
+        return None, None, ("rx_file_write",                       # stream - silent (refuter round 13: a
+                            f"cannot write {path!r}: a ':' in a file name would write a hidden NTFS stream")
+    return path, text, None                                        # `-X1:3` terminal name)
 
 
 def _load(loader, type_: str, what: str):
@@ -498,3 +538,118 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
                          "target": rule.target, "matches": len(matched), "created": tally["created"],
                          "outcome": outcome})
     return _finish(hook, database, log_rows, findings)
+
+
+# --- the template builder's doors (P-012) - side-effect free ------------------------------------- #
+@dataclass
+class Preview:
+    """What a fire of a rule would do for ONE source row - produced by the fire path's own render steps,
+    nothing added, nothing written (the template builder's live preview)."""
+    matched: bool = True            # the rule's condition holds for the row (a fire acts on it)
+    rows: list = field(default_factory=list)    # add_rows: the rows it would spawn (provenance incl.)
+    path: str = ""                  # file: the file it would APPEND to
+    text: str = ""                  # file: the text it would append
+    problem: tuple | None = None    # (finding type, detail): what the fire would report instead
+    note: str = ""                  # a preview-only remark (e.g. the source table has no rows)
+
+
+def preview(rule: Rule, row_index: int = 0, *, templates: dict, params: dict, database,
+            files_root: str | None = None) -> Preview:
+    """ONE fire of `rule` for the source row at `row_index` of its hook's `database` (None = a
+    database-less hook; a source-less rule previews its single fire): `_template_problem`, `_scope`,
+    the condition, then `_spawned` / `_file_output` - the steps a fire takes, minus the adding and
+    the writing. An out-of-range index is clamped (an editor's row spinner)."""
+    reason = _template_problem(rule, templates)
+    if reason:
+        return Preview(matched=False, problem=("rx_bad_template", reason))
+    db_tables = _db_tables(database) if database is not None else {}
+    row = {}
+    if rule.source_table:
+        if database is None or rule.source_table not in database:
+            return Preview(matched=False, problem=("rx_unknown_table", _unknown_table("source", rule.source_table)))
+        rows = _complete_rows(database[rule.source_table])
+        if not rows:
+            return Preview(matched=False, note=f"{rule.source_table} has no rows - a fire matches nothing")
+        row = rows[max(0, min(row_index, len(rows) - 1))]
+    scope = _scope(row, rule, params, db_tables)
+    try:
+        matched = expr.test(rule.condition, scope) if rule.condition else True
+    except ExprError as error:
+        return Preview(matched=False, problem=("rx_bad_condition", str(error)))
+    if rule.action == "add_rows":
+        if database is None or rule.target not in database:
+            return Preview(matched, problem=("rx_unknown_table", _unknown_table("target", rule.target)))
+        table, spawned = database[rule.target], []
+        try:
+            for values in _spawned(rule, templates, scope, row):
+                spawned.append(table.stamped(values))       # as add_row stores it (the uid included)
+        except ExprError as error:
+            return Preview(matched, rows=spawned, problem=("rx_bad_template", _bad_rows(rule, error)))
+        return Preview(matched, rows=spawned)
+    path, text, problem = _file_output(rule, templates, scope,
+                                       config.output_root() if files_root is None else files_root)
+    return Preview(matched, path=path or "", text=text or "", problem=problem)
+
+
+def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -> list:
+    """What a fire would report for `templates`, found WITHOUT firing -> [tempemplator.Problem]. Every
+    entry is judged for its KIND: a TEXT template (a string) by `tempemplator.lint` (every branch), a
+    ROW template by `_row_template_problem` + each value by `tempemplator.lint_line` (`where` =
+    (entry number, field)); anything else is neither. With a `rule` - its hook's `database` (None = a
+    database-less hook) and the run-plan's `hooks` - the rule's own template is also judged in the
+    rule's E1 scope (the matched row's columns + _params/_rule/_db; the hook's tables for the loops),
+    and the RULE's own problems come back with template=None: a template of the wrong kind, a table
+    absent at the hook, a hook never fired, a target that will not render."""
+    problems, fields, tables = [], None, None
+    if rule is not None:
+        fields, tables = _lint_rule(rule, templates, database, hooks, problems)
+    text_start = rule.template if rule is not None and rule.action == "file" else None
+    problems.extend(tempemplator.lint(templates, start=text_start, fields=fields, tables=tables))
+    row_start = rule.template if rule is not None and rule.action == "add_rows" else None
+    for name, body in templates.items():
+        if isinstance(body, str):
+            continue
+        if not isinstance(body, list):
+            problems.append(tempemplator.Problem(name, None, 0, 0, f"template {name!r} is neither a TEXT "
+                                                 "template (a string) nor a ROW template (a list of "
+                                                 "{field: template} maps)", "error"))
+            continue
+        shape = _row_template_problem(name, body)
+        if shape:
+            problems.append(tempemplator.Problem(name, None, 0, 0, shape, "error"))
+        scope = fields if name == row_start else None
+        for number, spec in enumerate(body, start=1):
+            for column, value in (spec.items() if isinstance(spec, dict) else ()):
+                if isinstance(value, str):
+                    problems.extend(tempemplator.Problem(name, (number, str(column)), s, e, message, severity)
+                                    for s, e, message, severity in tempemplator.lint_line(value, fields=scope))
+    return problems
+
+
+def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> tuple:
+    """The rule's own problems (appended, template=None) -> its E1 (fields, tables); fields None when
+    the source table is absent (every hole would read as missing - one problem says why)."""
+    def problem(message, where=None, start=0, end=0, severity="error"):
+        problems.append(tempemplator.Problem(None, where, start, end, f"rule {rule.name!r}: {message}", severity))
+
+    reason = _template_problem(rule, templates)
+    if reason:
+        problem(reason)
+    declared = [h.strip().lower() for h in hooks] if hooks is not None else None
+    if declared is not None and rule.fire_when not in declared:
+        problem(f"hook {rule.fire_when!r} is never fired by this run-plan (it fires: {', '.join(declared)})")
+    tables = {} if database is None else {name: database[name].effective_columns() for name in database.names()}
+    fields = {"_params", "_rule", "_db"}
+    if rule.source_table:
+        if rule.source_table in tables:
+            fields |= set(tables[rule.source_table])
+        else:
+            problem(_unknown_table("source", rule.source_table))
+            fields = None
+    if rule.action == "add_rows" and rule.target not in tables:
+        problem(_unknown_table("target", rule.target))
+    if rule.action == "file":
+        for start, end, message, severity in tempemplator.lint_line(rule.target, fields=fields):
+            problem(f"target {rule.target!r}: {message}", "target", start, end, severity)
+    return fields, tables
+

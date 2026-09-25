@@ -226,9 +226,25 @@ def run_risky_index(ctx, only=None):
                      f"{os.path.basename(res['output_path'])}{backup}. REVIEW the _RiskyIndex sheet.")
 
 
-# Every chain-reaction hook THIS run-plan fires - handed to each fire so a rule naming any other
-# hook (it would never run) is reported instead of silently waiting forever.
-_REACTION_HOOKS = ("before_300", "after_300")
+def _staged_database():
+    """The Database `after_300` sees on a full staging (300/320): staging's own tables (`staged_database`
+    - declared once) + the findings record its C&E pass writes (validation_issues), re-read from the
+    SSOT dir - the last staged state. (The 310-only leg records no findings, so its fire sees no
+    validation_issues - a rule looping over that table would report it missing there.)"""
+    from pipeline5 import config
+    from pipeline5.findings.finding import validation_issues_table
+    from pipeline5.phases.staging import iolist as staging
+    database = staging.staged_database(config.load_column_map("IoList"))
+    database.add_table(validation_issues_table())
+    return database.load(config.database_dir())
+
+
+# Every chain-reaction hook THIS run-plan fires, in firing order -> the Database it sees (None: nothing
+# is staged yet). The names go to each fire, so a rule naming any other hook (it would never run) is
+# reported instead of silently waiting forever; the template builder (P-012) previews a rule against
+# its hook's Database (System.reaction_hooks).
+REACTION_HOOKS = {"before_300": None, "after_300": _staged_database}
+_REACTION_HOOKS = tuple(REACTION_HOOKS)
 
 
 def run_staging(ctx, only=None):

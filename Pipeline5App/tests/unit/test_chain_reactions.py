@@ -665,6 +665,13 @@ def test_doubled_braces_in_row_values_and_targets():
                                       templates={"txt": "x"}, params={}, files_root=out_root)
             eq([x.type for x in findings], ["rx_bad_template"], "a lone brace in a file target")
             eq(sorted(os.listdir(out_root)), ["{x}_D1.txt", "{x}_D2.txt"], "…nothing new written")
+            # refuter round 17 note 3: holes render one by one, so the message names what failed -
+            # the target, or the row template's entry + field
+            ok(findings[0].detail.startswith("target '{$name}}.txt': a lone '}'"), f"the target named: {findings[0].detail}")
+            _, findings = engine.fire("after_300", _db(), rules=[_rule()], params={}, files_root=out_root,
+                                      templates={"rows": [{"label": "ok-{$name}"}, {"label": "x", "note": "{$nte}"}]})
+            eq(findings[0].detail, "row template 'rows': entry 2 field 'note': render(strict): missing field "
+                                   "$nte in '{$nte}'", "the entry + field named")
     _sandboxed(body)()
 
 

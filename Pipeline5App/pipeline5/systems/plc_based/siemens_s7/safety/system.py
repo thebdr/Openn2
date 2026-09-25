@@ -65,6 +65,7 @@ SYSTEM = System(
     templates=_templates,
     output_layout=LAYOUT,
     config_root=os.path.join(os.path.dirname(os.path.abspath(__file__)), "config_project"),
+    reaction_hooks=_main.REACTION_HOOKS,
 )
 
 # Registration (deliberately LAST - see the module docstring): the builders decorate themselves

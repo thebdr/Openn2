@@ -216,6 +216,10 @@ class System:
                                          # template_ref) the 800 engine reads - system truth, not kernel
     output_layout: OutputLayout = None   # the delivery tree (coupling #3)
     config_root: str = ""                # the system's BUILTIN config_project dir (4-tier resolver, tier 3)
+    reaction_hooks: dict = field(default_factory=dict)  # {hook: None | callable() -> Database}, in FIRING
+                                         # order: the chain-reaction hooks the run-plan fires + the Database
+                                         # each one sees (None = none staged yet) - the template builder
+                                         # previews a rule against its hook's (P-012)
 
     def __post_init__(self):
         if not self.id or not str(self.id).strip():

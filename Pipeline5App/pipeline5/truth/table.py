@@ -65,10 +65,16 @@ class Table:
         return self.add_row(values)
 
     def add_row(self, row: dict) -> dict:
+        row = self.stamped(row)
+        self.rows.append(row)
+        return row
+
+    def stamped(self, row: dict) -> dict:
+        """`row` exactly as `add_row` stores it - a copy with the content-hash `uid` stamped from the key
+        fields (when `key_columns` are declared and no `uid` was supplied) - WITHOUT appending it."""
         row = dict(row)
         if self.key_columns and not row.get("uid"):
             row["uid"] = content_uid(*(row.get(key) for key in self.key_columns))
-        self.rows.append(row)
         return row
 
     def extend(self, rows) -> "Table":

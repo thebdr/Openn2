@@ -285,6 +285,13 @@ def _load_cabinets(io_path: str, cab_table) -> None:
                       template_type=c["template_type"], swp=c["swp"])
 
 
+def staged_database(colmap) -> Database:
+    """The EMPTY Database staging fills - `signals` (the I/O List's canonical columns, from `colmap`) +
+    `diagnosis_cabinets`. Declared ONCE: what reads the staged record back (the template builder's
+    preview of an after_300 reaction rule, P-012) loads exactly the tables staging writes."""
+    return Database([signals_table([m["canonical"] for m in colmap]), diagnosis_cabinets_table()])
+
+
 def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> tuple:
     """Phase 310 - Stage I/O List: read the I/O List into the `signals` table WITHOUT the C&E enrichment
     (no matrix_areas / ce_* / numerazione_linea -> `combined_FLD` == `iol_FLD`, `IsSorterArea` ''), plus the
@@ -297,9 +304,8 @@ def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> 
     io_path = params.get("iolist_path")
     colmap = config.load_column_map("IoList")
 
-    table = signals_table([m["canonical"] for m in colmap])
-    cab_table = diagnosis_cabinets_table()
-    database = Database([table, cab_table])
+    database = staged_database(colmap)
+    table, cab_table = database["signals"], database["diagnosis_cabinets"]
 
     rows, matched = _read_iolist(params, signal_types, io_path)
     if not matched:                                   # the required input is absent -> halt before anything
