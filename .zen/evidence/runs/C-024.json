@@ -6,20 +6,20 @@
     "Pipeline5App/scripts/verify_c024.sh"
   ],
   "exitCode": 0,
-  "outputSha": "1eb4b9a7df7b4400ef6d77ea37772797a6902aa031673dcd8bb61517fe64a4ff",
+  "outputSha": "82d2bb66224ff2ed80860ead2a1aa28edb2859dcc3e53239d8c23ded440bce21",
   "outputTail": "  PASS  render_literal_braces_and_empty\r\n  PASS  render_spec_split_with_colon_in_extract_slice\r\n  PASS  coalesce_edge_values\r\n  PASS  if_truthiness_edge\r\n  PASS  where_pred_references_row_column\r\n  PASS  node_of_boundaries\r\n  PASS  node_of_bad_byte_columns_skipped\r\n  PASS  lookup_and_unique_edges\r\n  -> 27/27 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-09-25T12:23:22.448Z",
-  "headCommit": "d47d4208760cca174a2aaebb067334024341a050",
+  "ranAt": "2026-09-25T20:21:31.403Z",
+  "headCommit": "2c1e755299fa77d7c3c0678f2ef1fa12ec353e47",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_tempemplator.py",
       "file": "Pipeline5App/tests/unit/test_tempemplator.py",
-      "fileSha": "55eb94ec9331027bf722d1aa1efc1f5e3692dd0fa01cf46aa7f41c74e8bf4bfa"
+      "fileSha": "ddfd2137f7bfec08f07ff2961b8cc744a114c6902522ca382b3b2fe35b1bca15"
     },
     {
       "name": "Pipeline5App/tests/unit/test_chain_reactions.py",
       "file": "Pipeline5App/tests/unit/test_chain_reactions.py",
-      "fileSha": "2bad87395f79cca3a5dc741dc2bbb36d58751ad066cfaac5f97d725d8446e12b"
+      "fileSha": "c159996c807f6deb382e1ff9dfd969dd94704face91d20b704885ed14fec14f6"
     },
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
