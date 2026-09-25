@@ -427,10 +427,16 @@ def test_the_builder_models_what_the_after_300_fire_gets():
     def shape(database):
         return {name: (database[name].effective_columns(), len(database[name])) for name in database.names()}
 
+    def saved():
+        folder = config.database_dir()
+        return {name: open(os.path.join(folder, name), "rb").read() for name in sorted(os.listdir(folder))}
+
     def recording_fire(hook, database, **kw):
         if hook == "after_300":                       # the fire's input, before it runs - and the model
             seen["fired"] = shape(database)
+            before = saved()
             seen["model"] = shape(template_doc.Session(None).base("after_300"))
+            seen["untouched"] = saved() == before     # the model stages IN MEMORY - nothing written
         return real_fire(hook, database, **kw)
 
     with tempfile.TemporaryDirectory() as project:
@@ -452,6 +458,7 @@ def test_the_builder_models_what_the_after_300_fire_gets():
     for name in ("signals", "diagnosis_cabinets", "chain_reactions_log"):
         eq(model[name][1], fired[name][1], f"{name}: the same rows (the saved spawns are not in the fire's input)")
     ok("spawned_by" not in fired["signals"][0], "run 2's fire gets no spawn column")
+    ok(seen["untouched"], "building the model wrote nothing to the Database folder")
 
 
 def test_spawns_are_saved_beside_a_ragged_record():

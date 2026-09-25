@@ -249,6 +249,9 @@ def test_the_session_models_the_run_plan():
             broken = td.Session(None, rows=rules, hooks={"after_300": lambda system: 1 / 0}, params={})
             eq(broken.base("after_300"), None, "a Database that cannot be built")
             ok(any("cannot be built" in note for note in broken.notes), f"…is noted: {broken.notes}")
+            text = broken.preview_text(doc, broken.rules[2], 0)
+            ok("rx_unknown_table" in text and "does NOT match" not in text,
+               f"a fire that stops BEFORE the condition is not called a 'no match': {text!r}")
             ok(any("declares no reaction hooks" in note for note in td.Session(None, rows=rules, hooks={}, params={}).notes),
                "a system that declares no hooks is noted")
             elsewhere = td.Session(os.path.join(sandbox, "other.yaml"), rows=rules, hooks=hooks, params={})

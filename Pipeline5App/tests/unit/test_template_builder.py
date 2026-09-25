@@ -341,12 +341,45 @@ def test_preview_keeps_the_fires_guards():
             engine.tempemplator.render_text = real
         eq(shown.problem, (findings[0].type, findings[0].detail), "the backstop: exactly the fire's rx_rule_crashed")
         eq(shown.matched, True, "…for a row the condition matches")
+        real_test = engine.expr.test
+
+        def broken_test(*_args, **_kwargs):
+            raise RuntimeError("condition defect")
+
+        engine.expr.test = broken_test                  # a crash BEFORE the condition says anything
+        try:
+            shown = engine.preview(_rule(condition='$kind = "door"'), 0, templates=templates, params={},
+                                   database=_database())
+        finally:
+            engine.expr.test = real_test
+        eq((shown.matched, shown.problem[0]), (None, "rx_rule_crashed"), "matched stays None - never a false 'no match'")
         database, findings = engine.fire("after_300", _database(), rules=[_rule()], templates=templates, params={})
         eq(findings, [], "a `self` field fires")
         for index, fired in enumerate(database["dst"]):
             eq(engine.preview(_rule(), index, templates=templates, params={}, database=_database()).rows, [fired],
                f"a `self` field: row {index} previews as the fire spawns it")
     _sandboxed(body)
+
+
+def test_has_business_mirrors_the_fires_no_op():
+    """`has_business` answers exactly `fire`'s strict no-op test - the builder's model of a settled
+    database-less hook depends on it: a rule on the hook, or a rule-INDEX problem (every hook's)."""
+    row = {"name": "h", "fire_when": "before_300", "source_table": "", "condition": "", "action": "file",
+           "target": "x.txt", "template": "t"}
+    hooks = ("before_300", "after_300")
+    eq(engine.has_business("before_300", [row], hooks), True, "a rule on the hook")
+    eq(engine.has_business("before_300", [], hooks), False, "nothing: the strict no-op")
+    eq(engine.has_business("before_300", [{**row, "fire_when": "after_300"}], hooks), False, "another hook's rule")
+    eq(engine.has_business("before_300", [{**row, "fire_when": "whenever"}], hooks), True,
+       "a row naming no hook - an index problem, every hook's business")
+    eq(engine.has_business("before_300", [{**row, "fire_when": "after_900"}], hooks), True,
+       "a rule on a hook the run-plan never fires - every hook's business")
+    eq(engine.has_business("before_300", [{**row, "name": ""}], hooks), True, "its own malformed rule")
+    for rows in ([row], [], [{**row, "fire_when": "after_300"}], [{**row, "fire_when": "whenever"}]):
+        with tempfile.TemporaryDirectory() as out:
+            deferred, _findings = engine.fire("before_300", None, rules=rows, templates={"t": "x"}, params={},
+                                              files_root=out, hooks=hooks)
+        eq(deferred is not None, engine.has_business("before_300", rows, hooks), f"the fire agrees: {rows}")
 
 
 def test_preview_sees_the_in_hook_cascade():
@@ -398,5 +431,6 @@ if __name__ == "__main__":
         ("format_specs_are_judged_in_every_branch", test_format_specs_are_judged_in_every_branch),
         ("use_depth_is_judged_whatever_the_order", test_use_depth_is_judged_whatever_the_order),
         ("preview_keeps_the_fires_guards", test_preview_keeps_the_fires_guards),
+        ("has_business_mirrors_the_fires_no_op", test_has_business_mirrors_the_fires_no_op),
         ("preview_sees_the_in_hook_cascade", test_preview_sees_the_in_hook_cascade),
     ]))
