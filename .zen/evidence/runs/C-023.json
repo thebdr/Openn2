@@ -8,8 +8,8 @@
   "exitCode": 0,
   "outputSha": "6d507e5b866acc0117517cdae2a6a176a670438afa6c78ffeabe273502795d74",
   "outputTail": "== architecture_contracts ==\r\n  PASS  l1_layers_one_direction\r\n  PASS  l2_phases_are_filters\r\n  PASS  l3_systems_sealed\r\n  PASS  l4_headless_pipeline\r\n  PASS  l5_no_type_id_literals_below_workbench\r\n  PASS  ratchet_entries_still_real\r\n  PASS  parts_all_known\r\n  -> 7/7 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-09-25T08:47:05.416Z",
-  "headCommit": "6d7c01a7528c713d4c17712b373d4af5d09b3595",
+  "ranAt": "2026-09-25T10:19:44.493Z",
+  "headCommit": "9b9104db4b9958b9a33c960178e3d1fbafde0fd8",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_gui_phase_model.py",

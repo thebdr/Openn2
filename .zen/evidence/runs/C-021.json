@@ -8,8 +8,8 @@
   "exitCode": 0,
   "outputSha": "f26a8e0831ee952043a8d776220d0759d9ab0e83ba15d818d5f29f276a813f73",
   "outputTail": "== architecture_contracts ==\r\n  PASS  l1_layers_one_direction\r\n  PASS  l2_phases_are_filters\r\n  PASS  l3_systems_sealed\r\n  PASS  l4_headless_pipeline\r\n  PASS  l5_no_type_id_literals_below_workbench\r\n  PASS  ratchet_entries_still_real\r\n  PASS  parts_all_known\r\n  -> 7/7 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-09-25T08:45:53.206Z",
-  "headCommit": "6d7c01a7528c713d4c17712b373d4af5d09b3595",
+  "ranAt": "2026-09-25T10:18:18.238Z",
+  "headCommit": "9b9104db4b9958b9a33c960178e3d1fbafde0fd8",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_systems_contract.py",
