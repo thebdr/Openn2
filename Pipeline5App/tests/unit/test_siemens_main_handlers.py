@@ -427,16 +427,17 @@ def test_the_builder_models_what_the_after_300_fire_gets():
     def shape(database):
         return {name: (database[name].effective_columns(), len(database[name])) for name in database.names()}
 
-    def saved():
-        folder = config.database_dir()
-        return {name: open(os.path.join(folder, name), "rb").read() for name in sorted(os.listdir(folder))}
-
     def recording_fire(hook, database, **kw):
         if hook == "after_300":                       # the fire's input, before it runs - and the model
             seen["fired"] = shape(database)
-            before = saved()
-            seen["model"] = shape(template_doc.Session(None).base("after_300"))
-            seen["untouched"] = saved() == before     # the model stages IN MEMORY - nothing written
+            from pipeline5.truth.database import Database
+            real_save, saves = Database.save, []
+            Database.save = lambda self, directory: saves.append(directory)   # (a re-staging would write
+            try:                                                              # the same bytes: count saves)
+                seen["model"] = shape(template_doc.Session(None).base("after_300"))
+            finally:
+                Database.save = real_save
+            seen["untouched"] = not saves             # the model stages IN MEMORY - nothing saved
         return real_fire(hook, database, **kw)
 
     with tempfile.TemporaryDirectory() as project:

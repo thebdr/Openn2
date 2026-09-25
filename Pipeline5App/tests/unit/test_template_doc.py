@@ -88,6 +88,9 @@ def test_two_layer_highlight():
     ok("tx_error" not in {t for t, _s, _e in td.spans(doc, "scl")}, "no false error token (the spec is split off)")
     ok("REGION" not in _tagged(doc, "hl_key", language=None),
        "no language layer unless the system names one (System.template_language - no SCL baked in)")
+    other = td.parse("q: |-\n  SELECT {$x} FROM t REGION\n")
+    keys = [other.text[s:e] for t, s, e in td.spans(other, "sql") if t == "hl_key"]
+    ok("SELECT" in keys and "REGION" not in keys, f"the system's OWN language - not SCL ({keys})")
 
 
 def test_problems_land_on_the_culprit():
