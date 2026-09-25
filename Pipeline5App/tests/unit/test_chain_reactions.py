@@ -525,6 +525,26 @@ def test_round_10_evidence_holes():
     _sandboxed(body)()
 
 
+def test_round_12_target_strictness_and_else_if():
+    """Refuter round 12: (a) the FILE TARGET's strict render was unpinned - rendered leniently, a typo'd
+    `gen/{$nmae}.txt` appended every belt into `gen/.txt`, audited ok; (b) a template using `@else if`
+    rendered the wrong branch for every row, audited ok - now a template finding, nothing written."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            _, findings = engine.fire("after_300", _db(),
+                                      rules=[_rule(action="file", target="gen/{$nmae}.txt", template="txt")],
+                                      templates={"txt": "x"}, params={}, files_root=out_root)
+            eq([x.type for x in findings], ["rx_bad_template"], "(a) a typo'd target field")
+            eq(os.listdir(out_root), [], "…and NOTHING was written")
+            database, findings = engine.fire("after_300", _db(),
+                                             rules=[_rule(action="file", target="m.txt", template="txt")],
+                                             templates={"txt": '@if $name = "D1"\nONE\n@else if $name = "D2"\nTWO\n@end'},
+                                             params={}, files_root=out_root)
+            eq([x.type for x in findings], ["rx_bad_template"], "(b) `@else if` is a finding, not a wrong branch")
+            ok(not os.path.exists(os.path.join(out_root, "m.txt")), "…and nothing was written")
+    _sandboxed(body)()
+
+
 def test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook():
     """U3 (the orchestrator's mutation check): a malformed rule on a hook the run-plan never fires can
     never be recorded at its own hook - so it is an INDEX problem, recorded even by a hook that has no
@@ -919,6 +939,7 @@ if __name__ == "__main__":
          test_record_attaches_atomically_and_spawns_survive_a_ragged_record),
         ("a_condition_failing_at_evaluation_is_a_bad_condition", test_a_condition_failing_at_evaluation_is_a_bad_condition),
         ("round_10_evidence_holes", test_round_10_evidence_holes),
+        ("round_12_target_strictness_and_else_if", test_round_12_target_strictness_and_else_if),
         ("undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook",
          test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook),
         ("unreadable_rules_file_is_recorded_not_just_rendered",

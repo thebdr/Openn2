@@ -24,7 +24,8 @@
 #       @for $i in 1..{$count}: @use <name>  inclusive range loop (inline body form); a BLANK end
 #                                            (an empty cell) = no iterations at all
 #       @for $row in <table> where <pred>    loop over SSOT rows ({$row.field} inside)
-#       @if <pred> / @else / @end            block conditional
+#       @if <pred> / @else / @end            block conditional - there is NO @elif / `@else if`:
+#                                            nest an @if inside the @else (a slip is an error)
 #   Write a TEXT template as a block scalar (`name: |-` then the indented body, as below): YAML
 #   reserves `@` at the START of a plain value, so `name: @use other` does not even load (the
 #   engine reports rx_templates_unreadable and blocks the hook's rules - never a crash).

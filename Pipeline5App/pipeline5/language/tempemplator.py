@@ -36,7 +36,10 @@ THE GRAMMAR (line-based; a directive line's own indentation is consumed, body li
                                          exactly expr's where() semantics (a /regex/ in it is
                                          one literal: its `..` or `:` never splits the line)
     @for ... : <one line>                the inline body form (the line may itself be a directive)
-    @if <pred> / @else / @end            block conditional (expr.test); nests freely
+    @if <pred> / @else / @end            block conditional (expr.test); nests freely - there is NO
+                                         @elif / `@else if`: nest an @if inside the @else. The
+                                         GRAMMAR is checked even in an untaken branch (only its
+                                         VALUES are never evaluated)
     anything else                        a literal line - {expr} holes rendered STRICT
 
 WHAT "STRICT" CATCHES (refuter round 6, resolved against C-002): a missing TOP-LEVEL field, and -
@@ -252,14 +255,40 @@ def _opens_block(line: str) -> bool:
     return False
 
 
+_DIRECTIVES = ("@use", "@for", "@if", "@else", "@end")
+
+
+def _check_directive(raw: str, word: str, template: str, line_no: int) -> None:
+    """A directive line's GRAMMAR - checked when the line is rendered AND when a block is scanned, so
+    a slip inside an UNTAKEN branch is still a located error: laziness is about VALUES, never about
+    grammar (refuter round 12: `@else if <pred>` read as a bare @else - its condition silently
+    dropped, the wrong branch rendered - and an `@elif` inside an untaken branch was never seen)."""
+    rest = raw.strip()[len(word):].strip()
+    if word not in _DIRECTIVES:
+        raise TempemplatorError(template, line_no, f"unknown directive {word!r} (the directives: "
+                                f"{', '.join(_DIRECTIVES)} - there is no @elif: nest an @if inside the @else)")
+    if word in ("@else", "@end") and rest:
+        raise TempemplatorError(template, line_no, f"{word} takes nothing after it (got {rest!r}) - there "
+                                "is no `@else if`: nest an @if inside the @else")
+    if word == "@if" and not rest:
+        raise TempemplatorError(template, line_no, "@if needs a condition")
+    if word == "@use" and not rest:
+        raise TempemplatorError(template, line_no, "@use needs a template name")
+    if word == "@for" and _FOR_HEAD.match(_split_top(rest, ":")[0].strip()) is None:
+        raise TempemplatorError(template, line_no, "@for needs `$var in <a>..<b> | <table> [where <pred>]`")
+
+
 def _scan_block(lines, start, template, opener_line, *, want_else: bool, base: int = 0):
     """Scan (WITHOUT rendering - an untaken branch must never evaluate) from `start` to the @end
     matching the block opened just before it. Returns (else_index_or_None, end_index). Only a
     depth-1 @else is reported (and only when `want_else` - a @for block admits none). `base` is
-    the slice's offset into the TEMPLATE, so error lines are template-absolute."""
+    the slice's offset into the TEMPLATE, so error lines are template-absolute. Every directive
+    line it passes is GRAMMAR-checked (never evaluated)."""
     depth, else_at, j = 1, None, start
     while j < len(lines):
         word = _line_word(lines[j])
+        if word:
+            _check_directive(lines[j], word, template, base + j + 1)
         if _opens_block(lines[j]):
             depth += 1
         elif word == "@else" and depth == 1:
@@ -290,14 +319,13 @@ def _render_block(lines, i, template, templates, ctx, stack, schemas, base: int 
         word = _line_word(raw)
 
         if word:
+            _check_directive(raw, word, template, line_no)
             rest = raw.strip()[len(word):].strip()
 
             if word in ("@end", "@else"):
                 raise TempemplatorError(template, line_no, f"{word} without an open block")
 
             if word == "@use":
-                if not rest:
-                    raise TempemplatorError(template, line_no, "@use needs a template name")
                 out.extend(_render_named(rest, templates, ctx, stack, (template, line_no), schemas))
                 i += 1
                 continue
@@ -353,8 +381,6 @@ def _render_block(lines, i, template, templates, ctx, stack, schemas, base: int 
                         schemas.pop(var, None)
                 i = after
                 continue
-
-            raise TempemplatorError(template, line_no, f"unknown directive {word!r}")
 
         out.append(_render_line(raw, template, line_no, ctx, schemas))
         i += 1

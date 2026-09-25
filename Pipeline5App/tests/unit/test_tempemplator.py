@@ -101,6 +101,7 @@ def test_raw_errors_become_located():
     for bad in ("1...3", "1..2.7", "1..1e308"):
         raises(TempemplatorError, lambda: _render(f"@for $i in {bad}: x", {}))
     eq(_render("@for $i in\t1..2: x{$i}", {}), "x1\nx2", "…after `in` too")
+    eq(_render("@for $i  in  1..2: x{$i}", {}), "x1\nx2", "…and any AMOUNT of it (round 12)")
     raises(TempemplatorError, lambda: _render("@for $1x in 1..2: x", {}))   # not a referenceable var
     db = {"signals": [{"tag": "P1"}]}
     raises(TempemplatorError, lambda: _render("{extract($tag, /(P/)}", {"tag": "P1"}))
@@ -199,6 +200,23 @@ def test_if_else_and_lazy_branches():
     raises(TempemplatorError, lambda: _render("@else", {}))
     raises(TempemplatorError, lambda: _render("@for $i in 1..1\n@else\n@end", {}))  # @else in a @for
     raises(TempemplatorError, lambda: _render("@nope stuff", {}))                   # unknown directive
+    # the GRAMMAR is checked in the untaken branch too - laziness is about values (refuter round 12:
+    # `@else if` silently read as a bare @else, the condition dropped: wrong branch, no finding)
+    try:
+        _render('@if $x = "1"\nA\n@else if $x = "2"\nB\n@end', {"x": "3"})
+        ok(False, "`@else if` must raise")
+    except TempemplatorError as error:
+        eq(error.line, 3, "…at the @else line")
+        ok("nest an @if" in error.message, "…telling the author how to write it")
+    for slip in ('@if $x = "1"\nA\n@elif $x = "2"\nB\n@end',          # SCL's ELSIF habit, UNTAKEN
+                 '@if $x = "1"\nA\n@elsif $x = "2"\nB\n@end',
+                 '@if $x = "1"\nA\n@else @use other\n@end',
+                 '@if $x = "1"\nA\n@end // done',
+                 '@if $x = "1"\n@bogus\n@end',
+                 "@if\nA\n@end"):                                     # a bare @if (no condition)
+        raises(TempemplatorError, lambda: _render(slip, {"x": "2"}, extra={"other": "o"}))
+    eq(_render('@if $x = "1"\nA\n@else\n@if $x = "2"\nB\n@end\n@end', {"x": "2"}), "B",
+       "the else-if idiom: an @if nested in the @else")
 
 
 def _error_line(body, ctx, extra=None):
