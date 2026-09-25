@@ -220,6 +220,10 @@ class System:
                                          # FIRING order: the chain-reaction hooks the run-plan fires + the
                                          # Database each one gets (None = none staged yet), rebuilt in memory
                                          # - the template builder previews a rule against it (C-025)
+    reaction_legs: dict = field(default_factory=dict)   # {hook: {leg label: callable(system) -> Database}} -
+                                         # OTHER run-plan legs firing the same hook over a different Database
+                                         # (Siemens after_300: the 310 Stage-I/O-List leg, no C&E) - the
+                                         # builder lints each rule against them too (C-025)
     template_language: str = ""          # the langs.json key of the language this system's TEXT templates
                                          # generate - the template builder's base highlight ("" = none)
 

@@ -107,6 +107,15 @@ from pipeline5.truth.table import Table
 
 _HOOK = re.compile(r"^(before|after)_(\d+)$")
 _ACTIONS = ("add_rows", "file")
+# the characters a Windows file path refuses (open() -> EINVAL): judged BEFORE the write, so the fire and
+# the builder's preview name the same refusal (C-025 refute round 2); other platforms accept them
+_INVALID_PATH = '<>"|?*' if os.name == "nt" else ""
+
+
+class WouldNotFire(Exception):
+    """A system's hook loader (System.reaction_hooks) found that the run-plan halts BEFORE the hook
+    fires - e.g. a staging FAIL the treatments registry does not lift. The builder says so instead of
+    previewing a fire that never happens."""
 
 LOG_TABLE = "chain_reactions_log"
 RULES_FILE = "chain_reactions/reactions.csv"
@@ -321,21 +330,23 @@ def _bad_rows(rule: Rule, error) -> str:
 
 
 def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
-                 db_tables: dict, files_root: str, tally: dict) -> list:
+                 db_tables: dict, files_root: str, tally: dict, write: bool = True) -> list:
     """The file action: per matched row, render the TEXT template and APPEND it (+ newline) to the
     expr-rendered target path (relative -> under `files_root`). Counts the lines written into
-    `tally["created"]` as it goes. Returns the findings."""
+    `tally["created"]` as it goes. Returns the findings. `write` False = a DRY fire: every step but
+    the write itself (counted as written)."""
     for row in matched:
         path, text, problem = _file_output(rule, templates, _scope(row, rule, params, db_tables), files_root)
         if problem is not None:
             return [_f(rule.phase, *problem, rule.name)]
-        try:
-            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-            with open(path, "a", encoding="utf-8") as handle:      # APPEND is the only mode (user decision)
-                handle.write(text + "\n")
-        except OSError as error:                                   # e.g. a `"` a quoted tag rendered in
-            return [_f(rule.phase, "rx_file_write", f"cannot write {path!r}: {error.strerror or error}",
-                       rule.name)]
+        if write:
+            try:
+                os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+                with open(path, "a", encoding="utf-8") as handle:  # APPEND is the only mode (user decision)
+                    handle.write(text + "\n")
+            except OSError as error:                               # e.g. a `"` a quoted tag rendered in
+                return [_f(rule.phase, "rx_file_write", f"cannot write {path!r}: {error.strerror or error}",
+                           rule.name)]
         tally["created"] += text.count("\n") + 1
     return []
 
@@ -360,15 +371,19 @@ def _file_output(rule: Rule, templates: dict, scope: dict, files_root: str) -> t
     if ":" in os.path.splitdrive(os.path.abspath(path))[1]:       # NTFS would write a HIDDEN alternate data
         return None, None, ("rx_file_write",                       # stream - silent (refuter round 13: a
                             f"cannot write {path!r}: a ':' in a file name would write a hidden NTFS stream")
-    return path, text, None                                        # `-X1:3` terminal name)
+    bad = next((ch for ch in os.path.splitdrive(path)[1]                    # `-X1:3` terminal name)
+                if ch in _INVALID_PATH or (_INVALID_PATH and ord(ch) < 32)), None)
+    if bad is not None:                                            # Windows refuses it at open() - say why
+        return None, None, ("rx_file_write", f"cannot write {path!r}: {bad!r} is not allowed in a Windows path")
+    return path, text, None
 
 
 def _act(rule: Rule, database, templates: dict, params: dict, db_tables: dict, files_root: str,
-         tally: dict) -> tuple:
+         tally: dict, write: bool = True) -> tuple:
     """ONE rule's turn at its hook - the template check, the matching, then the spawn / the append -
     with the per-rule BACKSTOP: an unforeseen exception anywhere in it is `rx_rule_crashed`, never a
     crash. Returns (matched rows, problems); `tally["created"]` counts as it goes. The fire's step,
-    and the builder's `cascade`."""
+    and the builder's `cascade`. `write` False: a file rule writes nothing (a dry fire)."""
     matched = []
     try:
         reason = _template_problem(rule, templates)
@@ -379,7 +394,7 @@ def _act(rule: Rule, database, templates: dict, params: dict, db_tables: dict, f
             return matched, [problem]
         if rule.action == "add_rows":
             return matched, _spawn_rows(rule, matched, database, templates, params, db_tables, tally)
-        return matched, _append_file(rule, matched, templates, params, db_tables, files_root, tally)
+        return matched, _append_file(rule, matched, templates, params, db_tables, files_root, tally, write)
     except Exception as error:   # the backstop: an unforeseen defect is a finding, never a crash
         return matched, [_f(rule.phase, "rx_rule_crashed", f"{type(error).__name__}: {error}", rule.name)]
 
@@ -443,7 +458,7 @@ def _record_new(database, findings) -> int:
     return len(fresh)
 
 
-def _persist(database, hook: str, log_rows: list, findings: list) -> list:
+def _persist(database, hook: str, log_rows: list, findings: list, save: bool = True) -> list:
     """Replace `hook`'s audit rows with this firing's, record its findings, save the database. A record
     that will not LOAD (a hand-edited CSV gone ragged) is left untouched - this firing's audit and
     findings are not recorded over it - yet the REST of the Database is still saved (an add_rows spawn
@@ -463,6 +478,8 @@ def _persist(database, hook: str, log_rows: list, findings: list) -> list:
         log.rows = [r for r in log.rows if r.get("hook") != hook]   # this hook's audit reflects THE LAST run
         log.extend(log_rows)
         _record_new(database, findings)
+    if not save:                                              # the builder's view of a settle: attached +
+        return problems                                       # recorded in memory, nothing written
     try:
         database.save(where)
     except OSError as error:
@@ -488,7 +505,7 @@ def _finish(hook: str, database, log_rows: list, findings: list) -> tuple:
 
 
 def fire(hook: str, database, *, rules=None, templates=None, params=None,
-         files_root=None, hooks=None) -> tuple:
+         files_root=None, hooks=None, write: bool = True) -> tuple:
     """Fire every rule registered for `hook` (CSV order) and return (database, findings).
 
     `database` may be None for a hook where no staged Database exists (before_300): add_rows rules
@@ -496,7 +513,10 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
     first element returned is a `Deferred` (hand it to `settle` once a database exists) instead of
     None. Defaults come from the active config: rules/templates via the 4-tier resolver,
     `files_root` = the project output root. `hooks` = every hook the calling run-plan fires: a
-    rule naming any other hook would never fire, so it is reported (`rx_unfired_hook`).
+    rule naming any other hook would never fire, so it is reported (`rx_unfired_hook`). `write`
+    False = a DRY fire (the template builder's model of a settle): every step - the audit rows and
+    findings a real fire gives - but a file rule writes nothing (only a write the OS itself would
+    refuse is beyond it).
 
     STRICT NO-OP when the hook has nothing to do - no rule for it (valid or malformed) and no
     rule-INDEX problem (a malformed row naming no hook, a rule on a hook nobody fires, an unreadable
@@ -543,7 +563,7 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
     for rule in active:
         matched, problems, tally = [], [], {"created": 0}
         if blocked is None:
-            matched, problems = _act(rule, database, templates, params, db_tables, files_root, tally)
+            matched, problems = _act(rule, database, templates, params, db_tables, files_root, tally, write)
         if rule.action == "add_rows" and tally["created"]:
             db_tables = _db_tables(database)                 # the CASCADE: a later rule's `_db` sees this
         findings.extend(problems)                            # rule's spawns, as its matching does (round 9)
@@ -637,6 +657,12 @@ def _copy(table: Table) -> Table:
     return copy
 
 
+def copy_database(database):
+    """A Database the builder may settle / spawn into without touching the original (rows shared, each
+    table's row list copied)."""
+    return Database([_copy(database[name]) for name in database.names()])
+
+
 def cascade(rules, rule: Rule, database, *, templates: dict, params: dict) -> tuple:
     """The Database `rule` sees WITHIN its hook's fire: `database` plus the rows every EARLIER add_rows
     rule of that hook spawns (CSV order - the chain reaction within one hook), each through the
@@ -677,15 +703,19 @@ def has_business(hook: str, rows, hooks=None) -> bool:
     return any(r.fire_when == hook for r in compiled) or any(owner in (hook, None) for owner, _f in tagged)
 
 
-def settle_view(database) -> list:
-    """What a `settle` attaches, WITHOUT saving anything: the reaction-record tables (the audit +
-    validation_issues) from the on-disk record into `database` - both or neither, as settle does.
-    Returns the problems (a record that will not load)."""
-    try:
-        _attach_record(database, config.database_dir())
-    except Exception as error:  # noqa: BLE001 - the fire reports rx_record_unreadable; the builder notes it
-        return [f"the reaction record does not load: {error}"]
-    return []
+def settle_view(database, deferred=None) -> list:
+    """What a `settle` makes of `deferred` - WITHOUT saving: the reaction-record tables attached from the
+    on-disk record (both or neither), the hook's audit rows REPLACED by the deferred ones, its findings
+    recorded into validation_issues - exactly `_persist`, minus the write. No `deferred`: the record
+    attached only. Returns the problems as text (a record that will not load)."""
+    if deferred is None:
+        try:
+            _attach_record(database, config.database_dir())
+        except Exception as error:  # noqa: BLE001 - the fire reports rx_record_unreadable; the builder notes it
+            return [f"the reaction record does not load: {error}"]
+        return []
+    problems = _persist(database, deferred.hook, deferred.log_rows, deferred.findings, save=False)
+    return [f"{p.type}: {p.detail}" for p in problems]
 
 
 def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -> list:
@@ -697,11 +727,12 @@ def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -
     rule's E1 scope (the matched row's columns + _params/_rule/_db; the hook's tables for the loops),
     and the RULE's own problems come back with template=None: a template of the wrong kind, a table
     absent at the hook, a hook never fired, a target that will not render."""
-    problems, fields, tables = [], None, None
+    problems, fields, tables, json, json_fields = [], None, None, None, None
     if rule is not None:
-        fields, tables = _lint_rule(rule, templates, database, hooks, problems)
+        fields, tables, json, json_fields = _lint_rule(rule, templates, database, hooks, problems)
     text_start = rule.template if rule is not None and rule.action == "file" else None
-    problems.extend(tempemplator.lint(templates, start=text_start, fields=fields, tables=tables))
+    problems.extend(tempemplator.lint(templates, start=text_start, fields=fields, tables=tables,
+                                      json=json, json_fields=json_fields))
     row_start = rule.template if rule is not None and rule.action == "add_rows" else None
     for name, body in templates.items():
         if isinstance(body, str):
@@ -714,18 +745,21 @@ def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -
         shape = _row_template_problem(name, body)
         if shape:
             problems.append(tempemplator.Problem(name, None, 0, 0, shape, "error"))
-        scope = fields if name == row_start else None
+        own = name == row_start
         for number, spec in enumerate(body, start=1):
             for column, value in (spec.items() if isinstance(spec, dict) else ()):
                 if isinstance(value, str):
+                    found = tempemplator.lint_line(value, fields=fields if own else None, tables=tables if own else None,
+                                                   json=json_fields if own else None)
                     problems.extend(tempemplator.Problem(name, (number, str(column)), s, e, message, severity)
-                                    for s, e, message, severity in tempemplator.lint_line(value, fields=scope))
+                                    for s, e, message, severity in found)
     return problems
 
 
 def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> tuple:
-    """The rule's own problems (appended, template=None) -> its E1 (fields, tables); fields None when
-    the source table is absent (every hole would read as missing - one problem says why)."""
+    """The rule's own problems (appended, template=None) -> its E1 (fields, tables, {table: JSON columns},
+    the source row's JSON fields); fields None when the source table is absent (every hole would read
+    as missing - one problem says why)."""
     def problem(message, where=None, start=0, end=0, severity="error"):
         problems.append(tempemplator.Problem(None, where, start, end, f"rule {rule.name!r}: {message}", severity))
 
@@ -736,6 +770,8 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
     if declared is not None and rule.fire_when not in declared:
         problem(f"hook {rule.fire_when!r} is never fired by this run-plan (it fires: {', '.join(declared)})")
     tables = {} if database is None else {name: database[name].effective_columns() for name in database.names()}
+    json = {} if database is None else {name: frozenset(database[name].json_columns) for name in database.names()}
+    json_fields = json.get(rule.source_table, frozenset())
     fields = {"_params", "_rule", "_db"}
     if rule.source_table:
         if rule.source_table in tables:
@@ -746,32 +782,38 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
     if rule.action == "add_rows" and rule.target not in tables:
         problem(_unknown_table("target", rule.target))
     if rule.action == "file":
-        for start, end, message, severity in tempemplator.lint_line(rule.target, fields=fields):
+        for start, end, message, severity in tempemplator.lint_line(rule.target, fields=fields, tables=tables,
+                                                                    json=json_fields):
             problem(f"target {rule.target!r}: {message}", "target", start, end, severity)
-        colon = _literal_colon(rule.target)
-        if colon is not None:
-            problem(f"target {rule.target!r}: a ':' in a relative target or a file name (a drive letter, or a "
-                    "hidden NTFS stream) - the fire refuses every row (rx_file_write)", "target", colon, colon + 1)
-    return fields, tables
+        refusal = _literal_refusal(rule.target)
+        if refusal is not None:
+            column, why = refusal
+            problem(f"target {rule.target!r}: {why} - the fire refuses every row (rx_file_write)", "target",
+                    column, column + 1)
+    return fields, tables, json, json_fields
 
 
-def _literal_colon(target: str):
-    """The column of a LITERAL ':' the fire's target guards refuse whatever the row (None = none): any
-    ':' but a drive's - a leading literal letter's (`C:/`), or the one right after a LEADING hole that
-    may render the drive letter (`{$_params.drive}:/out` - C-024 refute round 19's note); holes are
-    data, judged per row by the fire."""
+def _literal_refusal(target: str):
+    """(column, why) of a LITERAL character the fire's target guards refuse whatever the row - None when
+    there is none. A ':' - but a drive's: a leading literal letter's (`C:/`), or the one right after a
+    LEADING hole that may render the drive letter (`{$_params.drive}:/out` - C-024 refute round 19's
+    note) - or a character a Windows path refuses (`<>"|?*`, a control character). Holes are data,
+    judged per row by the fire."""
     runs = tempemplator.brace_runs(target)
     for number, (kind, start, end) in enumerate(runs):
         if kind != "text":
             continue
         for index in range(start, end):
-            if target[index] != ":":
+            ch = target[index]
+            if _INVALID_PATH and (ch in _INVALID_PATH or ord(ch) < 32):
+                return index, f"{ch!r} is not allowed in a Windows path"
+            if ch != ":":
                 continue
             separated = target[index + 1:index + 2] in ("\\", "/")
             if separated and index == 1 and target[0].isalpha():
                 continue                                     # a literal drive letter
             if separated and number == 1 and index == start and runs[0][0] == "hole":
                 continue                                     # a drive a leading hole may render
-            return index
+            return index, ("a ':' in a relative target or a file name (a drive letter, or a hidden NTFS "
+                           "stream)")
     return None
-

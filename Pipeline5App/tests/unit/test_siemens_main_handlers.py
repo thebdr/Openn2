@@ -355,7 +355,10 @@ def test_a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten():
 def _spawn_project(project, params, header: bool = False):
     """A project whose after_300 rules CASCADE within one hook: the templates.yaml manual's own
     example (spawn a DIAG signal per `A` row), then a rule that counts and lists those spawns.
-    `header` adds a before_300 file rule - the run-plan then SETTLES it into the staged database."""
+    `header` adds the run-plan's business AROUND after_300: a before_300 file rule that succeeds and
+    one that fails (no database yet), a rule on a hook the run-plan never fires (a rule-INDEX
+    problem - every hook's business), and an after_300 rule listing the audit + the reaction
+    findings - the before_300 firing is SETTLED into the staged database before after_300 reads it."""
     import csv
     from ruamel.yaml import YAML
     shared = os.path.join(project, "config_project", "shared")
@@ -369,12 +372,19 @@ def _spawn_project(project, params, header: bool = False):
             ["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
             ["probe_spawn", "after_300", "signals", '$script_type = "A"', "add_rows", "signals", "diag_rows", ""],
             ["probe_read", "after_300", "", "", "file", "rx/diag.txt", "diag_txt", "reads the spawns"],
-        ] + ([["probe_hdr", "before_300", "", "", "file", "rx/hdr.txt", "hdr_txt", "settled"]] if header else []))
+        ] + ([["probe_hdr", "before_300", "", "", "file", "rx/hdr.txt", "hdr_txt", "settled"],
+               ["probe_early", "before_300", "signals", "", "file", "rx/early.txt", "hdr_txt", "fails"],
+               ["probe_never", "after_999", "", "", "file", "rx/never.txt", "hdr_txt", "never fired"],
+               ["probe_log", "after_300", "", "", "file", "rx/log.txt", "log_txt", "reads the record"]]
+              if header else []))
     with open(os.path.join(rx_dir, "templates.yaml"), "w", encoding="utf-8") as handle:
         handle.write("diag_rows:\n  - script_type: \"DIAG\"\n    mnemonic: \"DIAG-{$mnemonic}\"\n"
                      "diag_txt: |-\n  DIAG rows: {count(signals, $script_type = \"DIAG\")}\n"
                      "  @for $s in signals where $script_type = \"DIAG\": {$s.spawned_by}\n"
-                     "hdr_txt: |-\n  HEADER {$_rule.hook}\n")
+                     "hdr_txt: |-\n  HEADER {$_rule.hook}\n"
+                     "log_txt: |-\n  @for $l in chain_reactions_log: LOG {$l.hook} {$l.rule} {$l.outcome}\n"
+                     "  @for $i in validation_issues where $type ~ /^rx_/: ISSUE {$i.type} {$i.location}\n"
+                     "  END\n")
 
 
 def _staged_count(host):
@@ -412,54 +422,191 @@ def test_a_cascade_within_one_hook_through_the_real_run_plan():
 
 
 def test_the_builder_models_what_the_after_300_fire_gets():
-    """C-025 refute round 1 + the implications check: the template builder's after_300 Database was the
-    Database/ folder - the last SAVED state: a previous run's spawns (with their spawned_by /
-    source_uid columns), later phases' write-backs, no settled record. The builder's Session now
-    models the run-plan - System.reaction_hooks' in-memory staging + a settled before_300 with
-    business - and here it is compared with what the REAL after_300 fire gets, on a SECOND run
-    (after the first saved its spawns)."""
+    """C-025 refute round 1 + round 2 (#1): the builder previewed against the Database/ folder (a
+    previous run's spawns, later phases' write-backs), then modelled the settle as "attach the on-disk
+    record" - not this run's before_300 audit and findings. Built BEFORE each run, as a user opens
+    the builder (a failing before_300 rule and a rule-index problem among the rules), the model is
+    compared with what the REAL after_300 fire gets: every table's rows, in order - the audit and
+    validation_issues included - and the preview of a rule listing them is the text the fire
+    appends. Run 2 re-stages from the documents: run 1's saved spawns are not in its input."""
     from pipeline5.phases.chain_reactions import engine as reactions
+    from pipeline5.truth.database import Database
     from pipeline5.workbench import template_doc
     params = config.load_params()
     previous_project = config.active_project()
-    seen, real_fire = {}, reactions.fire
+    seen, real_fire = [], reactions.fire
 
-    def shape(database):
-        return {name: (database[name].effective_columns(), len(database[name])) for name in database.names()}
+    def rows_of(database):
+        return {name: [dict(row) for row in database[name]] for name in database.names()}
 
     def recording_fire(hook, database, **kw):
-        if hook == "after_300":                       # the fire's input, before it runs - and the model
-            seen["fired"] = shape(database)
-            from pipeline5.truth.database import Database
-            real_save, saves = Database.save, []
-            Database.save = lambda self, directory: saves.append(directory)   # (a re-staging would write
-            try:                                                              # the same bytes: count saves)
-                seen["model"] = shape(template_doc.Session(None).base("after_300"))
-            finally:
-                Database.save = real_save
-            seen["untouched"] = not saves             # the model stages IN MEMORY - nothing saved
+        if hook == "after_300":                       # the fire's input, before it runs
+            seen.append(rows_of(database))
         return real_fire(hook, database, **kw)
+
+    def model():
+        """The builder, opened before the run: the first after_300 rule's Database (no spawns before
+        it) and probe_log's preview - built in memory (Database.save counted: nothing may be saved)."""
+        real_save, saves = Database.save, []
+        Database.save = lambda self, directory: saves.append(directory)
+        try:
+            session = template_doc.Session(None)
+            with open(session.active, encoding="utf-8") as handle:
+                doc = template_doc.parse(handle.read())
+            first = next(r for r in session.rules if r.fire_when == "after_300")
+            view = rows_of(session.view(first, doc.templates)[0])
+            shown = session.preview_text(doc, next(r for r in session.rules if r.name == "probe_log"), 0)
+        finally:
+            Database.save = real_save
+        return view, shown, saves
 
     with tempfile.TemporaryDirectory() as project:
         _spawn_project(project, params, header=True)
         config.use_project(project)
         try:
-            SYSTEM.handlers["staging"](_Host().ctx())             # run 1: its spawns saved into signals.csv
-            ok("spawned_by" in _read_csv(os.path.join(config.database_dir(), "signals.csv"))[0],
-               "the saved Database carries run 1's spawns - what the old builder previewed against")
-            reactions.fire = recording_fire
-            SYSTEM.handlers["staging"](_Host().ctx())             # run 2: re-staged from the documents
+            out = config.output_root()
+            log_path = os.path.join(out, "rx", "log.txt")
+            for number in (1, 2):
+                view, shown, saves = model()
+                eq(saves, [], f"run {number}: building the model saved nothing")
+                if number == 1:
+                    ok(not os.path.exists(os.path.join(out, "rx")),
+                       "…and wrote no output (its dry before_300 fire writes nothing)")
+                else:
+                    ok("spawned_by" in _read_csv(os.path.join(config.database_dir(), "signals.csv"))[0],
+                       "the saved Database carries run 1's spawns - what the round-1 builder previewed against")
+                earlier = ""                                  # the file APPENDS: run 2 adds to run 1's text
+                if os.path.exists(log_path):
+                    with open(log_path, encoding="utf-8") as handle:
+                        earlier = handle.read()
+                reactions.fire = recording_fire
+                try:
+                    SYSTEM.handlers["staging"](_Host().ctx())
+                finally:
+                    reactions.fire = real_fire
+                fired = seen[-1]
+                eq(sorted(view), sorted(fired), f"run {number}: the same tables - the settled record included")
+                for name in fired:
+                    eq(view[name], fired[name], f"run {number}: {name} - the same rows, in order")
+                ok("spawned_by" not in fired["signals"][0], f"run {number}: the fire's input has no spawn column")
+                ok(any(r["rule"] == "probe_early" and r["outcome"] == "rx_unknown_table"
+                       for r in fired["chain_reactions_log"]), "…THIS run's before_300 audit, the failure included")
+                with open(log_path, encoding="utf-8") as handle:
+                    appended = handle.read()[len(earlier):]
+                lines = shown.split("\n")
+                body = appended.split("\n")[:-1]
+                ok(lines[0].startswith("APPEND to ") and os.path.normcase(os.path.abspath(lines[0][10:-1]))
+                   == os.path.normcase(os.path.abspath(log_path)), f"run {number}: the previewed path ({lines[0]})")
+                eq(lines[1:1 + len(body)], body, f"run {number}: the preview is the text the fire appends")
+                ok(all(line.startswith("note: ") for line in lines[1 + len(body):]), "…then notes only")
+                ok(any(line.startswith("ISSUE rx_unknown_table probe_early") for line in body)
+                   and any(line.startswith("ISSUE rx_unfired_hook probe_never") for line in body),
+                   f"…which lists this run's before_300 findings: {body}")
         finally:
-            reactions.fire = real_fire
             config.use_project(previous_project)
-    fired, model = seen["fired"], seen["model"]
-    eq(sorted(model), sorted(fired), "the same tables - the settled record included")
-    for name in fired:
-        eq(model[name][0], fired[name][0], f"{name}: the same columns (no leaked spawn columns)")
-    for name in ("signals", "diagnosis_cabinets", "chain_reactions_log"):
-        eq(model[name][1], fired[name][1], f"{name}: the same rows (the saved spawns are not in the fire's input)")
-    ok("spawned_by" not in fired["signals"][0], "run 2's fire gets no spawn column")
-    ok(seen["untouched"], "building the model wrote nothing to the Database folder")
+
+
+def test_the_builder_lints_every_leg_that_fires_after_300():
+    """C-025 refute round 2 (#2): the 310 button (Stage I/O List) fires after_300 over the I/O List
+    ALONE - no C&E pass, so no validation_issues table. The builder modelled only the full staging:
+    a rule listing validation_issues linted clean while the 310 fire rejects it. Each rule is linted
+    on every leg that fires its hook now; what only a leg rejects names the leg (a problem every leg
+    has is reported once)."""
+    from pipeline5.workbench import template_doc
+    rules = [["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
+             ["issues", "after_300", "", "", "file", "rx/issues.txt", "issues_txt", ""]]
+    templates = "issues_txt: |-\n  @for $i in validation_issues: ISSUE {$i.type}\n  END {$nme}\n"
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _rules_project(project, params, rules, templates)
+        config.use_project(project)
+        try:
+            session = template_doc.Session(None)
+            doc = template_doc.parse(templates)
+            rule = session.rules[0]
+            placed = session.check(doc, rule)
+            leg = [p for p in placed if p.message.startswith("on the 310 Stage I/O List leg: ")]
+            eq([(p.severity, doc.text[p.start:p.end]) for p in leg], [("error", "validation_issues")],
+               f"the 310 leg rejects the loop table, located ({[p.message for p in placed]})")
+            eq([(p.severity, doc.text[p.start:p.end]) for p in placed if not p.message.startswith("on the ")],
+               [("error", "$nme")], "the full staging accepts the loop - the missing field (every leg's) once")
+            ok("the 310 Stage I/O List leg also fires after_300" in session.preview_text(doc, rule, 0),
+               "the preview says another leg fires the hook")
+            host = _Host()
+            SYSTEM.handlers["staging"](host.ctx(), only=310)
+            fired = [f for batch in host.rendered for f in batch
+                     if getattr(f, "type", "") == "rx_bad_template" and f.location == "issues"]
+            ok(fired and "validation_issues" in fired[0].detail, f"the real 310 fire rejects it: {fired}")
+        finally:
+            config.use_project(previous_project)
+
+
+def test_the_builder_gates_as_the_run_plan_does():
+    """C-025 refute round 2 (#3): the builder halted on a staging finding's RAW severity; the run-plan
+    halts on its severity after the treatments registry. A FAIL the operator treated 'warn' showed
+    false errors on every after_300 rule (the fire runs), and a WARN treated 'fail' previewed a fire
+    that never happens. Both directions agree with the real run now - and a halt is said as a halt,
+    not as the rx_unknown_table errors of a fire that never runs."""
+    from pipeline5.findings.finding import Finding
+    from pipeline5.phases.staging import iolist
+    from pipeline5.workbench import template_doc
+    rules = [["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
+             ["per_signal", "after_300", "signals", "", "file", "rx/sig.txt", "sig_txt", ""],
+             ["typo", "after_300", "signals", "", "file", "rx/typo.txt", "typo_txt", ""]]
+    templates = "sig_txt: |-\n  SIG {$mnemonic}\ntypo_txt: |-\n  T {$mnemonc}\n"
+    params = config.load_params()
+    previous_project = config.active_project()
+    real_dups = iolist._dup_type_index_findings        # (called by the C&E pass only - not on the 310 leg)
+    cases = [(Finding(phase=300, type="stg_dup_type_index", severity="FAIL", detail="duplicated PEC index 7",
+                      location="IoList!AD12"), "warn", False),
+             (Finding(phase=300, type="stg_dup_signal_uid", severity="WARN", detail="duplicated signal uid",
+                      location="IoList!AD13"), "fail", True)]
+    try:
+        for finding, treatment, halts in cases:
+            iolist._dup_type_index_findings = lambda table, _f=finding: real_dups(table) + [_f]
+            treatments.write(treatments.registry_path(),
+                             {finding.uid: treatments.Treatment(uid=finding.uid, treatment=treatment, type=finding.type)})
+            label = f"a {finding.severity} treated {treatment!r}"
+            with tempfile.TemporaryDirectory() as project:
+                _rules_project(project, params, rules, templates)
+                config.use_project(project)
+                try:
+                    session = template_doc.Session(None)
+                    doc = template_doc.parse(templates)
+                    rule, typo = session.rules
+                    placed = session.check(doc, rule)
+                    shown = session.preview_text(doc, rule, 0)
+                    typo_placed = session.check(doc, typo)
+                    host = _Host()
+                    SYSTEM.handlers["staging"](host.ctx())
+                    path = os.path.join(config.output_root(), "rx", "sig.txt")
+                    written = open(path, encoding="utf-8").read().splitlines() if os.path.exists(path) else []
+                    host310 = _Host()
+                    SYSTEM.handlers["staging"](host310.ctx(), only=310)
+                finally:
+                    config.use_project(previous_project)
+            eq(host.halted, halts, f"{label}: the real run {'halts' if halts else 'runs'}")
+            eq(bool(session.halt("after_300")), halts, f"{label}: the builder agrees")
+            fired310 = [f.detail for batch in host310.rendered for f in batch
+                        if getattr(f, "type", "") == "rx_bad_template" and f.location == "typo"]
+            ok(not host310.halted and fired310 and "$mnemonc" in fired310[0],
+               f"{label}: the 310 leg (no C&E pass) fires all the same - and rejects the typo ({fired310})")
+            if halts:
+                eq([(p.severity, p.label) for p in placed], [("warning", "rule")], f"{label}: one note, no errors")
+                ok(placed[0].message.startswith("the run halts before after_300 fires - staging (300) halts on "
+                                                "stg_dup_signal_uid"), placed[0].message)
+                ok(shown.startswith("the run halts before after_300 fires") and "APPEND" not in shown, shown)
+                ok("note: the 310 Stage I/O List leg fires after_300 all the same" in shown, "…the 310 leg still fires")
+                eq(written, [], f"{label}: …and the fire wrote nothing")
+                eq([(p.severity, p.message.split(" - ")[0]) for p in typo_placed][1:],
+                   [("error", "on the 310 Stage I/O List leg: missing field $mnemonc")],
+                   f"{label}: the halt note, then the 310 leg's own check ({[p.message for p in typo_placed]})")
+            else:
+                eq(placed, [], f"{label}: no false errors")
+                eq(shown.split("\n")[1], written[0], f"{label}: the preview is the fire's first line")
+    finally:
+        iolist._dup_type_index_findings = real_dups
 
 
 def test_spawns_are_saved_beside_a_ragged_record():
@@ -595,6 +742,9 @@ if __name__ == "__main__":
         ("a_cascade_within_one_hook_through_the_real_run_plan",
          _sandboxed(test_a_cascade_within_one_hook_through_the_real_run_plan)),
         ("the_builder_models_what_the_after_300_fire_gets", _sandboxed(test_the_builder_models_what_the_after_300_fire_gets)),
+        ("the_builder_lints_every_leg_that_fires_after_300",
+         _sandboxed(test_the_builder_lints_every_leg_that_fires_after_300)),
+        ("the_builder_gates_as_the_run_plan_does", _sandboxed(test_the_builder_gates_as_the_run_plan_does)),
         ("spawns_are_saved_beside_a_ragged_record", _sandboxed(test_spawns_are_saved_beside_a_ragged_record)),
         ("a_blank_range_end_invents_nothing_on_the_real_fixture",
          _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),

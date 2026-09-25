@@ -55,7 +55,7 @@ def _session(path=None):
 
 
 def _pump(root, done, timeout: float = 10.0) -> bool:
-    """Run the Tk loop until `done()` - the template mode builds a hook's Database in a worker."""
+    """Run the Tk loop until `done()` - the template mode's checks and preview come from its worker."""
     import time
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -93,6 +93,12 @@ def _buttons(widget) -> list:
     for child in widget.winfo_children():
         found += _buttons(child)
     return found
+
+
+def _problem_rows(mode, needle: str) -> list:
+    """The problems list's rows mentioning `needle`."""
+    rows = [mode.problems.item(i, "values") for i in mode.problems.get_children()]
+    return [values for values in rows if needle in str(values)]
 
 
 def _tagged(text, tag):
@@ -149,8 +155,8 @@ def test_template_mode_in_the_files_panel():
             ok(mode is not None, "a templates.yaml opens in the template mode")
             eq(sorted(set(_tagged(text, "tp_directive"))), ["@end", "@for", "in", "where"], "the directives")
             ok("REGION" in _tagged(text, "hl_key"), "the SCL layer underneath")
+            ok(_pump(root, lambda: "Choose a rule" in mode.preview.get("1.0", "end")), "the preview invites a rule")
             eq(mode.problems.get_children(), (), "no rule chosen: the document alone is clean")
-            ok("Choose a rule" in mode.preview.get("1.0", "end"), "the preview invites a rule")
             mode.rule_box.current(1)
             mode.on_rule()
             ok("building the Database" in mode.preview.get("1.0", "end-1c"), "a worker builds the hook's Database")
@@ -161,8 +167,7 @@ def test_template_mode_in_the_files_panel():
                f"one fire for row 0: {preview!r}")
             text.insert("4.0", "  X {$r.tagg}\n")            # a loop-column typo inside the @for
             mode.refresh()
-            rows = [mode.problems.item(i, "values") for i in mode.problems.get_children()]
-            ok(any("tagg" in str(values) for values in rows), f"the problem row: {rows}")
+            ok(_pump(root, lambda: _problem_rows(mode, "tagg")), f"the problem row: {_problem_rows(mode, '')}")
             eq(_tagged(text, "tp_error"), ["$r.tagg"], "…and its squiggle on exactly the typo")
             mode.problems.selection_set(mode.problems.get_children()[0])
             root.update()                                    # the real <<TreeviewSelect>> -> the jump
@@ -181,6 +186,159 @@ def test_template_mode_in_the_files_panel():
             mode.popup.accept()
             eq(text.get("2.0", "2.end"), "  {$tag", "accepted into the text")
     finally:
+        template_doc.Session = _REAL_SESSION
+        config.use_project(None)
+        root.destroy()
+
+
+def test_the_session_works_off_the_tk_thread():
+    """C-025 refute round 2 (#8): the in-hook cascade - the whole Session - ran on the Tk thread (0.5 s
+    a keystroke at 20k rows), and a Reload during an in-flight build kept the stale build. Now the
+    Session's work runs on the view's ONE worker: the Tk thread stays live while a Database builds, a
+    result computed for an older request is dropped, and a Reload waits for the build it would race."""
+    import threading
+    import time
+    root = _tk()
+    if root is None:
+        return
+    gate, builds, calls, active = threading.Event(), [], [], [0]
+
+    def loader(system):
+        active[0] += 1
+        builds.append(threading.current_thread().name)
+        try:
+            gate.wait(10)
+            return _signals()
+        finally:
+            active[0] -= 1
+
+    def instrumented(path=None):
+        session = _REAL_SESSION(path, hooks={"before_300": None, "after_300": loader})
+        for name in ("reload", "base", "view", "check", "row_count", "preview_text", "context"):
+            def wrapper(*args, _real=getattr(session, name), _name=name, **kwargs):
+                calls.append((_name, threading.current_thread() is threading.main_thread(), active[0]))
+                return _real(*args, **kwargs)
+            setattr(session, name, wrapper)
+        return session
+
+    template_doc.Session = instrumented
+    try:
+        with tempfile.TemporaryDirectory() as project:
+            path = _project(project)
+            config.use_project(project)
+            panel = _panel(root, project)
+            panel._load(path)
+            mode, text = panel._template, panel._textw
+            applied, apply = [], mode._apply
+            mode._apply = lambda result: (applied.append(result[1]), apply(result))
+            mode.rule_box.current(1)
+            began = time.time()
+            mode.on_rule()
+            root.update()
+            ok(time.time() - began < 1.0, "choosing a rule returns at once - its Database builds on the worker")
+            ok("building the Database" in mode.preview.get("1.0", "end-1c"), "…the preview says so")
+            ok(_pump(root, lambda: builds, 5), "the build is running")
+            stale = mode._request
+            text.insert("4.0", "  X {$r.tagg}\n")          # typed WHILE the build runs
+            mode.refresh()
+            root.update()
+            gate.set()
+            ok(_pump(root, lambda: _problem_rows(mode, "tagg")), "the newest text's problems")
+            ok(stale not in applied, f"the result computed for the older text is dropped ({stale} in {applied})")
+            eq(applied, [mode._request], "only the result for the text AS IT IS was applied (one computed for a "
+                                         "text edited since it was sent is dropped too)")
+            eq(builds, ["template-builder"], "one build, on the worker")
+            gate.clear()
+            mode.reload()
+            ok(_pump(root, lambda: len(builds) == 2, 5), "a Reload rebuilds the Database")
+
+            class Key:
+                char, keysym = "a", "a"
+            text.insert("2.0", "  {$ta\n")
+            text.mark_set("insert", "2.6")
+            root.update()
+            mode._on_key(Key())
+            ok(not mode.popup.is_open, "while the rules reload, no stale rule columns are offered")
+            mode.refresh()                                   # a check queued behind that build…
+            mode.reload()                                    # …then a second Reload, both WHILE it runs
+            _pump(root, lambda: False, 0.3)
+            gate.set()
+            ok(_pump(root, lambda: len(builds) == 3 and applied and applied[-1] == mode._request),
+               f"…it waits for the build, then rebuilds once more ({builds})")
+            reloads = [(on_tk, busy) for name, on_tk, busy in calls if name == "reload"]
+            eq(reloads, [(False, 0), (False, 0)], "each Reload ran on the worker, never during a build")
+            last = max(i for i, call in enumerate(calls) if call[0] == "reload")
+            eq([name for name, _on_tk, _busy in calls[last + 1:] if name == "check"], ["check"],
+               "the check queued before that Reload was skipped - one check, against the reloaded rules")
+            eq([name for name, on_tk, _busy in calls if on_tk], [], "no Session work on the Tk thread")
+            mode._on_key(Key())
+            eq(mode.popup.listbox.get(0, "end") if mode.popup.is_open else (), ("$tag",),
+               "the reloaded rule's columns complete again")
+    finally:
+        template_doc.Session = _REAL_SESSION
+        config.use_project(None)
+        root.destroy()
+
+
+def test_only_the_newest_result_for_the_text_as_it_is_applies():
+    """The worker's result discipline, with the timing under the test's control (the worker is held
+    inside each `check` until the test lets it finish): a result for an OLDER request, arriving on its
+    own, is dropped; so is the newest request's result when the text was edited after it was sent (its
+    positions would squiggle the wrong characters); the next result applies."""
+    import threading
+    from pipeline5.workbench import template_mode
+    root = _tk()
+    if root is None:
+        return
+    permits, held = threading.Semaphore(0), [False]
+
+    def instrumented(path=None):
+        session = _session(path)
+
+        def check(*args, _real=session.check, **kwargs):
+            if held[0]:
+                permits.acquire(timeout=10)
+            return _real(*args, **kwargs)
+        session.check = check
+        return session
+
+    template_doc.Session = instrumented
+    debounce = template_mode._DEBOUNCE_MS
+    try:
+        with tempfile.TemporaryDirectory() as project:
+            path = _project(project)
+            config.use_project(project)
+            panel = _panel(root, project)
+            panel._load(path)
+            mode = panel._template
+            mode.rule_box.current(1)
+            mode.on_rule()
+            ok(_pump(root, lambda: mode.preview.get("1.0", "end-1c").startswith("APPEND")), "the rule's first result")
+            applied, apply = [], mode._apply
+            mode._apply = lambda result: (applied.append(result[1]), apply(result))
+            held[0] = True
+            mode.refresh()                                   # the worker is held inside its check…
+            mode.refresh()                                   # …a newer request queued behind it
+            permits.release()                                # only the OLDER one completes
+            _pump(root, lambda: False, 0.5)
+            eq(applied, [], "a result for an older request, arriving on its own, is dropped")
+            permits.release()
+            ok(_pump(root, lambda: applied == [mode._request]), f"…the newest one applies ({applied})")
+            template_mode._DEBOUNCE_MS = 5000                # the edit's own refresh must not come first
+            mode.refresh()
+            sent = mode._request
+            mode.schedule()                                  # the text is edited after that request was sent
+            permits.release()
+            _pump(root, lambda: False, 0.5)
+            ok(sent not in applied, f"the newest request's result, for a text edited since, is dropped ({applied})")
+            mode.refresh()
+            permits.release()
+            ok(_pump(root, lambda: applied[-1:] == [mode._request]), f"…and the fresh one applies ({applied})")
+    finally:
+        template_mode._DEBOUNCE_MS = debounce
+        held[0] = False
+        for _ in range(4):                                   # a failed assertion must not strand the worker
+            permits.release()
         template_doc.Session = _REAL_SESSION
         config.use_project(None)
         root.destroy()
@@ -268,6 +426,9 @@ if __name__ == "__main__":
     sys.exit(run("gui_template_mode", [
         ("project_copy_helpers", test_project_copy_helpers),
         ("template_mode_in_the_files_panel", test_template_mode_in_the_files_panel),
+        ("the_session_works_off_the_tk_thread", test_the_session_works_off_the_tk_thread),
+        ("only_the_newest_result_for_the_text_as_it_is_applies",
+         test_only_the_newest_result_for_the_text_as_it_is_applies),
         ("the_shipped_file_is_read_only_until_copied", test_the_shipped_file_is_read_only_until_copied),
         ("every_viewer_keeps_the_shipped_config_read_only", test_every_viewer_keeps_the_shipped_config_read_only),
     ]))

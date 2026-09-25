@@ -226,21 +226,38 @@ def run_risky_index(ctx, only=None):
                      f"{os.path.basename(res['output_path'])}{backup}. REVIEW the _RiskyIndex sheet.")
 
 
+def _gated(database, findings, leg: str):
+    """The run-plan's gate over a staging's findings - the treatments registry applied, READ-ONLY (the
+    real gate also reconciles the registry file; a preview must not write) - raising WouldNotFire when
+    it would halt: after_300 then never fires."""
+    from pipeline5.findings import severity
+    from pipeline5.findings import treatments
+    from pipeline5.phases.chain_reactions.engine import WouldNotFire
+    applied = treatments.apply(findings, treatments.load())
+    if treatments.should_halt(applied):
+        first = next(f for f, effective in applied if effective in severity.HALTING)
+        raise WouldNotFire(f"{leg} halts on {first.type}: {first.detail} - after_300 never fires")
+    return database
+
+
 def _staged_database(system):
-    """The Database `after_300` gets on a full staging (300/320): STAGING ITSELF, run in memory over the
-    current source documents - nothing saved. Not the Database/ folder: every later phase re-stages
-    and re-saves it (520 even writes values back), and the next run re-stages from the documents.
-    A staging that halts (a blocking FAIL, e.g. no I/O sheet) raises - after_300 would not fire. The
-    310-only leg stages no C&E, so its fire sees no validation_issues. What happens between staging
-    and the fire - a before_300 with business settled in (its record attached), and the in-hook
-    cascade - the builder models from the rules (template_doc.Session)."""
-    from pipeline5.findings import gate as run
+    """The Database `after_300` gets on a full staging (the 300 / 320 buttons, Run-all): STAGING ITSELF,
+    run in memory over the current source documents - nothing saved - through the run-plan's own gate
+    (the treatments registry). Not the Database/ folder: every later phase re-stages and re-saves it
+    (520 even writes values back), and the next run re-stages from the documents. What happens
+    between the gate and the fire - a before_300 with business settled in, the in-hook cascade - the
+    builder models from the rules (template_doc.Session)."""
     from pipeline5.phases.staging import iolist as staging
     database, findings = staging.stage(system=system, save=False)
-    if run.has_blocking(findings):
-        first = next((f for f in findings if f.severity == "FAIL"), findings[0])
-        raise RuntimeError(f"staging halts ({first.type}: {first.detail}) - after_300 would not fire")
-    return database
+    return _gated(database, findings, "staging (300)")
+
+
+def _iolist_database(system):
+    """The Database `after_300` gets on the 310 leg (Stage I/O List): the I/O List only - no C&E pass,
+    so no C&E values and no validation_issues table - in memory, through the same gate."""
+    from pipeline5.phases.staging import iolist as staging
+    database, findings = staging.stage_iolist(save=False, system=system)
+    return _gated(database, findings, "Stage I/O List (310)")
 
 
 # Every chain-reaction hook THIS run-plan fires, in firing order -> the Database it sees (None: nothing
@@ -249,6 +266,8 @@ def _staged_database(system):
 # its hook's Database (System.reaction_hooks).
 REACTION_HOOKS = {"before_300": None, "after_300": _staged_database}
 _REACTION_HOOKS = tuple(REACTION_HOOKS)
+# the OTHER legs that fire a hook over a different Database - the builder lints each rule against them too
+REACTION_LEGS = {"after_300": {"310 Stage I/O List": _iolist_database}}
 
 
 def run_staging(ctx, only=None):

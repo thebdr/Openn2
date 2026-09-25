@@ -82,7 +82,7 @@ from collections import namedtuple
 
 from pipeline5.language import expr
 from pipeline5.language.expr import ExprError
-from pipeline5.language.expr.parser import free_paths
+from pipeline5.language.expr.parser import free_paths, row_reads
 from pipeline5.language.expr.render import _split_spec
 
 _MAX_DEPTH = 32          # @use nesting backstop (the cycle guard catches loops; this catches towers)
@@ -513,11 +513,13 @@ def _field_span(text: str, start: int, end: int, name: str) -> tuple:
     return (found.start(), found.end()) if found else (start, end)
 
 
-def lint_line(text: str, *, fields=None, loops=None) -> list:
+def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None) -> list:
     """ONE literal line / row value judged the way `render_text` and the loop-column check judge it -
     WITHOUT rendering: [(start, end, message, severity)], columns into `text`. `fields` = the
     top-level names in scope (None = unknown - the strict missing-field check is skipped); `loops` =
-    {loop var: its table's columns - empty for a range var, None when unknown}."""
+    {loop var: its table's columns - empty for a range var, None when unknown}; `tables` = {table:
+    columns} (a data function's row reads are checked against them); `json` = the field paths holding
+    JSON (list / object) values ("type", "r.matrix_areas")."""
     loops = loops or {}
     names = None if fields is None else set(fields) | set(loops)
     issues = []
@@ -545,7 +547,15 @@ def lint_line(text: str, *, fields=None, loops=None) -> list:
             problem = _spec_problem(spec) if spec is not None else None
             if problem:
                 issues.append((end - 1 - len(spec), end - 1, problem, "error"))
-            for path in sorted(expr.hole_paths(text[start + 1:end - 1]) or ()):
+            paths = expr.hole_paths(text[start + 1:end - 1]) or ()
+            if spec is not None and not problem and json and len(paths) == 1:
+                path = next(iter(paths))
+                if expression.strip() == "$" + path and path in json:   # the value IS a JSON list / object
+                    issues.append((end - 1 - len(spec), end - 1, f"a format spec on a JSON (list / object) "
+                                   f"value fails on every non-blank row: ${path}:{spec}", "warning"))
+            issues.extend((s, e, message, "warning") for s, e, message in _row_read_problems(
+                text, start, end, expression, tables) if (s, e, message, "warning") not in issues)
+            for path in sorted(paths):
                 head, _dot, rest = path.partition(".")
                 if names is not None and head not in names:
                     message = f"missing field ${head} - not in scope here (the strict render raises)"
@@ -560,13 +570,31 @@ def lint_line(text: str, *, fields=None, loops=None) -> list:
     return issues
 
 
+def _row_read_problems(text: str, start: int, end: int, expression: str, tables) -> list:
+    """(start, end, message) for each column a data function reads from its table's rows (a predicate's
+    `$col`, lookup / unique's column word) that the table does not have - it reads blank there."""
+    out = []
+    for function, table, columns in (row_reads(expression) or ()) if tables else ():
+        known = tables.get(table)
+        if known is None:
+            continue                                        # an unknown table is judged elsewhere
+        for column in sorted(columns):
+            head = column.split(".", 1)[0]
+            if head not in known:
+                found = re.compile(r"\$?\b" + re.escape(head) + r"\b").search(text, start, end)
+                s, e = (found.start(), found.end()) if found else (start, end)
+                out.append((s, e, f"{head!r} is not a column of {table} - {function}() reads it as blank"))
+    return out
+
+
 def _spec_problem(spec: str) -> str | None:
     """Why NO value can satisfy a hole's format spec (None = some can) - tried with the kinds of value
     `format_spec` coerces to: an int for d/x/X/o/b/c/n, a float for e/E/f/F/g/G/%, else a text AND a
-    number (an untyped spec formats the value as it is - a field's text, a loop's number)."""
+    number (an untyped spec formats the value as it is - a field's text, a loop's number, count()'s
+    float)."""
     from pipeline5.language.expr.runtime import _FLOAT_CONV, _INT_CONV
     last = spec[-1:]
-    samples = [7] if last and last in _INT_CONV else [7.5] if last and last in _FLOAT_CONV else ["x", 7]
+    samples = [7] if last and last in _INT_CONV else [7.5] if last and last in _FLOAT_CONV else ["x", 7, 7.5]
     first = None
     for sample in samples:
         try:
@@ -584,15 +612,17 @@ def _braced(text: str, runs: list, index: int) -> bool:
             and text[runs[index - 1][1]] == "{" and text[runs[index + 1][1]] == "}")
 
 
-def lint(templates: dict, *, start: str | None = None, fields=None, tables=None) -> list:
+def lint(templates: dict, *, start: str | None = None, fields=None, tables=None, json=None,
+         json_fields=None) -> list:
     """Every problem the renderer would raise for the TEXT templates in `templates`, found WITHOUT
     rendering - EVERY branch of every template (a render evaluates only the taken one). `start` +
     `fields` = a rule's context: that template - and whatever it @uses, loop vars carried - is walked
     with `fields` (the matched row's columns + the E1 names) in scope, so a missing field is an error
     exactly where the strict render raises; every template is also walked without a context (the
     data-independent checks). `tables` = {table: columns} of the rule's hook database, for the context
-    walk: an unknown loop table, the loop-column check, a `where` predicate's names. Returns
-    [Problem], each once."""
+    walk: an unknown loop table, the loop-column check, a `where` predicate's names, a data function's
+    row reads; `json` = {table: its JSON columns} and `json_fields` = the rule's JSON fields (a format
+    spec on a JSON value). Returns [Problem], each once."""
     found = {}
 
     def add(template, line, start_col, end_col, message, severity="error"):
@@ -600,7 +630,7 @@ def lint(templates: dict, *, start: str | None = None, fields=None, tables=None)
                          Problem(template, line, start_col, end_col, message, severity))
 
     if start is not None and isinstance(templates.get(start), str):      # the context walk
-        _Lint(templates, tables, add).named(start, None if fields is None else frozenset(fields), {}, ())
+        _Lint(templates, tables, add, json, json_fields).named(start, None if fields is None else frozenset(fields), {}, ())
     plain = _Lint(templates, None, add)                 # every template, no context: another
     for name, body in templates.items():               # rule (another hook) may use it
         if isinstance(body, str):
@@ -684,6 +714,9 @@ def _block_extent(lines, start: int, hi: int, want_else: bool) -> tuple:
     return else_at, None, stack[-1][2], problems
 
 
+_NONE = object()                                        # "no previous value" (a loop var's table)
+
+
 def _whole(raw: str, col: int) -> tuple:
     """The span of a line's text (its indentation excluded)."""
     return col + len(raw) - len(raw.lstrip()), col + len(raw.rstrip())
@@ -693,8 +726,16 @@ class _Lint:
     """The lint walk: the renderer's structure over EVERY branch - lines checked, nothing evaluated.
     `fields` = the names in scope (a frozenset, None = no context); `loops` = {var: columns}."""
 
-    def __init__(self, templates: dict, tables, add):
+    def __init__(self, templates: dict, tables, add, json=None, json_fields=None):
         self.templates, self.tables, self.add, self.seen = templates, tables, add, set()
+        self.json, self.json_fields = json or {}, frozenset(json_fields or ())
+        self.loop_tables = {}                               # loop var -> its table, while its body is walked
+        self._table = None                                  # the table `iterable` just judged
+
+    def json_paths(self) -> frozenset:
+        """The field paths holding JSON values here: the rule's JSON fields + each loop row's JSON columns."""
+        return self.json_fields | frozenset(f"{var}.{column}" for var, table in self.loop_tables.items()
+                                            if table for column in self.json.get(table, ()))
 
     def named(self, name, fields, loops, stack):
         key = (name, fields, frozenset(loops.items()))
@@ -714,7 +755,8 @@ class _Lint:
                 i = self.directive(lines, i, hi, word, template, fields, loops, stack, base, col)
                 continue
             if not word:
-                for s, e, message, severity in lint_line(lines[i], fields=fields, loops=loops):
+                for s, e, message, severity in lint_line(lines[i], fields=fields, loops=loops,
+                                                         tables=self.tables, json=self.json_paths()):
                     self.add(template, base + i + 1, col + s, col + e, message, severity)
             i += 1
 
@@ -770,18 +812,30 @@ class _Lint:
     def loop(self, lines, i, hi, rest, at, template, fields, loops, stack, base, col):
         spec, inline = _split_top(rest, ":")
         head = _FOR_HEAD.match(spec.strip())
-        inner = dict(loops)
+        inner, var, table = dict(loops), None, None
         if head is not None:                                # (a malformed head was reported above)
             iterable_at = at + len(spec) - len(spec.lstrip()) + head.start(2)
-            inner[head.group(1)] = self.iterable(head.group(2).strip(), iterable_at, head.group(1),
-                                                 template, base + i + 1, fields, loops)
-        if inline is None:
-            return self.structure(lines, i, hi, template, fields, loops, stack, base, col, "@for", inner)
-        body, word = inline.strip(), _line_word(inline)
-        if body and word not in ("@if", "@else", "@end") and not (word == "@for" and _opens_block(body)):
-            body_at = at + len(spec) + 1 + len(inline) - len(inline.lstrip())
-            self.block([body], 0, 1, template, fields, inner, stack, base + i, body_at, frozenset())
-        return i + 1
+            self._table = None
+            var = head.group(1)
+            inner[var] = self.iterable(head.group(2).strip(), iterable_at, var, template, base + i + 1,
+                                       fields, loops)
+            table = self._table
+        before = self.loop_tables.get(var, _NONE) if var else _NONE
+        if var:
+            self.loop_tables[var] = table                   # the body's `$var` is a row of `table`
+        try:
+            if inline is None:
+                return self.structure(lines, i, hi, template, fields, loops, stack, base, col, "@for", inner)
+            body, word = inline.strip(), _line_word(inline)
+            if body and word not in ("@if", "@else", "@end") and not (word == "@for" and _opens_block(body)):
+                body_at = at + len(spec) + 1 + len(inline) - len(inline.lstrip())
+                self.block([body], 0, 1, template, fields, inner, stack, base + i, body_at, frozenset())
+            return i + 1
+        finally:
+            if var and before is _NONE:
+                self.loop_tables.pop(var, None)
+            elif var:
+                self.loop_tables[var] = before
 
     def iterable(self, iterable, at, var, template, line_no, fields, loops):
         """The @for iterable checked as `_iterate` would judge it -> the loop var's columns (empty for
@@ -794,7 +848,7 @@ class _Lint:
             for fragment, offset in ((low, 0), (high, len(low) + 2)):
                 text = fragment.strip()
                 where = at + offset + len(fragment) - len(fragment.lstrip())
-                issues = lint_line(text, fields=fields, loops=loops)
+                issues = lint_line(text, fields=fields, loops=loops, tables=self.tables, json=self.json_paths())
                 for s, e, message, severity in issues:
                     self.add(template, line_no, where + s, where + e, message, severity)
                 if not issues and all(kind != "hole" for kind, _s, _e in _scan(text)):
@@ -805,6 +859,7 @@ class _Lint:
             return frozenset()
         words = iterable.split(None, 1)
         table, columns = words[0], None
+        self._table = table
         if self.tables is not None:
             if table in self.tables:
                 columns = frozenset(self.tables[table])
@@ -826,6 +881,8 @@ class _Lint:
             self.add(template, line_no, at + issue.start, at + issue.end, issue.message)
         if syntax:
             return
+        for s, e, message in _row_read_problems(pred, 0, len(pred), pred, self.tables):
+            self.add(template, line_no, at + s, at + e, message, "warning")
         for path in sorted(free_paths(pred) or ()) if table is None and loops else ():
             head, _dot, rest = path.partition(".")
             if rest and loops.get(head) is not None:

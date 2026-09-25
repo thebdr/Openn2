@@ -241,20 +241,31 @@ def test_the_session_models_the_run_plan():
             session = td.Session(None, rows=rules, hooks=hooks, params={})
             ok(session.loaded("before_300") and not session.loaded("after_300"), "built on demand (a worker's job)")
             base = session.base("after_300")
-            ok("chain_reactions_log" in base.names(), "a before_300 rule is settled in: its record attached")
+            ok("chain_reactions_log" not in base.names(), "the base is the loader's own output")
             second = session.rules[2]
+            seen = session.view(second, doc.templates)[0]
+            ok("chain_reactions_log" in seen.names(), "a before_300 rule is settled in: its record attached")
+            ok("chain_reactions_log" not in base.names(), "…into a COPY - the built Database stays the loader's")
+            eq([(r["hook"], r["rule"], r["outcome"]) for r in seen["chain_reactions_log"]],
+               [("before_300", "hdr", "rx_bad_template")],
+               "…with THIS run's before_300 audit - a dry fire of it (its `$label` is missing: no source row)")
+            eq([f["type"] for f in seen["validation_issues"]], ["rx_bad_template"], "…and its finding recorded")
             eq(session.row_count(second, doc.templates), 2, "B sees A's spawns - the in-hook cascade")
             preview = session.preview_text(doc, second, 1)
             ok(preview.endswith("row L-M1"), preview)
             eq(len(base["dst"]), 0, "the cascade never touches the hook's Database")
             quiet = td.Session(None, rows=rules[1:], hooks=hooks, params={})
-            ok("chain_reactions_log" not in quiet.base("after_300").names(), "no before_300 business: no settle")
+            ok("chain_reactions_log" not in quiet.view(quiet.rules[1], doc.templates)[0].names(),
+               "no before_300 business: no settle")
             broken = td.Session(None, rows=rules, hooks={"after_300": lambda system: 1 / 0}, params={})
             eq(broken.base("after_300"), None, "a Database that cannot be built")
             ok(any("cannot be built" in note for note in broken.notes), f"…is noted: {broken.notes}")
             text = broken.preview_text(doc, broken.rules[2], 0)
-            ok("rx_unknown_table" in text and "does NOT match" not in text,
-               f"a fire that stops BEFORE the condition is not called a 'no match': {text!r}")
+            ok(text.startswith("the run halts before after_300 fires - its Database cannot be built (division by "
+                               "zero)") and "rx_unknown_table" not in text and "does NOT match" not in text,
+               f"a Database that cannot be built stops the run: no findings of a fire that never happens: {text!r}")
+            eq([(p.severity, p.label) for p in broken.check(doc, broken.rules[2])], [("warning", "rule")],
+               "…the check says so, once")
             ok(any("declares no reaction hooks" in note for note in td.Session(None, rows=rules, hooks={}, params={}).notes),
                "a system that declares no hooks is noted")
             elsewhere = td.Session(os.path.join(sandbox, "other.yaml"), rows=rules, hooks=hooks, params={})
@@ -263,6 +274,160 @@ def test_the_session_models_the_run_plan():
                "a document a fire does not use says so")
         finally:
             config.database_dir = original
+
+
+def test_folded_plain_scalars_are_approximate():
+    """C-025 refute round 2 (#7): a multi-line PLAIN scalar is FOLDED by YAML - one line in the value,
+    several in the document - yet was flagged exact: its squiggle landed on the wrong characters. It
+    is approximate now: a problem sits on its first line, labelled so, and the template layer paints
+    no colours at offsets that do not hold."""
+    from pipeline5.language.tempemplator import Problem
+    text = "rows:\n  - label: L-{$name}\n      -{$mnemonc}\nt: X {$nme}\n  Y {$kind}\nok: Z {$zz}\n"
+    doc = td.parse(text)
+    eq(doc.error, None, "loads")
+    rows, folded = doc.entries["rows"], doc.entries["t"]
+    eq((rows.value_text[(1, "label")], folded.text), ("L-{$name} -{$mnemonc}", "X {$nme} Y {$kind}"),
+       "YAML folds both")
+    ok(not rows.values[(1, "label")].exact and not folded.body.exact, "…so neither is exact")
+    ok(doc.entries["ok"].body.exact, "a one-line plain scalar stays exact")
+    value = rows.value_text[(1, "label")]
+    at = value.index("$mnemonc")
+    spot = td.place(doc, [Problem("rows", (1, "label"), at, at + 8, "m", "error")])[0]
+    eq((doc.text[spot.start:spot.end], spot.label), ("L-{$name}", "rows entry 1 label (approximate)"),
+       "a row value's problem: its first line, labelled approximate")
+    at = folded.text.index("$kind")
+    spot = td.place(doc, [Problem("t", 1, at, at + 5, "m", "error")])[0]
+    eq((doc.text[spot.start:spot.end], spot.label), ("X {$nme}", "t line 1 (approximate)"), "…a text template's too")
+    fields = _tagged(doc, "tx_field")
+    eq(fields, ["$zz"], "no template colours on the folded scalars - only where the offsets hold")
+
+
+def test_a_data_functions_predicate_completes_its_tables_columns():
+    """C-025 refute round 2 (#5): inside `count(<table>, ...)` / `where(` / `first(` the predicate reads
+    that table's ROW - yet the completion offered the rule's fields (the round-1 fix covered `@for ...
+    where` only). It offers the table's columns now - the innermost call's - and an ordinary call or
+    the table argument itself keeps the ordinary names."""
+    text = ("cab: |-\n  {$cabinet_id}: {count(signals, $\n"
+            "two: |-\n  {first(signals, $script_type = \"A\" and count(diagnosis_cabinets, $\n"
+            "own: |-\n  {upper($\n"
+            "quo: |-\n  {where(signals, $mnemonic = 'a)b' and $\n")
+    doc = td.parse(text)
+    ctx = td.Context(fields=frozenset({"_params", "_rule", "_db", "cabinet_id", "fld"}),
+                     tables={"signals": ["uid", "mnemonic", "script_type"], "diagnosis_cabinets": ["cabinet_id", "fld"]},
+                     reach=None)
+
+    def offered(needle):
+        return td.completions(doc, text.index(needle) + len(needle), ctx)[1]
+    eq(offered("count(signals, $"), ["$uid", "$mnemonic", "$script_type"], "count's predicate: the signals ROW")
+    eq(offered("count(diagnosis_cabinets, $"), ["$cabinet_id", "$fld"], "the innermost call's table")
+    eq(offered("upper($"), ["$_params", "$_rule", "$cabinet_id", "$fld"], "an ordinary call: the rule's names")
+    eq(offered("'a)b' and $"), ["$uid", "$mnemonic", "$script_type"], "a quoted string's ')' is not the call's")
+
+
+def test_unreadable_params_block_as_the_fire_blocks():
+    """C-025 refute round 2 (#6): with project_params.yaml unreadable the builder substituted {} and
+    previewed a render, while the fire BLOCKS every rule of the hook (rx_params_unreadable) and writes
+    nothing. The lint and the preview say the fire's finding now."""
+    import tempfile
+    from pipeline5 import config
+    rules = [{"name": "hdr", "fire_when": "before_300", "source_table": "", "condition": "", "action": "file",
+              "target": "h.txt", "template": "t"}]
+    doc = td.parse("t: |-\n  HEADER [{$_params.project_code}]\n")
+    original = config.load_params
+
+    def unreadable(path=None):
+        raise ValueError("while parsing a flow sequence: broken: [unclosed")
+    config.load_params = unreadable
+    try:
+        session = td.Session(None, rows=rules, hooks={"before_300": None, "after_300": None})
+        rule = session.rules[0]
+        errors = [p.message for p in session.check(doc, rule) if p.severity == "error"]
+        ok(len(errors) == 1 and "rx_params_unreadable" in errors[0] and "[unclosed" in errors[0], f"the lint: {errors}")
+        shown = session.preview_text(doc, rule, 0)
+        ok(shown.startswith("rx_params_unreadable") and "APPEND" not in shown, f"the preview: {shown!r}")
+        with tempfile.TemporaryDirectory() as out:
+            _deferred, findings = engine.fire("before_300", None, rules=rules, templates=doc.templates,
+                                              files_root=out, hooks=("before_300", "after_300"))
+            eq(([f.type for f in findings], os.listdir(out)), (["rx_params_unreadable"], []),
+               "the fire: blocked, nothing written")
+        from pipeline5.truth.database import Database
+        from pipeline5.truth.table import Table
+        later = rules + [{"name": "A", "fire_when": "after_300", "source_table": "src", "condition": "",
+                          "action": "file", "target": "a.txt", "template": "t"}]
+        original_dir = config.database_dir
+        with tempfile.TemporaryDirectory() as sandbox:
+            config.database_dir = lambda: sandbox
+            try:
+                both = td.Session(None, rows=later, hooks={
+                    "before_300": None, "after_300": lambda system: Database([Table("src", columns=["uid", "name"])])})
+                seen = both.view(both.rules[1], doc.templates)[0]
+                eq([(r["rule"], r["outcome"]) for r in seen["chain_reactions_log"]], [("hdr", "rx_params_unreadable")],
+                   "the before_300 settled into after_300's Database: its dry fire blocked, as the run's is")
+            finally:
+                config.database_dir = original_dir
+    finally:
+        config.load_params = original
+
+
+def test_the_dry_settle_writes_nothing():
+    """The Session models a settled before_300 with a DRY fire of it - an absolute file target included
+    (a scratch output root did not catch one: every view would have appended to the real file). The
+    settled audit counts the lines a run would write; nothing is written."""
+    import tempfile
+    from pipeline5 import config
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.table import Table
+    with tempfile.TemporaryDirectory() as sandbox, tempfile.TemporaryDirectory() as elsewhere:
+        absolute = os.path.join(elsewhere, "header.txt").replace("\\", "/")
+        rules = [{"name": "hdr", "fire_when": "before_300", "source_table": "", "condition": "", "action": "file",
+                  "target": absolute, "template": "t"},
+                 {"name": "A", "fire_when": "after_300", "source_table": "src", "condition": "", "action": "file",
+                  "target": "a.txt", "template": "t"}]
+        doc = td.parse("t: |-\n  HEADER {$_rule.hook}\n")
+        original_dir, original_out = config.database_dir, config.output_root
+        config.database_dir, config.output_root = (lambda: sandbox), (lambda: os.path.join(sandbox, "out"))
+        try:
+            session = td.Session(None, rows=rules, hooks={
+                "before_300": None, "after_300": lambda system: Database([Table("src", columns=["uid", "name"])])},
+                params={})
+            seen = session.view(session.rules[1], doc.templates)[0]
+            eq([(r["rule"], r["created"], r["outcome"]) for r in seen["chain_reactions_log"]], [("hdr", 1, "ok")],
+               "the settled audit: the line a run writes, counted")
+            eq((os.listdir(elsewhere), os.path.exists(os.path.join(sandbox, "out"))), ([], False), "…nothing written")
+        finally:
+            config.database_dir, config.output_root = original_dir, original_out
+
+
+def test_a_reload_discards_the_build_it_overtook():
+    """C-025 refute round 2 (#8): a Reload during an in-flight build KEPT the stale build (the builder
+    then showed 1 signal row while the documents had 5). The Session numbers its builds: one started
+    before a reload is discarded, and the next question rebuilds against the reloaded state."""
+    import threading
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.table import Table
+    entered, release, built = threading.Event(), threading.Event(), []
+
+    def loader(system):
+        built.append(len(built) + 1)
+        entered.set()
+        release.wait(10)
+        table = Table("src", columns=["uid", "name"], key_columns=["name"])
+        for number in range(len(built)):
+            table.add(name=f"N{number}")
+        return Database([table])
+
+    rules = [{"name": "A", "fire_when": "after_300", "source_table": "src", "condition": "", "action": "file",
+              "target": "x.txt", "template": "t"}]
+    session = td.Session(None, rows=rules, hooks={"after_300": loader}, params={})
+    worker = threading.Thread(target=session.base, args=("after_300",))
+    worker.start()
+    ok(entered.wait(10), "a build is in flight")
+    session.reload()                                         # e.g. the rules or the documents changed
+    release.set()
+    worker.join(10)
+    ok(not session.loaded("after_300"), "the build the reload overtook is not kept")
+    eq(len(session.base("after_300")["src"]), 2, "the next question rebuilds")
+    eq(built, [1, 2], "…once more")
 
 
 if __name__ == "__main__":
@@ -276,4 +441,10 @@ if __name__ == "__main__":
         ("positions_hold_for_every_scalar_style", test_positions_hold_for_every_scalar_style),
         ("completions_stay_in_scope", test_completions_stay_in_scope),
         ("the_session_models_the_run_plan", test_the_session_models_the_run_plan),
+        ("folded_plain_scalars_are_approximate", test_folded_plain_scalars_are_approximate),
+        ("a_data_functions_predicate_completes_its_tables_columns",
+         test_a_data_functions_predicate_completes_its_tables_columns),
+        ("unreadable_params_block_as_the_fire_blocks", test_unreadable_params_block_as_the_fire_blocks),
+        ("the_dry_settle_writes_nothing", test_the_dry_settle_writes_nothing),
+        ("a_reload_discards_the_build_it_overtook", test_a_reload_discards_the_build_it_overtook),
     ]))

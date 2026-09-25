@@ -70,18 +70,46 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   Warnings flag renders that succeed but probably are not what you meant:
   - a `where` that reads its own loop variable, or an `@if` that reads a loop row's missing column
     (both read blank - the branch is silently never taken);
+  - a data function reading a column its table does not have - a `count(signals, $col ...)` /
+    `where(` / `first(` predicate, `lookup` / `unique`'s column (it reads blank: `count` counts
+    nothing);
+  - a format spec on a JSON (list / object) value (`{$matrix_areas:>5}` - it fails on every row
+    that has a value);
   - an empty hole `{}` (it renders nothing - write `{{}}` for literal braces);
   - `{{$x}}`, which is the literal text `{$x}` - a hole in braces is `{{{$x}}}`.
+
+  A problem inside a multi-line PLAIN (unquoted) value or a folded `>` block is placed on its first
+  line and marked *(approximate)*: YAML joins those lines, so a column there is not a column of the
+  document.
 - **Rule and row.** Pick a rule from your `reactions.csv`, and a source row of the table it reads at
   its hook. The rows are what that hook's fire GETS - not the Database folder (later phases re-save
-  that): for `after_300`, staging itself runs in memory over your current source documents (nothing
-  is saved - a big project takes a moment; the preview says so while it builds), then an earlier
-  `before_300` rule's record is settled in and the hook's earlier `add_rows` rules spawn - as a run
-  would. The checks then also cover that rule's context:
+  that). For `after_300` the builder runs the run's own steps, in memory - nothing is saved or
+  written:
+  - staging itself, over your current source documents, through the run's gate - your finding
+    treatments applied (a big project takes a moment; the preview says so while it builds, and the
+    editor stays live meanwhile);
+  - the `before_300` rules fired dry - every step but writing their files - and their audit rows
+    and findings settled into the record, as the run settles them;
+  - the hook's earlier `add_rows` rules, spawning as they do in a run.
+
+  The checks then also cover that rule's context:
   - a field its rows do not carry;
   - a loop over a table that does not exist at that hook;
   - a column typo inside a loop;
-  - the rule itself (a template of the wrong kind, a hook the run never fires, a target with a `:`).
+  - the rule itself: a template of the wrong kind, a hook the run never fires, a target the fire
+    refuses for every row (a `:` other than a drive's, or a character Windows does not allow in a
+    path: `< > " | ? *`, a control character);
+  - project params that do not load (the fire blocks every rule of the hook: `rx_params_unreadable`).
+
+  When staging would HALT the run (a FAIL your treatments do not lift) - or cannot run at all (a
+  source document that will not open) - the builder says the run halts before `after_300` fires:
+  there is no fire to check or preview.
+
+  Another button may fire the same hook over a different Database: the **310 Stage I/O List**
+  button fires `after_300` over the I/O List alone (no C&E values, no `validation_issues` table).
+  Each rule is checked against every such leg too; a problem only that leg has reads
+  "on the 310 Stage I/O List leg: ...". The legs halt separately: when the full staging halts on a
+  C&E finding, the 310 leg still fires - and is still checked.
 - **Preview.** Shows what ONE fire of the rule would do for that row: the text it would append (and
   where), or the rows it would spawn, or the problem it would report. Nothing is written. When a
   row does not match the rule's condition, the preview says so and still renders (a problem it shows
@@ -90,7 +118,8 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   saved Database, not generation (later phases re-stage from the documents).
 - **Autocomplete** offers what fits at the cursor:
   - `$` offers the rule's columns (in the templates the rule renders), your loop variables,
-    `_params` and `_rule`; inside a `where`, only the loop table's columns (all it can see);
+    `_params` and `_rule`; inside a `where` - or a data function's predicate, `count(signals, $` -
+    only that table's columns (all it can see);
   - `$row.` offers that loop table's columns, and `$_params.` offers your project parameters;
   - `@use` offers template names, `@for $x in` offers table names, `@` offers the directives, and
     functions complete elsewhere.
@@ -98,4 +127,5 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   Up/Down choose, Enter/Tab accept, Escape closes.
 
 **↻ Reload rules + data** re-reads the rules and rebuilds the hook databases - after editing the
-rules or the source documents.
+rules, the params, the treatments or the source documents. A build that was still running when you
+clicked is discarded, never shown.

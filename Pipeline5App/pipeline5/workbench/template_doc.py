@@ -69,6 +69,12 @@ class Scalar:
     exact: bool = True
     chars: list | None = None
 
+    def first_line(self, text: str) -> tuple:
+        """(start, end) of the scalar's first document line - where an APPROXIMATE position is shown."""
+        start = self.starts[0] if self.chars is None else self.chars[0]
+        end = text.find("\n", start)
+        return start, len(text) if end == -1 else end
+
     def offset(self, line: int, column: int) -> int:
         """(0-based content line, column) -> the document offset."""
         if self.chars is not None:
@@ -289,7 +295,7 @@ def _scalar(text: str, starts: list, line: int, col: int, value: str) -> Scalar:
     if lead in ("'", '"'):
         chars = _quoted_chars(text, at, value)
         return Scalar([at + 1], exact=chars is not None, chars=chars)
-    return Scalar([at], exact="\n" not in value)
+    return Scalar([at], exact=text.startswith(value, at))
 
 
 # --- highlighting ----------------------------------------------------------------------------------- #
@@ -303,7 +309,7 @@ def spans(doc: Doc, language: str | None = None) -> list:
     out = [(tag, start, end) for tag, start, end in highlight.spans("yaml", doc.text)
            if not any(low <= start < high for low, high in bodies)]
     for entry in doc.entries.values():
-        if entry.kind == "text" and entry.body is not None:
+        if entry.kind == "text" and entry.body is not None and entry.body.exact:
             if language:
                 for tag, start, end in highlight.spans(language, entry.text):
                     out.append((tag, entry.body.at(start, entry.text), entry.body.at(end, entry.text)))
@@ -312,6 +318,8 @@ def spans(doc: Doc, language: str | None = None) -> list:
                     out.append((tag, entry.body.offset(number, start), entry.body.offset(number, end)))
         elif entry.kind == "row":
             for key, scalar in entry.values.items():
+                if not scalar.exact:
+                    continue                                # a folded value: no misplaced colours
                 value = entry.value_text[key]
                 for tag, start, end in _value_spans(value):
                     out.append((tag, scalar.at(start, value), scalar.at(end, value)))
@@ -373,14 +381,21 @@ def place(doc: Doc, problems) -> list:
         end = max(problem.end, problem.start + 1)
         where = problem.where
         if isinstance(where, int) and entry.body is not None:
-            start = entry.body.offset(where - 1, problem.start)
-            stop = entry.body.offset(where - 1, end)
-            label = f"{entry.name} line {where}"
+            if entry.body.exact:
+                start = entry.body.offset(where - 1, problem.start)
+                stop = entry.body.offset(where - 1, end)
+                label = f"{entry.name} line {where}"
+            else:                                           # a folded body: its lines are not the document's
+                (start, stop), label = entry.body.first_line(doc.text), f"{entry.name} line {where} (approximate)"
         elif isinstance(where, tuple) and (where[0], str(where[1])) in entry.values:
             key = (where[0], str(where[1]))
             value, scalar = entry.value_text[key], entry.values[key]
-            start, stop = scalar.at(problem.start, value), scalar.at(end, value)
-            label = f"{entry.name} entry {where[0]} {where[1]}"
+            if scalar.exact:
+                start, stop = scalar.at(problem.start, value), scalar.at(end, value)
+                label = f"{entry.name} entry {where[0]} {where[1]}"
+            else:                                           # a folded value: approximate - its first line
+                (start, stop), label = scalar.first_line(doc.text), \
+                    f"{entry.name} entry {where[0]} {where[1]} (approximate)"
         else:
             (start, stop), label = entry.key, entry.name
         out.append(Placed(start, stop, problem.message, problem.severity, label))
@@ -421,8 +436,9 @@ def completions(doc: Doc, at: int, context: Context | None = None) -> tuple:
     word, start = _word_before(line, column)
     if not word:
         return at, []
-    if where_table is not None and word.startswith("$"):     # a `where` sees the ROW's columns - only
-        columns = (context.tables or {}).get(where_table) or ()
+    row_table = where_table if where_table is not None else _data_table(line[:start])
+    if row_table is not None and word.startswith("$"):      # a `where` / data function's predicate sees
+        columns = (context.tables or {}).get(row_table) or ()   # that table's ROW columns - only
         return to_doc(start), [f"${c}" for c in _prefixed(word[1:], list(columns))]
     loops = _loops_at(entry, number, line, column, context)
     in_reach = context.reach is None or entry.name in context.reach
@@ -464,6 +480,38 @@ def _where_table(entry: Entry, line: str, column: int):
                 and line[parts[index - 1][1]:parts[index - 1][2]].lower() == "where":
             tables = [line[s:e] for r, s, e in parts[:index] if r == "table"]
             return tables[-1] if tables else None
+    return None
+
+
+_ROW_FUNCTIONS = ("count", "where", "first")               # a data function whose 2nd argument is a predicate
+
+
+def _data_table(before: str):
+    """The table whose ROWS the text at the end of `before` is evaluated against - the innermost
+    enclosing `count(<table>, ...` / `where(` / `first(` past its first argument - or None. A quoted
+    string or a /regex/ is opaque (its parentheses and commas are not the call's)."""
+    depth, commas, i, quote = 0, 0, len(before) - 1, ""
+    while i >= 0:
+        ch = before[i]
+        if quote:
+            if ch == quote:
+                quote = ""
+        elif ch in "\"'/":
+            quote = ch
+        elif ch == ")":
+            depth += 1
+        elif ch == "," and depth == 0:
+            commas += 1
+        elif ch == "(":
+            if depth:
+                depth -= 1
+            else:
+                name = re.search(r"(\w+)\s*$", before[:i])
+                if name and name.group(1) in _ROW_FUNCTIONS and commas:
+                    table = before[i + 1:].split(",", 1)[0].strip().strip('"')
+                    return table or None
+                commas = 0                                  # a plain call: keep looking outward
+        i -= 1
     return None
 
 
@@ -588,29 +636,43 @@ def is_templates_file(path: str) -> bool:
     return parts[-1:] == ["templates.yaml"] and parts[-2:-1] == ["chain_reactions"]
 
 
-_VIEW_CACHE = 8                                  # cascade views kept per session (templates change)
+_VIEW_CACHE = 8                                  # views kept per session (the templates change as one types)
 
 
 class Session:
     """The builder's live context over the ACTIVE config - the compiled rules (reactions.csv), the
-    system's `reaction_hooks`, the project params - and the Database each rule's fire GETS, the
-    run-plan modelled:
+    system's `reaction_hooks` / `reaction_legs`, the project params - and the Database each rule's fire
+    GETS, the run-plan modelled:
 
-      1. the hook's declared loader - the system's own input for it, rebuilt IN MEMORY (Siemens
-         after_300: staging itself, nothing saved) - NOT the Database/ folder, which later phases
-         re-save; it can take a while (`base` runs in the view's worker thread; `loaded` says when);
-      2. a DATABASE-LESS hook fired earlier WITH business is settled into the next database: its
-         reaction record attached (engine.settle_view), as the run-plan's `settle` does;
-      3. the in-hook CASCADE: the rows the hook's earlier add_rows rules spawn (engine.cascade).
+      1. the hook's declared loader - the system's own input for it, rebuilt IN MEMORY through the
+         run-plan's own gate (Siemens after_300: staging itself, the treatments registry applied,
+         nothing saved) - NOT the Database/ folder, which later phases re-save. A run that halts
+         before the hook raises engine.WouldNotFire: the builder then says the hook never fires;
+      2. a DATABASE-LESS hook fired earlier WITH business (engine.has_business) is settled into the
+         next database: a DRY fire of it (the real `fire` with write=False - its file rules write
+         nothing) and its Deferred applied exactly as `settle` applies it (engine.settle_view - the
+         record attached, the hook's audit rows replaced, its findings recorded - nothing saved);
+      3. the in-hook CASCADE: the rows the hook's earlier add_rows rules spawn (engine.cascade);
+      4. the OTHER legs that fire the hook (System.reaction_legs - Siemens: the 310 Stage-I/O-List
+         leg) - each rule is linted against them too; what only a leg rejects is reported as such.
 
-    `check` = the lint placed on the document; `preview_text` = one fire for one row, as text, with
-    the notes that matter (this document is not what a fire uses, a staging that would halt, ...)."""
+    Building a Database can take a while on a big project - the view constructs the Session (reading
+    the config files, no build) and then does the WORK (reload, base / view, check, row_count,
+    preview_text, context) on ONE worker thread (template_mode.py); its Tk thread only reads plain
+    state (rule_labels, rule, loaded, language, notes). A build a reload overtakes is discarded
+    (`generation`). `check` = the lint placed on the document; `preview_text` = one fire for one
+    row, as text, with the notes that matter."""
 
-    def __init__(self, path: str | None = None, *, rows=None, hooks=None, params=None):
-        """`rows` / `hooks` / `params` replace what `reload` reads from the active config and system (a
-        test's seam; the view passes only the document's path)."""
+    def __init__(self, path: str | None = None, *, rows=None, hooks=None, params=None, legs=None):
+        """`rows` / `hooks` / `params` / `legs` replace what `reload` reads from the active config and
+        system (a test's seam; the view passes only the document's path). Given `hooks` replace the
+        system's hook declaration as a whole - its legs too, unless `legs` are given."""
         self.path = path
-        self._given = {"rows": rows, "hooks": hooks, "params": params}
+        if hooks is not None and legs is None:
+            legs = {}
+        self._given = {"rows": rows, "hooks": hooks, "params": params, "legs": legs}
+        self._lock = threading.Lock()
+        self.generation = 0
         self.reload()
 
     def reload(self) -> None:
@@ -618,7 +680,9 @@ class Session:
         from pipeline5.config.resolver import find
         from pipeline5.phases.chain_reactions import engine
         from pipeline5.systems import catalog
-        self.notes = []                               # what could not load - shown, never raised
+        with self._lock:
+            self.generation += 1                          # a build started before this reload is discarded
+        self.notes = []                                   # what could not load - shown, never raised
         self.rows_ok = True
         try:
             self.rows = config.load_reactions() if self._given["rows"] is None else list(self._given["rows"])
@@ -629,70 +693,110 @@ class Session:
         self.notes += [f"{f.type}: {f.detail}" for f in findings]
         active = config.active_system()
         self.system = catalog.by_id(active[0]) if active else None
-        self.hooks = dict((getattr(self.system, "reaction_hooks", None) or {}) if self._given["hooks"] is None
-                          else self._given["hooks"])
+        given_hooks, given_legs = self._given["hooks"], self._given["legs"]
+        self.hooks = dict((getattr(self.system, "reaction_hooks", None) or {}) if given_hooks is None else given_hooks)
+        self.legs = {hook: dict(legs) for hook, legs in ((getattr(self.system, "reaction_legs", None) or {})
+                                                         if given_legs is None else given_legs).items()}
         self.language = getattr(self.system, "template_language", "") or None
         if not self.hooks:
             self.notes.append("the active system declares no reaction hooks (System.reaction_hooks) - "
                               "nothing to preview against")
+        self.params_problem = None
         try:
             self.params = config.load_params() if self._given["params"] is None else self._given["params"]
-        except Exception as error:  # noqa: BLE001
-            self.params = {}
+        except Exception as error:  # noqa: BLE001 - the fire blocks the hook's rules: rx_params_unreadable
+            self.params, self.params_problem = {}, str(error)
             self.notes.append(f"project params do not load: {error}")
         self.active = find("chain_reactions/templates.yaml")
-        self._bases, self._views = {}, {}
-        self._lock = threading.Lock()
+        self._bases, self._halts, self._views = {}, {}, {}
 
     # --- the Database a fire gets ---------------------------------------------------------------- #
-    def loaded(self, hook: str) -> bool:
-        """Whether `hook`'s Database is ready (a database-less or undeclared hook always is)."""
-        return self.hooks.get(hook) is None or hook in self._bases
+    def _loader(self, hook: str, leg):
+        return self.hooks.get(hook) if leg is None else self.legs.get(hook, {}).get(leg)
 
-    def base(self, hook: str):
-        """The Database `hook`'s fire gets from the run-plan (1 + 2 above) - None when database-less or
-        not buildable (noted). Built once per session; slow for a big project - call from a worker."""
+    def loaded(self, hook: str) -> bool:
+        """Whether every Database `hook` fires over (its legs included) is built - a database-less or
+        undeclared one always is."""
         with self._lock:
-            if hook in self._bases:
-                return self._bases[hook]
+            return all(self._loader(hook, leg) is None or (hook, leg) in self._bases
+                       for leg in (None, *self.legs.get(hook, {})))
+
+    def base(self, hook: str, leg=None):
+        """The Database `hook`'s fire gets from the run-plan's own input (1 above) on the main leg or
+        `leg` - None when database-less, when the run halts before the hook, or when it cannot be built
+        (the run's own staging would fail there: a halt too - noted). Built once per session; slow for a
+        big project."""
         from pipeline5.phases.chain_reactions import engine
-        loader, database = self.hooks.get(hook), None
+        key = (hook, leg)
+        with self._lock:
+            if key in self._bases:
+                return self._bases[key]
+            generation = self.generation
+        loader, database, halt, note = self._loader(hook, leg), None, None, None
         if loader is not None:
             try:
                 database = loader(self.system)
-            except Exception as error:  # noqa: BLE001 - e.g. a staging that would halt
-                self.notes.append(f"the {hook} database cannot be built: {error}")
-            else:
-                if self._settled_into(hook):
-                    self.notes += engine.settle_view(database)
+            except engine.WouldNotFire as error:
+                halt = str(error)
+            except Exception as error:  # noqa: BLE001 - e.g. a source document that will not open
+                note = f"the {hook} database{f' ({leg})' if leg else ''} cannot be built: {error}"
+                halt = f"its Database cannot be built ({error}) - the run stops there"   # its staging fails too
         with self._lock:
-            self._bases.setdefault(hook, database)
-            return self._bases[hook]
+            if generation != self.generation:              # reloaded meanwhile: this build is stale
+                return database
+            if halt:
+                self._halts[key] = halt
+            if note:
+                self.notes.append(note)
+            self._bases.setdefault(key, database)
+            return self._bases[key]
 
-    def _settled_into(self, hook: str) -> bool:
-        """A database-less hook fired before `hook` WITH business is settled into the first database
-        after it - the run-plan duty (its reaction record attached before this hook fires)."""
+    def halt(self, hook: str, leg=None):
+        """Why the run halts before `hook` fires on that leg (None = it fires)."""
+        self.base(hook, leg)
+        with self._lock:
+            return self._halts.get((hook, leg))
+
+    def _pending(self, hook: str) -> list:
+        """The database-less hooks fired before `hook` (since the previous database) WITH business -
+        each is settled into `hook`'s database (the run-plan's duty)."""
         from pipeline5.phases.chain_reactions import engine
-        order, pending = list(self.hooks), False
+        order, pending = list(self.hooks), []
         for name in order:
             if name == hook:
                 return pending
             if self.hooks[name] is None:
-                pending = pending or not self.rows_ok or engine.has_business(name, self.rows, tuple(order))
+                if not self.rows_ok or engine.has_business(name, self.rows, tuple(order)):
+                    pending.append(name)
             else:
-                pending = False
-        return False
+                pending = []
+        return []
 
-    def view(self, rule, templates: dict) -> tuple:
-        """(the Database `rule` sees at its hook - the base + the earlier rules' in-hook spawns, its
-        `_db` layer); cached per (hook, the earlier spawners' templates)."""
+    def view(self, rule, templates: dict, leg=None) -> tuple:
+        """(the Database `rule` sees at its hook on that leg - the base, the settled earlier hooks (2),
+        the earlier rules' in-hook spawns (3) - and its `_db` layer); cached per (hook, leg, the
+        templates those earlier rules render)."""
         from pipeline5.phases.chain_reactions import engine
-        base = self.base(rule.fire_when)
-        earlier = [r for r in self.rules[:self.rules.index(rule)]
-                   if r.fire_when == rule.fire_when and r.action == "add_rows"]
-        key = (rule.fire_when, tuple((r.name, repr(templates.get(r.template))) for r in earlier) if base else ())
+        base = self.base(rule.fire_when, leg)
+        pending = self._pending(rule.fire_when) if base is not None else []
+        index = self.rules.index(rule)
+        earlier = [r for r in self.rules[:index] if r.fire_when == rule.fire_when and r.action == "add_rows"]
+        drivers = [r for r in self.rules if r.fire_when in pending] + earlier
+        used = sorted({name for r in drivers for name in reach(templates, r.template)})
+        key = (rule.fire_when, leg, tuple(pending), tuple(r.name for r in earlier),
+               tuple((name, repr(templates.get(name))) for name in used))
         if key not in self._views:
-            database, _problems = engine.cascade(self.rules, rule, base, templates=templates, params=self.params)
+            database = base
+            if database is not None and pending:
+                database = engine.copy_database(database)
+                for hook in pending:                          # a DRY fire: its file rules write nothing
+                    deferred, _findings = engine.fire(
+                        hook, None, rules=self.rows if self.rows_ok else None, templates=templates,
+                        params=None if self.params_problem else self.params, hooks=tuple(self.hooks),
+                        write=False)
+                    if deferred is not None:
+                        self.notes += [n for n in engine.settle_view(database, deferred) if n not in self.notes]
+            database, _problems = engine.cascade(self.rules, rule, database, templates=templates, params=self.params)
             while len(self._views) >= _VIEW_CACHE:
                 self._views.pop(next(iter(self._views)))
             self._views[key] = (database, engine.db_layer(database))
@@ -732,12 +836,38 @@ class Session:
                        reach=reach(templates, rule.template) if rule.action == "file" else frozenset({rule.template}))
 
     def check(self, doc: Doc, rule) -> list:
-        """engine.lint on the document (the rule's context when one is chosen), placed."""
+        """engine.lint on the document - in the rule's context when one is chosen, on every leg that
+        fires its hook (what only another leg rejects says so). A leg the run halts on says THAT instead -
+        no checks of a fire that never happens - and the other legs are checked all the same."""
         from pipeline5.phases.chain_reactions import engine
         if doc.error is not None:
             return place(doc, [])
-        database = self.view(rule, doc.templates)[0] if rule is not None else None
-        return place(doc, engine.lint(doc.templates, rule, database, tuple(self.hooks) or None))
+        hooks = tuple(self.hooks) or None
+        if rule is None:
+            return place(doc, engine.lint(doc.templates, None, None, hooks))
+        halt = self.halt(rule.fire_when)
+        if halt:                                          # the main leg never fires: nothing it would report
+            placed = place(doc, engine.lint(doc.templates, None, None, hooks)) + [
+                Placed(None, None, f"the run halts before {rule.fire_when} fires - {halt}", "warning", "rule")]
+        else:
+            placed = place(doc, engine.lint(doc.templates, rule, self.view(rule, doc.templates)[0], hooks))
+        seen = {(p.start, p.end, p.message) for p in placed}
+        fires = not halt
+        for leg in self.legs.get(rule.fire_when, {}):
+            leg_halt = self.halt(rule.fire_when, leg)
+            if leg_halt:
+                placed.append(Placed(None, None, f"on the {leg} leg: {leg_halt}", "warning", "rule"))
+                continue
+            fires = True
+            for p in place(doc, engine.lint(doc.templates, rule, self.view(rule, doc.templates, leg)[0], hooks)):
+                if (p.start, p.end, p.message) not in seen:
+                    seen.add((p.start, p.end, p.message))
+                    placed.append(Placed(p.start, p.end, f"on the {leg} leg: {p.message}", p.severity, p.label))
+        if fires and self.params_problem:                 # a fire blocks every rule of the hook
+            placed.append(Placed(None, None, f"rule {rule.name!r}: rx_params_unreadable - the project params do "
+                                 f"not load, a fire blocks every rule of the hook: {self.params_problem}",
+                                 "error", "rule"))
+        return placed
 
     def document_note(self) -> str:
         """A note when this document is NOT the templates.yaml a fire uses (its lint and preview are
@@ -759,6 +889,16 @@ class Session:
         if doc.error is not None:
             return "templates.yaml does not load - fix it to preview."
         lines = [note for note in (self.document_note(),) if note]
+        halt = self.halt(rule.fire_when)
+        if halt:
+            firing = [leg for leg in self.legs.get(rule.fire_when, {}) if not self.halt(rule.fire_when, leg)]
+            return "\n".join(lines + [f"the run halts before {rule.fire_when} fires - {halt}",
+                                      "(no fire, so nothing to preview)"] +
+                             [f"note: the {leg} leg fires {rule.fire_when} all the same, over its own Database - "
+                              "its problems are in the problems list ('on the ... leg')" for leg in firing])
+        if self.params_problem:
+            return "\n".join(lines + [f"rx_params_unreadable: the project params do not load - a fire blocks "
+                                      f"every rule of {rule.fire_when}: {self.params_problem}"])
         database, layer = self.view(rule, doc.templates)
         shown = engine.preview(rule, row, templates=doc.templates, params=self.params, database=database,
                                layer=layer, hooks=tuple(self.hooks) or None)
@@ -776,10 +916,14 @@ class Session:
             if database is not None and rule.target in database and self._restaged(rule):
                 lines.append(f"note: later phases re-stage {rule.target} from the source documents - these rows "
                              "reach the saved Database, not generation (C-024's known boundary)")
+        for leg in self.legs.get(rule.fire_when, {}):
+            lines.append(f"note: the {leg} leg also fires {rule.fire_when}, over its own Database - what only "
+                         "it rejects is in the problems list ('on the ... leg')")
         return "\n".join(lines)
 
     def _restaged(self, rule) -> bool:
         """Whether the rule's target is a table the hook's declared loader builds (a staged table that
         later phases rebuild from the documents)."""
-        base = self._bases.get(rule.fire_when)
+        with self._lock:
+            base = self._bases.get((rule.fire_when, None))
         return base is not None and rule.target in base

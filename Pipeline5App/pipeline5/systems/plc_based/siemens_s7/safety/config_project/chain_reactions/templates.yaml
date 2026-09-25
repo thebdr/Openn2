@@ -20,7 +20,8 @@
 #   the rule's target file (append is the ONLY mode - you own the file's lifecycle, e.g. via a
 #   before_<phase> header rule or deleting it between runs). A ':' in the rendered file NAME (or
 #   anywhere in a RELATIVE target - `X:3.txt` would read as drive X:) is refused (Windows would
-#   hide the text in an NTFS stream) - e.g. a `-X1:3` terminal designation. Values are {expr} holes; structure
+#   hide the text in an NTFS stream) - e.g. a `-X1:3` terminal designation - and so is a character
+#   a Windows path does not allow: < > " | ? * or a control character. Values are {expr} holes; structure
 #   is @-directives:
 #       @use <name>                          splice another template here (recursive)
 #       @for $i in 1..{$count}: @use <name>  inclusive range loop (inline body form); a BLANK end

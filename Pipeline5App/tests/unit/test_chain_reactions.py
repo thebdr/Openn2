@@ -588,6 +588,57 @@ def test_round_13_colon_target_and_utf8_text():
     _sandboxed(body)()
 
 
+def test_windows_refused_path_characters_are_judged_before_the_write():
+    """C-025 refute round 2 (#4), the engine half: a character a Windows path refuses (`<>"|?*`, a
+    control character) failed at open() - EINVAL, "Invalid argument". The fire judges it BEFORE the
+    write now and says which character (so the builder's lint and preview can name the same
+    refusal): the rows before it are written, that row and the rest are not, the audit says so."""
+    if os.name != "nt":
+        return                                                # other platforms accept these characters
+    def body(sandbox):
+        for bad in '<>"|?*\x01':
+            with tempfile.TemporaryDirectory() as out_root:
+                src = Table("src", columns=["uid", "kind", "name"], key_columns=["name"])
+                for name in ("A1", f"B{bad}2", "C3"):
+                    src.add(kind="door", name=name)
+                database, findings = engine.fire("after_300", Database([src]),
+                                                 rules=[_rule(action="file", target="scl/{$name}.scl", template="txt")],
+                                                 templates={"txt": "x"}, params={}, files_root=out_root)
+                eq([(x.type, x.location) for x in findings], [("rx_file_write", "r1")], f"{bad!r}: refused")
+                ok(f"{bad!r} is not allowed in a Windows path" in findings[0].detail, findings[0].detail)
+                eq(os.listdir(os.path.join(out_root, "scl")), ["A1.scl"], f"{bad!r}: only the row before it written")
+                eq(_log(database), [("after_300", "r1", 3, 1, "rx_file_write")], f"{bad!r}: the audit")
+    _sandboxed(body)()
+
+
+def test_a_dry_fire_is_the_fire_minus_the_write():
+    """`fire(write=False)` - the template builder's model of a settle: the SAME Deferred (audit rows,
+    created counts, findings) as a real fire, and nothing written - a relative target or an ABSOLUTE
+    one (which no scratch root would catch)."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root, tempfile.TemporaryDirectory() as elsewhere:
+            absolute = os.path.join(elsewhere, "abs.txt").replace("\\", "/")
+            rules = [_rule(name="rel", fire_when="before_300", source_table="", condition="", action="file",
+                           target="rx/rel.txt", template="txt"),
+                     _rule(name="abs", fire_when="before_300", source_table="", condition="", action="file",
+                           target=absolute, template="txt"),
+                     _rule(name="bad", fire_when="before_300", source_table="src", condition="", action="file",
+                           target="rx/bad.txt", template="txt")]
+            templates = {"txt": "line one\nline two {$_rule.name}"}
+            dry, dry_findings = engine.fire("before_300", None, rules=rules, templates=templates, params={},
+                                            files_root=out_root, write=False)
+            eq((os.listdir(out_root), os.listdir(elsewhere)), ([], []), "the dry fire wrote nothing - not even the absolute target")
+            real, real_findings = engine.fire("before_300", None, rules=rules, templates=templates, params={},
+                                              files_root=out_root)
+            eq(dry.log_rows, real.log_rows, "the same audit rows (created counted as written)")
+            eq([(r["rule"], r["created"], r["outcome"]) for r in dry.log_rows],
+               [("rel", 2, "ok"), ("abs", 2, "ok"), ("bad", 0, "rx_unknown_table")], "…as the real fire's")
+            eq([(f.type, f.detail) for f in dry_findings], [(f.type, f.detail) for f in real_findings], "the same findings")
+            ok(os.path.exists(os.path.join(out_root, "rx", "rel.txt")) and os.path.exists(absolute),
+               "(the real fire writes both)")
+    _sandboxed(body)()
+
+
 def test_the_e1_scope_as_conditions_sources_and_row_templates_see_it():
     """Refuter round 15 (its proposed pin, adopted): the E1 scope and the in-hook cascade were pinned
     only as a fire-once TEXT template sees them. Conditions, source-table matching and ROW templates
@@ -1141,6 +1192,9 @@ if __name__ == "__main__":
         ("round_10_evidence_holes", test_round_10_evidence_holes),
         ("round_12_target_strictness_and_else_if", test_round_12_target_strictness_and_else_if),
         ("round_13_colon_target_and_utf8_text", test_round_13_colon_target_and_utf8_text),
+        ("windows_refused_path_characters_are_judged_before_the_write",
+         test_windows_refused_path_characters_are_judged_before_the_write),
+        ("a_dry_fire_is_the_fire_minus_the_write", test_a_dry_fire_is_the_fire_minus_the_write),
         ("the_e1_scope_as_conditions_sources_and_row_templates_see_it",
          test_the_e1_scope_as_conditions_sources_and_row_templates_see_it),
         ("doubled_braces_in_row_values_and_targets", test_doubled_braces_in_row_values_and_targets),
