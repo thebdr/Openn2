@@ -248,6 +248,13 @@ def test_the_session_works_off_the_tk_thread():
             eq(applied, [mode._request], "only the result for the text AS IT IS was applied (one computed for a "
                                          "text edited since it was sent is dropped too)")
             eq(builds, ["template-builder"], "one build, on the worker")
+            before = len([name for name, _t, _b in calls if name == "reload"])
+            panel.refresh()                                  # after a run / a project or system switch
+            ok(_pump(root, lambda: len(builds) == 2, 5) and len([n for n, _t, _b in calls if n == "reload"]) > before,
+               "the Files tab's refresh reloads the builder - it re-reads the config and rebuilds, on its worker")
+            gate.set()
+            ok(_pump(root, lambda: applied[-1:] == [mode._request]), "…and its result comes back")
+            del builds[1:]
             gate.clear()
             mode.reload()
             ok(_pump(root, lambda: len(builds) == 2, 5), "a Reload rebuilds the Database")
@@ -266,7 +273,7 @@ def test_the_session_works_off_the_tk_thread():
             ok(_pump(root, lambda: len(builds) == 3 and applied and applied[-1] == mode._request),
                f"…it waits for the build, then rebuilds once more ({builds})")
             reloads = [(on_tk, busy) for name, on_tk, busy in calls if name == "reload"]
-            eq(reloads, [(False, 0), (False, 0)], "each Reload ran on the worker, never during a build")
+            eq(reloads, [(False, 0)] * 3, "each reload (the refresh's + two ↻) ran on the worker, never during a build")
             last = max(i for i, call in enumerate(calls) if call[0] == "reload")
             eq([name for name, _on_tk, _busy in calls[last + 1:] if name == "check"], ["check"],
                "the check queued before that Reload was skipped - one check, against the reloaded rules")

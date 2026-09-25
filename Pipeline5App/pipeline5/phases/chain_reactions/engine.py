@@ -344,7 +344,7 @@ def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
                 os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
                 with open(path, "a", encoding="utf-8") as handle:  # APPEND is the only mode (user decision)
                     handle.write(text + "\n")
-            except OSError as error:                               # e.g. a `"` a quoted tag rendered in
+            except OSError as error:                               # e.g. a file held open, a permission
                 return [_f(rule.phase, "rx_file_write", f"cannot write {path!r}: {error.strerror or error}",
                            rule.name)]
         tally["created"] += text.count("\n") + 1

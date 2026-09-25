@@ -61,6 +61,28 @@ def test_has_blocking_raw_guard():
     ok(not run.has_blocking([Finding(phase=520, type="x", severity="WARN", detail="z")]), "WARN does not")
 
 
+def test_halting_is_the_gates_decision_read_only():
+    """`halting` - what the template builder asks (C-025) - is `gate`'s own decision over every
+    (severity, treatment) pair, the finding that halts named, and it never writes the registry (the
+    gate reconciles it; a preview must not)."""
+    for severity in ("FAIL", "WARN", "INFO"):
+        for treatment in ("", "fail", "warn", "info", "ignore"):
+            fs = [Finding(phase=300, type="t", severity=severity, detail=f"{severity}-{treatment}")]
+            with tempfile.TemporaryDirectory() as d:
+                path = os.path.join(d, "em.csv")
+                apply_and_reconcile(fs, path)
+                set_treatment(fs[0].uid, treatment, path)
+                with open(path, "rb") as handle:
+                    before = handle.read()
+                halt = run.halting(fs, path)
+                with open(path, "rb") as handle:
+                    eq(handle.read(), before, f"{severity}/{treatment!r}: nothing written")
+                _lines, sink = _sink()
+                eq(halt is not None, not run.gate(fs, sink, label="x", registry_path=path),
+                   f"{severity}/{treatment!r}: halting agrees with the gate")
+                eq(halt, fs[0] if halt is not None else None, "…naming the finding")
+
+
 def test_render_never_halts_no_halt_line():
     # render is for WARN-only projection phases (400/510): apply treatments + render, but never a halt line
     fs = [Finding(phase=400, type="if_signal_not_mirrored", severity="WARN", detail="not mirrored")]
@@ -82,5 +104,6 @@ if __name__ == "__main__":
         ("gate_downgrade_unhalts", test_gate_downgrade_unhalts),
         ("gate_escalate_halts", test_gate_escalate_halts),
         ("has_blocking_raw_guard", test_has_blocking_raw_guard),
+        ("halting_is_the_gates_decision_read_only", test_halting_is_the_gates_decision_read_only),
         ("render_never_halts_no_halt_line", test_render_never_halts_no_halt_line),
     ]))

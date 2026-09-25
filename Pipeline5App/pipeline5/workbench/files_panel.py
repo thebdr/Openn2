@@ -88,7 +88,8 @@ class FilesPanel(ttk.Frame):
     def refresh(self) -> None:
         """(Re)build the section tree from `self.sections` (`{title, roots, include, exclude}` dicts -
         the compiled files_tab config). A section with no matching file shows '(empty)'. Called on
-        construction, after each phase run, and on a project switch."""
+        construction, after each phase run, and on a project / system switch - an open template mode
+        reloads then too."""
         self.tree.delete(*self.tree.get_children())
         self._paths.clear()
         for section in self.sections:
@@ -99,6 +100,8 @@ class FilesPanel(ttk.Frame):
                     count += self._insert(node, child)
             if count == 0 and section.get("roots"):
                 self.tree.insert(node, "end", text="(empty)")
+        if self._template is not None:    # a run or a project / system switch changed what a fire gets:
+            self._template.reload()       # the open builder re-reads the config + rebuilds (on its worker)
 
     def _insert(self, parent, node) -> int:
         """Insert one files_view node (and its children) under `parent`; returns the count of FILE nodes

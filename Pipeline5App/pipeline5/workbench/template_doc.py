@@ -723,7 +723,7 @@ class Session:
 
     def base(self, hook: str, leg=None):
         """The Database `hook`'s fire gets from the run-plan's own input (1 above) on the main leg or
-        `leg` - None when database-less, when the run halts before the hook, or when it cannot be built
+        `leg` - None when database-less, when the run stops before the hook, or when it cannot be built
         (the run's own staging would fail there: a halt too - noted). Built once per session; slow for a
         big project."""
         from pipeline5.phases.chain_reactions import engine
@@ -752,7 +752,8 @@ class Session:
             return self._bases[key]
 
     def halt(self, hook: str, leg=None):
-        """Why the run halts before `hook` fires on that leg (None = it fires)."""
+        """Why the run stops before `hook` fires on that leg - a halt, a downgraded raw FAIL, a Database
+        that cannot be built (None = it fires)."""
         self.base(hook, leg)
         with self._lock:
             return self._halts.get((hook, leg))
@@ -796,7 +797,9 @@ class Session:
                         write=False)
                     if deferred is not None:
                         self.notes += [n for n in engine.settle_view(database, deferred) if n not in self.notes]
-            database, _problems = engine.cascade(self.rules, rule, database, templates=templates, params=self.params)
+            if not self.params_problem:                   # (unreadable params block every rule: no spawns)
+                database, _problems = engine.cascade(self.rules, rule, database, templates=templates,
+                                                     params=self.params)
             while len(self._views) >= _VIEW_CACHE:
                 self._views.pop(next(iter(self._views)))
             self._views[key] = (database, engine.db_layer(database))
@@ -848,7 +851,7 @@ class Session:
         halt = self.halt(rule.fire_when)
         if halt:                                          # the main leg never fires: nothing it would report
             placed = place(doc, engine.lint(doc.templates, None, None, hooks)) + [
-                Placed(None, None, f"the run halts before {rule.fire_when} fires - {halt}", "warning", "rule")]
+                Placed(None, None, f"the run stops before {rule.fire_when} fires - {halt}", "warning", "rule")]
         else:
             placed = place(doc, engine.lint(doc.templates, rule, self.view(rule, doc.templates)[0], hooks))
         seen = {(p.start, p.end, p.message) for p in placed}
@@ -892,7 +895,7 @@ class Session:
         halt = self.halt(rule.fire_when)
         if halt:
             firing = [leg for leg in self.legs.get(rule.fire_when, {}) if not self.halt(rule.fire_when, leg)]
-            return "\n".join(lines + [f"the run halts before {rule.fire_when} fires - {halt}",
+            return "\n".join(lines + [f"the run stops before {rule.fire_when} fires - {halt}",
                                       "(no fire, so nothing to preview)"] +
                              [f"note: the {leg} leg fires {rule.fire_when} all the same, over its own Database - "
                               "its problems are in the problems list ('on the ... leg')" for leg in firing])

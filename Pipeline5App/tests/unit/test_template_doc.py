@@ -261,11 +261,15 @@ def test_the_session_models_the_run_plan():
             eq(broken.base("after_300"), None, "a Database that cannot be built")
             ok(any("cannot be built" in note for note in broken.notes), f"…is noted: {broken.notes}")
             text = broken.preview_text(doc, broken.rules[2], 0)
-            ok(text.startswith("the run halts before after_300 fires - its Database cannot be built (division by "
+            ok(text.startswith("the run stops before after_300 fires - its Database cannot be built (division by "
                                "zero)") and "rx_unknown_table" not in text and "does NOT match" not in text,
                f"a Database that cannot be built stops the run: no findings of a fire that never happens: {text!r}")
             eq([(p.severity, p.label) for p in broken.check(doc, broken.rules[2])], [("warning", "rule")],
                "…the check says so, once")
+            missing = td.Session(None, rows=rules[:2] + [{**rules[2], "source_table": "nope"}], hooks=hooks, params={})
+            text = missing.preview_text(doc, missing.rules[2], 0)
+            ok("rx_unknown_table" in text and "does NOT match" not in text,
+               f"a fire that stops BEFORE the condition is not called a 'no match': {text!r}")
             ok(any("declares no reaction hooks" in note for note in td.Session(None, rows=rules, hooks={}, params={}).notes),
                "a system that declares no hooks is noted")
             elsewhere = td.Session(os.path.join(sandbox, "other.yaml"), rows=rules, hooks=hooks, params={})
@@ -363,6 +367,16 @@ def test_unreadable_params_block_as_the_fire_blocks():
                 seen = both.view(both.rules[1], doc.templates)[0]
                 eq([(r["rule"], r["outcome"]) for r in seen["chain_reactions_log"]], [("hdr", "rx_params_unreadable")],
                    "the before_300 settled into after_300's Database: its dry fire blocked, as the run's is")
+                spawning = later + [{"name": "S", "fire_when": "after_300", "source_table": "src", "condition": "",
+                                     "action": "add_rows", "target": "dst", "template": "rows"},
+                                    {"name": "D", "fire_when": "after_300", "source_table": "dst", "condition": "",
+                                     "action": "file", "target": "d.txt", "template": "t"}]
+                src = Table("src", columns=["uid", "name"], key_columns=["name"])
+                src.add(name="N1")
+                cascade = td.Session(None, rows=spawning, hooks={"before_300": None, "after_300": lambda system: Database(
+                    [src, Table("dst", columns=["uid", "label", "spawned_by", "source_uid"], key_columns=["label"])])})
+                eq(cascade.row_count(cascade.rules[3], {"rows": [{"label": "L-{$name}"}], "t": "x"}), 0,
+                   "a blocked fire spawns nothing: no cascade over params that do not load")
             finally:
                 config.database_dir = original_dir
     finally:

@@ -227,16 +227,20 @@ def run_risky_index(ctx, only=None):
 
 
 def _gated(database, findings, leg: str):
-    """The run-plan's gate over a staging's findings - the treatments registry applied, READ-ONLY (the
-    real gate also reconciles the registry file; a preview must not write) - raising WouldNotFire when
-    it would halt: after_300 then never fires."""
+    """What `run_staging` decides before its after_300 fire, READ-ONLY: the gate (`gate.halting` - the
+    host gate's own decision, the treatments registry applied, without its reconcile write), then the
+    raw-FAIL guard (a blocking finding the registry downgraded: staging proceeds, the reactions do not).
+    Either raises WouldNotFire - after_300 never fires."""
+    from pipeline5.findings import gate as run
     from pipeline5.findings import severity
-    from pipeline5.findings import treatments
     from pipeline5.phases.chain_reactions.engine import WouldNotFire
-    applied = treatments.apply(findings, treatments.load())
-    if treatments.should_halt(applied):
-        first = next(f for f, effective in applied if effective in severity.HALTING)
-        raise WouldNotFire(f"{leg} halts on {first.type}: {first.detail} - after_300 never fires")
+    halt = run.halting(findings)
+    if halt is not None:
+        raise WouldNotFire(f"{leg} halts on {halt.type}: {halt.detail}")
+    if run.has_blocking(findings):
+        first = next(f for f in findings if f.severity in severity.HALTING)
+        raise WouldNotFire(f"{leg} has a blocking {first.type} the treatments downgraded ({first.detail}) - "
+                           "the reactions never run on a raw FAIL")
     return database
 
 
@@ -280,10 +284,12 @@ def run_staging(ctx, only=None):
     + findings come back DEFERRED and are settled into the staged record) and `after_300` over the
     freshly staged database. With no configured rules both are strict no-ops. A HALTED staging
     commits no reaction record: the deferred before_300 firings are listed in the log instead
-    (their findings were already rendered)."""
+    (their findings were already rendered). So does a blocking finding the registry DOWNGRADED: staging
+    proceeds, the reactions do not - the raw-FAIL guard every generation phase applies."""
     from pipeline5 import config
     from pipeline5.phases.chain_reactions import engine as reactions
     from pipeline5.phases.staging import iolist as staging
+    from pipeline5.findings import gate as run
     ctx.status("staging…")
     deferred, rx = reactions.fire("before_300", None, hooks=_REACTION_HOOKS)
     if rx:
@@ -302,12 +308,22 @@ def run_staging(ctx, only=None):
             ctx.emit("INFO", f"  before_300 reaction {row['rule']}: {row['outcome']} "
                              f"({row['created']} created) - not recorded, staging halted")
         return
-    settled = reactions.settle(database, deferred)   # before_300's audit + findings join the staged record
-    if settled:                                       # (a record that cannot load/save is reported)
-        ctx.render(settled, label="before_300 reactions")
-    database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS)
-    if rx:
-        ctx.render(rx, label="after_300 reactions")
+    if run.has_blocking(findings):
+        # downgraded in the registry: staging proceeds, but the reactions never run on a raw FAIL (the
+        # generation guard of every phase) - nothing settled, nothing fired, so an empty no-I/O-sheet
+        # Database is never saved over the record either
+        for row in getattr(deferred, "log_rows", ()):
+            ctx.emit("INFO", f"  before_300 reaction {row['rule']}: {row['outcome']} "
+                             f"({row['created']} created) - not recorded, a raw FAIL")
+        ctx.emit("WARN", "  after_300 reactions: a blocking staging finding is downgraded in the registry, but "
+                         "the reactions never run on a raw FAIL - fix it")
+    else:
+        settled = reactions.settle(database, deferred)   # before_300's audit + findings join the staged record
+        if settled:                                   # (a record that cannot load/save is reported)
+            ctx.render(settled, label="before_300 reactions")
+        database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS)
+        if rx:
+            ctx.render(rx, label="after_300 reactions")
     signals = database["signals"]
     suffix = "  (I/O List only - run 320 for the C&E)" if only == 310 else ""
     ctx.emit("RSLT", f"  staged {len(signals)} signals{suffix} "

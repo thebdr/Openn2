@@ -47,7 +47,10 @@
 # A single brace that opens or closes no hole is an error - so is a brace INSIDE a hole (a regex
 # quantifier: write /\d\d/, not /\d{2}/).
 # A rule fires only on a hook the system's run-plan fires (Siemens: before_300 / after_300) -
-# any other hook is reported as rx_unfired_hook.
+# any other hook is reported as rx_unfired_hook. after_300 also fires on the 310 Stage I/O List button,
+# over the I/O List ALONE: no C&E values, and no validation_issues table unless a before_300 rule's
+# record was settled in - write a rule that works on both, or expect a finding on 310. No reaction runs
+# on a raw staging FAIL, even one the treatments downgrade.
 #
 # The expression scope: the matched row's fields, {$_params...} (project params, dotted),
 # {$_rule.name}/{$_rule.hook}, and every SSOT table for @for queries + expr data functions.

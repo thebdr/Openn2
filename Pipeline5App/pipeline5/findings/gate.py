@@ -43,6 +43,14 @@ def render(findings, log_append, *, registry_path: str | None = None) -> None:
     _render(treatments.apply_and_reconcile(findings, registry_path), log_append)
 
 
+def halting(findings, registry_path: str | None = None):
+    """The first finding whose EFFECTIVE severity halts (the treatment registry applied) - else None:
+    exactly `gate`'s decision (it computes the same `apply(load())` before it reconciles), READ-ONLY - a
+    preview must not write the registry. The template builder's hook loaders ask it (C-025)."""
+    applied = treatments.apply(findings, treatments.load(registry_path))
+    return next((finding for finding, effective in applied if effective in severity.HALTING), None)
+
+
 def has_blocking(findings) -> bool:
     """True iff any finding's RAW (pre-treatment) severity halts - the build-side guard so a phase never
     WRITES its BuilderData output on a raw FAIL (a buggy registry can't trick it into writing)."""

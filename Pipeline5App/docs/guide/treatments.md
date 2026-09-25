@@ -12,12 +12,13 @@ and the detail text. The severities:
 When a finding is formally right but wrong for THIS project (a naming rule the customer overrides,
 say), give it a **treatment**: right-click the finding in the **Findings** tab (or the `[LEVEL]` link
 in the log) and pick the effective severity - `fail`, `error`, `warn`, `skip`, or `ignore`. A
-treatment can downgrade a FAIL so the phase proceeds, or escalate a WARN into a halting FAIL.
+treatment can downgrade a FAIL so the phase proceeds, or escalate a WARN into a halting FAIL. A
+downgrade lets the phase go on, but nothing is GENERATED from a raw FAIL: the generation phases write
+no output and the chain reactions do not run - fix the source.
 
 Treatments are keyed by the finding's content hash, so they survive re-runs and document revisions
-that don't change the finding itself. They live in
-[config_project/user_input/error_management.csv](src://config_project/user_input/error_management.csv) -
-a project-owned file; review it like code.
+that don't change the finding itself. They live in `config_project/shared/user_input/finding_treatments.csv`
+(the open project's own - the app writes it on the first run) - a project-owned file; review it like code.
 
 ## Where findings go
 

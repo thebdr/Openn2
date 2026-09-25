@@ -219,11 +219,14 @@ class System:
     reaction_hooks: dict = field(default_factory=dict)  # {hook: None | callable(system) -> Database}, in
                                          # FIRING order: the chain-reaction hooks the run-plan fires + the
                                          # Database each one gets (None = none staged yet), rebuilt in memory
-                                         # - the template builder previews a rule against it (C-025)
+                                         # through the run-plan's own decision (gate.halting, then the raw-FAIL
+                                         # guard) - engine.WouldNotFire when the run stops before the hook - the
+                                         # template builder previews a rule against it (C-025)
     reaction_legs: dict = field(default_factory=dict)   # {hook: {leg label: callable(system) -> Database}} -
                                          # OTHER run-plan legs firing the same hook over a different Database
-                                         # (Siemens after_300: the 310 Stage-I/O-List leg, no C&E) - the
-                                         # builder lints each rule against them too (C-025)
+                                         # (Siemens after_300: the 310 Stage-I/O-List leg, no C&E) - each built
+                                         # like a hook's loader (its leg's gate; WouldNotFire) - the builder
+                                         # lints each rule against them too (C-025)
     template_language: str = ""          # the langs.json key of the language this system's TEXT templates
                                          # generate - the template builder's base highlight ("" = none)
 

@@ -515,9 +515,27 @@ def test_the_builder_lints_every_leg_that_fires_after_300():
     from pipeline5.workbench import template_doc
     rules = [["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
              ["issues", "after_300", "", "", "file", "rx/issues.txt", "issues_txt", ""]]
-    templates = "issues_txt: |-\n  @for $i in validation_issues: ISSUE {$i.type}\n  END {$nme}\n"
+    templates = ("issues_txt: |-\n  @for $i in validation_issues: ISSUE {$i.type}\n  END {$nme}\n"
+                 "hdr_txt: |-\n  HEADER\n")
     params = config.load_params()
     previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:           # + a before_300 rule: its settle attaches the
+        _rules_project(project, params, rules + [["hdr", "before_300", "", "", "file", "rx/hdr.txt", "hdr_txt",
+                                                  ""]], templates)  # record - validation_issues included
+        config.use_project(project)
+        try:
+            session = template_doc.Session(None)
+            doc = template_doc.parse(templates)
+            leg = [p for p in session.check(doc, session.rules[0]) if p.message.startswith("on the ")]
+            eq(leg, [], "after a before_300 settle the 310 leg HAS validation_issues (the record attached)")
+            host = _Host()
+            SYSTEM.handlers["staging"](host.ctx(), only=310)
+            fired = [f.detail for batch in host.rendered for f in batch
+                     if getattr(f, "type", "") == "rx_bad_template" and f.location == "issues"]
+            ok(fired and "validation_issues" not in fired[0] and "$nme" in fired[0],
+               f"…and the real 310 fire loops it (it stops at the missing field): {fired}")
+        finally:
+            config.use_project(previous_project)
     with tempfile.TemporaryDirectory() as project:
         _rules_project(project, params, rules, templates)
         config.use_project(project)
@@ -528,7 +546,7 @@ def test_the_builder_lints_every_leg_that_fires_after_300():
             placed = session.check(doc, rule)
             leg = [p for p in placed if p.message.startswith("on the 310 Stage I/O List leg: ")]
             eq([(p.severity, doc.text[p.start:p.end]) for p in leg], [("error", "validation_issues")],
-               f"the 310 leg rejects the loop table, located ({[p.message for p in placed]})")
+               f"with no settle the 310 leg rejects the loop table, located ({[p.message for p in placed]})")
             eq([(p.severity, doc.text[p.start:p.end]) for p in placed if not p.message.startswith("on the ")],
                [("error", "$nme")], "the full staging accepts the loop - the missing field (every leg's) once")
             ok("the 310 Stage I/O List leg also fires after_300" in session.preview_text(doc, rule, 0),
@@ -543,11 +561,14 @@ def test_the_builder_lints_every_leg_that_fires_after_300():
 
 
 def test_the_builder_gates_as_the_run_plan_does():
-    """C-025 refute round 2 (#3): the builder halted on a staging finding's RAW severity; the run-plan
-    halts on its severity after the treatments registry. A FAIL the operator treated 'warn' showed
-    false errors on every after_300 rule (the fire runs), and a WARN treated 'fail' previewed a fire
-    that never happens. Both directions agree with the real run now - and a halt is said as a halt,
-    not as the rx_unknown_table errors of a fire that never runs."""
+    """C-025 refute round 2 (#3) + the implications check: the builder halted on a staging finding's RAW
+    severity, the run-plan on its severity after the treatments registry - and the run-plan then let
+    the reactions fire on a raw FAIL the operator DOWNGRADED (every generation phase refuses one; with
+    no I/O sheet it saved an empty Database over the record). Now: a WARN escalated to 'fail' halts
+    the run; a FAIL downgraded to 'warn' lets staging proceed but the reactions never run on it; an
+    untreated WARN fires. The builder agrees in each case - and a stop is said as a stop, not as the
+    rx_unknown_table errors of a fire that never runs; the 310 leg (no second staging pass) fires in
+    all three, and is checked."""
     from pipeline5.findings.finding import Finding
     from pipeline5.phases.staging import iolist
     from pipeline5.workbench import template_doc
@@ -557,13 +578,16 @@ def test_the_builder_gates_as_the_run_plan_does():
     templates = "sig_txt: |-\n  SIG {$mnemonic}\ntypo_txt: |-\n  T {$mnemonc}\n"
     params = config.load_params()
     previous_project = config.active_project()
-    real_dups = iolist._dup_type_index_findings        # (called by the C&E pass only - not on the 310 leg)
-    cases = [(Finding(phase=300, type="stg_dup_type_index", severity="FAIL", detail="duplicated PEC index 7",
-                      location="IoList!AD12"), "warn", False),
-             (Finding(phase=300, type="stg_dup_signal_uid", severity="WARN", detail="duplicated signal uid",
-                      location="IoList!AD13"), "fail", True)]
+    real_dups = iolist._dup_type_index_findings        # (the full staging's second pass only - not on 310)
+    dup = Finding(phase=300, type="stg_dup_type_index", severity="FAIL", detail="duplicated PEC index 7",
+                  location="IoList!AD12")
+    uid = Finding(phase=300, type="stg_dup_signal_uid", severity="WARN", detail="duplicated signal uid",
+                  location="IoList!AD13")
+    cases = [(dup, "warn", False, "staging (300) has a blocking stg_dup_type_index the treatments downgraded"),
+             (uid, "fail", True, "staging (300) halts on stg_dup_signal_uid"),
+             (uid, "", False, None)]
     try:
-        for finding, treatment, halts in cases:
+        for finding, treatment, halts, stop in cases:
             iolist._dup_type_index_findings = lambda table, _f=finding: real_dups(table) + [_f]
             treatments.write(treatments.registry_path(),
                              {finding.uid: treatments.Treatment(uid=finding.uid, treatment=treatment, type=finding.type)})
@@ -587,26 +611,77 @@ def test_the_builder_gates_as_the_run_plan_does():
                 finally:
                     config.use_project(previous_project)
             eq(host.halted, halts, f"{label}: the real run {'halts' if halts else 'runs'}")
-            eq(bool(session.halt("after_300")), halts, f"{label}: the builder agrees")
+            eq(bool(written), stop is None, f"{label}: the reactions {'fire' if stop is None else 'do not fire'}")
+            eq(session.halt("after_300") is None, stop is None, f"{label}: the builder agrees")
+            skipped = [m for level, m in host.lines if level == "WARN" and "never run on a raw FAIL" in m]
+            eq(bool(skipped), not halts and stop is not None, f"{label}: the run says the reactions were skipped")
             fired310 = [f.detail for batch in host310.rendered for f in batch
                         if getattr(f, "type", "") == "rx_bad_template" and f.location == "typo"]
             ok(not host310.halted and fired310 and "$mnemonc" in fired310[0],
-               f"{label}: the 310 leg (no C&E pass) fires all the same - and rejects the typo ({fired310})")
-            if halts:
+               f"{label}: the 310 leg fires all the same - and rejects the typo ({fired310})")
+            if stop is not None:
                 eq([(p.severity, p.label) for p in placed], [("warning", "rule")], f"{label}: one note, no errors")
-                ok(placed[0].message.startswith("the run halts before after_300 fires - staging (300) halts on "
-                                                "stg_dup_signal_uid"), placed[0].message)
-                ok(shown.startswith("the run halts before after_300 fires") and "APPEND" not in shown, shown)
+                ok(placed[0].message.startswith(f"the run stops before after_300 fires - {stop}"), placed[0].message)
+                ok(shown.startswith("the run stops before after_300 fires") and "APPEND" not in shown, shown)
                 ok("note: the 310 Stage I/O List leg fires after_300 all the same" in shown, "…the 310 leg still fires")
-                eq(written, [], f"{label}: …and the fire wrote nothing")
                 eq([(p.severity, p.message.split(" - ")[0]) for p in typo_placed][1:],
                    [("error", "on the 310 Stage I/O List leg: missing field $mnemonc")],
-                   f"{label}: the halt note, then the 310 leg's own check ({[p.message for p in typo_placed]})")
+                   f"{label}: the stop note, then the 310 leg's own check ({[p.message for p in typo_placed]})")
             else:
                 eq(placed, [], f"{label}: no false errors")
                 eq(shown.split("\n")[1], written[0], f"{label}: the preview is the fire's first line")
     finally:
         iolist._dup_type_index_findings = real_dups
+
+
+def test_a_downgraded_no_io_sheet_never_saves_over_the_record():
+    """The implications check (item 1), the data-loss case: with no I/O sheet matched, staging returns an
+    EMPTY Database and a raw FAIL. Downgraded in the registry, the gate let the run on - and the
+    after_300 fire (any rule) saved that empty Database over signals.csv. The reactions never run on a
+    raw FAIL now: the saved record keeps its rows (the audit too - a before_300 firing is listed, not
+    recorded), and the builder says the run stops there."""
+    from pipeline5.phases.staging import iolist
+    from pipeline5.workbench import template_doc
+    rules = [["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
+             ["per_signal", "after_300", "signals", "", "file", "rx/sig.txt", "sig_txt", ""],
+             ["hdr", "before_300", "", "", "file", "rx/hdr.txt", "sig_txt", ""]]
+    templates = "sig_txt: |-\n  SIG {$_rule.name}\n"
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _rules_project(project, params, rules, templates)
+        config.use_project(project)
+        try:
+            SYSTEM.handlers["staging"](_Host().ctx())                  # a good run: signals.csv saved
+            saved = os.path.join(config.database_dir(), "signals.csv")
+            before = len(_read_csv(saved))
+            ok(before > 0, f"the good run saved {before} signals")
+            audit = os.path.join(config.database_dir(), "chain_reactions_log.csv")
+            with open(audit, "rb") as handle:
+                recorded = handle.read()
+            broken = dict(params, iolist_params=dict(params["iolist_params"], sheets=["NoSuchSheet"]))
+            _database, findings = iolist.stage_iolist(broken, save=False)
+            eq([f.type for f in findings], ["stg_no_io_sheet"], "the probe's staging finds no I/O sheet")
+            treatments.write(treatments.registry_path(), {findings[0].uid: treatments.Treatment(
+                uid=findings[0].uid, treatment="warn", type=findings[0].type)})
+            real_load = config.load_params
+            config.load_params = lambda path=None: broken
+            try:
+                session = template_doc.Session(None)
+                stop = session.halt("after_300")
+                host = _Host()
+                SYSTEM.handlers["staging"](host.ctx())
+            finally:
+                config.load_params = real_load
+            eq(host.halted, False, "the downgraded FAIL lets the run on")
+            eq(len(_read_csv(saved)), before, "…yet signals.csv keeps its rows - nothing saved over it")
+            with open(audit, "rb") as handle:
+                eq(handle.read(), recorded, "…and the audit is untouched")
+            ok(any(level == "INFO" and "before_300 reaction hdr: ok (1 created) - not recorded, a raw FAIL" in m
+                   for level, m in host.lines), "the before_300 firing is listed, not recorded")
+            ok(stop and "has a blocking stg_no_io_sheet the treatments downgraded" in stop, f"the builder: {stop}")
+        finally:
+            config.use_project(previous_project)
 
 
 def test_spawns_are_saved_beside_a_ragged_record():
@@ -745,6 +820,8 @@ if __name__ == "__main__":
         ("the_builder_lints_every_leg_that_fires_after_300",
          _sandboxed(test_the_builder_lints_every_leg_that_fires_after_300)),
         ("the_builder_gates_as_the_run_plan_does", _sandboxed(test_the_builder_gates_as_the_run_plan_does)),
+        ("a_downgraded_no_io_sheet_never_saves_over_the_record",
+         _sandboxed(test_a_downgraded_no_io_sheet_never_saves_over_the_record)),
         ("spawns_are_saved_beside_a_ragged_record", _sandboxed(test_spawns_are_saved_beside_a_ragged_record)),
         ("a_blank_range_end_invents_nothing_on_the_real_fixture",
          _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),

@@ -86,8 +86,8 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   that). For `after_300` the builder runs the run's own steps, in memory - nothing is saved or
   written:
   - staging itself, over your current source documents, through the run's gate - your finding
-    treatments applied (a big project takes a moment; the preview says so while it builds, and the
-    editor stays live meanwhile);
+    [treatments](guide://treatments) applied (a big project takes a moment; the preview says so while it
+    builds, and the editor stays live meanwhile);
   - the `before_300` rules fired dry - every step but writing their files - and their audit rows
     and findings settled into the record, as the run settles them;
   - the hook's earlier `add_rows` rules, spawning as they do in a run.
@@ -102,14 +102,16 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   - project params that do not load (the fire blocks every rule of the hook: `rx_params_unreadable`).
 
   When staging would HALT the run (a FAIL your treatments do not lift) - or cannot run at all (a
-  source document that will not open) - the builder says the run halts before `after_300` fires:
-  there is no fire to check or preview.
+  source document that will not open) - the builder says the run stops before `after_300` fires:
+  there is no fire to check or preview. So it does for a FAIL your treatments DOWNGRADE: staging then
+  goes on, but the reactions never run on a raw FAIL (as no phase generates from one).
 
   Another button may fire the same hook over a different Database: the **310 Stage I/O List**
-  button fires `after_300` over the I/O List alone (no C&E values, no `validation_issues` table).
-  Each rule is checked against every such leg too; a problem only that leg has reads
-  "on the 310 Stage I/O List leg: ...". The legs halt separately: when the full staging halts on a
-  C&E finding, the 310 leg still fires - and is still checked.
+  button fires `after_300` over the I/O List alone - no C&E values, and no `validation_issues` table
+  unless a `before_300` rule's record was settled in. Each rule is checked against every such leg too;
+  a problem only that leg has reads "on the 310 Stage I/O List leg: ...". The legs stop separately:
+  when the full staging stops on a finding only its second pass raises (a duplicate (script_type,
+  index)), the 310 leg still fires - and is still checked.
 - **Preview.** Shows what ONE fire of the rule would do for that row: the text it would append (and
   where), or the rows it would spawn, or the problem it would report. Nothing is written. When a
   row does not match the rule's condition, the preview says so and still renders (a problem it shows
@@ -128,4 +130,5 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
 
 **↻ Reload rules + data** re-reads the rules and rebuilds the hook databases - after editing the
 rules, the params, the treatments or the source documents. A build that was still running when you
-clicked is discarded, never shown.
+clicked is discarded, never shown. The Files tab reloads it for you after a run and on a project or
+system switch.
