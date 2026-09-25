@@ -1,0 +1,35 @@
+{
+  "clause": "C-025",
+  "command": "bash Pipeline5App/scripts/verify_c025.sh",
+  "commandArgv": [
+    "bash",
+    "Pipeline5App/scripts/verify_c025.sh"
+  ],
+  "exitCode": 0,
+  "outputSha": "bf0f429f8abfa3a0e0d1b9d4a3230ad62a3c4b54dcc50589701d95bdc6585f41",
+  "outputTail": "  -> 4/4 passed\r\n\r\n== siemens_main_handlers ==\r\n  PASS  run_plan_executes_end_to_end\r\n  PASS  staging_fires_reaction_hooks\r\n  PASS  configured_rules_fire_through_the_real_run_plan\r\n  PASS  halted_staging_lists_the_deferred_trail_and_records_nothing\r\n  PASS  a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten\r\n  PASS  a_cascade_within_one_hook_through_the_real_run_plan\r\n  PASS  the_builder_models_what_the_after_300_fire_gets\r\n  PASS  spawns_are_saved_beside_a_ragged_record\r\n  PASS  a_blank_range_end_invents_nothing_on_the_real_fixture\r\n  PASS  310_leg_appends_reaction_findings_to_the_existing_record\r\n  PASS  sub_phase_dispatch\r\n  -> 11/11 passed",
+  "ranAt": "2026-09-25T22:03:37.812Z",
+  "headCommit": "6ee6288d4f1933b872fac288d7bb04b674cc184c",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_template_builder.py",
+      "file": "Pipeline5App/tests/unit/test_template_builder.py",
+      "fileSha": "e4705ad12e071f2c28cc483d34c7bdce544d7e90444209cde30ea17ace082316"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_template_doc.py",
+      "file": "Pipeline5App/tests/unit/test_template_doc.py",
+      "fileSha": "a5d155f89f9da1cb931d22e237ab674abc7e84a04697a50c1d18c480c6e01e35"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_gui_template_mode.py",
+      "file": "Pipeline5App/tests/unit/test_gui_template_mode.py",
+      "fileSha": "b554d6cc0b2318a69252c73446b2679b54ea488a761862342103902f427053b7"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "fileSha": "2b27bdb574f228d2fd99e08c36f2293bb39a5fa570cda5ed357cae480c5b96f2"
+    }
+  ]
+}
