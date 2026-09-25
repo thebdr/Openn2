@@ -303,6 +303,33 @@ def test_indented_directives():
        "indented directives work; literal lines keep their indentation")
 
 
+def test_literal_braces():
+    """P-012 user decision (2026-09-25): a brace is written DOUBLED - `{{` / `}}` render ONE literal
+    brace (the Python format-string rule), so a TIA pragma can be written in a text template (C-024
+    refuter round 10: `{ S7_Optimized_Access := 'TRUE' }` was unwritable - it parsed as a hole).
+    Scanned left to right: `{{{$x}}}` is a literal brace around a hole, `{{$x}}` the literal text
+    `{$x}`. Any OTHER single brace is a located error - an extra `}` or an unclosed `{` is a typo,
+    never silently copied (it used to be)."""
+    eq(_render('FUNCTION_BLOCK "FB"\n{{ S7_Optimized_Access := \'TRUE\' }}', {}),
+       'FUNCTION_BLOCK "FB"\n{ S7_Optimized_Access := \'TRUE\' }', "a pragma line")
+    eq(_render("{{ Name := '{$name}' }}", {"name": "B1"}), "{ Name := 'B1' }", "a hole inside a pragma")
+    eq(_render("{{{$x}}}|{{$x}}|{$x}}}|}}{{", {"x": "v"}), "{v}|{$x}|v}|}{", "left to right, Python's pairing")
+    eq(_render("@for $i in 1..2: {{ X{$i} := {$i} }}", {}), "{ X1 := 1 }\n{ X2 := 2 }", "an inline @for body")
+    eq(_render('@if $k = "a"\n  {{ A }}\n@else\n  {{ B }}\n@end', {"k": "b"}), "  { B }", "inside a block")
+    db = {"signals": [{"tag": "P1"}]}
+    eq(_render("@for $r in signals: {{ $r.tagg }} {$r.tag}", {"_db": db}), "{ $r.tagg } P1",
+       "a doubled-brace literal is NOT a hole - the loop-column check does not read it")
+    for typo, column in (("A {$x}} B", 7), ("{{$x}", 5), ("a { b", 3), ("{ {$x} }", 1),
+                         (r"{extract($x, /(\d{2})$/)}", 1)):       # a regex quantifier inside a hole (P-015)
+        try:
+            _render("ok\n" + typo, {"x": "v"})
+            ok(False, f"{typo!r} must raise")
+        except TempemplatorError as error:
+            eq(error.line, 2, f"{typo!r} is located")
+            ok(f"column {column}" in error.message and "doubled" in error.message, f"…and explained: {error.message}")
+    raises(TempemplatorError, lambda: _render("@for $r in signals: {$r.tag}}", {"_db": db}))   # inside a table loop
+
+
 def test_shipped_worked_examples_render():
     """The three REFERENCE templates shipped in the Siemens chain_reactions/templates.yaml are the
     VBA Tempemplator worked examples - they must render for real (the authoring manual is executable)."""
@@ -334,5 +361,6 @@ if __name__ == "__main__":
         ("if_else_and_lazy_branches", test_if_else_and_lazy_branches),
         ("errors_locate_true_template_lines", test_errors_locate_true_template_lines),
         ("indented_directives", test_indented_directives),
+        ("literal_braces", test_literal_braces),
         ("shipped_worked_examples_render", test_shipped_worked_examples_render),
     ]))

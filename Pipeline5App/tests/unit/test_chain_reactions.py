@@ -635,6 +635,39 @@ def test_the_e1_scope_as_conditions_sources_and_row_templates_see_it():
     _sandboxed(body)()
 
 
+def test_doubled_braces_in_row_values_and_targets():
+    """P-012 (user decision 2026-09-25): the literal-brace rule is the SAME wherever a template renders -
+    a row template's values (a JSON cell `{{"of": "{$name}"}}`) and a file target go through
+    tempemplator.render_text, like the text lines; a lone brace there is a template finding with
+    nothing spawned or written."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            database, findings = engine.fire("after_300", _db(), rules=[_rule()],
+                                             templates={"rows": [{"label": '{{"of": "{$name}"}}'}]},
+                                             params={}, files_root=out_root)
+            eq(findings, [], "clean")
+            eq([r["label"] for r in database["dst"]], ['{"of": "D1"}', '{"of": "D2"}'], "a JSON literal row value")
+            _, findings = engine.fire("after_300", _db(),
+                                      rules=[_rule(action="file", target="{{x}}_{$name}.txt", template="txt")],
+                                      templates={"txt": "{{ P := '{$name}' }}"}, params={}, files_root=out_root)
+            eq(findings, [], "clean")
+            eq(sorted(os.listdir(out_root)), ["{x}_D1.txt", "{x}_D2.txt"], "the target's doubled braces")
+            with open(os.path.join(out_root, "{x}_D1.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "{ P := 'D1' }\n", "…and the text template's pragma")
+            database, findings = engine.fire("after_300", _db(), rules=[_rule()],
+                                             templates={"rows": [{"label": "{$name}}"}]}, params={},
+                                             files_root=out_root)
+            eq([x.type for x in findings], ["rx_bad_template"], "a lone brace in a row value")
+            ok("doubled" in findings[0].detail, "…explained")
+            eq(list(database["dst"]), [], "…nothing spawned")
+            _, findings = engine.fire("after_300", _db(),
+                                      rules=[_rule(action="file", target="{$name}}.txt", template="txt")],
+                                      templates={"txt": "x"}, params={}, files_root=out_root)
+            eq([x.type for x in findings], ["rx_bad_template"], "a lone brace in a file target")
+            eq(sorted(os.listdir(out_root)), ["{x}_D1.txt", "{x}_D2.txt"], "…nothing new written")
+    _sandboxed(body)()
+
+
 def test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook():
     """U3 (the orchestrator's mutation check): a malformed rule on a hook the run-plan never fires can
     never be recorded at its own hook - so it is an INDEX problem, recorded even by a hook that has no
@@ -1033,6 +1066,7 @@ if __name__ == "__main__":
         ("round_13_colon_target_and_utf8_text", test_round_13_colon_target_and_utf8_text),
         ("the_e1_scope_as_conditions_sources_and_row_templates_see_it",
          test_the_e1_scope_as_conditions_sources_and_row_templates_see_it),
+        ("doubled_braces_in_row_values_and_targets", test_doubled_braces_in_row_values_and_targets),
         ("undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook",
          test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook),
         ("unreadable_rules_file_is_recorded_not_just_rendered",

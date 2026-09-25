@@ -40,6 +40,11 @@
 # (e.g. on node rows) - so guard them: `@if present($r.type.type_id)` / `coalesce($x.key, "0")`.
 # A ROW template or a file target has no @if: filter such rows in the rule's `condition` instead.
 # Predicates (@if, where, conditions) are lenient: a misspelled name there just reads blank.
+# A LITERAL brace is written DOUBLED - in text lines, row values and file targets alike: `{{`
+# renders `{`, `}}` renders `}`. A TIA pragma is `{{ S7_Optimized_Access := 'TRUE' }}`, a hole
+# still works inside one (`{{ Name := '{$name}' }}`), and `{{{$x}}}` is a brace around a hole.
+# A single brace that opens or closes no hole is an error - so is a brace INSIDE a hole (a regex
+# quantifier: write /\d\d/, not /\d{2}/).
 # A rule fires only on a hook the system's run-plan fires (Siemens: before_300 / after_300) -
 # any other hook is reported as rx_unfired_hook.
 #

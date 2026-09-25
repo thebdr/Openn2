@@ -276,7 +276,7 @@ def _spawn_rows(rule: Rule, matched: list, database, templates: dict,
         scope = _scope(row, rule, params, db_tables)
         for row_spec in templates[rule.template]:
             try:
-                values = {str(name): expr.render(str(tpl), scope, mode="strict")
+                values = {str(name): tempemplator.render_text(str(tpl), scope)
                           for name, tpl in row_spec.items()}
             except ExprError as error:
                 return [_f(rule.phase, "rx_bad_template", f"row template {rule.template!r}: {error}", rule.name)]
@@ -295,7 +295,7 @@ def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
     for row in matched:
         scope = _scope(row, rule, params, db_tables)
         try:
-            path = expr.render(rule.target, scope, mode="strict")
+            path = tempemplator.render_text(rule.target, scope)
             text = tempemplator.render_template(rule.template, templates, scope)
         except (ExprError, TempemplatorError) as error:
             return [_f(rule.phase, "rx_bad_template", str(error), rule.name)]

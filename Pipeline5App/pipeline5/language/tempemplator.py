@@ -42,6 +42,13 @@ THE GRAMMAR (line-based; a directive line's own indentation is consumed, body li
                                          VALUES are never evaluated)
     anything else                        a literal line - {expr} holes rendered STRICT
 
+LITERAL BRACES (user decision 2026-09-25 - a TIA pragma needs them): a brace is written DOUBLED, the
+Python format-string rule - `{{` renders `{`, `}}` renders `}` (`{{ S7_Optimized_Access := 'TRUE' }}`,
+`{{ Name := '{$name}' }}`, and `{{{$x}}}` = a literal brace around a hole). A `{...}` with no brace
+inside is a hole; any OTHER single brace is a located error (an extra `}` or an unclosed `{` is a
+typo - never silently copied). The rule is one scanner (`_scan`), shared by the text lines, the
+@for range ends, and - via `render_text` - the engine's row-template values and file targets.
+
 WHAT "STRICT" CATCHES (refuter round 6, resolved against C-002): a missing TOP-LEVEL field, and -
 inside a TABLE loop - a `$row.column` naming no column of that table (a SCHEMA check - the columns
 are every key its rows carry; the reaction engine hands over rows carrying every DECLARED column:
@@ -150,10 +157,12 @@ def _check_loop_columns(line: str, template: str, line_no: int, schemas: dict) -
     """The table-loop SCHEMA check: a `$var.column` hole whose `$var` is an active loop variable must
     name a column of that loop's table (a range var has none). Only the FIRST level is a column -
     deeper keys live inside a JSON cell and stay optional (C-002)."""
-    for body in _HOLE.findall(line):
-        for path in expr.hole_paths(body) or ():            # PARSED: a data-function predicate's row
-            head, _dot, rest = path.partition(".")          # column / a let-bound name is not a loop
-            if rest and head in schemas:                    # row's column (refuter round 9)
+    for kind, start, end in _scan(line):                   # the SAME holes the render sees (a doubled-
+        if kind != "hole":                                  # brace literal is no hole; a lone brace is
+            continue                                        # the render's error)
+        for path in expr.hole_paths(line[start + 1:end - 1]) or ():   # PARSED: a data-function
+            head, _dot, rest = path.partition(".")          # predicate's row column / a let-bound name
+            if rest and head in schemas:                    # is not a loop row's column (refuter round 9)
                 column = rest.split(".", 1)[0]
                 if column not in schemas[head]:
                     known = ", ".join(sorted(schemas[head])) or "none - a range variable is a number"
@@ -162,13 +171,64 @@ def _check_loop_columns(line: str, template: str, line_no: int, schemas: dict) -
                                             f"{column!r} (columns: {known})")
 
 
+def _scan(text: str):
+    """The ONE brace scanner, LEFT TO RIGHT (a blind replace breaks `{{{$x}}}`): yields (kind, start,
+    end) runs covering `text` - "hole" = a `{...}` with no brace inside (expr's hole shape), "brace" =
+    a doubled `{{` / `}}` (ONE literal brace), "lone" = a single brace that opens or closes no hole (an
+    authoring error), "text" = everything else. Braces pair LEFT TO RIGHT, as in a Python format
+    string: `{{$x}}` is the literal text `{$x}`, `{{{$x}}}` a literal brace around a hole."""
+    i = start = 0
+    while i < len(text):
+        ch = text[i]
+        if ch not in "{}":
+            i += 1
+            continue
+        if i > start:
+            yield "text", start, i
+        hole = _HOLE.match(text, i)                         # (anchored on a `{` - None at a `}`)
+        if text.startswith(ch * 2, i):
+            yield "brace", i, i + 2
+            i += 2
+        elif hole:
+            yield "hole", i, hole.end()
+            i = hole.end()
+        else:
+            yield "lone", i, i + 1
+            i += 1
+        start = i
+    if start < len(text):
+        yield "text", start, len(text)
+
+
+def _lone_brace(text: str, at: int) -> ExprError:
+    brace = text[at]
+    return ExprError(f"a lone {brace!r} at column {at + 1} of {text!r} - write a literal brace doubled "
+                     f"({brace * 2!r}); a {{hole}} cannot contain a brace")
+
+
+def render_text(text: str, ctx: dict) -> str:
+    """ONE line / value rendered the Tempemplator way: `{{` / `}}` literal braces + STRICT `{expr}`
+    holes, each hole rendered on its own (a literal brace can never pair up into a hole). Raises
+    expr's ExprError. The engine's row-template values and file targets render through this too -
+    the brace rule is the same wherever a template renders."""
+    out = []
+    for kind, start, end in _scan(text):
+        if kind == "lone":
+            raise _lone_brace(text, start)
+        if kind == "hole":
+            out.append(expr.render(text[start:end], ctx, mode="strict"))
+        else:
+            out.append(text[start] if kind == "brace" else text[start:end])
+    return "".join(out)
+
+
 def _render_line(line: str, template: str, line_no: int, ctx: dict, schemas: dict) -> str:
     """A literal line: render its {expr} holes STRICT (a missing field / bad expr is an authoring
-    error the engine must surface as a finding, never a silent blank)."""
+    error the engine must surface as a finding, never a silent blank); `{{` / `}}` are literal braces."""
     try:
         if schemas:
             _check_loop_columns(line, template, line_no, schemas)
-        return expr.render(line, ctx, mode="strict")
+        return render_text(line, ctx)
     except TempemplatorError:
         raise                                               # already located (the column check)
     except ExprError as error:

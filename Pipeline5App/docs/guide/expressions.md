@@ -49,5 +49,12 @@ with `present(...)` / `coalesce(...)`. In a chain-reaction `@for $row in <table>
 must name a real column of that table. Predicates (conditions, `where`, `@if`) stay lenient: a
 misspelled name there simply reads blank. A malformed `/regex/` is always reported as an error.
 
+In the chain-reaction templates (text lines, row-template values and file targets) a **literal
+brace is written doubled**: `{{ S7_Optimized_Access := 'TRUE' }}` renders the TIA pragma
+`{ S7_Optimized_Access := 'TRUE' }`, a hole still works inside it (`{{ Name := '{$name}' }}`), and
+`{{{$x}}}` puts a brace around a hole. A single brace that opens or closes no hole is an error, and
+so is a brace inside a hole (write a regex quantifier out: `/\d\d/`, not `/\d{2}/`). The other
+templates keep copying a stray brace verbatim.
+
 The full syntax reference lives at the top of
 [pipeline5/language/expr/\_\_init\_\_.py](src://pipeline5/language/expr/__init__.py).
