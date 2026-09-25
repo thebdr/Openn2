@@ -481,6 +481,50 @@ def test_a_condition_failing_at_evaluation_is_a_bad_condition():
     _sandboxed(body)()
 
 
+def test_round_10_evidence_holes():
+    """Refuter round 10's evidence holes (the code held; nothing pinned it):
+    (a) a FILE rule naming a ROW template is rx_bad_template BEFORE any matching - with zero matches
+        the renderer never runs, so only the pre-check catches it (round 6's B4 class);
+    (b) `_db` is rebuilt after a PARTIALLY failed spawn too - the rows it did create are real;
+    (c) record load/save failures of OTHER exception classes (a directory where the CSV should be; a
+        full disk) are the same located findings - never a crash."""
+    import errno
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            _, findings = engine.fire("after_300", _db(),
+                                      rules=[_rule(action="file", condition='$kind = "none"', target="x.txt")],
+                                      templates=_ROW_TPL, params={}, files_root=out_root)
+            eq([x.type for x in findings], ["rx_bad_template"], "(a) wrong kind caught with zero matches")
+            src = Table("src", columns=["uid", "n"], key_columns=["n"])
+            for n in ("1", "2", "inf"):
+                src.add(n=n)
+            dst = Table("dst", columns=["uid", "label"], key_columns=["label"])
+            spawn = _rule(name="spawn", condition="", template="rows")
+            read = _rule(name="read", action="file", source_table="", condition="", target="c.txt", template="txt")
+            _, findings = engine.fire("after_300", Database([src, dst]), rules=[spawn, read],
+                                      templates={"rows": [{"label": "x{$n:03d}"}], "txt": "{count(dst)}"},
+                                      params={}, files_root=out_root)
+            eq([x.type for x in findings], ["rx_bad_template"], "(b) the spawn failed on 'inf'…")
+            with open(os.path.join(out_root, "c.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "2.0\n", "…yet the later rule saw the TWO rows it created")
+        issues_path = os.path.join(sandbox, "validation_issues.csv")
+        if os.path.exists(issues_path):
+            os.remove(issues_path)                                         # (the earlier fires saved one)
+        os.mkdir(issues_path)                                              # (c) an OSError on READ
+        _, findings = engine.fire("after_300", Database([Table("src", columns=["uid"], key_columns=["uid"])]),
+                                  rules=[_rule(source_table="nope")], templates=_ROW_TPL, params={})
+        eq([x.type for x in findings], ["rx_unknown_table", "rx_record_unreadable"], "(c) unreadable: a directory")
+        os.rmdir(os.path.join(sandbox, "validation_issues.csv"))
+        full = _db()
+
+        def disk_full(directory):
+            raise OSError(errno.ENOSPC, "No space left on device")
+        full.save = disk_full
+        _, findings = engine.fire("after_300", full, rules=[_rule()], templates=_ROW_TPL, params={})
+        eq([x.type for x in findings], ["rx_record_unwritable"], "(c) unwritable: a full disk")
+    _sandboxed(body)()
+
+
 def test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook():
     """U3 (the orchestrator's mutation check): a malformed rule on a hook the run-plan never fires can
     never be recorded at its own hook - so it is an INDEX problem, recorded even by a hook that has no
@@ -874,6 +918,7 @@ if __name__ == "__main__":
         ("record_attaches_atomically_and_spawns_survive_a_ragged_record",
          test_record_attaches_atomically_and_spawns_survive_a_ragged_record),
         ("a_condition_failing_at_evaluation_is_a_bad_condition", test_a_condition_failing_at_evaluation_is_a_bad_condition),
+        ("round_10_evidence_holes", test_round_10_evidence_holes),
         ("undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook",
          test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook),
         ("unreadable_rules_file_is_recorded_not_just_rendered",
