@@ -216,15 +216,9 @@ def _iterate(spec: str, template: str, line_no: int, ctx: dict, schemas: dict) -
             return list(range(ends[0], ends[1] + 1)), frozenset()
         except (OverflowError, MemoryError) as error:       # `1..1e308` (refuter round 9)
             raise TempemplatorError(template, line_no, f"range too large to iterate: {spec!r}") from error
-    words = spec.split(None, 1)
-    table = words[0].strip()
-    pred = ""
-    if len(words) > 1:
-        rest = words[1].strip()
-        if not rest.lower().startswith("where"):
-            raise TempemplatorError(template, line_no,
-                                    f"@for iterable must be `a..b` or `<table> [where <pred>]`, got {spec!r}")
-        pred = rest[5:].strip()
+    words = spec.split(None, 1)                             # `<table> [where <pred>]` - the shape is
+    table = words[0].strip()                                # grammar-checked by _check_directive
+    pred = words[1].strip()[5:].strip() if len(words) > 1 else ""
     tables = ctx.get("_db") or {}
     if table not in tables:
         raise TempemplatorError(template, line_no,
@@ -274,8 +268,28 @@ def _check_directive(raw: str, word: str, template: str, line_no: int) -> None:
         raise TempemplatorError(template, line_no, "@if needs a condition")
     if word == "@use" and not rest:
         raise TempemplatorError(template, line_no, "@use needs a template name")
-    if word == "@for" and _FOR_HEAD.match(_split_top(rest, ":")[0].strip()) is None:
-        raise TempemplatorError(template, line_no, "@for needs `$var in <a>..<b> | <table> [where <pred>]`")
+    if word == "@for":
+        spec, inline = _split_top(rest, ":")
+        head = _FOR_HEAD.match(spec.strip())
+        if head is None:
+            raise TempemplatorError(template, line_no, "@for needs `$var in <a>..<b> | <table> [where <pred>]`")
+        iterable = head.group(2).strip()
+        if _split_top(iterable, "..")[1] is None:            # the TABLE form
+            words = iterable.split(None, 1)
+            if len(words) > 1:
+                tail = words[1].strip()
+                if not tail.lower().startswith("where"):
+                    raise TempemplatorError(template, line_no, f"@for iterable must be `a..b` or "
+                                            f"`<table> [where <pred>]`, got {iterable!r}")
+                if not tail[5:].strip():                     # a dangling `where` - not "every row"
+                    raise TempemplatorError(template, line_no, "a `where` needs a predicate")
+        if inline is not None:
+            body = inline.strip()
+            if not body:
+                raise TempemplatorError(template, line_no, "@for inline `:` with an empty body")
+            inner = _line_word(body)
+            if inner:                                        # an inline body that is itself a directive
+                _check_directive(body, inner, template, line_no)
 
 
 def _scan_block(lines, start, template, opener_line, *, want_else: bool, base: int = 0):
@@ -284,25 +298,33 @@ def _scan_block(lines, start, template, opener_line, *, want_else: bool, base: i
     depth-1 @else is reported (and only when `want_else` - a @for block admits none). `base` is
     the slice's offset into the TEMPLATE, so error lines are template-absolute. Every directive
     line it passes is GRAMMAR-checked (never evaluated)."""
-    depth, else_at, j = 1, None, start
+    # one entry per OPEN block, innermost last: [kind, else_seen, line] - the structure is checked at
+    # EVERY depth (refuter round 13: a misplaced @else in a NESTED block of an untaken branch passed)
+    stack = [["@if" if want_else else "@for", False, opener_line]]
+    else_at, j = None, start
     while j < len(lines):
         word = _line_word(lines[j])
+        line_no = base + j + 1
         if word:
-            _check_directive(lines[j], word, template, base + j + 1)
+            _check_directive(lines[j], word, template, line_no)
         if _opens_block(lines[j]):
-            depth += 1
-        elif word == "@else" and depth == 1:
-            if not want_else:
-                raise TempemplatorError(template, base + j + 1, "@else inside a @for block")
-            if else_at is not None:
-                raise TempemplatorError(template, base + j + 1, "a second @else in one @if")
-            else_at = j
+            stack.append([word, False, line_no])
+        elif word == "@else":
+            kind, seen, _line = stack[-1]
+            if kind != "@if":
+                raise TempemplatorError(template, line_no, "@else inside a @for block")
+            if seen:
+                raise TempemplatorError(template, line_no, "a second @else in one @if")
+            stack[-1][1] = True
+            if len(stack) == 1:
+                else_at = j
         elif word == "@end":
-            depth -= 1
-            if depth == 0:
+            stack.pop()
+            if not stack:
                 return else_at, j
         j += 1
-    raise TempemplatorError(template, opener_line, "block never closed (@end missing)")
+    kind, _seen, line = stack[-1]                            # the INNERMOST unclosed block is the culprit
+    raise TempemplatorError(template, line, f"block never closed (the {kind} here has no @end)")
 
 
 def _render_block(lines, i, template, templates, ctx, stack, schemas, base: int = 0):
@@ -347,13 +369,8 @@ def _render_block(lines, i, template, templates, ctx, stack, schemas, base: int 
 
             if word == "@for":
                 spec, inline = _split_top(rest, ":")
-                head = _FOR_HEAD.match(spec.strip())
-                if head is None:
-                    raise TempemplatorError(template, line_no,
-                                            "@for needs `$var in <a>..<b> | <table> [where <pred>]`")
+                head = _FOR_HEAD.match(spec.strip())            # grammar-checked by _check_directive above
                 var, iterable_spec = head.group(1), head.group(2).strip()
-                if inline is not None and not inline.strip():
-                    raise TempemplatorError(template, line_no, "@for inline `:` with an empty body")
                 if inline is not None:
                     # the inline body is carved out of THIS physical line - errors point at it
                     body_lines, after, body_base = [inline.strip()], i + 1, base + i

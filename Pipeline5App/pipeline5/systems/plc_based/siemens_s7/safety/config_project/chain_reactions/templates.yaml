@@ -18,12 +18,14 @@
 #
 #   TEXT template (action: file) - a multi-line STRING rendered per matched row and APPENDED to
 #   the rule's target file (append is the ONLY mode - you own the file's lifecycle, e.g. via a
-#   before_<phase> header rule or deleting it between runs). Values are {expr} holes; structure
+#   before_<phase> header rule or deleting it between runs). A ':' in the rendered file NAME is
+#   refused (Windows would hide the text in an NTFS stream) - e.g. a `-X1:3` terminal designation. Values are {expr} holes; structure
 #   is @-directives:
 #       @use <name>                          splice another template here (recursive)
 #       @for $i in 1..{$count}: @use <name>  inclusive range loop (inline body form); a BLANK end
 #                                            (an empty cell) = no iterations at all
-#       @for $row in <table> where <pred>    loop over SSOT rows ({$row.field} inside)
+#       @for $row in <table> where <pred>    loop over SSOT rows ({$row.field} inside; a `where`
+#                                            needs a predicate - leave it out to loop over all rows)
 #       @if <pred> / @else / @end            block conditional - there is NO @elif / `@else if`:
 #                                            nest an @if inside the @else (a slip is an error)
 #   Write a TEXT template as a block scalar (`name: |-` then the indented body, as below): YAML

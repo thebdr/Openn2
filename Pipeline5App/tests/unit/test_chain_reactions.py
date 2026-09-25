@@ -545,6 +545,31 @@ def test_round_12_target_strictness_and_else_if():
     _sandboxed(body)()
 
 
+def test_round_13_colon_target_and_utf8_text():
+    """Refuter round 13: (a) a ':' in a rendered file NAME (an IEC terminal `-X1:3`) wrote into a
+    HIDDEN NTFS alternate data stream - a 0-byte visible file, audited ok. It is rx_file_write now,
+    nothing written; (b) the appended text is UTF-8 (the explicit encoding was an unpinned mutant)."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            src = Table("src", columns=["uid", "kind", "name"], key_columns=["name"])
+            src.add(kind="door", name="=S1+MC1-K1:X1")
+            database, findings = engine.fire("after_300", Database([src]),
+                                             rules=[_rule(action="file", target="scl/{$name}.scl", template="txt")],
+                                             templates={"txt": "x"}, params={}, files_root=out_root)
+            eq([x.type for x in findings], ["rx_file_write"], "(a) a colon in the file name is refused")
+            ok("hidden NTFS stream" in findings[0].detail, "…saying why")
+            eq(os.listdir(out_root), [], "…and NOTHING was written (not even a 0-byte decoy)")
+            eq(_log(database), [("after_300", "r1", 1, 0, "rx_file_write")])
+            _, findings = engine.fire("after_300", _db(),
+                                      rules=[_rule(action="file", target="u.txt", template="txt")],
+                                      templates={"txt": "Δ ±5°C {$name}"}, params={}, files_root=out_root)
+            eq(findings, [], "(b) a clean non-ASCII render")
+            with open(os.path.join(out_root, "u.txt"), "rb") as handle:     # the BYTES decode as UTF-8
+                text = handle.read().decode("utf-8").replace("\r\n", "\n")  # (the platform's newline)
+            ok(text == "Δ ±5°C D1\nΔ ±5°C D2\n", "...written as UTF-8")
+    _sandboxed(body)()
+
+
 def test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook():
     """U3 (the orchestrator's mutation check): a malformed rule on a hook the run-plan never fires can
     never be recorded at its own hook - so it is an INDEX problem, recorded even by a hook that has no
@@ -940,6 +965,7 @@ if __name__ == "__main__":
         ("a_condition_failing_at_evaluation_is_a_bad_condition", test_a_condition_failing_at_evaluation_is_a_bad_condition),
         ("round_10_evidence_holes", test_round_10_evidence_holes),
         ("round_12_target_strictness_and_else_if", test_round_12_target_strictness_and_else_if),
+        ("round_13_colon_target_and_utf8_text", test_round_13_colon_target_and_utf8_text),
         ("undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook",
          test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook),
         ("unreadable_rules_file_is_recorded_not_just_rendered",

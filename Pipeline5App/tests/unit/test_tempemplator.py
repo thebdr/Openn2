@@ -217,6 +217,31 @@ def test_if_else_and_lazy_branches():
         raises(TempemplatorError, lambda: _render(slip, {"x": "2"}, extra={"other": "o"}))
     eq(_render('@if $x = "1"\nA\n@else\n@if $x = "2"\nB\n@end\n@end', {"x": "2"}), "B",
        "the else-if idiom: an @if nested in the @else")
+    # refuter round 13: the same slips one level DEEPER, and the other grammar, in untaken branches
+    for slip in ('@if $x = "1"\n@if $y = "1"\nA\n@elif $y = "2"\nB\n@end\n@end',
+                 '@if $x = "1"\n@if $y = "1"\nA\n@else if $y = "2"\nB\n@end\n@end',
+                 '@if $x = "1"\n@for $i in 1..2\nA\n@end // loop\n@end',
+                 '@if $x = "1"\n@for i in 1..2: A\n@end',                # a malformed @for head
+                 '@if $x = "1"\n@use\n@end',                             # a bare @use
+                 '@if $x = "1"\n@for $r in signals where: A\n@end',      # a dangling `where`
+                 '@if $x = "1"\n@for $i in 1..2: @usee leaf\n@end',      # an inline body's directive
+                 '@if $x = "1"\n@if $y = "1"\nA\n@else\nB\n@else\nC\n@end\n@end'):   # a nested SECOND @else
+        raises(TempemplatorError, lambda: _render(slip, {"x": "0", "y": "0"}))
+    raises(TempemplatorError, lambda: _render("@for $i in 1..{$n}: @usee leaf", {"n": ""}))   # zero iterations too
+    raises(TempemplatorError, lambda: _render("@for $r in signals where: {$r.tag}", {"_db": {"signals": []}}))
+    # a misplaced @else in a NESTED block of an untaken branch (a forgotten inner @end): located at the
+    # @else, never a silently dropped branch
+    misclosed = 'CAB\n@if $swp = "Y"\n@for $s in signals\n  {$s.tag}\n@else\n  // no SWP\n@end\n@end'
+    try:
+        _render(misclosed, {"swp": "N", "_db": {"signals": []}})
+        ok(False, "a nested misplaced @else must raise")
+    except TempemplatorError as error:
+        eq(error.line, 5, "…at the @else line")
+    try:                                                    # and a never-closed block names the INNERMOST
+        _render('@if $x = "1"\nA\n@for $i in 1..2\nB', {"x": "0"})
+        ok(False, "a never-closed block must raise")
+    except TempemplatorError as error:
+        eq(error.line, 3, "…at the unclosed @for, not the outer @if (the author's real slip)")
 
 
 def _error_line(body, ctx, extra=None):

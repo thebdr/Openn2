@@ -56,7 +56,8 @@ the handler's `ctx.render` and recorded (uid-deduplicated) to `validation_issues
     rx_bad_template     the template is missing, the wrong kind for the action, malformed, or fails
                         to render (a strict hole, a template error)
     rx_unknown_table    a source / target table absent at this hook
-    rx_file_write       the rendered target path cannot be written (e.g. a Windows-invalid `"`)
+    rx_file_write       the rendered target path cannot be written (e.g. a Windows-invalid `"`, or a
+                        ':' in the file name - NTFS would hide the text in an alternate data stream)
     rx_rules_unreadable / rx_templates_unreadable / rx_params_unreadable
                         a config file does not load (e.g. a YAML syntax error) - the hook's rules
                         are all blocked, each audited with that outcome
@@ -300,6 +301,10 @@ def _append_file(rule: Rule, matched: list, templates: dict, params: dict,
             return [_f(rule.phase, "rx_bad_template", str(error), rule.name)]
         if not os.path.isabs(path):
             path = os.path.join(files_root, path)
+        if ":" in os.path.splitdrive(os.path.abspath(path))[1]:   # NTFS would write a HIDDEN alternate data
+            return [_f(rule.phase, "rx_file_write",                # stream - silent (refuter round 13: a
+                       f"cannot write {path!r}: a ':' in a file name would write a hidden NTFS stream",
+                       rule.name)]                                 # `-X1:3` terminal name)
         try:
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
             with open(path, "a", encoding="utf-8") as handle:      # APPEND is the only mode (user decision)
