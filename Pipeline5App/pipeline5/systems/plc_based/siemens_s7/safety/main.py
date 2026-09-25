@@ -226,17 +226,21 @@ def run_risky_index(ctx, only=None):
                      f"{os.path.basename(res['output_path'])}{backup}. REVIEW the _RiskyIndex sheet.")
 
 
-def _staged_database():
-    """The Database `after_300` sees on a full staging (300/320): staging's own tables (`staged_database`
-    - declared once) + the findings record its C&E pass writes (validation_issues), re-read from the
-    SSOT dir - the last staged state. (The 310-only leg records no findings, so its fire sees no
-    validation_issues - a rule looping over that table would report it missing there.)"""
-    from pipeline5 import config
-    from pipeline5.findings.finding import validation_issues_table
+def _staged_database(system):
+    """The Database `after_300` gets on a full staging (300/320): STAGING ITSELF, run in memory over the
+    current source documents - nothing saved. Not the Database/ folder: every later phase re-stages
+    and re-saves it (520 even writes values back), and the next run re-stages from the documents.
+    A staging that halts (a blocking FAIL, e.g. no I/O sheet) raises - after_300 would not fire. The
+    310-only leg stages no C&E, so its fire sees no validation_issues. What happens between staging
+    and the fire - a before_300 with business settled in (its record attached), and the in-hook
+    cascade - the builder models from the rules (template_doc.Session)."""
+    from pipeline5.findings import gate as run
     from pipeline5.phases.staging import iolist as staging
-    database = staging.staged_database(config.load_column_map("IoList"))
-    database.add_table(validation_issues_table())
-    return database.load(config.database_dir())
+    database, findings = staging.stage(system=system, save=False)
+    if run.has_blocking(findings):
+        first = next((f for f in findings if f.severity == "FAIL"), findings[0])
+        raise RuntimeError(f"staging halts ({first.type}: {first.detail}) - after_300 would not fire")
+    return database
 
 
 # Every chain-reaction hook THIS run-plan fires, in firing order -> the Database it sees (None: nothing

@@ -1,5 +1,5 @@
-"""The templates.yaml EDITING MODEL behind the Files tab's template mode (P-012) - Tk-free and tested;
-src://pipeline5/workbench/files_panel.py is the view over it.
+"""The templates.yaml EDITING MODEL behind the Files tab's template mode (C-025) - Tk-free and tested;
+src://pipeline5/workbench/template_mode.py is the view over it.
 
 A `chain_reactions/templates.yaml` is ONE YAML mapping of named templates: a TEXT template (a block
 scalar - the `file` action) or a ROW template (a list of {field: template} maps - `add_rows`). This
@@ -8,20 +8,29 @@ engine's rx_templates_unreadable) and remembers WHERE every template line and ro
 builder can:
 
     parse(text)                  -> Doc: the engine's view (`templates`) + every scalar's position
-    spans(doc)                   two-layer highlighting - the target language (SCL) UNDER the template
-                                 constructs (@directives, @use references, {holes} with their
-                                 expression tokens, {{ }} literal braces); YAML for the structure
+    spans(doc, language)         two-layer highlighting - the system's target language (its
+                                 `template_language`) UNDER the template constructs (@directives,
+                                 @use references, {holes} and their expression tokens, {{ }} braces);
+                                 YAML for the structure
     place(doc, problems)         the engine's lint problems (engine.lint) -> document offsets + labels
     completions(doc, at, ctx)    what fits at the cursor: the rule's columns, loop vars and _params
-                                 keys after `$`, a loop row's columns after `$var.`, templates after
-                                 `@use`, tables in `@for ... in`, directives after `@`, functions
+                                 keys after `$` (a `where` sees the loop table's columns only), a loop
+                                 row's columns after `$var.`, templates after `@use`, tables in
+                                 `@for ... in`, directives after `@`, functions
+    Session                      the live context: the rules, the Database each hook's fire gets
+                                 (the run-plan modelled - see its docstring), lint + preview
 
-The grammar is never re-derived here: lines are read through the renderer's own views
-(tempemplator.outline / brace_runs / hole_parts - src://pipeline5/language/tempemplator.py).
+POSITIONS are exact for literal blocks (`|`, `|-`, `|+`, with or without an indentation indicator),
+plain scalars and single-line quoted scalars (escapes decoded); a FOLDED block (`>`) or a multi-line
+quoted scalar joins lines, so its positions are approximate. The grammar is never re-derived here:
+lines are read through the renderer's own views (tempemplator.outline / brace_runs / hole_parts /
+use_refs - src://pipeline5/language/tempemplator.py).
 """
 from __future__ import annotations
 
+import os
 import re
+import threading
 from dataclasses import dataclass, field
 
 from pipeline5.language import expr
@@ -52,35 +61,51 @@ _DIRECTIVES = ("@use", "@for", "@if", "@else", "@end")
 
 @dataclass
 class Scalar:
-    """Where one YAML scalar's CONTENT sits: the document offset of each content line's first column.
-    `exact` False = a folded block / a quoted scalar with escapes (positions approximate)."""
+    """Where one YAML scalar's CONTENT sits: the document offset of each content line's first column
+    (`starts`) - or, for a single-line QUOTED scalar, of each of its value's characters (`chars`, the
+    escapes decoded; one more for the end). `exact` False = a folded block / a multi-line quoted
+    scalar (positions approximate)."""
     starts: list
     exact: bool = True
+    chars: list | None = None
 
     def offset(self, line: int, column: int) -> int:
         """(0-based content line, column) -> the document offset."""
+        if self.chars is not None:
+            return self.chars[max(0, min(column, len(self.chars) - 1))]
         return self.starts[max(0, min(line, len(self.starts) - 1))] + max(0, column)
 
     def at(self, index: int, value: str) -> int:
         """A character offset into the scalar's VALUE -> the document offset."""
+        if self.chars is not None:
+            return self.chars[max(0, min(index, len(self.chars) - 1))]
         line = value.count("\n", 0, index)
         return self.offset(line, index - (value.rfind("\n", 0, index) + 1))
+
+    def end(self, value: str) -> int:
+        """The document offset just past the value's LAST non-blank line (a `|` / `|+` block's trailing
+        newlines are not content the document shows as the block's)."""
+        lines = value.split("\n")
+        last = max((k for k, line in enumerate(lines) if line.strip()), default=0)
+        return self.offset(last, len(lines[last])) if self.chars is None else self.chars[-1]
 
 
 @dataclass
 class Entry:
-    name: str
+    name: str                                   # the template's name, as text (YAML may type it: 123)
     kind: str                                   # "text" | "row" | "other"
     key: tuple                                  # (start, end) of the name
     body: Scalar | None = None                  # text: the block's content lines
+    text: str = ""                              # text: the template itself
     values: dict = field(default_factory=dict)  # row: {(entry number, field): Scalar}
+    value_text: dict = field(default_factory=dict)  # row: {(entry number, field): the value}
 
 
 @dataclass
 class Doc:
     text: str
     templates: dict                             # the engine's view ({} when the YAML does not load)
-    entries: dict                               # name -> Entry
+    entries: dict                               # name (text) -> Entry
     error: tuple | None = None                  # (offset, message): the engine's rx_templates_unreadable
 
 
@@ -101,6 +126,7 @@ class Context:
     fields: frozenset | None = None             # the matched row's columns (None = no rule chosen)
     tables: dict | None = None                  # {table: columns} at the rule's hook
     params: dict = field(default_factory=dict)  # the project params ($_params. completion)
+    reach: frozenset | None = None              # the templates the rule renders (None = every one)
 
 
 # --- parse ---------------------------------------------------------------------------------------- #
@@ -111,9 +137,15 @@ def _line_starts(text: str) -> list:
     return starts
 
 
+def _row(text: str, starts: list, index: int) -> str:
+    end = starts[index + 1] if index + 1 < len(starts) else len(text)
+    return text[starts[index]:end].rstrip("\n").rstrip("\r")
+
+
 def parse(text: str) -> Doc:
     """The document as the engine loads it (the safe loader - config.params._read_yaml) + WHERE each
-    template sits (a round-trip parse's line/column marks)."""
+    template sits (a round-trip parse's line/column marks). Names and field keys are kept as TEXT -
+    YAML types `123:` / `true:` keys, the positions must not care."""
     from ruamel.yaml import YAML
     starts = _line_starts(text)
 
@@ -133,17 +165,17 @@ def parse(text: str) -> Doc:
     except Exception:  # noqa: BLE001 - the safe load passed; positions are a convenience
         tree = None
     entries = {}
-    for name, body in templates.items():
-        name = str(name)
-        key_line, key_col = _mark(tree, "key", name)
+    for raw_name, body in templates.items():
+        name = str(raw_name)
+        key_line, key_col = _mark(tree, "key", raw_name)
         key = (offset(key_line, key_col), offset(key_line, key_col) + len(name)) if key_line is not None else (0, 0)
         if isinstance(body, str):
-            line, col = _mark(tree, "value", name)
+            line, col = _mark(tree, "value", raw_name)
             scalar = _scalar(text, starts, line, col, body) if line is not None else None
-            entries[name] = Entry(name, "text", key, body=scalar)
+            entries[name] = Entry(name, "text", key, body=scalar, text=body)
         elif isinstance(body, list):
-            values = {}
-            items = tree.get(name) if tree is not None and hasattr(tree, "get") else None
+            entry = Entry(name, "row", key)
+            items = _child(tree, raw_name)
             for number, spec in enumerate(body, start=1):
                 item = items[number - 1] if items is not None and number - 1 < len(items) else None
                 if not isinstance(spec, dict) or not hasattr(item, "lc"):
@@ -151,12 +183,24 @@ def parse(text: str) -> Doc:
                 for column, value in spec.items():
                     if isinstance(value, str):
                         line, col = _mark(item, "value", column)
+                        entry.value_text[(number, str(column))] = value
                         if line is not None:
-                            values[(number, str(column))] = _scalar(text, starts, line, col, value)
-            entries[name] = Entry(name, "row", key, values=values)
+                            entry.values[(number, str(column))] = _scalar(text, starts, line, col, value)
+            entries[name] = entry
         else:
             entries[name] = Entry(name, "other", key)
     return Doc(text, templates, entries)
+
+
+def _child(tree, key):
+    """The round-trip node under `key` (matched as text - the rt tree may type it differently)."""
+    try:
+        for candidate in tree:
+            if str(candidate) == str(key):
+                return tree[candidate]
+    except Exception:  # noqa: BLE001
+        pass
+    return None
 
 
 def _mark(node, part: str, key) -> tuple:
@@ -170,55 +214,105 @@ def _mark(node, part: str, key) -> tuple:
     return None, None
 
 
+_DQ_ESCAPES = {"0": "\0", "a": "\a", "b": "\b", "t": "\t", "\t": "\t", "n": "\n", "v": "\v", "f": "\f",
+               "r": "\r", "e": "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\", "N": "\x85", "_": "\xa0",
+               "L": " ", "P": " "}
+_DQ_HEX = {"x": 2, "u": 4, "U": 8}
+
+
+def _quoted_chars(text: str, at: int, value: str):
+    """The document offset of each character of a SINGLE-LINE quoted scalar's value (+ one for its
+    end), the raw text decoded as YAML decodes it (`''` in single quotes; the backslash escapes in
+    double quotes). None when that does not reproduce the value (a multi-line, folded scalar)."""
+    quote, chars, decoded, i = text[at], [], [], at + 1
+    while i < len(text):
+        ch = text[i]
+        if ch in "\r\n":
+            return None
+        if ch == quote:
+            if quote == "'" and text.startswith("''", i):
+                chars.append(i)
+                decoded.append("'")
+                i += 2
+                continue
+            break
+        if quote == '"' and ch == "\\":
+            code = text[i + 1:i + 2]
+            if code in _DQ_ESCAPES:
+                chars.append(i)
+                decoded.append(_DQ_ESCAPES[code])
+                i += 2
+                continue
+            width = _DQ_HEX.get(code)
+            if width is None:
+                return None
+            try:
+                decoded.append(chr(int(text[i + 2:i + 2 + width], 16)))
+            except ValueError:
+                return None
+            chars.append(i)
+            i += 2 + width
+            continue
+        chars.append(i)
+        decoded.append(ch)
+        i += 1
+    if "".join(decoded) != value:
+        return None
+    return chars + [i]
+
+
 def _scalar(text: str, starts: list, line: int, col: int, value: str) -> Scalar:
-    """The content position of the scalar whose value starts at (line, col) - a block (`|` exact,
-    `>` folded), a quoted or a plain scalar."""
+    """The content position of the scalar whose value starts at (line, col) - a block (`|` exact, `>`
+    folded), a quoted or a plain scalar."""
     at = starts[min(line, len(starts) - 1)] + col
     lead = text[at:at + 1]
     if lead in ("|", ">"):                      # a block: content from the next line, at its indent
-        count = max(1, len(value.split("\n")))
+        pieces = value.split("\n")
         first = min(line + 1, len(starts) - 1)
         indent = None
-        for index in range(first, len(starts)):
-            row = text[starts[index]:starts[index + 1] if index + 1 < len(starts) else len(text)].rstrip("\n")
-            if row.strip():
-                indent = len(row) - len(row.lstrip(" "))
-                break
+        if lead == "|":                         # read the indent off the DATA (an indentation
+            for k, piece in enumerate(pieces):  # indicator `|2-` keeps extra spaces in the value)
+                if piece.strip() and first + k < len(starts):
+                    row = _row(text, starts, first + k)
+                    if row.endswith(piece):
+                        indent = len(row) - len(piece)
+                    break
+        if indent is None:                      # folded / unmatched: the first non-blank line's indent
+            for index in range(first, len(starts)):
+                row = _row(text, starts, index)
+                if row.strip():
+                    indent = len(row) - len(row.lstrip(" "))
+                    break
         indent = indent or 0
-        lines = [starts[min(first + k, len(starts) - 1)] + indent for k in range(count)]
+        lines = [starts[min(first + k, len(starts) - 1)] + indent for k in range(max(1, len(pieces)))]
         return Scalar(lines, exact=lead == "|")
-    if lead in ("'", '"'):                      # quoted: exact while the raw text IS the value
-        raw = text[at + 1:at + 1 + len(value)]
-        return Scalar([at + 1], exact=raw == value and "\n" not in value)
+    if lead in ("'", '"'):
+        chars = _quoted_chars(text, at, value)
+        return Scalar([at + 1], exact=chars is not None, chars=chars)
     return Scalar([at], exact="\n" not in value)
 
 
 # --- highlighting ----------------------------------------------------------------------------------- #
-def spans(doc: Doc) -> list:
+def spans(doc: Doc, language: str | None = None) -> list:
     """(tag, start, end) over the document, in layering order: YAML for the structure (not inside a
-    text template's body), then the target language (SCL) under each text template, then the
-    template constructs on top (the view raises the tp_/tx_ tags)."""
-    bodies = []
-    out = []
+    text template's body), then the system's target `language` under each text template (a langs.json
+    key - its `template_language`; None = no language layer), then the template constructs on top
+    (the view raises the tp_/tx_ tags)."""
+    bodies = [(entry.body.starts[0], entry.body.end(entry.text)) for entry in doc.entries.values()
+              if entry.kind == "text" and entry.body is not None]
+    out = [(tag, start, end) for tag, start, end in highlight.spans("yaml", doc.text)
+           if not any(low <= start < high for low, high in bodies)]
     for entry in doc.entries.values():
         if entry.kind == "text" and entry.body is not None:
-            body = doc.templates.get(entry.name, "")
-            bodies.append((entry.body.starts[0], entry.body.at(len(body), body)))
-    for tag, start, end in highlight.spans("yaml", doc.text):
-        if not any(low <= start < high for low, high in bodies):
-            out.append((tag, start, end))
-    for entry in doc.entries.values():
-        if entry.kind == "text" and entry.body is not None:
-            body = doc.templates.get(entry.name, "")
-            for tag, start, end in highlight.spans("scl", body):
-                out.append((tag, entry.body.at(start, body), entry.body.at(end, body)))
-            for number, line in enumerate(body.split("\n")):
+            if language:
+                for tag, start, end in highlight.spans(language, entry.text):
+                    out.append((tag, entry.body.at(start, entry.text), entry.body.at(end, entry.text)))
+            for number, line in enumerate(entry.text.split("\n")):
                 for tag, start, end in _line_spans(line):
                     out.append((tag, entry.body.offset(number, start), entry.body.offset(number, end)))
         elif entry.kind == "row":
-            rows = doc.templates.get(entry.name) or []
-            for (number, column), scalar in entry.values.items():
-                value = rows[number - 1][column]
+            for key, scalar in entry.values.items():
+                value = entry.value_text[key]
                 for tag, start, end in _value_spans(value):
                     out.append((tag, scalar.at(start, value), scalar.at(end, value)))
     return out
@@ -271,21 +365,22 @@ def place(doc: Doc, problems) -> list:
         out.append(Placed(start, min(start + 1, len(doc.text)) if doc.text else start, doc.error[1],
                           "error", "templates.yaml"))
     for problem in problems:
-        entry = doc.entries.get(problem.template) if problem.template is not None else None
+        entry = doc.entries.get(str(problem.template)) if problem.template is not None else None
         if entry is None:
             label = "rule" if problem.template is None else str(problem.template)
             out.append(Placed(None, None, problem.message, problem.severity, label))
             continue
         end = max(problem.end, problem.start + 1)
-        if isinstance(problem.where, int) and entry.body is not None:
-            start = entry.body.offset(problem.where - 1, problem.start)
-            stop = entry.body.offset(problem.where - 1, end)
-            label = f"{entry.name} line {problem.where}"
-        elif isinstance(problem.where, tuple) and problem.where in entry.values:
-            value = doc.templates[entry.name][problem.where[0] - 1][problem.where[1]]
-            scalar = entry.values[problem.where]
+        where = problem.where
+        if isinstance(where, int) and entry.body is not None:
+            start = entry.body.offset(where - 1, problem.start)
+            stop = entry.body.offset(where - 1, end)
+            label = f"{entry.name} line {where}"
+        elif isinstance(where, tuple) and (where[0], str(where[1])) in entry.values:
+            key = (where[0], str(where[1]))
+            value, scalar = entry.value_text[key], entry.values[key]
             start, stop = scalar.at(problem.start, value), scalar.at(end, value)
-            label = f"{entry.name} entry {problem.where[0]} {problem.where[1]}"
+            label = f"{entry.name} entry {where[0]} {where[1]}"
         else:
             (start, stop), label = entry.key, entry.name
         out.append(Placed(start, stop, problem.message, problem.severity, label))
@@ -305,7 +400,7 @@ def completions(doc: Doc, at: int, context: Context | None = None) -> tuple:
     found = _locate(doc, at)
     if found is None:
         return at, []
-    entry, number, line, column, line_start = found
+    entry, number, line, column, to_doc = found
     before = line[:column]
     if entry.kind == "text":
         stem = _DIRECTIVE_STEM.match(before)
@@ -314,49 +409,70 @@ def completions(doc: Doc, at: int, context: Context | None = None) -> tuple:
             return at - len(stem.group(1)), [d for d in _DIRECTIVES if d.startswith(word) and d != word]
         stem = _USE_STEM.match(before)
         if stem:
-            names = [n for n, body in doc.templates.items() if isinstance(body, str) and n != entry.name]
+            names = [n for n, e in doc.entries.items() if e.kind == "text" and n != entry.name]
             return at - len(stem.group(1)), _prefixed(stem.group(1), names)
         stem = _TABLE_STEM.match(before)
         if stem:
             word = stem.group(1) or ""
             return at - len(word), _prefixed(word, sorted(context.tables or ()))
-    if not _in_expression(entry, line, column):
+    where_table = _where_table(entry, line, column)
+    if where_table is None and not _in_expression(entry, line, column):
         return at, []
     word, start = _word_before(line, column)
     if not word:
         return at, []
-    loops = _loops_at(doc, entry, number, line, column, context)
-    return line_start + start, _expression_candidates(word, loops, context)
+    if where_table is not None and word.startswith("$"):     # a `where` sees the ROW's columns - only
+        columns = (context.tables or {}).get(where_table) or ()
+        return to_doc(start), [f"${c}" for c in _prefixed(word[1:], list(columns))]
+    loops = _loops_at(entry, number, line, column, context)
+    in_reach = context.reach is None or entry.name in context.reach
+    return to_doc(start), _expression_candidates(word, loops, context, in_reach)
 
 
 def _locate(doc: Doc, at: int):
     """The template text around `at`: (entry, line number or value key, the line's text, the column,
-    the line's document offset) - None outside every template."""
+    a column -> document offset map) - None outside every template. A quoted row value maps through
+    its decoded characters (an escape is two document characters for one value character)."""
     for entry in doc.entries.values():
         if entry.kind == "text" and entry.body is not None:
-            body = doc.templates.get(entry.name, "")
-            for number, line in enumerate(body.split("\n")):
+            for number, line in enumerate(entry.text.split("\n")):
                 start = entry.body.offset(number, 0)
                 if start <= at <= start + len(line):
-                    return entry, number, line, at - start, start
+                    return entry, number, line, at - start, (lambda i, s=start: s + i)
         elif entry.kind == "row":
-            rows = doc.templates.get(entry.name) or []
-            for (number, column), scalar in entry.values.items():
-                value = rows[number - 1][column]
+            for key, scalar in entry.values.items():
+                value = entry.value_text[key]
+                if scalar.chars is not None:          # a quoted value: the cursor maps through its chars
+                    if scalar.chars[0] <= at <= scalar.chars[-1]:
+                        index = max(i for i, offset in enumerate(scalar.chars) if offset <= at)
+                        return entry, key, value, index, (lambda i, c=scalar.chars: c[max(0, min(i, len(c) - 1))])
+                    continue
                 for index, line in enumerate(value.split("\n")):
                     start = scalar.offset(index, 0)
                     if start <= at <= start + len(line):
-                        return entry, (number, column), line, at - start, start
+                        return entry, key, line, at - start, (lambda i, s=start: s + i)
+    return None
+
+
+def _where_table(entry: Entry, line: str, column: int):
+    """The loop TABLE whose `where` predicate holds the cursor (None = not in a `where`)."""
+    if entry.kind != "text":
+        return None
+    parts = _outline_all(line)
+    for index, (role, start, end) in enumerate(parts):
+        if role == "predicate" and start <= column <= end and index and parts[index - 1][0] == "keyword" \
+                and line[parts[index - 1][1]:parts[index - 1][2]].lower() == "where":
+            tables = [line[s:e] for r, s, e in parts[:index] if r == "table"]
+            return tables[-1] if tables else None
     return None
 
 
 def _in_expression(entry: Entry, line: str, column: int) -> bool:
-    """The cursor is inside an expression: an open or closed hole, or an @if / `where` predicate."""
+    """The cursor is inside an expression: an open or closed hole, or an @if predicate."""
     runs = tempemplator.brace_runs(line[:column])
     if runs and runs[-1][0] == "lone" and line[runs[-1][1]] == "{":
         return True                                             # typing inside a hole not yet closed
-    if any(kind == "lone" and line[start] == "{" for kind, start, _end in runs[-2:]) \
-            and runs[-1][0] == "text":
+    if len(runs) >= 2 and runs[-2][0] == "lone" and line[runs[-2][1]] == "{" and runs[-1][0] == "text":
         return True
     if any(kind == "hole" and start < column < end for kind, start, end in tempemplator.brace_runs(line)):
         return True
@@ -386,14 +502,14 @@ def _word_before(line: str, column: int) -> tuple:
     return "", column
 
 
-def _loops_at(doc: Doc, entry: Entry, number, line: str, column: int, context: Context) -> dict:
+def _loops_at(entry: Entry, number, line: str, column: int, context: Context) -> dict:
     """{loop var: its table's columns (None = a range / unknown)} active at the cursor - the enclosing
     block @for loops of this text template + an inline @for on the cursor's own line."""
     loops = {}
     if entry.kind != "text":
         return loops
     stack = []
-    for current in doc.templates.get(entry.name, "").split("\n")[:number]:
+    for current in entry.text.split("\n")[:number]:
         parts = dict((role, (s, e)) for role, s, e in tempemplator.outline(current))
         word = current.strip().split(None, 1)[0].lower() if current.strip().startswith("@") else ""
         if word == "@for" and "body" not in parts:
@@ -420,7 +536,7 @@ def _loop_of(line: str, parts: dict, context: Context):
     return var, (tuple(columns) if columns is not None else None)
 
 
-def _expression_candidates(word: str, loops: dict, context: Context) -> list:
+def _expression_candidates(word: str, loops: dict, context: Context, in_reach: bool) -> list:
     if word.startswith("$"):
         head, dot, rest = word[1:].partition(".")
         if dot:
@@ -439,7 +555,7 @@ def _expression_candidates(word: str, loops: dict, context: Context) -> list:
             else:
                 pool = ()
             return [f"${head}.{c}" for c in _prefixed(rest, list(pool))]
-        names = set(loops) | {"_params", "_rule"} | set(context.fields or ())
+        names = set(loops) | {"_params", "_rule"} | (set(context.fields or ()) if in_reach else set())
         names.discard("_db")
         return [f"${n}" for n in _prefixed(head, sorted(names))]
     pool = list(expr.function_names()) + ["and", "or", "not", "in"] + sorted(context.tables or ())
@@ -451,58 +567,138 @@ def _prefixed(stem: str, pool) -> list:
     return [item for item in pool if str(item).lower().startswith(stem) and str(item).lower() != stem]
 
 
+def reach(templates: dict, start: str) -> frozenset:
+    """The templates a render of `start` splices (itself included) - through @use, transitively."""
+    seen, todo = set(), [start]
+    while todo:
+        name = todo.pop()
+        if name in seen or name not in templates:
+            continue
+        seen.add(name)
+        if isinstance(templates[name], str):
+            todo += [ref for _line, _span, ref in tempemplator.use_refs(templates[name])]
+    return frozenset(str(name) for name in seen)
+
+
 # --- the live session (the view's state, Tk-free) ---------------------------------------------------- #
 def is_templates_file(path: str) -> bool:
     """A chain-reaction templates file - `chain_reactions/templates.yaml` in any tier - opens in the
     template mode."""
-    import os
     parts = os.path.normcase(os.path.abspath(path)).split(os.sep)
     return parts[-1:] == ["templates.yaml"] and parts[-2:-1] == ["chain_reactions"]
 
 
-class Session:
-    """The builder's live context over the ACTIVE config: the compiled rules (reactions.csv), the
-    run-plan's hooks and the Database each one sees (loaded once per hook - `reload()` refreshes),
-    the project params. The view is a thin shell over it: `check` = the lint placed on the document,
-    `preview_text` = one fire for one row, as text."""
+_VIEW_CACHE = 8                                  # cascade views kept per session (templates change)
 
-    def __init__(self):
+
+class Session:
+    """The builder's live context over the ACTIVE config - the compiled rules (reactions.csv), the
+    system's `reaction_hooks`, the project params - and the Database each rule's fire GETS, the
+    run-plan modelled:
+
+      1. the hook's declared loader - the system's own input for it, rebuilt IN MEMORY (Siemens
+         after_300: staging itself, nothing saved) - NOT the Database/ folder, which later phases
+         re-save; it can take a while (`base` runs in the view's worker thread; `loaded` says when);
+      2. a DATABASE-LESS hook fired earlier WITH business is settled into the next database: its
+         reaction record attached (engine.settle_view), as the run-plan's `settle` does;
+      3. the in-hook CASCADE: the rows the hook's earlier add_rows rules spawn (engine.cascade).
+
+    `check` = the lint placed on the document; `preview_text` = one fire for one row, as text, with
+    the notes that matter (this document is not what a fire uses, a staging that would halt, ...)."""
+
+    def __init__(self, path: str | None = None, *, rows=None, hooks=None, params=None):
+        """`rows` / `hooks` / `params` replace what `reload` reads from the active config and system (a
+        test's seam; the view passes only the document's path)."""
+        self.path = path
+        self._given = {"rows": rows, "hooks": hooks, "params": params}
         self.reload()
 
     def reload(self) -> None:
         from pipeline5 import config
+        from pipeline5.config.resolver import find
         from pipeline5.phases.chain_reactions import engine
         from pipeline5.systems import catalog
         self.notes = []                               # what could not load - shown, never raised
+        self.rows_ok = True
         try:
-            rows = config.load_reactions()
+            self.rows = config.load_reactions() if self._given["rows"] is None else list(self._given["rows"])
         except Exception as error:  # noqa: BLE001 - the engine reports rx_rules_unreadable; so do we
-            rows = []
+            self.rows, self.rows_ok = [], False
             self.notes.append(f"reactions.csv does not load: {error}")
-        self.rules, findings = engine.compile_rules(rows)
+        self.rules, findings = engine.compile_rules(self.rows)
         self.notes += [f"{f.type}: {f.detail}" for f in findings]
         active = config.active_system()
-        system = catalog.by_id(active[0]) if active else None
-        self.hooks = dict(getattr(system, "reaction_hooks", None) or {})
+        self.system = catalog.by_id(active[0]) if active else None
+        self.hooks = dict((getattr(self.system, "reaction_hooks", None) or {}) if self._given["hooks"] is None
+                          else self._given["hooks"])
+        self.language = getattr(self.system, "template_language", "") or None
+        if not self.hooks:
+            self.notes.append("the active system declares no reaction hooks (System.reaction_hooks) - "
+                              "nothing to preview against")
         try:
-            self.params = config.load_params()
+            self.params = config.load_params() if self._given["params"] is None else self._given["params"]
         except Exception as error:  # noqa: BLE001
             self.params = {}
             self.notes.append(f"project params do not load: {error}")
-        self._databases = {}
-        self._layers = {}                              # hook -> engine.db_layer (built once)
+        self.active = find("chain_reactions/templates.yaml")
+        self._bases, self._views = {}, {}
+        self._lock = threading.Lock()
 
-    def database(self, hook: str):
-        """The Database `hook` sees (None: database-less, or not loadable - noted)."""
-        if hook not in self._databases:
-            loader = self.hooks.get(hook)
+    # --- the Database a fire gets ---------------------------------------------------------------- #
+    def loaded(self, hook: str) -> bool:
+        """Whether `hook`'s Database is ready (a database-less or undeclared hook always is)."""
+        return self.hooks.get(hook) is None or hook in self._bases
+
+    def base(self, hook: str):
+        """The Database `hook`'s fire gets from the run-plan (1 + 2 above) - None when database-less or
+        not buildable (noted). Built once per session; slow for a big project - call from a worker."""
+        with self._lock:
+            if hook in self._bases:
+                return self._bases[hook]
+        from pipeline5.phases.chain_reactions import engine
+        loader, database = self.hooks.get(hook), None
+        if loader is not None:
             try:
-                self._databases[hook] = loader() if loader else None
-            except Exception as error:  # noqa: BLE001 - e.g. nothing staged yet in this project
-                self._databases[hook] = None
-                self.notes.append(f"the {hook} database does not load: {error}")
-        return self._databases[hook]
+                database = loader(self.system)
+            except Exception as error:  # noqa: BLE001 - e.g. a staging that would halt
+                self.notes.append(f"the {hook} database cannot be built: {error}")
+            else:
+                if self._settled_into(hook):
+                    self.notes += engine.settle_view(database)
+        with self._lock:
+            self._bases.setdefault(hook, database)
+            return self._bases[hook]
 
+    def _settled_into(self, hook: str) -> bool:
+        """A database-less hook fired before `hook` WITH business is settled into the first database
+        after it - the run-plan duty (its reaction record attached before this hook fires)."""
+        from pipeline5.phases.chain_reactions import engine
+        order, pending = list(self.hooks), False
+        for name in order:
+            if name == hook:
+                return pending
+            if self.hooks[name] is None:
+                pending = pending or not self.rows_ok or engine.has_business(name, self.rows, tuple(order))
+            else:
+                pending = False
+        return False
+
+    def view(self, rule, templates: dict) -> tuple:
+        """(the Database `rule` sees at its hook - the base + the earlier rules' in-hook spawns, its
+        `_db` layer); cached per (hook, the earlier spawners' templates)."""
+        from pipeline5.phases.chain_reactions import engine
+        base = self.base(rule.fire_when)
+        earlier = [r for r in self.rules[:self.rules.index(rule)]
+                   if r.fire_when == rule.fire_when and r.action == "add_rows"]
+        key = (rule.fire_when, tuple((r.name, repr(templates.get(r.template))) for r in earlier) if base else ())
+        if key not in self._views:
+            database, _problems = engine.cascade(self.rules, rule, base, templates=templates, params=self.params)
+            while len(self._views) >= _VIEW_CACHE:
+                self._views.pop(next(iter(self._views)))
+            self._views[key] = (database, engine.db_layer(database))
+        return self._views[key]
+
+    # --- the view's questions -------------------------------------------------------------------------- #
     def rule_labels(self) -> list:
         return ["(no rule - the syntax checks only)"] + [
             f"{r.name}  ·  {r.fire_when}  ·  {r.action} -> {r.target}" for r in self.rules]
@@ -511,32 +707,49 @@ class Session:
         """The rule at `index` of `rule_labels()` (0 = no rule)."""
         return self.rules[index - 1] if 1 <= index <= len(self.rules) else None
 
-    def row_count(self, rule) -> int:
-        """How many source rows the rule's hook offers (0: source-less, or no such table there)."""
-        database = self.database(rule.fire_when) if rule is not None else None
-        if rule is None or not rule.source_table or database is None or rule.source_table not in database:
+    def ready(self, rule) -> bool:
+        return rule is None or self.loaded(rule.fire_when)
+
+    def row_count(self, rule, templates: dict) -> int:
+        """How many source rows the rule's fire matches over (0: source-less, or no such table there)."""
+        if rule is None or not rule.source_table:
+            return 0
+        database, _layer = self.view(rule, templates)
+        if database is None or rule.source_table not in database:
             return 0
         return len(database[rule.source_table])
 
-    def context(self, rule) -> Context:
+    def context(self, rule, templates: dict) -> Context:
         """The completion context for `rule` (None: the document alone)."""
         if rule is None:
             return Context(params=self.params)
-        database = self.database(rule.fire_when)
+        database, _layer = self.view(rule, templates)
         tables = {} if database is None else {n: database[n].effective_columns() for n in database.names()}
         fields = None
         if not rule.source_table or rule.source_table in tables:
             fields = frozenset({"_params", "_rule", "_db"} | set(tables.get(rule.source_table, ())))
-        return Context(fields=fields, tables=tables, params=self.params)
+        return Context(fields=fields, tables=tables, params=self.params,
+                       reach=reach(templates, rule.template) if rule.action == "file" else frozenset({rule.template}))
 
     def check(self, doc: Doc, rule) -> list:
         """engine.lint on the document (the rule's context when one is chosen), placed."""
         from pipeline5.phases.chain_reactions import engine
         if doc.error is not None:
             return place(doc, [])
-        database = self.database(rule.fire_when) if rule is not None else None
-        hooks = tuple(self.hooks) or None
-        return place(doc, engine.lint(doc.templates, rule, database, hooks))
+        database = self.view(rule, doc.templates)[0] if rule is not None else None
+        return place(doc, engine.lint(doc.templates, rule, database, tuple(self.hooks) or None))
+
+    def document_note(self) -> str:
+        """A note when this document is NOT the templates.yaml a fire uses (its lint and preview are
+        about this document all the same)."""
+        if not self.path:
+            return ""
+        if not self.active:
+            return "note: no chain_reactions/templates.yaml is active - a fire finds no templates"
+        if os.path.normcase(os.path.abspath(self.path)) != os.path.normcase(os.path.abspath(self.active)):
+            return (f"note: a fire uses {self.active}, NOT this document - the preview renders this "
+                    "document's templates")
+        return ""
 
     def preview_text(self, doc: Doc, rule, row: int) -> str:
         """What ONE fire of `rule` would do for source row `row` (engine.preview), as text."""
@@ -545,21 +758,28 @@ class Session:
             return "Choose a rule to preview what a fire would do for one of its rows."
         if doc.error is not None:
             return "templates.yaml does not load - fix it to preview."
-        database = self.database(rule.fire_when)
-        if rule.fire_when not in self._layers:
-            self._layers[rule.fire_when] = engine.db_layer(database)
+        lines = [note for note in (self.document_note(),) if note]
+        database, layer = self.view(rule, doc.templates)
         shown = engine.preview(rule, row, templates=doc.templates, params=self.params, database=database,
-                               layer=self._layers[rule.fire_when])
-        lines = []
+                               layer=layer, hooks=tuple(self.hooks) or None)
         if shown.note:
             lines.append(shown.note)
-        if not shown.matched and shown.problem is None and not shown.note:
+        if shown.matched is False:
             lines.append("(this row does NOT match the rule's condition - a fire skips it; rendered anyway:)")
         if shown.problem is not None:
             lines.append(f"{shown.problem[0]}: {shown.problem[1]}")
-        if rule.action == "file" and shown.problem is None and not shown.note:
+        elif rule.action == "file" and not shown.note:
             lines += [f"APPEND to {shown.path}:", shown.text]
-        elif shown.rows:
+        if shown.rows:
             lines.append(f"SPAWN into {rule.target}:")
             lines += ["  " + ", ".join(f"{k}={v!r}" for k, v in row_values.items()) for row_values in shown.rows]
+            if database is not None and rule.target in database and self._restaged(rule):
+                lines.append(f"note: later phases re-stage {rule.target} from the source documents - these rows "
+                             "reach the saved Database, not generation (C-024's known boundary)")
         return "\n".join(lines)
+
+    def _restaged(self, rule) -> bool:
+        """Whether the rule's target is a table the hook's declared loader builds (a staged table that
+        later phases rebuild from the documents)."""
+        base = self._bases.get(rule.fire_when)
+        return base is not None and rule.target in base

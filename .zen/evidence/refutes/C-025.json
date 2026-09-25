@@ -1,0 +1,28 @@
+{
+  "clause": "C-025",
+  "verdict": "refuted",
+  "ranAt": "2026-09-25T21:31:28.896Z",
+  "headCommit": "abfd0c7e84c5c483448b2255b6d7f6974b37ba10",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_template_builder.py",
+      "file": "Pipeline5App/tests/unit/test_template_builder.py",
+      "symbolSha": "5a585317bb7c2b206e809cfbbe472614a33f6d66fcccf91af7bc854733ea50ca"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_template_doc.py",
+      "file": "Pipeline5App/tests/unit/test_template_doc.py",
+      "symbolSha": "ec064cb628edaaaeae9fe4acd37f1e741bb90b547b98432da9c33f86936d17a0"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_gui_template_mode.py",
+      "file": "Pipeline5App/tests/unit/test_gui_template_mode.py",
+      "symbolSha": "86dacbb624650c5ce1125de31472b4b85e07781e4861fa9d48b957aeb7b3bf2f"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "symbolSha": "eec0cfd0a3f1d62a9f0b0784676c9d87172273af3479a50a07c1e575c79f4afe"
+    }
+  ]
+}

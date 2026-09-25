@@ -668,10 +668,56 @@ def test_doubled_braces_in_row_values_and_targets():
             # refuter round 17 note 3: holes render one by one, so the message names what failed -
             # the target, or the row template's entry + field
             ok(findings[0].detail.startswith("target '{$name}}.txt': a lone '}'"), f"the target named: {findings[0].detail}")
-            _, findings = engine.fire("after_300", _db(), rules=[_rule()], params={}, files_root=out_root,
-                                      templates={"rows": [{"label": "ok-{$name}"}, {"label": "x", "note": "{$nte}"}]})
+            database, findings = engine.fire("after_300", _db(), rules=[_rule()], params={}, files_root=out_root,
+                                             templates={"rows": [{"label": "ok-{$name}"}, {"label": "x", "note": "{$nte}"}]})
             eq(findings[0].detail, "row template 'rows': entry 2 field 'note': render(strict): missing field "
                                    "$nte in '{$nte}'", "the entry + field named")
+            # refuter round 18 (G2): entry 1 was ADDED before entry 2 rendered - it stays, counted
+            eq([r["label"] for r in database["dst"]], ["ok-D1"], "the spec added before the failure stays")
+            eq(_log(database), [("after_300", "r1", 2, 1, "rx_bad_template")], "…the true partial count")
+            # round 18 (G4): only a failing TARGET is named - a failing template is not blamed on it
+            _, findings = engine.fire("after_300", _db(), params={}, files_root=out_root,
+                                      rules=[_rule(action="file", target="ok.txt", template="txt")],
+                                      templates={"txt": "{$nme}"})
+            eq(findings[0].detail, "template 'txt' line 1: render(strict): missing field $nme in '{$nme}'",
+               "a failing template's detail, no target prefix")
+            # C-025 refute round 1: a spawned field named `self` crashed Table.add(**values) - rx_rule_crashed
+            database, findings = engine.fire("after_300", _db(), rules=[_rule()], params={}, files_root=out_root,
+                                             templates={"rows": [{"label": "s-{$name}", "self": "me"}]})
+            eq(findings, [], "a field named `self` spawns")
+            eq([r.get("self") for r in database["dst"]], ["me", "me"], "…with its value")
+    _sandboxed(body)()
+
+
+def test_the_backstop_holds_at_every_render_site():
+    """Refuter round 18 (G1): an UNFORESEEN exception at the carve-out's catch sites - a row value
+    (`_spawned`) or a file target (`_file_output`) - still reaches the per-rule backstop as
+    rx_rule_crashed (only an ExprError is a template finding), and the spec added before it stays."""
+    def body(sandbox):
+        real, calls = engine.tempemplator.render_text, {"n": 0}
+
+        def flaky(text, ctx):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("flaky")
+            return real(text, ctx)
+
+        engine.tempemplator.render_text = flaky
+        try:
+            database, findings = engine.fire("after_300", _db(), rules=[_rule()], params={},
+                                             templates={"rows": [{"label": "a-{$name}"}, {"label": "b-{$name}"}]})
+            eq([(x.type, x.detail) for x in findings], [("rx_rule_crashed", "RuntimeError: flaky")],
+               "a row value's unforeseen exception")
+            eq(_log(database), [("after_300", "r1", 2, 1, "rx_rule_crashed")], "…audited, the partial count true")
+            eq([r["label"] for r in database["dst"]], ["a-D1"], "…the spec added before it stays")
+            calls["n"] = 1                                   # the next render - the target's - raises
+            with tempfile.TemporaryDirectory() as out:
+                _, findings = engine.fire("after_300", _db(), templates={"txt": "x"}, params={}, files_root=out,
+                                          rules=[_rule(action="file", target="t.txt", template="txt")])
+                eq([x.type for x in findings], ["rx_rule_crashed"], "a target's unforeseen exception")
+                eq(os.listdir(out), [], "…nothing written")
+        finally:
+            engine.tempemplator.render_text = real
     _sandboxed(body)()
 
 
@@ -1074,6 +1120,7 @@ if __name__ == "__main__":
         ("the_e1_scope_as_conditions_sources_and_row_templates_see_it",
          test_the_e1_scope_as_conditions_sources_and_row_templates_see_it),
         ("doubled_braces_in_row_values_and_targets", test_doubled_braces_in_row_values_and_targets),
+        ("the_backstop_holds_at_every_render_site", test_the_backstop_holds_at_every_render_site),
         ("undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook",
          test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook),
         ("unreadable_rules_file_is_recorded_not_just_rendered",

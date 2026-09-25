@@ -159,7 +159,7 @@ def test_staging_fires_reaction_hooks():
     # are the fired ones, in order, each loading exactly the tables (+ declared columns) it saw
     eq(list(SYSTEM.reaction_hooks), [hook for hook, _db in calls], "the declared hooks = the fired ones")
     for hook, loader in SYSTEM.reaction_hooks.items():
-        loaded = None if loader is None else loader()
+        loaded = None if loader is None else loader(SYSTEM)
         eq(None if loaded is None else {name: loaded[name].columns for name in loaded.names()}, seen[hook],
            f"{hook}: the declared Database = the one the fire saw")
     ok("RSLT" in host.levels(), "staging completed with the hooks live")
@@ -352,9 +352,10 @@ def test_a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten():
        "RENDERED twice - by the before_300 settle AND the after_300 fire: neither path is silent")
 
 
-def _spawn_project(project, params):
+def _spawn_project(project, params, header: bool = False):
     """A project whose after_300 rules CASCADE within one hook: the templates.yaml manual's own
-    example (spawn a DIAG signal per `A` row), then a rule that counts and lists those spawns."""
+    example (spawn a DIAG signal per `A` row), then a rule that counts and lists those spawns.
+    `header` adds a before_300 file rule - the run-plan then SETTLES it into the staged database."""
     import csv
     from ruamel.yaml import YAML
     shared = os.path.join(project, "config_project", "shared")
@@ -368,11 +369,12 @@ def _spawn_project(project, params):
             ["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
             ["probe_spawn", "after_300", "signals", '$script_type = "A"', "add_rows", "signals", "diag_rows", ""],
             ["probe_read", "after_300", "", "", "file", "rx/diag.txt", "diag_txt", "reads the spawns"],
-        ])
+        ] + ([["probe_hdr", "before_300", "", "", "file", "rx/hdr.txt", "hdr_txt", "settled"]] if header else []))
     with open(os.path.join(rx_dir, "templates.yaml"), "w", encoding="utf-8") as handle:
         handle.write("diag_rows:\n  - script_type: \"DIAG\"\n    mnemonic: \"DIAG-{$mnemonic}\"\n"
                      "diag_txt: |-\n  DIAG rows: {count(signals, $script_type = \"DIAG\")}\n"
-                     "  @for $s in signals where $script_type = \"DIAG\": {$s.spawned_by}\n")
+                     "  @for $s in signals where $script_type = \"DIAG\": {$s.spawned_by}\n"
+                     "hdr_txt: |-\n  HEADER {$_rule.hook}\n")
 
 
 def _staged_count(host):
@@ -407,6 +409,49 @@ def test_a_cascade_within_one_hook_through_the_real_run_plan():
             eq(_staged_count(host), len(saved), "the RSLT count matches the saved signals")
         finally:
             config.use_project(previous_project)
+
+
+def test_the_builder_models_what_the_after_300_fire_gets():
+    """C-025 refute round 1 + the implications check: the template builder's after_300 Database was the
+    Database/ folder - the last SAVED state: a previous run's spawns (with their spawned_by /
+    source_uid columns), later phases' write-backs, no settled record. The builder's Session now
+    models the run-plan - System.reaction_hooks' in-memory staging + a settled before_300 with
+    business - and here it is compared with what the REAL after_300 fire gets, on a SECOND run
+    (after the first saved its spawns)."""
+    from pipeline5.phases.chain_reactions import engine as reactions
+    from pipeline5.workbench import template_doc
+    params = config.load_params()
+    previous_project = config.active_project()
+    seen, real_fire = {}, reactions.fire
+
+    def shape(database):
+        return {name: (database[name].effective_columns(), len(database[name])) for name in database.names()}
+
+    def recording_fire(hook, database, **kw):
+        if hook == "after_300":                       # the fire's input, before it runs - and the model
+            seen["fired"] = shape(database)
+            seen["model"] = shape(template_doc.Session(None).base("after_300"))
+        return real_fire(hook, database, **kw)
+
+    with tempfile.TemporaryDirectory() as project:
+        _spawn_project(project, params, header=True)
+        config.use_project(project)
+        try:
+            SYSTEM.handlers["staging"](_Host().ctx())             # run 1: its spawns saved into signals.csv
+            ok("spawned_by" in _read_csv(os.path.join(config.database_dir(), "signals.csv"))[0],
+               "the saved Database carries run 1's spawns - what the old builder previewed against")
+            reactions.fire = recording_fire
+            SYSTEM.handlers["staging"](_Host().ctx())             # run 2: re-staged from the documents
+        finally:
+            reactions.fire = real_fire
+            config.use_project(previous_project)
+    fired, model = seen["fired"], seen["model"]
+    eq(sorted(model), sorted(fired), "the same tables - the settled record included")
+    for name in fired:
+        eq(model[name][0], fired[name][0], f"{name}: the same columns (no leaked spawn columns)")
+    for name in ("signals", "diagnosis_cabinets", "chain_reactions_log"):
+        eq(model[name][1], fired[name][1], f"{name}: the same rows (the saved spawns are not in the fire's input)")
+    ok("spawned_by" not in fired["signals"][0], "run 2's fire gets no spawn column")
 
 
 def test_spawns_are_saved_beside_a_ragged_record():
@@ -541,6 +586,7 @@ if __name__ == "__main__":
          _sandboxed(test_a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten)),
         ("a_cascade_within_one_hook_through_the_real_run_plan",
          _sandboxed(test_a_cascade_within_one_hook_through_the_real_run_plan)),
+        ("the_builder_models_what_the_after_300_fire_gets", _sandboxed(test_the_builder_models_what_the_after_300_fire_gets)),
         ("spawns_are_saved_beside_a_ragged_record", _sandboxed(test_spawns_are_saved_beside_a_ragged_record)),
         ("a_blank_range_end_invents_nothing_on_the_real_fixture",
          _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),

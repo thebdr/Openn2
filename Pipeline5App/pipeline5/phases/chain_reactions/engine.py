@@ -75,12 +75,15 @@ recorded once (the file-level findings carry phase 0, so the uid is the same whi
 whichever PHASE - meets the file). A HALTED staging commits no reaction record (the run-plan lists the deferred
 before_300 firings in the log instead - a half-committed record would mix runs).
 
-THE TEMPLATE BUILDER (P-012 - the Files tab's templates.yaml mode) reads the engine through two
+THE TEMPLATE BUILDER (C-025 - the Files tab's templates.yaml mode) reads the engine through
 side-effect-free doors: `lint(templates, rule, database, hooks)` - what a fire would report, found
 WITHOUT firing (every branch of every template; with a chosen rule, its E1 scope and its hook's
 tables) - and `preview(rule, row_index, ...)` - one fire for one source row through the fire path's
-OWN render steps (`_spawned`, `_file_output`), nothing added, nothing written. So the builder can
-never approve a template a fire rejects.
+OWN guards and render steps (the hook check, the backstop, `_spawned`, `_file_output`), nothing
+added, nothing written. The Database a preview renders over is the one the fire GETS: the system's
+declared hook loader (the run-plan's own input, rebuilt in memory), a settled database-less hook
+(`has_business` / `settle_view`), and the in-hook chain reaction (`cascade`, through the fire's own
+per-rule step `_act`) - modelled by the builder's Session (src://pipeline5/workbench/template_doc.py).
 
 KNOWN BOUNDARY (deliberate, until the generated-signals spec review): an `after_300` `add_rows`
 spawn persists into the SAVED Database - visible in the Explorer - but downstream phases RE-STAGE
@@ -290,7 +293,7 @@ def _spawn_rows(rule: Rule, matched: list, database, templates: dict,
     for row in matched:
         try:
             for values in _spawned(rule, templates, _scope(row, rule, params, db_tables), row):
-                table.add(**values)                            # added as rendered: a later spec's failure
+                table.add_row(values)                          # added as rendered: a later spec's failure
                 tally["created"] += 1                          # keeps the true partial count
         except ExprError as error:
             return [_f(rule.phase, "rx_bad_template", _bad_rows(rule, error), rule.name)]
@@ -358,6 +361,31 @@ def _file_output(rule: Rule, templates: dict, scope: dict, files_root: str) -> t
         return None, None, ("rx_file_write",                       # stream - silent (refuter round 13: a
                             f"cannot write {path!r}: a ':' in a file name would write a hidden NTFS stream")
     return path, text, None                                        # `-X1:3` terminal name)
+
+
+def _act(rule: Rule, database, templates: dict, params: dict, db_tables: dict, files_root: str,
+         tally: dict) -> tuple:
+    """ONE rule's turn at its hook - the template check, the matching, then the spawn / the append -
+    with the per-rule BACKSTOP: an unforeseen exception anywhere in it is `rx_rule_crashed`, never a
+    crash. Returns (matched rows, problems); `tally["created"]` counts as it goes. The fire's step,
+    and the builder's `cascade`."""
+    matched = []
+    try:
+        reason = _template_problem(rule, templates)
+        if reason:
+            return [], [_f(rule.phase, "rx_bad_template", reason, rule.name)]
+        matched, problem = _matches(rule, database, params, db_tables)
+        if problem is not None:
+            return matched, [problem]
+        if rule.action == "add_rows":
+            return matched, _spawn_rows(rule, matched, database, templates, params, db_tables, tally)
+        return matched, _append_file(rule, matched, templates, params, db_tables, files_root, tally)
+    except Exception as error:   # the backstop: an unforeseen defect is a finding, never a crash
+        return matched, [_f(rule.phase, "rx_rule_crashed", f"{type(error).__name__}: {error}", rule.name)]
+
+
+def _unfired(hook: str, declared) -> str:
+    return f"hook {hook!r} is never fired by this run-plan (it fires: {', '.join(declared)})"
 
 
 def _load(loader, type_: str, what: str):
@@ -490,9 +518,8 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
         tagged = [(owner if owner in fired else None, finding) for owner, finding in tagged]
         for rule in compiled:
             if rule.fire_when not in fired:
-                tagged.append((None, _f(rule.phase, "rx_unfired_hook",
-                                        f"hook {rule.fire_when!r} is never fired by this run-plan "
-                                        f"(it fires: {', '.join(declared)})", rule.name)))
+                tagged.append((None, _f(rule.phase, "rx_unfired_hook", _unfired(rule.fire_when, declared),
+                                        rule.name)))
         compiled = [r for r in compiled if r.fire_when in fired]
     findings = [finding for _owner, finding in tagged]
     active = [r for r in compiled if r.fire_when == hook]
@@ -516,20 +543,7 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
     for rule in active:
         matched, problems, tally = [], [], {"created": 0}
         if blocked is None:
-            try:
-                reason = _template_problem(rule, templates)
-                if reason:
-                    problems = [_f(rule.phase, "rx_bad_template", reason, rule.name)]
-                else:
-                    matched, problem = _matches(rule, database, params, db_tables)
-                    if problem is not None:
-                        problems = [problem]
-                    elif rule.action == "add_rows":
-                        problems = _spawn_rows(rule, matched, database, templates, params, db_tables, tally)
-                    else:
-                        problems = _append_file(rule, matched, templates, params, db_tables, files_root, tally)
-            except Exception as error:   # the backstop: an unforeseen defect is a finding, never a crash
-                problems = [_f(rule.phase, "rx_rule_crashed", f"{type(error).__name__}: {error}", rule.name)]
+            matched, problems = _act(rule, database, templates, params, db_tables, files_root, tally)
         if rule.action == "add_rows" and tally["created"]:
             db_tables = _db_tables(database)                 # the CASCADE: a later rule's `_db` sees this
         findings.extend(problems)                            # rule's spawns, as its matching does (round 9)
@@ -545,7 +559,8 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
 class Preview:
     """What a fire of a rule would do for ONE source row - produced by the fire path's own render steps,
     nothing added, nothing written (the template builder's live preview)."""
-    matched: bool = True            # the rule's condition holds for the row (a fire acts on it)
+    matched: bool | None = True     # the condition holds (a fire acts on the row) / fails (a fire skips
+                                    # it) / None: the fire stops BEFORE the condition (a problem)
     rows: list = field(default_factory=list)    # add_rows: the rows it would spawn (provenance incl.)
     path: str = ""                  # file: the file it would APPEND to
     text: str = ""                  # file: the text it would append
@@ -561,29 +576,45 @@ def db_layer(database) -> dict:
 
 
 def preview(rule: Rule, row_index: int = 0, *, templates: dict, params: dict, database,
-            files_root: str | None = None, layer: dict | None = None) -> Preview:
+            files_root: str | None = None, layer: dict | None = None, hooks=None) -> Preview:
     """ONE fire of `rule` for the source row at `row_index` of its hook's `database` (None = a
-    database-less hook; a source-less rule previews its single fire): `_template_problem`, `_scope`,
-    the condition, then `_spawned` / `_file_output` - the steps a fire takes, minus the adding and
-    the writing. `layer` = `db_layer(database)` when the caller keeps it (else built here); the
-    matched row is that layer's own complete row. An out-of-range index is clamped (a row spinner)."""
+    database-less hook; a source-less rule previews its single fire): the fire's own guards - a hook
+    the run-plan never fires (`hooks`), the per-rule backstop (rx_rule_crashed) - then
+    `_template_problem`, `_scope`, the condition, `_spawned` / `_file_output`: the steps a fire takes,
+    minus the adding and the writing. A row the condition rejects is still rendered, flagged
+    matched=False (a fire skips it - whatever its render says). `database` = what the rule sees at its
+    hook (`cascade` - the earlier rules' spawns included); `layer` = `db_layer(database)` when the
+    caller keeps it. An out-of-range index is clamped (a row spinner)."""
+    if hooks is not None:
+        declared = [h.strip().lower() for h in hooks]
+        if rule.fire_when not in declared:
+            return Preview(matched=None, problem=("rx_unfired_hook", _unfired(rule.fire_when, declared)))
+    state = {"matched": None}
+    try:
+        return _preview(rule, row_index, templates, params, database, files_root, layer, state)
+    except Exception as error:   # the fire's per-rule backstop, mirrored: a finding, never a crash
+        return Preview(matched=state["matched"], problem=("rx_rule_crashed", f"{type(error).__name__}: {error}"))
+
+
+def _preview(rule, row_index, templates, params, database, files_root, layer, state) -> Preview:
     reason = _template_problem(rule, templates)
     if reason:
-        return Preview(matched=False, problem=("rx_bad_template", reason))
+        return Preview(matched=None, problem=("rx_bad_template", reason))
     db_tables = db_layer(database) if layer is None else layer
     row = {}
     if rule.source_table:
         if database is None or rule.source_table not in database:
-            return Preview(matched=False, problem=("rx_unknown_table", _unknown_table("source", rule.source_table)))
+            return Preview(matched=None, problem=("rx_unknown_table", _unknown_table("source", rule.source_table)))
         rows = db_tables[rule.source_table]                  # == _complete_rows(the source table)
         if not rows:
-            return Preview(matched=False, note=f"{rule.source_table} has no rows - a fire matches nothing")
+            return Preview(matched=None, note=f"{rule.source_table} has no rows - a fire matches nothing")
         row = rows[max(0, min(row_index, len(rows) - 1))]
     scope = _scope(row, rule, params, db_tables)
     try:
         matched = expr.test(rule.condition, scope) if rule.condition else True
     except ExprError as error:
-        return Preview(matched=False, problem=("rx_bad_condition", str(error)))
+        return Preview(matched=None, problem=("rx_bad_condition", str(error)))
+    state["matched"] = matched
     if rule.action == "add_rows":
         if database is None or rule.target not in database:
             return Preview(matched, problem=("rx_unknown_table", _unknown_table("target", rule.target)))
@@ -597,6 +628,64 @@ def preview(rule: Rule, row_index: int = 0, *, templates: dict, params: dict, da
     path, text, problem = _file_output(rule, templates, scope,
                                        config.output_root() if files_root is None else files_root)
     return Preview(matched, path=path or "", text=text or "", problem=problem)
+
+
+def _copy(table: Table) -> Table:
+    """A table the cascade may spawn into without touching the original (rows shared, list copied)."""
+    copy = Table(table.name, columns=table.columns, json_columns=table.json_columns, key_columns=table.key_columns)
+    copy.rows = list(table.rows)
+    return copy
+
+
+def cascade(rules, rule: Rule, database, *, templates: dict, params: dict) -> tuple:
+    """The Database `rule` sees WITHIN its hook's fire: `database` plus the rows every EARLIER add_rows
+    rule of that hook spawns (CSV order - the chain reaction within one hook), each through the
+    fire's own `_act` on a COPY (nothing saved; a file rule changes no table and is skipped). Returns
+    (that database, the earlier rules' problems); no earlier spawner = `database` itself."""
+    earlier = []
+    for other in rules:
+        if other is rule:
+            break
+        if other.fire_when == rule.fire_when and other.action == "add_rows":
+            earlier.append(other)
+    if database is None or not earlier:
+        return database, []
+    copy = Database([_copy(database[name]) for name in database.names()])
+    db_tables, problems = _db_tables(copy), []
+    for other in earlier:
+        tally = {"created": 0}
+        _matched, found = _act(other, copy, templates, params, db_tables, "", tally)
+        problems.extend(found)
+        if tally["created"]:
+            db_tables = _db_tables(copy)                      # as the fire rebuilds `_db` after a spawn
+    return copy, problems
+
+
+def has_business(hook: str, rows, hooks=None) -> bool:
+    """Whether `fire(hook, ...)` would act for this rule index (`rows` = the reactions.csv rows): a rule
+    on the hook, or a rule-INDEX problem (every hook's business) - False = the strict no-op. The
+    builder models the run-plan with it: a database-less hook WITH business is settled into the
+    next database, its record attached (`settle_view`)."""
+    compiled, tagged = _compile(rows)
+    hook = hook.strip().lower()
+    if hooks is not None:
+        declared = [h.strip().lower() for h in hooks]
+        tagged = [(owner if owner in declared else None, finding) for owner, finding in tagged]
+        if any(r.fire_when not in declared for r in compiled):
+            return True                                       # rx_unfired_hook: every hook's business
+        compiled = [r for r in compiled if r.fire_when in declared]
+    return any(r.fire_when == hook for r in compiled) or any(owner in (hook, None) for owner, _f in tagged)
+
+
+def settle_view(database) -> list:
+    """What a `settle` attaches, WITHOUT saving anything: the reaction-record tables (the audit +
+    validation_issues) from the on-disk record into `database` - both or neither, as settle does.
+    Returns the problems (a record that will not load)."""
+    try:
+        _attach_record(database, config.database_dir())
+    except Exception as error:  # noqa: BLE001 - the fire reports rx_record_unreadable; the builder notes it
+        return [f"the reaction record does not load: {error}"]
+    return []
 
 
 def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -> list:
@@ -659,5 +748,21 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
     if rule.action == "file":
         for start, end, message, severity in tempemplator.lint_line(rule.target, fields=fields):
             problem(f"target {rule.target!r}: {message}", "target", start, end, severity)
+        colon = _literal_colon(rule.target)
+        if colon is not None:
+            problem(f"target {rule.target!r}: a ':' in a relative target or a file name (a drive letter, or a "
+                    "hidden NTFS stream) - the fire refuses every row (rx_file_write)", "target", colon, colon + 1)
     return fields, tables
+
+
+def _literal_colon(target: str):
+    """The column of a LITERAL ':' the fire's target guards refuse whatever the row (None = none): any
+    ':' but a leading drive's (`C:\\` / `C:/`) - holes are data, judged per row by the fire."""
+    for kind, start, end in tempemplator.brace_runs(target):
+        if kind != "text":
+            continue
+        for index in range(start, end):
+            if target[index] == ":" and not (index == 1 and target[0].isalpha() and target[2:3] in ("\\", "/")):
+                return index
+    return None
 

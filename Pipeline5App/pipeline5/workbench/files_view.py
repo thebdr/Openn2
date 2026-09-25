@@ -1,8 +1,8 @@
 """The Tk-free logic behind the Files tab (GUI M5): which files to show (the `files_tab` config section -
 regex include/exclude per section, ${placeholder} roots), which viewer a file gets, the file-tree
-structure, and the read helpers (CSV + xlsx). The Tk view (`gui/files_panel.py`) renders the tree these
-functions build and calls the readers; keeping the logic here makes it unit-testable without a display.
-VIEW-ONLY (decision #3: a table edit must go through the codec, so this previews + opens externally).
+structure, the read / write helpers (text, CSV, xlsx), and the SHIPPED system config's read-only rule
++ its project copy. The Tk view (`gui/files_panel.py`) renders the tree these functions build and
+calls the helpers; keeping the logic here makes it unit-testable without a display.
 
 Visibility is CONFIG-DRIVEN (UI_REFRESH_PLAN E): `sections_from_config` compiles app_config.yaml's
 `files_tab.sections` into `{title, roots, include, exclude}` dicts; `populate(root, include, exclude)`

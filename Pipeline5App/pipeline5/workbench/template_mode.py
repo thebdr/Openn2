@@ -12,6 +12,7 @@ the Tk shell over src://pipeline5/workbench/template_doc.py (the Tk-free model +
 """
 from __future__ import annotations
 
+import threading
 import tkinter as tk
 from tkinter import ttk
 
@@ -25,13 +26,14 @@ _TRIGGERS = "$@._{"                                # besides letters/digits, the
 
 
 class TemplateMode:
-    def __init__(self, text: tk.Text, bar, lower, *, mode: str = "dark", session=None):
+    def __init__(self, text: tk.Text, bar, lower, *, mode: str = "dark", session=None, path=None):
         self.text, self.mode = text, mode
-        self.session = session if session is not None else template_doc.Session()
+        self.session = session if session is not None else template_doc.Session(path)
         self.doc = template_doc.parse("")
         self.placed: list = []
         self._items: dict = {}
         self._job = None
+        self._loading: set = set()                         # hooks whose Database a worker is building
 
         ttk.Label(bar, text="Rule:").pack(side="left")
         self.rule_box = ttk.Combobox(bar, state="readonly", width=52, values=self.session.rule_labels())
@@ -68,7 +70,7 @@ class TemplateMode:
         self.preview.pack(fill="both", expand=True)
 
         self.configure_tags()
-        self.popup = CompletionPopup(text, mode)
+        self.popup = CompletionPopup(text, mode, on_accept=self.schedule)
         text.bind("<KeyRelease>", self._on_key, "+")
         text.bind("<Destroy>", self._on_destroy, "+")
         self.on_rule()
@@ -89,8 +91,26 @@ class TemplateMode:
             return 0
 
     def on_rule(self) -> None:
-        count = self.session.row_count(self.rule())
-        self.row_box.configure(to=max(0, count - 1), state="normal" if count else "disabled")
+        self.refresh()
+
+    def _ready(self, rule) -> bool:
+        """The rule's Database is built - else a worker builds it (staging in memory can take a while on
+        a big project) and the refresh follows when it is done."""
+        if self.session.ready(rule):
+            return True
+        if rule.fire_when not in self._loading:
+            self._loading.add(rule.fire_when)
+            threading.Thread(target=self.session.base, args=(rule.fire_when,), daemon=True).start()
+            self.text.after(150, self._poll)
+        return False
+
+    def _poll(self) -> None:
+        if not self.text.winfo_exists():
+            return
+        if any(not self.session.loaded(hook) for hook in self._loading):
+            self.text.after(150, self._poll)
+            return
+        self._loading.clear()
         self.refresh()
 
     def reload(self) -> None:
@@ -111,12 +131,26 @@ class TemplateMode:
         self._job = None
         if not self.text.winfo_exists():
             return
+        try:
+            self._refresh()
+        except Exception as error:  # noqa: BLE001 - a builder defect must never freeze the editor
+            self.summary.configure(text=f"template builder error: {type(error).__name__}")
+            self._show_preview(f"the template builder failed: {type(error).__name__}: {error}")
+
+    def _refresh(self) -> None:
         self.doc = template_doc.parse(self.text.get("1.0", "end-1c"))
-        self._paint(template_doc.spans(self.doc))
+        self._paint(template_doc.spans(self.doc, self.session.language))
         rule = self.rule()
-        self.placed = self.session.check(self.doc, rule)
+        ready = self._ready(rule)
+        self.placed = self.session.check(self.doc, rule if ready else None)
         self._squiggle()
         self._fill_problems()
+        count = self.session.row_count(rule, self.doc.templates) if ready else 0
+        self.row_box.configure(to=max(0, count - 1), state="normal" if count else "disabled")
+        if not ready:
+            self._show_preview(f"building the Database the {rule.fire_when} fire gets (staging in memory, "
+                               "nothing saved) - the rule's checks and preview follow...")
+            return
         self._show_preview(self.session.preview_text(self.doc, rule, self.row()))
 
     def _paint(self, spans) -> None:
@@ -143,7 +177,8 @@ class TemplateMode:
             self._items[item] = placed
         errors = sum(p.severity == "error" for p in self.placed)
         warnings = len(self.placed) - errors
-        notes = f"  |  {self.session.notes[0]}" if self.session.notes else ""
+        count = len(self.session.notes)
+        notes = f"  |  {self.session.notes[0]}" + (f" (+{count - 1} more)" if count > 1 else "") if count else ""
         self.summary.configure(text=(f"{errors} error(s), {warnings} warning(s)" if self.placed
                                      else "no problems") + notes)
 
@@ -179,7 +214,9 @@ class TemplateMode:
             return
         at = len(self.text.get("1.0", "insert"))
         doc = template_doc.parse(self.text.get("1.0", "end-1c"))     # the typed char included
-        start, candidates = template_doc.completions(doc, at, self.session.context(self.rule()))
+        rule = self.rule()
+        context = self.session.context(rule if self.session.ready(rule) else None, doc.templates)
+        start, candidates = template_doc.completions(doc, at, context)
         self.popup.show(candidates, f"1.0+{start}c")
 
     # --- theme ------------------------------------------------------------------------------------------- #

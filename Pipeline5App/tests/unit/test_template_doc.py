@@ -30,8 +30,8 @@ other: 7
 """
 
 
-def _tagged(doc, tag):
-    return [doc.text[s:e] for t, s, e in td.spans(doc) if t == tag]
+def _tagged(doc, tag, language="scl"):
+    return [doc.text[s:e] for t, s, e in td.spans(doc, language) if t == tag]
 
 
 def test_positions_are_exact():
@@ -85,7 +85,9 @@ def test_two_layer_highlight():
     eq(_tagged(doc, "tp_spec"), [">8"], "a format spec")
     ok(_tagged(doc, "tx_string") == ['"P1"'], "a predicate string")
     ok('"P1"' not in _tagged(doc, "hl_str"), "the YAML layer stays out of a text template's body")
-    ok("tx_error" not in {t for t, _s, _e in td.spans(doc)}, "no false error token (the spec is split off)")
+    ok("tx_error" not in {t for t, _s, _e in td.spans(doc, "scl")}, "no false error token (the spec is split off)")
+    ok("REGION" not in _tagged(doc, "hl_key", language=None),
+       "no language layer unless the system names one (System.template_language - no SCL baked in)")
 
 
 def test_problems_land_on_the_culprit():
@@ -134,6 +136,129 @@ def test_completions():
     eq(at("REGION {$n", context=None)[1], [], "no rule chosen: no fields to offer")
 
 
+_STYLES = r"""leaf: |2-
+      PEC_{$i}();
+    END {$nme}
+tail: |
+  kept {$a}
+
+keep: |+
+  plus {$b}
+
+after: |-
+  x
+rows:
+  - label: "{{\"of\": \"{$nme}\"}}"
+    note: 'it''s {$nm}'
+  - 1: "{$name}"
+123: |-
+  X {$zz}
+"""
+
+
+def test_positions_hold_for_every_scalar_style():
+    """C-025 refute round 1: positions held only for plain `|-` blocks. An indentation indicator
+    (`|2-` - YAML REQUIRES one when a body's first line is indented), an escaped double-quoted value
+    (a JSON cell), `''` in single quotes, a `|` / `|+` block's trailing newlines, keys YAML types
+    (`1:`, `123:`) - each placed exactly now, and none crashes the view."""
+    from pipeline5.language.tempemplator import Problem
+    doc = td.parse(_STYLES)
+    eq(doc.error, None, "loads")
+    eq(sorted((name, e.kind) for name, e in doc.entries.items()),
+       [("123", "text"), ("after", "text"), ("keep", "text"), ("leaf", "text"), ("rows", "row"), ("tail", "text")],
+       "the typed key 123 is the entry '123'")
+    for name, entry in doc.entries.items():
+        if entry.kind == "text":
+            for number, line in enumerate(entry.text.split("\n")):
+                start = entry.body.offset(number, 0)
+                eq(doc.text[start:start + len(line)], line, f"{name} line {number + 1}")
+    ok({"keep", "after", "rows"} <= set(_tagged(doc, "hl_key")), "a `|` / `|+` body does not swallow the next key")
+
+    def placed(template, where, value, needle):
+        start = value.index(needle)
+        spot = td.place(doc, [Problem(template, where, start, start + len(needle), "m", "error")])[0]
+        return doc.text[spot.start:spot.end]
+
+    rows = doc.entries["rows"]
+    eq(placed("rows", (1, "label"), rows.value_text[(1, "label")], "$nme"), "$nme", "an escaped JSON cell")
+    eq(placed("rows", (1, "note"), rows.value_text[(1, "note")], "$nm"), "$nm", "a '' in single quotes")
+    eq(placed("rows", (2, 1), rows.value_text[(2, "1")], "$name"), "$name", "a field YAML typed as the int 1")
+    eq(placed(123, 1, doc.entries["123"].text, "$zz"), "$zz", "a template YAML typed as the int 123")
+    fields = _tagged(doc, "tx_field")
+    ok({"$i", "$nme", "$nm", "$name", "$zz"} <= set(fields), f"every hole highlighted ({fields})")
+    problems = engine.lint(doc.templates)
+    ok(all(p.start is not None or p.label == "rule" for p in td.place(doc, problems)), "the lint places")
+    at = _STYLES.index('"{$name}') + len('"{$na')
+    eq(td.completions(doc, at, td.Context(fields=frozenset({"name"})))[1], ["$name"], "completes inside a typed key")
+
+
+def test_completions_stay_in_scope():
+    """C-025 refute round 1: a `where` offered names it cannot see (its scope is the loop table's
+    ROW), and a rule's fields were offered in templates the rule never renders."""
+    text = "w: |-\n  @for $s in signals where $\n  x\n  @end\na: |-\n  {$k\nb: |-\n  {$k\n"
+    doc = td.parse(text)
+    ctx = td.Context(fields=frozenset({"kind", "_params", "_rule", "_db"}), tables={"signals": ["uid", "tag"]},
+                     reach=frozenset({"w", "a"}))
+    eq(td.completions(doc, text.index("where $") + 7, ctx)[1], ["$uid", "$tag"], "a `where`: the table's columns")
+    eq(td.completions(doc, text.index("a: |-\n  {$k") + 11, ctx)[1], ["$kind"], "a rendered template: the fields")
+    eq(td.completions(doc, text.index("b: |-\n  {$k") + 11, ctx)[1], [], "a template the rule never renders")
+    eq(td.reach({"t": "@use u\n@for $i in 1..2: @use v", "u": "x", "v": "@use u", "w": "y"}, "t"),
+       frozenset({"t", "u", "v"}), "reach follows @use - inline bodies too")
+
+
+def test_the_session_models_the_run_plan():
+    """C-025 refute round 1 + the implications check: the builder previewed against the Database/
+    folder - the last SAVED state (later phases re-save it; a previous run's spawns in it) - not what
+    the fire gets. The Session models the run-plan: the hook's declared loader (the system's own
+    input, rebuilt in memory), a settled database-less hook (its record attached), the in-hook
+    cascade; and it says what cannot be built, and when a document is not what a fire uses."""
+    import tempfile
+    from pipeline5 import config
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.table import Table
+
+    def staged(system):
+        src = Table("src", columns=["uid", "kind", "name"], key_columns=["name"])
+        src.add(kind="door", name="D1")
+        src.add(kind="motor", name="M1")
+        return Database([src, Table("dst", columns=["uid", "label", "spawned_by", "source_uid"], key_columns=["label"])])
+
+    rules = [{"name": "hdr", "fire_when": "before_300", "source_table": "", "condition": "", "action": "file",
+              "target": "h.txt", "template": "t"},
+             {"name": "A", "fire_when": "after_300", "source_table": "src", "condition": "", "action": "add_rows",
+              "target": "dst", "template": "rows"},
+             {"name": "B", "fire_when": "after_300", "source_table": "dst", "condition": "", "action": "file",
+              "target": "{$label}.txt", "template": "t"}]
+    doc = td.parse('t: |-\n  row {$label}\nrows:\n  - label: "L-{$name}"\n')
+    hooks = {"before_300": None, "after_300": staged}
+    original = config.database_dir
+    with tempfile.TemporaryDirectory() as sandbox:
+        config.database_dir = lambda: sandbox
+        try:
+            session = td.Session(None, rows=rules, hooks=hooks, params={})
+            ok(session.loaded("before_300") and not session.loaded("after_300"), "built on demand (a worker's job)")
+            base = session.base("after_300")
+            ok("chain_reactions_log" in base.names(), "a before_300 rule is settled in: its record attached")
+            second = session.rules[2]
+            eq(session.row_count(second, doc.templates), 2, "B sees A's spawns - the in-hook cascade")
+            preview = session.preview_text(doc, second, 1)
+            ok(preview.endswith("row L-M1"), preview)
+            eq(len(base["dst"]), 0, "the cascade never touches the hook's Database")
+            quiet = td.Session(None, rows=rules[1:], hooks=hooks, params={})
+            ok("chain_reactions_log" not in quiet.base("after_300").names(), "no before_300 business: no settle")
+            broken = td.Session(None, rows=rules, hooks={"after_300": lambda system: 1 / 0}, params={})
+            eq(broken.base("after_300"), None, "a Database that cannot be built")
+            ok(any("cannot be built" in note for note in broken.notes), f"…is noted: {broken.notes}")
+            ok(any("declares no reaction hooks" in note for note in td.Session(None, rows=rules, hooks={}, params={}).notes),
+               "a system that declares no hooks is noted")
+            elsewhere = td.Session(os.path.join(sandbox, "other.yaml"), rows=rules, hooks=hooks, params={})
+            elsewhere.active = os.path.join(sandbox, "active.yaml")
+            ok(elsewhere.preview_text(doc, elsewhere.rules[2], 0).startswith("note: a fire uses"),
+               "a document a fire does not use says so")
+        finally:
+            config.database_dir = original
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("template_doc", [
@@ -142,4 +267,7 @@ if __name__ == "__main__":
         ("two_layer_highlight", test_two_layer_highlight),
         ("problems_land_on_the_culprit", test_problems_land_on_the_culprit),
         ("completions", test_completions),
+        ("positions_hold_for_every_scalar_style", test_positions_hold_for_every_scalar_style),
+        ("completions_stay_in_scope", test_completions_stay_in_scope),
+        ("the_session_models_the_run_plan", test_the_session_models_the_run_plan),
     ]))

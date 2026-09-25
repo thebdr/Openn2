@@ -14,8 +14,8 @@ NAVIGATION = ("Up", "Down", "Return", "Tab", "Escape")    # key releases that mu
 
 
 class CompletionPopup:
-    def __init__(self, text: tk.Text, mode: str = "dark"):
-        self.text, self.mode = text, mode
+    def __init__(self, text: tk.Text, mode: str = "dark", on_accept=None):
+        self.text, self.mode, self.on_accept = text, mode, on_accept
         self.popup: tk.Toplevel | None = None
         self.listbox: tk.Listbox | None = None
         self._stem_start = "insert"
@@ -63,6 +63,8 @@ class CompletionPopup:
         self.close()
         self.text.delete(start, "insert")
         self.text.insert("insert", chosen)
+        if self.on_accept is not None:
+            self.on_accept()
         return "break"
 
     def move(self, delta: int):

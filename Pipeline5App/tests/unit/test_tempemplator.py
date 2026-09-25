@@ -343,6 +343,11 @@ def test_literal_braces():
         ok(False, "a lone brace must raise")
     except ExprError as error:
         ok(str(error).startswith("a lone '}' at line 2, column 7 of "), f"line + column: {error}")
+    try:                                              # refuter round 18 (G3): a brace MID-value - counting
+        render_text("l1\nl2 }x\nl3 {$name}", {"name": "v"})     # every newline, or the last one, is wrong
+        ok(False, "a lone brace must raise")
+    except ExprError as error:
+        ok(str(error).startswith("a lone '}' at line 2, column 4 of "), f"a mid-value brace: {error}")
 
 
 def test_shipped_worked_examples_render():

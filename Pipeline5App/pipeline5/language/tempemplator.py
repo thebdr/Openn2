@@ -533,10 +533,18 @@ def lint_line(text: str, *, fields=None, loops=None) -> list:
             issues.append((runs[index - 1][1], runs[index + 1][2], "renders the literal text " + literal
                            + " - braces around a hole are written {{" + literal + "}}", "warning"))
         elif kind == "hole":
+            expression, spec = _split_spec(text[start + 1:end - 1])
+            if spec is not None and not expression.strip():     # `{:03d}` - the render compiles ""
+                issues.append((start, end, f"a hole needs an expression before its format spec ':{spec}' "
+                                           "(the render fails)", "error"))
+                continue
             syntax = expr.check_template(text[start:end])
             issues.extend((start + i.start, start + i.end, i.message, "error") for i in syntax)
             if syntax:
                 continue                                    # malformed: its fields cannot be read
+            problem = _spec_problem(spec) if spec is not None else None
+            if problem:
+                issues.append((end - 1 - len(spec), end - 1, problem, "error"))
             for path in sorted(expr.hole_paths(text[start + 1:end - 1]) or ()):
                 head, _dot, rest = path.partition(".")
                 if names is not None and head not in names:
@@ -550,6 +558,23 @@ def lint_line(text: str, *, fields=None, loops=None) -> list:
                 if message and issue not in issues:
                     issues.append(issue)
     return issues
+
+
+def _spec_problem(spec: str) -> str | None:
+    """Why NO value can satisfy a hole's format spec (None = some can) - tried with the kinds of value
+    `format_spec` coerces to: an int for d/x/X/o/b/c/n, a float for e/E/f/F/g/G/%, else a text AND a
+    number (an untyped spec formats the value as it is - a field's text, a loop's number)."""
+    from pipeline5.language.expr.runtime import _FLOAT_CONV, _INT_CONV
+    last = spec[-1:]
+    samples = [7] if last and last in _INT_CONV else [7.5] if last and last in _FLOAT_CONV else ["x", 7]
+    first = None
+    for sample in samples:
+        try:
+            format(sample, spec)
+            return None
+        except (ValueError, TypeError, OverflowError) as error:
+            first = first or error
+    return f"bad format spec {spec!r}: {first}"
 
 
 def _braced(text: str, runs: list, index: int) -> bool:
@@ -580,7 +605,55 @@ def lint(templates: dict, *, start: str | None = None, fields=None, tables=None)
     for name, body in templates.items():               # rule (another hook) may use it
         if isinstance(body, str):
             plain.named(name, None, {}, ())
+    for name, line, span, depth in _deep_chains(templates):   # the memo walk above sees each template
+        add(name, line, *span, f"@use nesting deeper than {_MAX_DEPTH} (a chain of {depth} templates "
+                               "starts here - the render stops at the limit)")   # once: depth apart
     return list(found.values())
+
+
+def use_refs(body: str) -> list:
+    """(line, (start, end), name) of every @use in a text template - inline @for bodies included."""
+    refs = []
+    for number, line in enumerate(body.splitlines(), start=1):
+        for role, start, end in outline(line):
+            if role == "ref":
+                refs.append((number, (start, end), line[start:end]))
+            elif role == "body":
+                refs += [(number, (start + s, start + e), line[start + s:start + e])
+                         for inner, s, e in outline(line[start:end]) if inner == "ref"]
+    return refs
+
+
+def _deep_chains(templates: dict) -> list:
+    """(template, line, span, depth) - each text template whose LONGEST @use chain splices more templates
+    than the renderer allows, located at the @use that starts it (a cycle is cut: the cycle check
+    reports it)."""
+    depths, active = {}, set()
+
+    def depth(name):
+        if name in depths:
+            return depths[name]
+        if name in active or not isinstance(templates.get(name), str):
+            return 0
+        active.add(name)
+        best = 1 + max((depth(ref) for _line, _span, ref in use_refs(templates[name])), default=0)
+        active.discard(name)
+        depths[name] = best
+        return best
+
+    out = []
+    for name, body in templates.items():
+        if not isinstance(body, str):
+            continue
+        try:
+            total = depth(name)
+        except RecursionError:                           # thousands deep: far past the limit anyway
+            total = _MAX_DEPTH + 1
+        if total > _MAX_DEPTH:
+            refs = use_refs(body)
+            line, span, _ref = max(refs, key=lambda ref: depths.get(ref[2], 0)) if refs else (1, (0, 0), "")
+            out.append((name, line, span, total))
+    return out
 
 
 def _block_extent(lines, start: int, hi: int, want_else: bool) -> tuple:
@@ -669,7 +742,7 @@ class _Lint:
         elif word == "@if":
             if rest:
                 names = None if fields is None else set(fields) | set(loops)
-                self.predicate(rest, template, line_no, at, names)
+                self.predicate(rest, template, line_no, at, names, loops=loops)
             return self.structure(lines, i, hi, template, fields, loops, stack, base, col, "@if", loops)
         elif word == "@for":
             return self.loop(lines, i, hi, rest, at, template, fields, loops, stack, base, col)
@@ -744,13 +817,24 @@ class _Lint:
             self.predicate(pred, template, line_no, at + len(iterable) - len(pred), columns, var, table)
         return columns
 
-    def predicate(self, pred, template, line_no, at, names, loop_var=None, table=None):
-        """An @if / `where` predicate: its syntax (an error - expr.test raises) and, when the names in
-        scope are known, what it reads (a WARNING - a predicate is lenient: an unknown name reads blank)."""
+    def predicate(self, pred, template, line_no, at, names, loop_var=None, table=None, loops=None):
+        """An @if / `where` predicate: its syntax (an error - expr.test raises) and what it reads, where
+        that is known - a WARNING (a predicate is lenient: an unknown name, or a loop row's missing
+        column in an @if, reads blank - the branch is silently never taken)."""
         syntax = expr.check(pred)
         for issue in syntax:
             self.add(template, line_no, at + issue.start, at + issue.end, issue.message)
-        if syntax or names is None:
+        if syntax:
+            return
+        for path in sorted(free_paths(pred) or ()) if table is None and loops else ():
+            head, _dot, rest = path.partition(".")
+            if rest and loops.get(head) is not None:
+                column = rest.split(".", 1)[0]
+                problem = _column_problem(head, column, loops[head])
+                if problem:
+                    s, e = _field_span(pred, 0, len(pred), f"{head}.{column}")
+                    self.add(template, line_no, at + s, at + e, f"{problem} - the @if reads it as blank", "warning")
+        if names is None:
             return
         for head in sorted({path.split(".", 1)[0] for path in free_paths(pred) or ()} - set(names)):
             if table is None:

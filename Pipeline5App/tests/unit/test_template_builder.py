@@ -48,6 +48,8 @@ _BROKEN = [
     ("@for $i in 1..2\n@else\n@end", 2),                   # @else in a @for
     ("@if $a\nA\n@else if $b\nB\n@end", 3),                # there is no `@else if`
     ("@if $a ~ /(/\nx\n@end", 1),                          # a malformed regex predicate
+    ("PEC{:03d}();", 1),                                   # a spec with no expression (C-025 round 1)
+    ("x {$a:03D}", 1),                                     # a spec no value satisfies (round 1)
 ]
 _CTX = {"a": "1", "b": "1", "_db": {"signals": []}}
 
@@ -123,6 +125,10 @@ def test_predicates_are_lenient_so_their_unknowns_are_warnings():
     eq(sorted((p.where, p.severity) for p in found), [(1, "warning"), (4, "warning")], "two warnings, no error")
     ok("loop variable" in found[0].message and "$colour" in found[1].message, "each says why")
     eq(lint({"t": "@if $a\nx\n@end"}), [], "without a context an @if name is not judged")
+    found = lint({"t": '@for $r in signals\n@if $r.tagg = "P1"\nX\n@end\n@end'}, start="t", fields={"_db"},
+                 tables={"signals": ["uid", "tag"]})                 # C-025 round 1: a loop row's typo in an
+    eq([(p.where, p.start, p.end, p.severity) for p in found], [(2, 4, 11, "warning")],   # @if reads blank
+       "an @if reading a loop row's missing column")
 
 
 def test_positions_point_at_the_culprit():
@@ -268,6 +274,111 @@ def test_engine_lint_judges_entries_and_rules():
     eq([p.message for p in found if p.template == "own"], [],
        "an absent source table does not flood the rule's own holes as missing (one rule problem says why)")
     ok(any("source table 'src'" in p.message for p in found), "…the rule problem")
+    colon = engine.lint({"txt": "x"}, _rule(action="file", target="gen/a:{$name}.txt", template="txt"), _database())
+    eq([(p.where, p.start) for p in colon if p.template is None], [("target", 5)],
+       "a literal ':' in a target - the fire refuses every row (C-025 round 1)")
+    drive = engine.lint({"txt": "x"}, _rule(action="file", target="C:/out/{$name}.txt", template="txt"), _database())
+    eq([p for p in drive if p.template is None], [], "…a drive's colon is fine")
+
+
+def test_format_specs_are_judged_in_every_branch():
+    """C-025 refute round 1: a hole's format spec was never checked - a typo in an untaken branch
+    linted clean, previewed fine, and failed the fire the day a row took the branch. A spec no value
+    can satisfy is an error; one some value satisfies (by its type letter) is not."""
+    body = '@if $kind = "motor"\nMOTOR {$name:03D}\n@else\nDOOR {$name}\n@end'
+    found = lint({"t": body}, start="t", fields={"kind", "name", "_params", "_rule", "_db"})
+    eq([(p.where, p.severity) for p in found], [(2, "error")], "the untaken branch's bad spec")
+    ok("'03D'" in found[0].message, found[0].message)
+    eq(lint_line("{$n:,.2f} {$i:03} {$n:+} {$x:>8} {$d:x}"), [], "specs some value satisfies")
+    rule = _rule(action="file", target="m.txt", template="t")
+
+    def fired():
+        with tempfile.TemporaryDirectory() as out:
+            _, findings = engine.fire("after_300", _database(), rules=[rule], templates={"t": body}, params={},
+                                      files_root=out)
+            eq([x.type for x in findings], ["rx_bad_template"], "the fire rejects it once a motor row comes")
+            ok("03D" in findings[0].detail, findings[0].detail)
+    _sandboxed(fired)
+
+
+def test_use_depth_is_judged_whatever_the_order():
+    """C-025 refute round 1: the no-context walk sees each template once, so a 34-deep @use chain
+    listed leaf-first linted clean while its render stops at the nesting limit."""
+    chain = {f"t{i}": f"@use t{i + 1}" for i in range(33)}
+    chain["t33"] = "leaf"
+    for order in (chain, dict(reversed(list(chain.items())))):
+        ok(any(p.template == "t0" and "deeper than" in p.message for p in lint(order)), "in either order")
+    try:
+        render_template("t0", chain, {})
+        ok(False, "the render must stop")
+    except TempemplatorError as error:
+        ok("deeper than" in error.message, error.message)
+    short = {f"t{i}": f"@use t{i + 1}" for i in range(20)}
+    short["t20"] = "leaf"
+    eq(lint(short), [], "a chain within the limit")
+
+
+def test_preview_keeps_the_fires_guards():
+    """C-025 refute round 1: the preview skipped the fire's own guards - a hook the run-plan never
+    fires previewed normally, and an unforeseen exception RAISED out of it (the view died). Both are
+    the fire's findings now; a `self` field previews as the fire spawns it."""
+    templates = {"rows": [{"label": "L-{$name}", "self": "me"}], "txt": "hello {$name}"}
+    shown = engine.preview(_rule(fire_when="after_900", action="file", target="h.txt", template="txt"), 0,
+                           templates=templates, params={}, database=_database(), files_root="o",
+                           hooks=("before_300", "after_300"))
+    eq((shown.matched, shown.problem[0]), (None, "rx_unfired_hook"), "a hook never fired")
+    real = engine.tempemplator.render_text
+
+    def boom(text, ctx):
+        raise RuntimeError("boom")
+
+    def body():
+        engine.tempemplator.render_text = boom
+        try:
+            _, findings = engine.fire("after_300", _database(), rules=[_rule()], templates=templates, params={})
+            shown = engine.preview(_rule(), 0, templates=templates, params={}, database=_database())
+        finally:
+            engine.tempemplator.render_text = real
+        eq(shown.problem, (findings[0].type, findings[0].detail), "the backstop: exactly the fire's rx_rule_crashed")
+        eq(shown.matched, True, "…for a row the condition matches")
+        database, findings = engine.fire("after_300", _database(), rules=[_rule()], templates=templates, params={})
+        eq(findings, [], "a `self` field fires")
+        for index, fired in enumerate(database["dst"]):
+            eq(engine.preview(_rule(), index, templates=templates, params={}, database=_database()).rows, [fired],
+               f"a `self` field: row {index} previews as the fire spawns it")
+    _sandboxed(body)
+
+
+def test_preview_sees_the_in_hook_cascade():
+    """C-025 refute round 1: a later rule of a hook SEES an earlier rule's spawns (the chain reaction
+    within one hook) - the preview did not. `cascade` runs the earlier add_rows rules through the
+    fire's own step on a copy; the preview over it equals the real multi-rule fire."""
+    rules, findings = engine.compile_rules([
+        {"name": "A", "fire_when": "after_300", "source_table": "src", "condition": "", "action": "add_rows",
+         "target": "dst", "template": "rows"},
+        {"name": "B", "fire_when": "after_300", "source_table": "dst", "condition": "", "action": "file",
+         "target": "{$label}.txt", "template": "each"},
+        {"name": "C", "fire_when": "after_300", "source_table": "", "condition": "", "action": "file",
+         "target": "count.txt", "template": "count"}])
+    eq(findings, [], "the rules compile")
+    templates = {"rows": [{"label": "L-{$name}"}], "each": "row {$label}", "count": "dst has {count(dst)} rows"}
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            engine.fire("after_300", _database(), rules=rules, templates=templates, params={}, files_root=out)
+            fired = {name: open(os.path.join(out, name), encoding="utf-8").read() for name in os.listdir(out)}
+            base = _database()
+            for index, name in enumerate(("L-D1.txt", "L-M1.txt")):
+                seen, _problems = engine.cascade(rules, rules[1], base, templates=templates, params={})
+                shown = engine.preview(rules[1], index, templates=templates, params={}, database=seen, files_root=out)
+                eq((os.path.basename(shown.path), shown.text + "\n"), (name, fired[name]), f"B row {index}")
+            seen, _problems = engine.cascade(rules, rules[2], base, templates=templates, params={})
+            shown = engine.preview(rules[2], 0, templates=templates, params={}, database=seen, files_root=out)
+            eq(shown.text + "\n", fired["count.txt"], "C counts A's spawns")
+            eq(len(base["dst"]), 0, "the cascade spawned into a COPY - the hook's Database is untouched")
+            alone = engine.preview(rules[1], 0, templates=templates, params={}, database=base, files_root=out)
+            ok("no rows" in alone.note, "(without the cascade B saw an empty dst - the round-1 finding)")
+    _sandboxed(body)
 
 
 if __name__ == "__main__":
@@ -284,4 +395,8 @@ if __name__ == "__main__":
         ("preview_equals_the_fire", test_preview_equals_the_fire),
         ("preview_states", test_preview_states),
         ("engine_lint_judges_entries_and_rules", test_engine_lint_judges_entries_and_rules),
+        ("format_specs_are_judged_in_every_branch", test_format_specs_are_judged_in_every_branch),
+        ("use_depth_is_judged_whatever_the_order", test_use_depth_is_judged_whatever_the_order),
+        ("preview_keeps_the_fires_guards", test_preview_keeps_the_fires_guards),
+        ("preview_sees_the_in_hook_cascade", test_preview_sees_the_in_hook_cascade),
     ]))

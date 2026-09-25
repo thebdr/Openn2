@@ -287,8 +287,7 @@ def _load_cabinets(io_path: str, cab_table) -> None:
 
 def staged_database(colmap) -> Database:
     """The EMPTY Database staging fills - `signals` (the I/O List's canonical columns, from `colmap`) +
-    `diagnosis_cabinets`. Declared ONCE: what reads the staged record back (the template builder's
-    preview of an after_300 reaction rule, P-012) loads exactly the tables staging writes."""
+    `diagnosis_cabinets` - declared once (the C&E pass adds `validation_issues` when it records)."""
     return Database([signals_table([m["canonical"] for m in colmap]), diagnosis_cabinets_table()])
 
 
@@ -342,7 +341,7 @@ def annotate_cematrix(database, params: dict | None = None, save: bool = True) -
     return database, findings
 
 
-def stage(params: dict | None = None, system=None) -> tuple:
+def stage(params: dict | None = None, system=None, save: bool = True) -> tuple:
     """Phase 300: the full staging - `stage_iolist` (310) then `annotate_cematrix` (320) - returning
     (database, findings) with `signals` + `diagnosis_cabinets` + `validation_issues` saved. The single
     staging entry point every downstream phase calls; BYTE-IDENTICAL to the pre-split monolith. A missing
@@ -350,12 +349,15 @@ def stage(params: dict | None = None, system=None) -> tuple:
 
     `system` gates the shared legs by CAPABILITY, never by type id: a system without a C&E matrix
     (`needs_ce_matrix=False`) stops after 310 (saved, no annotation); `needs_diagnosis_blocks=False`
-    skips the DiagnosisBlocks read. None (tests, transitional callers) keeps the full PL4 behavior."""
+    skips the DiagnosisBlocks read. None (tests, transitional callers) keeps the full PL4 behavior.
+    `save=False` stages IN MEMORY - nothing written: the template builder previews an after_300
+    reaction against exactly the Database the fire gets (C-025)."""
     params = params or config.load_params()
     database, findings = stage_iolist(params, save=False, system=system)
     if run.has_blocking(findings):                    # no I/O sheet -> halt before the C&E pass, nothing written
         return database, findings
     if system is not None and not system.capabilities.needs_ce_matrix:
-        database.save(config.database_dir())          # no C&E for this system: 310 IS the whole staging
+        if save:
+            database.save(config.database_dir())      # no C&E for this system: 310 IS the whole staging
         return database, findings
-    return annotate_cematrix(database, params, save=True)
+    return annotate_cematrix(database, params, save=save)

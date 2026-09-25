@@ -46,10 +46,24 @@ def _signals():
     return Database([table])
 
 
-class _Session(template_doc.Session):
-    """The real Session, its hook Database synthetic (no staging in a unit test)."""
-    def database(self, hook):
-        return _signals() if hook == "after_300" else None
+_REAL_SESSION = template_doc.Session
+
+
+def _session(path=None):
+    """The real Session, its after_300 Database synthetic (the Session's seam - no staging here)."""
+    return _REAL_SESSION(path, hooks={"before_300": None, "after_300": lambda system: _signals()})
+
+
+def _pump(root, done, timeout: float = 10.0) -> bool:
+    """Run the Tk loop until `done()` - the template mode builds a hook's Database in a worker."""
+    import time
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        root.update()
+        if done():
+            return True
+        time.sleep(0.02)
+    return False
 
 
 def _tk():
@@ -123,8 +137,7 @@ def test_template_mode_in_the_files_panel():
     root = _tk()
     if root is None:
         return
-    original = template_doc.Session
-    template_doc.Session = _Session
+    template_doc.Session = _session
     try:
         with tempfile.TemporaryDirectory() as project:
             path = _project(project)
@@ -140,6 +153,8 @@ def test_template_mode_in_the_files_panel():
             ok("Choose a rule" in mode.preview.get("1.0", "end"), "the preview invites a rule")
             mode.rule_box.current(1)
             mode.on_rule()
+            ok("building the Database" in mode.preview.get("1.0", "end-1c"), "a worker builds the hook's Database")
+            ok(_pump(root, lambda: mode.preview.get("1.0", "end-1c").startswith("APPEND")), "…then the preview")
             eq(str(mode.row_box.cget("to")), "1.0", "the rule's source rows (2) at its hook")
             preview = mode.preview.get("1.0", "end-1c")
             ok(preview.startswith("APPEND to ") and preview.endswith("REGION B1\n  PEC(P1);\nEND_REGION"),
@@ -166,7 +181,7 @@ def test_template_mode_in_the_files_panel():
             mode.popup.accept()
             eq(text.get("2.0", "2.end"), "  {$tag", "accepted into the text")
     finally:
-        template_doc.Session = original
+        template_doc.Session = _REAL_SESSION
         config.use_project(None)
         root.destroy()
 
@@ -219,13 +234,17 @@ def test_every_viewer_keeps_the_shipped_config_read_only():
             _project(project, templates=None)
             config.use_project(project)
             panel = _panel(root, project)
-            shipped_csv = os.path.join(SYSTEM.config_root, "chain_reactions", "reactions.csv")
+            shipped_csv = os.path.join(SYSTEM.config_root, "classification", "gate_rules.csv")   # data rows
+            with open(shipped_csv, "rb") as handle:
+                before = handle.read()
             panel._load(shipped_csv)
             root.update()
             eq([grid._editable for grid in _widgets(panel.editor, datagrid.DataGrid)], [False],
                "the shipped CSV grid is read-only")
-            ok("Open project copy" in _buttons(panel.editor) and "Save" not in _buttons(panel.editor),
-               f"…the project already has its copy: 'Open project copy', no Save ({_buttons(panel.editor)})")
+            ok("Create project copy" in _buttons(panel.editor) and "Save" not in _buttons(panel.editor),
+               f"…with the copy button, no Save ({_buttons(panel.editor)})")
+            with open(shipped_csv, "rb") as handle:
+                eq(handle.read(), before, "the shipped file is untouched")
             own_csv = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions", "reactions.csv")
             panel._load(own_csv)
             root.update()

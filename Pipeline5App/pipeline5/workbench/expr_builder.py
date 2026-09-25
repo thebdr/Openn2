@@ -18,6 +18,7 @@ from tkinter import ttk
 from pipeline5 import config
 from pipeline5.language import expr
 from pipeline5.workbench import theme
+from pipeline5.workbench.completion_popup import NAVIGATION, CompletionPopup
 
 _ROW_CAP = 500                 # rows loaded per table (an authoring aid, not a browser)
 _DEBOUNCE_MS = 150
@@ -118,8 +119,6 @@ class ExprBuilder(tk.Toplevel):
         self.geometry("760x460")
         self._mode = mode
         self._job = None
-        self._popup: tk.Toplevel | None = None
-        self._listbox: tk.Listbox | None = None
         self._tables = load_tables(config.database_dir())
 
         bar = ttk.Frame(self)
@@ -143,8 +142,7 @@ class ExprBuilder(tk.Toplevel):
                               insertbackground=theme.fg_for(mode), font=theme.MONO_FONT)
         self.editor.pack(side="top", fill="x", padx=8)
         self.editor.bind("<KeyRelease>", self._on_key)
-        self.editor.bind("<Escape>", lambda _e: self._close_popup())
-        self.editor.bind("<Button-1>", lambda _e: self._close_popup(), "+")
+        self.popup = CompletionPopup(self.editor, mode, on_accept=self._schedule)   # the shared popup
         self._configure_tags()
 
         self._lint = ttk.Label(self, text="", anchor="w")
@@ -164,7 +162,7 @@ class ExprBuilder(tk.Toplevel):
             self._on_table()
         else:
             self._show_preview("no Database tables found - run a phase first")
-        self.bind("<Destroy>", lambda e: self._close_popup() if e.widget is self else None)
+        self.bind("<Destroy>", lambda e: self.popup.close() if e.widget is self else None)
 
     # --- context ------------------------------------------------------------------------------- #
     def _columns(self) -> list:
@@ -189,7 +187,7 @@ class ExprBuilder(tk.Toplevel):
 
     # --- editing / refresh ----------------------------------------------------------------------- #
     def _on_key(self, event) -> None:
-        if event.keysym in ("Up", "Down", "Return", "Tab", "Escape") and self._popup:
+        if event.keysym in NAVIGATION and self.popup.is_open:
             return                                  # the popup navigation handled its own keys
         self._schedule()
         self._autocomplete()
@@ -243,67 +241,13 @@ class ExprBuilder(tk.Toplevel):
             self.editor.tag_configure(tag, **kwargs)
         self.editor.tag_raise("lint")
 
-    # --- autocomplete ---------------------------------------------------------------------------- #
+    # --- autocomplete (the shared popup - completion_popup.py) ------------------------------------- #
     def _autocomplete(self) -> None:
-        self._close_popup()
         text = self.editor.get("1.0", "end-1c")
         pos = len(self.editor.get("1.0", "insert"))
         word, start = word_before(text, pos)
         cands = completions(word, self._columns(), self._tables) if word else []
-        if not cands:
-            return
-        bbox = self.editor.bbox("insert")
-        if not bbox:
-            return
-        x = self.editor.winfo_rootx() + bbox[0]
-        y = self.editor.winfo_rooty() + bbox[1] + bbox[3]
-        popup = tk.Toplevel(self)
-        popup.overrideredirect(True)
-        popup.attributes("-topmost", True)
-        listbox = tk.Listbox(popup, height=min(8, len(cands)), font=theme.MONO_FONT,
-                             background=theme.bg_for(self._mode), foreground=theme.fg_for(self._mode))
-        for c in cands[:40]:
-            listbox.insert("end", c)
-        listbox.selection_set(0)
-        listbox.pack()
-        popup.geometry(f"+{x}+{y}")
-        self._popup, self._listbox = popup, listbox
-
-        def accept(_e=None):
-            sel = listbox.get(listbox.curselection() or 0)
-            self._close_popup()
-            self.editor.delete(f"1.0+{start}c", "insert")
-            self.editor.insert("insert", sel)
-            self._schedule()
-            return "break"
-
-        def move(delta):
-            cur = (listbox.curselection() or (0,))[0]
-            new = max(0, min(listbox.size() - 1, cur + delta))
-            listbox.selection_clear(0, "end")
-            listbox.selection_set(new)
-            listbox.see(new)
-            return "break"
-
-        listbox.bind("<Double-1>", accept)
-        self.editor.bind("<Return>", lambda e: accept() if self._popup else None)
-        self.editor.bind("<Tab>", lambda e: accept() if self._popup else None)
-        self.editor.bind("<Down>", lambda e: move(1) if self._popup else None)
-        self.editor.bind("<Up>", lambda e: move(-1) if self._popup else None)
-
-    def _close_popup(self) -> None:
-        if self._popup is not None:
-            try:
-                self._popup.destroy()
-            except tk.TclError:
-                pass
-            self._popup = self._listbox = None
-        try:                                       # the dialog may be mid-teardown (editor already gone)
-            if self.editor.winfo_exists():
-                for seq in ("<Return>", "<Tab>", "<Down>", "<Up>"):
-                    self.editor.unbind(seq)
-        except tk.TclError:
-            pass
+        self.popup.show(cands, f"1.0+{start}c")
 
     def _open_guide(self) -> None:
         try:
