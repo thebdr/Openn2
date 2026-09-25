@@ -449,3 +449,113 @@ def _expression_candidates(word: str, loops: dict, context: Context) -> list:
 def _prefixed(stem: str, pool) -> list:
     stem = stem.lower()
     return [item for item in pool if str(item).lower().startswith(stem) and str(item).lower() != stem]
+
+
+# --- the live session (the view's state, Tk-free) ---------------------------------------------------- #
+def is_templates_file(path: str) -> bool:
+    """A chain-reaction templates file - `chain_reactions/templates.yaml` in any tier - opens in the
+    template mode."""
+    import os
+    parts = os.path.normcase(os.path.abspath(path)).split(os.sep)
+    return parts[-1:] == ["templates.yaml"] and parts[-2:-1] == ["chain_reactions"]
+
+
+class Session:
+    """The builder's live context over the ACTIVE config: the compiled rules (reactions.csv), the
+    run-plan's hooks and the Database each one sees (loaded once per hook - `reload()` refreshes),
+    the project params. The view is a thin shell over it: `check` = the lint placed on the document,
+    `preview_text` = one fire for one row, as text."""
+
+    def __init__(self):
+        self.reload()
+
+    def reload(self) -> None:
+        from pipeline5 import config
+        from pipeline5.phases.chain_reactions import engine
+        from pipeline5.systems import catalog
+        self.notes = []                               # what could not load - shown, never raised
+        try:
+            rows = config.load_reactions()
+        except Exception as error:  # noqa: BLE001 - the engine reports rx_rules_unreadable; so do we
+            rows = []
+            self.notes.append(f"reactions.csv does not load: {error}")
+        self.rules, findings = engine.compile_rules(rows)
+        self.notes += [f"{f.type}: {f.detail}" for f in findings]
+        active = config.active_system()
+        system = catalog.by_id(active[0]) if active else None
+        self.hooks = dict(getattr(system, "reaction_hooks", None) or {})
+        try:
+            self.params = config.load_params()
+        except Exception as error:  # noqa: BLE001
+            self.params = {}
+            self.notes.append(f"project params do not load: {error}")
+        self._databases = {}
+
+    def database(self, hook: str):
+        """The Database `hook` sees (None: database-less, or not loadable - noted)."""
+        if hook not in self._databases:
+            loader = self.hooks.get(hook)
+            try:
+                self._databases[hook] = loader() if loader else None
+            except Exception as error:  # noqa: BLE001 - e.g. nothing staged yet in this project
+                self._databases[hook] = None
+                self.notes.append(f"the {hook} database does not load: {error}")
+        return self._databases[hook]
+
+    def rule_labels(self) -> list:
+        return ["(no rule - the syntax checks only)"] + [
+            f"{r.name}  ·  {r.fire_when}  ·  {r.action} -> {r.target}" for r in self.rules]
+
+    def rule(self, index: int):
+        """The rule at `index` of `rule_labels()` (0 = no rule)."""
+        return self.rules[index - 1] if 1 <= index <= len(self.rules) else None
+
+    def row_count(self, rule) -> int:
+        """How many source rows the rule's hook offers (0: source-less, or no such table there)."""
+        database = self.database(rule.fire_when) if rule is not None else None
+        if rule is None or not rule.source_table or database is None or rule.source_table not in database:
+            return 0
+        return len(database[rule.source_table])
+
+    def context(self, rule) -> Context:
+        """The completion context for `rule` (None: the document alone)."""
+        if rule is None:
+            return Context(params=self.params)
+        database = self.database(rule.fire_when)
+        tables = {} if database is None else {n: database[n].effective_columns() for n in database.names()}
+        fields = None
+        if not rule.source_table or rule.source_table in tables:
+            fields = frozenset({"_params", "_rule", "_db"} | set(tables.get(rule.source_table, ())))
+        return Context(fields=fields, tables=tables, params=self.params)
+
+    def check(self, doc: Doc, rule) -> list:
+        """engine.lint on the document (the rule's context when one is chosen), placed."""
+        from pipeline5.phases.chain_reactions import engine
+        if doc.error is not None:
+            return place(doc, [])
+        database = self.database(rule.fire_when) if rule is not None else None
+        hooks = tuple(self.hooks) or None
+        return place(doc, engine.lint(doc.templates, rule, database, hooks))
+
+    def preview_text(self, doc: Doc, rule, row: int) -> str:
+        """What ONE fire of `rule` would do for source row `row` (engine.preview), as text."""
+        from pipeline5.phases.chain_reactions import engine
+        if rule is None:
+            return "Choose a rule to preview what a fire would do for one of its rows."
+        if doc.error is not None:
+            return "templates.yaml does not load - fix it to preview."
+        shown = engine.preview(rule, row, templates=doc.templates, params=self.params,
+                               database=self.database(rule.fire_when))
+        lines = []
+        if shown.note:
+            lines.append(shown.note)
+        if not shown.matched and shown.problem is None and not shown.note:
+            lines.append("(this row does NOT match the rule's condition - a fire skips it; rendered anyway:)")
+        if shown.problem is not None:
+            lines.append(f"{shown.problem[0]}: {shown.problem[1]}")
+        if rule.action == "file" and shown.problem is None and not shown.note:
+            lines += [f"APPEND to {shown.path}:", shown.text]
+        elif shown.rows:
+            lines.append(f"SPAWN into {rule.target}:")
+            lines += ["  " + ", ".join(f"{k}={v!r}" for k, v in row_values.items()) for row_values in shown.rows]
+        return "\n".join(lines)

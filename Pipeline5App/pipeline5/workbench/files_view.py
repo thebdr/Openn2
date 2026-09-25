@@ -50,8 +50,10 @@ def matches(rel: str, include, exclude) -> bool:
 
 def placeholder_map(params: dict) -> dict:
     """The `${name}` -> path table a files_tab root resolves through, against the ACTIVE config/project."""
+    system = config.active_system()
     return {
         "config_project": config.config_project_dir(),
+        "system_config": (system[1] if system else "") or "",     # the SHIPPED system config (read-only)
         "user_input": config.user_input_dir(),
         "database_dir": config.database_dir(),
         "output_root": config.output_root(),
@@ -97,6 +99,45 @@ def sections_from_config(specs, params: dict) -> tuple:
         warnings.extend(f"{title}: {w}" for w in bad_inc + bad_exc)
         sections.append({"title": title, "roots": roots, "include": include, "exclude": exclude})
     return sections, warnings
+
+
+def is_shipped_system_config(path: str) -> bool:
+    """True for a file of the ACTIVE system's SHIPPED config (`System.config_root`, resolver tier 3) - it
+    opens READ-ONLY: a project overrides it through a project copy, never by editing what ships (the
+    P-012 spec review's decision, for the chain-reaction templates first)."""
+    system = config.active_system()
+    root = os.path.abspath(system[1]) if system and system[1] else ""
+    if not root:
+        return False
+    target = os.path.abspath(path)
+    return os.path.normcase(target).startswith(os.path.normcase(root) + os.sep)
+
+
+def project_copy_target(path: str) -> tuple:
+    """(target, None) - where 'Create project copy' puts a shipped system config file: the resolver's
+    tier 1, `<project>/config_project/systems/<sid>/<same relative path>`, which then OVERRIDES the
+    shipped one for this project - or (None, why not)."""
+    system, project = config.active_system(), config.active_project()
+    if not is_shipped_system_config(path):
+        return None, "not a shipped system config file"
+    if not project:
+        return None, "open a project to create its own copy"
+    rel = os.path.relpath(os.path.abspath(path), os.path.abspath(system[1]))
+    return os.path.join(project, "config_project", "systems", system[0], rel), None
+
+
+def create_project_copy(path: str) -> str:
+    """Copy a shipped system config file to its project tier (`project_copy_target`) and return the
+    copy's path. Never overwrites: an existing copy raises FileExistsError (open it instead)."""
+    import shutil
+    target, reason = project_copy_target(path)
+    if target is None:
+        raise ValueError(reason)
+    if os.path.exists(target):
+        raise FileExistsError(target)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    shutil.copy2(path, target)
+    return target
 
 
 def viewer_kind(name: str) -> str | None:

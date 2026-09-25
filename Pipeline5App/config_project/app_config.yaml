@@ -26,7 +26,8 @@ user_interface:
 # empty branches pruned; a file shows when ANY include matches and NO exclude does. A shown file without
 # a dedicated viewer still opens via the Open-externally buttons.
 # Placeholders: ${config_project} ${user_input} ${database_dir} ${output_root} ${reports}
-#               ${iolist} ${matrix} ${project_root}
+#               ${iolist} ${matrix} ${project_root} ${system_config} (the active system's SHIPPED
+#               config - its files open READ-ONLY, with 'Create project copy' to override them)
 # A project app_config.yaml WITHOUT this section inherits the app's builtin one; if neither has it, the
 # Files tab shows a pointed warning (the structure is never baked into code).
 files_tab:
@@ -35,6 +36,10 @@ files_tab:
     roots: ['${config_project}']
     include: [.*]
     exclude: [~\$.*, .*\.pyc$, .*\.bak_.*, __pycache__]
+  - title: System configuration (shipped, read-only)
+    roots: ['${system_config}']
+    include: [.*]
+    exclude: [~\$.*, .*\.pyc$, __pycache__]
   - title: User editable files
     roots: ['${iolist}', '${matrix}', '${user_input}']
     include: [.*]

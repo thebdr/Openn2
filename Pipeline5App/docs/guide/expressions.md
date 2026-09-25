@@ -54,7 +54,9 @@ brace is written doubled**: `{{ S7_Optimized_Access := 'TRUE' }}` renders the TI
 `{ S7_Optimized_Access := 'TRUE' }`, a hole still works inside it (`{{ Name := '{$name}' }}`), and
 `{{{$x}}}` puts a brace around a hole. A single brace that opens or closes no hole is an error, and
 so is a brace inside a hole (write a regex quantifier out: `/\d\d/`, not `/\d{2}/`). The other
-templates keep copying a stray brace verbatim.
+templates keep copying a stray brace verbatim. The Files tab's **template mode** checks all of this
+as you type, in every branch, and previews a rule's fire on a real row - see
+[The Files tab](guide://files-tab).
 
 The full syntax reference lives at the top of
 [pipeline5/language/expr/\_\_init\_\_.py](src://pipeline5/language/expr/__init__.py).

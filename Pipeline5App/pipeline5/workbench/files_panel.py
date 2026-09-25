@@ -6,6 +6,11 @@ dirty pane guards against silent discard; an over-cap file falls back to read-on
 carries a path strip + **Open externally** / **Open folder** buttons (`gui/extedit`). Table edits
 still go through the codec (the grids stay read-only). The Tk-free scan/filter/read/write logic
 lives in `gui/files_view.py` (tested); this is the view.
+
+A SHIPPED system config file (the active system's `config_root`) opens READ-ONLY with **Create
+project copy** - the copy lands in the open project's per-system tier and overrides the shipped one.
+A `chain_reactions/templates.yaml` opens in the TEMPLATE MODE (template_mode.py - P-012): two-layer
+highlighting, live lint, a rule/row context bar, a preview, autocomplete.
 """
 from __future__ import annotations
 
@@ -18,6 +23,8 @@ from pipeline5.workbench import external_editor as extedit
 from pipeline5.workbench import files_view
 from pipeline5.workbench import syntax_highlight as highlight
 from pipeline5.workbench import object_editor
+from pipeline5.workbench import template_doc
+from pipeline5.workbench import template_mode
 from pipeline5.workbench import theme
 
 
@@ -30,6 +37,7 @@ class FilesPanel(ttk.Frame):
         self._paths: dict = {}            # tree item id -> absolute file path
         self._cur: str | None = None      # the file currently shown (re-themed in place)
         self._textw: tk.Text | None = None
+        self._template = None             # the TemplateMode of a shown templates.yaml (P-012)
         self._text_editable = False       # the shown text pane accepts edits (drives the dirty guard)
         self._csv_dirty = False           # the shown CSV grid carries unsaved cell edits
         self._reselecting = False         # ignore the selection event our own dirty-guard rollback fires
@@ -153,6 +161,7 @@ class FilesPanel(ttk.Frame):
 
     def _clear_editor(self) -> None:
         self._textw = None
+        self._template = None
         self._text_editable = False
         self._csv_dirty = False
         for w in self.editor.winfo_children():
@@ -291,13 +300,26 @@ class FilesPanel(ttk.Frame):
         """The monospace text EDITOR (+ live yaml/json highlighting): text-based files edit in place
         and save ATOMICALLY with their original BOM/newline style (Save button / Ctrl+S; Revert
         re-reads). A file over the editor cap opens READ-ONLY - saving a truncated read would destroy
-        the tail (Open externally instead)."""
+        the tail (Open externally instead) - and so does a SHIPPED system config file (Create project
+        copy). A chain_reactions/templates.yaml gets the TEMPLATE MODE below the text."""
         info = files_view.read_text_file(path)
-        editable = not info["truncated"]
+        shipped = files_view.is_shipped_system_config(path)
+        editable = not info["truncated"] and not shipped
         bar = ttk.Frame(self.editor)
         bar.pack(side="top", fill="x", padx=6, pady=(0, 2))
-        frame = ttk.Frame(self.editor)
-        frame.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
+        # highlighting above the cap would freeze every keystroke on a huge file - skip it there
+        highlightable = len(info["text"]) <= files_view.HIGHLIGHT_CAP
+        template = highlightable and template_doc.is_templates_file(path)
+        if template:                          # the rule/row bar, then the text over problems | preview
+            context_bar = ttk.Frame(self.editor)
+            context_bar.pack(side="top", fill="x", padx=6, pady=(0, 2))
+            holder = ttk.Panedwindow(self.editor, orient="vertical")
+            holder.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
+            frame = ttk.Frame(holder)
+            holder.add(frame, weight=3)
+        else:
+            frame = ttk.Frame(self.editor)
+            frame.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
         text = tk.Text(frame, wrap="none", relief="flat", borderwidth=0, undo=True,
                        background=theme.bg_for(self._mode), foreground=theme.fg_for(self._mode),
                        insertbackground=theme.fg_for(self._mode), font=theme.MONO_FONT)
@@ -305,25 +327,32 @@ class FilesPanel(ttk.Frame):
         hsb = ttk.Scrollbar(frame, orient="horizontal", command=text.xview)
         text.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         text.insert("1.0", info["text"])
-        # highlighting above the cap would freeze every keystroke on a huge file - skip it there
-        highlightable = len(info["text"]) <= files_view.HIGHLIGHT_CAP
         kind = [highlight.kind_of(path) if highlightable else None]  # a HOLDER - the picker swaps it
         highlight.configure_tags(text, self._mode)
-        if kind[0]:
-            highlight.apply(text, kind[0], info["text"])
         vsb.pack(side="right", fill="y")
         hsb.pack(side="bottom", fill="x")
         text.pack(side="left", fill="both", expand=True)
         self._textw = text
         self._text_editable = editable
+        if template:
+            lower = ttk.Frame(holder)
+            holder.add(lower, weight=1)
+            self._template = template_mode.TemplateMode(text, context_bar, lower, mode=self._mode)
+        elif kind[0]:
+            highlight.apply(text, kind[0], info["text"])
 
         def repaint():
+            if self._template is not None:
+                self._template.refresh()
+                return
             for tag in highlight.COLORS:
                 text.tag_remove(tag, "1.0", "end")
             if kind[0]:
                 highlight.apply(text, kind[0], text.get("1.0", "end-1c"))
 
-        if highlightable:                     # the SELECTABLE language (Notepad++-style; langs.json)
+        if template:
+            ttk.Label(bar, text="template mode").pack(side="right", padx=(8, 2))
+        elif highlightable:                   # the SELECTABLE language (Notepad++-style; langs.json)
             ttk.Label(bar, text="Lang:").pack(side="right", padx=(8, 2))
             lang_box = ttk.Combobox(bar, width=8, state="readonly",
                                     values=["plain"] + highlight.available_kinds())
@@ -337,8 +366,11 @@ class FilesPanel(ttk.Frame):
 
         if not editable:
             text.configure(state="disabled")
-            ttk.Label(bar, text=f"read-only: over the {files_view.TEXT_EDIT_CAP // 1_000_000} MB "
-                                "editor cap - Open externally").pack(side="left")
+            if shipped:
+                self._project_copy_bar(bar, path)
+            else:
+                ttk.Label(bar, text=f"read-only: over the {files_view.TEXT_EDIT_CAP // 1_000_000} MB "
+                                    "editor cap - Open externally").pack(side="left")
             return
 
         save_btn = ttk.Button(bar, text="Save  (Ctrl+S)")
@@ -361,7 +393,9 @@ class FilesPanel(ttk.Frame):
         def on_modified(_event=None):
             if text.edit_modified():
                 set_dirty(True)
-                if kind[0]:                       # debounce the re-highlight while typing
+                if self._template is not None:    # the template mode debounces its own refresh
+                    self._template.schedule()
+                elif kind[0]:                     # debounce the re-highlight while typing
                     if hl_job[0]:
                         text.after_cancel(hl_job[0])
                     hl_job[0] = text.after(200, rehighlight)
@@ -384,6 +418,50 @@ class FilesPanel(ttk.Frame):
         text.bind("<<Modified>>", on_modified)
         text.bind("<Control-s>", save)
 
+    def _project_copy_bar(self, bar, path: str) -> None:
+        """A SHIPPED system config file is read-only here: 'Create project copy' puts it in the open
+        project's per-system tier, where it overrides the shipped one (or 'Open project copy' when
+        that copy exists); with no project open there is nowhere to put it."""
+        target, reason = files_view.project_copy_target(path)
+        exists = target is not None and os.path.exists(target)
+        button = ttk.Button(bar, text="Open project copy" if exists else "Create project copy",
+                            command=lambda: self._project_copy(path))
+        button.pack(side="left")
+        if target is None:
+            button.configure(state="disabled")
+        ttk.Label(bar, text="read-only: shipped with the app - " +
+                  (reason if target is None else "a project copy overrides it for this project")).pack(
+            side="left", padx=8)
+
+    def _project_copy(self, path: str) -> None:
+        target, reason = files_view.project_copy_target(path)
+        if target is None:
+            self.on_status(reason)
+            return
+        if not os.path.exists(target):
+            try:
+                files_view.create_project_copy(path)
+            except OSError as error:
+                self.on_status(f"project copy failed: {error}")
+                return
+            self.on_status(f"created {target} - it overrides the shipped file for this project")
+        self.refresh()
+        self._reveal(target)
+
+    def _reveal(self, target: str) -> None:
+        """Select `target` in the tree when a section lists it (its folders opened), else show it."""
+        wanted = os.path.normcase(os.path.abspath(target))
+        for item, known in self._paths.items():
+            if os.path.normcase(os.path.abspath(known)) == wanted:
+                parent = self.tree.parent(item)
+                while parent:
+                    self.tree.item(parent, open=True)
+                    parent = self.tree.parent(parent)
+                self.tree.selection_set(item)
+                self.tree.see(item)
+                return
+        self._load(target)
+
     def set_theme(self, mode: str) -> None:
         """Re-theme the panel for a light/dark switch. The ttk widgets follow the token styles; only the
         classic-tk text viewer needs its bg/fg set - reconfigure it live if one is shown."""
@@ -391,7 +469,9 @@ class FilesPanel(ttk.Frame):
         if self._textw is not None and self._textw.winfo_exists():
             self._textw.configure(background=theme.bg_for(mode), foreground=theme.fg_for(mode),
                                   insertbackground=theme.fg_for(mode))
-            if self._cur and highlight.kind_of(self._cur):
+            if self._template is not None:
+                self._template.set_theme(mode)
+            elif self._cur and highlight.kind_of(self._cur):
                 highlight.configure_tags(self._textw, mode)
         # the canvas DataGrids don't follow ttk styles - re-render the shown grid file in the new
         # mode (an open xlsx falls back to its first sheet; the text/object views re-theme in place)
