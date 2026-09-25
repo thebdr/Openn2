@@ -35,8 +35,9 @@ durable changes belong in the source documents or the config CSVs.
 ## The shipped system configuration (read-only)
 
 The **System configuration (shipped, read-only)** section lists the configuration that ships with
-the active system (the `${system_config}` placeholder). Its files open **read-only**. To change one for
-your project, press **Create project copy**. The copy lands in your project's per-system
+the active system (the `${system_config}` placeholder). Its files open **read-only** in every viewer:
+the text view, the CSV grid (no in-place edits), and the Object explorer (which is disabled here,
+because it saves). To change one for your project, press **Create project copy**. The copy lands in your project's per-system
 configuration folder (`<project>/config_project/systems/<system>/`, same relative path), and from
 then on it **overrides** the shipped file for that project. Once a copy exists the button reads
 **Open project copy**. With no project open there is nowhere to put a copy, so the button is

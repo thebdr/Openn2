@@ -188,18 +188,27 @@ class FilesPanel(ttk.Frame):
     def _show_csv(self, path: str) -> None:
         """The CSV grid, EDITABLE per cell: double-click a data cell, Enter commits, Save writes the
         table back in its own dialect (sniffed delimiter, CRLF, minimal quoting). Multi-line cells
-        refuse the single-line editor (a bell); the header row stays display-only."""
+        refuse the single-line editor (a bell); the header row stays display-only. A SHIPPED system
+        config table is read-only (Create project copy)."""
         self._clear_editor()
         self._header(path)
         rows, delim = files_view.read_csv_rows_delim(path)
         bar = ttk.Frame(self.editor)
         bar.pack(side="top", fill="x", padx=6, pady=(0, 2))
+        shipped = files_view.is_shipped_system_config(path)
+        if shipped:
+            self._project_copy_bar(bar, path)
         frame = ttk.Frame(self.editor)
         frame.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
         if not rows:
             ttk.Label(frame, text="(empty)", padding=8).pack(anchor="nw")
             return
         header_row, data = rows[0], rows[1:]
+        if shipped:                               # read-only: no in-place edits, no Save
+            grid = datagrid.DataGrid(frame, mode=self._mode)
+            grid.pack(fill="both", expand=True)
+            grid.set_data(header_row, data)
+            return
 
         save_btn = ttk.Button(bar, text="Save")
         save_btn.pack(side="left")
@@ -280,16 +289,20 @@ class FilesPanel(ttk.Frame):
         self._header(path)
         row = ttk.Frame(self.editor)
         row.pack(side="top", fill="x", padx=6, pady=(0, 2))
-        choice = tk.StringVar(value="object" if self._obj_mode else "text")
+        shipped = files_view.is_shipped_system_config(path)   # the Object explorer SAVES: a shipped
+        object_mode = self._obj_mode and not shipped           # file shows the read-only Text view
+        choice = tk.StringVar(value="object" if object_mode else "text")
 
         def flip():
             self._obj_mode = choice.get() == "object"
             self._load(path)
 
         ttk.Radiobutton(row, text="Text", value="text", variable=choice, command=flip).pack(side="left")
-        ttk.Radiobutton(row, text="Object explorer", value="object", variable=choice,
-                        command=flip).pack(side="left", padx=10)
-        if self._obj_mode:
+        explorer = ttk.Radiobutton(row, text="Object explorer", value="object", variable=choice, command=flip)
+        explorer.pack(side="left", padx=10)
+        if shipped:
+            explorer.configure(state="disabled")
+        if object_mode:
             editor = object_editor.ObjectEditor(self.editor, path, on_status=self.on_status,
                                                 mode=self._mode)
             editor.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))

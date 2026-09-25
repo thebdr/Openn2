@@ -198,10 +198,57 @@ def test_the_shipped_file_is_read_only_until_copied():
         root.destroy()
 
 
+def _widgets(widget, kind) -> list:
+    """Every widget of class `kind` under `widget` (recursive)."""
+    found = [widget] if isinstance(widget, kind) else []
+    for child in widget.winfo_children():
+        found += _widgets(child, kind)
+    return found
+
+
+def test_every_viewer_keeps_the_shipped_config_read_only():
+    """Not only the text editor: the CSV grid (it edits cells in place) and the Object explorer (it
+    saves) keep a shipped system config file read-only - each with the copy button - while a
+    project file of the same kinds stays editable."""
+    root = _tk()
+    if root is None:
+        return
+    from pipeline5.workbench import datagrid, object_editor
+    try:
+        with tempfile.TemporaryDirectory() as project:
+            _project(project, templates=None)
+            config.use_project(project)
+            panel = _panel(root, project)
+            shipped_csv = os.path.join(SYSTEM.config_root, "chain_reactions", "reactions.csv")
+            panel._load(shipped_csv)
+            root.update()
+            eq([grid._editable for grid in _widgets(panel.editor, datagrid.DataGrid)], [False],
+               "the shipped CSV grid is read-only")
+            ok("Open project copy" in _buttons(panel.editor) and "Save" not in _buttons(panel.editor),
+               f"…the project already has its copy: 'Open project copy', no Save ({_buttons(panel.editor)})")
+            own_csv = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions", "reactions.csv")
+            panel._load(own_csv)
+            root.update()
+            eq([grid._editable for grid in _widgets(panel.editor, datagrid.DataGrid)], [True], "a project CSV edits")
+            panel._obj_mode = True                            # the user prefers the Object explorer
+            panel._load(_SHIPPED)
+            root.update()
+            eq(_widgets(panel.editor, object_editor.ObjectEditor), [], "no Object explorer on a shipped file")
+            eq(str(panel._textw.cget("state")), "disabled", "…its read-only Text view instead")
+            own_yaml = os.path.join(project, "config_project", "shared", "project_params.yaml")
+            panel._load(own_yaml)
+            root.update()
+            eq(len(_widgets(panel.editor, object_editor.ObjectEditor)), 1, "a project yaml keeps the preference")
+    finally:
+        config.use_project(None)
+        root.destroy()
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_template_mode", [
         ("project_copy_helpers", test_project_copy_helpers),
         ("template_mode_in_the_files_panel", test_template_mode_in_the_files_panel),
         ("the_shipped_file_is_read_only_until_copied", test_the_shipped_file_is_read_only_until_copied),
+        ("every_viewer_keeps_the_shipped_config_read_only", test_every_viewer_keeps_the_shipped_config_read_only),
     ]))
