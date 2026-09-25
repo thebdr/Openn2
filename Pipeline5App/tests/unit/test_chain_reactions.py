@@ -588,6 +588,53 @@ def test_round_13_colon_target_and_utf8_text():
     _sandboxed(body)()
 
 
+def test_the_e1_scope_as_conditions_sources_and_row_templates_see_it():
+    """Refuter round 15 (its proposed pin, adopted): the E1 scope and the in-hook cascade were pinned
+    only as a fire-once TEXT template sees them. Conditions, source-table matching and ROW templates
+    see them too - a `lookup` condition, a `_params` gate, a `count(...)` guard over rows spawned
+    earlier in the same fire, `_rule`, a row template reading `_db` - each mutant dropping one of
+    those silently matched 0 rows, audited ok."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out:
+            sig = Table("signals", columns=["uid", "tag", "type_id", "script_type", "desc"], key_columns=["tag"])
+            sig.add(tag="S1", type_id="PEC", script_type="A")
+            sig.add(tag="S2", type_id="MOT", script_type="A")
+            types = Table("types", columns=["uid", "type_id", "category", "label"], key_columns=["type_id"])
+            types.add(type_id="PEC", category="SAFETY", label="photocell")
+            types.add(type_id="MOT", category="DRIVE", label="motor")
+            rules = [
+                {"name": "spawn", "fire_when": "after_300", "source_table": "signals", "action": "add_rows",
+                 "target": "signals", "condition": 'lookup("types", "type_id", $type_id, "category") = "SAFETY"',
+                 "template": "diag", "comment": ""},
+                {"name": "summary", "fire_when": "after_300", "source_table": "", "action": "add_rows",
+                 "target": "signals", "condition": "", "template": "summary_row", "comment": ""},
+                {"name": "per_diag", "fire_when": "after_300", "source_table": "signals", "action": "file",
+                 "target": "diag.scl", "condition": '$script_type = "DIAG" and $_params.rx.enable = "1"',
+                 "template": "call", "comment": ""},
+                {"name": "guard", "fire_when": "after_300", "source_table": "", "action": "file", "target": "guard.txt",
+                 "condition": 'count(signals, $script_type = "DIAG") > 0 and $_rule.hook = "after_300"',
+                 "template": "g", "comment": ""},
+            ]
+            templates = {"diag": [{"tag": "DIAG_{$tag}", "script_type": "DIAG",
+                                   "desc": '{lookup("types", "type_id", $type_id, "label")}'}],
+                         "summary_row": [{"tag": "SUM", "script_type": "SUM",
+                                          "desc": 'diags={count(signals, $script_type = "DIAG")}'}],
+                         "call": "DiagCall({$tag}, '{$desc}');", "g": "ok"}
+            database, findings = engine.fire("after_300", Database([sig, types]), rules=rules, templates=templates,
+                                             params={"rx": {"enable": "1"}}, files_root=out)
+            eq(findings, [], "clean")
+            eq([(r["rule"], r["matches"], r["created"], r["outcome"]) for r in database[engine.LOG_TABLE]],
+               [("spawn", 1, 1, "ok"), ("summary", 1, 1, "ok"), ("per_diag", 1, 1, "ok"), ("guard", 1, 1, "ok")],
+               "each rule matched exactly its row - through `lookup`, `_params`, `count` over spawns, `_rule`")
+            eq([(r["tag"], r["desc"]) for r in database["signals"] if r.get("spawned_by")],
+               [("DIAG_S1", "photocell"), ("SUM", "diags=1.0")], "row templates read `_db` - and the cascade")
+            with open(os.path.join(out, "diag.scl"), encoding="utf-8") as handle:
+                eq(handle.read(), "DiagCall(DIAG_S1, 'photocell');\n", "a later rule's SOURCE matched the spawn")
+            with open(os.path.join(out, "guard.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "ok\n", "a condition's `count` saw the spawn; `_rule.hook` resolved")
+    _sandboxed(body)()
+
+
 def test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook():
     """U3 (the orchestrator's mutation check): a malformed rule on a hook the run-plan never fires can
     never be recorded at its own hook - so it is an INDEX problem, recorded even by a hook that has no
@@ -984,6 +1031,8 @@ if __name__ == "__main__":
         ("round_10_evidence_holes", test_round_10_evidence_holes),
         ("round_12_target_strictness_and_else_if", test_round_12_target_strictness_and_else_if),
         ("round_13_colon_target_and_utf8_text", test_round_13_colon_target_and_utf8_text),
+        ("the_e1_scope_as_conditions_sources_and_row_templates_see_it",
+         test_the_e1_scope_as_conditions_sources_and_row_templates_see_it),
         ("undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook",
          test_undeclared_hooks_malformed_rule_is_recorded_by_a_rule_less_hook),
         ("unreadable_rules_file_is_recorded_not_just_rendered",

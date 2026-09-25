@@ -239,6 +239,7 @@ def test_if_else_and_lazy_branches():
     raises(TempemplatorError, lambda: _render("@for $i in 1..{$n}\nA\n@else\nB\n@end", {"n": ""}))
     # an inline body cannot be a BLOCK directive; `where` is a whole word (not `wherever`)
     for slip in ("@for $i in 1..{$n}: @else", "@for $i in 1..{$n}: @end", '@for $i in 1..{$n}: @if $x = "1"',
+                 "@for $i in 1..{$n}: @for $j in 1..2",                   # a BLOCK-form @for (round 15)
                  "@for $r in signals wherever $x: {$r.tag}"):
         raises(TempemplatorError, lambda: _render(slip, {"n": "", "_db": {"signals": []}}))
     raises(TempemplatorError, lambda: _render("@for $r in signals where: {$r.tag}", {"_db": {"signals": []}}))
@@ -290,6 +291,18 @@ def test_errors_locate_true_template_lines():
        "a second @else found by the NESTED block scan (M10)")
 
 
+def test_indented_directives():
+    """Refuter round 15 (its proposed pin, adopted): an INDENTED directive is a directive - its own
+    indentation consumed, body lines verbatim (their indentation kept). Every pin put directives at
+    column 0, so 'directives only at column 0' (the tempting fix for the recorded literal-@ hazard)
+    survived: indented @use / @if / @else / @end inside a REGION would come out as raw text."""
+    body = ("REGION {$name}\n  @use hdr\n  @if $kind = \"door\"\n    DoorCall();\n  @else\n    OtherCall();\n"
+            "  @end\n  @for $i in 1..2\n    PEC{$i}();\n  @end\n  @for $i in 1..2: X{$i}\nEND_REGION")
+    eq(render_template("t", {"t": body, "hdr": "// {$name}"}, {"name": "B1", "kind": "door"}),
+       "REGION B1\n// B1\n    DoorCall();\n    PEC1();\n    PEC2();\nX1\nX2\nEND_REGION",
+       "indented directives work; literal lines keep their indentation")
+
+
 def test_shipped_worked_examples_render():
     """The three REFERENCE templates shipped in the Siemens chain_reactions/templates.yaml are the
     VBA Tempemplator worked examples - they must render for real (the authoring manual is executable)."""
@@ -320,5 +333,6 @@ if __name__ == "__main__":
         ("for_table_query", test_for_table_query),
         ("if_else_and_lazy_branches", test_if_else_and_lazy_branches),
         ("errors_locate_true_template_lines", test_errors_locate_true_template_lines),
+        ("indented_directives", test_indented_directives),
         ("shipped_worked_examples_render", test_shipped_worked_examples_render),
     ]))
