@@ -279,6 +279,22 @@ def test_engine_lint_judges_entries_and_rules():
        "a literal ':' in a target - the fire refuses every row (C-025 round 1)")
     drive = engine.lint({"txt": "x"}, _rule(action="file", target="C:/out/{$name}.txt", template="txt"), _database())
     eq([p for p in drive if p.template is None], [], "…a drive's colon is fine")
+    colon = engine.lint({"txt": "x"}, _rule(action="file", target="{$name}:x/{$name}.txt", template="txt"), _database())
+    eq([(p.where, p.start) for p in colon if p.template is None], [("target", 7)], "…a hole's colon without a separator")
+
+    def drive_from_a_hole():                                  # C-024 refute round 19's note: the lint called a
+        with tempfile.TemporaryDirectory() as out:           # drive a HOLE renders a refused colon
+            letter, rest = os.path.splitdrive(out)
+            if not letter:
+                return                                        # (no drive letters on this platform)
+            target = "{$_params.drv}:" + rest.replace("\\", "/") + "/{$name}.txt"
+            rule = _rule(action="file", target=target, template="txt")
+            eq([p for p in engine.lint({"txt": "x"}, rule, _database()) if p.template is None], [],
+               "a drive a hole renders is the fire's to judge - no lint error")
+            _, findings = engine.fire("after_300", _database(), rules=[rule], templates={"txt": "x"},
+                                      params={"drv": letter[0]}, files_root=out)
+            eq((findings, sorted(os.listdir(out))), ([], ["D1.txt", "M1.txt"]), "…and the fire writes it")
+    _sandboxed(drive_from_a_hole)
 
 
 def test_format_specs_are_judged_in_every_branch():

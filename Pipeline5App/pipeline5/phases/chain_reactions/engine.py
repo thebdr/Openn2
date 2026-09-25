@@ -757,12 +757,21 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
 
 def _literal_colon(target: str):
     """The column of a LITERAL ':' the fire's target guards refuse whatever the row (None = none): any
-    ':' but a leading drive's (`C:\\` / `C:/`) - holes are data, judged per row by the fire."""
-    for kind, start, end in tempemplator.brace_runs(target):
+    ':' but a drive's - a leading literal letter's (`C:/`), or the one right after a LEADING hole that
+    may render the drive letter (`{$_params.drive}:/out` - C-024 refute round 19's note); holes are
+    data, judged per row by the fire."""
+    runs = tempemplator.brace_runs(target)
+    for number, (kind, start, end) in enumerate(runs):
         if kind != "text":
             continue
         for index in range(start, end):
-            if target[index] == ":" and not (index == 1 and target[0].isalpha() and target[2:3] in ("\\", "/")):
-                return index
+            if target[index] != ":":
+                continue
+            separated = target[index + 1:index + 2] in ("\\", "/")
+            if separated and index == 1 and target[0].isalpha():
+                continue                                     # a literal drive letter
+            if separated and number == 1 and index == start and runs[0][0] == "hole":
+                continue                                     # a drive a leading hole may render
+            return index
     return None
 

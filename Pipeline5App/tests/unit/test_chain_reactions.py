@@ -718,6 +718,30 @@ def test_the_backstop_holds_at_every_render_site():
                 eq(os.listdir(out), [], "…nothing written")
         finally:
             engine.tempemplator.render_text = real
+
+        class Boom(Exception):
+            pass
+
+        # round 19 (F2): ANY unforeseen exception - not only a RuntimeError: narrowing the backstop to
+        # RuntimeError survived every pin, and a TypeError would then crash the staging handler
+        for unforeseen in (TypeError("unforeseen"), Boom("boom"), KeyError("k"), ValueError("v")):
+            calls["n"] = 0
+
+            def raising(text, ctx, error=unforeseen):
+                calls["n"] += 1
+                if calls["n"] == 2:
+                    raise error
+                return real(text, ctx)
+
+            engine.tempemplator.render_text = raising
+            try:
+                database, findings = engine.fire("after_300", _db(), rules=[_rule()], params={},
+                                                 templates={"rows": [{"label": "a-{$name}"}, {"label": "b-{$name}"}]})
+            finally:
+                engine.tempemplator.render_text = real
+            eq([(x.type, x.detail) for x in findings], [("rx_rule_crashed", f"{type(unforeseen).__name__}: {unforeseen}")],
+               f"a {type(unforeseen).__name__} is a finding, never a crash")
+            eq(_log(database), [("after_300", "r1", 2, 1, "rx_rule_crashed")], "…audited with the true partial count")
     _sandboxed(body)()
 
 

@@ -348,6 +348,11 @@ def test_literal_braces():
         ok(False, "a lone brace must raise")
     except ExprError as error:
         ok(str(error).startswith("a lone '}' at line 2, column 4 of "), f"a mid-value brace: {error}")
+    try:                                              # round 19 (F1): a brace on line 3 - the column counts
+        render_text("l1\nl2\nl3 }x", {})              # from the LAST newline before it, not the first
+        ok(False, "a lone brace must raise")
+    except ExprError as error:
+        ok(str(error).startswith("a lone '}' at line 3, column 4 of "), f"a brace past two newlines: {error}")
 
 
 def test_shipped_worked_examples_render():
