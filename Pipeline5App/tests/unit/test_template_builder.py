@@ -80,6 +80,7 @@ def test_lint_walks_every_branch():
     context = lint({"t": body}, start="t", fields={"a", "b", "_params", "_rule", "_db"})
     ok(any(p.where == 4 and "$missing" in p.message for p in context), "…and, in context, its missing field")
     eq(lint({"t": "@if $a\nA\n@else\n@use t2\n@end", "t2": "{$x}"}), [], "a clean walk reports nothing")
+    eq(_errors(lint({"t": "@if $a\n@if $b\nx"})), {2}, "two unclosed blocks: ONLY the innermost, as the renderer says")
 
 
 def test_context_lint_matches_the_strict_render():
@@ -134,6 +135,9 @@ def test_positions_point_at_the_culprit():
     eq([(p.where, p.start, p.end) for p in found], [(2, 8, 12)], "an @use name inside an indented line")
     found = lint({"t": "@for $i in 1..{$n}: {$i.z}"}, start="t", fields={"_db"}, tables={})
     eq(sorted((p.start, p.end) for p in found), [(15, 17), (21, 25)], "a range-end hole + an inline body hole")
+    found = lint({"t": '  @for $s in signals where $s.tag = "P1"\nx\n  @end'}, start="t", fields={"_db"},
+                 tables={"signals": ["tag"]})
+    eq([(p.start, p.end) for p in found], [(27, 29)], "a `where` predicate's name, in an indented line")
 
 
 def test_silent_literals_and_boundary_lines():
@@ -200,6 +204,9 @@ def test_preview_equals_the_fire():
             fired = [r for r in database["dst"]]
             shown = engine.preview(_rule(), index, templates=templates, params={}, database=_database())
             eq((shown.matched, shown.rows, shown.problem), (True, fired, None), f"add_rows row {index}")
+            kept = _database()                               # the builder keeps the hook's layer
+            eq(engine.preview(_rule(), index, templates=templates, params={}, database=kept,
+                              layer=engine.db_layer(kept)), shown, "a kept layer previews the same")
         with tempfile.TemporaryDirectory() as out:
             rule = _rule(action="file", target="gen/{$name}.scl", template="txt")
             engine.fire("after_300", _database(), templates=templates, params={}, rules=[rule], files_root=out)
@@ -257,8 +264,10 @@ def test_engine_lint_judges_entries_and_rules():
     messages = " | ".join(p.message for p in found if p.template is None)
     for needle in ("is not a ROW template", "never fired", "source table 'src'", "target table 'dst'"):
         ok(needle in messages, f"a rule problem: {needle!r} ({messages})")
-    ok(not any(p.template == "rows" and "missing" in p.message for p in found),
-       "an absent source table does not flood every hole as missing")
+    found = engine.lint({"own": [{"label": "L-{$name}"}]}, _rule(template="own"), None)
+    eq([p.message for p in found if p.template == "own"], [],
+       "an absent source table does not flood the rule's own holes as missing (one rule problem says why)")
+    ok(any("source table 'src'" in p.message for p in found), "…the rule problem")
 
 
 if __name__ == "__main__":

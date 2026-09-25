@@ -490,6 +490,7 @@ class Session:
             self.params = {}
             self.notes.append(f"project params do not load: {error}")
         self._databases = {}
+        self._layers = {}                              # hook -> engine.db_layer (built once)
 
     def database(self, hook: str):
         """The Database `hook` sees (None: database-less, or not loadable - noted)."""
@@ -544,8 +545,11 @@ class Session:
             return "Choose a rule to preview what a fire would do for one of its rows."
         if doc.error is not None:
             return "templates.yaml does not load - fix it to preview."
-        shown = engine.preview(rule, row, templates=doc.templates, params=self.params,
-                               database=self.database(rule.fire_when))
+        database = self.database(rule.fire_when)
+        if rule.fire_when not in self._layers:
+            self._layers[rule.fire_when] = engine.db_layer(database)
+        shown = engine.preview(rule, row, templates=doc.templates, params=self.params, database=database,
+                               layer=self._layers[rule.fire_when])
         lines = []
         if shown.note:
             lines.append(shown.note)

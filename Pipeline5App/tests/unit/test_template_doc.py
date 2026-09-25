@@ -84,6 +84,7 @@ def test_two_layer_highlight():
         ok(name in fields, f"{name} as a field ({fields})")
     eq(_tagged(doc, "tp_spec"), [">8"], "a format spec")
     ok(_tagged(doc, "tx_string") == ['"P1"'], "a predicate string")
+    ok('"P1"' not in _tagged(doc, "hl_str"), "the YAML layer stays out of a text template's body")
     ok("tx_error" not in {t for t, _s, _e in td.spans(doc)}, "no false error token (the spec is split off)")
 
 

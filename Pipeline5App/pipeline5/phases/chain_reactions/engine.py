@@ -553,21 +553,29 @@ class Preview:
     note: str = ""                  # a preview-only remark (e.g. the source table has no rows)
 
 
+def db_layer(database) -> dict:
+    """The E1 `_db` layer a fire builds over `database` ({} for none) - {table: its complete rows}.
+    The builder computes it ONCE per hook and hands it to every `preview` (it re-previews on each
+    edit; the data does not change between edits, and a 20k-row layer costs a noticeable 0.3 s)."""
+    return _db_tables(database) if database is not None else {}
+
+
 def preview(rule: Rule, row_index: int = 0, *, templates: dict, params: dict, database,
-            files_root: str | None = None) -> Preview:
+            files_root: str | None = None, layer: dict | None = None) -> Preview:
     """ONE fire of `rule` for the source row at `row_index` of its hook's `database` (None = a
     database-less hook; a source-less rule previews its single fire): `_template_problem`, `_scope`,
     the condition, then `_spawned` / `_file_output` - the steps a fire takes, minus the adding and
-    the writing. An out-of-range index is clamped (an editor's row spinner)."""
+    the writing. `layer` = `db_layer(database)` when the caller keeps it (else built here); the
+    matched row is that layer's own complete row. An out-of-range index is clamped (a row spinner)."""
     reason = _template_problem(rule, templates)
     if reason:
         return Preview(matched=False, problem=("rx_bad_template", reason))
-    db_tables = _db_tables(database) if database is not None else {}
+    db_tables = db_layer(database) if layer is None else layer
     row = {}
     if rule.source_table:
         if database is None or rule.source_table not in database:
             return Preview(matched=False, problem=("rx_unknown_table", _unknown_table("source", rule.source_table)))
-        rows = _complete_rows(database[rule.source_table])
+        rows = db_tables[rule.source_table]                  # == _complete_rows(the source table)
         if not rows:
             return Preview(matched=False, note=f"{rule.source_table} has no rows - a fire matches nothing")
         row = rows[max(0, min(row_index, len(rows) - 1))]
