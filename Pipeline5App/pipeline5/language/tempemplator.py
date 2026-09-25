@@ -194,19 +194,22 @@ def _iterate(spec: str, template: str, line_no: int, ctx: dict, schemas: dict) -
         if not head.strip() or not tail.strip():            # `..3` - a syntax slip, not blank data
             raise TempemplatorError(template, line_no, f"a range end is missing: {spec!r}")
         texts = [_render_line(fragment.strip(), template, line_no, ctx, schemas).strip() for fragment in (head, tail)]
-        if not all(texts):                                  # a BLANK end (an empty cell) = an EMPTY range - no
-            return [], frozenset()                          # iterations (user decision 2026-09-25; it used to
-        ends = []                                           # read as 0 and invent an iteration - refuter round 10)
+        ends = []
         for text in texts:
-            try:
-                value = float(text)
+            if not text:
+                ends.append(None)
+                continue
+            try:                                            # EVERY non-blank end is validated first - a
+                value = float(text)                         # malformed end is an error even beside a blank one
             except ValueError as error:                     # 'abc'
                 raise TempemplatorError(template, line_no, f"range ends must be numbers: {spec!r}") from error
             if not value.is_integer():                      # nan / inf / 2.7 / a '1...3' typo (-> '.3')
                 raise TempemplatorError(template, line_no,
                                         f"range ends must be whole, finite numbers: {spec!r} ({text!r})")
             ends.append(int(value))
-        try:
+        if None in ends:                                    # a BLANK end (an empty cell) = an EMPTY range - no
+            return [], frozenset()                          # iterations (user decision 2026-09-25; it used to
+        try:                                                # read as 0 and invent an iteration - refuter round 10)
             return list(range(ends[0], ends[1] + 1)), frozenset()
         except (OverflowError, MemoryError) as error:       # `1..1e308` (refuter round 9)
             raise TempemplatorError(template, line_no, f"range too large to iterate: {spec!r}") from error

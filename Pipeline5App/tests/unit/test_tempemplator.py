@@ -79,6 +79,24 @@ def test_raw_errors_become_located():
     eq(_render("@for $i in {$a}..3: x{$i}", {"a": ""}), "", "a blank START is empty too - not 0..3")
     eq(_render("@for $i in 1..{$n}: x{$i}", {"n": "  "}), "", "whitespace is blank")
     raises(TempemplatorError, lambda: _render("@for $i in ..3: x", {}))       # a MISSING end is a syntax slip
+    # refuter round 11 (the code held; these pin it): a missing TAIL too, inline and block
+    raises(TempemplatorError, lambda: _render("@for $i in 1..: x", {}))
+    raises(TempemplatorError, lambda: _render("@for $i in 1..\nx\n@end", {}))
+    # a malformed end is an error EVEN beside a blank one (every non-blank end is validated first)
+    raises(TempemplatorError, lambda: _render("@for $i in abc..{$n}: x", {"n": ""}))
+    # the loop-column check guards the RANGE ENDS too - since a blank end is an empty range, a typo'd
+    # `$row.column` there would otherwise be a SILENT empty range (round 11's top hole)
+    nodes = {"nodes": [{"Q_startByte": "4", "Q_endByte": "5"}]}
+    raises(TempemplatorError, lambda: _render("@for $r in nodes\n@for $b in {$r.Q_startBytee}..{$r.Q_endByte}: x\n@end",
+                                              {"_db": nodes}))
+    raises(TempemplatorError, lambda: _render("@for $r in nodes: @for $b in {$r.Q_startBytee}..3: x", {"_db": nodes}))
+    eq(_render("@for $r in nodes\n@for $b in {$r.Q_startByte}..{$r.Q_endByte}: QB{$b}\n@end", {"_db": nodes}),
+       "QB4\nQB5", "the correct column iterates")
+    # an inline `:` with an EMPTY body (a Python habit: the body on the next lines) is an error
+    raises(TempemplatorError, lambda: _render("@for $i in 1..2:\n  x", {}))
+    # a loop var that did not exist before the loop is GONE after it (a later {$i} is missing, not the
+    # last value)
+    raises(TempemplatorError, lambda: _render("@for $i in 1..2: x\n{$i}", {}))
     eq(_render("@for $b in {$a}..{$z}: QB{$b}", {"a": "0", "z": "1"}), "QB0\nQB1", "real ends still iterate")
     for bad in ("1...3", "1..2.7", "1..1e308"):
         raises(TempemplatorError, lambda: _render(f"@for $i in {bad}: x", {}))

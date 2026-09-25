@@ -1,13 +1,13 @@
 {
   "clause": "C-024",
   "verdict": "refuted",
-  "ranAt": "2026-09-25T00:28:17.175Z",
-  "headCommit": "964b3b2d3eef54534d37382d6b590a4a60344452",
+  "ranAt": "2026-09-25T07:34:45.541Z",
+  "headCommit": "5b180ea2deea55d65cd3eac6a5e994314c84288d",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_tempemplator.py",
       "file": "Pipeline5App/tests/unit/test_tempemplator.py",
-      "symbolSha": "178b114413e8629da9f905108b5954d93e65cec265abb1c40d310128da713946"
+      "symbolSha": "789260da3606509314f1d1f0f42d6a14e8c69a4f5036c57160179198357b94a2"
     },
     {
       "name": "Pipeline5App/tests/unit/test_chain_reactions.py",
@@ -17,7 +17,7 @@
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
       "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
-      "symbolSha": "0d323a646c99af011a593eb050ccafa9afab1fab8ce22a596ece3180f87f8fb6"
+      "symbolSha": "580369ffdfe2381caf5a2887c7deb792acc230cbfc1abf8fc9b6dcf74c6cac35"
     },
     {
       "name": "Pipeline5App/tests/unit/test_expr_adversarial.py",

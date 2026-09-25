@@ -262,6 +262,8 @@ def test_configured_rules_fire_through_the_real_run_plan():
     eq(_rx_rendered(host), {("rx_unknown_table", "probe_early"), ("rx_unknown_table", "probe_bad"),
                             ("rx_unfired_hook", "probe_cold"), ("rx_bad_condition", "probe_mal")},
        "each finding was RENDERED through ctx.render - never silent")
+    eq(sum(1 for batch in host.rendered for f in batch if getattr(f, "type", "") == "rx_unfired_hook"), 2,
+       "the unfired-hook finding rendered at BOTH fires - each passes the run-plan's hooks (refuter round 11)")
 
 
 def test_halted_staging_lists_the_deferred_trail_and_records_nothing():
