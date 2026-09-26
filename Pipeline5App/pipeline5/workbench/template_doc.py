@@ -702,35 +702,38 @@ class Session:
         from pipeline5.config.resolver import find
         from pipeline5.phases.chain_reactions import engine
         from pipeline5.systems import catalog
-        with self._lock:
-            self.generation += 1                          # a build started before this reload is discarded
-        self.notes = []                                   # what could not load - shown, never raised
-        self.rows_ok = True
+        notes = []                                        # what could not load - shown, never raised
+        rows_ok = True
         try:
-            self.rows = config.load_reactions() if self._given["rows"] is None else list(self._given["rows"])
+            rows = config.load_reactions() if self._given["rows"] is None else list(self._given["rows"])
         except Exception as error:  # noqa: BLE001 - the engine reports rx_rules_unreadable; so do we
-            self.rows, self.rows_ok = [], False
-            self.notes.append(f"reactions.csv does not load: {error}")
-        self.rules, findings = engine.compile_rules(self.rows)
-        self.notes += [f"{f.type}: {f.detail}" for f in findings]
+            rows, rows_ok = [], False
+            notes.append(f"reactions.csv does not load: {error}")
+        rules, findings = engine.compile_rules(rows)
+        notes += [f"{f.type}: {f.detail}" for f in findings]
         active = config.active_system()
-        self.system = catalog.by_id(active[0]) if active else None
+        system = catalog.by_id(active[0]) if active else None
         given_hooks, given_legs = self._given["hooks"], self._given["legs"]
-        self.hooks = dict((getattr(self.system, "reaction_hooks", None) or {}) if given_hooks is None else given_hooks)
-        self.legs = {hook: dict(legs) for hook, legs in ((getattr(self.system, "reaction_legs", None) or {})
-                                                         if given_legs is None else given_legs).items()}
-        self.language = getattr(self.system, "template_language", "") or None
-        if not self.hooks:
-            self.notes.append("the active system declares no reaction hooks (System.reaction_hooks) - "
-                              "nothing to preview against")
-        self.params_problem = None
+        hooks = dict((getattr(system, "reaction_hooks", None) or {}) if given_hooks is None else given_hooks)
+        legs = {hook: dict(named) for hook, named in ((getattr(system, "reaction_legs", None) or {})
+                                                      if given_legs is None else given_legs).items()}
+        if not hooks:
+            notes.append("the active system declares no reaction hooks (System.reaction_hooks) - "
+                         "nothing to preview against")
+        params_problem = None
         try:
-            self.params = config.load_params() if self._given["params"] is None else self._given["params"]
+            params = config.load_params() if self._given["params"] is None else self._given["params"]
         except Exception as error:  # noqa: BLE001 - the fire blocks the hook's rules: rx_params_unreadable
-            self.params, self.params_problem = {}, str(error)
-            self.notes.append(f"project params do not load: {error}")
-        self.active = find("chain_reactions/templates.yaml")
-        self._bases, self._halts, self._views = {}, {}, {}
+            params, params_problem = {}, str(error)
+            notes.append(f"project params do not load: {error}")
+        templates_file = find("chain_reactions/templates.yaml")
+        with self._lock:                                  # published AT ONCE: the new generation and its fresh
+            self.generation += 1                          # caches - a build or a view started before is discarded
+            self.notes, self.rows_ok, self.rows, self.rules = notes, rows_ok, rows, rules
+            self.system, self.hooks, self.legs = system, hooks, legs
+            self.language = getattr(system, "template_language", "") or None
+            self.params, self.params_problem, self.active = params, params_problem, templates_file
+            self._bases, self._halts, self._views = {}, {}, {}
 
     # --- the Database a fire gets ---------------------------------------------------------------- #
     def _loader(self, hook: str, leg):

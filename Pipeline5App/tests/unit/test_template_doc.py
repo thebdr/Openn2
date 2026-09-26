@@ -514,6 +514,50 @@ def test_a_reload_discards_the_build_it_overtook():
     ok(not session._lock.armed, "(the reload landed inside view())")
     count = session.row_count(session.rules[0], templates)
     eq(count, len(session.base("after_300")["src"]), "the reload's fresh build - nothing stale cached")
+    from pipeline5.phases.chain_reactions import engine          # C-025 refute round 5 (#6): the reload bumped its
+    state = {"n": 1}                                              # generation FIRST and swapped the caches LAST,
+                                                                  # outside the lock - a view starting in between got
+    def growing(system):                                          # the OLD cached base (a base hit checks no
+        table = Table("src", columns=["uid", "name"], key_columns=["name"])   # generation) and cached a view
+        for number in range(state["n"]):                          # over it in the FRESH cache. A reload publishes
+            table.add(name=f"S{number}")                          # its whole state at once now
+        return Database([table])
+    session = td.Session(None, rows=rules, hooks={"after_300": growing}, params={})
+    session.base("after_300")                                     # built: 1 row, cached
+    state["n"] = 5                                                # a run rewrote the documents
+    in_reload, view_inside, reloaded = threading.Event(), threading.Event(), threading.Event()
+    real_compile, real_layer = engine.compile_rules, engine.db_layer
+
+    def compile_held(rows):                                       # the reload, held while a view starts
+        if threading.current_thread().name == "reload":
+            in_reload.set()
+            view_inside.wait(10)
+        return real_compile(rows)
+
+    def layer_held(database):                                     # the view, held past its base() until the reload
+        if threading.current_thread().name == "view":             # has finished
+            view_inside.set()
+            reloaded.wait(10)
+        return real_layer(database)
+
+    def reload():
+        session.reload()
+        reloaded.set()
+
+    def view():
+        in_reload.wait(10)
+        session.row_count(session.rules[0], templates)
+    engine.compile_rules, engine.db_layer = compile_held, layer_held
+    try:
+        threads = [threading.Thread(target=reload, name="reload"), threading.Thread(target=view, name="view")]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(20)
+    finally:
+        engine.compile_rules, engine.db_layer = real_compile, real_layer
+    ok(view_inside.is_set() and reloaded.is_set(), "(the view ran inside the reload)")
+    eq(session.row_count(session.rules[0], templates), 5, "the reload's build - no view over the old one cached")
 
 
 if __name__ == "__main__":

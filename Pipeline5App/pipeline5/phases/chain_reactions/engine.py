@@ -56,8 +56,9 @@ the handler's `ctx.render` and recorded (uid-deduplicated) to `validation_issues
     rx_bad_template     the template is missing, the wrong kind for the action, malformed, or fails
                         to render (a strict hole, a template error)
     rx_unknown_table    a source / target table absent at this hook
-    rx_file_write       the rendered target path cannot be written (e.g. a Windows-invalid `"`, or a
-                        ':' in the file name - NTFS would hide the text in an alternate data stream)
+    rx_file_write       the rendered target path cannot be written as the file it names (e.g. a
+                        Windows-invalid `"`, a ':' in the file name - NTFS would hide the text in an
+                        alternate data stream - a device name like `NUL`: see `_path_refusal`)
     rx_rules_unreadable / rx_templates_unreadable / rx_params_unreadable
                         a config file does not load (e.g. a YAML syntax error) - the hook's rules
                         are all blocked, each audited with that outcome
@@ -66,7 +67,7 @@ the handler's `ctx.render` and recorded (uid-deduplicated) to `validation_issues
                         the reaction record (audit / validation_issues) does not load - a hand-edited
                         CSV gone ragged: left UNTOUCHED, nothing recorded over it, while the rest of
                         the Database (a spawn) is still saved - or does not save (a file held open,
-                        e.g. by Excel); rendered, never a crash
+                        e.g. by Excel; a value the CSV cannot store); rendered, never a crash
     rx_rule_crashed     the backstop - an unforeseen defect, reported with its exception type
 
 A problem of the rule INDEX itself (a row naming no hook, an unfired hook, an unreadable
@@ -107,10 +108,20 @@ from pipeline5.truth.table import Table
 
 _HOOK = re.compile(r"^(before|after)_(\d+)$")
 _ACTIONS = ("add_rows", "file")
+_WINDOWS = os.name == "nt"
 # the characters a Windows file path refuses (open() -> EINVAL): judged BEFORE the write, so the fire and
 # the builder's preview name the same refusal (C-025 refute round 2); other platforms accept them
-_INVALID_PATH = '<>"|?*' if os.name == "nt" else ""
-_EXTENDED = ("\\\\?\\", "\\\\.\\", "//?/", "//./")    # a Win32 extended-length / device path's prefix
+_INVALID_PATH = '<>"|?*' if _WINDOWS else ""
+_SEPARATORS = ("\\", "/")
+_STRICT = "\\\\?\\"      # the device prefix Win32 takes AS WRITTEN - no '/' separator, no '.' / '..' resolved
+# a Win32 DEVICE-path prefix in every spelling Win32 reads as one: two separators, '.' or '?', a separator
+_DEVICE_PREFIXES = tuple(a + b + mark + c for a in _SEPARATORS for b in _SEPARATORS for mark in ".?"
+                         for c in _SEPARATORS)
+_TWO_SEPARATORS = tuple(a + b for a in _SEPARATORS for b in _SEPARATORS)
+# the names Windows opens as a DEVICE - older Windows whatever the extension (`NUL.txt`): the text would go to
+# the device, not to a file (C-024 refute round 22's note: `rx/NUL` audited "ok", nothing on disk)
+_DEVICE_NAMES = frozenset(["CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"]
+                          + [port + digit for port in ("COM", "LPT") for digit in "0123456789\u00b9\u00b2\u00b3"])
 
 
 class WouldNotFire(Exception):
@@ -158,7 +169,16 @@ class Deferred:
 
 
 def _f(phase: int, type_: str, detail: str, location: str) -> Finding:
-    return Finding(phase=phase, type=type_, severity="ERRR", detail=detail, location=location)
+    """A located ERRR finding, its text as the record can store it: a lone surrogate the message quotes (half
+    of a YAML `\\uD83D\\uDE00` escape pair - a duplicate key's value, a malformed /regex/, an @use cycle's
+    names) escaped - the finding's uid hashes UTF-8 and validation_issues.csv stores it (C-024 refute round
+    22: the raw text crashed the run at the record)."""
+    return Finding(phase=phase, type=type_, severity="ERRR", detail=_storable(detail), location=_storable(location))
+
+
+def _storable(text) -> str:
+    """`text` with every lone surrogate escaped (`\\ud83d`) - UTF-8 stores any other character as it is."""
+    return str(text).encode("utf-8", "backslashreplace").decode("utf-8")
 
 
 def _hook_phase(hook: str) -> int:
@@ -253,6 +273,10 @@ def _row_template_problem(name: str, body):
         if not isinstance(spec, dict) or not spec:
             return f"row template {name!r} entry {number} is not a {{field: expr}} map"
         for column, value in spec.items():
+            unstorable = _unencodable(str(column))           # a column name: the CSV header (round 22 -
+            if unstorable:                                   # the save failed after the add, the table's
+                return (f"row template {name!r} entry {number}: the field name {str(column)!r}: "  # CSV
+                        f"{unstorable}")                                                         # emptied)
             if value is None:
                 return (f"row template {name!r} entry {number}: field {column!r} has no "
                         "value (write '' for an empty field)")
@@ -366,7 +390,12 @@ def _file_output(rule: Rule, templates: dict, scope: dict, files_root: str) -> t
         text = tempemplator.render_template(rule.template, templates, scope)
     except (ExprError, TempemplatorError) as error:
         return None, None, ("rx_bad_template", str(error))
-    if not os.path.isabs(path):
+    judged = path                                                  # the TARGET's own names are judged, never the
+    if not os.path.isabs(path):                                    # output root's (Windows 11 allows `aux.files`)
+        if _WINDOWS and path[:1] in _SEPARATORS:                   # rooted, no drive: the join below would land
+            return None, None, ("rx_file_write",                   # it at the ROOT of the output root's drive
+                                f"cannot write {path!r}: a path rooted without a drive lands at the root of the "
+                                "output root's drive - write the drive, or a relative path")
         if ":" in path:                                            # `X:3.txt` would read as drive X: (a
             return None, None, ("rx_file_write",                   # drive-relative escape - round 14)
                                 f"cannot write {path!r}: a ':' in a relative target (a drive letter, or a "
@@ -375,7 +404,7 @@ def _file_output(rule: Rule, templates: dict, scope: dict, files_root: str) -> t
     if ":" in os.path.splitdrive(os.path.abspath(path))[1]:       # NTFS would write a HIDDEN alternate data
         return None, None, ("rx_file_write",                       # stream - silent (refuter round 13: a
                             f"cannot write {path!r}: a ':' in a file name would write a hidden NTFS stream")
-    refusal = _path_refusal(path)                                 # `-X1:3` terminal name)
+    refusal = _path_refusal(judged)                               # `-X1:3` terminal name)
     if refusal is not None:                                        # Windows refuses it at open() - say why
         return None, None, ("rx_file_write", f"cannot write {path!r}: {refusal}")
     unstorable = _unencodable(text)                                # the append would fail half-way
@@ -385,22 +414,88 @@ def _file_output(rule: Rule, templates: dict, scope: dict, files_root: str) -> t
 
 
 def _path_refusal(path: str):
-    """Why Windows refuses `path` whatever the text - judged BEFORE the write, so the fire, its dry run and
-    the builder name the same refusal (None = none; other platforms accept these): a character a path
-    refuses (`<>"|?*`, a control character) anywhere past an extended / device prefix - its drive and a
-    UNC share included; a drive that is not an ASCII letter (`1:`, `é:`); an extended path whose drive
-    goes on without a separator (`\\\\?\\C:x`, drive-relative)."""
-    if not _INVALID_PATH:
+    """Why Windows would not write `path` as the file it names - judged BEFORE the write, so the fire, its dry
+    run and the builder name the same refusal (None = none; other platforms take any of these). A relative
+    target is judged as written - its own names, never the output root's it joins (Windows 11 allows a
+    folder `aux.files`); the lint reads the same text:
+    - a character a path refuses (`<>"|?*`, a control character) anywhere past a device prefix (`\\\\?\\`,
+      `//./` - any mix of separators, as Win32 reads it) - its drive and a UNC share included;
+    - a drive that is not ONE ASCII letter (`1:`, `é:`); a device path's drive going on without a separator
+      (`\\\\?\\C:x`, drive-relative);
+    - a `\\\\?\\` path (Win32 takes it AS WRITTEN): a '/', or a '.' / '..' / empty name;
+    - a device path naming no drive, share (`UNC`) or volume (`Volume{...}`) - a pipe, a raw device - or one
+      whose '..' climbs above its drive / share (Win32 would drop the drive);
+    - a path naming no file (it ends in a separator, '.' or '..');
+    - a name ending in '.' or ' ' (Windows drops them - another file, or none, would be written);
+    - a device name (`NUL`, `CON`, `COM1`, ... - older Windows whatever the extension, `NUL.txt`)."""
+    if not _WINDOWS:
         return None
-    body = path[4:] if path[:4] in _EXTENDED else path
+    prefix = _device_prefix(path)
+    strict = path.startswith(_STRICT)
+    body = path[prefix:]
     bad = next((ch for ch in body if ch in _INVALID_PATH or ord(ch) < 32), None)
     if bad is not None:
         return f"{bad!r} is not allowed in a Windows path"
+    if strict and "/" in body:
+        return f"'/' is not a separator in a {_STRICT} path (Windows takes it as written) - write '\\'"
     if body[1:2] == ":":
         if not (body[:1].isascii() and body[:1].isalpha()):
             return f"{body[:2]!r} is not a drive"
-        if body is not path and body[2:3] not in ("\\", "/"):
-            return f"an extended path's drive {body[:2]!r} must go on with a separator"
+        if prefix and body[2:3] not in _SEPARATORS:
+            return f"a device path's drive {body[:2]!r} must go on with a separator"
+    names = body.split("\\") if strict else re.split(r"[\\/]", body)
+    if names[-1] in ("", ".", ".."):
+        return "the target names a folder, not a file (it ends in a separator, '.' or '..')"
+    volume = _volume_depth(names[0]) if prefix else 0
+    if volume is None:
+        return (f"a device path names a drive ({_STRICT}C:\\), a share ({_STRICT}UNC\\) or a volume - "
+                f"{names[0]!r} is none of them (a pipe, a raw device)")
+    if len(names) <= volume:
+        return "the target names a drive or a share, not a file"
+    depth = 0
+    for name in names:
+        refusal = _name_refusal(name, strict)
+        if refusal:
+            return refusal
+        if name == "..":
+            if prefix and depth <= volume:
+                return f"'..' climbs above the device path's {'share' if volume > 1 else 'drive'} (Windows drops it)"
+            depth -= 1
+        elif name not in ("", "."):
+            depth += 1
+    return None
+
+
+def _device_prefix(path: str) -> int:
+    """The length of the Win32 DEVICE-path prefix `path` opens with (0 = none): two separators, '.' or '?', a
+    separator - in any mix of '\\' and '/' (`\\\\.\\`, `//?/`, `\\\\./`: Win32 reads each as one)."""
+    return 4 if path[:4] in _DEVICE_PREFIXES else 0
+
+
+def _volume_depth(head: str):
+    """How many names a device path's volume takes - a drive `C:` or a `Volume{...}` 1, a share `UNC\\srv\\share` 3;
+    None: `head` names none of them."""
+    if head.upper() == "UNC":
+        return 3
+    if (len(head) == 2 and head[1] == ":" and head[0].isascii() and head[0].isalpha()) \
+            or (head[:7].upper() == "VOLUME{" and head.endswith("}")):
+        return 1
+    return None
+
+
+def _name_refusal(name: str, strict: bool):
+    """Why Windows would not write the path name `name` as it is written (None = it would) - see
+    `_path_refusal`. `strict`: a `\\\\?\\` path's name."""
+    if name in ("", ".", ".."):
+        if strict:
+            return (f"a {_STRICT} path resolves no '.' / '..' and takes no empty name - {name!r} "
+                    "(Windows takes it as written)")
+        return None
+    if name[-1] in (".", " "):
+        return (f"the name {name!r} ends in {name[-1]!r} - Windows drops it (another file, or none, "
+                "would be written)")
+    if name.split(".")[0].rstrip(" ").upper() in _DEVICE_NAMES:
+        return f"{name!r} is a Windows device name - the text would go to the device, not to a file"
     return None
 
 
@@ -519,9 +614,9 @@ def _persist(database, hook: str, log_rows: list, findings: list, save: bool = T
         return problems                                       # recorded in memory, nothing written
     try:
         database.save(where)
-    except (OSError, ValueError) as error:                   # a file held open; text a CSV cannot encode
-        problems.append(_f(phase, "rx_record_unwritable",
-                           f"the record could not be saved (a file held open by another program?): {error}", where))
+    except (OSError, ValueError) as error:                   # a file held open; a value a CSV cannot store
+        cause = "a file held open by another program?" if isinstance(error, OSError) else "a value the CSV cannot store"
+        problems.append(_f(phase, "rx_record_unwritable", f"the record could not be saved ({cause}): {error}", where))
     return problems
 
 
@@ -623,6 +718,10 @@ class Preview:
     text: str = ""                  # file: the text it would append
     problem: tuple | None = None    # (finding type, detail): what the fire would report instead
     note: str = ""                  # a preview-only remark (e.g. the source table has no rows)
+
+    def __post_init__(self):
+        if self.problem is not None:                      # the detail as the fire's finding carries it (`_f`)
+            self.problem = (self.problem[0], _storable(self.problem[1]))
 
 
 def db_layer(database) -> dict:
@@ -824,9 +923,9 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
             problem(f"target {rule.target!r}: {message}", "target", start, end, severity)
         refusal = _literal_refusal(rule.target)
         if refusal is not None:
-            column, why = refusal
+            start, end, why = refusal
             problem(f"target {rule.target!r}: {why} - the fire refuses every row (rx_file_write)", "target",
-                    column, column + 1)
+                    start, end)
     return fields, tables, json, json_fields
 
 
@@ -838,40 +937,142 @@ def _json_valued(table) -> frozenset:
 
 
 def _literal_refusal(target: str):
-    """(column, why) of a LITERAL character the fire's target guards refuse whatever the row - None when
-    there is none. A ':' - but a drive's: one with only holes and at most ONE ASCII letter before it (past
-    an extended `\\\\?\\` / device prefix) whose path goes on with a separator or a HOLE (`C:/`,
-    `{$_params.drive}:/out` - C-024 refute round 19's note - `{$p}C:{$dir}`: the rows' renders are the
-    fire's to judge) - or a character a Windows path refuses (`<>"|?*`, a control character), the drive's
-    position included. Holes are data, judged per row by the fire."""
-    runs = tempemplator.brace_runs(target)
-    prefix = 4 if target[:4] in _EXTENDED else 0            # an extended / device prefix's own `?` / `.`
-
-    def goes_on(number, index, end):
-        """What follows the ':' at `index` (the last or not of text run `number`) - a separator or a hole."""
-        if target[index + 1:index + 2] in ("\\", "/"):
-            return True
-        return index + 1 == end and number + 1 < len(runs) and runs[number + 1][0] == "hole"
-
-    def a_drive(number, index):
-        """Whether the ':' at `index` may be a DRIVE's: before it (past the prefix) only holes and at most
-        ONE ASCII letter - `C:`, `{$d}:`, `{$p}C:`, `{$d}{$e}:` (the rows' renders are the fire's to judge)."""
-        literal = "".join(target[max(s, prefix):min(e, index)] for kind, s, e in runs[:number + 1]
-                          if kind != "hole" and s < index)
-        holes = any(kind == "hole" and s < index for kind, s, _e in runs)
-        return (literal == "" and holes) or (len(literal) == 1 and literal.isascii() and literal.isalpha())
-
-    for number, (kind, start, end) in enumerate(runs):
-        if kind != "text":
+    """(start, end, why) of LITERAL target text the fire refuses whatever the row renders - None when there is
+    none. A hole is data: it may render any text (a separator, a drive, a device prefix - `{$p}//?/C:`), so a
+    literal is refused only where NO rendering of the holes lets the fire take it (the fire's own guards,
+    `_file_output` / `_path_refusal`, read on the literal text):
+    - a character a Windows path refuses (`<>"|*`, a control character) - and a '?' unless it may be a device
+      prefix's (what precedes it may render two separators, and a separator or a hole follows);
+    - a ':' unless it may be a DRIVE's: what precedes it may render exactly ONE ASCII letter, or a device prefix
+      and one (`C:`, `{$d}:`, `{$p}C:`, `\\\\./C:` - C-024 refute round 19's note), and a separator or a hole
+      follows;
+    - on Windows the path shapes - see `_literal_path_refusal`."""
+    atoms = _target_atoms(target)
+    for index, (ch, start, end) in enumerate(atoms):
+        if ch is None:
             continue
-        for index in range(max(start, prefix), end):
-            ch = target[index]
-            if _INVALID_PATH and (ch in _INVALID_PATH or ord(ch) < 32):
-                return index, f"{ch!r} is not allowed in a Windows path"
-            if ch != ":":
-                continue
-            if a_drive(number, index) and goes_on(number, index, end):
-                continue                                     # a drive (literal, or the holes may render it)
-            return index, ("a ':' in a relative target or a file name (a drive letter, or a hidden NTFS "
-                           "stream)")
+        if _WINDOWS and ch != "?" and (ch in _INVALID_PATH or ord(ch) < 32):
+            return start, end, f"{ch!r} is not allowed in a Windows path"
+        if _WINDOWS and ch == "?" and not _may_mark_device(atoms, index):
+            return start, end, "'?' is not allowed in a Windows path"
+        if ch == ":" and not _may_be_drive(atoms, index):
+            return start, end, "a ':' in a relative target or a file name (a drive letter, or a hidden NTFS stream)"
+    return _literal_path_refusal(atoms) if _WINDOWS else None
+
+
+def _target_atoms(target: str) -> list:
+    """`target` as the fire renders it: (character, start, end) per LITERAL character - `{{` renders one brace -
+    and (None, start, end) per hole, which renders any text (a lone brace fails the render: lint_line says so)."""
+    atoms = []
+    for kind, start, end in tempemplator.brace_runs(target):
+        if kind == "text":
+            atoms.extend((target[i], i, i + 1) for i in range(start, end))
+        elif kind == "brace":
+            atoms.append((target[start], start, end))
+        else:
+            atoms.append((None, start, end))
+    return atoms
+
+
+def _may_render(atoms: list, candidates) -> bool:
+    """Whether `atoms` may render exactly one of `candidates` - each literal as itself, each hole as any text."""
+    pattern = re.compile("".join(".*" if ch is None else re.escape(ch) for ch, _s, _e in atoms), re.DOTALL)
+    return any(pattern.fullmatch(candidate) for candidate in candidates)
+
+
+def _goes_on(atoms: list, index: int) -> bool:
+    """Whether a separator follows atom `index` - a literal one, or a hole that may render one."""
+    return index + 1 < len(atoms) and (atoms[index + 1][0] is None or atoms[index + 1][0] in _SEPARATORS)
+
+
+def _may_mark_device(atoms: list, index: int) -> bool:
+    """Whether the '?' at `index` may be a device prefix's (`\\\\?\\`, `//?/`, `{$p}\\\\?\\`): what precedes it
+    may render exactly two separators, and a separator (or a hole) follows."""
+    return _goes_on(atoms, index) and _may_render(atoms[:index], _TWO_SEPARATORS)
+
+
+def _may_be_drive(atoms: list, index: int) -> bool:
+    """Whether the ':' at `index` may be a DRIVE's: what precedes it may render exactly ONE ASCII letter, or a
+    device prefix and one (`C`, `{$d}`, `{$p}C`, `\\\\./C`), and a separator (or a hole) follows."""
+    if not _goes_on(atoms, index):
+        return False
+    letters = {"C"} | {ch for ch, _s, _e in atoms[:index] if ch and ch.isascii() and ch.isalpha()}
+    return _may_render(atoms[:index], [prefix + letter for letter in letters for prefix in ("",) + _DEVICE_PREFIXES])
+
+
+def _literal_path_refusal(atoms: list):
+    """The Windows path shapes of `_literal_refusal` - (start, end, why) or None, judged on literal text only:
+    - a path rooted without a drive: a literal separator, then a literal name (`/rx/a.txt`);
+    - a LITERAL `\\\\?\\` path's '/' - or its '.', '..' or empty name; a literal device path naming no drive,
+      share or volume (`\\\\.\\pipe\\x`), naming only one, or climbing above it (`\\\\.\\C:\\..\\x`). A literal
+      prefix is one at the start - or past leading holes when its mark is '?' (`{$p}\\\\?\\`): the fire takes
+      that '?' only when the holes render nothing, so the path is that device path whenever it is written;
+    - a target ending in a separator, or in a name ending in '.' / ' ' (whatever the holes before it render:
+      `X.`, or a folder step - `.` / `..` name no file);
+    - a name ending in a literal ' ', or in a literal '.' past its last hole but a lone `.` / `..` there (the hole
+      may render a separator - a folder step); on a literal `\\\\?\\` path any name ending in '.' or ' ';
+    - a device name: a literal name (`NUL`, `CON.txt`) or one opening with a literal device stem and '.'
+      (`nul.{$ext}`)."""
+    if atoms and atoms[0][0] in _SEPARATORS and (len(atoms) == 1 or atoms[1][0] not in (None,) + _SEPARATORS):
+        return atoms[0][1], atoms[0][2], "a path rooted without a drive lands at the root of the output root's drive"
+    lead = next((i for i, (ch, _s, _e) in enumerate(atoms) if ch is not None), len(atoms))   # leading holes
+    mark = atoms[lead:lead + 4]
+    head = "".join(ch for ch, _s, _e in mark) if len(mark) == 4 and all(ch is not None for ch, _s, _e in mark) else ""
+    prefix = _device_prefix(head) if lead == 0 or head[2:3] == "?" else 0
+    strict = bool(prefix) and head == _STRICT
+    body = atoms[lead + prefix:] if prefix else atoms
+    if strict:
+        slash = next((atom for atom in body if atom[0] == "/"), None)
+        if slash is not None:
+            return slash[1], slash[2], f"'/' is not a separator in a {_STRICT} path (Windows takes it as written)"
+    names, separators = [[]], []
+    for atom in body:
+        if atom[0] is not None and atom[0] in _SEPARATORS:
+            names.append([])
+            separators.append(atom)
+        else:
+            names[-1].append(atom)
+
+    def span(number):                                  # a name's columns - an empty one: the separator after it
+        name = names[number]                           # (before it, at the end; the prefix, for none)
+        if name:
+            return name[0][1], name[-1][2]
+        near = (separators[number:number + 1] or separators[-1:] or atoms[-1:])[0]
+        return near[1], near[2]
+
+    literal = [None if any(ch is None for ch, _s, _e in name) else "".join(ch for ch, _s, _e in name)
+               for name in names]
+    if prefix and literal[0] is not None:
+        volume = _volume_depth(literal[0])
+        if volume is None:
+            return (*span(0), f"a device path names a drive, a share or a volume - {literal[0]!r} is none of them")
+        if len(names) <= volume and all(text is not None for text in literal):
+            return (*span(len(names) - 1), "the target names a drive or a share, not a file")
+        depth = 0
+        for number, text in enumerate(literal):
+            if text is None:
+                break
+            if text == ".." and not strict and depth <= volume:
+                return (*span(number), "'..' climbs above the device path's drive or share (Windows drops it)")
+            depth += -1 if text == ".." else 0 if text in ("", ".") else 1
+    last = len(names) - 1
+    for number, name in enumerate(names):
+        text = literal[number]
+        cut = max((i for i, (ch, _s, _e) in enumerate(name) if ch is None), default=-1)
+        tail = "".join(ch for ch, _s, _e in name[cut + 1:])          # the literal text past the name's last hole
+        if number == last and (not name or tail[-1:] in (".", " ") or text in (".", "..")):
+            return (*span(number), "the target names no file (it ends in a separator, or in a name ending in "
+                                   "'.' / ' ' - Windows drops them)")
+        if text is not None and text in ("", ".", ".."):
+            if strict:
+                return (*span(number), f"a {_STRICT} path resolves no '.' / '..' and takes no empty name")
+            continue
+        if tail[-1:] == " " or (tail[-1:] == "." and (strict or text is not None or tail not in (".", ".."))):
+            return (*span(number), f"a name ending in {tail[-1]!r} - Windows drops it (another file would be written)")
+        first = next((i for i, (ch, _s, _e) in enumerate(name) if ch is None), len(name))
+        opening = "".join(ch for ch, _s, _e in name[:first])        # the literal text before the name's first hole
+        if text is not None or "." in opening:
+            stem = (text if text is not None else opening).split(".")[0].rstrip(" ")
+            if stem.upper() in _DEVICE_NAMES:
+                return (*span(number), f"{stem!r} is a Windows device name - the text would go to the device")
     return None

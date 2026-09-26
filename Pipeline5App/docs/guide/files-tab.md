@@ -71,17 +71,21 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   - a `where` that reads its own loop variable, or an `@if` that reads a loop row's missing column
     (both read blank - the branch is silently never taken);
   - a data function reading a column its table does not have - a `count(signals, $col ...)` /
-    `where(` / `first(` predicate, `lookup` / `unique`'s column (it reads blank: `count` counts
-    nothing) - or over a table the hook does not have at all (`before_300` has none), or inside
-    another function's predicate or a `where` (it sees that row alone): it finds no rows;
+    `where(` / `first(` predicate, `lookup` / `unique`'s column, `node_of`'s `start_byte` /
+    `end_byte` (it reads blank: `count` counts nothing) - or over a table the hook does not have at
+    all (`before_300` has none), or inside another function's predicate or a `where` (it sees that
+    row alone): it finds no rows;
   - a format spec on a JSON value - a list or an object in the rows (`{$type:>5}` - it fails on the
     rows that hold one; a JSON column that holds text is just text);
   - an empty hole `{}` (it renders nothing - write `{{}}` for literal braces);
   - `{{$x}}`, which is the literal text `{$x}` - a hole in braces is `{{{$x}}}`.
 
   Errors too: text a file cannot store - a `\uD83D\uDE00` escape pair in a double-quoted value is
-  two lone surrogates to YAML, which UTF-8 cannot write (the fire refuses the row: write the character
-  itself).
+  two lone surrogates to YAML, which UTF-8 cannot write. Write the character itself: in literal text,
+  in a hole that always renders it (`{"..."}`) or in a row template's field NAME (a column the table
+  cannot store) the fire refuses every row - an error; a hole that renders it only from some rows'
+  data is a warning (the fire refuses those rows); in a comparison it is never written - but it
+  never matches a real character either.
 
   A problem inside a multi-line PLAIN (unquoted) value, a folded `>` block, or a value holding a line
   break other than a newline (a `\r` escape, U+2028 ...) is placed on its first line and marked
@@ -103,10 +107,20 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   - a loop over a table that does not exist at that hook;
   - a column typo inside a loop;
   - the rule itself: a template of the wrong kind, a hook the run never fires, a target the fire
-    refuses for every row (a `:` other than a drive's - a drive is ONE letter A-Z, `C:/`,
-    `\\?\C:\`, or one holes complete, `{$_params.drive}:/out`, which the fire judges row by row - or a
-    character Windows does not allow in a path, `< > " | ? *` or a control character, the drive's
-    place included);
+    refuses for every row - judged on its literal text (a hole may render anything: the fire judges
+    it row by row, and the preview shows that row's verdict):
+    - a `:` other than a drive's - a drive is ONE letter A-Z (`C:/`, `\\?\C:\`, `\\./C:/` - Windows
+      reads any mix of slashes in a `\\.\` / `\\?\` prefix), or one holes may complete
+      (`{$_params.drive}:/out`, `{$_params.p}//?/C:/out`);
+    - a character Windows does not allow in a path - `< > " | ? *` or a control character, the
+      drive's place included (a `?` only as a `\\?\` prefix's);
+    - a name Windows would not write as named: a device name (`NUL`, `CON.txt`, `COM1` - the text
+      would go to the device), a name ending in `.` or a space (Windows drops it: `rx/a.` would append
+      to `rx/a`), a target naming a folder (it ends in `/`), a path starting with a single `/` (it
+      would land at the root of the drive, outside the output folder);
+    - in a `\\?\` path - which Windows takes exactly as written - a `/`, or a `.` / `..` / empty
+      name; a device path naming no drive, share or volume (`\\.\pipe\x`), or whose `..` climbs above
+      its drive (`\\.\C:\..\x`);
   - project params that do not load (the fire blocks every rule of the hook: `rx_params_unreadable`).
 
   When staging would HALT the run (a FAIL your treatments do not lift) - or cannot run at all (a

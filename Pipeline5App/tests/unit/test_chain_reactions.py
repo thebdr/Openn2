@@ -3,6 +3,7 @@ lifecycle (match -> spawn/append -> audit log -> save), provenance, the strict e
 and every failure surfacing as a located ERRR finding - never silent, never a crash (refuter
 round 6's B1-B4 pinned here). Hermetic: synthetic tables + injected rules/templates; the database
 dir is sandboxed."""
+import csv
 import os
 import tempfile
 
@@ -112,7 +113,9 @@ def test_a_headerless_or_overflowing_rule_file_is_never_silent():
     """C-024 refute round 21 (N2): a reactions.csv with no header row read its FIRST RULE as the header -
     the rule gone, nothing reported; a line whose only content sat past the header's columns was
     skipped as blank. Now a header that names no rule columns is unreadable (the fire's
-    rx_rules_unreadable), and an overflow-only line reaches the compiler."""
+    rx_rules_unreadable), and an overflow-only line reaches the compiler. C-024 refute round 22 (F-C): a
+    BLANK first line read as an empty header - every rule lost to unnamed rx_bad_rule findings; the blank
+    lines before the header are skipped now, like every other blank line."""
     from pipeline5.config import loaders
     real_find = loaders.find
 
@@ -139,6 +142,14 @@ def test_a_headerless_or_overflowing_rule_file_is_never_silent():
             with open(path, "w", encoding="utf-8", newline="") as handle:
                 handle.write("")
             eq(config.load_reactions(), [], "an empty file: no rules (absence is not an error)")
+            with open(path, "w", encoding="utf-8", newline="") as handle:
+                handle.write("\r\n  \r\n,,,\r\n"
+                             "name,fire_when,source_table,condition,action,target,template,comment\r\n"
+                             "r1,after_300,src,,add_rows,dst,rows,\r\nr2,after_300,src,,add_rows,dst,rows,\r\n")
+            eq([row["name"] for row in config.load_reactions()], ["r1", "r2"], "blank lines before the header: skipped")
+            with open(path, "w", encoding="utf-8", newline="") as handle:
+                handle.write("\r\n,,,\r\n")
+            eq(config.load_reactions(), [], "blank lines only: no rules")
         finally:
             loaders.find = real_find
     _sandboxed(body)()
@@ -1267,6 +1278,169 @@ def test_builtin_config_ships_empty_rules():
     ok(len(config.load_reaction_templates()) >= 3, "the worked-example templates ship")
 
 
+def test_a_findings_text_the_record_cannot_store_is_recorded_escaped():
+    """C-024 refute round 22 (F-A): round 21 refused text UTF-8 cannot store in a spawned VALUE and a file TEXT,
+    yet a finding's own detail QUOTED such text raw - a malformed /regex/ holding a lone surrogate, an @use
+    cycle naming templates that hold one: recording it crashed the fire (the finding's uid hashes UTF-8) and,
+    on a database-less hook, the settle. Every engine finding carries its text escaped now: the fire and the
+    settle record it, validation_issues.csv holds it, and the preview says the same."""
+    lone = "\ud83d"
+    file_rule = {"action": "file", "source_table": "", "condition": "", "template": "t"}
+    cases = (("a /regex/ in a text line", dict(file_rule, target="rx/a.txt"),
+              {"t": "x {extract($_rule.name, /(" + lone + "/)}"}, ("after_300", "before_300")),
+             ("a /regex/ in a row value", {"condition": ""},
+              {"rows": [{"label": "{extract($name, /(" + lone + "/)}"}]}, ("after_300",)),
+             ("an @use cycle's names", dict(file_rule, target="rx/d.txt"),
+              {"t": "@use a" + lone, "a" + lone: "@use a" + lone}, ("after_300", "before_300")))
+
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            for label, over, templates, hooks in cases:
+                for hook in hooks:
+                    database = _db() if hook == "after_300" else None
+                    got, findings = engine.fire(hook, database, rules=[_rule(fire_when=hook, **over)],
+                                                templates=templates, params={}, files_root=out_root)
+                    if hook == "before_300":
+                        eq(engine.settle(_db(), got), [], f"{label}: the settle records it")
+                    eq([f.type for f in findings], ["rx_bad_template"], f"{label} ({hook}): the finding")
+                    detail = findings[0].detail
+                    ok("\\ud83d" in detail and lone not in detail, f"{label}: its text escaped - {ascii(detail)}")
+                    with open(os.path.join(sandbox, "validation_issues.csv"), encoding="utf-8") as handle:
+                        ok(any(row["detail"] == detail for row in csv.DictReader(handle)), f"{label} ({hook}): recorded")
+        rule, templates = engine.compile_rules([_rule(condition="")])[0][0], cases[1][2]
+        _, findings = engine.fire("after_300", _db(), rules=[rule], templates=templates, params={})
+        shown = engine.preview(rule, 0, templates=templates, params={}, database=_db())
+        eq(shown.problem, (findings[0].type, findings[0].detail), "the preview says the fire's (escaped) finding")
+    _sandboxed(body)()
+
+
+def test_a_field_name_or_a_value_the_save_cannot_store_never_empties_a_table():
+    """C-024 refute round 22 (F-B): a row template's FIELD NAME holding a lone surrogate was added (round 21
+    judged the values only), then the save failed on the CSV header - after `write_csv` had opened the
+    table's file for writing: its CSV emptied, the finding blaming "a file held open by another program?".
+    The field name is the template's problem now (rx_bad_template naming the entry and the field, before any
+    matching: nothing added - the preview and the lint say the same); a save renders EVERY table before it
+    opens a file (a value that cannot be written raises, every file intact); rx_record_unwritable names its
+    cause."""
+    pair = "\ud83d\ude00"
+    templates = {"rows": [{"label": "ok-{$name}", "tag" + pair: "x"}]}
+
+    def snapshot(directory):
+        files = {}
+        for name in sorted(os.listdir(directory)):
+            with open(os.path.join(directory, name), "rb") as handle:
+                files[name] = handle.read()
+        return files
+
+    def body(sandbox):
+        database, findings = engine.fire("after_300", _db(), rules=[_rule()], templates=templates, params={})
+        eq([(f.type, f.location) for f in findings], [("rx_bad_template", "r1")], "the field name: refused, located")
+        ok("entry 1: the field name 'tag\\ud83d\\ude00'" in findings[0].detail, findings[0].detail)
+        eq(len(database["dst"]), 0, "…nothing added")
+        with open(os.path.join(sandbox, "dst.csv"), encoding="utf-8") as handle:
+            eq(handle.read().splitlines(), ["uid,label,spawned_by,source_uid"], "…the table saved as it was")
+        rule = engine.compile_rules([_rule()])[0][0]
+        shown = engine.preview(rule, 0, templates=templates, params={}, database=_db())
+        eq(shown.problem, (findings[0].type, findings[0].detail), "…the preview says the fire's finding")
+        eq([(p.template, p.message) for p in engine.lint(templates) if p.severity == "error"],
+           [("rows", findings[0].detail)], "…and so does the lint")
+        with tempfile.TemporaryDirectory() as directory:
+            first = Table("a", columns=["uid", "v"], key_columns=["v"])
+            second = Table("b", columns=["uid", "v"], key_columns=["v"])
+            first.add(v="one")
+            second.add(v="two")
+            both = Database([first, second])
+            both.save(directory)
+            saved = snapshot(directory)
+            first.add(v="three")                                  # a change a successful save would write
+            for bad in ("bad" + pair, ["a", "list"]):             # (set after the add: its uid hashes the key)
+                second.rows[0]["v"] = bad
+                try:
+                    both.save(directory)
+                    ok(False, f"{bad!r}: the save must raise")
+                except ValueError:                                # (UnicodeEncodeError is one)
+                    pass
+                eq(snapshot(directory), saved, f"{bad!r}: every file intact - the table before it not written either")
+        for error, cause in ((PermissionError(13, "Permission denied"), "(a file held open by another program?)"),
+                             (UnicodeEncodeError("utf-8", "x", 0, 1, "surrogates not allowed"),
+                              "(a value the CSV cannot store)")):
+            held = _db()
+
+            def failing(directory, error=error):
+                raise error
+            held.save = failing
+            _, findings = engine.fire("after_300", held, rules=[_rule()], templates=_ROW_TPL, params={})
+            eq([f.type for f in findings], ["rx_record_unwritable"], f"{type(error).__name__}: the record's finding")
+            ok(cause in findings[0].detail, f"…named by its cause: {findings[0].detail}")
+    _sandboxed(body)()
+
+
+def test_every_path_windows_would_misdirect_is_refused_before_the_write():
+    """C-025 refute round 5 (#2, #5) + C-024 refute round 22's notes, the engine half. Win32 takes a `\\\\?\\`
+    path AS WRITTEN - a '/' is no separator, '.' / '..' / an empty name are not resolved: every fire failed at
+    open() while the dry fire (the builder's preview) said ok. `rx/NUL` wrote into the null device, audited
+    ok; Windows drops a trailing '.' / ' ' (`rx/a.` appends to `rx/a`; `rx /a.txt` failed after making `rx`);
+    a rooted target (`/rx/a.txt`) landed at the root of the drive, outside the output root; `\\\\.\\C:\\..\\x`
+    drops the drive; `\\\\.\\pipe\\x` is a pipe. The fire - and its dry run - refuses each BEFORE the write,
+    named (nothing written, no folder made), while every device-prefix spelling Win32 normalizes (`//?/`,
+    `\\\\./`, `/\\?\\`, ...) is written, by its own name."""
+    if os.name != "nt":
+        return                                                # Win32 path rules
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            drive, rest = os.path.splitdrive(out_root)
+            slashed, strict = out_root.replace("\\", "/"), "\\\\?\\" + out_root
+            refused = ((strict + "\\s/a.txt", "'/' is not a separator"), (strict + "\\s\\.\\a.txt", "resolves no '.'"),
+                       (strict + "\\s\\..\\a.txt", "resolves no '.'"), (strict + "\\s\\\\a.txt", "takes no empty name"),
+                       ("\\\\.\\" + drive + "\\..\\" + rest.lstrip("\\") + "\\b.txt", "'..' climbs above"),
+                       ("\\\\.\\pipe\\rx_probe", "is none of them"), ("\\\\?\\UNC\\srv\\share", "not a file"),
+                       ("rx/a.", "ends in '.'"), ("rx/a{$_params.s}", "ends in ' '"), ("rx /a.txt", "ends in ' '"),
+                       ("rx./a.txt", "ends in '.'"), ("rx/.../a.txt", "ends in '.'"), ("rx/NUL", "device name"),
+                       ("rx/nul.txt", "device name"), ("rx/Con", "device name"), ("rx/com1.log", "device name"),
+                       ("rx/LPT\u00b9", "device name"), ("rx/NUL/a.txt", "device name"), ("rx/", "names a folder"),
+                       ("rx/..", "names a folder"), ("/rx/a.txt", "rooted without a drive"))
+            for target, why in refused:
+                rule = _rule(fire_when="before_300", source_table="", condition="", action="file", target=target,
+                             template="txt")
+                dry, dry_findings = engine.fire("before_300", None, rules=[rule], templates={"txt": "x"},
+                                                params={"s": " "}, files_root=out_root, write=False)
+                real, findings = engine.fire("before_300", None, rules=[rule], templates={"txt": "x"},
+                                             params={"s": " "}, files_root=out_root)   # (a target is compiled stripped:
+                                                                                       # a trailing ' ' comes from a hole)
+                eq([f.type for f in findings], ["rx_file_write"], f"{target!r}: refused")
+                ok(why in findings[0].detail, f"{target!r}: named - {findings[0].detail}")
+                eq((dry.log_rows, [f.detail for f in dry_findings]), (real.log_rows, [f.detail for f in findings]),
+                   f"{target!r}: …the dry fire says the same")
+                eq(os.listdir(out_root), [], f"{target!r}: nothing written, no folder made")
+            written = {"//?/" + slashed + "/sub/../e.txt": "e.txt", "\\\\./" + out_root + "\\d.txt": "d.txt",
+                       "//.\\" + out_root + "\\f.txt": "f.txt", "\\/.\\" + out_root + "\\g.txt": "g.txt",
+                       "/\\?\\" + out_root + "\\h.txt": "h.txt", "\\\\?/" + slashed + "/i.txt": "i.txt",
+                       "\\\\.\\" + out_root + "\\\\j.txt": "j.txt", strict + "\\k.txt": "k.txt",
+                       "rx/./l.txt": os.path.join("rx", "l.txt")}
+            rules = [_rule(name=f"w{number}", source_table="", condition="", action="file", target=target,
+                           template="txt") for number, target in enumerate(written)]
+            _, findings = engine.fire("after_300", _db(), rules=rules, templates={"txt": "x"}, params={},
+                                      files_root=out_root)
+            eq(findings, [], "every spelling Win32 normalizes: written")
+            eq(sorted(name for name in written.values() if os.path.isfile(os.path.join(out_root, name))),
+               sorted(written.values()), "…each by its own name")
+            eq(sorted(os.listdir(out_root)), sorted({"rx"} | {name for name in written.values() if os.sep not in name}),
+               "…and nothing else (no `sub` made for `sub/..`)")
+        with tempfile.TemporaryDirectory() as parent:             # the TARGET's names are judged, never the output
+            root = os.path.join(parent, "aux.files")              # root's: Windows 11 allows this folder (older
+            try:                                                  # Windows reads it as the AUX device - no such
+                os.makedirs(root)                                 # output root exists there)
+            except OSError:
+                root = None
+            if root is not None:
+                rule = _rule(name="aux", source_table="", condition="", action="file", target="rx/a.txt", template="txt")
+                _, findings = engine.fire("after_300", _db(), rules=[rule], templates={"txt": "x"}, params={},
+                                          files_root=root)
+                eq(findings, [], "an output root inside `aux.files`: its targets are written")
+                ok(os.path.isfile(os.path.join(root, "rx", "a.txt")), "…there")
+    _sandboxed(body)()
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("chain_reactions", [
@@ -1277,6 +1451,12 @@ if __name__ == "__main__":
         ("a_headerless_or_overflowing_rule_file_is_never_silent",
          test_a_headerless_or_overflowing_rule_file_is_never_silent),
         ("text_utf8_cannot_store_is_a_finding", test_text_utf8_cannot_store_is_a_finding),
+        ("a_findings_text_the_record_cannot_store_is_recorded_escaped",
+         test_a_findings_text_the_record_cannot_store_is_recorded_escaped),
+        ("a_field_name_or_a_value_the_save_cannot_store_never_empties_a_table",
+         test_a_field_name_or_a_value_the_save_cannot_store_never_empties_a_table),
+        ("every_path_windows_would_misdirect_is_refused_before_the_write",
+         test_every_path_windows_would_misdirect_is_refused_before_the_write),
         ("fire_empty_hook_is_a_strict_noop", test_fire_empty_hook_is_a_strict_noop),
         ("noop_loads_nothing_beyond_the_rule_index", test_noop_loads_nothing_beyond_the_rule_index),
         ("rules_on_hooks_the_run_plan_never_fires_are_reported",

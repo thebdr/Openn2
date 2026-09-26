@@ -742,6 +742,81 @@ def test_text_utf8_cannot_store_never_crashes_the_run():
             config.use_project(previous_project)
 
 
+def test_a_field_name_or_a_quoted_text_utf8_cannot_store_never_wipes_the_record():
+    """C-024 refute round 22 (F-A, F-B) + C-025 refute round 5 (#1), through the REAL run-plan. A row template's
+    FIELD NAME holding the escape pair (`"tag\\uD83D\\uDE00"` - a YAML key: two lone surrogates) was added, then
+    the save failed on the CSV header AFTER opening signals.csv for writing: the staged table emptied (0 bytes)
+    while RSLT reported it - and the builder approved the rule. A finding QUOTING such text (templates.yaml
+    naming a template twice, the second value holding the escape) crashed the run at the record (its uid
+    hashes UTF-8). Now the field name is the rule's rx_bad_template on BOTH legs that fire after_300 - nothing
+    added, the lint and the preview saying the same - signals.csv stays byte for byte what staging saved, the
+    audit reaches the disk, and a quoted text is recorded escaped, on either hook."""
+    from pipeline5.phases.chain_reactions import engine as reactions
+    from pipeline5.workbench import template_doc
+    header = ["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"]
+    escape = "\\uD83D\\uDE00"                                   # the YAML escapes, as an author types them
+    params = config.load_params()
+    previous_project = config.active_project()
+    real_fire, staged = reactions.fire, {}
+
+    def spy(hook, database, **kw):                            # signals.csv as staging saved it, before the fire
+        if hook == "after_300":
+            with open(os.path.join(config.database_dir(), "signals.csv"), "rb") as handle:
+                staged["signals"] = handle.read()
+        return real_fire(hook, database, **kw)
+
+    templates = 'name_rows:\n  - script_type: "E"\n    "tag' + escape + '": "E-{$mnemonic}"\n'
+    rule = ["rx_name", "after_300", "signals", '$script_type = "A"', "add_rows", "signals", "name_rows", ""]
+    for only in (None, 310):
+        leg = only or 300
+        with tempfile.TemporaryDirectory() as project:
+            _rules_project(project, params, [header, rule], templates)
+            config.use_project(project)
+            reactions.fire = spy
+            try:
+                if only is None:                                  # the builder, opened before the run
+                    session = template_doc.Session(None)
+                    doc = template_doc.parse(templates)
+                    placed = session.check(doc, session.rules[0])
+                    shown = session.preview_text(doc, session.rules[0], 0).splitlines()
+                    ok(any(p.severity == "error" and "the field name 'tag\\ud83d\\ude00'" in p.message for p in placed),
+                       f"the lint names the field: {[p.message for p in placed]}")
+                host = _Host()
+                SYSTEM.handlers["staging"](host.ctx(), only=only)
+                db_dir = config.database_dir()
+                found = [f for batch in host.rendered for f in batch if getattr(f, "type", "") == "rx_bad_template"]
+                eq([(f.location, "entry 1: the field name 'tag\\ud83d\\ude00'" in f.detail) for f in found],
+                   [("rx_name", True)], f"leg {leg}: the rule's rx_bad_template, naming the entry and the field")
+                if only is None:
+                    eq(shown[0], f"rx_bad_template: {found[0].detail}", "…the preview said the fire's finding")
+                with open(os.path.join(db_dir, "signals.csv"), "rb") as handle:
+                    eq(handle.read(), staged.pop("signals"), f"leg {leg}: signals.csv byte for byte as staged")
+                audit = _read_csv(os.path.join(db_dir, "chain_reactions_log.csv"))
+                eq([(r["rule"], r["created"], r["outcome"]) for r in audit], [("rx_name", "0", "rx_bad_template")],
+                   f"leg {leg}: the audit on disk - nothing created")
+                eq(_staged_count(host), len(_read_csv(os.path.join(db_dir, "signals.csv"))), f"leg {leg}: RSLT = the saved rows")
+            finally:
+                reactions.fire = real_fire
+                config.use_project(previous_project)
+    duplicated = 'hdr: "HEADER"\nhdr: "HEADER ' + escape + '"\n'   # the YAML error quotes the decoded value
+    for hook in ("after_300", "before_300"):
+        with tempfile.TemporaryDirectory() as project:
+            _rules_project(project, params, [header, ["rx_dup", hook, "", "", "file", "rx/d.txt", "hdr", ""]], duplicated)
+            config.use_project(project)
+            try:
+                host = _Host()
+                SYSTEM.handlers["staging"](host.ctx())
+                ok("RSLT" in host.levels(), f"{hook}: the run completes")
+                eq(_rx_rendered(host), {("rx_templates_unreadable", "chain_reactions/templates.yaml")}, f"{hook}: rendered")
+                recorded = [r for r in _read_csv(os.path.join(config.database_dir(), "validation_issues.csv"))
+                            if r["type"] == "rx_templates_unreadable"]
+                eq(len(recorded), 1, f"{hook}: …and recorded")
+                ok("\\ud83d" in recorded[0]["detail"] and "\ud83d" not in recorded[0]["detail"],
+                   f"{hook}: the quoted text recorded escaped - {ascii(recorded[0]['detail'])[:160]}")
+            finally:
+                config.use_project(previous_project)
+
+
 def test_spawns_are_saved_beside_a_ragged_record():
     """Refuter round 9: with a ragged chain_reactions_log.csv the engine skipped the WHOLE save - the
     after_300 spawns silently never reached signals.csv while RSLT reported them. The rest of the
@@ -881,6 +956,8 @@ if __name__ == "__main__":
         ("a_downgraded_no_io_sheet_never_saves_over_the_record",
          _sandboxed(test_a_downgraded_no_io_sheet_never_saves_over_the_record)),
         ("text_utf8_cannot_store_never_crashes_the_run", _sandboxed(test_text_utf8_cannot_store_never_crashes_the_run)),
+        ("a_field_name_or_a_quoted_text_utf8_cannot_store_never_wipes_the_record",
+         _sandboxed(test_a_field_name_or_a_quoted_text_utf8_cannot_store_never_wipes_the_record)),
         ("spawns_are_saved_beside_a_ragged_record", _sandboxed(test_spawns_are_saved_beside_a_ragged_record)),
         ("a_blank_range_end_invents_nothing_on_the_real_fixture",
          _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),

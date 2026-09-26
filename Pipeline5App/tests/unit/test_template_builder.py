@@ -654,6 +654,159 @@ def test_format_specs_know_the_values_type():
     _sandboxed(fired)
 
 
+def test_a_field_name_utf8_cannot_store_is_the_templates_error():
+    """C-025 refute round 5 (#1): the round-4 surrogate lint judged a row template's VALUES only - a FIELD NAME
+    holding the pair (`"tag\\uD83D\\uDE00": ...`, a YAML key) linted clean and previewed a spawn, while the real
+    run added the row and its save emptied signals.csv (C-024 round 22, F-B). The field name is the row
+    template's own problem now - one check (`_row_template_problem`) for the lint, the preview and the fire."""
+    pair = "\ud83d\ude00"
+    templates = {"rows": [{"label": "ok-{$name}", "tag" + pair: "x"}]}
+    found = [p for p in engine.lint(templates, _rule(), _database()) if p.severity == "error"]
+    eq([(p.template, p.where) for p in found], [(None, None), ("rows", None)], "the rule's error and the template's")
+    ok(all("entry 1: the field name 'tag\\ud83d\\ude00'" in p.message for p in found), [p.message for p in found])
+
+    def body():
+        database, findings = engine.fire("after_300", _database(), rules=[_rule()], templates=templates, params={})
+        shown = engine.preview(_rule(), 0, templates=templates, params={}, database=_database())
+        eq(shown.problem, (findings[0].type, findings[0].detail), "the preview is the fire's rx_bad_template")
+        eq((shown.rows, len(database["dst"])), ([], 0), "…nothing spawned, nothing added")
+    _sandboxed(body)
+
+
+def test_device_prefixes_and_names_lint_equals_the_fire():
+    """C-025 refute round 5 (#2, #5) + C-024 refute round 22's notes, the builder half: the lint approved exact
+    `\\\\?\\` targets every fire refuses (a '/', a '.' / '..' name), and rejected device-prefix spellings the
+    fire writes (`\\\\./C:`, `//.\\C:`, `\\/.\\C:`, `//?/C:` or `\\\\.\\C:` after a leading hole). The fire's new
+    name guards (a device name, a name ending in '.' / ' ', a rooted path, no file name, a device path's
+    volume) are the lint's too, on literal text: lint = preview = fire for every shape - a literal is refused
+    only where no rendering of the holes lets the fire take it."""
+    if os.name != "nt":
+        return                                                # Win32 path rules
+    templates = {"txt": "x"}
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            drive, rest = os.path.splitdrive(out)
+            letter, strict = drive[0], "\\\\?\\" + out
+            params = {"dir": rest.replace("\\", "/"), "p": "", "n": "", "a": "a", "e": "txt", "v": "v"}
+            refused = [strict + "/lit.txt", strict + "\\sub/b.txt", strict + "\\sub\\..\\c.txt", strict + "\\.\\d.txt",
+                       strict + "\\\\e.txt", "{$_params.p}\\\\?\\" + letter + ":{$_params.dir}/a.txt",
+                       "\\\\.\\" + letter + ":\\..\\" + rest.lstrip("\\") + "\\x.txt", "\\\\.\\pipe\\rx", "rx/NUL",
+                       "rx/nul.{$_params.e}", "rx/a.", "rx /a.txt", "/rx/a.txt", "rx/", "rx/{$_params.v}.",
+                       "rx/{$_params.v} /x.txt"]
+            for target in refused:
+                rule = _rule(action="file", target=target, template="txt")
+                errors = [p for p in engine.lint(templates, rule, _database())
+                          if p.template is None and p.severity == "error"]
+                shown = engine.preview(rule, 0, templates=templates, params=params, database=_database(), files_root=out)
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
+                                          files_root=out)
+                eq([f.type for f in findings], ["rx_file_write"], f"{target!r}: the fire refuses it")
+                eq(shown.problem, (findings[0].type, findings[0].detail), f"{target!r}: …the preview says so")
+                eq([p.where for p in errors], ["target"], f"{target!r}: …and so does the lint")
+            eq(os.listdir(out), [], "nothing written")
+            accepted = {"{$_params.p}//?/" + letter + ":{$_params.dir}/b.txt": "b.txt",
+                        "{$_params.p}\\\\.\\" + letter + ":{$_params.dir}/c.txt": "c.txt",
+                        "\\\\./" + letter + ":{$_params.dir}/d.txt": "d.txt",
+                        "//.\\" + letter + ":{$_params.dir}/e.txt": "e.txt",
+                        "\\/.\\" + letter + ":{$_params.dir}/f.txt": "f.txt",
+                        "//?/" + out.replace("\\", "/") + "/sub/../g.txt": "g.txt",
+                        "rx/{$_params.n}./h.txt": os.path.join("rx", "h.txt"),
+                        "rx/NUL{$_params.a}.txt": os.path.join("rx", "NULa.txt")}
+            for target, name in accepted.items():
+                rule = _rule(action="file", target=target, template="txt")
+                eq([p.message for p in engine.lint(templates, rule, _database()) if p.template is None], [],
+                   f"{target!r}: no lint error")
+                shown = engine.preview(rule, 0, templates=templates, params=params, database=_database(), files_root=out)
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
+                                          files_root=out)
+                eq((shown.problem, findings), (None, []), f"{target!r}: the preview and the fire accept it")
+                ok(os.path.isfile(os.path.join(out, name)), f"{target!r}: …written as {name}")
+    _sandboxed(body)
+
+
+def test_node_of_reads_are_judged_as_every_data_functions():
+    """C-025 refute round 5 (#3): node_of is a data function - listed, documented, offered by the completion -
+    yet the parser never recorded its read: over a table absent at the hook (a database-less hook has none),
+    inside a ROW predicate, and over a table lacking its byte-range columns it linted clean while finding
+    nothing. It is judged as count / lookup are now - warnings, each on its own call or table word."""
+    from pipeline5.language import expr
+    tables = {"signals": ["uid", "tag"], "nodes": ["uid", "name", "start_byte", "end_byte"], "bare": ["uid", "name"]}
+    body = ('{node_of($_params.bit, nodez)}\n{count(signals, node_of(1, nodes) = "")}\n'
+            '{node_of($_params.bit, bare)}\n{node_of($_params.bit, nodes)}')
+    found = lint({"t": body}, start="t", fields={"_params", "_rule", "_db", "tag"}, tables=tables)
+    eq(sorted((p.where, body.split("\n")[p.where - 1][p.start:p.end], p.severity, p.message.split(" - ")[0])
+              for p in found),
+       [(1, "nodez", "warning", "'nodez' is not a table at this hook"),
+        (2, "node_of", "warning", "node_of() inside a row predicate sees that ROW alone"),
+        (3, "node_of", "warning", "'end_byte' is not a column of bare"),
+        (3, "node_of", "warning", "'start_byte' is not a column of bare")],
+       "each read the fire makes blind - warned (the real one clean)")
+    ctx = {"_params": {"bit": 12}, "_db": {"nodes": [{"uid": "u", "name": "N1", "start_byte": "10", "end_byte": "20"}],
+                                           "bare": [{"uid": "u", "name": "B"}]}}
+    eq((expr.evaluate("node_of($_params.bit, bare)", ctx), expr.evaluate("node_of($_params.bit, nodes)", ctx)["name"]),
+       ({}, "N1"), "(what the fire computes: nothing over the bare table, the node over the real one)")
+    before = _rule(fire_when="before_300", source_table="", action="file", target="b.txt", template="b")
+    found = engine.lint({"b": "{node_of(1, nodes)}"}, before, None, hooks=("before_300", "after_300"))
+    eq([(p.template, p.severity, p.message.split(" - ")[0]) for p in found],
+       [("b", "warning", "'nodes' is not a table at this hook")], "a database-less hook: no table at all")
+
+
+def test_a_lone_surrogate_is_judged_where_it_is_stored():
+    """C-025 refute round 5 (#4): the round-4 check scanned the WHOLE line - holes included - and stopped
+    there: a compared literal (`{count(src, $name = "<pair>")}`, a row value's `{if($name = "<pair>", ...)}`)
+    and a range end's `{len("<pair>")}` were errors while the fire writes them, and `{$nope} <pair>` hid the
+    fire's own error (a missing field). The surrogate is judged where the render STORES it now - literal
+    text and a constant hole's value an error, a data-dependent hole a warning (a row rendering it is
+    refused), a predicate or a range end never - and the line's other problems still show."""
+    pair = "\ud83d\ude00"
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            for name, text, severity, written in (
+                    ("a", 'matches: {count(src, $name = "' + pair + '")}', "warning", "matches: 0.0"),
+                    ("c", '@for $i in 1..{count(src, $name != "' + pair + '")}: line {$i}', None, "line 1\nline 2"),
+                    ("k", 'x {"' + pair + '"}', "error", None)):
+                rule = _rule(action="file", source_table="", target=f"{name}.txt", template=name)
+                found = [p for p in engine.lint({name: text}, rule, _database()) if "surrogate" in p.message]
+                eq([p.severity for p in found], [severity] if severity else [], f"{name}: the lint")
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates={name: text}, params={},
+                                          files_root=out)
+                if written is None:
+                    eq([f.type for f in findings], ["rx_bad_template"], f"{name}: the fire refuses every row")
+                    continue
+                eq(findings, [], f"{name}: the fire writes it")
+                with open(os.path.join(out, f"{name}.txt"), encoding="utf-8") as handle:
+                    eq(handle.read().rstrip("\n"), written, f"{name}: …this")
+            rows = {"rows": [{"label": '{if($name = "' + pair + '", "smile", "plain")}'}]}
+            eq([p.severity for p in engine.lint(rows, _rule(), _database()) if "surrogate" in p.message], ["warning"],
+               "a row value's data-dependent hole: a warning")
+            database, findings = engine.fire("after_300", _database(), rules=[_rule()], templates=rows, params={})
+            eq((findings, [row["label"] for row in database["dst"]]), ([], ["plain", "plain"]), "…the fire spawns it")
+            rule = _rule(action="file", source_table="", target="n.txt", template="n")
+            found = engine.lint({"n": "{$nope} " + pair}, rule, _database())
+            eq(sorted((p.severity, p.message.split(" - ")[0]) for p in found if p.template == "n"),
+               [("error", "'\\ud83d' (a lone surrogate) cannot be stored as UTF-8"), ("error", "missing field $nope")],
+               "both of the line's problems - the fire's own error included")
+    _sandboxed(body)
+
+
+def test_an_in_row_warning_lands_on_its_own_call():
+    """C-025 refute round 5 (#7): the in-row warning searched its function's NAME after the hole's first
+    comma - `{lookup(signals, tag, count(nodes, count(signals) > 0), addr)}` squiggled the lookup KEY's
+    `count` (column 22), not the one inside count's predicate (35); inside a `where` three calls collapsed
+    into one warning. The parser records each call's own position; each warning is placed there."""
+    tables = {"signals": ["uid", "tag", "addr"], "nodes": ["uid", "name"]}
+    fields = {"_params", "_rule", "_db", "tag"}
+    line = "{lookup(signals, tag, count(nodes, count(signals) > 0), addr)}"
+    found = [p for p in lint({"t": line}, start="t", fields=fields, tables=tables) if "row predicate" in p.message]
+    eq([(p.start, p.end) for p in found], [(35, 40)], "on the call inside the predicate")
+    line = "@for $r in signals where count(nodes) > 0 and count(signals, count(nodes) > 0) > 0: {$r.tag}"
+    found = [p for p in lint({"t": line}, start="t", fields=fields, tables=tables) if "row predicate" in p.message]
+    eq(sorted((p.start, line[p.start:p.end]) for p in found), [(25, "count"), (46, "count"), (61, "count")],
+       "every call inside the `where`, each on its own")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("template_builder", [
@@ -679,4 +832,9 @@ if __name__ == "__main__":
         ("a_lone_surrogate_is_what_the_fire_refuses", test_a_lone_surrogate_is_what_the_fire_refuses),
         ("a_data_functions_row_reads_are_judged", test_a_data_functions_row_reads_are_judged),
         ("format_specs_know_the_values_type", test_format_specs_know_the_values_type),
+        ("a_field_name_utf8_cannot_store_is_the_templates_error", test_a_field_name_utf8_cannot_store_is_the_templates_error),
+        ("device_prefixes_and_names_lint_equals_the_fire", test_device_prefixes_and_names_lint_equals_the_fire),
+        ("node_of_reads_are_judged_as_every_data_functions", test_node_of_reads_are_judged_as_every_data_functions),
+        ("a_lone_surrogate_is_judged_where_it_is_stored", test_a_lone_surrogate_is_judged_where_it_is_stored),
+        ("an_in_row_warning_lands_on_its_own_call", test_an_in_row_warning_lands_on_its_own_call),
     ]))

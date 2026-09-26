@@ -443,7 +443,7 @@ class _Parser:
             return val
         raise ExprError(f"expected a table name in {self.src!r}")
 
-    def _pred_in_row_scope(self, name: str, table: str):
+    def _pred_in_row_scope(self, name: str, table: str, at: int):
         """Compile a predicate against a PER-ROW scope (scope=None so any $col resolves to the row cell).
         Its fields go to a PRIVATE set: a row column is not a free field of the enclosing hole - they are
         recorded as the function's ROW reads instead."""
@@ -451,19 +451,20 @@ class _Parser:
         sub.i = self.i
         fn = sub._or()
         self.i = sub.i
-        self.reads.append((name, table, frozenset(sub.free), self.in_row))
+        self.reads.append((name, table, frozenset(sub.free), self.in_row, at))
         return fn
 
     def _data_call(self, name):
+        at = self.i - 1                            # the function name's token (a read's position)
         self._eat("(")
         if name == "where" or name == "first":
             table = self._table_name()
             pred = None
             if self._peek()[1] == ",":
                 self._next()
-                pred = self._pred_in_row_scope(name, table)
+                pred = self._pred_in_row_scope(name, table, at)
             else:
-                self.reads.append((name, table, frozenset(), self.in_row))     # its table, read whole
+                self.reads.append((name, table, frozenset(), self.in_row, at))     # its table, read whole
             self._eat(")")
             if name == "where":
                 return lambda ctx: data.where(ctx, table, _binder(pred))
@@ -473,9 +474,9 @@ class _Parser:
             pred = None
             if self._peek()[1] == ",":
                 self._next()
-                pred = self._pred_in_row_scope(name, table)
+                pred = self._pred_in_row_scope(name, table, at)
             else:
-                self.reads.append((name, table, frozenset(), self.in_row))     # its table, read whole
+                self.reads.append((name, table, frozenset(), self.in_row, at))     # its table, read whole
             self._eat(")")
             return lambda ctx: data.count(ctx, table, _binder(pred))
         if name == "unique":
@@ -483,7 +484,7 @@ class _Parser:
             self._eat(",")
             table = self._table_name()
             self._eat(")")
-            self.reads.append((name, table, frozenset({col}), self.in_row))
+            self.reads.append((name, table, frozenset({col}), self.in_row, at))
             return lambda ctx: data.unique(ctx, col, table)
         if name == "lookup":
             table = self._table_name()
@@ -494,13 +495,14 @@ class _Parser:
             self._eat(",")
             val_col = self._col_word()
             self._eat(")")
-            self.reads.append((name, table, frozenset({key_col, val_col}), self.in_row))
+            self.reads.append((name, table, frozenset({key_col, val_col}), self.in_row, at))
             return lambda ctx: data.lookup(ctx, table, key_col, key_val(ctx), val_col)
         if name == "node_of":
             bit = self._value()
             self._eat(",")
             table = self._table_name()
             self._eat(")")
+            self.reads.append((name, table, frozenset({"start_byte", "end_byte"}), self.in_row, at))
             return lambda ctx: data.node_of(ctx, bit(ctx), table)
         raise ExprError(f"unknown data function {name!r} in {self.src!r}")
 
@@ -543,16 +545,18 @@ def free_paths(text: str):
 @functools.lru_cache(maxsize=4096)
 def row_reads(text: str):
     """What each data function in an expression reads from its TABLE's rows - a tuple of (function,
-    table, column paths, in a row predicate): a count / where / first predicate's `$col`s (none - the
-    table read whole - without one), lookup's key + value columns, unique's column; `in a row predicate`
-    = the call sits inside another data function's predicate, whose scope is the ROW alone (no `_db`:
-    it finds no rows). None when the text does not parse. The template builder warns on each."""
+    table, column paths, in a row predicate, offset): a count / where / first predicate's `$col`s (none -
+    the table read whole - without one), lookup's key + value columns, unique's column, node_of's byte
+    range; `in a row predicate` = the call sits inside another data function's predicate, whose scope
+    is the ROW alone (no `_db`: it finds no rows); `offset` = the call's name in `text`. None when the
+    text does not parse. The template builder warns on each, at its call."""
     try:
         parser = _Parser(_tokenize(text), text, None)
         parser.parse()
     except ExprError:
         return None
-    return tuple(parser.reads)
+    starts = [m.start() for m in _TOKEN_RE.finditer(text) if m.lastgroup is not None]
+    return tuple((function, table, columns, in_row, starts[at]) for function, table, columns, in_row, at in parser.reads)
 
 
 def free_fields(text: str):

@@ -377,20 +377,23 @@ def load_reactions() -> list:
     system that ships no reactions file simply has no rules ([] - absence of rules is not an error).
     Only fully BLANK lines are skipped; a row with content but no `name` is passed through so the
     compiler reports it (refuter round 6: it used to vanish here, silently) - so is one whose only
-    content sits PAST the header's columns (C-024 refute round 21). A header that does not name the rule
-    columns raises (a headerless file would read its first rule AS the header - lost, silently): the
-    engine reports rx_rules_unreadable."""
+    content sits PAST the header's columns (C-024 refute round 21). The header is the first line that is
+    not blank (C-024 refute round 22: a blank first line read as an EMPTY header - every rule lost to
+    unnamed rx_bad_rule findings); one that does not name the rule columns raises (a headerless file would
+    read its first rule AS the header - lost, silently): the engine reports rx_rules_unreadable."""
     path = find("chain_reactions/reactions.csv")
     if not path or not os.path.exists(path):
         return []
     rows = []
     with open(path, newline="", encoding="utf-8-sig") as handle:
-        reader = csv.DictReader(handle)
-        missing = [column for column in _RULE_COLUMNS if column not in (reader.fieldnames or _RULE_COLUMNS)]
+        header = next((cells for cells in csv.reader(handle) if any(cell.strip() for cell in cells)), None)
+        if header is None:                                    # an empty file, or blank lines only: no rules
+            return []
+        missing = [column for column in _RULE_COLUMNS if column not in header]
         if missing:
             raise ValueError(f"{path}: its header row names no {', '.join(missing)} column - got "
-                             f"{reader.fieldnames} (a headerless file reads its first rule as the header)")
-        for raw in reader:
+                             f"{header} (a headerless file reads its first rule as the header)")
+        for raw in csv.DictReader(handle, fieldnames=header):
             extra = raw.pop(None, None) or []
             if not any((v or "").strip() for v in raw.values() if isinstance(v, str)) \
                     and not any((v or "").strip() for v in extra):

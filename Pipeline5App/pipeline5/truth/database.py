@@ -49,10 +49,14 @@ class Database:
 
     # --- persistence ----------------------------------------------------------------------------- #
     def save(self, directory) -> None:
-        """Write every table to `<directory>/<table>.csv` (creating the directory)."""
+        """Write every table to `<directory>/<table>.csv` (creating the directory) - EVERY table rendered
+        first (`Table.csv_bytes`): a value that cannot be written raises before any file is touched, never
+        a truncated table nor a save stopped half-way by one (C-024 refute round 22)."""
+        payloads = [(table.name, table.csv_bytes()) for table in self._tables.values()]
         os.makedirs(directory, exist_ok=True)
-        for table in self._tables.values():
-            table.write_csv(os.path.join(directory, f"{table.name}.csv"))
+        for name, data in payloads:
+            with open(os.path.join(directory, f"{name}.csv"), "wb") as handle:
+                handle.write(data)
 
     def load(self, directory) -> "Database":
         """Read each declared table from `<directory>/<table>.csv` if present; an absent file leaves

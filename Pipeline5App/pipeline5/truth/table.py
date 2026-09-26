@@ -18,6 +18,7 @@ revisions and other tables can foreign-key to it.
 from __future__ import annotations
 
 import csv
+import io
 import json
 
 from pipeline5.truth.content_hash import uid as content_uid
@@ -128,26 +129,36 @@ class Table:
         extras = sorted({key for row in self.rows for key in row if key not in known})
         return declared + extras
 
-    def write_csv(self, path) -> None:
-        """Write the table as a comma CSV; `json_columns` are JSON-encoded, the rest plain text. A
-        structured value (list/dict) in a column NOT declared `json_columns` is a bug - it would `str()`
-        to a lossy Python repr - so raise instead of silently corrupting it."""
+    def csv_bytes(self) -> bytes:
+        """The table as `write_csv` stores it - a comma CSV (CRLF rows) in UTF-8; `json_columns` are
+        JSON-encoded, the rest plain text. A structured value (list/dict) in a column NOT declared
+        `json_columns` is a bug - it would `str()` to a lossy Python repr - so raise instead of silently
+        corrupting it; so does text UTF-8 cannot store (a lone surrogate - a YAML escape pair's half)."""
         columns = self.effective_columns()
-        with open(path, "w", newline="", encoding="utf-8") as handle:
-            writer = csv.writer(handle)
-            writer.writerow(columns)
-            for row in self.rows:
-                cells = []
-                for column in columns:
-                    value = row.get(column)
-                    if column in self.json_columns:
-                        cells.append(encode_cell(value))
-                    elif isinstance(value, (list, dict)):
-                        raise ValueError(f"{self.name}.{column}: holds a {type(value).__name__} but is not "
-                                         f"declared in json_columns (it would be stored lossily as a repr)")
-                    else:
-                        cells.append(_scalar_text(value))
-                writer.writerow(cells)
+        buffer = io.StringIO(newline="")
+        writer = csv.writer(buffer)
+        writer.writerow(columns)
+        for row in self.rows:
+            cells = []
+            for column in columns:
+                value = row.get(column)
+                if column in self.json_columns:
+                    cells.append(encode_cell(value))
+                elif isinstance(value, (list, dict)):
+                    raise ValueError(f"{self.name}.{column}: holds a {type(value).__name__} but is not "
+                                     f"declared in json_columns (it would be stored lossily as a repr)")
+                else:
+                    cells.append(_scalar_text(value))
+            writer.writerow(cells)
+        return buffer.getvalue().encode("utf-8")
+
+    def write_csv(self, path) -> None:
+        """Write the table as a comma CSV (`csv_bytes`) - rendered and encoded IN FULL before the file is
+        opened: a table that cannot be written raises with its previous file intact, never truncated
+        (C-024 refute round 22: a failed save emptied signals.csv)."""
+        data = self.csv_bytes()
+        with open(path, "wb") as handle:
+            handle.write(data)
 
     def read_csv(self, path) -> "Table":
         """Load rows from a comma CSV into this table's schema; the declared `json_columns` are

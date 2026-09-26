@@ -104,10 +104,21 @@ def test_extra_columns_sorted_deterministically():
 
 
 def test_write_rejects_structured_value_in_plain_column():
+    """A structured value in a plain column - or text UTF-8 cannot store - raises; the table is rendered in
+    full BEFORE its file is opened, so the previous file stays intact, never truncated (C-024 refute round
+    22: a failed save emptied signals.csv)."""
     t = Table("t", ["uid", "a"], json_columns=[])
-    t.add(uid="x", a=["should", "be", "declared", "json"])
+    t.add(uid="x", a="fine")
     with tempfile.TemporaryDirectory() as d:
-        raises(ValueError, lambda: t.write_csv(os.path.join(d, "t.csv")))
+        path = os.path.join(d, "t.csv")
+        t.write_csv(path)
+        with open(path, "rb") as handle:
+            before = handle.read()
+        for bad in (["should", "be", "declared", "json"], "a lone \ud83d surrogate"):
+            t.rows[0]["a"] = bad
+            raises(ValueError, lambda: t.write_csv(path))
+            with open(path, "rb") as handle:
+                eq(handle.read(), before, f"{bad!r}: the previous file intact")
 
 
 def test_read_locates_a_bad_json_cell():

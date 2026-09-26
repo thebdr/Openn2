@@ -8,6 +8,8 @@
 #   ROW template (action: add_rows) - a LIST of field maps; each map spawns ONE row into the
 #   rule's target TABLE per matched source row. Every value is an expr template STRING ({$field}
 #   holes, full function set) - QUOTE it: a bare 007 / true / [a, b] is rejected, never coerced.
+#   Each field NAME becomes a column of the table's CSV - a name no file can store (see the
+#   😀 note below) rejects the whole template.
 #   Spawned rows automatically carry spawned_by (the rule) + source_uid (the triggering row).
 #   Rules fire in reactions.csv order, and a later rule SEES an earlier rule's spawns (the chain
 #   reaction within one hook - e.g. spawn rows, then count or list them).
@@ -21,11 +23,14 @@
 #   before_<phase> header rule or deleting it between runs). A ':' in the rendered file NAME (or
 #   anywhere in a RELATIVE target - `X:3.txt` would read as drive X:) is refused (Windows would
 #   hide the text in an NTFS stream) - e.g. a `-X1:3` terminal designation - and so is a character
-#   a Windows path does not allow (< > " | ? * or a control character) or a drive that is not ONE
-#   letter A-Z. Write a non-ASCII character as itself, never as a \uD83D\uDE00 escape PAIR in a
-#   double-quoted value: YAML decodes that to two lone surrogates no file can store - the fire
-#   refuses the row. Values are {expr} holes; structure
-#   is @-directives:
+#   a Windows path does not allow (< > " | ? * or a control character), a drive that is not ONE
+#   letter A-Z, and a name Windows would not write as named: a device name (NUL, CON.txt, COM1),
+#   a name ending in '.' or a space (Windows drops it), a target ending in '/' (a folder), a path
+#   starting with a single '/' (the root of the drive, outside the output folder); in a \\?\ path,
+#   which Windows takes exactly as written, also a '/' or a '.' / '..' name.
+#   Write a non-ASCII character as itself, never as a \uD83D\uDE00 escape PAIR in a double-quoted
+#   value or key: YAML decodes that to two lone surrogates no file can store - the fire refuses the
+#   row. Values are {expr} holes; structure is @-directives:
 #       @use <name>                          splice another template here (recursive)
 #       @for $i in 1..{$count}: @use <name>  inclusive range loop (inline body form); a BLANK end
 #                                            (an empty cell) = no iterations at all
