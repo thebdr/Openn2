@@ -6,30 +6,30 @@
     "Pipeline5App/scripts/verify_c025.sh"
   ],
   "exitCode": 0,
-  "outputSha": "6f1b584401fbcb94adee0b408c3884109cc0ca832655288675936445d5b1e549",
+  "outputSha": "decf2de3cbed7c92882db5e5477a35e05b3aa9de015179d035d90b9ed69954fe",
   "outputTail": "  PASS  run_plan_executes_end_to_end\r\n  PASS  staging_fires_reaction_hooks\r\n  PASS  configured_rules_fire_through_the_real_run_plan\r\n  PASS  halted_staging_lists_the_deferred_trail_and_records_nothing\r\n  PASS  a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten\r\n  PASS  a_cascade_within_one_hook_through_the_real_run_plan\r\n  PASS  the_builder_models_what_the_after_300_fire_gets\r\n  PASS  the_builder_lints_every_leg_that_fires_after_300\r\n  PASS  the_builder_gates_as_the_run_plan_does\r\n  PASS  a_downgraded_no_io_sheet_never_saves_over_the_record\r\n  PASS  spawns_are_saved_beside_a_ragged_record\r\n  PASS  a_blank_range_end_invents_nothing_on_the_real_fixture\r\n  PASS  310_leg_appends_reaction_findings_to_the_existing_record\r\n  PASS  sub_phase_dispatch\r\n  -> 14/14 passed",
-  "ranAt": "2026-09-25T23:44:28.080Z",
-  "headCommit": "f8046bb470d88a944d614710f91c0b3064f6abce",
+  "ranAt": "2026-09-26T01:02:17.329Z",
+  "headCommit": "d00884e669c62690c45b4380a7d6ebd36ddf4009",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_template_builder.py",
       "file": "Pipeline5App/tests/unit/test_template_builder.py",
-      "fileSha": "cf9716d4563c235c2342a74baa670d59c795aefb5fdcb364c261c0d1ec21b846"
+      "fileSha": "6d1e35a9933b60f601c279eceb8d4ce74f3aab7bbd64eb60febe728c5d8daf13"
     },
     {
       "name": "Pipeline5App/tests/unit/test_template_doc.py",
       "file": "Pipeline5App/tests/unit/test_template_doc.py",
-      "fileSha": "156ed11536de3ebecde2770d8860717d19139d38c52d4a868bd221798da1a29f"
+      "fileSha": "3f72be49628d174888de56e59f83f65764c9aa88c789fbe37d58e43ff29b1e2a"
     },
     {
       "name": "Pipeline5App/tests/unit/test_gui_template_mode.py",
       "file": "Pipeline5App/tests/unit/test_gui_template_mode.py",
-      "fileSha": "5de7a9aa0995e490f9d3b5bd58e74a1faea6685218cb62e17254ffb1c2a69f10"
+      "fileSha": "5b8965afef703fa1bf01d5a035f4307b8336e789ecd0b7e93fc86d3666a2b38d"
     },
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
       "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
-      "fileSha": "8dfe3ea418fab97222cc31324608c1b2e094ce7e0e2013d57c1681407b480759"
+      "fileSha": "2a09d071e4550410fa56f72bae2c0d1621f8e79e3dc8a9bcb6a97925b2ae77c0"
     }
   ]
 }
