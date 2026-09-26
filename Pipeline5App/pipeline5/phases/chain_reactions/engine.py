@@ -93,6 +93,7 @@ absorption (spawned signals consumed by every phase) lands with its own reviewed
 """
 from __future__ import annotations
 
+import itertools
 import os
 import re
 from dataclasses import dataclass, field
@@ -273,6 +274,9 @@ def _row_template_problem(name: str, body):
         if not isinstance(spec, dict) or not spec:
             return f"row template {name!r} entry {number} is not a {{field: expr}} map"
         for column, value in spec.items():
+            if not isinstance(column, str):                  # YAML typed the NAME (`010:` reads as 10, `true:` as
+                return (f"row template {name!r} entry {number}: the field name {column!r} is a "   # True): it would
+                        f"{type(column).__name__}, not a text - YAML typed it; quote it")          # be renamed
             unstorable = _unencodable(str(column))           # a column name: the CSV header (round 22 -
             if unstorable:                                   # the save failed after the add, the table's
                 return (f"row template {name!r} entry {number}: the field name {str(column)!r}: "  # CSV
@@ -391,22 +395,25 @@ def _file_output(rule: Rule, templates: dict, scope: dict, files_root: str) -> t
     except (ExprError, TempemplatorError) as error:
         return None, None, ("rx_bad_template", str(error))
     judged = path                                                  # the TARGET's own names are judged, never the
-    if not os.path.isabs(path):                                    # output root's (Windows 11 allows `aux.files`)
-        if _WINDOWS and path[:1] in _SEPARATORS:                   # rooted, no drive: the join below would land
-            return None, None, ("rx_file_write",                   # it at the ROOT of the output root's drive
-                                f"cannot write {path!r}: a path rooted without a drive lands at the root of the "
-                                "output root's drive - write the drive, or a relative path")
+    # output root's (Windows 11 allows `aux.files`). Rooted without a drive (`/rx/a.txt`): joined, it lands at the
+    # ROOT of the output root's drive - refused before any isabs test (Python < 3.13 calls it absolute: never
+    # joined, it was written at the root of the current drive)
+    if _WINDOWS and path[:1] in _SEPARATORS and path[1:2] not in _SEPARATORS:
+        return None, None, ("rx_file_write", f"cannot write {path!r}: a path rooted without a drive lands at the "
+                            "root of the output root's drive - write the drive, or a relative path")
+    if not os.path.isabs(path):
         if ":" in path:                                            # `X:3.txt` would read as drive X: (a
             return None, None, ("rx_file_write",                   # drive-relative escape - round 14)
                                 f"cannot write {path!r}: a ':' in a relative target (a drive letter, or a "
                                 "hidden NTFS stream) - use an absolute path for another drive")
         path = os.path.join(files_root, path)
-    if ":" in os.path.splitdrive(os.path.abspath(path))[1]:       # NTFS would write a HIDDEN alternate data
-        return None, None, ("rx_file_write",                       # stream - silent (refuter round 13: a
-                            f"cannot write {path!r}: a ':' in a file name would write a hidden NTFS stream")
-    refusal = _path_refusal(judged)                               # `-X1:3` terminal name)
+    refusal = _path_refusal(judged)
     if refusal is not None:                                        # Windows refuses it at open() - say why
         return None, None, ("rx_file_write", f"cannot write {path!r}: {refusal}")
+    colon = _colon_name(judged)                                    # NTFS would write a HIDDEN alternate data
+    if colon is not None:                                          # stream - silent (refuter round 13: a `-X1:3`
+        return None, None, ("rx_file_write", f"cannot write {path!r}: a ':' in the name {colon!r} would write a "
+                            "hidden NTFS stream")                  # terminal name) - judged AS WRITTEN (C-025 round 6)
     unstorable = _unencodable(text)                                # the append would fail half-way
     if unstorable:
         return None, None, ("rx_bad_template", f"template {rule.template!r}: {unstorable}")
@@ -446,24 +453,50 @@ def _path_refusal(path: str):
     names = body.split("\\") if strict else re.split(r"[\\/]", body)
     if names[-1] in ("", ".", ".."):
         return "the target names a folder, not a file (it ends in a separator, '.' or '..')"
-    volume = _volume_depth(names[0]) if prefix else 0
+    unc = not prefix and body[:1] in _SEPARATORS and body[1:2] in _SEPARATORS   # \\server\share\...
+    volume = _volume_depth(names[0]) if prefix else 2 if unc else 0
     if volume is None:
-        return (f"a device path names a drive ({_STRICT}C:\\), a share ({_STRICT}UNC\\) or a volume - "
-                f"{names[0]!r} is none of them (a pipe, a raw device)")
-    if len(names) <= volume:
-        return "the target names a drive or a share, not a file"
-    depth = 0
+        return (f"a device path's first name is its drive ({_STRICT}C:\\), share ({_STRICT}UNC\\) or volume - "
+                f"{names[0]!r} is none of them (a pipe, a raw device - an empty, '.' or '..' name there included)")
     for name in names:
         refusal = _name_refusal(name, strict)
         if refusal:
             return refusal
-        if name == "..":
-            if prefix and depth <= volume:
-                return f"'..' climbs above the device path's {'share' if volume > 1 else 'drive'} (Windows drops it)"
-            depth -= 1
-        elif name not in ("", "."):
-            depth += 1
+    if prefix or unc:
+        depth, climb = _depth(names[2:] if unc else names, volume, device=bool(prefix))
+        if climb is not None:
+            return f"'..' climbs above the device path's {'share' if volume > 1 else 'drive'} (Windows drops it)"
+        if depth <= volume:
+            return f"the target names a {'server or a share' if unc else 'drive or a share'}, not a file"
     return None
+
+
+def _depth(names: list, volume: int, device: bool) -> tuple:
+    """(how deep `names` reach, the index of a '..' that climbs above the first `volume` of them - None: none does).
+    As Win32 walks them: an empty or '.' name is no step, '..' one up - above a device path's volume it drops the
+    drive / share (refused), at a UNC path's share it stays (Win32 clamps there, as at a drive's root). The share
+    root of a device or UNC path in any spelling (`\\\\.\\UNC\\srv\\.\\share`) reaches no deeper than its volume: no file
+    (C-024 refute round 23, F2)."""
+    depth, climb = 0, None
+    for index, name in enumerate(names):
+        if name in ("", "."):
+            continue
+        if name != "..":
+            depth += 1
+        elif depth > volume:
+            depth -= 1
+        elif device and climb is None:
+            climb = index
+    return depth, climb
+
+
+def _colon_name(path: str):
+    """The first name of `path` holding a ':' past its drive - judged AS WRITTEN: a `..` after it removes nothing
+    (the lint reads the same text), a UNC server / share and a volume name included. None: there is none."""
+    body = path[_device_prefix(path):] if _WINDOWS else path
+    names = re.split(r"[\\/]", body) if _WINDOWS else body.split("/")
+    drive = 1 if _WINDOWS and names[0][1:2] == ":" else 0          # (the drive's own ':' - `_path_refusal` judges it)
+    return next((name for name in names[drive:] if ":" in name), None)
 
 
 def _device_prefix(path: str) -> int:
@@ -494,7 +527,7 @@ def _name_refusal(name: str, strict: bool):
     if name[-1] in (".", " "):
         return (f"the name {name!r} ends in {name[-1]!r} - Windows drops it (another file, or none, "
                 "would be written)")
-    if name.split(".")[0].rstrip(" ").upper() in _DEVICE_NAMES:
+    if re.split(r"[.:]", name, maxsplit=1)[0].rstrip(" ").upper() in _DEVICE_NAMES:   # `NUL.txt`, `NUL:`
         return f"{name!r} is a Windows device name - the text would go to the device, not to a file"
     return None
 
@@ -763,6 +796,9 @@ def _preview(rule, row_index, templates, params, database, files_root, layer, st
             return Preview(matched=None, problem=("rx_unknown_table", _unknown_table("source", rule.source_table)))
         rows = db_tables[rule.source_table]                  # == _complete_rows(the source table)
         if not rows:
+            if rule.action == "add_rows" and rule.target not in database:   # the fire's _spawn_rows says so,
+                return Preview(matched=None,                                  # rows or none (round 6)
+                               problem=("rx_unknown_table", _unknown_table("target", rule.target)))
             return Preview(matched=None, note=f"{rule.source_table} has no rows - a fire matches nothing")
         row = rows[max(0, min(row_index, len(rows) - 1))]
     scope = _scope(row, rule, params, db_tables)
@@ -864,11 +900,13 @@ def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -
     and the RULE's own problems come back with template=None: a template of the wrong kind, a table
     absent at the hook, a hook never fired, a target that will not render."""
     problems, fields, tables, json, json_fields = [], None, None, None, None
+    values = None
     if rule is not None:
         fields, tables, json, json_fields = _lint_rule(rule, templates, database, hooks, problems)
+        values = _column_values(rule, database)
     text_start = rule.template if rule is not None and rule.action == "file" else None
     problems.extend(tempemplator.lint(templates, start=text_start, fields=fields, tables=tables,
-                                      json=json, json_fields=json_fields))
+                                      json=json, json_fields=json_fields, values=values))
     row_start = rule.template if rule is not None and rule.action == "add_rows" else None
     for name, body in templates.items():
         if isinstance(body, str):
@@ -886,7 +924,9 @@ def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -
             for column, value in (spec.items() if isinstance(spec, dict) else ()):
                 if isinstance(value, str):
                     found = tempemplator.lint_line(value, fields=fields if own else None, tables=tables if own else None,
-                                                   json=json_fields if own else None)
+                                                   json=json_fields if own else None,
+                                                   values=(lambda path: values(None, path) if "." not in path else ())
+                                                   if own and values is not None else None)
                     problems.extend(tempemplator.Problem(name, (number, str(column)), s, e, message, severity)
                                     for s, e, message, severity in found)
     return problems
@@ -927,6 +967,28 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
             problem(f"target {rule.target!r}: {why} - the fire refuses every row (rx_file_write)", "target",
                     start, end)
     return fields, tables, json, json_fields
+
+
+def _column_values(rule: Rule, database):
+    """`(table - None for the rule's own source table, column) -> the distinct non-blank values its rows hold there`
+    (a list / object left to the JSON warning) - a hole's format spec is tried on them (C-025 refute round 6: a
+    `{$qty:,}` over a text column linted clean while the fire fails on every row holding text). Each column is
+    read once per lint, only when a hole asks."""
+    cache = {}
+
+    def values(table, column):
+        name = rule.source_table if table is None else table
+        if (name, column) not in cache:
+            found = {}
+            if database is not None and name and name in database:
+                for row in database[name].rows:
+                    value = row.get(column)
+                    if value is None or value == "" or isinstance(value, (list, dict)):
+                        continue
+                    found.setdefault((type(value), value), value)
+            cache[(name, column)] = tuple(found.values())
+        return cache[(name, column)]
+    return values
 
 
 def _json_valued(table) -> frozenset:
@@ -1042,19 +1104,21 @@ def _literal_path_refusal(atoms: list):
 
     literal = [None if any(ch is None for ch, _s, _e in name) else "".join(ch for ch, _s, _e in name)
                for name in names]
-    if prefix and literal[0] is not None:
-        volume = _volume_depth(literal[0])
+    unc = not prefix and literal[:2] == ["", ""] and len(names) > 2       # a literal \\server\share\... start
+    if (prefix and literal[0] is not None) or unc:
+        volume = _volume_depth(literal[0]) if prefix else 2
         if volume is None:
-            return (*span(0), f"a device path names a drive, a share or a volume - {literal[0]!r} is none of them")
-        if len(names) <= volume and all(text is not None for text in literal):
-            return (*span(len(names) - 1), "the target names a drive or a share, not a file")
-        depth = 0
-        for number, text in enumerate(literal):
-            if text is None:
-                break
-            if text == ".." and not strict and depth <= volume:
-                return (*span(number), "'..' climbs above the device path's drive or share (Windows drops it)")
-            depth += -1 if text == ".." else 0 if text in ("", ".") else 1
+            return (*span(0), f"a device path's first name is its drive, share or volume - {literal[0]!r} is none "
+                              "of them")
+        walked = literal[2:] if unc else literal
+        known = list(itertools.takewhile(lambda text: text is not None, walked))   # up to the first hole
+        depth, climb = _depth(known, volume, device=bool(prefix))
+        if climb is not None and not strict:                # (a `\\?\` path's '..': its own name rule says so)
+            return (*span(climb + (2 if unc else 0)), "'..' climbs above the device path's drive or share (Windows "
+                                                     "drops it)")
+        if len(known) == len(walked) and depth <= volume:   # every name literal
+            return (*span(len(names) - 1), f"the target names a {'server or a share' if unc else 'drive or a share'}, "
+                                           "not a file")
     last = len(names) - 1
     for number, name in enumerate(names):
         text = literal[number]

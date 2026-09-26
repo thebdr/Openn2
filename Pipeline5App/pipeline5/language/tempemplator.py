@@ -82,7 +82,7 @@ from collections import namedtuple
 
 from pipeline5.language import expr
 from pipeline5.language.expr import ExprError
-from pipeline5.language.expr.parser import free_paths, row_reads
+from pipeline5.language.expr.parser import free_paths, row_reads, value_kind
 from pipeline5.language.expr.render import _split_spec
 
 _MAX_DEPTH = 32          # @use nesting backstop (the cycle guard catches loops; this catches towers)
@@ -513,14 +513,16 @@ def _field_span(text: str, start: int, end: int, name: str) -> tuple:
     return (found.start(), found.end()) if found else (start, end)
 
 
-def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, stored: bool = True) -> list:
+def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, stored: bool = True,
+              values=None) -> list:
     """ONE literal line / row value judged the way `render_text` and the loop-column check judge it -
     WITHOUT rendering: [(start, end, message, severity)], columns into `text`. `fields` = the
     top-level names in scope (None = unknown - the strict missing-field check is skipped); `loops` =
     {loop var: its table's columns - empty for a range var, None when unknown}; `tables` = {table:
     columns} (a data function's row reads are checked against them); `json` = the field paths holding
     JSON (list / object) values ("type", "r.matrix_areas"); `stored` = the render is stored as UTF-8 (a
-    text line, a row value - not a file target): a lone surrogate there is an error (the fire refuses it)."""
+    text line, a row value - not a file target): a lone surrogate there is an error (the fire refuses it);
+    `values` = `path -> the values the rule's Database holds there` (a format spec is tried on them)."""
     loops = loops or {}
     names = None if fields is None else set(fields) | set(loops)
     runs = list(_scan(text))
@@ -554,8 +556,11 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
                 if expression.strip() == "$" + path and path in json:   # the value IS a JSON list / object
                     issues.append((end - 1 - len(spec), end - 1, f"a format spec on a JSON (list / object) "
                                    f"value fails on the rows that hold one: ${path}:{spec}", "warning"))
+            trouble = _spec_on_kind(expression, spec, loops, values) if spec and not problem else None
+            if trouble:                                     # the kind the value IS (round 6)
+                issues.append((end - 1 - len(spec), end - 1, *trouble))
             issues.extend((s, e, message, "warning") for s, e, message in _row_read_problems(
-                text, start + 1, expression, tables) if (s, e, message, "warning") not in issues)
+                start + 1, expression, tables) if (s, e, message, "warning") not in issues)
             for path in sorted(paths):
                 head, _dot, rest = path.partition(".")
                 if names is not None and head not in names:
@@ -599,34 +604,74 @@ def _surrogate_problems(text: str, runs: list) -> list:
     return out
 
 
-def _row_read_problems(text: str, base: int, expression: str, tables, row_scope: bool = False) -> list:
+def _row_read_problems(base: int, expression: str, tables, row_scope: bool = False) -> list:
     """(start, end, message) for each column a data function reads from its table's rows (a predicate's
     `$col`, lookup / unique's column word, node_of's byte range) that the table does not have - it reads
     blank there - and for a table the hook does not have at all, `{}` included - a database-less hook (the
     function finds no rows: 0 / blank). A data function inside a ROW predicate (another's predicate, or a
-    `where` - `row_scope`) sees that row alone: it finds no rows either. `expression` sits at `base` in
-    `text`; each problem is placed at its OWN call (the parser's offset)."""
+    `where` - `row_scope`) sees that row alone: it finds no rows either. `expression` sits at `base`; each
+    problem sits on its OWN token - the call, the table word, the column (the parser's positions)."""
     out = []
-    stop = base + len(expression)
-    for function, table, columns, in_row, at in (row_reads(expression) or ()) if tables is not None else ():
-        s, e = base + at, base + at + len(function)
-        if in_row or row_scope:
-            out.append((s, e, f"{function}() inside a row predicate sees that ROW alone - it finds no rows "
+    for read in (row_reads(expression) or ()) if tables is not None else ():
+        s, e = base + read.at, base + read.at + len(read.function)
+        if read.in_row or row_scope:
+            out.append((s, e, f"{read.function}() inside a row predicate sees that ROW alone - it finds no rows "
                               "(0 / blank)"))
             continue
-        known = tables.get(table)
+        known = tables.get(read.table)
         if known is None:
-            found = re.compile(r"\b" + re.escape(table) + r"\b").search(text, e, stop)
-            out.append((*((found.start(), found.end()) if found else (s, e)),
-                        f"{table!r} is not a table at this hook - {function}() finds no rows (0 / blank)"))
+            out.append((base + read.table_span[0], base + read.table_span[1],
+                        f"{read.table!r} is not a table at this hook - {read.function}() finds no rows (0 / blank)"))
             continue
-        for column in sorted(columns):
+        for column in sorted(read.columns):
             head = column.split(".", 1)[0]
             if head not in known:
-                found = re.compile(r"\$?\b" + re.escape(head) + r"\b").search(text, e, stop)
-                out.append((*((found.start(), found.end()) if found else (s, e)),
-                            f"{head!r} is not a column of {table} - {function}() reads it as blank"))
+                span = read.column_spans.get(column)
+                if span is None:                            # node_of's byte range: no token of its own
+                    at = (s, e)
+                elif expression[span[0]:span[0] + 1] == "$":  # a predicate's `$col` - its head, not its sub-keys
+                    at = (base + span[0], base + span[0] + 1 + len(head))
+                else:                                       # lookup / unique's column word
+                    at = (base + span[0], base + span[1])
+                out.append((*at, f"{head!r} is not a column of {read.table} - {read.function}() reads it as blank"))
     return out
+
+
+_KIND_SAMPLES = {"list": [], "dict": {}, "float": 0.0, "int": 0}
+_BARE = re.compile(r"\$([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)")
+
+
+def _spec_on_kind(expression: str, spec: str, loops, values) -> tuple | None:
+    """(message, severity) when a hole's format spec fails on the value its expression yields (None: it takes
+    it). A kind fixed whatever the data - where / unique a list, first / node_of a dict (`{}` when nothing is
+    found - never blank), count / len a float, a range loop var an int, a table loop var its row: an ERROR,
+    every render fails. A value the rule's Database holds in that column (`values` - e.g. a text where the
+    spec takes numbers only, `{$qty:,}`): a WARNING, the rows holding it fail."""
+    from pipeline5.language.expr.runtime import format_spec
+    text = expression.strip()
+    kind, what, bare = value_kind(text), "", _BARE.fullmatch(text)
+    if kind is not None:
+        what = text.split("(", 1)[0].strip() + "()"
+    elif bare and "." not in bare.group(1) and (loops or {}).get(bare.group(1)) is not None:
+        kind, what = ("dict" if loops[bare.group(1)] else "int"), f"the loop var ${bare.group(1)}"
+    if kind is not None:
+        try:
+            format_spec(_KIND_SAMPLES[kind], spec)
+        except ExprError as error:
+            return (f"bad format spec {spec!r} for {what} - it renders a{'n' if kind == 'int' else ''} {kind}: "
+                    f"every render fails ({error})", "error")
+        return None
+    if not bare or values is None:
+        return None
+    for sample in values(bare.group(1)):
+        if isinstance(sample, (list, dict)):
+            continue                                        # (a JSON value: the JSON warning says so)
+        try:
+            format_spec(sample, spec)
+        except ExprError:
+            return (f"format spec {spec!r} fails on some values of ${bare.group(1)} (e.g. {sample!r}) - the fire "
+                    "fails on the rows holding them", "warning")
+    return None
 
 
 def _spec_problem(spec: str) -> str | None:
@@ -655,7 +700,7 @@ def _braced(text: str, runs: list, index: int) -> bool:
 
 
 def lint(templates: dict, *, start: str | None = None, fields=None, tables=None, json=None,
-         json_fields=None) -> list:
+         json_fields=None, values=None) -> list:
     """Every problem the renderer would raise for the TEXT templates in `templates`, found WITHOUT
     rendering - EVERY branch of every template (a render evaluates only the taken one). `start` +
     `fields` = a rule's context: that template - and whatever it @uses, loop vars carried - is walked
@@ -664,7 +709,8 @@ def lint(templates: dict, *, start: str | None = None, fields=None, tables=None,
     data-independent checks). `tables` = {table: columns} of the rule's hook database, for the context
     walk: an unknown loop table, the loop-column check, a `where` predicate's names, a data function's
     row reads; `json` = {table: its JSON columns} and `json_fields` = the rule's JSON fields (a format
-    spec on a JSON value). Returns [Problem], each once."""
+    spec on a JSON value); `values` = `(table - None for the rule's own row, column) -> the values the rule's
+    Database holds there` (a format spec is tried on them). Returns [Problem], each once."""
     found = {}
 
     def add(template, line, start_col, end_col, message, severity="error"):
@@ -672,7 +718,8 @@ def lint(templates: dict, *, start: str | None = None, fields=None, tables=None,
                          Problem(template, line, start_col, end_col, message, severity))
 
     if start is not None and isinstance(templates.get(start), str):      # the context walk
-        _Lint(templates, tables, add, json, json_fields).named(start, None if fields is None else frozenset(fields), {}, ())
+        _Lint(templates, tables, add, json, json_fields, values).named(start, None if fields is None else frozenset(fields),
+                                                                       {}, ())
     plain = _Lint(templates, None, add)                 # every template, no context: another
     for name, body in templates.items():               # rule (another hook) may use it
         if isinstance(body, str):
@@ -768,9 +815,9 @@ class _Lint:
     """The lint walk: the renderer's structure over EVERY branch - lines checked, nothing evaluated.
     `fields` = the names in scope (a frozenset, None = no context); `loops` = {var: columns}."""
 
-    def __init__(self, templates: dict, tables, add, json=None, json_fields=None):
+    def __init__(self, templates: dict, tables, add, json=None, json_fields=None, values=None):
         self.templates, self.tables, self.add, self.seen = templates, tables, add, set()
-        self.json, self.json_fields = json or {}, frozenset(json_fields or ())
+        self.json, self.json_fields, self.values = json or {}, frozenset(json_fields or ()), values
         self.loop_tables = {}                               # loop var -> its table, while its body is walked
         self._table = None                                  # the table `iterable` just judged
 
@@ -778,6 +825,20 @@ class _Lint:
         """The field paths holding JSON values here: the rule's JSON fields + each loop row's JSON columns."""
         return self.json_fields | frozenset(f"{var}.{column}" for var, table in self.loop_tables.items()
                                             if table for column in self.json.get(table, ()))
+
+    def path_values(self):
+        """`path -> the values the rule's Database holds there` for lint_line - the rule's own fields and each
+        loop row's columns (None: no Database here)."""
+        if self.values is None:
+            return None
+        loops = dict(self.loop_tables)                      # (as they are now: the walk moves on)
+
+        def resolve(path):
+            head, _dot, rest = path.partition(".")
+            if not rest:
+                return self.values(None, head)
+            return self.values(loops[head], rest) if loops.get(head) and "." not in rest else ()
+        return resolve
 
     def named(self, name, fields, loops, stack):
         key = (name, fields, frozenset(loops.items()))
@@ -797,8 +858,8 @@ class _Lint:
                 i = self.directive(lines, i, hi, word, template, fields, loops, stack, base, col)
                 continue
             if not word:
-                for s, e, message, severity in lint_line(lines[i], fields=fields, loops=loops,
-                                                         tables=self.tables, json=self.json_paths()):
+                for s, e, message, severity in lint_line(lines[i], fields=fields, loops=loops, tables=self.tables,
+                                                         json=self.json_paths(), values=self.path_values()):
                     self.add(template, base + i + 1, col + s, col + e, message, severity)
             i += 1
 
@@ -891,7 +952,7 @@ class _Lint:
                 text = fragment.strip()
                 where = at + offset + len(fragment) - len(fragment.lstrip())
                 issues = lint_line(text, fields=fields, loops=loops, tables=self.tables, json=self.json_paths(),
-                                   stored=False)              # a range end renders a number, never stored
+                                   stored=False, values=self.path_values())   # a range end renders a number, never stored
                 for s, e, message, severity in issues:
                     self.add(template, line_no, where + s, where + e, message, severity)
                 if not issues and all(kind != "hole" for kind, _s, _e in _scan(text)):
@@ -924,7 +985,7 @@ class _Lint:
             self.add(template, line_no, at + issue.start, at + issue.end, issue.message)
         if syntax:
             return
-        for s, e, message in _row_read_problems(pred, 0, pred, self.tables, row_scope=table is not None):
+        for s, e, message in _row_read_problems(0, pred, self.tables, row_scope=table is not None):
             self.add(template, line_no, at + s, at + e, message, "warning")
         for path in sorted(free_paths(pred) or ()) if table is None and loops else ():
             head, _dot, rest = path.partition(".")

@@ -504,6 +504,82 @@ def test_every_viewer_keeps_the_shipped_config_read_only():
         _done(root)
 
 
+def test_a_check_queued_behind_a_reload_is_dropped():
+    """C-025 refute round 6 (#1) through the real FilesPanel: a Reload queued while the worker builds, then a check
+    queued behind it - a refresh reads session.rules BEFORE the reload publishes. The worker ran the reload, then
+    that check with the pre-reload Rule: the view cache poisoned (every add_rows rule cascaded, the rule's own
+    included) and the preview applied afterwards was not the fire's. A stale rule's check is dropped now - the
+    reload's labels bring a fresh one."""
+    root = _tk()
+    if root is None:
+        return
+    import threading
+    from pipeline5.phases.chain_reactions import engine
+    rules = ("name,fire_when,source_table,condition,action,target,template,comment\n"
+             "cnt,after_300,,,file,gen/c.txt,cnt_txt,\n"
+             "sp,after_300,signals,,add_rows,dst,rows,\n")
+    templates = 'cnt_txt: |-\n  dst has {count(dst)} rows\nrows:\n  - label: "L-{$tag}"\n'
+
+    def database():
+        base = _signals()
+        base.add_table(Table("dst", columns=["uid", "label", "spawned_by", "source_uid"], key_columns=["label"]))
+        return base
+
+    gate, builds = threading.Event(), []
+    gate.set()
+
+    def loader(system):
+        builds.append(1)
+        gate.wait(10)
+        return database()
+
+    template_doc.Session = lambda path=None: _REAL_SESSION(path, hooks={"before_300": None, "after_300": loader})
+    try:
+        with tempfile.TemporaryDirectory() as proj, tempfile.TemporaryDirectory() as out, \
+                tempfile.TemporaryDirectory() as dbdir:
+            path = _project(proj, templates)
+            with open(os.path.join(os.path.dirname(path), "reactions.csv"), "w", encoding="utf-8") as handle:
+                handle.write(rules)
+            config.use_project(proj)
+            original_db = config.database_dir
+            config.database_dir = lambda: dbdir
+            try:
+                header, *lines = rules.splitlines()
+                compiled, _findings = engine.compile_rules([dict(zip(header.split(","), line.split(","))) for line in lines])
+                engine.fire("after_300", database(), rules=compiled, templates=template_doc.parse(templates).templates,
+                            params={}, files_root=out, hooks=("before_300", "after_300"))
+                with open(os.path.join(out, "gen", "c.txt"), encoding="utf-8") as handle:
+                    fired = handle.read().splitlines()
+                eq(fired, ["dst has 0.0 rows"], "(the fire: cnt runs before sp spawns)")
+                panel = _panel(root, proj)
+                panel._load(path)
+                mode = panel._template
+                mode.rule_box.current(1)
+                mode.on_rule()
+
+                def shown():
+                    text = mode.preview.get("1.0", "end-1c")
+                    return text.splitlines()[1:2] if text.startswith("APPEND") and not mode._editing else None
+                ok(_pump(root, lambda: shown() is not None), "the preview comes")
+                eq(shown(), fired, "first: the fire's line")
+                gate.clear()
+                mode.reload()                                   # a Reload - its labels' fresh check builds...
+                ok(_pump(root, lambda: len(builds) >= 2, 5), "(the worker is inside that build)")
+                mode.reload()                                   # ...a second Reload, and a check queued behind it
+                mode.refresh()                                  # with the rule read BEFORE that reload publishes
+                _pump(root, lambda: False, 0.3)
+                gate.set()
+                _pump(root, lambda: False, 1.5)
+                ok(_pump(root, lambda: shown() is not None, 5), "the preview comes back")
+                eq(shown(), fired, "after the reloads: still the fire's line - the stale check dropped")
+            finally:
+                config.database_dir = original_db
+    finally:
+        template_doc.Session = _REAL_SESSION
+        config.use_project(None)
+        _done(root)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_template_mode", [
@@ -515,4 +591,5 @@ if __name__ == "__main__":
          test_only_the_newest_result_for_the_text_as_it_is_applies),
         ("the_shipped_file_is_read_only_until_copied", test_the_shipped_file_is_read_only_until_copied),
         ("every_viewer_keeps_the_shipped_config_read_only", test_every_viewer_keeps_the_shipped_config_read_only),
+        ("a_check_queued_behind_a_reload_is_dropped", test_a_check_queued_behind_a_reload_is_dropped),
     ]))

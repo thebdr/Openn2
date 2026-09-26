@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import functools
 import re
+from typing import NamedTuple
 
 from . import data, runtime
 from .errors import ExprError
@@ -99,14 +100,15 @@ def _field_thunk(name: str):
 # --- parser (compiles to a thunk fn(ctx) -> value) ---------------------------------------------- #
 class _Parser:
     def __init__(self, toks, src, scope: Scope | None, free: set | None = None, bound=frozenset(),
-                 reads: list | None = None, in_row: bool = False):
+                 reads: list | None = None, in_row: bool = False, free_at: dict | None = None):
         self.toks, self.i, self.src, self.scope = toks, 0, src, scope
         # the FREE top-level fields (read from the caller's ctx) - a data-function predicate's `$col`
         # (the iterated ROW's column) and a let-bound name are NOT free (see `free_fields`)
         self.free = free if free is not None else set()
+        self.free_at = free_at if free_at is not None else {}   # each free path's first token (a warning's spot)
         self.bound = bound
-        # what each data function reads from its TABLE's rows: (function, table, column paths, in a row
-        # predicate) - shared by every sub-parser of one expression (see `row_reads`)
+        # what each data function reads from its TABLE's rows (a `_Read`) - shared by every sub-parser of one
+        # expression (see `row_reads`)
         self.reads = reads if reads is not None else []
         self.in_row = in_row                     # inside a data function's ROW predicate (no `_db` there)
 
@@ -213,6 +215,7 @@ class _Parser:
                 raise ExprError(f"unknown field ${top} (not in scope) in {self.src!r}")
             if top not in self.bound:
                 self.free.add(name)                          # the full dotted path ($r.tag -> "r.tag")
+                self.free_at.setdefault(name, self.i - 1)
             return _field_thunk(name)
         if kind == "regex":
             raise ExprError(f"a /regex/ is only valid after '~' or in extract(), in {self.src!r}")
@@ -407,7 +410,7 @@ class _Parser:
             self._eat(":=")
             # compile the binding expr in the CURRENT (accumulating) scope
             sub = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names), self.reads,
-                          self.in_row)
+                          self.in_row, self.free_at)
             sub.i = self.i
             expr_fn = sub._or()
             self.i = sub.i
@@ -421,7 +424,7 @@ class _Parser:
             self._eat(",")
         # body compiled in the scope extended with all bound names
         body_parser = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names), self.reads,
-                              self.in_row)
+                              self.in_row, self.free_at)
         body_parser.i = self.i
         body_fn = body_parser._or()
         self.i = body_parser.i
@@ -443,7 +446,7 @@ class _Parser:
             return val
         raise ExprError(f"expected a table name in {self.src!r}")
 
-    def _pred_in_row_scope(self, name: str, table: str, at: int):
+    def _pred_in_row_scope(self, name: str, table: str, at: int, table_at: int):
         """Compile a predicate against a PER-ROW scope (scope=None so any $col resolves to the row cell).
         Its fields go to a PRIVATE set: a row column is not a free field of the enclosing hole - they are
         recorded as the function's ROW reads instead."""
@@ -451,58 +454,67 @@ class _Parser:
         sub.i = self.i
         fn = sub._or()
         self.i = sub.i
-        self.reads.append((name, table, frozenset(sub.free), self.in_row, at))
+        self.reads.append(_Read(name, table, frozenset(sub.free), self.in_row, at, table_at, dict(sub.free_at)))
         return fn
 
     def _data_call(self, name):
         at = self.i - 1                            # the function name's token (a read's position)
         self._eat("(")
         if name == "where" or name == "first":
+            table_at = self.i
             table = self._table_name()
             pred = None
             if self._peek()[1] == ",":
                 self._next()
-                pred = self._pred_in_row_scope(name, table, at)
+                pred = self._pred_in_row_scope(name, table, at, table_at)
             else:
-                self.reads.append((name, table, frozenset(), self.in_row, at))     # its table, read whole
+                self.reads.append(_Read(name, table, frozenset(), self.in_row, at, table_at, {}))   # read whole
             self._eat(")")
             if name == "where":
                 return lambda ctx: data.where(ctx, table, _binder(pred))
             return lambda ctx: data.first(ctx, table, _binder(pred))
         if name == "count":
+            table_at = self.i
             table = self._table_name()
             pred = None
             if self._peek()[1] == ",":
                 self._next()
-                pred = self._pred_in_row_scope(name, table, at)
+                pred = self._pred_in_row_scope(name, table, at, table_at)
             else:
-                self.reads.append((name, table, frozenset(), self.in_row, at))     # its table, read whole
+                self.reads.append(_Read(name, table, frozenset(), self.in_row, at, table_at, {}))   # read whole
             self._eat(")")
             return lambda ctx: data.count(ctx, table, _binder(pred))
         if name == "unique":
+            col_at = self.i
             col = self._col_word()
             self._eat(",")
+            table_at = self.i
             table = self._table_name()
             self._eat(")")
-            self.reads.append((name, table, frozenset({col}), self.in_row, at))
+            self.reads.append(_Read(name, table, frozenset({col}), self.in_row, at, table_at, {col: col_at}))
             return lambda ctx: data.unique(ctx, col, table)
         if name == "lookup":
+            table_at = self.i
             table = self._table_name()
             self._eat(",")
+            key_at = self.i
             key_col = self._col_word()
             self._eat(",")
             key_val = self._value()
             self._eat(",")
+            val_at = self.i
             val_col = self._col_word()
             self._eat(")")
-            self.reads.append((name, table, frozenset({key_col, val_col}), self.in_row, at))
+            self.reads.append(_Read(name, table, frozenset({key_col, val_col}), self.in_row, at, table_at,
+                                    {val_col: val_at, key_col: key_at}))
             return lambda ctx: data.lookup(ctx, table, key_col, key_val(ctx), val_col)
         if name == "node_of":
             bit = self._value()
             self._eat(",")
+            table_at = self.i
             table = self._table_name()
             self._eat(")")
-            self.reads.append((name, table, frozenset({"start_byte", "end_byte"}), self.in_row, at))
+            self.reads.append(_Read(name, table, frozenset({"start_byte", "end_byte"}), self.in_row, at, table_at, {}))
             return lambda ctx: data.node_of(ctx, bit(ctx), table)
         raise ExprError(f"unknown data function {name!r} in {self.src!r}")
 
@@ -542,21 +554,66 @@ def free_paths(text: str):
     return frozenset(parser.free)
 
 
+class _Read(NamedTuple):
+    """One data function's read of its table's rows, positions as TOKEN indices (see `RowRead`)."""
+    function: str
+    table: str
+    columns: frozenset
+    in_row: bool
+    at: int
+    table_at: int
+    column_at: dict
+
+
+class RowRead(NamedTuple):
+    """What one data function reads from its TABLE's rows (`row_reads`) - positions as (start, end) in the text."""
+    function: str               # count / where / first / lookup / unique / node_of
+    table: str
+    columns: frozenset          # a predicate's `$col`s (none - the table read whole - without one), lookup's key
+                                # + value columns, unique's column, node_of's byte range
+    in_row: bool                # inside another data function's predicate: its scope is the ROW alone (no `_db`)
+    at: int                     # the call's name
+    table_span: tuple           # the table word
+    column_spans: dict          # {column path: its token} - a predicate's `$col`, lookup / unique's column word
+
+
 @functools.lru_cache(maxsize=4096)
 def row_reads(text: str):
-    """What each data function in an expression reads from its TABLE's rows - a tuple of (function,
-    table, column paths, in a row predicate, offset): a count / where / first predicate's `$col`s (none -
-    the table read whole - without one), lookup's key + value columns, unique's column, node_of's byte
-    range; `in a row predicate` = the call sits inside another data function's predicate, whose scope
-    is the ROW alone (no `_db`: it finds no rows); `offset` = the call's name in `text`. None when the
-    text does not parse. The template builder warns on each, at its call."""
+    """What each data function in an expression reads from its TABLE's rows - a tuple of `RowRead`, each
+    with its own positions (the call, its table word, each column's token). None when the text does not
+    parse. The template builder warns on each, where it sits."""
     try:
         parser = _Parser(_tokenize(text), text, None)
         parser.parse()
     except ExprError:
         return None
-    starts = [m.start() for m in _TOKEN_RE.finditer(text) if m.lastgroup is not None]
-    return tuple((function, table, columns, in_row, starts[at]) for function, table, columns, in_row, at in parser.reads)
+    spans = [m.span() for m in _TOKEN_RE.finditer(text) if m.lastgroup is not None]
+    return tuple(RowRead(read.function, read.table, read.columns, read.in_row, spans[read.at][0], spans[read.table_at],
+                         {column: spans[index] for column, index in read.column_at.items()})
+                 for read in parser.reads)
+
+
+# the result kind of a function whose result kind is FIXED (first / node_of give `{}` when nothing is found -
+# never blank; count / len a float)
+_KINDS = {"where": "list", "unique": "list", "first": "dict", "node_of": "dict", "count": "float", "len": "float"}
+
+
+def value_kind(text: str):
+    """The kind of value an expression yields when its top is ONE call of a function whose result kind is
+    fixed - where / unique a list, first / node_of a dict, count / len a float - else None (it depends on the
+    data). The template builder tries a hole's format spec on that kind."""
+    try:
+        toks = _tokenize(text)
+    except ExprError:
+        return None
+    if len(toks) < 3 or toks[0][0] != "ident" or toks[0][1] not in _KINDS or toks[1] != ("op", "("):
+        return None
+    depth = 0
+    for index, token in enumerate(toks[1:], start=1):
+        depth += {("op", "("): 1, ("op", ")"): -1}.get(token, 0)
+        if depth == 0:
+            return _KINDS[toks[0][1]] if index == len(toks) - 1 else None
+    return None
 
 
 def free_fields(text: str):

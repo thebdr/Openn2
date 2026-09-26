@@ -55,10 +55,26 @@ def test_resolve_type_exact_and_pattern():
     eq(config.resolve_type(types, ""), None, "blank -> None")
 
 
+def test_a_blank_line_before_the_header_is_skipped():
+    """C-024 refute round 22's implications check: round 22 (F-C) fixed a blank FIRST line in reactions.csv only -
+    the shared reader (`read_config_csv`, 14 config files) still read it as an EMPTY header and returned no
+    rows, silently. Every config reader takes the first non-blank line as the header now."""
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "c.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write('\r\n  \r\n,,\r\na,tags\r\nx,"[""one""]"\r\ny,\r\n')
+        rows = config.read_config_csv(path, json_columns=["tags"])
+        eq([(row["a"], row["tags"]) for row in rows], [("x", ["one"]), ("y", None)], "the rows under a late header")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write('\r\n,,\r\n')
+        eq(config.read_config_csv(path), [], "blank lines only: no rows")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("config_loaders", [
         ("read_config_csv_decodes_json_and_skips_blanks", test_read_config_csv_decodes_json_and_skips_blanks),
+        ("a_blank_line_before_the_header_is_skipped", test_a_blank_line_before_the_header_is_skipped),
         ("load_column_map_iolist", test_load_column_map_iolist),
         ("load_signal_types_uses_the_stripped_schema", test_load_signal_types_uses_the_stripped_schema),
         ("paired_channel_inherits_tagtable", test_paired_channel_inherits_tagtable),

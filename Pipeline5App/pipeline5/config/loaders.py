@@ -1,7 +1,9 @@
 """The config-CSV readers: rulesets, type registries, and the device-types database.
 
-Everything here reads a hand-editable CSV through `read_config_csv` (the SAME JSON-cell codec as the
-SSOT tables, tolerant of hand edits) and returns plain dicts/lists. Grouped by the phase that consumes
+Everything here reads a hand-editable CSV - through `read_config_csv` (the SAME JSON-cell codec as the
+SSOT tables, tolerant of hand edits), the rule index through `load_reactions` (which refuses a header naming
+no rule columns) - its header the first line that is not blank (`_config_header`), and returns plain
+dicts/lists. Grouped by the phase that consumes
 them: ph200 classification rules · the signal-type registry · diagnosis · chain-reactions/interfaces ·
 the ph520 data-block registry · the ph700 DeviceTypesDatabase.
 """
@@ -24,18 +26,28 @@ def _as_bool(value, default: bool = False) -> bool:
     return default
 
 
+def _config_header(handle):
+    """A hand-edited config CSV's header: its first line that is NOT blank - a blank line before it is skipped
+    like any other, never read as an EMPTY header (every row would then be lost, silently - C-024 refute round
+    22 and its implications check). None: no header at all (an empty file, or blank lines only)."""
+    return next((cells for cells in csv.reader(handle) if any(cell.strip() for cell in cells)), None)
+
+
 def read_config_csv(path: str, json_columns=()) -> list:
     """Read a config CSV to a list of dict rows. The declared `json_columns` are JSON-decoded with the
     SAME codec as the SSOT tables (`core.table.decode_cell`), so a `|`-free list/object cell round-trips;
-    every other column stays a string. Blank rows are skipped (config files are hand-edited). Missing
-    file -> []."""
+    every other column stays a string. Blank rows are skipped - before the header too (`_config_header`;
+    config files are hand-edited). Missing file -> []."""
     from pipeline5.truth.table import decode_cell
     if not path or not os.path.exists(path):
         return []
     wanted = set(json_columns)
     rows = []
     with open(path, newline="", encoding="utf-8-sig") as handle:
-        for raw in csv.DictReader(handle):
+        header = _config_header(handle)
+        if header is None:                                    # an empty file, or blank lines only
+            return []
+        for raw in csv.DictReader(handle, fieldnames=header):
             if not any((v or "").strip() for v in raw.values() if isinstance(v, str)):
                 continue
             rows.append({key: (decode_cell(value) if key in wanted else value)
@@ -378,15 +390,15 @@ def load_reactions() -> list:
     Only fully BLANK lines are skipped; a row with content but no `name` is passed through so the
     compiler reports it (refuter round 6: it used to vanish here, silently) - so is one whose only
     content sits PAST the header's columns (C-024 refute round 21). The header is the first line that is
-    not blank (C-024 refute round 22: a blank first line read as an EMPTY header - every rule lost to
-    unnamed rx_bad_rule findings); one that does not name the rule columns raises (a headerless file would
-    read its first rule AS the header - lost, silently): the engine reports rx_rules_unreadable."""
+    not blank (`_config_header` - C-024 refute round 22: a blank first line read as an EMPTY header, every
+    rule lost to unnamed rx_bad_rule findings); one that does not name the rule columns raises (a headerless
+    file would read its first rule AS the header - lost, silently): the engine reports rx_rules_unreadable."""
     path = find("chain_reactions/reactions.csv")
     if not path or not os.path.exists(path):
         return []
     rows = []
     with open(path, newline="", encoding="utf-8-sig") as handle:
-        header = next((cells for cells in csv.reader(handle) if any(cell.strip() for cell in cells)), None)
+        header = _config_header(handle)
         if header is None:                                    # an empty file, or blank lines only: no rules
             return []
         missing = [column for column in _RULE_COLUMNS if column not in header]

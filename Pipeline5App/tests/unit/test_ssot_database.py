@@ -1,5 +1,6 @@
 """The Database (core.database.Database): multi-table save/load round-trip + access forms."""
 import os
+import stat
 import tempfile
 
 from _harness import run, eq, ok, raises
@@ -51,6 +52,51 @@ def test_duplicate_table_name_rejected():
     raises(ValueError, lambda: Database([Table("x", ["uid"]), Table("x", ["uid"])]))
 
 
+def _files(directory):
+    files = {}
+    for name in sorted(os.listdir(directory)):
+        with open(os.path.join(directory, name), "rb") as handle:
+            files[name] = handle.read()
+    return files
+
+
+def test_a_refused_save_leaves_every_file_as_it_was():
+    """A save is all or nothing, as far as a save can be (C-024 refute round 22 and its implications check): it
+    wrote table by table - a value that could not be written emptied its table's CSV (the file opened, then the
+    write failed), and a file another program held open (Excel) stopped it with the tables before it already
+    this run's: a Database half new, half old. Every table is rendered, then every file opened for writing,
+    before any is truncated now: a value that cannot be written (located) or a file that cannot be opened (a
+    read-only one here, as a lock) leaves every file as it was, none created."""
+    a = Table("a", ["uid", "v"], key_columns=["v"])
+    b = Table("b", ["uid", "v"], key_columns=["v"])
+    a.add(v="one")
+    b.add(v="two")
+    with tempfile.TemporaryDirectory() as d:
+        Database([a, b]).save(d)
+        saved = _files(d)
+        a.add(v="three")                                        # a change a successful save would write
+        fresh = Table("c", ["uid", "v"])                        # a table with no file yet, saved BEFORE b
+        database = Database([a, fresh, b])
+        b.rows[0]["v"] = "bad \ud83d"                           # (set after the add: its uid hashes the key)
+        try:
+            database.save(d)
+            ok(False, "a value UTF-8 cannot store must stop the save")
+        except ValueError as error:
+            ok(str(error).startswith("b.v row 0:"), f"located: {error}")
+        eq(_files(d), saved, "a value that cannot be written: every file as it was, none created")
+        b.rows[0]["v"] = "two"
+        locked = os.path.join(d, "b.csv")
+        os.chmod(locked, stat.S_IREAD)                          # a file that cannot be opened for writing
+        try:
+            raises(PermissionError, lambda: database.save(d))
+            eq(_files(d), saved, "a file that cannot be opened: every file as it was - c.csv made and removed")
+        finally:
+            os.chmod(locked, stat.S_IREAD | stat.S_IWRITE)
+        database.save(d)
+        eq(sorted(_files(d)), ["a.csv", "b.csv", "c.csv"], "then it saves, whole")
+        eq(len(Database([Table("a", ["uid", "v"])]).load(d)["a"]), 2, "…this run's rows")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("database", [
@@ -58,4 +104,5 @@ if __name__ == "__main__":
         ("load_missing_table_is_noop", test_load_missing_table_is_noop),
         ("access_forms", test_access_forms),
         ("duplicate_table_name_rejected", test_duplicate_table_name_rejected),
+        ("a_refused_save_leaves_every_file_as_it_was", test_a_refused_save_leaves_every_file_as_it_was),
     ]))

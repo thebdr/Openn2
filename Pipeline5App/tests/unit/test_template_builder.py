@@ -689,21 +689,29 @@ def test_device_prefixes_and_names_lint_equals_the_fire():
             drive, rest = os.path.splitdrive(out)
             letter, strict = drive[0], "\\\\?\\" + out
             params = {"dir": rest.replace("\\", "/"), "p": "", "n": "", "a": "a", "e": "txt", "v": "v"}
+            rooted = f"/rx_rooted_{os.getpid()}/a.txt"            # unique: were its refusal lost, the join lands it at
+            landed = os.path.join(drive + os.sep, rooted[1:])     # the drive's ROOT - removed below
             refused = [strict + "/lit.txt", strict + "\\sub/b.txt", strict + "\\sub\\..\\c.txt", strict + "\\.\\d.txt",
                        strict + "\\\\e.txt", "{$_params.p}\\\\?\\" + letter + ":{$_params.dir}/a.txt",
                        "\\\\.\\" + letter + ":\\..\\" + rest.lstrip("\\") + "\\x.txt", "\\\\.\\pipe\\rx", "rx/NUL",
-                       "rx/nul.{$_params.e}", "rx/a.", "rx /a.txt", "/rx/a.txt", "rx/", "rx/{$_params.v}.",
+                       "rx/nul.{$_params.e}", "rx/a.", "rx /a.txt", rooted, "rx/", "rx/{$_params.v}.",
                        "rx/{$_params.v} /x.txt"]
-            for target in refused:
-                rule = _rule(action="file", target=target, template="txt")
-                errors = [p for p in engine.lint(templates, rule, _database())
-                          if p.template is None and p.severity == "error"]
-                shown = engine.preview(rule, 0, templates=templates, params=params, database=_database(), files_root=out)
-                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
-                                          files_root=out)
-                eq([f.type for f in findings], ["rx_file_write"], f"{target!r}: the fire refuses it")
-                eq(shown.problem, (findings[0].type, findings[0].detail), f"{target!r}: …the preview says so")
-                eq([p.where for p in errors], ["target"], f"{target!r}: …and so does the lint")
+            try:
+                for target in refused:
+                    rule = _rule(action="file", target=target, template="txt")
+                    errors = [p for p in engine.lint(templates, rule, _database())
+                              if p.template is None and p.severity == "error"]
+                    shown = engine.preview(rule, 0, templates=templates, params=params, database=_database(),
+                                           files_root=out)
+                    _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates,
+                                              params=params, files_root=out)
+                    eq([f.type for f in findings], ["rx_file_write"], f"{target!r}: the fire refuses it")
+                    eq(shown.problem, (findings[0].type, findings[0].detail), f"{target!r}: …the preview says so")
+                    eq([p.where for p in errors], ["target"], f"{target!r}: …and so does the lint")
+            finally:
+                if os.path.isfile(landed):
+                    os.remove(landed)
+                    os.rmdir(os.path.dirname(landed))
             eq(os.listdir(out), [], "nothing written")
             accepted = {"{$_params.p}//?/" + letter + ":{$_params.dir}/b.txt": "b.txt",
                         "{$_params.p}\\\\.\\" + letter + ":{$_params.dir}/c.txt": "c.txt",
@@ -807,6 +815,111 @@ def test_an_in_row_warning_lands_on_its_own_call():
        "every call inside the `where`, each on its own")
 
 
+def test_a_colon_is_judged_as_written():
+    """C-025 refute round 6 (#2): the fire read a ':' on the NORMALIZED path (`abspath`) - `<tmp>\\a:b\\..\\x.txt` has
+    none there, so the fire wrote `<tmp>\\x.txt` while the lint refused the literal ':'; a ':' in a UNC server or
+    share name sat in splitdrive's DRIVE part, unseen (and `NUL:` normalized to the device - C-024 round 23, F1). One
+    rule for both now: a ':' in any name past the drive, as written - lint = preview = fire."""
+    if os.name != "nt":
+        return                                                # Win32 path rules
+    templates = {"txt": "x"}
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            slashed = out.replace("\\", "/")
+            for target in (out + "\\a:b\\..\\x.txt", "//./" + slashed + "/c:d/../y.txt", out + "\\sub\\e:f\\..\\..\\z.txt",
+                           "\\\\localhost\\sh:are\\x.txt", "//localhost:1/share/x.txt", "\\\\?\\Volume{{a:b}}\\x.txt",
+                           out + "\\NUL:", out + "\\nul :"):
+                rule = _rule(action="file", target=target, template="txt")
+                errors = [p for p in engine.lint(templates, rule, _database()) if p.template is None and p.severity == "error"]
+                shown = engine.preview(rule, 0, templates=templates, params={}, database=_database(), files_root=out)
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params={},
+                                          files_root=out)
+                eq([f.type for f in findings], ["rx_file_write"], f"{target!r}: the fire refuses it")
+                eq(shown.problem, (findings[0].type, findings[0].detail), f"{target!r}: …the preview says so")
+                eq([p.where for p in errors], ["target"], f"{target!r}: …and so does the lint")
+            eq(os.listdir(out), [], "nothing written")
+            for target in ("\\\\.\\UNC\\localhost\\.\\rx_share", "\\\\localhost\\rx_share", "\\\\.\\\\" + out + "\\f3.txt"):
+                rule = _rule(action="file", target=target, template="txt")     # C-024 round 23 (F2, F3): a share
+                errors = [p for p in engine.lint(templates, rule, _database())  # root in any spelling; a device
+                          if p.template is None and p.severity == "error"]      # path whose first name is empty
+                shown = engine.preview(rule, 0, templates=templates, params={}, database=_database(), files_root=out)
+                eq((shown.problem or ("",))[0], "rx_file_write", f"{target!r}: the fire refuses it")
+                eq([p.where for p in errors], ["target"], f"{target!r}: …and so does the lint")
+    _sandboxed(body)
+
+
+def test_a_format_spec_is_tried_on_the_value_the_hole_yields():
+    """C-025 refute round 6 (#3): a format spec was tried on ANY value (a text, an int, a float): `{where(src):>5}`,
+    `{first(...):>5}`, `{unique(...):>5}`, `{count(src):s}`, a range var's `{$i:s}`, a table var's `{$r:>5}` linted
+    clean while every fire fails (a list / dict - `[]` / `{}` when nothing is found, never blank - a float, an int,
+    a row), and a spec only numbers take on a text column (`{$txt:,}`) failed on every row holding text. The kind the
+    hole's expression yields is tried now - an ERROR where it is fixed, a WARNING on the values the rule's Database
+    holds; an in-memory number (`{$n:,}`), numeric text under a conversion (`{$num:d}`) and a text spec stay clean."""
+    def database():
+        base = _database()
+        base.add_table(Table("specs", columns=["uid", "txt", "num", "n"], key_columns=["txt"]))
+        base["specs"].add(txt="abc", num="12", n=1200)          # (n: a number in memory - a staged cell)
+        return base
+
+    cases = (("{where(src):>5}", "", "error"), ('{first(src, $name = "none"):>5}', "", "error"),
+             ("{unique(name, src):>5}", "", "error"), ("{count(src):s}", "", "error"), ("{len($txt):s}", "specs", "error"),
+             ("@for $i in 1..2: {$i:s}", "", "error"), ("@for $r in specs: {$r:>5}", "", "error"),
+             ("{$txt:,}", "specs", "warning"), ("{$txt:d}", "specs", "warning"), ("{$num:,}", "specs", "warning"),
+             ("{count(src):>7}", "", None), ("{$txt:>5}", "specs", None), ("{$n:,}", "specs", None),
+             ("{$num:d}", "specs", None), ("@for $r in specs: {$r.txt:>5}", "", None))
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            for number, (text, source, severity) in enumerate(cases):
+                name = f"t{number}"
+                rule = _rule(action="file", source_table=source, target=f"o{number}.txt", template=name)
+                found = [p.severity for p in engine.lint({name: text}, rule, database())
+                         if p.template == name and "format spec" in p.message]
+                eq(found, [severity] if severity else [], f"{text!r}: the lint")
+                _, findings = engine.fire("after_300", database(), rules=[rule], templates={name: text}, params={},
+                                          files_root=out)
+                eq([f.type for f in findings], ["rx_bad_template"] if severity else [], f"{text!r}: the fire")
+    _sandboxed(body)
+
+
+def test_an_empty_sources_preview_keeps_the_fires_finding():
+    """C-025 refute round 6 (#4): an add_rows rule over an EMPTY source table into a table the hook does not have -
+    the fire reports rx_unknown_table (rows or none), the preview said only "no rows". The target is judged first."""
+    database = _database()
+    database.add_table(Table("empty", columns=["uid", "name"]))
+    rule = _rule(source_table="empty", target="dstt")
+    templates = {"rows": [{"label": "x"}]}
+
+    def body():
+        _, findings = engine.fire("after_300", database, rules=[rule], templates=templates, params={})
+        shown = engine.preview(rule, 0, templates=templates, params={}, database=database)
+        eq([f.type for f in findings], ["rx_unknown_table"], "(the fire)")
+        eq(shown.problem, (findings[0].type, findings[0].detail), "the preview says the fire's finding")
+    _sandboxed(body)
+
+
+def test_a_row_read_warning_sits_on_its_own_token():
+    """C-025 refute round 6 (#5): a missing column was found by searching its name from the call on - `{count(signals,
+    "name" = $name)}` squiggled the string, `{lookup(signals, tag, first(nodes, $name = "x"), name)}` squiggled the
+    inner first()'s `$name` (a column nodes HAS) for the lookup's missing `name`. The parser records each read's
+    tokens now; each warning sits on its own."""
+    tables = {"signals": ["uid", "tag", "addr"], "nodes": ["uid", "name"]}
+    fields = {"_params", "_rule", "_db", "tag"}
+
+    def placed(line):
+        return [(line[p.start:p.end], p.start) for p in lint({"t": line}, start="t", fields=fields, tables=tables)
+                if "not a column" in p.message or "not a table" in p.message]
+    line = '{count(signals, "name" = $name)}'
+    eq(placed(line), [("$name", line.index("$name"))], "on the $col, not the string")
+    line = '{lookup(signals, tag, first(nodes, $name = "x"), name)}'
+    eq(placed(line), [("name", line.rindex("name"))], "on the lookup's own column word")
+    line = '{concat(count(signals, $x = "1"), count(signals, $x = "2"))}'
+    eq(placed(line), [("$x", line.index("$x")), ("$x", line.rindex("$x"))], "each call's own")
+    line = '{concat("nodez", count(nodez))}'
+    eq(placed(line), [("nodez", line.rindex("nodez"))], "an unknown table on the call's table word")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("template_builder", [
@@ -837,4 +950,8 @@ if __name__ == "__main__":
         ("node_of_reads_are_judged_as_every_data_functions", test_node_of_reads_are_judged_as_every_data_functions),
         ("a_lone_surrogate_is_judged_where_it_is_stored", test_a_lone_surrogate_is_judged_where_it_is_stored),
         ("an_in_row_warning_lands_on_its_own_call", test_an_in_row_warning_lands_on_its_own_call),
+        ("a_colon_is_judged_as_written", test_a_colon_is_judged_as_written),
+        ("a_format_spec_is_tried_on_the_value_the_hole_yields", test_a_format_spec_is_tried_on_the_value_the_hole_yields),
+        ("an_empty_sources_preview_keeps_the_fires_finding", test_an_empty_sources_preview_keeps_the_fires_finding),
+        ("a_row_read_warning_sits_on_its_own_token", test_a_row_read_warning_sits_on_its_own_token),
     ]))

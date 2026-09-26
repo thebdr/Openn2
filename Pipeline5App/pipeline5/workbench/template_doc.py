@@ -661,6 +661,13 @@ def is_templates_file(path: str) -> bool:
 _VIEW_CACHE = 8                                  # views kept per session (the templates change as one types)
 
 
+class StaleRule(LookupError):
+    """A Rule object from BEFORE a reload - every rule is a new object after one (a check queued behind a Reload
+    carries the old): asking about it would mix two rule sets (C-025 refute round 6 - the view found it by value,
+    the cascade by identity, and cached a wrong Database). The view's worker drops such a check: the reload's
+    rule labels come back, and a fresh check follows."""
+
+
 class Session:
     """The builder's live context over the ACTIVE config - the compiled rules (reactions.csv), the
     system's `reaction_hooks` / `reaction_legs`, the project params - and the Database each rule's fire
@@ -800,19 +807,23 @@ class Session:
 
     def view(self, rule, templates: dict, leg=None) -> tuple:
         """(the Database `rule` sees at its hook on that leg - the base, the settled earlier hooks (2),
-        the earlier rules' in-hook spawns (3) - and its `_db` layer); cached per (hook, leg, the
-        templates those earlier rules render)."""
+        the earlier rules' in-hook spawns (3) - and its `_db` layer); cached per (hook, leg, the earlier
+        rules - by POSITION, as the fire's cascade goes - and the templates they render). `rule` is one of
+        the Session's rules (by identity: two identical reactions.csv lines are two rules) - one a reload
+        replaced raises StaleRule (C-025 refute round 6)."""
         from pipeline5.phases.chain_reactions import engine
         with self._lock:
-            generation = self.generation
+            generation, rules = self.generation, self.rules
+        index = next((i for i, r in enumerate(rules) if r is rule), None)
+        if index is None:
+            raise StaleRule(f"rule {rule.name!r} is not one of the rules now loaded (a reload replaced them)")
         base = self.base(rule.fire_when, leg)
         notes = []
         pending = self._pending(rule.fire_when) if base is not None else []
-        index = self.rules.index(rule)
-        earlier = [r for r in self.rules[:index] if r.fire_when == rule.fire_when and r.action == "add_rows"]
-        drivers = [r for r in self.rules if r.fire_when in pending] + earlier
+        earlier = [i for i in range(index) if rules[i].fire_when == rule.fire_when and rules[i].action == "add_rows"]
+        drivers = [r for r in rules if r.fire_when in pending] + [rules[i] for i in earlier]
         used = sorted({name for r in drivers for name in reach(templates, r.template)})
-        key = (rule.fire_when, leg, tuple(pending), tuple(r.name for r in earlier),
+        key = (rule.fire_when, leg, tuple(pending), tuple(earlier),
                tuple((name, repr(templates.get(name))) for name in used))
         cached = self._views.get(key)                     # (one read: a reload may swap the cache)
         if cached is None:
@@ -827,7 +838,7 @@ class Session:
                     if deferred is not None:
                         notes += engine.settle_view(database, deferred)
             if not self.params_problem:                   # (unreadable params block every rule: no spawns)
-                database, _problems = engine.cascade(self.rules, rule, database, templates=templates,
+                database, _problems = engine.cascade(rules, rule, database, templates=templates,
                                                      params=self.params)
             view = (database, engine.db_layer(database))
             with self._lock:                              # the check AND the write: a reload cannot land between

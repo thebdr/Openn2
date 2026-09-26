@@ -560,6 +560,62 @@ def test_a_reload_discards_the_build_it_overtook():
     eq(session.row_count(session.rules[0], templates), 5, "the reload's build - no view over the old one cached")
 
 
+def test_a_rule_is_one_of_the_sessions_rules():
+    """C-025 refute round 6 (#1): the Session found a rule by VALUE (`rules.index`) while the fire's cascade goes by
+    identity. A Rule from BEFORE a reload - what a check queued behind a Reload carries - cascaded EVERY add_rows rule
+    of the hook (its own spawns included) and cached that view under the key the reloaded rule shares; two identical
+    reactions.csv lines shared one view, whichever was asked first deciding both. A rule is one of the Session's by
+    identity now - a stale one raises StaleRule (nothing computed, nothing cached) - and a view is keyed by the
+    earlier rules' POSITIONS."""
+    import tempfile
+    from pipeline5 import config
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.table import Table
+
+    def staged(system=None):
+        src = Table("src", columns=["uid", "kind", "name"], key_columns=["name"])
+        src.add(kind="door", name="D1")
+        src.add(kind="motor", name="M1")
+        return Database([src, Table("dst", columns=["uid", "label", "spawned_by", "source_uid"], key_columns=["label"])])
+
+    count = {"name": "cnt", "fire_when": "after_300", "source_table": "", "condition": "", "action": "file",
+             "target": "c.txt", "template": "cnt_txt", "comment": ""}
+    spawn = {"name": "sp", "fire_when": "after_300", "source_table": "src", "condition": "", "action": "add_rows",
+             "target": "dst", "template": "rows", "comment": ""}
+    rows = [dict(count), spawn, dict(count)]                        # line 3 duplicates line 1
+    doc = td.parse('cnt_txt: |-\n  dst has {count(dst)} rows\nrows:\n  - label: "L-{$name}"\n')
+    with tempfile.TemporaryDirectory() as sandbox, tempfile.TemporaryDirectory() as out:
+        original = config.database_dir
+        config.database_dir = lambda: sandbox
+        try:
+            engine.fire("after_300", staged(), rules=rows, templates=doc.templates, params={}, files_root=out,
+                        hooks=("after_300",))
+            with open(os.path.join(out, "c.txt"), encoding="utf-8") as handle:
+                fired = handle.read().splitlines()
+            eq(fired, ["dst has 0.0 rows", "dst has 2.0 rows"], "(the fire: each copy sees its own cascade)")
+            for order in ((0, 2), (2, 0)):
+                session = td.Session(None, rows=rows, hooks={"after_300": staged}, params={}, legs={})
+                shown = {i: session.preview_text(doc, session.rules[i], 0).splitlines()[-1] for i in order}
+                eq([shown[0], shown[2]], fired, f"asked in the order {order}: each copy previews its own fire line")
+            session = td.Session(None, rows=rows, hooks={"after_300": staged}, params={}, legs={})
+            stale_count, stale_spawn = session.rules[0], session.rules[1]
+            session.reload()                                        # the same rules - new Rule objects
+            ok(stale_count == session.rules[0] and stale_count is not session.rules[0], "(equal, not the same)")
+            for label, ask in (("preview", lambda: session.preview_text(doc, stale_count, 0)),
+                               ("check", lambda: session.check(doc, stale_count)),
+                               ("context", lambda: session.context(stale_count, doc.templates)),
+                               ("row_count", lambda: session.row_count(stale_spawn, doc.templates))):
+                try:
+                    ask()
+                    ok(False, f"{label}: a rule from before the reload must not be answered")
+                except td.StaleRule:
+                    pass
+            eq(session._views, {}, "…nothing computed over it, nothing cached")
+            eq(session.preview_text(doc, session.rules[0], 0).splitlines()[-1], fired[0], "the reloaded rule = the fire")
+        finally:
+            config.database_dir = original
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("template_doc", [
@@ -579,4 +635,5 @@ if __name__ == "__main__":
         ("a_quoted_template_with_newline_escapes_is_exact", test_a_quoted_template_with_newline_escapes_is_exact),
         ("a_reload_discards_the_build_it_overtook", test_a_reload_discards_the_build_it_overtook),
         ("other_line_breaks_are_approximate", test_other_line_breaks_are_approximate),
+        ("a_rule_is_one_of_the_sessions_rules", test_a_rule_is_one_of_the_sessions_rules),
     ]))

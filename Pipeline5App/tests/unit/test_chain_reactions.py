@@ -1390,28 +1390,49 @@ def test_every_path_windows_would_misdirect_is_refused_before_the_write():
         with tempfile.TemporaryDirectory() as out_root:
             drive, rest = os.path.splitdrive(out_root)
             slashed, strict = out_root.replace("\\", "/"), "\\\\?\\" + out_root
+            rooted = f"/rx_rooted_{os.getpid()}/a.txt"            # unique: were its refusal lost, the join lands it at
+            landed = os.path.join(drive + os.sep, rooted[1:])     # the drive's ROOT (a mutant run wrote C:\rx) - removed
             refused = ((strict + "\\s/a.txt", "'/' is not a separator"), (strict + "\\s\\.\\a.txt", "resolves no '.'"),
                        (strict + "\\s\\..\\a.txt", "resolves no '.'"), (strict + "\\s\\\\a.txt", "takes no empty name"),
                        ("\\\\.\\" + drive + "\\..\\" + rest.lstrip("\\") + "\\b.txt", "'..' climbs above"),
-                       ("\\\\.\\pipe\\rx_probe", "is none of them"), ("\\\\?\\UNC\\srv\\share", "not a file"),
+                       ("\\\\.\\pipe\\rx_probe", "is none of them"), ("\\\\?\\UNC\\localhost\\rx_no_share", "not a file"),
                        ("rx/a.", "ends in '.'"), ("rx/a{$_params.s}", "ends in ' '"), ("rx /a.txt", "ends in ' '"),
                        ("rx./a.txt", "ends in '.'"), ("rx/.../a.txt", "ends in '.'"), ("rx/NUL", "device name"),
                        ("rx/nul.txt", "device name"), ("rx/Con", "device name"), ("rx/com1.log", "device name"),
                        ("rx/LPT\u00b9", "device name"), ("rx/NUL/a.txt", "device name"), ("rx/", "names a folder"),
-                       ("rx/..", "names a folder"), ("/rx/a.txt", "rooted without a drive"))
-            for target, why in refused:
-                rule = _rule(fire_when="before_300", source_table="", condition="", action="file", target=target,
-                             template="txt")
-                dry, dry_findings = engine.fire("before_300", None, rules=[rule], templates={"txt": "x"},
-                                                params={"s": " "}, files_root=out_root, write=False)
-                real, findings = engine.fire("before_300", None, rules=[rule], templates={"txt": "x"},
-                                             params={"s": " "}, files_root=out_root)   # (a target is compiled stripped:
-                                                                                       # a trailing ' ' comes from a hole)
-                eq([f.type for f in findings], ["rx_file_write"], f"{target!r}: refused")
-                ok(why in findings[0].detail, f"{target!r}: named - {findings[0].detail}")
-                eq((dry.log_rows, [f.detail for f in dry_findings]), (real.log_rows, [f.detail for f in findings]),
-                   f"{target!r}: …the dry fire says the same")
-                eq(os.listdir(out_root), [], f"{target!r}: nothing written, no folder made")
+                       ("rx/..", "names a folder"), (rooted, "rooted without a drive"),
+                       (out_root + "\\NUL:", "device name"), (slashed + "/nul :", "device name"),    # round 23 (F1):
+                       (out_root + "\\NUL::", "device name"), ("{$_params.d}/NUL:", "device name"),   # a device's ':'
+                       ("\\\\.\\UNC\\localhost\\\\rx_share", "not a file"),                       # (F2) a share
+                       ("\\\\.\\UNC\\localhost\\.\\rx_share", "not a file"),                      # root in any
+                       ("\\\\.\\UNC\\\\localhost\\rx_share", "not a file"),                       # spelling
+                       ("//./UNC/localhost/./rx_share", "not a file"), ("\\\\localhost\\rx_share", "not a file"),
+                       ("\\\\localhost", "not a file"),
+                       ("\\\\.\\\\" + out_root + "\\f3.txt", "first name is its drive"),     # (F3) a device
+                       ("\\\\.\\.\\" + out_root + "\\f3.txt", "first name is its drive"),    # path's first
+                       ("//./../" + slashed + "/f3.txt", "first name is its drive"),                   # name: its volume
+                       (out_root + "\\a:b\\..\\x.txt", "hidden NTFS stream"),     # a ':' judged AS WRITTEN: a '..'
+                       ("\\\\localhost\\sh:are\\x.txt", "hidden NTFS stream"))    # removes nothing; a share name too
+            try:
+                for target, why in refused:
+                    rule = _rule(fire_when="before_300", source_table="", condition="", action="file", target=target,
+                                 template="txt")
+                    dry, dry_findings = engine.fire("before_300", None, rules=[rule], templates={"txt": "x"},
+                                                    params={"s": " ", "d": out_root}, files_root=out_root, write=False)
+                    real, findings = engine.fire("before_300", None, rules=[rule], templates={"txt": "x"},
+                                                 params={"s": " ", "d": out_root}, files_root=out_root)   # (a target compiles
+                                                                                           # stripped: a trailing ' '
+                    eq([f.type for f in findings], ["rx_file_write"], f"{target!r}: refused")   # comes from a hole)
+                    ok(why in findings[0].detail, f"{target!r}: named - {findings[0].detail}")
+                    eq((dry.log_rows, [f.detail for f in dry_findings]), (real.log_rows, [f.detail for f in findings]),
+                       f"{target!r}: …the dry fire says the same")
+                    eq(os.listdir(out_root), [], f"{target!r}: nothing written, no folder made")
+            finally:
+                if os.path.isfile(landed):
+                    os.remove(landed)
+                    os.rmdir(os.path.dirname(landed))
+            eq(engine._path_refusal("\\\\localhost\\rx_share\\..\\x.txt"), None,
+               "a UNC path's '..' at its share stays there (Win32 clamps it, as at a drive's root)")
             written = {"//?/" + slashed + "/sub/../e.txt": "e.txt", "\\\\./" + out_root + "\\d.txt": "d.txt",
                        "//.\\" + out_root + "\\f.txt": "f.txt", "\\/.\\" + out_root + "\\g.txt": "g.txt",
                        "/\\?\\" + out_root + "\\h.txt": "h.txt", "\\\\?/" + slashed + "/i.txt": "i.txt",
@@ -1438,6 +1459,51 @@ def test_every_path_windows_would_misdirect_is_refused_before_the_write():
                                           files_root=root)
                 eq(findings, [], "an output root inside `aux.files`: its targets are written")
                 ok(os.path.isfile(os.path.join(root, "rx", "a.txt")), "…there")
+        real_isabs = os.path.isabs                                # the implications check: Python < 3.13 calls
+                                                                  # `/rx` ABSOLUTE - the refusal sat inside the
+        def legacy_isabs(path):                                   # relative branch, so there the fire wrote at
+            head = str(path)[:3].replace("/", "\\")             # the drive's root while the lint refused
+            return head.startswith("\\") or head[1:3] == ":\\"
+        rooted = f"/rx_rooted_{os.getpid()}/a.txt"
+        landed = os.path.join(os.path.abspath(os.sep), rooted[1:])   # (where a lost refusal writes: removed below)
+        os.path.isabs = legacy_isabs
+        try:
+            ok(legacy_isabs(rooted), "(the legacy rule, as Python 3.10-3.12 has it)")
+            rule = _rule(name="rooted", source_table="", condition="", action="file", target=rooted, template="txt")
+            _, findings = engine.fire("after_300", _db(), rules=[rule], templates={"txt": "x"}, params={},
+                                      files_root=sandbox)
+        finally:
+            os.path.isabs = real_isabs
+            if os.path.isfile(landed):
+                os.remove(landed)
+                os.rmdir(os.path.dirname(landed))
+        eq([f.type for f in findings], ["rx_file_write"], "a rooted target, whatever isabs says: refused")
+        ok("rooted without a drive" in findings[0].detail, findings[0].detail)
+    _sandboxed(body)()
+
+
+def test_a_typed_field_name_is_the_templates_problem():
+    """C-025 refute round 6's C-024 note: a YAML-typed field NAME (`010:` reads as 10, `true:` as True, `null:` as
+    None, `1e3:` as 1000.0) was renamed silently - '10', 'True', 'None', '1000.0' - while a typed VALUE is refused
+    (never coerced). The name is refused too now: rx_bad_template naming the entry and the field, nothing added;
+    the lint and the preview say the same."""
+    from pipeline5.config.params import _read_yaml
+
+    def body(sandbox):
+        path = os.path.join(sandbox, "templates.yaml")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write('rows:\n  - label: "ok-{$name}"\n    010: "x"\n')
+        for templates in (_read_yaml(path), {"rows": [{"label": "ok", True: "x"}]}, {"rows": [{"label": "ok", None: "x"}]},
+                          {"rows": [{"label": "ok", 1000.0: "x"}]}):
+            key = next(k for k in templates["rows"][0] if k != "label")
+            database, findings = engine.fire("after_300", _db(), rules=[_rule()], templates=templates, params={})
+            eq([(f.type, f.location) for f in findings], [("rx_bad_template", "r1")], f"{key!r}: refused, located")
+            ok(f"entry 1: the field name {key!r} is a {type(key).__name__}" in findings[0].detail, findings[0].detail)
+            eq(len(database["dst"]), 0, f"{key!r}: …nothing added")
+            shown = engine.preview(engine.compile_rules([_rule()])[0][0], 0, templates=templates, params={}, database=_db())
+            eq(shown.problem, (findings[0].type, findings[0].detail), f"{key!r}: …the preview says so")
+            eq([p.message for p in engine.lint(templates) if p.severity == "error"], [findings[0].detail],
+               f"{key!r}: …and so does the lint")
     _sandboxed(body)()
 
 
@@ -1505,4 +1571,5 @@ if __name__ == "__main__":
         ("sourceless_and_before_hook_semantics", test_sourceless_and_before_hook_semantics),
         ("rules_fire_in_csv_order_and_only_their_hook", test_rules_fire_in_csv_order_and_only_their_hook),
         ("builtin_config_ships_empty_rules", test_builtin_config_ships_empty_rules),
+        ("a_typed_field_name_is_the_templates_problem", test_a_typed_field_name_is_the_templates_problem),
     ]))

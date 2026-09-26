@@ -158,6 +158,37 @@ def test_encode_rejects_non_finite_float():
     raises(ValueError, lambda: encode_cell([float("inf")]))
 
 
+def test_text_utf8_cannot_store_is_located_on_write_and_read():
+    """C-024 refute round 22's implications check: the save's refusal of text UTF-8 cannot store named no table,
+    column or row - and a hand-edited JSON cell's lone `\\ud83d` escape LOADED a value no save could store (it
+    then blocked every save, unlocated). Both are located now, as read_csv locates every cell it refuses; a
+    surrogate PAIR escape decodes to its character and is fine."""
+    def refusal(fn):
+        try:
+            fn()
+        except ValueError as error:
+            return str(error)
+        return None
+    t = Table("t", ["uid", "a", "j"], json_columns=["j"])
+    t.add(uid="x", a="fine", j=["ok"])
+    t.rows[0]["a"] = "bad \ud83d"
+    eq(refusal(t.csv_bytes), "t.a row 0: text UTF-8 cannot store (a lone surrogate)", "a plain cell")
+    t.rows[0]["a"], t.rows[0]["j"] = "fine", ["\ud83d"]
+    eq(refusal(t.csv_bytes), "t.j row 0: text UTF-8 cannot store (a lone surrogate)", "a JSON cell")
+    t.rows[0]["j"], t.rows[0]["x\ud83d"] = ["ok"], "v"
+    ok((refusal(t.csv_bytes) or "").startswith("t: the column name 'x\\ud83d'"), "a column name")
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "t.csv")
+        with open(path, "w", encoding="utf-8", newline="") as handle:
+            handle.write('uid,a,j\r\nx,fine,"[""\\ud83d""]"\r\n')
+        text = refusal(lambda: Table("t", ["uid", "a", "j"], json_columns=["j"]).read_csv(path)) or ""
+        ok(text.startswith("t.j row 0: a JSON escape decodes to text UTF-8 cannot store"), f"read: {text}")
+        with open(path, "w", encoding="utf-8", newline="") as handle:
+            handle.write('uid,a,j\r\nx,fine,"[""\\ud83d\\ude00""]"\r\n')
+        eq(Table("t", ["uid", "a", "j"], json_columns=["j"]).read_csv(path).rows[0]["j"], ["\U0001F600"],
+           "a surrogate PAIR escape: its character")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("table", [
@@ -175,4 +206,5 @@ if __name__ == "__main__":
         ("iter_len_extend", test_iter_len_extend),
         ("duplicate_uids_detector", test_duplicate_uids_detector),
         ("encode_rejects_non_finite_float", test_encode_rejects_non_finite_float),
+        ("text_utf8_cannot_store_is_located_on_write_and_read", test_text_utf8_cannot_store_is_located_on_write_and_read),
     ]))

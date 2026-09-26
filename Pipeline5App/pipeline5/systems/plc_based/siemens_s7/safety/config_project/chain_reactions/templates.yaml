@@ -9,7 +9,7 @@
 #   rule's target TABLE per matched source row. Every value is an expr template STRING ({$field}
 #   holes, full function set) - QUOTE it: a bare 007 / true / [a, b] is rejected, never coerced.
 #   Each field NAME becomes a column of the table's CSV - a name no file can store (see the
-#   😀 note below) rejects the whole template.
+#   \uD83D\uDE00 note below) or one YAML types (010, true, null: QUOTE it too) rejects the template.
 #   Spawned rows automatically carry spawned_by (the rule) + source_uid (the triggering row).
 #   Rules fire in reactions.csv order, and a later rule SEES an earlier rule's spawns (the chain
 #   reaction within one hook - e.g. spawn rows, then count or list them).
@@ -25,9 +25,10 @@
 #   hide the text in an NTFS stream) - e.g. a `-X1:3` terminal designation - and so is a character
 #   a Windows path does not allow (< > " | ? * or a control character), a drive that is not ONE
 #   letter A-Z, and a name Windows would not write as named: a device name (NUL, CON.txt, COM1),
-#   a name ending in '.' or a space (Windows drops it), a target ending in '/' (a folder), a path
-#   starting with a single '/' (the root of the drive, outside the output folder); in a \\?\ path,
-#   which Windows takes exactly as written, also a '/' or a '.' / '..' name.
+#   a name ending in '.' or a space (Windows drops it), a target ending in '/' (a folder) or naming
+#   only a server or a share (\\srv\share), a path starting with a single '/' (the root of the
+#   drive, outside the output folder); in a \\?\ path, which Windows takes exactly as written,
+#   also a '/' or a '.' / '..' name. A ':' is judged as written (a '..' after it removes nothing).
 #   Write a non-ASCII character as itself, never as a \uD83D\uDE00 escape PAIR in a double-quoted
 #   value or key: YAML decodes that to two lone surrogates no file can store - the fire refuses the
 #   row. Values are {expr} holes; structure is @-directives:

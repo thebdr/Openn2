@@ -817,6 +817,37 @@ def test_a_field_name_or_a_quoted_text_utf8_cannot_store_never_wipes_the_record(
                 config.use_project(previous_project)
 
 
+def test_a_device_name_target_is_refused_through_the_run_plan():
+    """C-024 refute round 23 (F1) through the REAL run-plan: an absolute target naming `NUL:` (a ':' after the device
+    name) reached the null device - the ':' was read on the NORMALIZED path (`\\\\.\\NUL`, all of it a drive) - audited
+    ok on both hooks, nothing on disk. Refused before the write now, rendered and recorded, on both hooks."""
+    header = ["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"]
+    params = dict(config.load_params())
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project, tempfile.TemporaryDirectory() as elsewhere:
+        params["rx_dir"] = elsewhere
+        _rules_project(project, params, [header,
+                                         ["nul_before", "before_300", "", "", "file", elsewhere.replace("\\", "/") + "/nul:",
+                                          "hdr", ""],
+                                         ["nul_after", "after_300", "", "", "file", "{$_params.rx_dir}/NUL:", "hdr", ""]],
+                       'hdr: "HEADER"\n')
+        config.use_project(project)
+        try:
+            host = _Host()
+            SYSTEM.handlers["staging"](host.ctx())
+            ok("RSLT" in host.levels(), "the run completes")
+            eq(_rx_rendered(host), {("rx_file_write", "nul_before"), ("rx_file_write", "nul_after")},
+               "both refused - rendered")
+            audit = _read_csv(os.path.join(config.database_dir(), "chain_reactions_log.csv"))
+            eq(sorted((r["rule"], r["outcome"]) for r in audit),
+               [("nul_after", "rx_file_write"), ("nul_before", "rx_file_write")], "…audited so, never ok")
+            recorded = {(r["type"], r["location"]) for r in _read_csv(os.path.join(config.database_dir(), "validation_issues.csv"))}
+            ok({("rx_file_write", "nul_before"), ("rx_file_write", "nul_after")} <= recorded, "…and recorded")
+            eq(os.listdir(elsewhere), [], "nothing written")
+        finally:
+            config.use_project(previous_project)
+
+
 def test_spawns_are_saved_beside_a_ragged_record():
     """Refuter round 9: with a ragged chain_reactions_log.csv the engine skipped the WHOLE save - the
     after_300 spawns silently never reached signals.csv while RSLT reported them. The rest of the
@@ -958,6 +989,8 @@ if __name__ == "__main__":
         ("text_utf8_cannot_store_never_crashes_the_run", _sandboxed(test_text_utf8_cannot_store_never_crashes_the_run)),
         ("a_field_name_or_a_quoted_text_utf8_cannot_store_never_wipes_the_record",
          _sandboxed(test_a_field_name_or_a_quoted_text_utf8_cannot_store_never_wipes_the_record)),
+        ("a_device_name_target_is_refused_through_the_run_plan",
+         _sandboxed(test_a_device_name_target_is_refused_through_the_run_plan)),
         ("spawns_are_saved_beside_a_ragged_record", _sandboxed(test_spawns_are_saved_beside_a_ragged_record)),
         ("a_blank_range_end_invents_nothing_on_the_real_fixture",
          _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),

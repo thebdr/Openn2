@@ -66,6 +66,9 @@ def _work(jobs: queue.Queue, results: queue.Queue, session) -> None:
                 shown = session.preview_text(doc, rule, row)
                 context = session.context(rule, doc.templates)
                 results.put(("check", number, (placed, count, shown, context, doc.text), None, None))
+            except template_doc.StaleRule:
+                pass                                    # over the rules a reload replaced: its labels come back and
+                                                        # a fresh check follows (`_drain` -> `on_rule`)
             except Exception as error:  # noqa: BLE001 - a builder defect is shown, never raised
                 results.put(("check", number, None, None, error))
 

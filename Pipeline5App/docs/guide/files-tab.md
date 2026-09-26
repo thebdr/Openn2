@@ -65,7 +65,10 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   when it fires, found WITHOUT firing and in **every** branch, including an `@else` no row has taken
   yet:
   - a directive typo, an unclosed block, an unknown `@use`, a `@use` chain nested too deep;
-  - a hole that does not compile, a lone brace, a format spec no value can satisfy (`{$x:03D}`).
+  - a hole that does not compile, a lone brace, a format spec no value can satisfy (`{$x:03D}`) - or
+    none the hole's value can take: `where` / `unique` give a list, `first` / `node_of` a record (an
+    empty one when nothing is found), `count` / `len` a number, a range loop variable a whole number,
+    a table loop variable its row (`{where(signals):>5}`, `{count(signals):s}` - every render fails).
 
   Warnings flag renders that succeed but probably are not what you meant:
   - a `where` that reads its own loop variable, or an `@if` that reads a loop row's missing column
@@ -76,7 +79,9 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
     all (`before_300` has none), or inside another function's predicate or a `where` (it sees that
     row alone): it finds no rows;
   - a format spec on a JSON value - a list or an object in the rows (`{$type:>5}` - it fails on the
-    rows that hold one; a JSON column that holds text is just text);
+    rows that hold one; a JSON column that holds text is just text) - or one some values of the
+    column do not take (`{$qty:,}` over a column holding text: `,` takes numbers only - it fails on
+    those rows);
   - an empty hole `{}` (it renders nothing - write `{{}}` for literal braces);
   - `{{$x}}`, which is the literal text `{$x}` - a hole in braces is `{{{$x}}}`.
 
@@ -109,18 +114,21 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   - the rule itself: a template of the wrong kind, a hook the run never fires, a target the fire
     refuses for every row - judged on its literal text (a hole may render anything: the fire judges
     it row by row, and the preview shows that row's verdict):
-    - a `:` other than a drive's - a drive is ONE letter A-Z (`C:/`, `\\?\C:\`, `\\./C:/` - Windows
-      reads any mix of slashes in a `\\.\` / `\\?\` prefix), or one holes may complete
+    - a `:` other than a drive's, anywhere in the target as written (a `..` after it removes nothing;
+      a server or share name included) - a drive is ONE letter A-Z (`C:/`, `\\?\C:\`, `\\./C:/` -
+      Windows reads any mix of slashes in a `\\.\` / `\\?\` prefix), or one holes may complete
       (`{$_params.drive}:/out`, `{$_params.p}//?/C:/out`);
     - a character Windows does not allow in a path - `< > " | ? *` or a control character, the
       drive's place included (a `?` only as a `\\?\` prefix's);
     - a name Windows would not write as named: a device name (`NUL`, `CON.txt`, `COM1` - the text
-      would go to the device), a name ending in `.` or a space (Windows drops it: `rx/a.` would append
-      to `rx/a`), a target naming a folder (it ends in `/`), a path starting with a single `/` (it
-      would land at the root of the drive, outside the output folder);
+      would go to the device - `NUL:` too), a name ending in `.` or a space (Windows drops it: `rx/a.`
+      would append to `rx/a`), a target naming a folder (it ends in `/`) or only a server or a share
+      (`\\srv\share`, however spelled), a path starting with a single `/` (it would land at the root
+      of the drive, outside the output folder);
     - in a `\\?\` path - which Windows takes exactly as written - a `/`, or a `.` / `..` / empty
-      name; a device path naming no drive, share or volume (`\\.\pipe\x`), or whose `..` climbs above
-      its drive (`\\.\C:\..\x`);
+      name; a device path whose first name is not its drive, share or volume (`\\.\pipe\x`, an empty
+      or `.` name there - `\\.\\C:\x`), or whose `..` climbs above its drive (`\\.\C:\..\x` - a
+      plain `\\srv\share\..` stays at the share, as Windows keeps it);
   - project params that do not load (the fire blocks every rule of the hook: `rx_params_unreadable`).
 
   When staging would HALT the run (a FAIL your treatments do not lift) - or cannot run at all (a

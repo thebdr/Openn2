@@ -35,6 +35,15 @@ def encode_cell(value) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
+def _encodes(text: str) -> bool:
+    """Whether UTF-8 can store `text` (a lone surrogate it cannot)."""
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def decode_cell(text: str):
     """The inverse of `encode_cell`: '' -> `None`; otherwise parse the JSON back to a list/dict/scalar."""
     if text == "":
@@ -150,7 +159,23 @@ class Table:
                 else:
                     cells.append(_scalar_text(value))
             writer.writerow(cells)
-        return buffer.getvalue().encode("utf-8")
+        try:
+            return buffer.getvalue().encode("utf-8")
+        except UnicodeEncodeError as error:                    # located, as read_csv locates what it refuses
+            raise ValueError(self._unstorable(columns)) from error
+
+    def _unstorable(self, columns) -> str:
+        """Where the text UTF-8 cannot store sits (a lone surrogate - a YAML / JSON `\\ud83d` escape's half):
+        a column name of the header, or a row's cell - located (table.column row n)."""
+        for column in columns:
+            if not _encodes(column):
+                return f"{self.name}: the column name {column!r} holds text UTF-8 cannot store (a lone surrogate)"
+        for index, row in enumerate(self.rows):
+            for column in columns:
+                value = row.get(column)
+                if not _encodes(encode_cell(value) if column in self.json_columns else _scalar_text(value)):
+                    return f"{self.name}.{column} row {index}: text UTF-8 cannot store (a lone surrogate)"
+        return f"{self.name}: text UTF-8 cannot store (a lone surrogate)"
 
     def write_csv(self, path) -> None:
         """Write the table as a comma CSV (`csv_bytes`) - rendered and encoded IN FULL before the file is
@@ -164,7 +189,8 @@ class Table:
         """Load rows from a comma CSV into this table's schema; the declared `json_columns` are
         JSON-decoded back to lists/dicts, every other column stays a string. Replaces `self.rows`. These
         files are human/Excel-editable, so it VALIDATES: a duplicate header, a ragged row, or a malformed
-        JSON cell raises a LOCATED error (table/column/row) instead of silently dropping or mis-reading data."""
+        JSON cell - one whose escape decodes to text UTF-8 cannot store included (no save could store it) -
+        raises a LOCATED error (table/column/row) instead of silently dropping or mis-reading data."""
         with open(path, newline="", encoding="utf-8-sig") as handle:
             reader = csv.reader(handle)
             header = next(reader, [])
@@ -181,6 +207,9 @@ class Table:
                             row[column] = decode_cell(text)
                         except json.JSONDecodeError as error:
                             raise ValueError(f"{self.name}.{column} row {index}: not valid JSON: {text!r}") from error
+                        if "\\u" in text and not _encodes(encode_cell(row[column])):   # a LONE `\\ud83d` escape: it
+                            raise ValueError(f"{self.name}.{column} row {index}: a JSON escape decodes to text "  # would
+                                             f"UTF-8 cannot store (a lone surrogate): {text!r}")  # block every save
                     else:
                         row[column] = text
                 self.rows.append(row)

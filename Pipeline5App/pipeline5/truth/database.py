@@ -10,6 +10,7 @@ the SAME declared schemas, fully typed - so a run can resume from a saved Databa
 """
 from __future__ import annotations
 
+import contextlib
 import os
 
 from pipeline5.truth.table import Table
@@ -49,13 +50,31 @@ class Database:
 
     # --- persistence ----------------------------------------------------------------------------- #
     def save(self, directory) -> None:
-        """Write every table to `<directory>/<table>.csv` (creating the directory) - EVERY table rendered
-        first (`Table.csv_bytes`): a value that cannot be written raises before any file is touched, never
-        a truncated table nor a save stopped half-way by one (C-024 refute round 22)."""
-        payloads = [(table.name, table.csv_bytes()) for table in self._tables.values()]
+        """Write every table to `<directory>/<table>.csv` (creating the directory) - all or nothing, as far as a
+        save can be: EVERY table rendered first (`Table.csv_bytes` - a value that cannot be written raises,
+        located), then EVERY file opened for writing without truncating it (a file another program holds
+        open - Excel's deny-write lock - or a read-only one raises there; a file this save created is removed
+        again), and only then written. A refused save leaves every file as it was: never a truncated table,
+        never a Database half this run's and half the last (C-024 refute round 22 + its implications check).
+        Only a failure DURING the writes - a full disk, a lock taken in between - can stop it part-way."""
+        payloads = [(os.path.join(directory, f"{table.name}.csv"), table.csv_bytes())
+                    for table in self._tables.values()]
         os.makedirs(directory, exist_ok=True)
-        for name, data in payloads:
-            with open(os.path.join(directory, f"{name}.csv"), "wb") as handle:
+        created = []
+        try:
+            for path, _data in payloads:                    # every file writable BEFORE any is truncated
+                existed = os.path.exists(path)
+                with open(path, "ab"):
+                    pass
+                if not existed:
+                    created.append(path)
+        except OSError:
+            for path in created:
+                with contextlib.suppress(OSError):
+                    os.remove(path)
+            raise
+        for path, data in payloads:
+            with open(path, "wb") as handle:
                 handle.write(data)
 
     def load(self, directory) -> "Database":
