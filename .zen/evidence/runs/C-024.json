@@ -6,10 +6,10 @@
     "Pipeline5App/scripts/verify_c024.sh"
   ],
   "exitCode": 0,
-  "outputSha": "e3a87d4a31bb95fb9e4ad6fb0bed03d4a356dd8b76f343c1e6e22acc4017037a",
+  "outputSha": "70a57ec906b98feea4bde2e82d917339b9e8d3828a0c8a0942278fbda77de30d",
   "outputTail": "  PASS  render_literal_braces_and_empty\r\n  PASS  render_spec_split_with_colon_in_extract_slice\r\n  PASS  coalesce_edge_values\r\n  PASS  if_truthiness_edge\r\n  PASS  where_pred_references_row_column\r\n  PASS  node_of_boundaries\r\n  PASS  node_of_bad_byte_columns_skipped\r\n  PASS  lookup_and_unique_edges\r\n  -> 27/27 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-09-26T01:01:37.066Z",
-  "headCommit": "d00884e669c62690c45b4380a7d6ebd36ddf4009",
+  "ranAt": "2026-09-26T02:34:29.774Z",
+  "headCommit": "0156f3653975c992dca7e3dc36f497774e9d8168",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_tempemplator.py",
@@ -19,12 +19,12 @@
     {
       "name": "Pipeline5App/tests/unit/test_chain_reactions.py",
       "file": "Pipeline5App/tests/unit/test_chain_reactions.py",
-      "fileSha": "a2ffeb5b8c789e338d1f6732d8564b2954377d65189109251c62c5d04a704218"
+      "fileSha": "75cad4ec3aeda2e5f6af47bcef92a710e2283a3dbe6fd828c0a442ebf36bb02c"
     },
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
       "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
-      "fileSha": "2a09d071e4550410fa56f72bae2c0d1621f8e79e3dc8a9bcb6a97925b2ae77c0"
+      "fileSha": "09e455191c770bdd536b4afd058d139c0d2a765c33f9423dfaf60bae6662babb"
     },
     {
       "name": "Pipeline5App/tests/unit/test_expr_adversarial.py",
