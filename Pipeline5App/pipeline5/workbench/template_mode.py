@@ -65,7 +65,7 @@ def _work(jobs: queue.Queue, results: queue.Queue, session) -> None:
                 count = session.row_count(rule, doc.templates) if rule is not None else 0
                 shown = session.preview_text(doc, rule, row)
                 context = session.context(rule, doc.templates)
-                results.put(("check", number, (placed, count, shown, context), None, None))
+                results.put(("check", number, (placed, count, shown, context, doc.text), None, None))
             except Exception as error:  # noqa: BLE001 - a builder defect is shown, never raised
                 results.put(("check", number, None, None, error))
 
@@ -216,15 +216,21 @@ class TemplateMode:
             else:
                 checks.append(result)
         newest = [r for r in checks if r[1] == self._request]
-        if newest and not self._editing:                     # positions of an older text are stale
-            self._apply(newest[-1])
+        if newest and not self._editing and self._for_this_text(newest[-1]):
+            self._apply(newest[-1])                          # (positions of another text would be wrong)
+
+    def _for_this_text(self, result) -> bool:
+        """Whether `result` was computed for the text as it IS - an edit's <<Modified>> may not have run yet
+        (its handler sets `_editing`), so the text itself is compared."""
+        payload = result[2]
+        return payload is None or payload[-1] == self.text.get("1.0", "end-1c")
 
     def _apply(self, result) -> None:
         _kind, _number, payload, _chosen, error = result
         if error is not None:
             self._failed(error)
             return
-        self.placed, count, shown, self._context = payload
+        self.placed, count, shown, self._context, _text = payload
         self._squiggle()
         self._fill_problems()
         self.row_box.configure(to=max(0, count - 1), state="normal" if count else "disabled")

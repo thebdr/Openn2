@@ -72,15 +72,21 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
     (both read blank - the branch is silently never taken);
   - a data function reading a column its table does not have - a `count(signals, $col ...)` /
     `where(` / `first(` predicate, `lookup` / `unique`'s column (it reads blank: `count` counts
-    nothing) - or over a table the hook does not have at all (it finds no rows);
+    nothing) - or over a table the hook does not have at all (`before_300` has none), or inside
+    another function's predicate or a `where` (it sees that row alone): it finds no rows;
   - a format spec on a JSON value - a list or an object in the rows (`{$type:>5}` - it fails on the
     rows that hold one; a JSON column that holds text is just text);
   - an empty hole `{}` (it renders nothing - write `{{}}` for literal braces);
   - `{{$x}}`, which is the literal text `{$x}` - a hole in braces is `{{{$x}}}`.
 
-  A problem inside a multi-line PLAIN (unquoted) value or a folded `>` block is placed on its first
-  line and marked *(approximate)*: YAML joins those lines, so a column there is not a column of the
-  document.
+  Errors too: text a file cannot store - a `\uD83D\uDE00` escape pair in a double-quoted value is
+  two lone surrogates to YAML, which UTF-8 cannot write (the fire refuses the row: write the character
+  itself).
+
+  A problem inside a multi-line PLAIN (unquoted) value, a folded `>` block, or a value holding a line
+  break other than a newline (a `\r` escape, U+2028 ...) is placed on its first line and marked
+  *(approximate)*: YAML joins those lines, or the render splits where the document does not, so a
+  column there is not a column of the document.
 - **Rule and row.** Pick a rule from your `reactions.csv`, and a source row of the table it reads at
   its hook. The rows are what that hook's fire GETS - not the Database folder (later phases re-save
   that). For `after_300` the builder runs the run's own steps, in memory - nothing is saved or
@@ -97,10 +103,10 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   - a loop over a table that does not exist at that hook;
   - a column typo inside a loop;
   - the rule itself: a template of the wrong kind, a hook the run never fires, a target the fire
-    refuses for every row (a `:` other than a drive's - `C:/`, `\\?\C:\`, a share, or a drive a
-    hole completes, `C:{$_params.dir}/x.txt`, which the fire judges row by row - or a character Windows
-    does not allow in a
-    path: `< > " | ? *`, a control character);
+    refuses for every row (a `:` other than a drive's - a drive is ONE letter A-Z, `C:/`,
+    `\\?\C:\`, or one holes complete, `{$_params.drive}:/out`, which the fire judges row by row - or a
+    character Windows does not allow in a path, `< > " | ? *` or a control character, the drive's
+    place included);
   - project params that do not load (the fire blocks every rule of the hook: `rx_params_unreadable`).
 
   When staging would HALT the run (a FAIL your treatments do not lift) - or cannot run at all (a

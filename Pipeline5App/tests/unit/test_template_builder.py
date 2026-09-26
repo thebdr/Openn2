@@ -504,6 +504,43 @@ def test_drive_targets_are_the_fires_to_judge():
     _sandboxed(body)
 
 
+def test_every_target_shape_lint_equals_the_fire():
+    """C-025 refute round 4 (F1): the round-3 drive skip took ANY character before a ':' for a drive -
+    `?:`, `1:`, `_:`, `é:`, and an extended `\\\\?\\C:` whatever followed - the lint and the preview
+    approved targets the OS refuses; and two hole-driven drives were refused while the fire writes them.
+    A drive is at most ONE ASCII letter (plus holes that may render it) now, the fire refuses a
+    non-letter drive and an extended drive-relative path before the write - lint = preview = fire."""
+    if os.name != "nt":
+        return                                                # drive letters: Windows only
+    templates = {"txt": "x"}
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            drive, rest = os.path.splitdrive(out)
+            params = {"dir": rest.replace("\\", "/"), "d": "", "e": drive[0], "p": ""}
+            for target in (":/rx/x.txt", "?:/rx/x.txt", "*:/rx/x.txt", "1:/rx/x.txt", "1:\\rx\\x.txt", "_:\\rx\\x.txt",
+                           "\u00e9:\\rx\\x.txt", "1:{$_params.dir}/e.txt", "\\\\?\\" + drive[0] + ":i.txt",
+                           "\\\\srv\\sh?re\\x.txt"):             # (a share's '?': refused BEFORE any network)
+                rule = _rule(action="file", target=target, template="txt")
+                lint_errors = [p for p in engine.lint(templates, rule, _database()) if p.template is None]
+                shown = engine.preview(rule, 0, templates=templates, params=params, database=_database(), files_root=out)
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
+                                          files_root=out)
+                eq([f.type for f in findings], ["rx_file_write"], f"{target!r}: the fire refuses it")
+                eq(shown.problem, (findings[0].type, findings[0].detail), f"{target!r}: …the preview says so")
+                eq([p.severity for p in lint_errors], ["error"], f"{target!r}: …and so does the lint")
+            for target in ("{$_params.d}{$_params.e}:{$_params.dir}/two_holes.txt",
+                           "{$_params.p}" + drive[0] + ":{$_params.dir}/hole_then_letter.txt"):
+                rule = _rule(action="file", target=target, template="txt")
+                eq([p.message for p in engine.lint(templates, rule, _database()) if p.template is None], [],
+                   f"{target!r}: a drive the holes render - no lint error")
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
+                                          files_root=out)
+                eq(findings, [], f"{target!r}: …the fire writes it")
+            eq(sorted(os.listdir(out)), ["hole_then_letter.txt", "two_holes.txt"], "…both written")
+    _sandboxed(body)
+
+
 def test_a_data_functions_row_reads_are_judged():
     """C-025 refute round 2 (#5): a data function reads ITS table's rows - a predicate's `$col`,
     lookup's / unique's column words - and a column the table does not have reads BLANK (count() then
@@ -523,8 +560,10 @@ def test_a_data_functions_row_reads_are_judged():
     found = lint({"t": '@for $s in signals where count(diagnosis_cabinets, $colour = "x") > 0: {$s.uid}\n'
                        '@for $i in 1..{count(signals, $nope = 1)}: x'}, start="t", fields=fields, tables=tables)
     eq(sorted((p.where, p.severity, p.message.split(" - ")[0]) for p in found),
-       [(1, "warning", "'colour' is not a column of diagnosis_cabinets"), (2, "warning", "'nope' is not a column of signals")],
-       "…inside a `where` predicate and a range end too")
+       [(1, "warning", "count() inside a row predicate sees that ROW alone"),
+        (2, "warning", "'nope' is not a column of signals")],
+       "…a range end's too; inside a `where` a data function sees the ROW alone - it finds no rows at all "
+       "(C-025 refute round 4, F2)")
     ctx = {"cabinet_id": "C1", "_db": {"signals": [{"uid": "u", "mnemonic": "M", "script_type": "A"}]}}
     eq(expr.evaluate('count(signals, $cabinet_id = "C1")', ctx), 0.0, "(what the fire computes: nothing matches)")
     body = '{count(signalz, $script_type = "PEC")} {lookup(signalz, tag, "P1", script_type)} {count(signalz)}'
@@ -535,11 +574,45 @@ def test_a_data_functions_row_reads_are_judged():
     ok(all("'signalz' is not a table at this hook" in p.message for p in found), [p.message for p in found])
     eq((expr.evaluate('count(signalz, $script_type = "PEC")', ctx), expr.evaluate("count(signalz)", ctx)), (0.0, 0.0),
        "(what the fire computes: nothing, silently)")
+    before = _rule(fire_when="before_300", source_table="", action="file", target="b.txt", template="b")
+    found = engine.lint({"b": '@for $r in signals: x\nsignals: {count(signals)} first: {lookup(signals, tag, "P1", uid)}\n'
+                              '@if count(signals) > 0\ny\n@end'}, before, None, hooks=("before_300", "after_300"))
+    eq(sorted((p.where, p.severity) for p in found if p.template == "b"),
+       [(1, "error"), (2, "warning"), (2, "warning"), (3, "warning")],
+       "a database-less hook: no table at all - the @for's error, each data function warned (round 4, F2)")
+    found = lint({"t": '@for $r in signals where count(signals) > 0: {$r.uid}\n{count(signals, count(signals) > 0)}'},
+                 start="t", fields=fields, tables=tables)
+    eq(sorted((p.where, p.message.split(" - ")[0]) for p in found),
+       [(1, "count() inside a row predicate sees that ROW alone"), (2, "count() inside a row predicate sees that ROW alone")],
+       "a data function inside a ROW predicate finds no rows - warned, on the function")
+    ok(expr.evaluate("count(signals, count(signals) > 0)", {"_db": {"signals": [{"uid": "u"}]}}) == 0.0,
+       "(what the fire computes: nothing)")
     database = _database()
     database.add_table(Table("signals", columns=tables["signals"]))
     rows = engine.lint({"rows": [{"n": '{count(signals, $cabinet_id = "C1")}'}]}, _rule(), database)
     ok(any(p.where == (1, "n") and "cabinet_id" in p.message and p.severity == "warning" for p in rows),
        f"…in a row template's value too ({rows})")
+
+
+def test_a_lone_surrogate_is_what_the_fire_refuses():
+    """C-024 refute round 21's builder half: text UTF-8 cannot store (a YAML `\\uD83D\\uDE00` pair decodes to
+    two lone surrogates) - the fire refuses every row now; the lint says so (an error on the character)
+    in a text template and a row value, the preview gives the fire's finding - and a file TARGET holding
+    one is left alone (a path is not stored as UTF-8)."""
+    lone = "\ud83d\ude00"
+    templates = {"rows": [{"label": "E" + lone}], "txt": "smile " + lone}
+    found = engine.lint(templates, _rule(), _database())
+    eq(sorted((p.template, str(p.where), p.severity) for p in found if "surrogate" in p.message),
+       [("rows", "(1, 'label')", "error"), ("txt", "1", "error")], "a row value and a text line: errors")
+
+    def body():                                               # (the fire saves its record: sandboxed)
+        _database_, findings = engine.fire("after_300", _database(), rules=[_rule()], templates=templates, params={})
+        shown = engine.preview(_rule(), 0, templates=templates, params={}, database=_database())
+        eq(shown.problem, (findings[0].type, findings[0].detail), "the preview is the fire's rx_bad_template")
+    _sandboxed(body)
+    target = [p for p in engine.lint({"txt": "x"}, _rule(action="file", target="o" + lone + ".txt", template="txt"),
+                                     _database()) if "surrogate" in p.message]
+    eq(target, [], "a target is not stored as UTF-8 - no error there")
 
 
 def test_format_specs_know_the_values_type():
@@ -564,6 +637,8 @@ def test_format_specs_know_the_values_type():
     found = engine.lint({"m": "{$j:>5}"}, rule, database)
     ok(any(p.template == "m" and p.severity == "warning" and "JSON" in p.message for p in found),
        f"the engine carries the rule's JSON columns ({found})")
+    eq([p for p in engine.lint({"m": "{$j:}"}, rule, database) if p.template == "m"], [],
+       "an EMPTY spec formats a list fine - no warning (round 4, F6)")
     eq([p for p in engine.lint({"m": "{$im:>8}"}, rule, database) if p.template == "m"], [],
        "a declared JSON column that HOLDS text is text (C-025 refute round 3, F4 - a staged I/O-List cell)")
     with tempfile.TemporaryDirectory() as out:
@@ -600,6 +675,8 @@ if __name__ == "__main__":
         ("preview_sees_the_in_hook_cascade", test_preview_sees_the_in_hook_cascade),
         ("windows_refused_target_characters", test_windows_refused_target_characters),
         ("drive_targets_are_the_fires_to_judge", test_drive_targets_are_the_fires_to_judge),
+        ("every_target_shape_lint_equals_the_fire", test_every_target_shape_lint_equals_the_fire),
+        ("a_lone_surrogate_is_what_the_fire_refuses", test_a_lone_surrogate_is_what_the_fire_refuses),
         ("a_data_functions_row_reads_are_judged", test_a_data_functions_row_reads_are_judged),
         ("format_specs_know_the_values_type", test_format_specs_know_the_values_type),
     ]))

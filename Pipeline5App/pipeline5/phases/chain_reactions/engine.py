@@ -110,6 +110,7 @@ _ACTIONS = ("add_rows", "file")
 # the characters a Windows file path refuses (open() -> EINVAL): judged BEFORE the write, so the fire and
 # the builder's preview name the same refusal (C-025 refute round 2); other platforms accept them
 _INVALID_PATH = '<>"|?*' if os.name == "nt" else ""
+_EXTENDED = ("\\\\?\\", "\\\\.\\", "//?/", "//./")    # a Win32 extended-length / device path's prefix
 
 
 class WouldNotFire(Exception):
@@ -320,6 +321,9 @@ def _spawned(rule: Rule, templates: dict, scope: dict, row: dict):
                 values[str(name)] = tempemplator.render_text(str(tpl), scope)
             except ExprError as error:                     # located: which entry, which field
                 raise ExprError(f"entry {number} field {str(name)!r}: {error}") from error
+            unstorable = _unencodable(values[str(name)])   # refused BEFORE the add (its uid, the save)
+            if unstorable:
+                raise ExprError(f"entry {number} field {str(name)!r}: {unstorable}")
         values["spawned_by"] = rule.name
         values.setdefault("source_uid", str(row.get("uid") or ""))
         yield values
@@ -371,11 +375,44 @@ def _file_output(rule: Rule, templates: dict, scope: dict, files_root: str) -> t
     if ":" in os.path.splitdrive(os.path.abspath(path))[1]:       # NTFS would write a HIDDEN alternate data
         return None, None, ("rx_file_write",                       # stream - silent (refuter round 13: a
                             f"cannot write {path!r}: a ':' in a file name would write a hidden NTFS stream")
-    bad = next((ch for ch in os.path.splitdrive(path)[1]                    # `-X1:3` terminal name)
-                if ch in _INVALID_PATH or (_INVALID_PATH and ord(ch) < 32)), None)
-    if bad is not None:                                            # Windows refuses it at open() - say why
-        return None, None, ("rx_file_write", f"cannot write {path!r}: {bad!r} is not allowed in a Windows path")
+    refusal = _path_refusal(path)                                 # `-X1:3` terminal name)
+    if refusal is not None:                                        # Windows refuses it at open() - say why
+        return None, None, ("rx_file_write", f"cannot write {path!r}: {refusal}")
+    unstorable = _unencodable(text)                                # the append would fail half-way
+    if unstorable:
+        return None, None, ("rx_bad_template", f"template {rule.template!r}: {unstorable}")
     return path, text, None
+
+
+def _path_refusal(path: str):
+    """Why Windows refuses `path` whatever the text - judged BEFORE the write, so the fire, its dry run and
+    the builder name the same refusal (None = none; other platforms accept these): a character a path
+    refuses (`<>"|?*`, a control character) anywhere past an extended / device prefix - its drive and a
+    UNC share included; a drive that is not an ASCII letter (`1:`, `é:`); an extended path whose drive
+    goes on without a separator (`\\\\?\\C:x`, drive-relative)."""
+    if not _INVALID_PATH:
+        return None
+    body = path[4:] if path[:4] in _EXTENDED else path
+    bad = next((ch for ch in body if ch in _INVALID_PATH or ord(ch) < 32), None)
+    if bad is not None:
+        return f"{bad!r} is not allowed in a Windows path"
+    if body[1:2] == ":":
+        if not (body[:1].isascii() and body[:1].isalpha()):
+            return f"{body[:2]!r} is not a drive"
+        if body is not path and body[2:3] not in ("\\", "/"):
+            return f"an extended path's drive {body[:2]!r} must go on with a separator"
+    return None
+
+
+def _unencodable(text: str):
+    """Why `text` cannot be stored as UTF-8 (a lone surrogate - a YAML `\\uD83D\\uDE00` escape pair decodes
+    to two) - None when it can."""
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError as error:
+        return (f"{text[error.start]!r} (a lone surrogate) cannot be stored as UTF-8 - write the character "
+                "itself, not a \\uXXXX surrogate pair")
+    return None
 
 
 def _act(rule: Rule, database, templates: dict, params: dict, db_tables: dict, files_root: str,
@@ -482,7 +519,7 @@ def _persist(database, hook: str, log_rows: list, findings: list, save: bool = T
         return problems                                       # recorded in memory, nothing written
     try:
         database.save(where)
-    except OSError as error:
+    except (OSError, ValueError) as error:                   # a file held open; text a CSV cannot encode
         problems.append(_f(phase, "rx_record_unwritable",
                            f"the record could not be saved (a file held open by another program?): {error}", where))
     return problems
@@ -783,7 +820,7 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
         problem(_unknown_table("target", rule.target))
     if rule.action == "file":
         for start, end, message, severity in tempemplator.lint_line(rule.target, fields=fields, tables=tables,
-                                                                    json=json_fields):
+                                                                    json=json_fields, stored=False):
             problem(f"target {rule.target!r}: {message}", "target", start, end, severity)
         refusal = _literal_refusal(rule.target)
         if refusal is not None:
@@ -802,13 +839,13 @@ def _json_valued(table) -> frozenset:
 
 def _literal_refusal(target: str):
     """(column, why) of a LITERAL character the fire's target guards refuse whatever the row - None when
-    there is none. A ':' - but a drive's, which the fire judges as it does: a literal drive (`C:/`, an
-    extended `\\\\?\\C:\\`, a UNC share) whose path goes on with a separator or a HOLE (the row may
-    render an absolute path - or not: the fire judges that row), or the ':' right after a LEADING hole
-    that may render the drive letter (`{$_params.drive}:/out` - C-024 refute round 19's note) - or a
-    character a Windows path refuses (`<>"|?*`, a control character) past the drive. Holes are data,
-    judged per row by the fire."""
+    there is none. A ':' - but a drive's: one with only holes and at most ONE ASCII letter before it (past
+    an extended `\\\\?\\` / device prefix) whose path goes on with a separator or a HOLE (`C:/`,
+    `{$_params.drive}:/out` - C-024 refute round 19's note - `{$p}C:{$dir}`: the rows' renders are the
+    fire's to judge) - or a character a Windows path refuses (`<>"|?*`, a control character), the drive's
+    position included. Holes are data, judged per row by the fire."""
     runs = tempemplator.brace_runs(target)
+    prefix = 4 if target[:4] in _EXTENDED else 0            # an extended / device prefix's own `?` / `.`
 
     def goes_on(number, index, end):
         """What follows the ':' at `index` (the last or not of text run `number`) - a separator or a hole."""
@@ -816,22 +853,25 @@ def _literal_refusal(target: str):
             return True
         return index + 1 == end and number + 1 < len(runs) and runs[number + 1][0] == "hole"
 
-    skip = 0                                                # a literal drive's own characters
-    if runs and runs[0][0] == "text":
-        drive = os.path.splitdrive(target[:runs[0][2]])[0]
-        if drive and (len(drive) > 2 or goes_on(0, len(drive) - 1, runs[0][2])):
-            skip = len(drive)                                # (a drive-relative `X:1.txt` is not skipped)
+    def a_drive(number, index):
+        """Whether the ':' at `index` may be a DRIVE's: before it (past the prefix) only holes and at most
+        ONE ASCII letter - `C:`, `{$d}:`, `{$p}C:`, `{$d}{$e}:` (the rows' renders are the fire's to judge)."""
+        literal = "".join(target[max(s, prefix):min(e, index)] for kind, s, e in runs[:number + 1]
+                          if kind != "hole" and s < index)
+        holes = any(kind == "hole" and s < index for kind, s, _e in runs)
+        return (literal == "" and holes) or (len(literal) == 1 and literal.isascii() and literal.isalpha())
+
     for number, (kind, start, end) in enumerate(runs):
         if kind != "text":
             continue
-        for index in range(max(start, skip), end):
+        for index in range(max(start, prefix), end):
             ch = target[index]
             if _INVALID_PATH and (ch in _INVALID_PATH or ord(ch) < 32):
                 return index, f"{ch!r} is not allowed in a Windows path"
             if ch != ":":
                 continue
-            if number == 1 and index == start and runs[0][0] == "hole" and goes_on(number, index, end):
-                continue                                     # a drive a leading hole may render
+            if a_drive(number, index) and goes_on(number, index, end):
+                continue                                     # a drive (literal, or the holes may render it)
             return index, ("a ':' in a relative target or a file name (a drive letter, or a hidden NTFS "
                            "stream)")
     return None

@@ -404,6 +404,19 @@ def test_only_the_newest_result_for_the_text_as_it_is_applies():
             mode.refresh()
             permits.release()
             ok(_pump(root, lambda: applied[-1:] == [mode._request]), f"…and the fresh one applies ({applied})")
+            import time                                      # C-025 refute round 4 (F4): the poll can run BEFORE
+            inside.clear()                                   # an edit's <<Modified>> handler (which sets _editing)
+            mode.refresh()
+            ok(inside.wait(5), "the worker is inside the check")
+            seen = list(applied)
+            panel._textw.insert("1.0", "# typed\n")        # a keystroke - its <<Modified>> not yet handled
+            permits.release()
+            deadline = time.time() + 5
+            while mode._results.empty() and time.time() < deadline:
+                time.sleep(0.02)                             # (no Tk events processed meanwhile)
+            ok(not mode._results.empty(), "the result for the text BEFORE the keystroke is in")
+            mode._drain()                                    # the 100 ms poll first
+            eq(applied, seen, "…and never applied: it was computed for another text (its positions would be wrong)")
     finally:
         template_mode._DEBOUNCE_MS = debounce
         held[0] = False

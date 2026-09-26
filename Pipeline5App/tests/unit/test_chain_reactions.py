@@ -108,6 +108,84 @@ def test_loader_passes_nameless_rows_to_the_compiler():
     eq([f.type for f in findings], ["rx_bad_rule"], "…and the compiler reports it")
 
 
+def test_a_headerless_or_overflowing_rule_file_is_never_silent():
+    """C-024 refute round 21 (N2): a reactions.csv with no header row read its FIRST RULE as the header -
+    the rule gone, nothing reported; a line whose only content sat past the header's columns was
+    skipped as blank. Now a header that names no rule columns is unreadable (the fire's
+    rx_rules_unreadable), and an overflow-only line reaches the compiler."""
+    from pipeline5.config import loaders
+    real_find = loaders.find
+
+    def body(sandbox):                                        # (the fire saves its record: sandboxed)
+        path = os.path.join(sandbox, "reactions.csv")
+        loaders.find = lambda rel: path if rel == "chain_reactions/reactions.csv" else real_find(rel)
+        try:
+            with open(path, "w", encoding="utf-8", newline="") as handle:
+                handle.write("r1,after_300,src,,add_rows,dst,rows,\n")          # the header forgotten
+            try:
+                config.load_reactions()
+                ok(False, "a headerless rule file must not load")
+            except ValueError as error:
+                ok("names no name" in str(error), str(error))
+            _, findings = engine.fire("after_300", _db(), templates=_ROW_TPL, params={})
+            eq([f.type for f in findings], ["rx_rules_unreadable"], "…the fire reports it")
+            with open(path, "w", encoding="utf-8", newline="") as handle:
+                handle.write("name,fire_when,source_table,condition,action,target,template,comment\n"
+                             ",,,,,,,,r2,after_300\n")                          # content past the header
+            rows = config.load_reactions()
+            eq(len(rows), 1, "the overflow-only line is content - kept")
+            _rules, findings = engine.compile_rules(rows)
+            eq([f.type for f in findings], ["rx_bad_rule"], "…and the compiler reports it")
+            with open(path, "w", encoding="utf-8", newline="") as handle:
+                handle.write("")
+            eq(config.load_reactions(), [], "an empty file: no rules (absence is not an error)")
+        finally:
+            loaders.find = real_find
+    _sandboxed(body)()
+
+
+def test_text_utf8_cannot_store_is_a_finding():
+    """C-024 refute round 21 (F1): text UTF-8 cannot store - a YAML `\\uD83D\\uDE00` escape pair decodes to two
+    lone surrogates - was found only at the write or the save: the fire RAISED (the staging handler
+    crashed), a file rule left a 0-byte file, and the dry fire said ok. Now it is refused before any add
+    or write, located (rx_bad_template - the entry + field, the template), the preview and the dry fire
+    agree; and a save that raises ValueError is the record's rx_record_unwritable, never a crash."""
+    lone = "\ud83d\ude00"
+    def body(sandbox):
+        database, findings = engine.fire("after_300", _db(), rules=[_rule()], templates={"rows": [{"label": "E" + lone}]},
+                                         params={})
+        eq([(f.type, f.location) for f in findings], [("rx_bad_template", "r1")], "a row value: refused, located")
+        ok("entry 1 field 'label'" in findings[0].detail and "lone surrogate" in findings[0].detail, findings[0].detail)
+        eq(len(database["dst"]), 0, "…nothing added")
+        shown = engine.preview(engine.compile_rules([_rule()])[0][0], 0, templates={"rows": [{"label": "E" + lone}]},
+                               params={}, database=_db())
+        eq(shown.problem, (findings[0].type, findings[0].detail), "…the preview says the fire's finding")
+        with tempfile.TemporaryDirectory() as out_root:
+            rule = _rule(name="f", fire_when="before_300", source_table="", condition="", action="file",
+                         target="rx/emoji.txt", template="txt")
+            templates = {"txt": "smile " + lone}
+            dry, dry_findings = engine.fire("before_300", None, rules=[rule], templates=templates, params={},
+                                            files_root=out_root, write=False)
+            real, real_findings = engine.fire("before_300", None, rules=[rule], templates=templates, params={},
+                                              files_root=out_root)
+            eq([(r["created"], r["outcome"]) for r in real.log_rows], [(0, "rx_bad_template")], "a file text: refused")
+            eq((dry.log_rows, [f.detail for f in dry_findings]), (real.log_rows, [f.detail for f in real_findings]),
+               "…the dry fire says the same")
+            eq(os.listdir(out_root), [], "…and no 0-byte file is left")
+        from pipeline5.truth.database import Database as Db
+        real_save = Db.save
+
+        def unencodable(self, directory):
+            raise UnicodeEncodeError("utf-8", "x", 0, 1, "surrogates not allowed")
+        Db.save = unencodable
+        try:
+            _, findings = engine.fire("after_300", _db(), rules=[_rule()], templates=_ROW_TPL, params={})
+        finally:
+            Db.save = real_save
+        eq([f.type for f in findings], ["rx_record_unwritable"], "a save that cannot encode: the record's finding")
+    _sandboxed(body)()
+
+
 def test_fire_empty_hook_is_a_strict_noop(sandbox=None):
     def body(sandbox):
         database = _db()
@@ -615,6 +693,15 @@ def test_windows_refused_path_characters_are_judged_before_the_write():
             eq([(x.type, x.location) for x in findings], [("rx_file_write", "r1")], "a directory's '<'")
             ok("'<' is not allowed in a Windows path" in findings[0].detail, findings[0].detail)
             eq(os.listdir(out_root), [], "…no directory made, nothing written")
+        drive = os.path.splitdrive(sandbox)[0][:1]              # C-025 refute round 4 (F1): the DRIVE too
+        for target, why in (("?:/rx/x.txt", "'?' is not allowed in a Windows path"),
+                            ("1:\\rx\\x.txt", "'1:' is not a drive"),
+                            ("\\\\?\\" + drive + ":i.txt", "must go on with a separator"),
+                            ("\\\\srv\\sh?re\\x.txt", "'?' is not allowed in a Windows path")):
+            _, findings = engine.fire("after_300", _db(), rules=[_rule(action="file", target=target, template="txt")],
+                                      templates={"txt": "x"}, params={}, files_root=sandbox)
+            eq([x.type for x in findings], ["rx_file_write"], f"{target!r}: refused before the write")
+            ok(why in findings[0].detail, f"{target!r}: named - {findings[0].detail}")
     _sandboxed(body)()
 
 
@@ -1187,6 +1274,9 @@ if __name__ == "__main__":
         ("unnamed_and_uncompilable_rules_are_caught_at_compile",
          test_unnamed_and_uncompilable_rules_are_caught_at_compile),
         ("loader_passes_nameless_rows_to_the_compiler", test_loader_passes_nameless_rows_to_the_compiler),
+        ("a_headerless_or_overflowing_rule_file_is_never_silent",
+         test_a_headerless_or_overflowing_rule_file_is_never_silent),
+        ("text_utf8_cannot_store_is_a_finding", test_text_utf8_cannot_store_is_a_finding),
         ("fire_empty_hook_is_a_strict_noop", test_fire_empty_hook_is_a_strict_noop),
         ("noop_loads_nothing_beyond_the_rule_index", test_noop_loads_nothing_beyond_the_rule_index),
         ("rules_on_hooks_the_run_plan_never_fires_are_reported",

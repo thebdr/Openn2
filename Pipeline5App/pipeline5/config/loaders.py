@@ -367,14 +367,36 @@ def load_seed_members() -> list:
 
 
 # --- chain reactions (the rule engine's config pair - see phases/chain_reactions/engine.py) ------- #
+_RULE_COLUMNS = ("name", "fire_when", "action", "target", "template")   # what a reactions.csv header names
+
+
 def load_reactions() -> list:
     """The chain-reaction RULE rows (`chain_reactions/reactions.csv`, 4-tier resolved): one dict per
     rule - {name, fire_when, source_table, condition, action, target, template, comment}, strings
     verbatim (the engine compiles + validates them into located findings, never a crash here). A
     system that ships no reactions file simply has no rules ([] - absence of rules is not an error).
-    Only fully BLANK lines are skipped (read_config_csv); a row with content but no `name` is passed
-    through so the compiler reports it (refuter round 6: it used to vanish here, silently)."""
-    return read_config_csv(find("chain_reactions/reactions.csv"))
+    Only fully BLANK lines are skipped; a row with content but no `name` is passed through so the
+    compiler reports it (refuter round 6: it used to vanish here, silently) - so is one whose only
+    content sits PAST the header's columns (C-024 refute round 21). A header that does not name the rule
+    columns raises (a headerless file would read its first rule AS the header - lost, silently): the
+    engine reports rx_rules_unreadable."""
+    path = find("chain_reactions/reactions.csv")
+    if not path or not os.path.exists(path):
+        return []
+    rows = []
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        reader = csv.DictReader(handle)
+        missing = [column for column in _RULE_COLUMNS if column not in (reader.fieldnames or _RULE_COLUMNS)]
+        if missing:
+            raise ValueError(f"{path}: its header row names no {', '.join(missing)} column - got "
+                             f"{reader.fieldnames} (a headerless file reads its first rule as the header)")
+        for raw in reader:
+            extra = raw.pop(None, None) or []
+            if not any((v or "").strip() for v in raw.values() if isinstance(v, str)) \
+                    and not any((v or "").strip() for v in extra):
+                continue
+            rows.append(raw)
+    return rows
 
 
 def load_reaction_templates() -> dict:

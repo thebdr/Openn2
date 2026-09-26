@@ -702,8 +702,42 @@ def test_a_downgraded_no_io_sheet_never_saves_over_the_record():
                 SYSTEM.handlers["staging"](host.ctx())
                 eq([m for _level, m in host.lines if "reaction" in m], [], "the dark engine: the skip says nothing")
                 ok("RSLT" in host.levels(), "…and the staging reports as ever")
+                with open(os.path.join(rx_dir, "reactions.csv"), "w", encoding="utf-8", newline="") as handle:
+                    handle.write(",".join(rules[0]) + "\n" + ",".join(rules[2]) + "\n")   # before_300 only
+                host = _Host()
+                SYSTEM.handlers["staging"](host.ctx())
+                eq(len([m for level, m in host.lines if level == "WARN" and "never run on a raw FAIL" in m]), 1,
+                   "only a before_300 rule dropped: the skip is said (C-024 refute round 21, N1)")
             finally:
                 config.load_params = real_load
+        finally:
+            config.use_project(previous_project)
+
+
+def test_text_utf8_cannot_store_never_crashes_the_run():
+    """C-024 refute round 21 (F1) through the REAL run-plan: an add_rows value holding a JSON-style emoji
+    escape (`"\\uD83D\\uDE00"` - YAML decodes it to two lone surrogates) crashed the staging handler at the
+    save ("surrogates not allowed"; no RSLT, the spawns and findings lost). The value is refused before
+    the add now: the run completes, the finding is rendered AND recorded, signals.csv holds the staged
+    rows."""
+    rules = [["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
+             ["emoji", "after_300", "signals", '$script_type = "A"', "add_rows", "signals", "emoji_rows", ""]]
+    templates = 'emoji_rows:\n  - script_type: "E"\n    mnemonic: "E-{$mnemonic}-\\uD83D\\uDE00"\n'
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _rules_project(project, params, rules, templates)
+        config.use_project(project)
+        try:
+            host = _Host()
+            SYSTEM.handlers["staging"](host.ctx())
+            ok("RSLT" in host.levels(), "the run completes")
+            eq(_rx_rendered(host), {("rx_bad_template", "emoji")}, "the finding is rendered")
+            recorded = _read_csv(os.path.join(config.database_dir(), "validation_issues.csv"))
+            ok(any(r["type"] == "rx_bad_template" and r["location"] == "emoji" for r in recorded), "…and recorded")
+            saved = _read_csv(os.path.join(config.database_dir(), "signals.csv"))
+            eq((_staged_count(host), sum(1 for r in saved if r.get("script_type") == "E")), (len(saved), 0),
+               "signals.csv holds the staged rows - no spawn")
         finally:
             config.use_project(previous_project)
 
@@ -846,6 +880,7 @@ if __name__ == "__main__":
         ("the_builder_gates_as_the_run_plan_does", _sandboxed(test_the_builder_gates_as_the_run_plan_does)),
         ("a_downgraded_no_io_sheet_never_saves_over_the_record",
          _sandboxed(test_a_downgraded_no_io_sheet_never_saves_over_the_record)),
+        ("text_utf8_cannot_store_never_crashes_the_run", _sandboxed(test_text_utf8_cannot_store_never_crashes_the_run)),
         ("spawns_are_saved_beside_a_ragged_record", _sandboxed(test_spawns_are_saved_beside_a_ragged_record)),
         ("a_blank_range_end_invents_nothing_on_the_real_fixture",
          _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),

@@ -513,14 +513,19 @@ def _field_span(text: str, start: int, end: int, name: str) -> tuple:
     return (found.start(), found.end()) if found else (start, end)
 
 
-def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None) -> list:
+def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, stored: bool = True) -> list:
     """ONE literal line / row value judged the way `render_text` and the loop-column check judge it -
     WITHOUT rendering: [(start, end, message, severity)], columns into `text`. `fields` = the
     top-level names in scope (None = unknown - the strict missing-field check is skipped); `loops` =
     {loop var: its table's columns - empty for a range var, None when unknown}; `tables` = {table:
     columns} (a data function's row reads are checked against them); `json` = the field paths holding
-    JSON (list / object) values ("type", "r.matrix_areas")."""
+    JSON (list / object) values ("type", "r.matrix_areas"); `stored` = the render is stored as UTF-8 (a
+    text line, a row value - not a file target): a lone surrogate there is an error (the fire refuses it)."""
     loops = loops or {}
+    lone = next((i for i, ch in enumerate(text) if "\ud800" <= ch <= "\udfff"), None) if stored else None
+    if lone is not None:                                     # a YAML `\\uD83D\\uDE00` pair decodes to two
+        return [(lone, lone + 1, f"{text[lone]!r} (a lone surrogate) cannot be stored as UTF-8 - the fire "
+                                 "refuses every row: write the character itself", "error")]
     names = None if fields is None else set(fields) | set(loops)
     issues = []
     runs = list(_scan(text))
@@ -548,7 +553,7 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None) -> 
             if problem:
                 issues.append((end - 1 - len(spec), end - 1, problem, "error"))
             paths = expr.hole_paths(text[start + 1:end - 1]) or ()
-            if spec is not None and not problem and json and len(paths) == 1:
+            if spec and not problem and json and len(paths) == 1:
                 path = next(iter(paths))
                 if expression.strip() == "$" + path and path in json:   # the value IS a JSON list / object
                     issues.append((end - 1 - len(spec), end - 1, f"a format spec on a JSON (list / object) "
@@ -570,12 +575,21 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None) -> 
     return issues
 
 
-def _row_read_problems(text: str, start: int, end: int, expression: str, tables) -> list:
+def _row_read_problems(text: str, start: int, end: int, expression: str, tables, row_scope: bool = False) -> list:
     """(start, end, message) for each column a data function reads from its table's rows (a predicate's
     `$col`, lookup / unique's column word) that the table does not have - it reads blank there - and for a
-    table the hook does not have at all (the function finds no rows: 0 / blank)."""
+    table the hook does not have at all, `{}` included - a database-less hook (the function finds no rows:
+    0 / blank). A data function inside a ROW predicate (another's predicate, or a `where` - `row_scope`)
+    sees that row alone: it finds no rows either."""
     out = []
-    for function, table, columns in (row_reads(expression) or ()) if tables else ():
+    for function, table, columns, in_row in (row_reads(expression) or ()) if tables is not None else ():
+        if in_row or row_scope:                             # (a nested call sits past its outer call's comma)
+            begin = start if row_scope else (text.find(",", start, end) + 1 or start)
+            found = re.compile(r"\b" + re.escape(function) + r"\s*\(").search(text, begin, end)
+            s, e = (found.start(), found.start() + len(function)) if found else (start, end)
+            out.append((s, e, f"{function}() inside a row predicate sees that ROW alone - it finds no rows "
+                              "(0 / blank)"))
+            continue
         known = tables.get(table)
         if known is None:
             found = re.compile(r"\b" + re.escape(table) + r"\b").search(text, start, end)
@@ -885,7 +899,7 @@ class _Lint:
             self.add(template, line_no, at + issue.start, at + issue.end, issue.message)
         if syntax:
             return
-        for s, e, message in _row_read_problems(pred, 0, len(pred), pred, self.tables):
+        for s, e, message in _row_read_problems(pred, 0, len(pred), pred, self.tables, row_scope=table is not None):
             self.add(template, line_no, at + s, at + e, message, "warning")
         for path in sorted(free_paths(pred) or ()) if table is None and loops else ():
             head, _dot, rest = path.partition(".")

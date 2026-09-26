@@ -269,7 +269,19 @@ def _quoted_chars(text: str, at: int, value: str):
     return chars + [i]
 
 
+_OTHER_BREAKS = re.compile("[\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]")   # splitlines() breaks besides \n
+
+
 def _scalar(text: str, starts: list, line: int, col: int, value: str) -> Scalar:
+    """The content position of the scalar whose value starts at (line, col) - approximate when its value
+    holds a line break besides `\\n` (the renderer splits on every one; the view's lines would not)."""
+    scalar = _scalar_at(text, starts, line, col, value)
+    if scalar.exact and _OTHER_BREAKS.search(value):
+        scalar.exact = False
+    return scalar
+
+
+def _scalar_at(text: str, starts: list, line: int, col: int, value: str) -> Scalar:
     """The content position of the scalar whose value starts at (line, col) - a block (`|` exact, `>`
     folded), a quoted or a plain scalar."""
     at = starts[min(line, len(starts) - 1)] + col
@@ -791,6 +803,7 @@ class Session:
         with self._lock:
             generation = self.generation
         base = self.base(rule.fire_when, leg)
+        notes = []
         pending = self._pending(rule.fire_when) if base is not None else []
         index = self.rules.index(rule)
         earlier = [r for r in self.rules[:index] if r.fire_when == rule.fire_when and r.action == "add_rows"]
@@ -798,7 +811,8 @@ class Session:
         used = sorted({name for r in drivers for name in reach(templates, r.template)})
         key = (rule.fire_when, leg, tuple(pending), tuple(r.name for r in earlier),
                tuple((name, repr(templates.get(name))) for name in used))
-        if key not in self._views:
+        cached = self._views.get(key)                     # (one read: a reload may swap the cache)
+        if cached is None:
             database = base
             if database is not None and pending:
                 database = engine.copy_database(database)
@@ -808,18 +822,20 @@ class Session:
                         params=None if self.params_problem else self.params, hooks=tuple(self.hooks),
                         write=False)
                     if deferred is not None:
-                        self.notes += [n for n in engine.settle_view(database, deferred) if n not in self.notes]
+                        notes += engine.settle_view(database, deferred)
             if not self.params_problem:                   # (unreadable params block every rule: no spawns)
                 database, _problems = engine.cascade(self.rules, rule, database, templates=templates,
                                                      params=self.params)
             view = (database, engine.db_layer(database))
-            with self._lock:
+            with self._lock:                              # the check AND the write: a reload cannot land between
                 if generation != self.generation:         # reloaded meanwhile: over a stale build - never cached
                     return view
-            while len(self._views) >= _VIEW_CACHE:
-                self._views.pop(next(iter(self._views)))
-            self._views[key] = view
-        return self._views[key]
+                self.notes += [n for n in notes if n not in self.notes]
+                while len(self._views) >= _VIEW_CACHE:
+                    self._views.pop(next(iter(self._views)))
+                self._views[key] = view
+            return view
+        return cached
 
     # --- the view's questions -------------------------------------------------------------------------- #
     def rule_labels(self) -> list:

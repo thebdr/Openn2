@@ -99,15 +99,16 @@ def _field_thunk(name: str):
 # --- parser (compiles to a thunk fn(ctx) -> value) ---------------------------------------------- #
 class _Parser:
     def __init__(self, toks, src, scope: Scope | None, free: set | None = None, bound=frozenset(),
-                 reads: list | None = None):
+                 reads: list | None = None, in_row: bool = False):
         self.toks, self.i, self.src, self.scope = toks, 0, src, scope
         # the FREE top-level fields (read from the caller's ctx) - a data-function predicate's `$col`
         # (the iterated ROW's column) and a let-bound name are NOT free (see `free_fields`)
         self.free = free if free is not None else set()
         self.bound = bound
-        # what each data function reads from its TABLE's rows: (function, table, column paths) - shared by
-        # every sub-parser of one expression (see `row_reads`)
+        # what each data function reads from its TABLE's rows: (function, table, column paths, in a row
+        # predicate) - shared by every sub-parser of one expression (see `row_reads`)
         self.reads = reads if reads is not None else []
+        self.in_row = in_row                     # inside a data function's ROW predicate (no `_db` there)
 
     def _peek(self):
         return self.toks[self.i] if self.i < len(self.toks) else (None, None)
@@ -405,7 +406,8 @@ class _Parser:
                 raise ExprError(f"let: expected a binding name in {self.src!r}")
             self._eat(":=")
             # compile the binding expr in the CURRENT (accumulating) scope
-            sub = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names), self.reads)
+            sub = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names), self.reads,
+                          self.in_row)
             sub.i = self.i
             expr_fn = sub._or()
             self.i = sub.i
@@ -418,7 +420,8 @@ class _Parser:
                 break
             self._eat(",")
         # body compiled in the scope extended with all bound names
-        body_parser = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names), self.reads)
+        body_parser = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names), self.reads,
+                              self.in_row)
         body_parser.i = self.i
         body_fn = body_parser._or()
         self.i = body_parser.i
@@ -444,11 +447,11 @@ class _Parser:
         """Compile a predicate against a PER-ROW scope (scope=None so any $col resolves to the row cell).
         Its fields go to a PRIVATE set: a row column is not a free field of the enclosing hole - they are
         recorded as the function's ROW reads instead."""
-        sub = _Parser(self.toks, self.src, None, set(), reads=self.reads)
+        sub = _Parser(self.toks, self.src, None, set(), reads=self.reads, in_row=True)
         sub.i = self.i
         fn = sub._or()
         self.i = sub.i
-        self.reads.append((name, table, frozenset(sub.free)))
+        self.reads.append((name, table, frozenset(sub.free), self.in_row))
         return fn
 
     def _data_call(self, name):
@@ -460,7 +463,7 @@ class _Parser:
                 self._next()
                 pred = self._pred_in_row_scope(name, table)
             else:
-                self.reads.append((name, table, frozenset()))     # its table, read whole
+                self.reads.append((name, table, frozenset(), self.in_row))     # its table, read whole
             self._eat(")")
             if name == "where":
                 return lambda ctx: data.where(ctx, table, _binder(pred))
@@ -472,7 +475,7 @@ class _Parser:
                 self._next()
                 pred = self._pred_in_row_scope(name, table)
             else:
-                self.reads.append((name, table, frozenset()))     # its table, read whole
+                self.reads.append((name, table, frozenset(), self.in_row))     # its table, read whole
             self._eat(")")
             return lambda ctx: data.count(ctx, table, _binder(pred))
         if name == "unique":
@@ -480,7 +483,7 @@ class _Parser:
             self._eat(",")
             table = self._table_name()
             self._eat(")")
-            self.reads.append((name, table, frozenset({col})))
+            self.reads.append((name, table, frozenset({col}), self.in_row))
             return lambda ctx: data.unique(ctx, col, table)
         if name == "lookup":
             table = self._table_name()
@@ -491,7 +494,7 @@ class _Parser:
             self._eat(",")
             val_col = self._col_word()
             self._eat(")")
-            self.reads.append((name, table, frozenset({key_col, val_col})))
+            self.reads.append((name, table, frozenset({key_col, val_col}), self.in_row))
             return lambda ctx: data.lookup(ctx, table, key_col, key_val(ctx), val_col)
         if name == "node_of":
             bit = self._value()
@@ -540,9 +543,10 @@ def free_paths(text: str):
 @functools.lru_cache(maxsize=4096)
 def row_reads(text: str):
     """What each data function in an expression reads from its TABLE's rows - a tuple of (function,
-    table, column paths): a count / where / first predicate's `$col`s, lookup's key + value columns,
-    unique's column. None when the text does not parse. The template builder warns on a column the
-    table does not have (a predicate reads it as blank)."""
+    table, column paths, in a row predicate): a count / where / first predicate's `$col`s (none - the
+    table read whole - without one), lookup's key + value columns, unique's column; `in a row predicate`
+    = the call sits inside another data function's predicate, whose scope is the ROW alone (no `_db`:
+    it finds no rows). None when the text does not parse. The template builder warns on each."""
     try:
         parser = _Parser(_tokenize(text), text, None)
         parser.parse()

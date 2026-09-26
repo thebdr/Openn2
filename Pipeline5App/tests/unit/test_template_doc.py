@@ -432,6 +432,21 @@ def test_a_quoted_template_with_newline_escapes_is_exact():
        "a completion on line 2")
 
 
+def test_other_line_breaks_are_approximate():
+    """C-025 refute round 4 (F3): the renderer splits a template on EVERY line break (`str.splitlines`:
+    `\\r`, `\\f`, `\\v`, U+2028 ...), the view on `\\n` only - a `\\r` escape's problem landed on the
+    closing quote. Such a scalar is approximate now: its first line, labelled so, no colours."""
+    from pipeline5.language.tempemplator import Problem
+    text = 'hdr: "HEADER\\rX {$nme} END"\nplain: A {$zz}\u2029B\n'
+    doc = td.parse(text)
+    for name, line in (("hdr", 2), ("plain", 1)):
+        entry = doc.entries[name]
+        ok(not entry.body.exact, f"{name}: approximate")
+        spot = td.place(doc, [Problem(name, line, 0, 1, "m", "error")])[0]
+        eq(spot.label, f"{name} line {line} (approximate)", f"{name}: labelled so")
+    eq(_tagged(doc, "tx_field"), [], "no template colours at offsets that do not hold")
+
+
 def test_a_reload_discards_the_build_it_overtook():
     """C-025 refute round 2 (#8): a Reload during an in-flight build KEPT the stale build (the builder
     then showed 1 signal row while the documents had 5). The Session numbers its builds: one started
@@ -474,6 +489,31 @@ def test_a_reload_discards_the_build_it_overtook():
     release.set()
     worker.join(10)
     eq(session.row_count(session.rules[0], templates), 2, "a view over the overtaken build is not cached either")
+    import sys                                                # C-025 refute round 4 (F5): a reload landing
+    release.set()                                             # right after view()'s generation check
+
+    class ReloadAfterTheCheck:
+        """The Session's lock, reloading on the SECOND release inside one view() call - after its check."""
+        def __init__(self, target):
+            self.real, self.target, self.count, self.armed = threading.Lock(), target, 0, True
+
+        def __enter__(self):
+            self.real.acquire()
+
+        def __exit__(self, *exc):
+            self.real.release()
+            if self.armed and sys._getframe(1).f_code.co_name == "view":
+                self.count += 1
+                if self.count == 2:
+                    self.armed = False
+                    self.target.reload()
+    session = td.Session(None, rows=rules, hooks={"after_300": loader}, params={})
+    session.base("after_300")                                 # built - view() takes the lock twice
+    session._lock = ReloadAfterTheCheck(session)
+    session.row_count(session.rules[0], templates)
+    ok(not session._lock.armed, "(the reload landed inside view())")
+    count = session.row_count(session.rules[0], templates)
+    eq(count, len(session.base("after_300")["src"]), "the reload's fresh build - nothing stale cached")
 
 
 if __name__ == "__main__":
@@ -494,4 +534,5 @@ if __name__ == "__main__":
         ("the_dry_settle_writes_nothing", test_the_dry_settle_writes_nothing),
         ("a_quoted_template_with_newline_escapes_is_exact", test_a_quoted_template_with_newline_escapes_is_exact),
         ("a_reload_discards_the_build_it_overtook", test_a_reload_discards_the_build_it_overtook),
+        ("other_line_breaks_are_approximate", test_other_line_breaks_are_approximate),
     ]))
