@@ -608,6 +608,13 @@ def test_windows_refused_path_characters_are_judged_before_the_write():
                 ok(f"{bad!r} is not allowed in a Windows path" in findings[0].detail, findings[0].detail)
                 eq(os.listdir(os.path.join(out_root, "scl")), ["A1.scl"], f"{bad!r}: only the row before it written")
                 eq(_log(database), [("after_300", "r1", 3, 1, "rx_file_write")], f"{bad!r}: the audit")
+        with tempfile.TemporaryDirectory() as out_root:              # in a DIRECTORY name: refused before the
+            _, findings = engine.fire("after_300", _db(),            # makedirs that would fail unnamed
+                                      rules=[_rule(action="file", target="r<x/{$name}.scl", template="txt")],
+                                      templates={"txt": "x"}, params={}, files_root=out_root)
+            eq([(x.type, x.location) for x in findings], [("rx_file_write", "r1")], "a directory's '<'")
+            ok("'<' is not allowed in a Windows path" in findings[0].detail, findings[0].detail)
+            eq(os.listdir(out_root), [], "…no directory made, nothing written")
     _sandboxed(body)()
 
 
@@ -623,7 +630,13 @@ def test_a_dry_fire_is_the_fire_minus_the_write():
                      _rule(name="abs", fire_when="before_300", source_table="", condition="", action="file",
                            target=absolute, template="txt"),
                      _rule(name="bad", fire_when="before_300", source_table="src", condition="", action="file",
-                           target="rx/bad.txt", template="txt")]
+                           target="rx/bad.txt", template="txt"),
+                     _rule(name="drv", fire_when="before_300", source_table="", condition="", action="file",
+                           target="X:1.txt", template="txt")]
+            if os.name == "nt":                               # refused before the write - by the guard itself
+                rules += [_rule(name=name, fire_when="before_300", source_table="", condition="", action="file",
+                                target=target, template="txt")
+                          for name, target in (("q", "rx/bad?.txt"), ("lt", "r<x/ok.txt"))]
             templates = {"txt": "line one\nline two {$_rule.name}"}
             dry, dry_findings = engine.fire("before_300", None, rules=rules, templates=templates, params={},
                                             files_root=out_root, write=False)
@@ -631,8 +644,14 @@ def test_a_dry_fire_is_the_fire_minus_the_write():
             real, real_findings = engine.fire("before_300", None, rules=rules, templates=templates, params={},
                                               files_root=out_root)
             eq(dry.log_rows, real.log_rows, "the same audit rows (created counted as written)")
+            refused = [("q", 0, "rx_file_write"), ("lt", 0, "rx_file_write")] if os.name == "nt" else []
             eq([(r["rule"], r["created"], r["outcome"]) for r in dry.log_rows],
-               [("rel", 2, "ok"), ("abs", 2, "ok"), ("bad", 0, "rx_unknown_table")], "…as the real fire's")
+               [("rel", 2, "ok"), ("abs", 2, "ok"), ("bad", 0, "rx_unknown_table"), ("drv", 0, "rx_file_write")]
+               + refused, "…as the real fire's - a target the fire refuses too, refused by the dry fire")
+            if os.name == "nt":
+                details = {f.location: f.detail for f in dry_findings}
+                ok("'?' is not allowed in a Windows path" in details["q"]
+                   and "'<' is not allowed in a Windows path" in details["lt"], f"…named, before any write: {details}")
             eq([(f.type, f.detail) for f in dry_findings], [(f.type, f.detail) for f in real_findings], "the same findings")
             ok(os.path.exists(os.path.join(out_root, "rx", "rel.txt")) and os.path.exists(absolute),
                "(the real fire writes both)")

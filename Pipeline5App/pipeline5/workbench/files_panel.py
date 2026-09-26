@@ -41,6 +41,7 @@ class FilesPanel(ttk.Frame):
         self._textw: tk.Text | None = None
         self._template = None             # the TemplateMode of a shown templates.yaml (P-012)
         self._text_editable = False       # the shown text pane accepts edits (drives the dirty guard)
+        self._text_dirty = False          # the shown text pane carries unsaved edits (Tk's flag is re-armed)
         self._csv_dirty = False           # the shown CSV grid carries unsaved cell edits
         self._reselecting = False         # ignore the selection event our own dirty-guard rollback fires
         self._obj_mode = False            # the yaml/json Text ⇄ Object toggle (remembered per session)
@@ -141,7 +142,7 @@ class FilesPanel(ttk.Frame):
         if self._csv_dirty:
             return True
         return (self._text_editable and self._textw is not None
-                and self._textw.winfo_exists() and bool(self._textw.edit_modified()))
+                and self._textw.winfo_exists() and self._text_dirty)
 
     # --- dispatch + viewers --------------------------------------------------------------------- #
     def _load(self, path: str) -> None:
@@ -168,6 +169,7 @@ class FilesPanel(ttk.Frame):
         self._textw = None
         self._template = None
         self._text_editable = False
+        self._text_dirty = False
         self._csv_dirty = False
         for w in self.editor.winfo_children():
             w.destroy()
@@ -399,6 +401,7 @@ class FilesPanel(ttk.Frame):
         hl_job = [None]
 
         def set_dirty(flag: bool):
+            self._text_dirty = flag
             dirty_lbl.configure(text="● modified" if flag else "")
             save_btn.configure(state="normal" if flag else "disabled")
 
@@ -410,7 +413,8 @@ class FilesPanel(ttk.Frame):
 
         def on_modified(_event=None):
             if text.edit_modified():
-                set_dirty(True)
+                text.edit_modified(False)         # re-armed: Tk raises <<Modified>> as the flag FLIPS, so
+                set_dirty(True)                   # left set, the edits after the first went unseen
                 if self._template is not None:    # the template mode debounces its own refresh
                     self._template.schedule()
                 elif kind[0]:                     # debounce the re-highlight while typing

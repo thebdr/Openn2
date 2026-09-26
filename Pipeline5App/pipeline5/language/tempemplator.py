@@ -552,7 +552,7 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None) -> 
                 path = next(iter(paths))
                 if expression.strip() == "$" + path and path in json:   # the value IS a JSON list / object
                     issues.append((end - 1 - len(spec), end - 1, f"a format spec on a JSON (list / object) "
-                                   f"value fails on every non-blank row: ${path}:{spec}", "warning"))
+                                   f"value fails on the rows that hold one: ${path}:{spec}", "warning"))
             issues.extend((s, e, message, "warning") for s, e, message in _row_read_problems(
                 text, start, end, expression, tables) if (s, e, message, "warning") not in issues)
             for path in sorted(paths):
@@ -572,12 +572,16 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None) -> 
 
 def _row_read_problems(text: str, start: int, end: int, expression: str, tables) -> list:
     """(start, end, message) for each column a data function reads from its table's rows (a predicate's
-    `$col`, lookup / unique's column word) that the table does not have - it reads blank there."""
+    `$col`, lookup / unique's column word) that the table does not have - it reads blank there - and for a
+    table the hook does not have at all (the function finds no rows: 0 / blank)."""
     out = []
     for function, table, columns in (row_reads(expression) or ()) if tables else ():
         known = tables.get(table)
         if known is None:
-            continue                                        # an unknown table is judged elsewhere
+            found = re.compile(r"\b" + re.escape(table) + r"\b").search(text, start, end)
+            s, e = (found.start(), found.end()) if found else (start, end)
+            out.append((s, e, f"{table!r} is not a table at this hook - {function}() finds no rows (0 / blank)"))
+            continue
         for column in sorted(columns):
             head = column.split(".", 1)[0]
             if head not in known:

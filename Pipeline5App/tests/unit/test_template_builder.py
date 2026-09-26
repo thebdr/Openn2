@@ -467,6 +467,43 @@ def test_windows_refused_target_characters():
     _sandboxed(body)
 
 
+def test_drive_targets_are_the_fires_to_judge():
+    """C-025 refute round 3 (F2, F3): a literal drive followed by a HOLE (`C:{$_params.dir}/x.txt`) and an
+    extended-length `\\\\?\\C:\\...` target linted as refused while the fire writes both - the builder
+    rejected what the fire accepts. The lint skips a drive's own characters and leaves a drive a hole
+    completes to the fire, row by row; a drive-relative literal (`X:1.txt`) is still refused."""
+    if os.name != "nt":
+        return                                                # no drive letters elsewhere
+    templates = {"txt": "x"}
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            drive, rest = os.path.splitdrive(out)
+            params = {"dir": rest.replace("\\", "/"), "drive": drive[0], "rel": "out/x.txt"}
+            for target in (drive[0] + ":{$_params.dir}/x1.txt", "{$_params.drive}:{$_params.dir}/x2.txt",
+                           "\\\\?\\" + out + "\\ext.txt"):
+                rule = _rule(action="file", target=target, template="txt")
+                eq([p.message for p in engine.lint(templates, rule, _database()) if p.template is None], [],
+                   f"{target!r}: no lint error")
+                shown = engine.preview(rule, 0, templates=templates, params=params, database=_database(), files_root=out)
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
+                                          files_root=out)
+                eq((shown.problem, findings), (None, []), f"{target!r}: the preview and the fire accept it")
+            eq(sorted(os.listdir(out)), ["ext.txt", "x1.txt", "x2.txt"], "…the fire wrote each")
+            rule = _rule(action="file", target=drive[0] + ":{$_params.rel}", template="txt")
+            eq([p for p in engine.lint(templates, rule, _database()) if p.template is None], [],
+               "a drive a hole completes: the fire's to judge")
+            shown = engine.preview(rule, 0, templates=templates, params=params, database=_database(), files_root=out)
+            _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
+                                      files_root=out)
+            eq(shown.problem, (findings[0].type, findings[0].detail),
+               "…a row it renders drive-relative is refused by the fire, and its preview says so")
+            flagged = engine.lint(templates, _rule(action="file", target="X:1.txt", template="txt"), _database())
+            eq([(p.where, p.start) for p in flagged if p.template is None], [("target", 1)],
+               "a drive-relative literal is still refused")
+    _sandboxed(body)
+
+
 def test_a_data_functions_row_reads_are_judged():
     """C-025 refute round 2 (#5): a data function reads ITS table's rows - a predicate's `$col`,
     lookup's / unique's column words - and a column the table does not have reads BLANK (count() then
@@ -490,6 +527,14 @@ def test_a_data_functions_row_reads_are_judged():
        "…inside a `where` predicate and a range end too")
     ctx = {"cabinet_id": "C1", "_db": {"signals": [{"uid": "u", "mnemonic": "M", "script_type": "A"}]}}
     eq(expr.evaluate('count(signals, $cabinet_id = "C1")', ctx), 0.0, "(what the fire computes: nothing matches)")
+    body = '{count(signalz, $script_type = "PEC")} {lookup(signalz, tag, "P1", script_type)} {count(signalz)}'
+    found = lint({"t": body}, start="t", fields=fields, tables=tables)
+    eq(sorted((p.start, p.severity) for p in found),
+       [(body.index("signalz", body.index(hole)), "warning") for hole in ("{count(signalz, $", "{lookup(", "{count(signalz)}")],
+       "a table the hook does not have - each function over it, warned (C-025 refute round 3, F5)")
+    ok(all("'signalz' is not a table at this hook" in p.message for p in found), [p.message for p in found])
+    eq((expr.evaluate('count(signalz, $script_type = "PEC")', ctx), expr.evaluate("count(signalz)", ctx)), (0.0, 0.0),
+       "(what the fire computes: nothing, silently)")
     database = _database()
     database.add_table(Table("signals", columns=tables["signals"]))
     rows = engine.lint({"rows": [{"n": '{count(signals, $cabinet_id = "C1")}'}]}, _rule(), database)
@@ -511,13 +556,20 @@ def test_format_specs_know_the_values_type():
     ok(all("JSON" in p.message for p in found), [p.message for p in found])
     eq(lint_line("{count(t):,.1} {count(t):03d}"), [], "specs a float / an int satisfies")
     eq(render_text("{count(t):,.1}", {"_db": {"t": [{}, {}]}}), "2e+00", "(it renders)")
-    database = Database([Table("src", columns=["uid", "kind", "name", "j"], json_columns=["j"], key_columns=["name"]),
+    database = Database([Table("src", columns=["uid", "kind", "name", "j", "im"], json_columns=["j", "im"],
+                               key_columns=["name"]),
                          Table("dst", columns=["uid", "label"])])
-    database["src"].add(kind="door", name="D1", j=[1, 2])
+    database["src"].add(kind="door", name="D1", j=[1, 2], im="01|02")
     rule = _rule(action="file", target="o.txt", template="m")
     found = engine.lint({"m": "{$j:>5}"}, rule, database)
     ok(any(p.template == "m" and p.severity == "warning" and "JSON" in p.message for p in found),
        f"the engine carries the rule's JSON columns ({found})")
+    eq([p for p in engine.lint({"m": "{$im:>8}"}, rule, database) if p.template == "m"], [],
+       "a declared JSON column that HOLDS text is text (C-025 refute round 3, F4 - a staged I/O-List cell)")
+    with tempfile.TemporaryDirectory() as out:
+        shown = engine.preview(_rule(action="file", target="o.txt", template="m"), 0, templates={"m": "{$im:>8}"},
+                               params={}, database=database, files_root=out)
+        eq((shown.problem, shown.text), (None, "   01|02"), "…and it renders")
 
     def fired():
         with tempfile.TemporaryDirectory() as out:
@@ -547,6 +599,7 @@ if __name__ == "__main__":
         ("has_business_mirrors_the_fires_no_op", test_has_business_mirrors_the_fires_no_op),
         ("preview_sees_the_in_hook_cascade", test_preview_sees_the_in_hook_cascade),
         ("windows_refused_target_characters", test_windows_refused_target_characters),
+        ("drive_targets_are_the_fires_to_judge", test_drive_targets_are_the_fires_to_judge),
         ("a_data_functions_row_reads_are_judged", test_a_data_functions_row_reads_are_judged),
         ("format_specs_know_the_values_type", test_format_specs_know_the_values_type),
     ]))

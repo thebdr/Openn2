@@ -244,6 +244,21 @@ def _gated(database, findings, leg: str):
     return database
 
 
+def _reactions_dropped(deferred) -> bool:
+    """Whether skipping the reactions drops any work: a deferred before_300 firing, or after_300 business
+    (a rule for it, a rule-index problem - an unreadable rule index included). None - the engine dark,
+    as shipped - and the skip is silent."""
+    from pipeline5 import config
+    from pipeline5.phases.chain_reactions import engine
+    if deferred is not None:
+        return True
+    try:
+        rows = config.load_reactions()
+    except Exception:  # noqa: BLE001 - an unreadable rule index is every hook's business
+        return True
+    return engine.has_business("after_300", rows, _REACTION_HOOKS)
+
+
 def _staged_database(system):
     """The Database `after_300` gets on a full staging (the 300 / 320 buttons, Run-all): STAGING ITSELF,
     run in memory over the current source documents - nothing saved - through the run-plan's own gate
@@ -315,8 +330,9 @@ def run_staging(ctx, only=None):
         for row in getattr(deferred, "log_rows", ()):
             ctx.emit("INFO", f"  before_300 reaction {row['rule']}: {row['outcome']} "
                              f"({row['created']} created) - not recorded, a raw FAIL")
-        ctx.emit("WARN", "  after_300 reactions: a blocking staging finding is downgraded in the registry, but "
-                         "the reactions never run on a raw FAIL - fix it")
+        if _reactions_dropped(deferred):              # the engine dark (no rules): nothing to say
+            ctx.emit("WARN", "  after_300 reactions: a blocking staging finding is downgraded in the registry, "
+                             "but the reactions never run on a raw FAIL - fix it")
     else:
         settled = reactions.settle(database, deferred)   # before_300's audit + findings join the staged record
         if settled:                                   # (a record that cannot load/save is reported)

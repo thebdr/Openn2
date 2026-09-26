@@ -12,6 +12,7 @@ from pipeline5.systems import catalog
 from pipeline5.truth.database import Database
 from pipeline5.truth.table import Table
 from pipeline5.workbench import files_view, template_doc
+from tkinter import ttk
 
 SYSTEM = catalog.by_id("siemens_s7_safety")
 _SHIPPED = os.path.join(SYSTEM.config_root, "chain_reactions", "templates.yaml")
@@ -67,6 +68,8 @@ def _pump(root, done, timeout: float = 10.0) -> bool:
 
 
 def _tk():
+    import gc
+    gc.collect()                                             # an earlier test's Tk garbage - freed HERE
     try:
         import tkinter as tk
         root = tk.Tk()
@@ -75,6 +78,19 @@ def _tk():
         return None
     root.geometry("1000x700+-3000+-3000")                  # mapped (bbox works) but off-screen
     return root
+
+
+def _done(root) -> None:
+    """End a test's Tk root: destroy it, then wait for its template-builder workers to end (each gets
+    its stop at the text's <Destroy>). This suite makes one root per test in ONE process: a worker
+    outliving its test could trigger the cyclic GC that frees an old root's LAST Tk object on that
+    worker thread - and Tcl aborts ('Tcl_AsyncDelete: async handler deleted by the wrong thread'). The
+    App has one root for its life, so it never frees one mid-run."""
+    import threading
+    root.destroy()
+    for thread in threading.enumerate():
+        if thread.name == "template-builder":
+            thread.join(10)
 
 
 def _panel(root, project_root):
@@ -188,7 +204,49 @@ def test_template_mode_in_the_files_panel():
     finally:
         template_doc.Session = _REAL_SESSION
         config.use_project(None)
-        root.destroy()
+        _done(root)
+
+
+def test_every_edit_reaches_the_template_mode():
+    """C-025 refute round 3 (F1, HIGH): Tk raised <<Modified>> as the text's modified flag FLIPPED, and the
+    Files tab never re-armed it - after the FIRST edit the template mode never re-checked: its problems,
+    squiggles and preview showed the old text while a fire rejects the new. Two real edits through the
+    panel now - no hand-called refresh or schedule - each is re-checked; the unsaved-changes guard and
+    Save still hold."""
+    root = _tk()
+    if root is None:
+        return
+    template_doc.Session = _session
+    try:
+        with tempfile.TemporaryDirectory() as project:
+            path = _project(project)
+            config.use_project(project)
+            panel = _panel(root, project)
+            panel._load(path)
+            mode, text = panel._template, panel._textw
+            mode.rule_box.current(1)
+            mode.on_rule()
+            ok(_pump(root, lambda: mode.preview.get("1.0", "end-1c").startswith("APPEND")), "the rule's preview")
+            ok(not panel._unsaved_changes(), "freshly loaded: clean")
+            text.insert("6.0", "  ")                          # edit 1 - harmless
+            _pump(root, lambda: False, 0.6)
+            ok(panel._unsaved_changes(), "an edit is an unsaved change")
+            text.insert("4.0", "  X {$r.tagg}\n")             # edit 2 - a loop-column typo
+            ok(_pump(root, lambda: _problem_rows(mode, "tagg")), "the SECOND edit is re-checked")
+            eq(_tagged(text, "tp_error"), ["$r.tagg"], "…its squiggle")
+            ok("tagg" in mode.preview.get("1.0", "end-1c"), "…and the preview says the fire's finding")
+            text.delete("4.0", "5.0")                           # edit 3 - the typo gone again
+            ok(_pump(root, lambda: not _problem_rows(mode, "tagg")), "the THIRD edit is re-checked too")
+            save = [w for w in _widgets(panel.editor, ttk.Button) if w.cget("text").startswith("Save")]
+            save[0].invoke()
+            root.update()
+            ok(not panel._unsaved_changes(), "saved: clean")
+            with open(path, encoding="utf-8") as handle:
+                eq(handle.read(), text.get("1.0", "end-1c"), "…the file is the text")
+    finally:
+        template_doc.Session = _REAL_SESSION
+        config.use_project(None)
+        _done(root)
 
 
 def test_the_session_works_off_the_tk_thread():
@@ -284,7 +342,7 @@ def test_the_session_works_off_the_tk_thread():
     finally:
         template_doc.Session = _REAL_SESSION
         config.use_project(None)
-        root.destroy()
+        _done(root)
 
 
 def test_only_the_newest_result_for_the_text_as_it_is_applies():
@@ -297,13 +355,14 @@ def test_only_the_newest_result_for_the_text_as_it_is_applies():
     root = _tk()
     if root is None:
         return
-    permits, held = threading.Semaphore(0), [False]
+    permits, held, inside = threading.Semaphore(0), [False], threading.Event()
 
     def instrumented(path=None):
         session = _session(path)
 
         def check(*args, _real=session.check, **kwargs):
             if held[0]:
+                inside.set()                                 # the test knows the worker is here
                 permits.acquire(timeout=10)
             return _real(*args, **kwargs)
         session.check = check
@@ -324,7 +383,9 @@ def test_only_the_newest_result_for_the_text_as_it_is_applies():
             applied, apply = [], mode._apply
             mode._apply = lambda result: (applied.append(result[1]), apply(result))
             held[0] = True
+            inside.clear()
             mode.refresh()                                   # the worker is held inside its check…
+            ok(inside.wait(5), "the worker is inside the older request's check")
             mode.refresh()                                   # …a newer request queued behind it
             permits.release()                                # only the OLDER one completes
             _pump(root, lambda: False, 0.5)
@@ -332,8 +393,10 @@ def test_only_the_newest_result_for_the_text_as_it_is_applies():
             permits.release()
             ok(_pump(root, lambda: applied == [mode._request]), f"…the newest one applies ({applied})")
             template_mode._DEBOUNCE_MS = 5000                # the edit's own refresh must not come first
+            inside.clear()
             mode.refresh()
             sent = mode._request
+            ok(inside.wait(5), "the worker is inside that request's check")
             mode.schedule()                                  # the text is edited after that request was sent
             permits.release()
             _pump(root, lambda: False, 0.5)
@@ -348,7 +411,7 @@ def test_only_the_newest_result_for_the_text_as_it_is_applies():
             permits.release()
         template_doc.Session = _REAL_SESSION
         config.use_project(None)
-        root.destroy()
+        _done(root)
 
 
 def test_the_shipped_file_is_read_only_until_copied():
@@ -375,7 +438,7 @@ def test_the_shipped_file_is_read_only_until_copied():
             eq(str(panel._textw.cget("state")), "normal", "…editable")
     finally:
         config.use_project(None)
-        root.destroy()
+        _done(root)
 
 
 def _widgets(widget, kind) -> list:
@@ -425,7 +488,7 @@ def test_every_viewer_keeps_the_shipped_config_read_only():
             eq(len(_widgets(panel.editor, object_editor.ObjectEditor)), 1, "a project yaml keeps the preference")
     finally:
         config.use_project(None)
-        root.destroy()
+        _done(root)
 
 
 if __name__ == "__main__":
@@ -433,6 +496,7 @@ if __name__ == "__main__":
     sys.exit(run("gui_template_mode", [
         ("project_copy_helpers", test_project_copy_helpers),
         ("template_mode_in_the_files_panel", test_template_mode_in_the_files_panel),
+        ("every_edit_reaches_the_template_mode", test_every_edit_reaches_the_template_mode),
         ("the_session_works_off_the_tk_thread", test_the_session_works_off_the_tk_thread),
         ("only_the_newest_result_for_the_text_as_it_is_applies",
          test_only_the_newest_result_for_the_text_as_it_is_applies),

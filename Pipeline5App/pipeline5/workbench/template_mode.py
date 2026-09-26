@@ -34,6 +34,42 @@ _SQUIGGLES = {"error": ("tp_error", "#ff6b6b", "#d63031"), "warning": ("tp_warni
 _TRIGGERS = "$@._{"                                # besides letters/digits, the chars that complete
 
 
+def _work(jobs: queue.Queue, results: queue.Queue, session) -> None:
+    """The worker: the Session's work happens here, one batch at a time - a pending reload first, then
+    only the NEWEST check (an older one - or one requested before that reload - is skipped). Results go
+    back through `results`. A module-level function over the queues + the Session ONLY: it must hold no
+    Tk object - one released last on this thread would take the Tcl interpreter down with it."""
+    while True:
+        pending = [jobs.get()]
+        while True:
+            try:
+                pending.append(jobs.get_nowait())
+            except queue.Empty:
+                break
+        if None in pending:
+            return
+        reloads = [job for job in pending if job[0] == "reload"]
+        after = reloads[-1][1] if reloads else 0
+        checks = [job for job in pending if job[0] == "check" and job[1] > after]
+        if reloads:
+            _kind, number, chosen = reloads[-1]
+            try:
+                session.reload()
+                results.put(("labels", number, session.rule_labels(), chosen, None))
+            except Exception as error:  # noqa: BLE001
+                results.put(("labels", number, None, chosen, error))
+        if checks:
+            _kind, number, doc, rule, row = checks[-1]
+            try:
+                placed = session.check(doc, rule)
+                count = session.row_count(rule, doc.templates) if rule is not None else 0
+                shown = session.preview_text(doc, rule, row)
+                context = session.context(rule, doc.templates)
+                results.put(("check", number, (placed, count, shown, context), None, None))
+            except Exception as error:  # noqa: BLE001 - a builder defect is shown, never raised
+                results.put(("check", number, None, None, error))
+
+
 class TemplateMode:
     def __init__(self, text: tk.Text, bar, lower, *, mode: str = "dark", session=None, path=None):
         self.text, self.mode = text, mode
@@ -86,7 +122,8 @@ class TemplateMode:
         self.popup = CompletionPopup(text, mode, on_accept=self.schedule)
         text.bind("<KeyRelease>", self._on_key, "+")
         text.bind("<Destroy>", self._on_destroy, "+")
-        threading.Thread(target=self._work, daemon=True, name="template-builder").start()
+        threading.Thread(target=_work, args=(self._jobs, self._results, self.session), daemon=True,
+                         name="template-builder").start()     # (it holds no Tk object - see _work)
         self._poll_job = self.text.after(_POLL_MS, self._poll)
         self.on_rule()
 
@@ -148,40 +185,6 @@ class TemplateMode:
         if rule is not None and not self.session.loaded(rule.fire_when):
             self._show_preview(f"building the Database the {rule.fire_when} fire gets (staging in memory, "
                                "nothing saved) - the rule's checks and preview follow...")
-
-    def _work(self) -> None:
-        """The worker: the Session's work happens here, one batch at a time - a pending reload first,
-        then only the NEWEST check (an older one - or one requested before that reload - is skipped).
-        Results go back through `_results`."""
-        while True:
-            pending = [self._jobs.get()]
-            while True:
-                try:
-                    pending.append(self._jobs.get_nowait())
-                except queue.Empty:
-                    break
-            if None in pending:
-                return
-            reloads = [job for job in pending if job[0] == "reload"]
-            after = reloads[-1][1] if reloads else 0
-            checks = [job for job in pending if job[0] == "check" and job[1] > after]
-            if reloads:
-                _kind, number, chosen = reloads[-1]
-                try:
-                    self.session.reload()
-                    self._results.put(("labels", number, self.session.rule_labels(), chosen, None))
-                except Exception as error:  # noqa: BLE001
-                    self._results.put(("labels", number, None, chosen, error))
-            if checks:
-                _kind, number, doc, rule, row = checks[-1]
-                try:
-                    placed = self.session.check(doc, rule)
-                    count = self.session.row_count(rule, doc.templates) if rule is not None else 0
-                    shown = self.session.preview_text(doc, rule, row)
-                    context = self.session.context(rule, doc.templates)
-                    self._results.put(("check", number, (placed, count, shown, context), None, None))
-                except Exception as error:  # noqa: BLE001 - a builder defect is shown, never raised
-                    self._results.put(("check", number, None, None, error))
 
     def _poll(self) -> None:
         self._poll_job = None

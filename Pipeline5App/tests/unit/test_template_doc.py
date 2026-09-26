@@ -412,6 +412,26 @@ def test_the_dry_settle_writes_nothing():
             config.database_dir, config.output_root = original_dir, original_out
 
 
+def test_a_quoted_template_with_newline_escapes_is_exact():
+    """C-025 refute round 3 (F6): a double-quoted text template's `\\n` escapes are value LINES on one
+    document line - `offset` ignored the line for a character-mapped scalar, so line 2's squiggle, colours
+    and completions landed on line 1's characters. They map through the decoded value now - an escape
+    earlier on the same line (`\\"`) included."""
+    from pipeline5.language.tempemplator import Problem
+    text = 'hdr: "HEADER {$_rule.hook}\\nL2 \\"x\\" {$nme} END"\n'
+    doc = td.parse(text)
+    body = doc.entries["hdr"]
+    eq(body.text, 'HEADER {$_rule.hook}\nL2 "x" {$nme} END', "the value: two lines")
+    ok(body.body.exact and body.body.chars is not None, "exact, character-mapped")
+    column = 'L2 "x" {$nme} END'.index("$nme")
+    spot = td.place(doc, [Problem("hdr", 2, column, column + 4, "m", "error")])[0]
+    eq((doc.text[spot.start:spot.end], spot.label), ("$nme", "hdr line 2"), "line 2's problem on its culprit")
+    eq(sorted(_tagged(doc, "tx_field")), ["$_rule.hook", "$nme"], "the template colours on their holes")
+    at = text.index("{$n") + 3
+    eq(td.completions(doc, at, td.Context(fields=frozenset({"name", "_params", "_rule", "_db"})))[1], ["$name"],
+       "a completion on line 2")
+
+
 def test_a_reload_discards_the_build_it_overtook():
     """C-025 refute round 2 (#8): a Reload during an in-flight build KEPT the stale build (the builder
     then showed 1 signal row while the documents had 5). The Session numbers its builds: one started
@@ -442,6 +462,18 @@ def test_a_reload_discards_the_build_it_overtook():
     ok(not session.loaded("after_300"), "the build the reload overtook is not kept")
     eq(len(session.base("after_300")["src"]), 2, "the next question rebuilds")
     eq(built, [1, 2], "…once more")
+    entered.clear()                                           # C-025 refute round 3 (F8): the same, through
+    release.clear()                                           # a VIEW - it was cached over the stale build
+    del built[:]
+    session = td.Session(None, rows=rules, hooks={"after_300": loader}, params={})
+    templates = {"t": "row {$name}"}
+    worker = threading.Thread(target=session.row_count, args=(session.rules[0], templates))
+    worker.start()
+    ok(entered.wait(10), "a view's build is in flight")
+    session.reload()
+    release.set()
+    worker.join(10)
+    eq(session.row_count(session.rules[0], templates), 2, "a view over the overtaken build is not cached either")
 
 
 if __name__ == "__main__":
@@ -460,5 +492,6 @@ if __name__ == "__main__":
          test_a_data_functions_predicate_completes_its_tables_columns),
         ("unreadable_params_block_as_the_fire_blocks", test_unreadable_params_block_as_the_fire_blocks),
         ("the_dry_settle_writes_nothing", test_the_dry_settle_writes_nothing),
+        ("a_quoted_template_with_newline_escapes_is_exact", test_a_quoted_template_with_newline_escapes_is_exact),
         ("a_reload_discards_the_build_it_overtook", test_a_reload_discards_the_build_it_overtook),
     ]))

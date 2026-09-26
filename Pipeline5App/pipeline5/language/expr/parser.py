@@ -459,6 +459,8 @@ class _Parser:
             if self._peek()[1] == ",":
                 self._next()
                 pred = self._pred_in_row_scope(name, table)
+            else:
+                self.reads.append((name, table, frozenset()))     # its table, read whole
             self._eat(")")
             if name == "where":
                 return lambda ctx: data.where(ctx, table, _binder(pred))
@@ -469,6 +471,8 @@ class _Parser:
             if self._peek()[1] == ",":
                 self._next()
                 pred = self._pred_in_row_scope(name, table)
+            else:
+                self.reads.append((name, table, frozenset()))     # its table, read whole
             self._eat(")")
             return lambda ctx: data.count(ctx, table, _binder(pred))
         if name == "unique":

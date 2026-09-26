@@ -68,6 +68,7 @@ class Scalar:
     starts: list
     exact: bool = True
     chars: list | None = None
+    value: str = ""                             # the decoded value - a chars scalar's lines map through it
 
     def first_line(self, text: str) -> tuple:
         """(start, end) of the scalar's first document line - where an APPROXIMATE position is shown."""
@@ -77,8 +78,9 @@ class Scalar:
 
     def offset(self, line: int, column: int) -> int:
         """(0-based content line, column) -> the document offset."""
-        if self.chars is not None:
-            return self.chars[max(0, min(column, len(self.chars) - 1))]
+        if self.chars is not None:                  # a quoted scalar: its `\n` escapes are value lines
+            index = sum(len(piece) + 1 for piece in self.value.split("\n")[:line]) + max(0, column)
+            return self.chars[max(0, min(index, len(self.chars) - 1))]
         return self.starts[max(0, min(line, len(self.starts) - 1))] + max(0, column)
 
     def at(self, index: int, value: str) -> int:
@@ -294,7 +296,7 @@ def _scalar(text: str, starts: list, line: int, col: int, value: str) -> Scalar:
         return Scalar(lines, exact=lead == "|")
     if lead in ("'", '"'):
         chars = _quoted_chars(text, at, value)
-        return Scalar([at + 1], exact=chars is not None, chars=chars)
+        return Scalar([at + 1], exact=chars is not None, chars=chars, value=value)
     return Scalar([at], exact=text.startswith(value, at))
 
 
@@ -450,7 +452,15 @@ def _locate(doc: Doc, at: int):
     a column -> document offset map) - None outside every template. A quoted row value maps through
     its decoded characters (an escape is two document characters for one value character)."""
     for entry in doc.entries.values():
-        if entry.kind == "text" and entry.body is not None:
+        if entry.kind == "text" and entry.body is not None and entry.body.chars is not None:
+            chars = entry.body.chars                  # a quoted template: the cursor maps through its chars
+            if chars[0] <= at <= chars[-1]:
+                index = max(i for i, offset in enumerate(chars) if offset <= at)
+                number = entry.text.count("\n", 0, index)
+                begin = entry.text.rfind("\n", 0, index) + 1
+                return entry, number, entry.text.split("\n")[number], index - begin, \
+                    (lambda i, c=chars, b=begin: c[max(0, min(b + i, len(c) - 1))])
+        elif entry.kind == "text" and entry.body is not None:
             for number, line in enumerate(entry.text.split("\n")):
                 start = entry.body.offset(number, 0)
                 if start <= at <= start + len(line):
@@ -778,6 +788,8 @@ class Session:
         the earlier rules' in-hook spawns (3) - and its `_db` layer); cached per (hook, leg, the
         templates those earlier rules render)."""
         from pipeline5.phases.chain_reactions import engine
+        with self._lock:
+            generation = self.generation
         base = self.base(rule.fire_when, leg)
         pending = self._pending(rule.fire_when) if base is not None else []
         index = self.rules.index(rule)
@@ -800,9 +812,13 @@ class Session:
             if not self.params_problem:                   # (unreadable params block every rule: no spawns)
                 database, _problems = engine.cascade(self.rules, rule, database, templates=templates,
                                                      params=self.params)
+            view = (database, engine.db_layer(database))
+            with self._lock:
+                if generation != self.generation:         # reloaded meanwhile: over a stale build - never cached
+                    return view
             while len(self._views) >= _VIEW_CACHE:
                 self._views.pop(next(iter(self._views)))
-            self._views[key] = (database, engine.db_layer(database))
+            self._views[key] = view
         return self._views[key]
 
     # --- the view's questions -------------------------------------------------------------------------- #
@@ -830,7 +846,11 @@ class Session:
         """The completion context for `rule` (None: the document alone)."""
         if rule is None:
             return Context(params=self.params)
-        database, _layer = self.view(rule, templates)
+        leg = None
+        if self.halt(rule.fire_when):                     # the main leg stops: a leg that fires names it
+            leg = next((name for name in self.legs.get(rule.fire_when, {}) if not self.halt(rule.fire_when, name)),
+                       None)
+        database, _layer = self.view(rule, templates, leg)
         tables = {} if database is None else {n: database[n].effective_columns() for n in database.names()}
         fields = None
         if not rule.source_table or rule.source_table in tables:

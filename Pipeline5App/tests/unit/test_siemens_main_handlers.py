@@ -602,6 +602,7 @@ def test_the_builder_gates_as_the_run_plan_does():
                     placed = session.check(doc, rule)
                     shown = session.preview_text(doc, rule, 0)
                     typo_placed = session.check(doc, typo)
+                    context = session.context(typo, doc.templates)
                     host = _Host()
                     SYSTEM.handlers["staging"](host.ctx())
                     path = os.path.join(config.output_root(), "rx", "sig.txt")
@@ -627,6 +628,8 @@ def test_the_builder_gates_as_the_run_plan_does():
                 eq([(p.severity, p.message.split(" - ")[0]) for p in typo_placed][1:],
                    [("error", "on the 310 Stage I/O List leg: missing field $mnemonc")],
                    f"{label}: the stop note, then the 310 leg's own check ({[p.message for p in typo_placed]})")
+                ok("mnemonic" in (context.fields or ()) and "signals" in (context.tables or {}),
+                   f"{label}: completions come from the 310 leg that fires (C-025 refute round 3, F7)")
             else:
                 eq(placed, [], f"{label}: no false errors")
                 eq(shown.split("\n")[1], written[0], f"{label}: the preview is the fire's first line")
@@ -635,11 +638,14 @@ def test_the_builder_gates_as_the_run_plan_does():
 
 
 def test_a_downgraded_no_io_sheet_never_saves_over_the_record():
-    """The implications check (item 1), the data-loss case: with no I/O sheet matched, staging returns an
-    EMPTY Database and a raw FAIL. Downgraded in the registry, the gate let the run on - and the
-    after_300 fire (any rule) saved that empty Database over signals.csv. The reactions never run on a
-    raw FAIL now: the saved record keeps its rows (the audit too - a before_300 firing is listed, not
-    recorded), and the builder says the run stops there."""
+    """The implications check (item 1), the data-loss case - and C-024 refute round 20 (G1: pinned on the 300
+    leg only, a guard skipped on 310 / 320 survived; G3: the dark engine warned). With no I/O sheet matched,
+    staging returns an EMPTY Database and a raw FAIL. Downgraded in the registry, the gate let the run on -
+    and the after_300 fire (any rule) saved that empty Database over signals.csv. On EVERY staging leg
+    (300, 310, 320) now: downgraded, the reactions are skipped (a WARN; the before_300 firing listed, not
+    recorded); untreated, the run halts (listed as halted) - either way signals.csv, the audit and the
+    rule's file are untouched, and the builder says the run stops there. With no rules at all (the engine
+    dark, as shipped) the skip says nothing."""
     from pipeline5.phases.staging import iolist
     from pipeline5.workbench import template_doc
     rules = [["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
@@ -657,29 +663,47 @@ def test_a_downgraded_no_io_sheet_never_saves_over_the_record():
             before = len(_read_csv(saved))
             ok(before > 0, f"the good run saved {before} signals")
             audit = os.path.join(config.database_dir(), "chain_reactions_log.csv")
-            with open(audit, "rb") as handle:
-                recorded = handle.read()
+            sig = os.path.join(config.output_root(), "rx", "sig.txt")
+
+            def snapshot():
+                with open(audit, "rb") as a, open(sig, "rb") as s:
+                    return len(_read_csv(saved)), a.read(), s.read()
+            recorded = snapshot()
             broken = dict(params, iolist_params=dict(params["iolist_params"], sheets=["NoSuchSheet"]))
             _database, findings = iolist.stage_iolist(broken, save=False)
             eq([f.type for f in findings], ["stg_no_io_sheet"], "the probe's staging finds no I/O sheet")
-            treatments.write(treatments.registry_path(), {findings[0].uid: treatments.Treatment(
-                uid=findings[0].uid, treatment="warn", type=findings[0].type)})
             real_load = config.load_params
             config.load_params = lambda path=None: broken
             try:
-                session = template_doc.Session(None)
-                stop = session.halt("after_300")
+                for treatment, halts in (("warn", False), ("", True)):
+                    treatments.write(treatments.registry_path(), {findings[0].uid: treatments.Treatment(
+                        uid=findings[0].uid, treatment=treatment, type=findings[0].type)})
+                    session = template_doc.Session(None)
+                    stops = (session.halt("after_300"), session.halt("after_300", "310 Stage I/O List"))
+                    why = "halts on stg_no_io_sheet" if halts else "has a blocking stg_no_io_sheet the treatments downgraded"
+                    ok(all(stop and why in stop for stop in stops), f"treated {treatment!r}: the builder, both legs: {stops}")
+                    for only in (None, 310, 320):
+                        label = f"leg {only or 300}, treated {treatment!r}"
+                        host = _Host()
+                        SYSTEM.handlers["staging"](host.ctx(), only=only)
+                        eq(host.halted, halts, f"{label}: the run {'halts' if halts else 'goes on'}")
+                        eq(snapshot(), recorded, f"{label}: signals.csv, the audit and the rule's file untouched")
+                        listed = "not recorded, staging halted" if halts else "not recorded, a raw FAIL"
+                        ok(any(level == "INFO" and f"before_300 reaction hdr: ok (1 created) - {listed}" in m
+                               for level, m in host.lines), f"{label}: the before_300 firing is listed")
+                        warned = [m for level, m in host.lines if level == "WARN" and "never run on a raw FAIL" in m]
+                        eq(len(warned), 0 if halts else 1, f"{label}: the skip {'is a halt' if halts else 'is said'}")
+                treatments.write(treatments.registry_path(), {findings[0].uid: treatments.Treatment(
+                    uid=findings[0].uid, treatment="warn", type=findings[0].type)})
+                rx_dir = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions")
+                with open(os.path.join(rx_dir, "reactions.csv"), "w", encoding="utf-8", newline="") as handle:
+                    handle.write(",".join(rules[0]) + "\n")            # the engine DARK, as shipped
                 host = _Host()
                 SYSTEM.handlers["staging"](host.ctx())
+                eq([m for _level, m in host.lines if "reaction" in m], [], "the dark engine: the skip says nothing")
+                ok("RSLT" in host.levels(), "…and the staging reports as ever")
             finally:
                 config.load_params = real_load
-            eq(host.halted, False, "the downgraded FAIL lets the run on")
-            eq(len(_read_csv(saved)), before, "…yet signals.csv keeps its rows - nothing saved over it")
-            with open(audit, "rb") as handle:
-                eq(handle.read(), recorded, "…and the audit is untouched")
-            ok(any(level == "INFO" and "before_300 reaction hdr: ok (1 created) - not recorded, a raw FAIL" in m
-                   for level, m in host.lines), "the before_300 firing is listed, not recorded")
-            ok(stop and "has a blocking stg_no_io_sheet the treatments downgraded" in stop, f"the builder: {stop}")
         finally:
             config.use_project(previous_project)
 

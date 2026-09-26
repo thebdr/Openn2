@@ -72,9 +72,9 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
     (both read blank - the branch is silently never taken);
   - a data function reading a column its table does not have - a `count(signals, $col ...)` /
     `where(` / `first(` predicate, `lookup` / `unique`'s column (it reads blank: `count` counts
-    nothing);
-  - a format spec on a JSON (list / object) value (`{$matrix_areas:>5}` - it fails on every row
-    that has a value);
+    nothing) - or over a table the hook does not have at all (it finds no rows);
+  - a format spec on a JSON value - a list or an object in the rows (`{$type:>5}` - it fails on the
+    rows that hold one; a JSON column that holds text is just text);
   - an empty hole `{}` (it renders nothing - write `{{}}` for literal braces);
   - `{{$x}}`, which is the literal text `{$x}` - a hole in braces is `{{{$x}}}`.
 
@@ -97,7 +97,9 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   - a loop over a table that does not exist at that hook;
   - a column typo inside a loop;
   - the rule itself: a template of the wrong kind, a hook the run never fires, a target the fire
-    refuses for every row (a `:` other than a drive's, or a character Windows does not allow in a
+    refuses for every row (a `:` other than a drive's - `C:/`, `\\?\C:\`, a share, or a drive a
+    hole completes, `C:{$_params.dir}/x.txt`, which the fire judges row by row - or a character Windows
+    does not allow in a
     path: `< > " | ? *`, a control character);
   - project params that do not load (the fire blocks every rule of the hook: `rx_params_unreadable`).
 
@@ -121,7 +123,8 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
 - **Autocomplete** offers what fits at the cursor:
   - `$` offers the rule's columns (in the templates the rule renders), your loop variables,
     `_params` and `_rule`; inside a `where` - or a data function's predicate, `count(signals, $` -
-    only that table's columns (all it can see);
+    only that table's columns (all it can see); when the full staging stops, the 310 leg's
+    columns (it still fires);
   - `$row.` offers that loop table's columns, and `$_params.` offers your project parameters;
   - `@use` offers template names, `@for $x in` offers table names, `@` offers the directives, and
     functions complete elsewhere.

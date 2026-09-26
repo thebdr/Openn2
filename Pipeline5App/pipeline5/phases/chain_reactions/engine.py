@@ -770,7 +770,7 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
     if declared is not None and rule.fire_when not in declared:
         problem(f"hook {rule.fire_when!r} is never fired by this run-plan (it fires: {', '.join(declared)})")
     tables = {} if database is None else {name: database[name].effective_columns() for name in database.names()}
-    json = {} if database is None else {name: frozenset(database[name].json_columns) for name in database.names()}
+    json = {} if database is None else {name: _json_valued(database[name]) for name in database.names()}
     json_fields = json.get(rule.source_table, frozenset())
     fields = {"_params", "_rule", "_db"}
     if rule.source_table:
@@ -793,26 +793,44 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
     return fields, tables, json, json_fields
 
 
+def _json_valued(table) -> frozenset:
+    """`table`'s declared JSON columns that HOLD a list / object in its rows - a format spec fails on those
+    rows. A declared JSON column holding text (a staged I/O-List cell) renders as the text it is."""
+    return frozenset(column for column in table.json_columns
+                     if any(isinstance(row.get(column), (list, dict)) for row in table.rows))
+
+
 def _literal_refusal(target: str):
     """(column, why) of a LITERAL character the fire's target guards refuse whatever the row - None when
-    there is none. A ':' - but a drive's: a leading literal letter's (`C:/`), or the one right after a
-    LEADING hole that may render the drive letter (`{$_params.drive}:/out` - C-024 refute round 19's
-    note) - or a character a Windows path refuses (`<>"|?*`, a control character). Holes are data,
+    there is none. A ':' - but a drive's, which the fire judges as it does: a literal drive (`C:/`, an
+    extended `\\\\?\\C:\\`, a UNC share) whose path goes on with a separator or a HOLE (the row may
+    render an absolute path - or not: the fire judges that row), or the ':' right after a LEADING hole
+    that may render the drive letter (`{$_params.drive}:/out` - C-024 refute round 19's note) - or a
+    character a Windows path refuses (`<>"|?*`, a control character) past the drive. Holes are data,
     judged per row by the fire."""
     runs = tempemplator.brace_runs(target)
+
+    def goes_on(number, index, end):
+        """What follows the ':' at `index` (the last or not of text run `number`) - a separator or a hole."""
+        if target[index + 1:index + 2] in ("\\", "/"):
+            return True
+        return index + 1 == end and number + 1 < len(runs) and runs[number + 1][0] == "hole"
+
+    skip = 0                                                # a literal drive's own characters
+    if runs and runs[0][0] == "text":
+        drive = os.path.splitdrive(target[:runs[0][2]])[0]
+        if drive and (len(drive) > 2 or goes_on(0, len(drive) - 1, runs[0][2])):
+            skip = len(drive)                                # (a drive-relative `X:1.txt` is not skipped)
     for number, (kind, start, end) in enumerate(runs):
         if kind != "text":
             continue
-        for index in range(start, end):
+        for index in range(max(start, skip), end):
             ch = target[index]
             if _INVALID_PATH and (ch in _INVALID_PATH or ord(ch) < 32):
                 return index, f"{ch!r} is not allowed in a Windows path"
             if ch != ":":
                 continue
-            separated = target[index + 1:index + 2] in ("\\", "/")
-            if separated and index == 1 and target[0].isalpha():
-                continue                                     # a literal drive letter
-            if separated and number == 1 and index == start and runs[0][0] == "hole":
+            if number == 1 and index == start and runs[0][0] == "hole" and goes_on(number, index, end):
                 continue                                     # a drive a leading hole may render
             return index, ("a ':' in a relative target or a file name (a drive letter, or a hidden NTFS "
                            "stream)")
