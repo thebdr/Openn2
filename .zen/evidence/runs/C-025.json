@@ -6,30 +6,30 @@
     "Pipeline5App/scripts/verify_c025.sh"
   ],
   "exitCode": 0,
-  "outputSha": "afbf60571b7f464697986c4feff77730d362419250d7546f8bc327ea1443369e",
-  "outputTail": "  PASS  configured_rules_fire_through_the_real_run_plan\r\n  PASS  halted_staging_lists_the_deferred_trail_and_records_nothing\r\n  PASS  a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten\r\n  PASS  a_cascade_within_one_hook_through_the_real_run_plan\r\n  PASS  the_builder_models_what_the_after_300_fire_gets\r\n  PASS  the_builder_lints_every_leg_that_fires_after_300\r\n  PASS  the_builder_gates_as_the_run_plan_does\r\n  PASS  a_downgraded_no_io_sheet_never_saves_over_the_record\r\n  PASS  text_utf8_cannot_store_never_crashes_the_run\r\n  PASS  a_field_name_or_a_quoted_text_utf8_cannot_store_never_wipes_the_record\r\n  PASS  spawns_are_saved_beside_a_ragged_record\r\n  PASS  a_blank_range_end_invents_nothing_on_the_real_fixture\r\n  PASS  310_leg_appends_reaction_findings_to_the_existing_record\r\n  PASS  sub_phase_dispatch\r\n  -> 16/16 passed",
-  "ranAt": "2026-09-26T04:06:29.670Z",
-  "headCommit": "75353b34a676a28bf2697c94a0cb6396e617521b",
+  "outputSha": "46333a39f4919d602d0e0112a4df03b343ddd015729ed08933845f17ea3492c3",
+  "outputTail": "  PASS  halted_staging_lists_the_deferred_trail_and_records_nothing\r\n  PASS  a_corrupt_reaction_record_is_reported_not_crashed_or_overwritten\r\n  PASS  a_cascade_within_one_hook_through_the_real_run_plan\r\n  PASS  the_builder_models_what_the_after_300_fire_gets\r\n  PASS  the_builder_lints_every_leg_that_fires_after_300\r\n  PASS  the_builder_gates_as_the_run_plan_does\r\n  PASS  a_downgraded_no_io_sheet_never_saves_over_the_record\r\n  PASS  text_utf8_cannot_store_never_crashes_the_run\r\n  PASS  a_field_name_or_a_quoted_text_utf8_cannot_store_never_wipes_the_record\r\n  PASS  a_device_name_target_is_refused_through_the_run_plan\r\n  PASS  spawns_are_saved_beside_a_ragged_record\r\n  PASS  a_blank_range_end_invents_nothing_on_the_real_fixture\r\n  PASS  310_leg_appends_reaction_findings_to_the_existing_record\r\n  PASS  sub_phase_dispatch\r\n  -> 17/17 passed",
+  "ranAt": "2026-09-26T05:43:33.677Z",
+  "headCommit": "d2551175d24f5b8fd58e219961267d17703e5a5b",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_template_builder.py",
       "file": "Pipeline5App/tests/unit/test_template_builder.py",
-      "fileSha": "9582d6bf86c8a877a8d93e92494648ef5dd2a4c574aed1254dc010723526b1ac"
+      "fileSha": "27a3835e487e497e2626e36bc06862103d03c572b28061c17025e2b0e067d091"
     },
     {
       "name": "Pipeline5App/tests/unit/test_template_doc.py",
       "file": "Pipeline5App/tests/unit/test_template_doc.py",
-      "fileSha": "f744bfa6a4d7b4207a8ed37df1cecfd6d71a0831f58cba06709ba6f013ad0c91"
+      "fileSha": "3b27066776f875fea945b4e444a4d74279c84eda10a85e6af95d872c3e0f7a05"
     },
     {
       "name": "Pipeline5App/tests/unit/test_gui_template_mode.py",
       "file": "Pipeline5App/tests/unit/test_gui_template_mode.py",
-      "fileSha": "34a0ea6937303a9719698876d1cc4d51aebe5f03d93ba2edde6837bc3225f25e"
+      "fileSha": "9ddf11d27cbc5aa928756654258f7bf7d3a6cc3722dd311e656be793530721b8"
     },
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
       "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
-      "fileSha": "a4bdb392729eaad56b7747e58e2c5ec085d4f4272bb9f4e94ec9cf62200da51b"
+      "fileSha": "7a3cfe3cf17fef5a2d7104fc481c4e7ecfce867ec64a29fe2f334a39e5cad00d"
     }
   ]
 }
