@@ -3,7 +3,8 @@ off-screen Tk root (SKIPPED where no display exists), `tkinter.messagebox.askyes
 viewer that edits - the text pane (the template mode's included), the CSV grid, the Object explorer - is made
 dirty for real, then every path that would replace or close it runs: another file picked in the tree, the
 Text <-> Object explorer toggle, the project-copy jump, the App's close. A light/dark switch re-themes in place;
-the text pane is clean again once its text is back to the saved one; Revert is the deliberate discard."""
+the text pane is clean again once its text is back to the saved one; Revert is the deliberate discard; a text pane
+that goes takes its pending timers with it."""
 import os
 import re
 import tempfile
@@ -180,6 +181,16 @@ def _button(widget, prefix):
 def _mark(panel) -> str:
     """The text pane's modified mark (the label in its Save bar)."""
     return "".join(str(w.cget("text")) for w in _widgets(panel.editor, ttk.Label) if "modified" in str(w.cget("text")))
+
+
+def _timers(root) -> list:
+    """The root's pending `after` jobs, sorted, as (function, alive) pairs: tkinter names a job's Tcl command
+    <id><function name> and deletes a widget's commands when it is destroyed - a job not alive fires into nothing."""
+    jobs = []
+    for job in root.tk.splitlist(root.tk.call("after", "info")):
+        command = root.tk.splitlist(root.tk.call("after", "info", job))[0]
+        jobs.append((re.sub(r"^\d+", "", command), bool(root.tk.call("info", "commands", command))))
+    return sorted(jobs)
 
 
 def _begin():
@@ -588,6 +599,50 @@ def test_back_to_the_saved_text_is_clean():
         _end(root, project)
 
 
+def test_a_pane_that_goes_leaves_no_timer():
+    """Refute round 3's side finding: an edit arms the text pane's debounced re-check (the mark) and re-highlight;
+    a pane that went within their delay - another file picked, Revert, the Text -> Object toggle - left them
+    pending, and they fired into its deleted Tcl command (`invalid command name "...recheck"`, swallowed by
+    tkinter's no-op `tkerror`). They go with the pane now, however it goes - the panel itself destroyed (what
+    closing the App does to it) included; the template mode's own timers still go too, and a pane whose timers
+    already ran goes as cleanly: no background error, no callback raising."""
+    begun = _begin()
+    if begun is None:
+        return
+    root, project, paths, panel = begun
+    errors = []                                              # Tcl's background errors + the callbacks' own exceptions
+    root.tk.call("interp", "bgerror", "", root.register(lambda message, *_options: errors.append(message)))
+    root.report_callback_exception = lambda kind, value, _tb: errors.append(f"{kind.__name__}: {value}")
+    try:
+        def leaves(name, path, armed, leave):
+            _pick(root, panel, path)
+            _type(root, panel, "1.0", "# edited\n")
+            eq(_timers(root), armed, f"{name}: (the edit armed them)")
+            with _Answer(True):                              # (where leaving asks - the pane holds the edit)
+                leave()
+            eq([job for job in _timers(root) if job[0] in ("recheck", "rehighlight") or not job[1]], [],
+               f"{name}: the pane gone - none of its timers left, none firing into a deleted command")
+
+        both = [("recheck", True), ("rehighlight", True)]
+        panel._obj_mode = False
+        _pick(root, panel, paths["yaml"])
+        _type(root, panel, "1.0", "# edited\n")
+        ok(_pump(root, lambda: _timers(root) == []), "(a pause after the edit: both ran)")
+        with _Answer(True):
+            _pick(root, panel, paths["xlsx"])                # …then the pane goes, nothing pending
+        leaves("another file", paths["yaml"], both, lambda: _pick(root, panel, paths["xlsx"]))
+        leaves("Revert", paths["yaml"], both, lambda: (_button(panel.editor, "Revert").invoke(), root.update()))
+        leaves("the toggle", paths["yaml"], both, lambda: _toggle(root, panel, "Object explorer"))
+        panel._obj_mode = False
+        leaves("the template mode", paths["templates"], [("_debounced", True), ("_poll", True), ("recheck", True)],
+               lambda: _pick(root, panel, paths["csv"]))
+        leaves("the panel destroyed", paths["yaml"], both, panel.destroy)
+        _pump(root, lambda: False, 0.5)                      # past every delay (250 ms at most)
+        eq(errors, [], "no background error, no callback raised")
+    finally:
+        _end(root, project)
+
+
 def test_grid_and_object_explorer_stay_modified_until_save():
     """The recorded boundary on the safe side: the CSV grid and the Object explorer stay modified from their first
     committed change until Save - a value typed back to what the file holds still asks (a needless question,
@@ -851,6 +906,7 @@ if __name__ == "__main__":
         ("the_text_object_toggle_asks_both_ways", test_the_text_object_toggle_asks_both_ways),
         ("a_theme_switch_re_themes_in_place", test_a_theme_switch_re_themes_in_place),
         ("back_to_the_saved_text_is_clean", test_back_to_the_saved_text_is_clean),
+        ("a_pane_that_goes_leaves_no_timer", test_a_pane_that_goes_leaves_no_timer),
         ("grid_and_object_explorer_stay_modified_until_save", test_grid_and_object_explorer_stay_modified_until_save),
         ("a_refused_save_is_no_save", test_a_refused_save_is_no_save),
         ("every_object_explorer_edit_counts", test_every_object_explorer_edit_counts),

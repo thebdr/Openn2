@@ -6,6 +6,7 @@
 #     project-copy jump, the App's close - asks; No keeps the same widgets + edits, Yes replaces them;
 #   - a light/dark switch reloads nothing (the same widgets, edits and view, re-themed);
 #   - the text pane is clean again back at the saved text, and the load itself is not undoable;
+#   - a text pane that goes takes its pending re-check / re-highlight with it (none fires into a deleted command);
 #   - Revert and an open cell editor are the deliberate boundaries;
 #   - headless: the Files tab reaches FileXY's widgets through public members only (dirty / set_theme).
 # Exit code = verdict. PY may be set to another interpreter (a git worktree has no ../.venv of its own).

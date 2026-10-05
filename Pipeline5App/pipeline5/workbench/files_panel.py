@@ -491,12 +491,18 @@ class FilesPanel(ttk.Frame):
             self.on_status(f"saved {os.path.basename(path)}")
             return "break"
 
+        def on_destroy(_event=None):              # the pane goes (another file, Revert, the toggle, the App's close):
+            for job in (check_job[0], hl_job[0]):  # its pending re-check / re-highlight go with it - left, they fired
+                if job:                           # into its deleted Tcl command ('invalid command name "...recheck"')
+                    text.after_cancel(job)
+
         save_btn.configure(command=save)
         set_dirty(False)
         text.edit_modified(False)                 # the initial insert is not an edit
         self._text_saved = text.get("1.0", "end-1c")   # the widget's own view of the loaded text
         text.bind("<<Modified>>", on_modified)
         text.bind("<Control-s>", save)
+        text.bind("<Destroy>", on_destroy, "+")   # "+": the template mode (and its completion popup) bind it too
 
     def _project_copy_bar(self, bar, path: str) -> None:
         """A SHIPPED system config file is read-only here: 'Create project copy' puts it in the open
