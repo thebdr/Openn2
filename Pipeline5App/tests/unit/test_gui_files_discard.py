@@ -7,7 +7,9 @@ the text pane is clean again once its text is back to the saved one; Revert is t
 import os
 import re
 import tempfile
+import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
+import tkinter.simpledialog as simpledialog
 import types
 from tkinter import ttk
 
@@ -15,8 +17,9 @@ from openpyxl import Workbook
 
 from _harness import run, eq, ok
 from pipeline5 import config
-from pipeline5.workbench import datagrid, object_editor, template_doc, theme
+from pipeline5.workbench import datagrid, files_view, object_editor, template_doc, theme
 from pipeline5.workbench import syntax_highlight as highlight
+from filexy import objectview                                 # (on sys.path once the object_editor shim loaded)
 from test_gui_template_mode import _REAL_SESSION, _SHIPPED, _done, _panel, _project, _pump, _session, _tk, _widgets
 
 _CSV = "name,qty\r\nbelt,1\r\npec,2\r\n"
@@ -43,6 +46,12 @@ def _fixture(root) -> dict:
     second.append(["x", "y", "z"])
     second.append(["7", "8", "9"])
     book.save(paths["xlsx"])
+    paths["big"] = os.path.join(shared, "big.csv")             # enough rows to scroll
+    with open(paths["big"], "w", encoding="utf-8", newline="") as handle:
+        handle.write("name,qty\r\n" + "".join(f"row{i},{i}\r\n" for i in range(200)))
+    paths["doc"] = os.path.join(shared, "paths.yaml")          # a path key (the … picker) and a list
+    with open(paths["doc"], "w", encoding="utf-8", newline="\n") as handle:
+        handle.write("input_path: docs/io.xlsx\nitems:\n  - a\n")
     return paths
 
 
@@ -63,6 +72,42 @@ class _Answer:
 
     def __exit__(self, *_exc):
         messagebox.askyesno = self._real
+
+
+class _Patched:
+    """Temporarily replace `module.name` (a dialog, a writer) - restored on exit, whatever happens."""
+
+    def __init__(self, *replacements):
+        self.replacements = replacements                         # (module, name, value) triples
+
+    def __enter__(self):
+        self.saved = [(module, name, getattr(module, name)) for module, name, _value in self.replacements]
+        for module, name, value in self.replacements:
+            setattr(module, name, value)
+        return self
+
+    def __exit__(self, *_exc):
+        for module, name, real in self.saved:
+            setattr(module, name, real)
+
+
+_DIALOGS = ((messagebox, "askyesno"), (simpledialog, "askstring"), (filedialog, "askopenfilename"),
+            (filedialog, "askdirectory"))
+_UNEXPECTED: list = []                                       # questions no _Answer / _Patched was set up for
+_GUARD: list = []                                            # the running test's dialog guard
+
+
+def _no_real_dialog(*args, **_kwargs):
+    """Stands in for every real dialog while a test runs: a question no `_Answer` / `_Patched` expected is
+    recorded - the test fails at its end - and answered No / cancelled, the safe side. A real modal window would
+    open on the desktop and wait for a person (it did, once: a guard left unpatched)."""
+    _UNEXPECTED.append(" / ".join(str(arg) for arg in args[:2]))
+    return False
+
+
+def _refuse(*_args, **_kwargs):
+    """A writer the OS refuses - what a save meets when the file is held open (Excel does that to a CSV)."""
+    raise PermissionError(13, "Access is denied")
 
 
 def _question(path) -> list:
@@ -143,6 +188,8 @@ def _begin():
     root = _tk()
     if root is None:
         return None
+    _GUARD[:] = [_Patched(*[(module, name, _no_real_dialog) for module, name in _DIALOGS])]
+    _GUARD[0].__enter__()                                    # no real dialog from here to _end
     template_doc.Session = _session                          # the template mode's Database: synthetic, no staging
     project = tempfile.TemporaryDirectory()
     paths = _fixture(project.name)
@@ -154,8 +201,11 @@ def _begin():
 def _end(root, project) -> None:
     template_doc.Session = _REAL_SESSION
     config.use_project(None)
+    _GUARD[0].__exit__(None, None, None)
     _done(root)
     project.cleanup()
+    unexpected, _UNEXPECTED[:] = list(_UNEXPECTED), []
+    eq(unexpected, [], "every question was one the test expected (an unexpected one would have opened a real dialog)")
 
 
 def test_another_file_asks_for_every_viewer():
@@ -383,30 +433,54 @@ def test_a_theme_switch_re_themes_in_place():
         eq(_disk(paths["csv"]), b"name,qty\r\nbelt,99\r\npec,2\r\n", "…and Save writes the edit it kept")
         ok(not panel._csv_dirty, "…saved: clean")
 
-        _pick(root, panel, paths["xlsx"])
+        _pick(root, panel, paths["big"])                       # a grid scrolled half-way (refute round 2: the 2-row
+        grid = _grid(panel)                                    # table cannot scroll - a re-theme through the view's
+        grid._commit_cell(0, 1, "99")                          # refresh, which scrolls home, passed)
+        grid.body.yview_moveto(0.5)
+        root.update()
+        scrolled = grid.body.yview()
+        ok(scrolled[0] > 0.4, f"(scrolled: {scrolled})")
+        panel.set_theme("dark")
+        root.update()
+        ok(_grid(panel) is grid and panel._csv_dirty, "the scrolled grid: the same, dirty")
+        eq((grid.body.yview(), grid._mode), (scrolled, "dark"), "…its scroll kept, re-themed")
+
+        with _Answer(True) as yes:                              # leaving the edited grid asks (its edit let go)
+            _pick(root, panel, paths["xlsx"])
+        eq(yes.asked, _question(paths["big"]), "(leaving the edited grid asked)")
         box = _widgets(panel.editor, ttk.Combobox)[0]
         box.set("second")
         box.event_generate("<<ComboboxSelected>>")
         root.update()
         grid = _grid(panel)
         eq(grid._columns, ["x", "y", "z"], "(the second sheet shown)")
-        panel.set_theme("dark")
+        panel.set_theme("light")
         root.update()
         ok(_grid(panel) is grid, "an xlsx grid is the same widget")
-        eq((box.get(), grid._columns, grid._mode), ("second", ["x", "y", "z"], "dark"), "…still on its sheet, re-themed")
+        eq((box.get(), grid._columns, grid._mode), ("second", ["x", "y", "z"], "light"), "…still on its sheet, re-themed")
+        box.set("first")                                       # a sheet picked AFTER the switch comes up in its theme
+        box.event_generate("<<ComboboxSelected>>")
+        root.update()
+        grid = _grid(panel)
+        eq((grid._columns, grid._mode, str(grid.body.cget("bg"))), (["a", "b"], "light", theme.TOKENS["light"]["field"]),
+           "a sheet picked after the switch: in the new theme")
 
-        panel._obj_mode = True
-        _pick(root, panel, paths["yaml"])
+        panel._obj_mode = True                                 # (every viewer below is built in one theme and
+        _pick(root, panel, paths["yaml"])                      # switched to the OTHER - a no-op switch proves nothing)
         editor = _commit_value(panel, "project_code", "9Z")
+        light, dark = theme.TOKENS["light"], theme.TOKENS["dark"]
+
+        def object_colours():
+            return (str(editor.tree.tag_configure("z0", "background")), str(editor.tree.tag_configure("z1", "background")),
+                    [str(d.cget("bg")) for d in editor._dividers])
+        eq(object_colours(), (light["field"], light["field_alt"], [light["grid_line"]] * 2), "(the Object explorer, light)")
         with _Answer(False) as never:
-            panel.set_theme("light")
+            panel.set_theme("dark")
             root.update()
         eq(never.asked, [], "the Object explorer: no question")
         ok(_object(panel) is editor and editor.dirty, "the same Object explorer with its edit")
-        light = theme.TOKENS["light"]
-        eq((str(editor.tree.tag_configure("z0", "background")), str(editor.tree.tag_configure("z1", "background")),
-            [str(d.cget("bg")) for d in editor._dividers]),
-           (light["field"], light["field_alt"], [light["grid_line"]] * 2), "…its rows and dividers in the new theme")
+        eq(object_colours(), (dark["field"], dark["field_alt"], [dark["grid_line"]] * 2),
+           "…its rows and dividers in the new theme")
 
         panel._obj_mode = False
         with _Answer(True):
@@ -417,28 +491,29 @@ def test_a_theme_switch_re_themes_in_place():
         lang.set("yaml")                                         # coloured as yaml from the Lang box
         lang.event_generate("<<ComboboxSelected>>")
         root.update()
-        eq(str(text.tag_cget("hl_key", "foreground")), highlight.COLORS["hl_key"][1], "(the Lang box's yaml, light)")
-        panel.set_theme("dark")
+        eq(str(text.tag_cget("hl_key", "foreground")), highlight.COLORS["hl_key"][0], "(the Lang box's yaml, dark)")
+        panel.set_theme("light")
         root.update()
         ok(panel._textw is text and text.get("1.0", "1.1") == "X" and panel._unsaved_changes(),
            "the text pane: the same widget with its edit")
-        eq(str(text.cget("background")), theme.bg_for("dark"), "…re-themed")
-        eq(str(text.tag_cget("hl_key", "foreground")), highlight.COLORS["hl_key"][0],
+        eq(str(text.cget("background")), theme.bg_for("light"), "…re-themed")
+        eq(str(text.tag_cget("hl_key", "foreground")), highlight.COLORS["hl_key"][1],
            "…its highlight too - a language picked in the Lang box included")
         with _Answer(True):
             _pick(root, panel, paths["templates"])
         mode = panel._template
         _type(root, panel, "1.0", "# edited\n")
-        eq(str(panel._textw.tag_cget("tp_directive", "foreground")), template_doc.TAG_COLORS["tp_directive"][0],
-           "(the template layer, dark)")
-        panel.set_theme("light")
+        eq(str(panel._textw.tag_cget("tp_directive", "foreground")), template_doc.TAG_COLORS["tp_directive"][1],
+           "(the template layer, light)")
+        panel.set_theme("dark")
         root.update()
         ok(panel._template is mode and panel._textw.get("1.0", "2.0") == "# edited\n" and panel._unsaved_changes(),
            "the template mode: the same, with its edit")
-        eq((str(panel._textw.tag_cget("tp_directive", "foreground")), str(panel._textw.tag_cget("hl_key", "foreground")),
-            str(mode.preview.cget("background"))),
-           (template_doc.TAG_COLORS["tp_directive"][1], highlight.COLORS["hl_key"][1], theme.bg_for("light")),
-           "…re-themed: its template layer, the language under it and its preview")
+        eq((str(panel._textw.cget("background")), str(panel._textw.tag_cget("tp_directive", "foreground")),
+            str(panel._textw.tag_cget("hl_key", "foreground")), str(mode.preview.cget("background"))),
+           (theme.bg_for("dark"), template_doc.TAG_COLORS["tp_directive"][0], highlight.COLORS["hl_key"][0],
+            theme.bg_for("dark")),
+           "…re-themed: the pane itself, its template layer, the language under it and its preview")
     finally:
         _end(root, project)
 
@@ -545,6 +620,94 @@ def test_grid_and_object_explorer_stay_modified_until_save():
         _button(editor, "Save").invoke()
         root.update()
         ok(not editor.dirty and not panel._unsaved_changes(), "saved: clean")
+    finally:
+        _end(root, project)
+
+
+def test_a_refused_save_is_no_save():
+    """Refute round 2: a Save the OS refuses (the file held open - Excel does that to a CSV) is no Save. The text
+    pane, the CSV grid and the Object explorer keep the file as it was, stay modified (the mark shown), and
+    leaving them still asks - a viewer marked clean before its write succeeded let the edit go unasked. Once the
+    writer works again, Save saves. (The writers refuse as the OS does: PermissionError.)"""
+    begun = _begin()
+    if begun is None:
+        return
+    root, project, paths, panel = begun
+    refused = _Patched((files_view, "write_text_file", _refuse), (files_view, "write_csv_rows", _refuse),
+                       (objectview, "dump_document", _refuse))
+    try:
+        statuses = []
+        panel.on_status = statuses.append
+
+        def refused_then_asks(name, path, save_button, still):
+            with refused:
+                save_button.invoke()
+                root.update()
+            ok(statuses and statuses[-1].startswith("save failed"), f"{name}: the refusal reported ({statuses[-1:]})")
+            eq(_disk(path), paths["disk"][name], f"{name}: the file as it was")
+            ok(panel._unsaved_changes() and still(), f"{name}: still modified")
+            with _Answer(False) as no:
+                _pick(root, panel, paths["xlsx"])
+            eq(no.asked, _question(path), f"{name}: leaving it still asks")
+            ok(still(), f"{name}: …No keeps the edit")
+            save_button.invoke()                              # the writer works again
+            root.update()
+            ok(not panel._unsaved_changes(), f"{name}: then Save saves")
+
+        _pick(root, panel, paths["text"])
+        _type(root, panel, "1.0", "X")
+        text = panel._textw
+        refused_then_asks("text", paths["text"], _button(panel.editor, "Save"),
+                          lambda: panel._textw is text and text.get("1.0", "1.1") == "X" and _mark(panel) == "● modified")
+        eq(_disk(paths["text"]), ("X" + _NOTES).encode(), "text: written once the writer works")
+        with _Answer(True):
+            _pick(root, panel, paths["csv"])
+        grid = _grid(panel)
+        grid._commit_cell(0, 1, "99")
+        refused_then_asks("csv", paths["csv"], _button(panel.editor, "Save"),
+                          lambda: _grid(panel) is grid and panel._csv_dirty and grid._rows[0][1] == "99")
+        panel._obj_mode = True
+        with _Answer(True):
+            _pick(root, panel, paths["yaml"])
+        editor = _commit_value(panel, "project_code", "9Z")
+        refused_then_asks("yaml", paths["yaml"], _button(editor, "Save"),
+                          lambda: _object(panel) is editor and editor.dirty)
+    finally:
+        _end(root, project)
+
+
+def test_every_object_explorer_edit_counts():
+    """Refute round 2: the Object explorer has three ways to edit - a value committed in place, a neighbour added
+    (right-click 'Add element': a new mapping key, a duplicated list member) and a path chosen with its '…' picker -
+    and each one is an unsaved change the guard sees: leaving asks, No keeps the editor with the edit."""
+    begun = _begin()
+    if begun is None:
+        return
+    root, project, paths, panel = begun
+    try:
+        panel._obj_mode = True
+        _pick(root, panel, paths["doc"])
+        editor = _object(panel)
+        chosen = os.path.join(os.path.dirname(paths["doc"]), "notes.txt")
+        edits = (("a mapping key added", lambda: editor._add_neighbor(_value_item(editor, "input_path")),
+                  lambda: "new_key" in editor._doc),
+                 ("a list member added", lambda: editor._add_neighbor(_value_item(editor, 0)),
+                  lambda: list(editor._doc["items"]) == ["a", "a"]),
+                 ("a path picked", lambda: editor._pick(_value_item(editor, "input_path"), ("input_path",), "file"),
+                  lambda: editor._doc["input_path"] == "notes.txt"))
+        with _Patched((simpledialog, "askstring", lambda *_a, **_k: "new_key"),
+                      (filedialog, "askopenfilename", lambda *_a, **_k: chosen)):
+            for name, edit, done in edits:
+                ok(not editor.dirty and not panel._unsaved_changes(), f"{name}: (clean before)")
+                edit()
+                ok(done() and editor.dirty, f"{name}: an unsaved change")
+                with _Answer(False) as no:
+                    _pick(root, panel, paths["text"])
+                eq(no.asked, _question(paths["doc"]), f"{name}: leaving asks")
+                ok(_object(panel) is editor and editor.dirty and done(), f"{name}: No keeps the editor with the edit")
+                _button(editor, "Revert").invoke()            # clean again for the next way
+                root.update()
+        eq(_disk(paths["doc"]), paths["disk"]["doc"], "nothing written")
     finally:
         _end(root, project)
 
@@ -689,6 +852,8 @@ if __name__ == "__main__":
         ("a_theme_switch_re_themes_in_place", test_a_theme_switch_re_themes_in_place),
         ("back_to_the_saved_text_is_clean", test_back_to_the_saved_text_is_clean),
         ("grid_and_object_explorer_stay_modified_until_save", test_grid_and_object_explorer_stay_modified_until_save),
+        ("a_refused_save_is_no_save", test_a_refused_save_is_no_save),
+        ("every_object_explorer_edit_counts", test_every_object_explorer_edit_counts),
         ("revert_is_the_discard_itself", test_revert_is_the_discard_itself),
         ("closing_the_app_asks", test_closing_the_app_asks),
         ("the_project_copy_jump_asks", test_the_project_copy_jump_asks),
