@@ -15,6 +15,8 @@ Model (Tk-free, tested):
 View: `ObjectEditor(parent, path, on_status)` - a 2-column Treeview (keys tree + values), double-click
 a value to edit in place (Enter commits, Escape cancels), `…` column click opens the picker, Save
 writes via the model (dirty marker; scalar edits only - add/remove keys is a text/external edit).
+An embedding host reads `dirty` (its unsaved-changes guard) and calls `set_theme(mode)` on a light/dark
+switch - in place, so an unsaved edit survives it.
 """
 from __future__ import annotations
 
@@ -364,6 +366,22 @@ class ObjectEditor(ttk.Frame):
         self._dirty = dirty
         self._dirty_lbl.configure(text="● modified" if dirty else "")
         self._save_btn.configure(state="normal" if dirty else "disabled")
+
+    @property
+    def dirty(self) -> bool:
+        """True from the first committed edit until Save / Revert - what a host's unsaved-changes guard
+        reads (a value editor still open is no edit: leaving it cancels it, as Escape does)."""
+        return self._dirty
+
+    def set_theme(self, mode: str) -> None:
+        """A host's light/dark switch, IN PLACE: the row colours and the column dividers follow; the
+        document, its unsaved edits and the open nodes stay (a host that rebuilt the view to re-theme
+        it would lose them)."""
+        from filexy import theme
+        self._mode = "dark" if mode == "dark" else "light"
+        self._configure_row_tags()
+        for divider in self._dividers:
+            divider.configure(bg=theme.TOKENS[self._mode]["grid_line"])
 
     # --- editing ----------------------------------------------------------------------------------- #
     def _on_double(self, event) -> None:

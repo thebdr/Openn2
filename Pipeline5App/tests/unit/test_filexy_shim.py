@@ -51,6 +51,25 @@ def test_to_tsv_and_column_stats():
     ok("sum" not in datagrid.column_stats([["x"]], [0], 0), "no aggregation for a non-numeric column")
 
 
+def test_the_editor_surface_the_files_tab_relies_on():
+    """C-026: the Files tab reaches FileXY's editing widgets through PUBLIC members only - the Object
+    explorer's read-only `dirty` (the unsaved-changes guard reads it) and its `set_theme(mode)`, the grid's
+    `set_theme(mode)` (a theme switch re-themes in place). Pinned WITHOUT a display: the behaviour itself is
+    test_gui_files_discard's, which a headless runner skips."""
+    import inspect
+    import re
+    from pipeline5.workbench import files_panel, object_editor
+    dirty = object_editor.ObjectEditor.__dict__.get("dirty")
+    ok(isinstance(dirty, property) and dirty.fset is None, "ObjectEditor.dirty: a read-only property")
+    for cls in (object_editor.ObjectEditor, datagrid.DataGrid):
+        eq(list(inspect.signature(cls.set_theme).parameters), ["self", "mode"], f"{cls.__name__}.set_theme(mode)")
+    source = inspect.getsource(files_panel)
+    eq(re.findall(r"(?:self\._object|\bgrid)\._\w+", source), [],
+       "files_panel touches no private member of the Object explorer or a grid")
+    ok("self._object.dirty" in source and "grid.set_theme(mode)" in source and "self._object.set_theme(mode)" in source,
+       "…and does use the public ones")
+
+
 def test_package_stands_alone():
     """The extracted package must import + pass its own tests WITHOUT pipeline5 anywhere on the
     path - the standalone/shippable contract."""
@@ -73,5 +92,6 @@ if __name__ == "__main__":
         ("shim_reexports_and_theme_binding", test_shim_reexports_and_theme_binding),
         ("quick_search_spec", test_quick_search_spec),
         ("to_tsv_and_column_stats", test_to_tsv_and_column_stats),
+        ("the_editor_surface_the_files_tab_relies_on", test_the_editor_surface_the_files_tab_relies_on),
         ("package_stands_alone", test_package_stands_alone),
     ]))

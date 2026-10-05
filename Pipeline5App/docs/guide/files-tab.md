@@ -19,8 +19,9 @@ it inherits the app's.
   columns size themselves to the data - **drag a header separator** to resize one, **double-click
   the separator** to auto-fit it.
 - **Text-based files edit in place**: change the text, **Save** (or `Ctrl+S`) writes atomically with
-  the file's original BOM/newline style; **Revert** re-reads. Switching files with unsaved changes
-  asks first. A file over the 50 MB editor cap opens read-only - use *Open externally*.
+  the file's original BOM/newline style; **Revert** re-reads. **● modified** marks unsaved changes -
+  undo your edits back to the saved text and it clears (undo never goes further back than the file as
+  you opened it). A file over the 50 MB editor cap opens read-only - use *Open externally*.
 - `.yaml` / `.json` add **syntax highlighting** (live while typing), plus a **Text / Object explorer**
   toggle:
   - the Object explorer shows the document as a key/value tree,
@@ -31,6 +32,22 @@ it inherits the app's.
 
 Editing a pipeline-produced file is possible, but remember the next phase run regenerates it -
 durable changes belong in the source documents or the config CSVs.
+
+## Unsaved changes are never lost silently
+
+While the file on show holds an unsaved change - typed text (in the template mode too), an edited
+CSV cell, a value changed in the Object explorer - anything that would replace or close it asks
+first (*Discard unsaved changes to ...?*): picking another file, the **Text / Object explorer**
+toggle, closing the app. Answer **No** and everything stays as it was - your edits, the file on
+show, the toggle. A phase run or a project / system switch refreshes the tree but leaves the file on
+show - and your edits - alone. Switching between light and dark re-colours what is shown and never
+re-reads a file: a grid keeps its edits, its sort and filters, and an `.xlsx` its sheet.
+
+In the CSV grid and the Object explorer, **● modified** stays until **Save** or **Revert**, even if
+you type a value back to what it was. Two things never ask:
+- **Revert** - it is the discard: it re-reads the file from disk;
+- a cell or value you are still typing in (before Enter) - it is not a change yet: clicking
+  elsewhere cancels it, like Escape.
 
 ## The shipped system configuration (a read-only reference)
 

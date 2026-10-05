@@ -57,7 +57,8 @@ class App:
         config.use_system(self._system)       # the resolver system tiers + Database/<sid> routing follow
         self._set_title()
         root.geometry(f"{app_ui['width']}x{app_ui['height']}")
-        root.protocol("WM_DELETE_WINDOW", self._on_close)   # persist window size + close the tee on exit
+        root.protocol("WM_DELETE_WINDOW", self._on_close)   # ask before an unsaved Files-tab edit is lost (C-026),
+        #                                                     then persist window size + close the tee on exit
         backend = theme.apply_theme(root, self.mode)
 
         toolbar = ttk.Frame(root)
@@ -845,7 +846,10 @@ class App:
         self._tb_logfile.configure(text=self._logfile_label())
 
     def _on_close(self) -> None:
-        """Persist the window size + close the log tee, then destroy the window."""
+        """Ask before the Files tab's unsaved change is lost (No keeps the app open - C-026), then persist
+        the window size + close the log tee, then destroy the window."""
+        if not self.files.confirm_discard():
+            return
         try:
             config.save_app_window_size(self.root.winfo_width(), self.root.winfo_height())
         except Exception:                                    # noqa: BLE001 - never block a clean exit

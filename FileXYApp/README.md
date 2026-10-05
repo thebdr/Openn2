@@ -38,8 +38,9 @@ grid.set_data(columns, rows, row_fg=my_row_colors)
 ```
 
 Rebind the look before constructing widgets (`filexy.theme`): assign your own `TOKENS`
-(same role names) and/or `mono_family` / `narrow_family` resolvers. Pipeline4App embeds exactly
-this way through its `pipeline4/gui/datagrid.py` shim.
+(same role names) and/or `mono_family` / `narrow_family` resolvers. Pipeline5App embeds exactly
+this way through its `pipeline5/workbench/datagrid.py` / `object_editor.py` shims (the frozen
+Pipeline4App through `pipeline4/gui/datagrid.py`).
 
 ## Layout
 
@@ -53,12 +54,15 @@ this way through its `pipeline4/gui/datagrid.py` shim.
   `available_kinds()` as a selectable language picker.
 - `filexy/objectview.py` — the object explorer/editor (yaml/json scalar editing with `…` path
   pickers + Add-element; xml as a read-only structure tree); zebra, dividers, the highlight
-  palette, Expand/Collapse all.
+  palette, Expand/Collapse all. An embedding host reads its `dirty` flag (an unsaved-changes guard)
+  and re-themes it in place with `set_theme(mode)` - an unsaved edit survives a theme switch.
 - `filexy/grid.py` — the Tk widget + popups (filter / quick search / row detail).
 - `filexy/theme.py` — rebindable palette + fonts; minimal standalone styling.
 - `filexy/files.py` — CSV/xlsx loaders.
 - `filexy/app.py` + `launch_filexy.py` — the standalone window.
 - `tests/test_core.py` — standalone sanity tests (`python tests/test_core.py`); the full behaviour
-  suite lives in Pipeline4App's gate and runs against this package through the shim.
+  suite lives in the embedding pipelines' gates and runs against this package through their shims
+  (Pipeline5App: `test_gui_datagrid`, `test_gui_object_editor`, `test_filexy_shim` - the surface
+  the Files tab relies on, `dirty` / `set_theme` - and `test_gui_files_discard`).
 
 Deferred: the Rust core port (calamine + PyO3), an egui shell if the standalone exe needs it.
