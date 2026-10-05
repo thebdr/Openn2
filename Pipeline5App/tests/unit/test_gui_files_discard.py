@@ -229,16 +229,63 @@ def test_another_file_asks_for_every_viewer():
             _pick(root, panel, os.path.join(rx, "reactions.csv"))
         eq((yes.asked, os.path.basename(panel._cur)), (_question(paths["text"]), "reactions.csv"),
            "picked again: asked again, and Yes opens it")
+    finally:
+        _end(root, project)
 
-        _pick(root, panel, paths["templates"])               # a refresh (after a run, a project / system
-        mode, text = panel._template, panel._textw           # switch) keeps the shown viewer: the builder
-        _type(root, panel, "1.0", "# edited\n")              # re-reads its rules + data, never the text
-        with _Answer(False) as never:
-            panel.refresh()
-            _pump(root, lambda: False, 1.0)
-        eq(never.asked, [], "a refresh asks nothing")
-        ok(panel._template is mode and panel._textw is text and text.get("1.0", "2.0") == "# edited\n"
-           and panel._unsaved_changes(), "…and keeps the edited template mode, still modified")
+
+def test_a_refresh_keeps_every_viewer():
+    """A refresh - after every run, and with new sections on a project / system switch (the App calls both) - only
+    re-lists the tree: whatever is shown stays the same widget with its unsaved edit (a committed CSV cell, a
+    committed Object-explorer value, typed text, the template mode's - its builder re-reads rules + data, never
+    the text) or its view (an xlsx's second sheet), and nothing asks. (Refute round 1: a reload of only some
+    viewer kinds passed the template-only pin.)"""
+    begun = _begin()
+    if begun is None:
+        return
+    root, project, paths, panel = begun
+    try:
+        sections = panel.sections
+        rules_only = [{"title": "rules", "roots": [os.path.dirname(paths["templates"])], "include": [re.compile(".*")],
+                       "exclude": []}]
+
+        def refreshes(name, kept):
+            with _Answer(False) as never:
+                for step in (panel.refresh, lambda: panel.set_sections(rules_only), lambda: panel.set_sections(sections)):
+                    step()
+                    _pump(root, lambda: False, 0.3)            # (an open builder reloads on its worker)
+                    ok(kept(), f"{name}: kept through {getattr(step, '__name__', 'set_sections')}")
+            eq(never.asked, [], f"{name}: a refresh asks nothing")
+
+        _pick(root, panel, paths["csv"])
+        grid = _grid(panel)
+        grid._commit_cell(0, 1, "99")
+        refreshes("csv", lambda: _grid(panel) is grid and panel._csv_dirty and grid._rows[0][1] == "99")
+        with _Answer(True):
+            _pick(root, panel, paths["xlsx"])
+        box = _widgets(panel.editor, ttk.Combobox)[0]
+        box.set("second")
+        box.event_generate("<<ComboboxSelected>>")
+        root.update()
+        grid = _grid(panel)
+        refreshes("xlsx", lambda: _grid(panel) is grid and box.get() == "second" and grid._columns == ["x", "y", "z"])
+        panel._obj_mode = True
+        _pick(root, panel, paths["yaml"])
+        editor = _commit_value(panel, "project_code", "9Z")
+        item = _value_item(editor, "project_code")
+        refreshes("object", lambda: _object(panel) is editor and editor.dirty and editor.tree.set(item, "value") == "9Z")
+        panel._obj_mode = False
+        with _Answer(True):
+            _pick(root, panel, paths["text"])
+        text = panel._textw
+        _type(root, panel, "1.0", "# edited\n")
+        refreshes("text", lambda: panel._textw is text and text.get("1.0", "2.0") == "# edited\n"
+                  and panel._unsaved_changes())
+        with _Answer(True):
+            _pick(root, panel, paths["templates"])
+        mode, text = panel._template, panel._textw
+        _type(root, panel, "1.0", "# edited\n")
+        refreshes("template", lambda: panel._template is mode and panel._textw is text
+                  and text.get("1.0", "2.0") == "# edited\n" and panel._unsaved_changes())
     finally:
         _end(root, project)
 
@@ -382,10 +429,16 @@ def test_a_theme_switch_re_themes_in_place():
             _pick(root, panel, paths["templates"])
         mode = panel._template
         _type(root, panel, "1.0", "# edited\n")
+        eq(str(panel._textw.tag_cget("tp_directive", "foreground")), template_doc.TAG_COLORS["tp_directive"][0],
+           "(the template layer, dark)")
         panel.set_theme("light")
         root.update()
         ok(panel._template is mode and panel._textw.get("1.0", "2.0") == "# edited\n" and panel._unsaved_changes(),
            "the template mode: the same, with its edit")
+        eq((str(panel._textw.tag_cget("tp_directive", "foreground")), str(panel._textw.tag_cget("hl_key", "foreground")),
+            str(mode.preview.cget("background"))),
+           (template_doc.TAG_COLORS["tp_directive"][1], highlight.COLORS["hl_key"][1], theme.bg_for("light")),
+           "…re-themed: its template layer, the language under it and its preview")
     finally:
         _end(root, project)
 
@@ -533,8 +586,12 @@ def test_closing_the_app_asks():
     """Closing the app over an unsaved Files-tab edit asks too: No keeps the app open - nothing persisted,
     nothing destroyed; Yes closes it; a clean Files tab closes without a question. The App's real `_on_close`
     over a real FilesPanel - the rest of the App stubbed (building one would re-open the user's last project and
-    persist into the live app_config)."""
+    persist into the live app_config). Headless too: the window manager's close - the title-bar X - IS that
+    `_on_close` (refute round 1: the stubbed call alone stayed green with the protocol bound elsewhere)."""
+    import inspect
     from pipeline5.workbench.app_main import App
+    eq(re.findall(r'root\.protocol\("WM_DELETE_WINDOW", self\.(\w+)\)', inspect.getsource(App.__init__)), ["_on_close"],
+       "the App binds the window manager's close to _on_close, once, at construction")
     begun = _begin()
     if begun is None:
         return
@@ -627,6 +684,7 @@ if __name__ == "__main__":
     import sys
     sys.exit(run("gui_files_discard", [
         ("another_file_asks_for_every_viewer", test_another_file_asks_for_every_viewer),
+        ("a_refresh_keeps_every_viewer", test_a_refresh_keeps_every_viewer),
         ("the_text_object_toggle_asks_both_ways", test_the_text_object_toggle_asks_both_ways),
         ("a_theme_switch_re_themes_in_place", test_a_theme_switch_re_themes_in_place),
         ("back_to_the_saved_text_is_clean", test_back_to_the_saved_text_is_clean),

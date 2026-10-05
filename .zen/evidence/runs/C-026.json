@@ -1,0 +1,25 @@
+{
+  "clause": "C-026",
+  "command": "bash Pipeline5App/scripts/verify_c026.sh",
+  "commandArgv": [
+    "bash",
+    "Pipeline5App/scripts/verify_c026.sh"
+  ],
+  "exitCode": 0,
+  "outputSha": "f96e5663b27f635dbc264d58bfb54cfb21fb2c2a591d4f4a56eceec7fd671d66",
+  "outputTail": "  PASS  back_to_the_saved_text_is_clean\r\n  PASS  grid_and_object_explorer_stay_modified_until_save\r\n  PASS  revert_is_the_discard_itself\r\n  PASS  closing_the_app_asks\r\n  PASS  the_project_copy_jump_asks\r\n  PASS  an_open_cell_editor_is_not_an_edit\r\n  -> 9/9 passed\r\n\r\n== filexy_shim ==\r\n  PASS  shim_reexports_and_theme_binding\r\n  PASS  quick_search_spec\r\n  PASS  to_tsv_and_column_stats\r\n  PASS  the_editor_surface_the_files_tab_relies_on\r\n  PASS  package_stands_alone\r\n  -> 5/5 passed",
+  "ranAt": "2026-10-05T15:05:35.441Z",
+  "headCommit": "7d9e174eca5e540b381d5fd78bba97e76b355022",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_gui_files_discard.py",
+      "file": "Pipeline5App/tests/unit/test_gui_files_discard.py",
+      "fileSha": "1cbb13201aae404abbe11382bb743f527811916ca6b6e5ad69b8b0792521ce53"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_filexy_shim.py",
+      "file": "Pipeline5App/tests/unit/test_filexy_shim.py",
+      "fileSha": "b1c7629be0abe0c7cf34a46646bbc1b7f927d07622119f654955c42712b34793"
+    }
+  ]
+}

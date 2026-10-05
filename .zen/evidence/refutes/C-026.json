@@ -1,0 +1,18 @@
+{
+  "clause": "C-026",
+  "verdict": "refuted",
+  "ranAt": "2026-10-05T15:23:19.666Z",
+  "headCommit": "7d9e174eca5e540b381d5fd78bba97e76b355022",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_gui_files_discard.py",
+      "file": "Pipeline5App/tests/unit/test_gui_files_discard.py",
+      "symbolSha": "1cbb13201aae404abbe11382bb743f527811916ca6b6e5ad69b8b0792521ce53"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_filexy_shim.py",
+      "file": "Pipeline5App/tests/unit/test_filexy_shim.py",
+      "symbolSha": "b1c7629be0abe0c7cf34a46646bbc1b7f927d07622119f654955c42712b34793"
+    }
+  ]
+}
