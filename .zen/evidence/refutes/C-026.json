@@ -1,18 +1,18 @@
 {
   "clause": "C-026",
   "verdict": "holds",
-  "ranAt": "2026-10-06T00:05:28.204Z",
-  "headCommit": "8f962233675fcf9541d0b56422031a9eb5d034c4",
+  "ranAt": "2026-10-06T08:39:13.237Z",
+  "headCommit": "8bbac780d559387baa3c63bc6aea8cbcbd84aaf4",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_gui_files_discard.py",
       "file": "Pipeline5App/tests/unit/test_gui_files_discard.py",
-      "symbolSha": "a4acc890a12d9631312b835d9debeb3172e2c8ad5e7d4aeb32324d2030c77530"
+      "symbolSha": "772edce0cdb8fd48ef9a115b7f04f5a3cbc88eef245092fb468567a8f5a51d08"
     },
     {
       "name": "Pipeline5App/tests/unit/test_filexy_shim.py",
       "file": "Pipeline5App/tests/unit/test_filexy_shim.py",
-      "symbolSha": "b1c7629be0abe0c7cf34a46646bbc1b7f927d07622119f654955c42712b34793"
+      "symbolSha": "074f87f75f15f069eb975259f73b97a67df2fc580f96a661eb2d9a791761ca62"
     }
   ]
 }

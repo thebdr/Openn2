@@ -8,18 +8,18 @@
   "exitCode": 0,
   "outputSha": "c0d772cf6486ee61c814f3f2ccbe3be1539f845b8f6ff65598deab4efea0a57d",
   "outputTail": "  PASS  a_refused_save_is_no_save\r\n  PASS  every_object_explorer_edit_counts\r\n  PASS  revert_is_the_discard_itself\r\n  PASS  closing_the_app_asks\r\n  PASS  the_project_copy_jump_asks\r\n  PASS  an_open_cell_editor_is_not_an_edit\r\n  -> 13/13 passed\r\n\r\n== filexy_shim ==\r\n  PASS  shim_reexports_and_theme_binding\r\n  PASS  quick_search_spec\r\n  PASS  to_tsv_and_column_stats\r\n  PASS  the_editor_surface_the_files_tab_relies_on\r\n  PASS  package_stands_alone\r\n  -> 5/5 passed",
-  "ranAt": "2026-10-06T00:05:27.863Z",
-  "headCommit": "8f962233675fcf9541d0b56422031a9eb5d034c4",
+  "ranAt": "2026-10-06T08:39:12.856Z",
+  "headCommit": "8bbac780d559387baa3c63bc6aea8cbcbd84aaf4",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_gui_files_discard.py",
       "file": "Pipeline5App/tests/unit/test_gui_files_discard.py",
-      "fileSha": "a4acc890a12d9631312b835d9debeb3172e2c8ad5e7d4aeb32324d2030c77530"
+      "fileSha": "772edce0cdb8fd48ef9a115b7f04f5a3cbc88eef245092fb468567a8f5a51d08"
     },
     {
       "name": "Pipeline5App/tests/unit/test_filexy_shim.py",
       "file": "Pipeline5App/tests/unit/test_filexy_shim.py",
-      "fileSha": "b1c7629be0abe0c7cf34a46646bbc1b7f927d07622119f654955c42712b34793"
+      "fileSha": "074f87f75f15f069eb975259f73b97a67df2fc580f96a661eb2d9a791761ca62"
     }
   ]
 }
