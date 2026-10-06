@@ -604,8 +604,10 @@ def test_a_pane_that_goes_leaves_no_timer():
     a pane that went within their delay - another file picked, Revert, the Text -> Object toggle - left them
     pending, and they fired into its deleted Tcl command (`invalid command name "...recheck"`, swallowed by
     tkinter's no-op `tkerror`). They go with the pane now, however it goes - the panel itself destroyed (what
-    closing the App does to it) included; the template mode's own timers still go too, and a pane whose timers
-    already ran goes as cleanly: no background error, no callback raising."""
+    closing the App does to it) included; the template mode's own timers still go too, what follows the pane comes
+    up (refute round 4: `_load` turns an exception raised while the pane is destroyed into a 'could not open'
+    placeholder no recorder sees), and a pane whose timers already ran goes as cleanly: no background error, no
+    callback raising."""
     begun = _begin()
     if begun is None:
         return
@@ -614,7 +616,7 @@ def test_a_pane_that_goes_leaves_no_timer():
     root.tk.call("interp", "bgerror", "", root.register(lambda message, *_options: errors.append(message)))
     root.report_callback_exception = lambda kind, value, _tb: errors.append(f"{kind.__name__}: {value}")
     try:
-        def leaves(name, path, armed, leave):
+        def leaves(name, path, armed, leave, follows):
             _pick(root, panel, path)
             _type(root, panel, "1.0", "# edited\n")
             eq(_timers(root), armed, f"{name}: (the edit armed them)")
@@ -622,6 +624,17 @@ def test_a_pane_that_goes_leaves_no_timer():
                 leave()
             eq([job for job in _timers(root) if job[0] in ("recheck", "rehighlight") or not job[1]], [],
                f"{name}: the pane gone - none of its timers left, none firing into a deleted command")
+            ok(follows(), f"{name}: …what follows it shown - not a 'could not open' placeholder")
+
+        def shown(path, viewer):
+            return lambda: os.path.normcase(panel._cur) == os.path.normcase(path) and viewer()
+
+        def a_grid():
+            return len(_widgets(panel.editor, datagrid.DataGrid)) == 1
+
+        def reread():                                        # Revert: the file's own text, the edit gone
+            loaded = paths["disk"]["yaml"].decode("utf-8").replace("\r\n", "\n")
+            return panel._textw is not None and panel._textw.get("1.0", "end-1c") == loaded
 
         both = [("recheck", True), ("rehighlight", True)]
         panel._obj_mode = False
@@ -630,13 +643,16 @@ def test_a_pane_that_goes_leaves_no_timer():
         ok(_pump(root, lambda: _timers(root) == []), "(a pause after the edit: both ran)")
         with _Answer(True):
             _pick(root, panel, paths["xlsx"])                # …then the pane goes, nothing pending
-        leaves("another file", paths["yaml"], both, lambda: _pick(root, panel, paths["xlsx"]))
-        leaves("Revert", paths["yaml"], both, lambda: (_button(panel.editor, "Revert").invoke(), root.update()))
-        leaves("the toggle", paths["yaml"], both, lambda: _toggle(root, panel, "Object explorer"))
+        leaves("another file", paths["yaml"], both, lambda: _pick(root, panel, paths["xlsx"]),
+               shown(paths["xlsx"], a_grid))
+        leaves("Revert", paths["yaml"], both, lambda: (_button(panel.editor, "Revert").invoke(), root.update()),
+               shown(paths["yaml"], reread))
+        leaves("the toggle", paths["yaml"], both, lambda: _toggle(root, panel, "Object explorer"),
+               shown(paths["yaml"], lambda: _object(panel) is not None))
         panel._obj_mode = False
         leaves("the template mode", paths["templates"], [("_debounced", True), ("_poll", True), ("recheck", True)],
-               lambda: _pick(root, panel, paths["csv"]))
-        leaves("the panel destroyed", paths["yaml"], both, panel.destroy)
+               lambda: _pick(root, panel, paths["csv"]), shown(paths["csv"], a_grid))
+        leaves("the panel destroyed", paths["yaml"], both, panel.destroy, lambda: not panel.winfo_exists())
         _pump(root, lambda: False, 0.5)                      # past every delay (250 ms at most)
         eq(errors, [], "no background error, no callback raised")
     finally:
