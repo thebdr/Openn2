@@ -6,15 +6,15 @@
     "Pipeline5App/scripts/verify_c026.sh"
   ],
   "exitCode": 0,
-  "outputSha": "2a22534e978003b9e45fcc485d7c01fea6d383932d2bd810996a1c23ecabdf63",
-  "outputTail": "  PASS  a_refused_save_is_no_save\r\n  PASS  every_object_explorer_edit_counts\r\n  PASS  revert_is_the_discard_itself\r\n  PASS  closing_the_app_asks\r\n  PASS  the_project_copy_jump_asks\r\n  PASS  an_open_cell_editor_is_not_an_edit\r\n  -> 12/12 passed\r\n\r\n== filexy_shim ==\r\n  PASS  shim_reexports_and_theme_binding\r\n  PASS  quick_search_spec\r\n  PASS  to_tsv_and_column_stats\r\n  PASS  the_editor_surface_the_files_tab_relies_on\r\n  PASS  package_stands_alone\r\n  -> 5/5 passed",
-  "ranAt": "2026-10-05T16:25:28.359Z",
-  "headCommit": "6fa3f9a7d4a3d7d55b959e9ada9396e5e6f10995",
+  "outputSha": "c0d772cf6486ee61c814f3f2ccbe3be1539f845b8f6ff65598deab4efea0a57d",
+  "outputTail": "  PASS  a_refused_save_is_no_save\r\n  PASS  every_object_explorer_edit_counts\r\n  PASS  revert_is_the_discard_itself\r\n  PASS  closing_the_app_asks\r\n  PASS  the_project_copy_jump_asks\r\n  PASS  an_open_cell_editor_is_not_an_edit\r\n  -> 13/13 passed\r\n\r\n== filexy_shim ==\r\n  PASS  shim_reexports_and_theme_binding\r\n  PASS  quick_search_spec\r\n  PASS  to_tsv_and_column_stats\r\n  PASS  the_editor_surface_the_files_tab_relies_on\r\n  PASS  package_stands_alone\r\n  -> 5/5 passed",
+  "ranAt": "2026-10-06T00:05:27.863Z",
+  "headCommit": "8f962233675fcf9541d0b56422031a9eb5d034c4",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_gui_files_discard.py",
       "file": "Pipeline5App/tests/unit/test_gui_files_discard.py",
-      "fileSha": "ce15161570cb326c3c8df4e1da73ae4794d2de3d9c73b1cc1164faff497670fc"
+      "fileSha": "a4acc890a12d9631312b835d9debeb3172e2c8ad5e7d4aeb32324d2030c77530"
     },
     {
       "name": "Pipeline5App/tests/unit/test_filexy_shim.py",
