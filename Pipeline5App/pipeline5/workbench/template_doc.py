@@ -161,11 +161,13 @@ def parse(text: str) -> Doc:
         return starts[min(line, len(starts) - 1)] + column
 
     try:
-        templates = YAML(typ="safe").load(text) or {}
+        templates = YAML(typ="safe").load(text)
     except Exception as error:  # noqa: BLE001 - any loader failure is the engine's unreadable file
         mark = getattr(error, "problem_mark", None) or getattr(error, "context_mark", None)
         where = offset(mark.line, mark.column) if mark is not None else 0
         return Doc(text, {}, {}, (min(where, len(text)), f"templates.yaml does not load: {error}"))
+    if templates is None:                                     # an EMPTY document: no templates (a falsy `[]` /
+        templates = {}                                        # `false` is no mapping - C-024 refute round 28)
     if not isinstance(templates, dict):                       # (the fire's loader refuses it, in these words)
         from pipeline5.config.loaders import TEMPLATES_NOT_A_MAPPING
         return Doc(text, {}, {}, (0, TEMPLATES_NOT_A_MAPPING))

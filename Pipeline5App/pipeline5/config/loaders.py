@@ -433,12 +433,15 @@ def load_reaction_templates() -> dict:
     """The UNIFIED named-template mapping (`chain_reactions/templates.yaml`, 4-tier resolved):
     name -> a multi-line STRING (a Tempemplator text template - the `file` action) or a LIST of
     {field: expr-template} dicts (a ROW template - the `add_rows` action). {} when no file ships
-    (or an empty one). A top level that is no mapping - a list, a number, a text: an indent short - names
-    no template: unreadable, raised here (the fire's ONE rx_templates_unreadable - C-024 refute round 27:
-    each rule crashed, or was told its template is missing, one record per rule)."""
-    from pipeline5.config.params import _read_yaml
+    (or an EMPTY one - no document, comments only). A top level that is no mapping - a list, a number, a
+    text: an indent short; an empty list, 0, false or '' too (round 28) - names no template: unreadable,
+    raised here (the fire's ONE rx_templates_unreadable - C-024 refute round 27: each rule crashed, or was
+    told its template is missing, one record per rule)."""
+    from pipeline5.config.params import _load_yaml
     path = find("chain_reactions/templates.yaml")
-    data = (_read_yaml(path) or {}) if path else {}
+    data = _load_yaml(path) if path else None
+    if data is None:
+        return {}
     if not isinstance(data, dict):
         raise ValueError(TEMPLATES_NOT_A_MAPPING)
     return data

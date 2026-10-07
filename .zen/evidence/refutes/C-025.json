@@ -1,18 +1,18 @@
 {
   "clause": "C-025",
   "verdict": "refuted",
-  "ranAt": "2026-10-07T13:31:10.067Z",
-  "headCommit": "78f5a3951e896384c9660e25999f18769729e8cc",
+  "ranAt": "2026-10-07T14:08:14.525Z",
+  "headCommit": "652769e79b9d57141100e136411852e87ea2a49a",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_template_builder.py",
       "file": "Pipeline5App/tests/unit/test_template_builder.py",
-      "symbolSha": "1c0b9325ec81d9bc7961add985cf0ee9be795040c08b8a7083f79cf6d5dc4c18"
+      "symbolSha": "d3bc2b42b8060111300018d8bf593d72b51de0ddced0e8b380c0bb59c7efbc1e"
     },
     {
       "name": "Pipeline5App/tests/unit/test_template_doc.py",
       "file": "Pipeline5App/tests/unit/test_template_doc.py",
-      "symbolSha": "fa35d2cef1290a6d0b20604c4178df5f1e470176862f9a3d0b8d811e6a09da15"
+      "symbolSha": "4cd2fde3d89b197938103d84043d5ed576d8b1f6a1dda7e26031fb817ac3d999"
     },
     {
       "name": "Pipeline5App/tests/unit/test_gui_template_mode.py",

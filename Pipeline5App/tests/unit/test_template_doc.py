@@ -66,6 +66,10 @@ def test_a_yaml_error_is_located():
     ok(doc.text[placed[0].start:].startswith(("more", "\n", "bad", " [")) or placed[0].start >= doc.text.index("bad"),
        f"at the broken line or after it ({placed[0].start})")
     eq(td.parse("- a\n- b\n").error[1], "templates.yaml must be a mapping of named templates", "a list")
+    for falsy in ("[]\n", "false\n", "0\n", "''\n"):                 # C-024 refute round 28: a FALSY top level is no
+        eq(td.parse(falsy).error, (0, "templates.yaml must be a mapping of named templates"), f"{falsy!r}")  # mapping
+    for empty in ("", "# only a comment\n", "\n"):                   # - as the fire's loader; an EMPTY document is
+        eq((td.parse(empty).error, td.parse(empty).templates), (None, {}), f"{empty!r}: no templates")   # none
 
 
 def test_two_layer_highlight():
@@ -552,6 +556,32 @@ def _empty():
     return Database([])
 
 
+def test_a_rule_on_a_hook_never_fired_is_checked_without_its_context():
+    """C-025 refute round 10 (#3): round 9 fixed the preview, but the check still judged the unfired rule's template
+    in its rule's context - a database-less one that does not exist ("source table 'src' is not in the database at
+    this hook", "unknown table 'signals' in @for"): errors no fire raises, the fire dropping the rule first. The rule
+    gets the hook problem alone now, its templates the context-free walk; on a hook that fires, the same rule checks
+    clean."""
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.table import Table
+
+    def database(_system=None):
+        src = Table("src", columns=["uid", "name"], key_columns=["name"])
+        src.add(name="D1")
+        signals = Table("signals", columns=["uid", "tag"], key_columns=["tag"])
+        signals.add(tag="T1")
+        return Database([src, signals])
+
+    doc = td.parse("belt: |-\n  @for $r in signals: {$r.tag}\n  {count(signals)}\n")
+    for hook, expected in (("after_30", [("error", "rule", "rule 'belts': hook 'after_30' is never fired by this "
+                                          "run-plan (it fires: before_300, after_300)")]), ("after_300", [])):
+        rules = [{"name": "belts", "fire_when": hook, "source_table": "src", "condition": "", "action": "file",
+                  "target": "gen/x.txt", "template": "belt", "comment": ""}]
+        session = td.Session(None, rows=rules, hooks={"before_300": None, "after_300": database}, params={})
+        eq([(p.severity, p.label, p.message) for p in session.check(doc, session.rules[0])], expected,
+           f"{hook}: what a fire reports for the rule - nothing of a context it never gets")
+
+
 def test_the_saved_read_never_holds_the_file_while_it_parses():
     """C-025 refute round 8 (#1): every check reads the templates.yaml a fire reads - and the loader parsed INSIDE
     its `open`, so for the whole parse Windows refused to replace the file: a Save pressed meanwhile failed (the
@@ -843,6 +873,8 @@ if __name__ == "__main__":
         ("the_fires_own_finding_comes_first", test_the_fires_own_finding_comes_first),
         ("a_rule_on_a_hook_never_fired_previews_the_fires_finding",
          test_a_rule_on_a_hook_never_fired_previews_the_fires_finding),
+        ("a_rule_on_a_hook_never_fired_is_checked_without_its_context",
+         test_a_rule_on_a_hook_never_fired_is_checked_without_its_context),
         ("the_saved_read_never_holds_the_file_while_it_parses",
          test_the_saved_read_never_holds_the_file_while_it_parses),
         ("the_dry_settle_writes_nothing", test_the_dry_settle_writes_nothing),

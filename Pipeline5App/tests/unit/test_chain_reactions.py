@@ -560,12 +560,12 @@ def test_record_attaches_atomically_and_spawns_survive_a_ragged_record():
 def test_a_condition_failing_at_evaluation_is_a_bad_condition():
     """Refuter round 9: every rx_bad_condition pin failed at COMPILE; a condition that compiles but
     raises a located ExprError when EVALUATED (a bad group reference) must still be rx_bad_condition,
-    never relabelled rx_rule_crashed (a different audit outcome and treatment uid). C-025 refute round 9: a
-    LITERAL replacement re.sub refuses fails every evaluation - it is refused at COMPILE now (the rule dropped,
-    no audit row); a replacement only the data builds still fails when evaluated."""
+    never relabelled rx_rule_crashed (a different audit outcome and treatment uid). C-025 refute rounds 9-10: a
+    CONSTANT replacement re.sub refuses fails every evaluation - it is refused at COMPILE now (the rule dropped,
+    no audit row); a replacement the row's data builds (`$kind` + `\\9`) still fails when evaluated."""
     def body(sandbox):
         database, findings = engine.fire("after_300", _db(),
-                                         rules=[_rule(condition='regex_replace($name, /(D)/, concat("\\\\", "9")) = "x"')],
+                                         rules=[_rule(condition='regex_replace($name, /(D)/, concat($kind, "\\\\9")) = "x"')],
                                          templates=_ROW_TPL, params={})
         eq([x.type for x in findings], ["rx_bad_condition"], "an evaluation-time ExprError")
         eq(_log(database), [("after_300", "r1", 0, 0, "rx_bad_condition")])
@@ -1569,7 +1569,8 @@ def test_a_templates_file_that_is_no_mapping_is_unreadable():
         loaders.find = lambda rel: path if rel == "chain_reactions/templates.yaml" else real_find(rel)
         try:
             with tempfile.TemporaryDirectory() as out:
-                for text in ("- rows\n- header\n", "- rows:\n    - label: x\n", "rows and header\n", "42\n", "true\n"):
+                for text in ("- rows\n- header\n", "- rows:\n    - label: x\n", "rows and header\n", "42\n", "true\n",
+                             "[]\n", "0\n", "false\n", "''\n", "0.0\n"):      # (round 28: a FALSY one too)
                     with open(path, "w", encoding="utf-8") as handle:
                         handle.write(text)
                     eq(engine.saved_templates_problem().detail, detail, f"{text!r}: (the builder's saved-file check)")
@@ -1588,11 +1589,44 @@ def test_a_templates_file_that_is_no_mapping_is_unreadable():
                         eq(audit, [("r1", "rx_templates_unreadable"), ("r2", "rx_templates_unreadable")],
                            f"{text!r} {hook}: every rule audited with it")
                 eq(os.listdir(out), [], "nothing written")
-                with open(path, "w", encoding="utf-8") as handle:
-                    handle.write("")
-                eq(engine.saved_templates_problem(), None, "(an empty file: no templates - loads)")
+                for empty in ("", "# only a comment\n", "\n\n"):
+                    with open(path, "w", encoding="utf-8") as handle:
+                        handle.write(empty)
+                    eq((engine.saved_templates_problem(), config.load_reaction_templates()), (None, {}),
+                       f"an EMPTY file ({empty!r}): no templates - it loads")
         finally:
             loaders.find = real_find
+    _sandboxed(body)()
+
+
+def test_a_replacement_inside_a_predicate_or_a_let_names_its_own_cause():
+    """C-024 refute round 28: the parser refused a constant bad `regex_replace` replacement at compile - and the
+    STRUCTURAL reads (`free_paths`, `row_reads`) parsed with that check too, gave up, and the strict render fell back
+    to its token scan, which counts a data function's row column and a let-bound name as fields: the fire said
+    "render(strict): missing field $name" where it said the replacement's own error before (the lint, which
+    compiles, said the right one). A structural read skips the check now: the runtime's message in a text line, a
+    row value and a target, lint = fire."""
+    from pipeline5.language import expr as language_expr
+    pred = '{count(src, regex_replace($name, /-/, "\\\\1") = "x")}'
+    let = '{let(v := regex_replace($kind, /-/, "\\\\1"); $v)}'
+    eq(language_expr.hole_paths(pred[1:-1]), frozenset(), "(the predicate's row column is no field of the hole)")
+    eq(language_expr.hole_paths(let[1:-1]), frozenset({"kind"}), "(the let-bound name is no field either)")
+    cause = "regex_replace: bad replacement '\\\\1': invalid group reference 1 at position 1"
+
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out:
+            for hole in (pred, let):                            # (per row: the let reads the row's $kind)
+                cases = ((_rule(action="file", condition="", target="t.txt", template="t"),
+                          {"t": "n=" + hole}, f"template 't' line 1: {cause}"),
+                         (_rule(condition="", template="r"), {"r": [{"label": "L" + hole}]},
+                          f"row template 'r': entry 1 field 'label': {cause}"),
+                         (_rule(action="file", condition="", target="gen/" + hole + ".txt", template="t"),
+                          {"t": "x"}, f"target {'gen/' + hole + '.txt'!r}: {cause}"))
+                for rule, templates, detail in cases:
+                    _, findings = engine.fire("after_300", _db(), rules=[rule], templates=templates, params={},
+                                              files_root=out)
+                    eq([(f.type, f.detail) for f in findings], [("rx_bad_template", detail)],
+                       f"{hole} in {rule['template']} -> {rule['target']}: the replacement's own cause")
     _sandboxed(body)()
 
 
@@ -1747,6 +1781,8 @@ if __name__ == "__main__":
         ("a_misspelt_or_doubled_rule_column_is_never_silent", test_a_misspelt_or_doubled_rule_column_is_never_silent),
         ("content_a_doubled_column_holds_is_never_skipped", test_content_a_doubled_column_holds_is_never_skipped),
         ("a_templates_file_that_is_no_mapping_is_unreadable", test_a_templates_file_that_is_no_mapping_is_unreadable),
+        ("a_replacement_inside_a_predicate_or_a_let_names_its_own_cause",
+         test_a_replacement_inside_a_predicate_or_a_let_names_its_own_cause),
         ("every_path_windows_would_misdirect_is_refused_before_the_write",
          test_every_path_windows_would_misdirect_is_refused_before_the_write),
         ("fire_empty_hook_is_a_strict_noop", test_fire_empty_hook_is_a_strict_noop),

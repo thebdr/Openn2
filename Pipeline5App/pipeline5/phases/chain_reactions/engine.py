@@ -912,7 +912,12 @@ def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None, p
     take is an error wherever it sits (C-025 refute round 8)."""
     problems, fields, tables, json, json_fields = [], None, None, None, None
     values = None
-    if rule is not None:
+    declared = [h.strip().lower() for h in hooks] if hooks is not None else None
+    if rule is not None and declared is not None and rule.fire_when not in declared:
+        problems.append(tempemplator.Problem(None, None, 0, 0, f"rule {rule.name!r}: {_unfired(rule.fire_when, declared)}",
+                                             "error"))
+        rule = None                  # the fire drops it before anything renders (rx_unfired_hook): no context of a
+    if rule is not None:             # fire that never happens - the plain walk only (C-025 refute round 10)
         values = _column_values(rule, database)
         fields, tables, json, json_fields = _lint_rule(rule, templates, database, hooks, problems, values, params)
     text_start = rule.template if rule is not None and rule.action == "file" else None
@@ -955,9 +960,6 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list, val
     reason = _template_problem(rule, templates)
     if reason:
         problem(reason)
-    declared = [h.strip().lower() for h in hooks] if hooks is not None else None
-    if declared is not None and rule.fire_when not in declared:
-        problem(f"hook {rule.fire_when!r} is never fired by this run-plan (it fires: {', '.join(declared)})")
     tables = {} if database is None else {name: database[name].effective_columns() for name in database.names()}
     json = {} if database is None else {name: _json_valued(database[name]) for name in database.names()}
     json_fields = json.get(rule.source_table, frozenset())

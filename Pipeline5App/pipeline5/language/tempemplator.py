@@ -322,12 +322,35 @@ def _end_value(text: str, spec: str):
     return int(value)
 
 
-def _params_only(text: str) -> bool:
-    """True when every hole of a range end is a bare `$_params.<key>` (a format spec allowed) - a constant the
-    project params give, so the lint can render it as every fire does."""
-    holes = [_split_spec(text[start + 1:end - 1])[0].strip() for kind, start, end in _scan(text) if kind == "hole"]
-    return bool(holes) and all((bare := _BARE.fullmatch(hole)) is not None and bare.group(1).startswith("_params.")
-                               for hole in holes)
+_PARAMS_PATH = re.compile(r"\$(_params(?:\.[A-Za-z_]\w*)+)")      # a bare `$_params.<key>[.<key>...]` hole
+
+
+def _params_value(expression: str, params) -> tuple:
+    """(path, value) when `expression` is a bare `$_params.<key>[.<key>...]` and the params are known - the value
+    every fire renders, through the renderer's own dotted drill (a missing key, or a non-mapping on the way, is
+    blank) - else (None, None). Nested keys too: the params schema is nested (C-025 refute round 10)."""
+    found = _PARAMS_PATH.fullmatch(expression.strip())
+    if found is None or not isinstance(params, dict):
+        return None, None
+    return found.group(1), expr.evaluate("$" + found.group(1), {"_params": params})
+
+
+def _constant_end(text: str, params) -> str | None:
+    """How a range end with holes is CONSTANT - "params" (every hole a constant or a known `$_params` path, one at
+    least), "constant" (every hole reads no field and no table) - or None: its value is the data's (judged at
+    render). A constant end renders the same at every fire, so the lint renders it as they do (rounds 8-10)."""
+    kinds = set()
+    for kind, start, end in _scan(text):
+        if kind != "hole":
+            continue
+        expression = _split_spec(text[start + 1:end - 1])[0].strip()
+        if _params_value(expression, params)[0] is not None:
+            kinds.add("params")
+        elif not expr.hole_paths(text[start + 1:end - 1]) and not row_reads(expression):
+            kinds.add("constant")
+        else:
+            return None
+    return ("params" if "params" in kinds else "constant") if kinds else None
 
 
 def _line_word(line: str) -> str:
@@ -557,12 +580,12 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
             issues.extend((start + i.start, start + i.end, i.message, "error") for i in syntax)
             if syntax:
                 continue                                    # malformed: its fields cannot be read
-            bare = _BARE.fullmatch(expression.strip())          # a known `$_params` value: judged by ITSELF (a date
-            by_value = bool(bare) and bare.group(1).startswith("_params.") and isinstance(params, dict)   # takes
-            problem = _spec_problem(spec) if spec is not None and not by_value else None   # `%Y` - round 9)
-            if problem:
-                issues.append((end - 1 - len(spec), end - 1, problem, "error"))
             paths = expr.hole_paths(text[start + 1:end - 1]) or ()
+            constant = not paths and not row_reads(expression)  # a known `$_params` value or a constant: judged by
+            by_value = constant or _params_value(expression, params)[0] is not None   # ITSELF (a date takes `%Y`;
+            problem = _spec_problem(spec) if spec is not None and not by_value else None   # a blank one any spec -
+            if problem:                                                                     # rounds 9-10)
+                issues.append((end - 1 - len(spec), end - 1, problem, "error"))
             if spec and not problem and json and len(paths) == 1:
                 path = next(iter(paths))
                 if expression.strip() == "$" + path and path in json:   # the value IS a JSON list / object
@@ -571,7 +594,7 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
             trouble = _spec_on_kind(expression, spec, loops, values, params) if spec and not problem else None
             if trouble:                                     # the kind the value IS (round 6)
                 issues.append((end - 1 - len(spec), end - 1, *trouble))
-            elif not problem and not paths and not row_reads(expression):
+            elif not problem and constant:
                 try:                                        # a CONSTANT hole: every render is this one (round 9 -
                     render_text(text[start:end], {})        # `{"8X":04d}` linted clean, every fire failed)
                 except (ExprError, TempemplatorError) as error:
@@ -680,14 +703,16 @@ def _spec_on_kind(expression: str, spec: str, loops, values, params=None) -> tup
             return (f"bad format spec {spec!r} for {what} - it renders a{'n' if kind == 'int' else ''} {kind}: "
                     f"every render fails ({error})", "error")
         return None
-    if bare and bare.group(1).startswith("_params."):
-        value = params.get(bare.group(1)[len("_params."):]) if isinstance(params, dict) else None
+    path, value = _params_value(text, params)              # (nested keys too - round 10)
+    if path is not None:
         try:
             format_spec(value, spec)                        # (None / "": blank - the render's too)
         except ExprError as error:
-            return (f"bad format spec {spec!r} for ${bare.group(1)} - the project parameter is {value!r}: "
+            return (f"bad format spec {spec!r} for ${path} - the project parameter is {value!r}: "
                     f"every render reaching it fails ({error})", "error")
         return None
+    if bare and bare.group(1).startswith("_params."):
+        return None                                         # (unknown params: nothing judged)
     if not bare or values is None:
         return None
     for sample in values(bare.group(1)):
@@ -979,6 +1004,7 @@ class _Lint:
             if not low.strip() or not high.strip():
                 self.add(template, line_no, at, at + len(iterable), f"a range end is missing: {iterable!r}")
                 return frozenset()
+            ends = []                                       # the ends known now (a blank one: None)
             for fragment, offset in ((low, 0), (high, len(low) + 2)):
                 text = fragment.strip()
                 where = at + offset + len(fragment) - len(fragment.lstrip())
@@ -989,16 +1015,23 @@ class _Lint:
                     self.add(template, line_no, where + s, where + e, message, severity)
                 if not issues and all(kind != "hole" for kind, _s, _e in _scan(text)):
                     try:                                    # a LITERAL end: judged now, not at render
-                        _end_value(render_text(text, {}), iterable)
+                        ends.append(_end_value(render_text(text, {}), iterable))
                     except ValueError as error:
                         self.add(template, line_no, where, where + len(text), str(error))
-                elif not issues and self.params is not None and _params_only(text):
-                    try:                                    # an end the project params alone give: a constant,
-                        _end_value(render_text(text, {"_params": self.params}).strip(), iterable)   # stripped as
-                                                            # `_iterate` strips it (a blank one: no iteration)
-                    except ValueError as error:             # (C-025 refute round 8)
+                elif not issues and (constant := _constant_end(text, self.params)):
+                    try:                                    # an end the project params / constants alone give,
+                        ends.append(_end_value(render_text(text, {"_params": self.params or {}}).strip(),   # as
+                                               iterable))   # `_iterate` strips it - a blank one: no iteration
+                    except ValueError as error:             # (rounds 8-10)
+                        source = "from the project params" if constant == "params" else "a constant"
                         self.add(template, line_no, where, where + len(text),
-                                 f"{error} - from the project params: every render reaching it fails")
+                                 f"{error} - {source}: every render reaching it fails")
+            if len(ends) == 2 and None not in ends:
+                try:                                        # both ends known: a range no int can count fails
+                    len(range(ends[0], ends[1] + 1))        # every render (`_iterate`'s OverflowError - round 10;
+                except OverflowError:                       # one memory cannot hold is the machine's, not judged)
+                    self.add(template, line_no, at, at + len(iterable),
+                             f"range too large to iterate: {iterable!r} - every render reaching it fails")
             return frozenset()
         words = iterable.split(None, 1)
         table, columns = words[0], None

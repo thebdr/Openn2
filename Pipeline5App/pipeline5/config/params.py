@@ -74,6 +74,13 @@ def _read_yaml(path: str) -> dict:
     then parsed (a stream named as the file: every message the same): held open across the parse it refused
     the Files tab's Save - Windows replaces no file a reader holds (C-025 refute round 8: the template
     builder reads the file a fire reads on every check)."""
+    return _load_yaml(path) or {}
+
+
+def _load_yaml(path: str):
+    """`_read_yaml`'s parse, the top level as YAML gives it: None for an EMPTY file (no document, comments only),
+    else whatever it holds - a falsy `[]` / `0` / `false` too (a loader that needs a mapping tells them apart -
+    C-024 refute round 28)."""
     import io
     from ruamel.yaml import YAML
     parser = YAML(typ="safe")
@@ -81,7 +88,7 @@ def _read_yaml(path: str) -> dict:
         text = handle.read()
     stream = io.StringIO(text)
     stream.name = path
-    return parser.load(stream) or {}
+    return parser.load(stream)
 
 
 def _resolve_path(base: str, value) -> str:

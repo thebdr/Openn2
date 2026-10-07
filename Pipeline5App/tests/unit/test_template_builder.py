@@ -266,10 +266,14 @@ def test_engine_lint_judges_entries_and_rules():
     found = engine.lint(templates, _rule(action="file", target="gen/{$nam}.txt", template="txt"), _database())
     ok(any(p.template == "txt" and "$kindd" in p.message for p in found), "a file rule's text template in scope")
     ok(any(p.template is None and p.where == "target" and "$nam" in p.message for p in found), "…and its target")
-    found = engine.lint(templates, _rule(fire_when="after_900", template="txt"), None, hooks=("before_300", "after_300"))
+    found = engine.lint(templates, _rule(template="txt"), None, hooks=("before_300", "after_300"))
     messages = " | ".join(p.message for p in found if p.template is None)
-    for needle in ("is not a ROW template", "never fired", "source table 'src'", "target table 'dst'"):
+    for needle in ("is not a ROW template", "source table 'src'", "target table 'dst'"):
         ok(needle in messages, f"a rule problem: {needle!r} ({messages})")
+    found = engine.lint(templates, _rule(fire_when="after_900", template="txt"), None, hooks=("before_300", "after_300"))
+    eq([p.message for p in found if p.template is None],
+       ["rule 'r1': hook 'after_900' is never fired by this run-plan (it fires: before_300, after_300)"],
+       "a hook the run never fires: that alone - the fire drops the rule before anything else (C-025 refute round 10)")
     found = engine.lint({"own": [{"label": "L-{$name}"}]}, _rule(template="own"), None)
     eq([p.message for p in found if p.template == "own"], [],
        "an absent source table does not flood the rule's own holes as missing (one rule problem says why)")
@@ -1068,6 +1072,109 @@ def test_a_params_date_and_a_blank_range_end_render_as_the_fire_renders_them():
     _sandboxed(body)
 
 
+def test_a_nested_params_value_is_judged_by_itself():
+    """C-025 refute round 10 (#1, MEDIUM): the project params are NESTED by design (iolist_params, matrix_params,
+    output ...), but rounds 8-9 judged a `$_params` value only one level down - `{$_params.matrix_params.sorter_areas
+    :>6}` (a list), `{$_params.iolist_params.sheets:04d}` (a text), `1..{$_params.iolist_params.diag_bits_range}`
+    linted clean while every fire failed, and a nested date under `%Y-%m` got the generic false error. Every dotted
+    path is resolved through the renderer's own drill now (a missing key: blank): lint = preview = fire, in a text
+    line, a row value and a target, through the Session."""
+    import datetime
+    import tempfile
+    from pipeline5.workbench import template_doc
+    params = {"matrix_params": {"sorter_areas": [1]}, "iolist_params": {"sheets": "^NET SAFETY",
+              "diag_bits_range": [0, 62]}, "output": {"release": datetime.date(2026, 10, 7)}, "deep": {"n": 3}}
+    sheets = ("bad format spec '04d' for $_params.iolist_params.sheets - the project parameter is '^NET SAFETY': every "
+              "render reaching it fails (bad format spec '04d' for value '^NET SAFETY': could not convert string to "
+              "float: '^NET SAFETY')")
+    areas = ("bad format spec '>6' for $_params.matrix_params.sorter_areas - the project parameter is [1]: every "
+             "render reaching it fails (bad format spec '>6' for value [1]: unsupported format string passed to "
+             "list.__format__)")
+    templates = {"l": "{$_params.matrix_params.sorter_areas:>6}", "t": "{$_params.iolist_params.sheets:04d}",
+                 "r": "@for $i in 1..{$_params.iolist_params.diag_bits_range}: x",
+                 "d": "built {$_params.output.release:%Y-%m}",
+                 "ok": "{$_params.deep.n:03d}{$_params.deep.missing:04d}{$_params.nope.x:04d}\n@for $i in 1..{$_params.deep.n}: y",
+                 "rows": [{"label": "L-{$_params.iolist_params.sheets:04d}"}]}
+    eq(sorted((p.template, p.message) for p in engine.lint(templates, params=params) if p.severity == "error"),
+       sorted([("l", areas), ("t", sheets), ("rows", sheets),
+               ("r", "range ends must be numbers: '1..{$_params.iolist_params.diag_bits_range}' - from the project "
+                     "params: every render reaching it fails")]),
+       "each nested value a spec / an end cannot take: an error; the date, a value taken, a missing key: clean")
+    target = "gen/{$_params.matrix_params.sorter_areas:>6}.txt"
+    rule = _rule(action="file", source_table="", condition="", target=target, template="d")
+    eq([p.message for p in engine.lint(templates, rule, _database(), params=params) if p.template is None],
+       [f"rule 'r1': target {target!r}: {areas}"], "the target's too")
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            for name, problem in (("l", "bad format spec '>6' for value [1]: unsupported format string passed to "
+                                        "list.__format__"), ("d", None)):
+                once = _rule(action="file", source_table="", condition="", target=f"{name}.txt", template=name)
+                _, findings = engine.fire("after_300", _database(), rules=[once], templates=templates, params=params,
+                                          files_root=out)
+                shown = engine.preview(once, 0, templates=templates, params=params, database=_database(),
+                                       files_root=out)
+                fired = [(f.type, f.detail) for f in findings]
+                eq(fired, [] if problem is None else [("rx_bad_template", f"template {name!r} line 1: {problem}")],
+                   f"{name!r}: (the fire)")
+                eq(shown.problem, fired[0] if fired else None, f"{name!r}: the preview = the fire")
+            with open(os.path.join(out, "d.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "built 2026-10\n", "(the nested date rendered)")
+            session = template_doc.Session(None, rows=[dict(name="r1", fire_when="after_300", source_table="",
+                                                            condition="", action="file", target="o.txt",
+                                                            template="l", comment="")],
+                                           hooks={"before_300": None, "after_300": lambda system: _database()},
+                                           params=params)
+            doc = template_doc.parse("l: |-\n  {$_params.matrix_params.sorter_areas:>6}\nd: |-\n  {$_params.output.release:%Y-%m}\n")
+            eq([p.message for p in session.check(doc, session.rules[0]) if p.severity == "error"], [areas],
+               "the builder: the Session's params, nested")
+    _sandboxed(body)
+
+
+def test_a_constant_failure_is_judged_wherever_it_is_built():
+    """C-025 refute round 10 (#2): only a bare literal replacement and a whole-hole constant were judged - a CONSTANT
+    replacement built otherwise (`("\\1")`, `concat("\\1", "_")`, `strip(" \\1 ")`, `coalesce("\\1")`, a `let`
+    inside it) and a constant range end (`1..{"x"}`, `1..{"2.5"}`, `1..{concat("2", ".5")}`) linted clean while
+    every fire failed; a constant blank under a spec no value takes (`{"":03D}`) was a false error (a blank renders
+    blank). A replacement with no field, no table and no name an enclosing let binds is evaluated at compile; a range
+    end of constants is rendered as `_iterate` renders it - both ends known, a range no int can count is refused too;
+    a constant hole is judged by its value."""
+    import tempfile
+    group = r"regex_replace: bad replacement '\\1': invalid group reference 1 at position 1"
+    templates = {"paren": r'{regex_replace($name, /-/, ("\1"))}', "strip": r'{regex_replace($name, /-/, strip(" \1 "))}',
+                 "coal": r'{regex_replace($name, /-/, coalesce("\1"))}',
+                 "inner": r'{regex_replace($name, /-/, let(v := "\1"; $v))}',
+                 "cat": r'{regex_replace($name, /-/, concat("\1", "_"))}',
+                 "rx": '@for $i in 1..{"x"}: y', "r25": '@for $i in 1..{"2.5"}: y',
+                 "rcat": '@for $i in 1..{concat("2", ".5")}: y', "huge": '@for $i in 1..{concat("1e3", "8")}: y',
+                 "fine": '{"":03D}{clean(""):%Y}{regex_replace($name, /(-)/, concat("<", "\\1", ">"))}\n'
+                         '@for $i in 1..{concat("1", "2")}: y\n'      # a name an ENCLOSING let binds is data: `\\1`
+                         '{let(r := "\\\\"; regex_replace($name, /-/, concat($r, "\\1")))}'}   # - not judged without it
+    expected = [("paren", group), ("strip", group), ("coal", group), ("inner", group),
+                ("cat", r"regex_replace: bad replacement '\\1_': invalid group reference 1 at position 1"),
+                ("rx", "range ends must be numbers: '1..{\"x\"}' - a constant: every render reaching it fails"),
+                ("r25", "range ends must be whole, finite numbers: '1..{\"2.5\"}' ('2.5') - a constant: every render "
+                        "reaching it fails"),
+                ("rcat", "range ends must be whole, finite numbers: '1..{concat(\"2\", \".5\")}' ('2.5') - a constant: "
+                         "every render reaching it fails"),
+                ("huge", "range too large to iterate: '1..{concat(\"1e3\", \"8\")}' - every render reaching it fails")]
+    eq(sorted((p.template, p.message) for p in engine.lint(templates) if p.severity == "error"), sorted(expected),
+       "each constant failure an error - none in `fine`")
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            for name, _message in expected:
+                rule = _rule(action="file", source_table="src", condition="", target=f"{name}.txt", template=name)
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params={},
+                                          files_root=out)
+                eq([f.type for f in findings], ["rx_bad_template"], f"{name!r}: (the fire refuses it)")
+            fine = _rule(action="file", source_table="src", condition="", target="fine.txt", template="fine")
+            _, findings = engine.fire("after_300", _database(), rules=[fine], templates=templates, params={},
+                                      files_root=out)
+            eq(findings, [], "`fine`: the fire renders it")
+    _sandboxed(body)
+
+
 def test_a_row_read_warning_sits_on_its_own_token():
     """C-025 refute round 6 (#5): a missing column was found by searching its name from the call on - `{count(signals,
     "name" = $name)}` squiggled the string, `{lookup(signals, tag, first(nodes, $name = "x"), name)}` squiggled the
@@ -1129,4 +1236,6 @@ if __name__ == "__main__":
         ("a_hole_that_fails_whatever_the_data_is_an_error", test_a_hole_that_fails_whatever_the_data_is_an_error),
         ("a_params_date_and_a_blank_range_end_render_as_the_fire_renders_them",
          test_a_params_date_and_a_blank_range_end_render_as_the_fire_renders_them),
+        ("a_nested_params_value_is_judged_by_itself", test_a_nested_params_value_is_judged_by_itself),
+        ("a_constant_failure_is_judged_wherever_it_is_built", test_a_constant_failure_is_judged_wherever_it_is_built),
     ]))
