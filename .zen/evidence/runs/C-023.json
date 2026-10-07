@@ -6,10 +6,10 @@
     "Pipeline5App/scripts/verify_c023.sh"
   ],
   "exitCode": 0,
-  "outputSha": "8bd76f2bca2f74c8d9b95f611ff6299a2fbe10cb13b32abc83c48502ab552b3e",
+  "outputSha": "aa6423f1181040992b13d144f565cb000c7fdf1f58a353693331ed6ff2a27fc3",
   "outputTail": "== architecture_contracts ==\r\n  PASS  l1_layers_one_direction\r\n  PASS  l2_phases_are_filters\r\n  PASS  l3_systems_sealed\r\n  PASS  l4_headless_pipeline\r\n  PASS  l5_no_type_id_literals_below_workbench\r\n  PASS  ratchet_entries_still_real\r\n  PASS  parts_all_known\r\n  -> 7/7 passed\r\n\r\nrunning PL4 (frozen reference)...\r\nrunning PL5...\r\n\r\ncompared 14 SSOT files + 39 output files\r\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)",
-  "ranAt": "2026-09-26T05:38:09.487Z",
-  "headCommit": "d2551175d24f5b8fd58e219961267d17703e5a5b",
+  "ranAt": "2026-10-07T12:01:18.666Z",
+  "headCommit": "7e11385c9ae1cb28477dfb757a5708c884a720c9",
   "tests": [
     {
       "name": "Pipeline5App/tests/unit/test_gui_phase_model.py",
@@ -19,7 +19,7 @@
     {
       "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
       "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
-      "fileSha": "7a3cfe3cf17fef5a2d7104fc481c4e7ecfce867ec64a29fe2f334a39e5cad00d"
+      "fileSha": "f1539dd38ddc8f3701006b87141793a6509d327b07d2c6dfd24881df080db2cc"
     },
     {
       "name": "Pipeline5App/tests/unit/test_project_manager.py",
