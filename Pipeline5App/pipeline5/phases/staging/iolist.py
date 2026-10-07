@@ -27,7 +27,7 @@ from pipeline5.truth.content_hash import uid as content_uid
 from pipeline5.truth import identity
 from pipeline5.phases.staging import cematrix as matrix
 from pipeline5.truth.diagnosis import diagnosis_cabinets_table
-from pipeline5.truth.signals import signals_table
+from pipeline5.truth.signals import signals_table, is_generated   # noqa: F401 - re-exported
 from pipeline5.documents import xlsx_reader as workbook
 
 _DIAGBLOCKS_SHEETS = frozenset({"diagnosisblocks", "diagnosticblocks"})   # current + legacy spelling
@@ -69,6 +69,21 @@ def _dup_type_index_findings(table) -> list:
             out.append(_f("stg_dup_type_index", "FAIL",
                           f"duplicated {st} index {idx} - a (script_type, index) pair must be unique"
                           + (f" (also at {others})" if others else ""), _norm(row.get("source_cell"))))
+    return out
+
+
+def generated_dup_findings(table) -> list:
+    """The staging duplicate checks (`stg_dup_signal_uid`, `stg_dup_type_index`) over the table AFTER the
+    generated signals were absorbed, kept for the groups a GENERATED row is in - a spawn duplicating a document
+    row (or another spawn) halts generation as the same pair in the document would ([[C-030]] round 1)."""
+    gen = [r for r in table.rows if is_generated(r)]
+    if not gen:
+        return []
+    uids = {r.get("uid") for r in gen}
+    cells = {_norm(r.get("source_cell")) for r in gen}
+    out = [f for f in _dup_findings(table) if f.location in uids]
+    out += [f for f in _dup_type_index_findings(table)
+            if f.location in cells or any(c and c in f.detail for c in cells)]
     return out
 
 
@@ -216,14 +231,15 @@ def _derive_identity(row: dict, signal_diag: dict, sorter_names: set, keep: froz
         diag_template = signal_diag.get(str((row.get("type") or {}).get("type_id", "")).upper(),
                                         {}).get("diag_desc", "")
         row["diag_desc"] = identity.interp(diag_template, row)   # the resolved per-type diagnosis text
+    set_table = row.get("tagtable") if "tagtable" in keep else ""     # a table the RULE set, kept on its own
     if "name_in_tagtable" in keep and row.get("name_in_tagtable"):
         if identity.is_io_signal(row):
-            row["tagtable"] = row.get("tagtable") or identity.tagtable(row)
+            row["tagtable"] = set_table or identity.tagtable(row)
         else:
             row["name_in_tagtable"], row["tagtable"] = "", ""
     elif identity.is_io_signal(row) and identity.tag_name(row):
         row["name_in_tagtable"] = identity.tag_name(row)
-        row["tagtable"] = identity.tagtable(row)
+        row["tagtable"] = set_table or identity.tagtable(row)
     else:
         row["name_in_tagtable"] = ""
         row["tagtable"] = ""
@@ -233,9 +249,6 @@ def _derive_identity(row: dict, signal_diag: dict, sorter_names: set, keep: froz
 _RULE_SET_FIELDS = frozenset({"name_in_tagtable", "tagtable", "diag_desc"})
 
 
-def is_generated(row) -> bool:
-    """A signal a chain reaction spawned (no document row behind it - its provenance is `spawned_by`)."""
-    return bool(str(row.get("spawned_by") or "").strip())
 
 
 def absorb_spawned(database, params: dict | None = None) -> int:

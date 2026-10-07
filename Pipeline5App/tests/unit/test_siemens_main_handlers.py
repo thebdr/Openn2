@@ -1102,6 +1102,153 @@ def test_generated_signals_reach_generation():
             config.use_project(previous_project)
 
 
+def _rules_project(project, params, rules, templates):
+    """A PROJECT with its own after_300 rules (`rules` = data rows of reactions.csv) and templates.yaml text."""
+    import csv
+    from ruamel.yaml import YAML
+    shared = os.path.join(project, "config_project", "shared")
+    rx_dir = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions")
+    os.makedirs(shared)
+    os.makedirs(rx_dir)
+    with open(os.path.join(shared, "project_params.yaml"), "w", encoding="utf-8") as handle:
+        YAML(typ="safe").dump(params, handle)
+    with open(os.path.join(rx_dir, "reactions.csv"), "w", encoding="utf-8", newline="") as handle:
+        csv.writer(handle).writerows(
+            [["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"]] + rules)
+    with open(os.path.join(rx_dir, "templates.yaml"), "w", encoding="utf-8") as handle:
+        handle.write(templates)
+
+
+_QBAD_RULE = ["qbad", "after_300", "signals", "$script_type ~ /^KQ/ and $bit ~ /^Q/", "add_rows", "signals",
+              "qbad_rows", "the QBAD of every contactor output"]
+_QBAD_TPL = ("qbad_rows:\n  - script_type: \"KB\"\n    bit: \"{regex_replace($bit, /^Q/, 'I')}\"\n"
+             "    functional_unit: \"{$functional_unit}\"\n    location: \"{$location}\"\n    device: \"{$device}\"\n"
+             "    name_in_tagtable: \"QBAD_{$name_in_tagtable}\"\n")
+
+
+def _run_all(host):
+    for number in SYSTEM.phases.run_order():
+        SYSTEM.handlers[SYSTEM.phases.by_number(number).handler](host.ctx())
+
+
+def _builder_data(out_root):
+    """{relative path: content} of the BuilderData tree - .xlsx by cell values (zip containers are not
+    byte-stable), everything else by bytes."""
+    from openpyxl import load_workbook
+    tree = {}
+    for dirpath, _dirs, files in os.walk(out_root):
+        for name in files:
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, out_root).replace(os.sep, "/")
+            if "BuilderData" not in rel:
+                continue
+            if name.endswith(".xlsx"):
+                wb = load_workbook(path, read_only=True)
+                tree[rel] = {ws.title: [list(r) for r in ws.iter_rows(values_only=True)] for ws in wb.worksheets}
+                wb.close()
+            else:
+                tree[rel] = open(path, "rb").read()
+    return tree
+
+
+def test_generated_signals_change_only_their_own_outputs():
+    """C-030 refute round 1, at the clause's altitude: Run-all WITH the QBAD rule vs WITHOUT it - every
+    BuilderData file but the PLC tag tables is byte-identical (the hardware included: a generated signal sits
+    under no station), the tags gain exactly the QBADs, and after Run-all (its last step, 100, judges the
+    documents) the saved signals still hold every generated row."""
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as on, tempfile.TemporaryDirectory() as off:
+        _rules_project(on, params, [_QBAD_RULE], _QBAD_TPL)
+        _rules_project(off, params, [], "")
+        try:
+            config.use_project(off)
+            _run_all(_Host())
+            base = _builder_data(config.output_root())
+            config.use_project(on)
+            _run_all(_Host())
+            with_rule = _builder_data(config.output_root())
+            sig = _read_csv(os.path.join(config.database_dir(), "signals.csv"))
+            log = _read_csv(os.path.join(config.database_dir(), "chain_reactions_log.csv"))
+        finally:
+            config.use_project(previous_project)
+    changed = sorted(k for k in set(base) | set(with_rule) if base.get(k) != with_rule.get(k))
+    ok(changed and all("PlcTags" in k for k in changed), f"only the PLC tag tables change: {changed}")
+    gen = [r for r in sig if r.get("spawned_by") == "qbad"]
+    created = sum(int(r["created"]) for r in log if r["rule"] == "qbad")
+    ok(created > 0 and len(gen) == created, f"after Run-all the saved signals hold the {created} generated rows ({len(gen)})")
+
+
+def test_lone_buttons_in_a_fresh_project():
+    """C-030 refute round 1: in FRESH projects (nothing ran before) a lone 510 emits the generated tags and a lone
+    700 the same hardware as Run-all, and neither writes the reaction record (phase 300 owns it)."""
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as ref, tempfile.TemporaryDirectory() as a, \
+            tempfile.TemporaryDirectory() as b:
+        for p in (ref, a, b):
+            _rules_project(p, params, [_QBAD_RULE], _QBAD_TPL)
+        try:
+            config.use_project(ref)
+            _run_all(_Host())
+            ref_tree = _builder_data(config.output_root())
+            config.use_project(a)
+            SYSTEM.handlers["data_blocks"](_Host().ctx(), only=510)
+            tags = _builder_data(config.output_root())
+            no_log_a = not os.path.exists(os.path.join(config.database_dir(), "chain_reactions_log.csv"))
+            config.use_project(b)
+            SYSTEM.handlers["hardware"](_Host().ctx())
+            hw = _builder_data(config.output_root())
+            no_log_b = not os.path.exists(os.path.join(config.database_dir(), "chain_reactions_log.csv"))
+        finally:
+            config.use_project(previous_project)
+    tag_files = [k for k in tags if "PlcTags" in k]
+    ok(tag_files and all(tags[k] == ref_tree.get(k) for k in tag_files), "a lone 510 = Run-all's tags (the QBADs incl.)")
+    hw_files = [k for k in hw if "HardwareConfiguration" in k]
+    ok(hw_files and all(hw[k] == ref_tree.get(k) for k in hw_files), "a lone 700 = Run-all's hardware")
+    ok(no_log_a and no_log_b, "a generation button writes no reaction record")
+
+
+def test_cascade_orphan_and_validation_see_absorbed_rows():
+    """C-030 refute round 1: within ONE hook a later rule reads an earlier rule's spawns ABSORBED - a condition on
+    a derived field matches them and its source_uid is their saved uid; a generated row landing in no output is
+    an ORPHAN; a spawn the 140 check would flag (a C&E-mandatory type unknown to the C&E) stays unseen by 100."""
+    params = config.load_params()
+    previous_project = config.active_project()
+    rules = [_QBAD_RULE,
+             ["echo", "after_300", "signals", "$script_type = 'KB' and $tagtable = 'SAFETY_Contactors'", "add_rows",
+              "signals", "echo_rows", "reads the absorbed QBADs"],
+             ["lost", "after_300", "", "", "add_rows", "signals", "lost_rows", "a signal nothing consumes"]]
+    tpl = (_QBAD_TPL + "echo_rows:\n  - script_type: \"ZZ_ECHO\"\n    functional_unit: \"{$functional_unit}\"\n"
+           "    device: \"{$device}\"\n    desc_l1: \"echo\"\n"
+           "lost_rows:\n  - script_type: \"KQ\"\n    functional_unit: \"=NOWHERE\"\n    device: \"-K999\"\n"
+           "    bit: \"Q999.7\"\n    desc_l1: \"EMERGENCY\"\n")
+    with tempfile.TemporaryDirectory() as project:
+        _rules_project(project, params, rules, tpl)
+        try:
+            config.use_project(project)
+            host = _Host()
+            SYSTEM.handlers["staging"](host.ctx())
+            sig = _read_csv(os.path.join(config.database_dir(), "signals.csv"))
+            qbad = {r["uid"] for r in sig if r.get("spawned_by") == "qbad"}
+            echo = [r for r in sig if r.get("spawned_by") == "echo"]
+            ok(qbad and len(echo) == len(qbad), f"the echo matched every absorbed QBAD ({len(echo)} / {len(qbad)})")
+            ok(all(r["source_uid"] in qbad for r in echo), "its source_uid is a saved QBAD uid")
+            eq(len({r["source_cell"] for r in echo}), len(echo), "one provenance per source - no #n chain")
+            SYSTEM.handlers["reporting"](_Host().ctx())
+            cov = _read_csv(os.path.join(config.database_dir(), "coverage.csv"))
+            lost = [r for r in cov if r.get("source_cell", "").startswith("lost:")]
+            ok(lost and lost[0].get("kind") == "generated", "the lost spawn is a generated row in coverage")
+            val = _Host()
+            SYSTEM.handlers["validation"](val.ctx())
+            seen = [f for batch in val.rendered for f in batch
+                    if any(str(getattr(f, k, "")).startswith(("lost:", "qbad:", "echo:")) for k in ("location", "location2"))
+                    or "=NOWHERE" in str(getattr(f, "detail", ""))]
+            eq(seen, [], "validation judges the documents only - the lost KQ is not checked against the C&E")
+        finally:
+            config.use_project(previous_project)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("siemens_main_handlers", [
@@ -1132,6 +1279,9 @@ if __name__ == "__main__":
         ("a_blank_range_end_invents_nothing_on_the_real_fixture",
          _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),
         ("generated_signals_reach_generation", _sandboxed(test_generated_signals_reach_generation)),
+        ("generated_signals_change_only_their_own_outputs", _sandboxed(test_generated_signals_change_only_their_own_outputs)),
+        ("lone_buttons_in_a_fresh_project", _sandboxed(test_lone_buttons_in_a_fresh_project)),
+        ("cascade_orphan_and_validation_see_absorbed_rows", _sandboxed(test_cascade_orphan_and_validation_see_absorbed_rows)),
         ("310_leg_appends_reaction_findings_to_the_existing_record",
          _sandboxed(test_310_leg_appends_reaction_findings_to_the_existing_record)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),

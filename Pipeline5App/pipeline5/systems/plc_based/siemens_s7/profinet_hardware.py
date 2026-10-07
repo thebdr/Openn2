@@ -58,7 +58,7 @@ from pipeline5.findings import gate as run
 from pipeline5.truth.database import Database
 from pipeline5.findings.finding import Finding, record
 from pipeline5.truth.table import Table
-from pipeline5.truth.signals import signals_table
+from pipeline5.truth.signals import signals_table, is_generated
 
 HEAD_PLC = "PLC"
 HEAD_CM = "PLCCARDCM"
@@ -324,6 +324,8 @@ def extract(rows, dtd) -> tuple:
             })
 
     for row in rows or []:
+        if is_generated(row):                    # a generated signal sits under no head in the document - a
+            continue                             # POSITIONAL walk never gives it to a station ([[C-030]] round 1)
         role = _role(row)
         if role is not None:
             finalize()

@@ -43,6 +43,12 @@ ENRICHED_COLUMNS = [
 ]
 
 
+def is_generated(row) -> bool:
+    """A signal a chain reaction spawned ([[C-030]]): no document row behind it - its provenance is `spawned_by`.
+    It sits under no node in the document, so a POSITIONAL reader (hardware stations / cards) skips it."""
+    return bool(str((row or {}).get("spawned_by") or "").strip())
+
+
 def signals_table(iolist_columns) -> Table:
     """Build the empty `signals` Table: `uid`, then the raw IoList canonical columns VERBATIM (in their
     given order), then the enriched columns (those not already a raw column). `iolist_columns` is the

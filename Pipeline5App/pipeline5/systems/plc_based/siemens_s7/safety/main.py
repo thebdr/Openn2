@@ -123,7 +123,7 @@ def run_validation(ctx, only=None):
         from pipeline5.findings import report_renderer as iorender
         ctx.emit("PHASE", f"100 {i18n.tr('ph_validation', ctx.lang)}  (110 + 120 + 130 + 140 + 150)")
         ctx.status("validation…")
-        database, _sf = staging.stage(system=ctx.system)
+        database, _sf = staging.stage(system=ctx.system, save=False)   # judges the DOCUMENTS (C-030)
         res = validation.run_validation(database, lang=ctx.lang)
         issues = [f for f in res["findings"] if f.severity in ("FAIL", "ERRR", "WARN")]
         applied = treatments.apply_and_reconcile(issues)   # registry maintenance
@@ -148,10 +148,10 @@ def run_validation(ctx, only=None):
         elif only == 120:
             findings = matrix.run_ce_matrix(params)
         elif only == 150:                      # diagnosis checks over the staged SSOT
-            database, _sf = staging.stage(params, system=ctx.system)
+            database, _sf = staging.stage(params, system=ctx.system, save=False)
             findings = diagcheck.run_diag_checks(database, params)
         else:                                  # 130 / 140 read the staged signals
-            database, _sf = staging.stage(params, system=ctx.system)
+            database, _sf = staging.stage(params, system=ctx.system, save=False)
             runner = crosscheck.run_xcheck_cem_iol if only == 130 else crosscheck.run_xcheck_iol_cem
             findings = runner(database, params)
     issues = [f for f in findings if f.severity in ("FAIL", "ERRR", "WARN")]
@@ -200,7 +200,7 @@ def run_fill(ctx, only=None):
             230: "pb_fill_diag_cabinet", 240: "pb_fill_diag_bit"}
     label = f"{only or 200} {i18n.tr(keys.get(only, 'ph_fill'), ctx.lang)}"
     ctx.emit("PHASE", label)
-    database, _sf = staging.stage(system=ctx.system)   # the READ of the source doc (stage #1)
+    database, _sf = staging.stage(system=ctx.system, save=False)   # the READ of the source doc (stage #1)
     res = fill.fill_out(database, only=only)
     if not ctx.gate(res["findings"], label=label):
         return
@@ -220,7 +220,7 @@ def run_risky_index(ctx, only=None):
     ctx.status("risky index…")
     label = f"245 {i18n.tr('pb_risky_index', ctx.lang)}"
     ctx.emit("PHASE", label)
-    database, _sf = staging.stage(system=ctx.system)   # the read of the (already-filled) source doc
+    database, _sf = staging.stage(system=ctx.system, save=False)   # the read of the (already-filled) source doc
     res = fill.risky_index_fill(database)
     ctx.render(res["findings"], label="245 risky index")           # doc already written
     backup = f"  (backup {os.path.basename(res['backup'])})" if res.get("backup") else "  (no change)"
@@ -295,29 +295,36 @@ REACTION_ABSORBS = {"after_300": ("signals",)}
 
 
 def _stage_generation(ctx):
-    """The staging every GENERATION phase (400-900) builds on ([[C-030]]): the documents staged, then - when
-    the rules give `after_300` business - the after_300 reactions re-fired IN MEMORY over it (write=False:
-    no file appended, no record written - phase 300 owns those) and their spawned signals absorbed as
-    first-class staged signals. So a generated signal reaches tags, blocks, hardware and coverage from any
-    phase button exactly as from Run-all, and is never stale (the rules read the current documents).
-    Validation (100) and the fill (200) judge / write the DOCUMENTS and stage without them. A blocking
-    staging finding skips the reactions (the generation guard); the engine dark - no rules, as shipped -
-    is a strict no-op. Returns (database, staging findings)."""
+    """The staging every GENERATION phase (400-900) builds on ([[C-030]]). The engine dark - no after_300
+    business, as shipped - it is exactly the staging (a strict no-op). Otherwise the documents are staged IN
+    MEMORY, the after_300 reactions re-fired over it with NO record (write=False, persist=False: no file
+    appended, no audit, nothing saved - phase 300 owns those) absorbing each rule's spawns as first-class
+    staged signals before the next rule reads `_db` (the in-hook cascade), the duplicate checks re-run over
+    the absorbed signals (a spawn duplicating a row halts as a document duplicate would), and the result
+    saved ONCE - so the saved signals always carry the generated ones, never a half state. A generated signal
+    reaches tags, blocks, hardware and coverage from any phase button exactly as from Run-all, and is never
+    stale (the rules read the current documents). Validation (100), the fill (200) and the risky fill (245)
+    judge / write the DOCUMENTS: they stage without them and never re-save the signals. A blocking staging
+    finding skips the reactions (the generation guard). Returns (database, findings)."""
     from pipeline5 import config
     from pipeline5.findings import gate as run
     from pipeline5.phases.chain_reactions import engine as reactions
     from pipeline5.phases.staging import iolist as staging
-    database, findings = staging.stage(system=ctx.system)
-    if run.has_blocking(findings):
-        return database, findings
     try:
         rows = config.load_reactions()
+        business = reactions.has_business("after_300", rows, _REACTION_HOOKS)
     except Exception:  # noqa: BLE001 - an unreadable rule index: phase 300 reports it; generation goes on
+        business = False
+    if not business:
+        return staging.stage(system=ctx.system)
+    database, findings = staging.stage(system=ctx.system, save=False)
+    if run.has_blocking(findings):
         return database, findings
-    if not reactions.has_business("after_300", rows, _REACTION_HOOKS):
-        return database, findings
-    database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS, write=False)
+    database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS, write=False, persist=False,
+                                  absorb=staging.absorb_spawned)
     generated = staging.absorb_spawned(database)
+    findings = findings + staging.generated_dup_findings(database["signals"])
+    database.save(config.database_dir())
     if generated:
         ctx.emit("INFO", f"  {generated} generated signal(s) absorbed (the after_300 reactions, re-fired in memory)")
     if rx:
@@ -374,12 +381,14 @@ def run_staging(ctx, only=None):
         settled = reactions.settle(database, deferred)   # before_300's audit + findings join the staged record
         if settled:                                   # (a record that cannot load/save is reported)
             ctx.render(settled, label="before_300 reactions")
-        database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS)
+        database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS,
+                                      absorb=staging.absorb_spawned)   # [[C-030]]: first-class as they come
         if rx:
             ctx.render(rx, label="after_300 reactions")
-        generated = staging.absorb_spawned(database)      # [[C-030]]: the spawns, first-class + re-saved
-        if generated:
-            database.save(config.database_dir())
+        generated = staging.absorb_spawned(database)      # (idempotent: the count; the fire saved them)
+        dups = staging.generated_dup_findings(database["signals"])
+        if dups:
+            ctx.gate(dups, label="after_300 generated signals")
     signals = database["signals"]
     suffix = "  (I/O List only - run 320 for the C&E)" if only == 310 else ""
     gen = f" ({generated} generated)" if generated else ""

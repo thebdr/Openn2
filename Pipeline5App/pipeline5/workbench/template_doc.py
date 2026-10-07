@@ -849,8 +849,12 @@ class Session:
                     if deferred is not None:
                         notes += engine.settle_view(database, deferred)
             if not self.params_problem:                   # (unreadable params block every rule: no spawns)
+                absorb = None
+                if (getattr(self, "absorbs", {}) or {}).get(rule.fire_when):   # as the run-plan's fire (C-030)
+                    from pipeline5.phases.staging import iolist as staging
+                    absorb = staging.absorb_spawned
                 database, _problems = engine.cascade(rules, rule, database, templates=templates,
-                                                     params=self.params)
+                                                     params=self.params, absorb=absorb)
             view = (database, engine.db_layer(database))
             with self._lock:                              # the check AND the write: a reload cannot land between
                 if generation != self.generation:         # reloaded meanwhile: over a stale build - never cached
@@ -1009,12 +1013,16 @@ class Session:
         elif rule.action == "file" and not shown.note:
             lines += [f"APPEND to {shown.path}:", shown.text]
         if shown.rows:
+            absorbed = rule.target in (getattr(self, "absorbs", {}) or {}).get(rule.fire_when, ())
             lines.append(f"SPAWN into {rule.target}:")
-            lines += ["  " + ", ".join(f"{k}={v!r}" for k, v in row_values.items()) for row_values in shown.rows]
-            if rule.target in (getattr(self, "absorbs", {}) or {}).get(rule.fire_when, ()):
+            # an absorbed row's uid is stamped AT absorption (from its derived identity + provenance) - the raw
+            # one would be a value no saved row carries (C-030 round 1): shown without it
+            lines += ["  " + ", ".join(f"{k}={v!r}" for k, v in row_values.items() if not (absorbed and k == "uid"))
+                      for row_values in shown.rows]
+            if absorbed:
                 lines.append(f"note: these rows are GENERATED {rule.target} - every generation phase re-fires "
                              "this rule and absorbs them, so they reach generation (tags, blocks, hardware, "
-                             "coverage - C-030)")
+                             "coverage - C-030); the type, tag, provenance and uid are derived at absorption")
             elif database is not None and rule.target in database and self._restaged(rule):
                 lines.append(f"note: later phases re-stage {rule.target} from the source documents - these rows "
                              "reach the saved Database, not generation")

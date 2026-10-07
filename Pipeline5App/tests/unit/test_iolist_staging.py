@@ -299,6 +299,28 @@ def test_absorb_spawned_makes_a_generated_signal_first_class():
     ok(staging.is_generated(g) and not staging.is_generated(doc), "is_generated")
 
 
+def test_absorb_keeps_a_rule_set_table_and_finds_generated_duplicates():
+    """C-030 refute round 1: a tag table the RULE set is kept even without a rule-set tag name; a spawn that
+    duplicates a document (script_type, index) is the stg_dup_type_index FAIL a document duplicate would be."""
+    from pipeline5.config import paths
+    from pipeline5.truth.database import Database
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    paths.use_system(SYSTEM)
+    sig = signals_table(["functional_unit", "location", "device", "script_type", "bit", "index"])
+    doc = sig.add(functional_unit="=A", device="-K1", script_type="KQ", bit="Q1.0", index="0005", source_cell="NET!O5")
+    sig.add_row({"functional_unit": "=A", "device": "-K1", "script_type": "KB", "bit": "I1.0", "tagtable": "MY_TABLE",
+                 "spawned_by": "r", "source_uid": doc["uid"]})
+    sig.add_row({"functional_unit": "=B", "device": "-K2", "script_type": "KQ", "bit": "Q2.0", "index": "0005",
+                 "spawned_by": "dup", "source_uid": doc["uid"]})
+    db = Database([sig])
+    staging.absorb_spawned(db, params={})
+    kb = next(r for r in sig.rows if r.get("spawned_by") == "r")
+    eq(kb["tagtable"], "MY_TABLE", "the rule's table kept, without a rule-set name")
+    dups = staging.generated_dup_findings(sig)
+    eq(sorted(f.type for f in dups), ["stg_dup_type_index", "stg_dup_type_index"], "the KQ-0005 pair, both rows")
+    eq(staging.generated_dup_findings(signals_table(["script_type"])), [], "no generated rows: nothing")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("staging", [
@@ -318,4 +340,5 @@ if __name__ == "__main__":
         ("read_view_stores_the_canonical_address", test_read_view_stores_the_canonical_address),
         ("cematrix_matches_a_dotted_ce", test_cematrix_matches_a_dotted_ce),
         ("absorb_spawned_makes_a_generated_signal_first_class", test_absorb_spawned_makes_a_generated_signal_first_class),
+        ("absorb_keeps_a_rule_set_table_and_finds_generated_duplicates", test_absorb_keeps_a_rule_set_table_and_finds_generated_duplicates),
     ]))

@@ -671,7 +671,7 @@ def _finish(hook: str, database, log_rows: list, findings: list) -> tuple:
 
 
 def fire(hook: str, database, *, rules=None, templates=None, params=None,
-         files_root=None, hooks=None, write: bool = True) -> tuple:
+         files_root=None, hooks=None, write: bool = True, persist: bool = True, absorb=None) -> tuple:
     """Fire every rule registered for `hook` (CSV order) and return (database, findings).
 
     `database` may be None for a hook where no staged Database exists (before_300): add_rows rules
@@ -682,7 +682,10 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
     rule naming any other hook would never fire, so it is reported (`rx_unfired_hook`). `write`
     False = a DRY fire (the template builder's model of a settle): every step - the audit rows and
     findings a real fire gives - but a file rule writes nothing (only a write the OS itself would
-    refuse is beyond it).
+    refuse is beyond it). `persist` False = an IN-MEMORY re-fire ([[C-030]]: every generation phase re-fires
+    after_300 over its own staging): no record attached, no audit, nothing saved - the spawns live in
+    `database` only. `absorb` = callable(database): run after every add_rows rule that spawned, BEFORE `_db`
+    is rebuilt, so a later rule of the hook sees the spawns as the run-plan makes them first-class (C-030).
 
     STRICT NO-OP when the hook has nothing to do - no rule for it (valid or malformed) and no
     rule-INDEX problem (a malformed row naming no hook, a rule on a hook nobody fires, an unreadable
@@ -690,13 +693,19 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
     empty-config byte-parity guarantee. Index-wide problems are every hook's business: rendered at
     each fire, recorded once (uid dedupe)."""
     hook = hook.strip().lower()
+
+    def done(log_rows: list, found: list) -> tuple:
+        if not persist and database is not None:       # in memory: no record, nothing saved
+            return database, found
+        return _finish(hook, database, log_rows, found)
+
     if isinstance(rules, list) and rules and isinstance(rules[0], Rule):
         compiled, tagged = list(rules), []
     else:
         if rules is None:
             rules, problem = _load(config.load_reactions, "rx_rules_unreadable", RULES_FILE)
             if problem is not None:      # a broken rule index is every hook's business - never silent
-                return _finish(hook, database, [], [problem])
+                return done([], [problem])
         compiled, tagged = _compile(rules)
     if hooks is not None:                # the run-plan's own hooks: a rule anywhere else never fires
         declared = [h.strip().lower() for h in hooks]   # the run-plan's firing order (for the message)
@@ -731,13 +740,15 @@ def fire(hook: str, database, *, rules=None, templates=None, params=None,
         if blocked is None:
             matched, problems = _act(rule, database, templates, params, db_tables, files_root, tally, write)
         if rule.action == "add_rows" and tally["created"]:
+            if absorb is not None and database is not None:
+                absorb(database)                             # the spawns made first-class first (C-030)
             db_tables = _db_tables(database)                 # the CASCADE: a later rule's `_db` sees this
         findings.extend(problems)                            # rule's spawns, as its matching does (round 9)
         outcome = blocked.type if blocked is not None else (problems[0].type if problems else "ok")
         log_rows.append({"hook": rule.fire_when, "rule": rule.name, "action": rule.action,
                          "target": rule.target, "matches": len(matched), "created": tally["created"],
                          "outcome": outcome})
-    return _finish(hook, database, log_rows, findings)
+    return done(log_rows, findings)
 
 
 # --- the template builder's doors (P-012) - side-effect free ------------------------------------- #
@@ -844,7 +855,7 @@ def copy_database(database):
     return Database([_copy(database[name]) for name in database.names()])
 
 
-def cascade(rules, rule: Rule, database, *, templates: dict, params: dict) -> tuple:
+def cascade(rules, rule: Rule, database, *, templates: dict, params: dict, absorb=None) -> tuple:
     """The Database `rule` sees WITHIN its hook's fire: `database` plus the rows every EARLIER add_rows
     rule of that hook spawns (CSV order - the chain reaction within one hook), each through the
     fire's own `_act` on a COPY (nothing saved; a file rule changes no table and is skipped). Returns
@@ -864,6 +875,8 @@ def cascade(rules, rule: Rule, database, *, templates: dict, params: dict) -> tu
         _matched, found = _act(other, copy, templates, params, db_tables, "", tally)
         problems.extend(found)
         if tally["created"]:
+            if absorb is not None:
+                absorb(copy)                                  # as the run-plan's fire absorbs (C-030)
             db_tables = _db_tables(copy)                      # as the fire rebuilds `_db` after a spawn
     return copy, problems
 
