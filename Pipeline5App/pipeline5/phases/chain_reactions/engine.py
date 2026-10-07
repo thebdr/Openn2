@@ -77,9 +77,10 @@ whichever PHASE - meets the file). A HALTED staging commits no reaction record (
 before_300 firings in the log instead - a half-committed record would mix runs).
 
 THE TEMPLATE BUILDER (C-025 - the Files tab's templates.yaml mode) reads the engine through
-side-effect-free doors: `lint(templates, rule, database, hooks)` - what a fire would report, found
+side-effect-free doors: `lint(templates, rule, database, hooks, params)` - what a fire would report, found
 WITHOUT firing (every branch of every template; with a chosen rule, its E1 scope and its hook's
-tables) - and `preview(rule, row_index, ...)` - one fire for one source row through the fire path's
+tables; the project params `$_params` renders) - `saved_templates_problem()` - the fire's own verdict on
+the templates.yaml it reads - and `preview(rule, row_index, ...)` - one fire for one source row through the fire path's
 OWN guards and render steps (the hook check, the backstop, `_spawned`, `_file_output`), nothing
 added, nothing written. The Database a preview renders over is the one the fire GETS: the system's
 declared hook loader (the run-plan's own input, rebuilt in memory), a settled database-less hook
@@ -898,7 +899,7 @@ def settle_view(database, deferred=None) -> list:
     return [f"{p.type}: {p.detail}" for p in problems]
 
 
-def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -> list:
+def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None, params=None) -> list:
     """What a fire would report for `templates`, found WITHOUT firing -> [tempemplator.Problem]. Every
     entry is judged for its KIND: a TEXT template (a string) by `tempemplator.lint` (every branch), a
     ROW template by `_row_template_problem` + each value by `tempemplator.lint_line` (`where` =
@@ -906,15 +907,17 @@ def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -
     database-less hook) and the run-plan's `hooks` - the rule's own template is also judged in the
     rule's E1 scope (the matched row's columns + _params/_rule/_db; the hook's tables for the loops),
     and the RULE's own problems come back with template=None: a template of the wrong kind, a table
-    absent at the hook, a hook never fired, a target that will not render."""
+    absent at the hook, a hook never fired, a target that will not render. `params` = the project params
+    every fire renders `$_params` with (None = unknown): a format spec or a range end their value does not
+    take is an error wherever it sits (C-025 refute round 8)."""
     problems, fields, tables, json, json_fields = [], None, None, None, None
     values = None
     if rule is not None:
         values = _column_values(rule, database)
-        fields, tables, json, json_fields = _lint_rule(rule, templates, database, hooks, problems, values)
+        fields, tables, json, json_fields = _lint_rule(rule, templates, database, hooks, problems, values, params)
     text_start = rule.template if rule is not None and rule.action == "file" else None
     problems.extend(tempemplator.lint(templates, start=text_start, fields=fields, tables=tables,
-                                      json=json, json_fields=json_fields, values=values))
+                                      json=json, json_fields=json_fields, values=values, params=params))
     row_start = rule.template if rule is not None and rule.action == "add_rows" else None
     for name, body in templates.items():
         if isinstance(body, str):
@@ -933,13 +936,14 @@ def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -
                 if isinstance(value, str):
                     found = tempemplator.lint_line(value, fields=fields if own else None, tables=tables if own else None,
                                                    json=json_fields if own else None,
-                                                   values=_own_values(values) if own and values is not None else None)
+                                                   values=_own_values(values) if own and values is not None else None,
+                                                   params=params)
                     problems.extend(tempemplator.Problem(name, (number, str(column)), s, e, message, severity)
                                     for s, e, message, severity in found)
     return problems
 
 
-def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list, values) -> tuple:
+def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list, values, params=None) -> tuple:
     """The rule's own problems (appended, template=None) -> its E1 (fields, tables, {table: JSON columns},
     the source row's JSON fields); fields None when the source table is absent (every hole would read
     as missing - one problem says why). A file target's holes are judged as a text line's: a format spec
@@ -969,7 +973,7 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list, val
     if rule.action == "file":
         for start, end, message, severity in tempemplator.lint_line(rule.target, fields=fields, tables=tables,
                                                                     json=json_fields, stored=False,
-                                                                    values=_own_values(values)):
+                                                                    values=_own_values(values), params=params):
             problem(f"target {rule.target!r}: {message}", "target", start, end, severity)
         refusal = _literal_refusal(rule.target)
         if refusal is not None:

@@ -60,7 +60,9 @@ What RUNS is your project's own copy: a new project is created with a copy of ev
 files in its per-system configuration folder (`<project>/config_project/systems/<system>/`, same
 relative path - under **Project configuration**), and that copy **overrides** the shipped one. So
 the button on a shipped file usually reads **Open project copy** - it takes you to the file you
-edit. On a project without its own copy of a file it reads **Create project copy** and makes one.
+edit: the copy that runs, wherever your project keeps it (its per-system folder, or its `shared`
+folder). On a project without its own copy of a file it reads **Create project copy** and makes one -
+never over a copy the project already has.
 With no project open there is nowhere to put a copy (the button is disabled); then **Project
 configuration** shows the app's builtin project configuration, which is what runs - and is edited
 - until a project is opened. A project that carries its own `files_tab` block needs this section
@@ -85,7 +87,10 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   - a hole that does not compile, a lone brace, a format spec no value can satisfy (`{$x:03D}`) - or
     none the hole's value can take: `where` / `unique` give a list, `first` / `node_of` a record (an
     empty one when nothing is found), `count` / `len` a number, a range loop variable a whole number,
-    a table loop variable its row (`{where(signals):>5}`, `{count(signals):s}` - every render fails).
+    a table loop variable its row (`{where(signals):>5}`, `{count(signals):s}` - every render fails);
+  - a project parameter the template cannot use - its value is the same for every row, so the render
+    fails wherever it is reached: a format spec it does not take (`{$_params.code:04d}` with
+    `code: 8X`), a range end it gives that is not a whole number (`1..{$_params.n}` with `n: 2.5`).
 
   Warnings flag renders that succeed but probably are not what you meant:
   - a `where` that reads its own loop variable, or an `@if` that reads a loop row's missing column

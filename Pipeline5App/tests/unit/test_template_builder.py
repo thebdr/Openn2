@@ -935,6 +935,65 @@ def test_a_targets_format_spec_is_tried_on_its_values():
     _sandboxed(body)
 
 
+def test_a_params_value_a_spec_or_a_range_end_cannot_take_is_an_error():
+    """C-025 refute round 8 (#2): a `$_params` value is a constant the project params give every fire - yet the lint
+    never consulted it: `{$_params.code:04d}` with code `8X`, `{$_params.areas:>6}` with a list and
+    `@for $i in 1..{$_params.n}` with n 2.5 linted clean while every render reaching them fails. Each is an ERROR
+    now - in a text template (in a branch too), a row value and a file target; a value the spec takes, a blank or
+    a missing parameter (optional - it renders blank) stays clean, and unknown params judge nothing. Lint = the
+    preview of the row taking the branch = the fire."""
+    import tempfile
+    from pipeline5.workbench import template_doc
+    params = {"code": "8X", "areas": [1, 2], "n": 2.5, "num": 12, "blank": ""}
+    spec_error = ("bad format spec '04d' for $_params.code - the project parameter is '8X': every render reaching it "
+                  "fails (bad format spec '04d' for value '8X': could not convert string to float: '8X')")
+    templates = {"m": "@if $kind = \"motor\"\nM-{$_params.code:04d}-{$name}\n@else\nX-{$name}\n@end",
+                 "a": "{$_params.areas:>6}", "r": "@for $i in 1..{$_params.n}: x{$i}",
+                 "ok": "{$_params.num:04d}{$_params.blank:04d}{$_params.missing:04d}\n@for $i in 1..{$_params.num}: y\n"
+                       "@for $j in 1..{$rows}: z",                     # (a row's end: the data's - not judged here)
+                 "rows": [{"label": "L-{$_params.code:04d}-{$name}"}]}
+
+    def errors(problems):
+        return sorted((p.template, p.where, p.message) for p in problems if p.severity == "error")
+
+    found = errors(engine.lint(templates, params=params))
+    eq(found, sorted([("m", 2, spec_error), ("rows", (1, "label"), spec_error),
+                      ("a", 1, "bad format spec '>6' for $_params.areas - the project parameter is [1, 2]: every render "
+                               "reaching it fails (bad format spec '>6' for value [1, 2]: unsupported format string "
+                               "passed to list.__format__)"),
+                      ("r", 1, "range ends must be whole, finite numbers: '1..{$_params.n}' ('2.5') - from the project "
+                               "params: every render reaching it fails")]),
+       "each constant a spec / a range end cannot take: an error; the clean ones - none")
+    eq(errors(engine.lint(templates)), [], "unknown params: nothing judged")
+    rule = _rule(action="file", source_table="src", target="gen/{$_params.code:04d}.txt", template="m")
+    eq([(p.where, p.message) for p in engine.lint({"m": "x"}, rule, _database(), params=params) if p.severity == "error"],
+       [("target", f"rule 'r1': target 'gen/{{$_params.code:04d}}.txt': {spec_error}")], "the target's too")
+
+    def body():
+        branch = _rule(action="file", source_table="src", target="out.txt", template="m")
+        with tempfile.TemporaryDirectory() as out:
+            _, findings = engine.fire("after_300", _database(), rules=[branch], templates=templates, params=params,
+                                      files_root=out)
+            eq([(f.type, f.detail) for f in findings],
+               [("rx_bad_template", "template 'm' line 2: bad format spec '04d' for value '8X': could not convert "
+                 "string to float: '8X'")], "(the fire: the motor row fails, the door row written)")
+            door, motor = (engine.preview(branch, row, templates=templates, params=params, database=_database(),
+                                          files_root=out) for row in (0, 1))
+            eq((door.problem, door.text), (None, "X-D1"), "the door row's preview: rendered")
+            eq(motor.problem, (findings[0].type, findings[0].detail), "the motor row's preview: the fire's finding")
+            session = template_doc.Session(None, rows=[dict(name="r1", fire_when="after_300", source_table="src",
+                                                            condition="", action="file", target="out.txt",
+                                                            template="m", comment="")],
+                                           hooks={"before_300": None, "after_300": lambda system: _database()},
+                                           params=params)
+            doc = template_doc.parse('m: |-\n  @if $kind = "motor"\n  M-{$_params.code:04d}-{$name}\n  @else\n'
+                                     '  X-{$name}\n  @end\n')
+            for chosen in (None, session.rules[0]):
+                eq([p.message for p in session.check(doc, chosen) if p.severity == "error"], [spec_error],
+                   f"the builder ({chosen.name if chosen else 'no rule'}): the Session's params judged")
+    _sandboxed(body)
+
+
 def test_a_row_read_warning_sits_on_its_own_token():
     """C-025 refute round 6 (#5): a missing column was found by searching its name from the call on - `{count(signals,
     "name" = $name)}` squiggled the string, `{lookup(signals, tag, first(nodes, $name = "x"), name)}` squiggled the
@@ -991,4 +1050,6 @@ if __name__ == "__main__":
         ("an_empty_sources_preview_keeps_the_fires_finding", test_an_empty_sources_preview_keeps_the_fires_finding),
         ("a_row_read_warning_sits_on_its_own_token", test_a_row_read_warning_sits_on_its_own_token),
         ("a_targets_format_spec_is_tried_on_its_values", test_a_targets_format_spec_is_tried_on_its_values),
+        ("a_params_value_a_spec_or_a_range_end_cannot_take_is_an_error",
+         test_a_params_value_a_spec_or_a_range_end_cannot_take_is_an_error),
     ]))

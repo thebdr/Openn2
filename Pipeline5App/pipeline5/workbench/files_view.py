@@ -12,9 +12,11 @@ by extension anymore.
 """
 from __future__ import annotations
 
+import contextlib
 import csv as _csv
 import os
 import re
+import time
 
 from pipeline5 import config
 
@@ -114,21 +116,27 @@ def is_shipped_system_config(path: str) -> bool:
 
 
 def project_copy_target(path: str) -> tuple:
-    """(target, None) - where 'Create project copy' puts a shipped system config file: the resolver's
-    tier 1, `<project>/config_project/systems/<sid>/<same relative path>`, which then OVERRIDES the
-    shipped one for this project - or (None, why not)."""
+    """(target, None) - the project's OWN copy of a shipped system config file, the one that RUNS, wherever the
+    project keeps it: its system tier (the resolver's tier 1, `<project>/config_project/systems/<sid>/<same
+    relative path>`) or its shared tier (tier 2, `<project>/config_project/shared/<same relative path>`) - 'Open
+    project copy' goes there (C-025 refute round 8: a tier-2 copy was hidden - 'Create project copy' put the
+    shipped file at tier 1, over it). With no copy in either: where 'Create project copy' puts one - tier 1,
+    which then OVERRIDES the shipped one for this project. Or (None, why not)."""
     system, project = config.active_system(), config.active_project()
     if not is_shipped_system_config(path):
         return None, "not a shipped system config file"
     if not project:
         return None, "open a project to create its own copy"
     rel = os.path.relpath(os.path.abspath(path), os.path.abspath(system[1]))
-    return os.path.join(project, "config_project", "systems", system[0], rel), None
+    own = [os.path.join(project, "config_project", "systems", system[0], rel),   # the resolver's order:
+           os.path.join(project, "config_project", "shared", rel)]               # the first that exists runs
+    return next((copy for copy in own if os.path.exists(copy)), own[0]), None
 
 
 def create_project_copy(path: str) -> str:
     """Copy a shipped system config file to its project tier (`project_copy_target`) and return the
-    copy's path. Never overwrites: an existing copy raises FileExistsError (open it instead)."""
+    copy's path. Never overwrites, never hides: an existing copy - in either project tier - raises
+    FileExistsError (open it instead)."""
     import shutil
     target, reason = project_copy_target(path)
     if target is None:
@@ -207,14 +215,34 @@ def read_text_file(path: str, cap: int = TEXT_EDIT_CAP) -> dict:
     return {"text": text, "truncated": truncated, "bom": bom, "crlf": crlf and b"\n" in raw}
 
 
+_REPLACE_TRIES = 20                   # a replace a reader's BRIEF open refuses: retried, 25 ms apart (0.5 s at most)
+_REPLACE_PAUSE = 0.025
+
+
 def write_text_file(path: str, text: str, bom: bool, crlf: bool) -> None:
     """Write the editor's \\n-normalized `text` back ATOMICALLY (temp + os.replace), restoring the
-    original BOM and newline style."""
+    original BOM and newline style. On Windows a reader that opened the file without FILE_SHARE_DELETE
+    (Python's own open - a check reading the file a fire reads, an antivirus scan) refuses the replace while
+    it reads: the replace is retried for a moment (C-025 refute round 8: a Save pressed while the template
+    builder read the file failed, its temp file left beside it); a refusal that lasts raises with the file
+    as it was - and whatever fails, no temp file is left."""
     tmp = f"{path}.tmp_textedit"
-    with open(tmp, "w", encoding="utf-8-sig" if bom else "utf-8",
-              newline="\r\n" if crlf else "\n") as handle:
-        handle.write(text)
-    os.replace(tmp, path)
+    try:
+        with open(tmp, "w", encoding="utf-8-sig" if bom else "utf-8",
+                  newline="\r\n" if crlf else "\n") as handle:
+            handle.write(text)
+        for attempt in range(_REPLACE_TRIES):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:
+                if attempt == _REPLACE_TRIES - 1:
+                    raise
+                time.sleep(_REPLACE_PAUSE)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(tmp)
+        raise
 
 
 def sniff_delim(text: str) -> str:

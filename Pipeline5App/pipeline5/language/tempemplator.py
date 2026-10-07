@@ -322,6 +322,14 @@ def _end_value(text: str, spec: str):
     return int(value)
 
 
+def _params_only(text: str) -> bool:
+    """True when every hole of a range end is a bare `$_params.<key>` (a format spec allowed) - a constant the
+    project params give, so the lint can render it as every fire does."""
+    holes = [_split_spec(text[start + 1:end - 1])[0].strip() for kind, start, end in _scan(text) if kind == "hole"]
+    return bool(holes) and all((bare := _BARE.fullmatch(hole)) is not None and bare.group(1).startswith("_params.")
+                               for hole in holes)
+
+
 def _line_word(line: str) -> str:
     """The directive word of a line ('' for a literal line)."""
     stripped = line.strip()
@@ -514,7 +522,7 @@ def _field_span(text: str, start: int, end: int, name: str) -> tuple:
 
 
 def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, stored: bool = True,
-              values=None) -> list:
+              values=None, params=None) -> list:
     """ONE literal line / row value judged the way `render_text` and the loop-column check judge it -
     WITHOUT rendering: [(start, end, message, severity)], columns into `text`. `fields` = the
     top-level names in scope (None = unknown - the strict missing-field check is skipped); `loops` =
@@ -522,7 +530,9 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
     columns} (a data function's row reads are checked against them); `json` = the field paths holding
     JSON (list / object) values ("type", "r.matrix_areas"); `stored` = the render is stored as UTF-8 (a
     text line, a row value - not a file target): a lone surrogate there is an error (the fire refuses it);
-    `values` = `path -> the values the rule's Database holds there` (a format spec is tried on them)."""
+    `values` = `path -> the values the rule's Database holds there` (a format spec is tried on them);
+    `params` = the project params a fire renders `$_params` with (None = unknown): a constant, so a format
+    spec its value does not take fails every render reaching it."""
     loops = loops or {}
     names = None if fields is None else set(fields) | set(loops)
     runs = list(_scan(text))
@@ -556,7 +566,7 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
                 if expression.strip() == "$" + path and path in json:   # the value IS a JSON list / object
                     issues.append((end - 1 - len(spec), end - 1, f"a format spec on a JSON (list / object) "
                                    f"value fails on the rows that hold one: ${path}:{spec}", "warning"))
-            trouble = _spec_on_kind(expression, spec, loops, values) if spec and not problem else None
+            trouble = _spec_on_kind(expression, spec, loops, values, params) if spec and not problem else None
             if trouble:                                     # the kind the value IS (round 6)
                 issues.append((end - 1 - len(spec), end - 1, *trouble))
             issues.extend((s, e, message, "warning") for s, e, message in _row_read_problems(
@@ -641,11 +651,13 @@ _KIND_SAMPLES = {"list": [], "dict": {}, "float": 0.0, "int": 0}
 _BARE = re.compile(r"\$([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)")
 
 
-def _spec_on_kind(expression: str, spec: str, loops, values) -> tuple | None:
+def _spec_on_kind(expression: str, spec: str, loops, values, params=None) -> tuple | None:
     """(message, severity) when a hole's format spec fails on the value its expression yields (None: it takes
     it). A kind fixed whatever the data - where / unique a list, first / node_of a dict (`{}` when nothing is
     found - never blank), count / len a float, a range loop var an int, a table loop var its row: an ERROR,
-    every render fails. A value the rule's Database holds in that column (`values` - e.g. a text where the
+    every render fails. So is a project parameter's value (`params` - `{$_params.code:04d}` with code `8X`: a
+    constant, every render reaching it fails - C-025 refute round 8); a missing or blank one renders blank
+    (optional, C-002). A value the rule's Database holds in that column (`values` - e.g. a text where the
     spec takes numbers only, `{$qty:,}`): a WARNING, the rows holding it fail."""
     from pipeline5.language.expr.runtime import format_spec
     text = expression.strip()
@@ -660,6 +672,14 @@ def _spec_on_kind(expression: str, spec: str, loops, values) -> tuple | None:
         except ExprError as error:
             return (f"bad format spec {spec!r} for {what} - it renders a{'n' if kind == 'int' else ''} {kind}: "
                     f"every render fails ({error})", "error")
+        return None
+    if bare and bare.group(1).startswith("_params."):
+        value = params.get(bare.group(1)[len("_params."):]) if isinstance(params, dict) else None
+        try:
+            format_spec(value, spec)                        # (None / "": blank - the render's too)
+        except ExprError as error:
+            return (f"bad format spec {spec!r} for ${bare.group(1)} - the project parameter is {value!r}: "
+                    f"every render reaching it fails ({error})", "error")
         return None
     if not bare or values is None:
         return None
@@ -700,7 +720,7 @@ def _braced(text: str, runs: list, index: int) -> bool:
 
 
 def lint(templates: dict, *, start: str | None = None, fields=None, tables=None, json=None,
-         json_fields=None, values=None) -> list:
+         json_fields=None, values=None, params=None) -> list:
     """Every problem the renderer would raise for the TEXT templates in `templates`, found WITHOUT
     rendering - EVERY branch of every template (a render evaluates only the taken one). `start` +
     `fields` = a rule's context: that template - and whatever it @uses, loop vars carried - is walked
@@ -710,7 +730,9 @@ def lint(templates: dict, *, start: str | None = None, fields=None, tables=None,
     walk: an unknown loop table, the loop-column check, a `where` predicate's names, a data function's
     row reads; `json` = {table: its JSON columns} and `json_fields` = the rule's JSON fields (a format
     spec on a JSON value); `values` = `(table - None for the rule's own row, column) -> the values the rule's
-    Database holds there` (a format spec is tried on them). Returns [Problem], each once."""
+    Database holds there` (a format spec is tried on them); `params` = the project params every fire renders
+    `$_params` with (a format spec or a range end they do not take - in every walk: every rule sees them).
+    Returns [Problem], each once."""
     found = {}
 
     def add(template, line, start_col, end_col, message, severity="error"):
@@ -718,9 +740,9 @@ def lint(templates: dict, *, start: str | None = None, fields=None, tables=None,
                          Problem(template, line, start_col, end_col, message, severity))
 
     if start is not None and isinstance(templates.get(start), str):      # the context walk
-        _Lint(templates, tables, add, json, json_fields, values).named(start, None if fields is None else frozenset(fields),
-                                                                       {}, ())
-    plain = _Lint(templates, None, add)                 # every template, no context: another
+        _Lint(templates, tables, add, json, json_fields, values, params).named(
+            start, None if fields is None else frozenset(fields), {}, ())
+    plain = _Lint(templates, None, add, params=params)  # every template, no context: another
     for name, body in templates.items():               # rule (another hook) may use it
         if isinstance(body, str):
             plain.named(name, None, {}, ())
@@ -815,9 +837,10 @@ class _Lint:
     """The lint walk: the renderer's structure over EVERY branch - lines checked, nothing evaluated.
     `fields` = the names in scope (a frozenset, None = no context); `loops` = {var: columns}."""
 
-    def __init__(self, templates: dict, tables, add, json=None, json_fields=None, values=None):
+    def __init__(self, templates: dict, tables, add, json=None, json_fields=None, values=None, params=None):
         self.templates, self.tables, self.add, self.seen = templates, tables, add, set()
         self.json, self.json_fields, self.values = json or {}, frozenset(json_fields or ()), values
+        self.params = params                                # the project params (None = unknown)
         self.loop_tables = {}                               # loop var -> its table, while its body is walked
         self._table = None                                  # the table `iterable` just judged
 
@@ -859,7 +882,8 @@ class _Lint:
                 continue
             if not word:
                 for s, e, message, severity in lint_line(lines[i], fields=fields, loops=loops, tables=self.tables,
-                                                         json=self.json_paths(), values=self.path_values()):
+                                                         json=self.json_paths(), values=self.path_values(),
+                                                         params=self.params):
                     self.add(template, base + i + 1, col + s, col + e, message, severity)
             i += 1
 
@@ -952,7 +976,8 @@ class _Lint:
                 text = fragment.strip()
                 where = at + offset + len(fragment) - len(fragment.lstrip())
                 issues = lint_line(text, fields=fields, loops=loops, tables=self.tables, json=self.json_paths(),
-                                   stored=False, values=self.path_values())   # a range end renders a number, never stored
+                                   stored=False, values=self.path_values(),   # a range end renders a number,
+                                   params=self.params)                        # never stored
                 for s, e, message, severity in issues:
                     self.add(template, line_no, where + s, where + e, message, severity)
                 if not issues and all(kind != "hole" for kind, _s, _e in _scan(text)):
@@ -960,6 +985,12 @@ class _Lint:
                         _end_value(render_text(text, {}), iterable)
                     except ValueError as error:
                         self.add(template, line_no, where, where + len(text), str(error))
+                elif not issues and self.params is not None and _params_only(text):
+                    try:                                    # an end the project params alone give: a constant
+                        _end_value(render_text(text, {"_params": self.params}), iterable)
+                    except ValueError as error:             # (C-025 refute round 8)
+                        self.add(template, line_no, where, where + len(text),
+                                 f"{error} - from the project params: every render reaching it fails")
             return frozenset()
         words = iterable.split(None, 1)
         table, columns = words[0], None

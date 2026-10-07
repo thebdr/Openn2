@@ -172,6 +172,62 @@ def test_project_copy_helpers():
                 pass
         finally:
             config.use_project(None)
+    with tempfile.TemporaryDirectory() as root:              # C-025 refute round 8 (#3): the project's own copy
+        _project(root, templates=None)                        # kept in its SHARED tier (resolver tier 2) runs -
+        shared = os.path.join(root, "config_project", "shared", "chain_reactions", "templates.yaml")
+        os.makedirs(os.path.dirname(shared))                  # 'Create project copy' put the shipped file at tier
+        with open(shared, "w", encoding="utf-8") as handle:   # 1, over it: the project's templates silently gone
+            handle.write("mine: x\n")
+        config.use_project(root)
+        try:
+            from pipeline5.config.resolver import find
+            eq(os.path.normcase(find("chain_reactions/templates.yaml")), os.path.normcase(shared), "(the shared copy runs)")
+            eq(files_view.project_copy_target(_SHIPPED), (shared, None), "the project's copy is the one that runs")
+            try:
+                files_view.create_project_copy(_SHIPPED)
+                ok(False, "a copy must not be made over the project's own")
+            except FileExistsError:
+                pass
+            tier1 = os.path.join(root, "config_project", "systems", SYSTEM.id, "chain_reactions", "templates.yaml")
+            ok(not os.path.exists(tier1), "nothing made at tier 1 - the project's own copy still runs")
+        finally:
+            config.use_project(None)
+
+
+def test_a_save_bridges_a_readers_brief_hold():
+    """C-025 refute round 8 (#1), the Save's half: Windows replaces no file a reader holds (Python's own open shares
+    no delete) - a Save pressed while a check read the file failed at once, its temp file left beside it. The
+    replace is retried for a moment now: a brief hold is bridged; a lasting one raises with the file as it was -
+    and no temp file is left either way. Tk-free."""
+    import threading
+    with tempfile.TemporaryDirectory() as folder:
+        path = os.path.join(folder, "templates.yaml")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("old\n")
+        holder = open(path, encoding="utf-8")                  # a reader - held 150 ms
+        timer = threading.Timer(0.15, holder.close)
+        timer.start()
+        try:
+            files_view.write_text_file(path, "new\n", False, False)
+        finally:
+            timer.join()
+            holder.close()
+        with open(path, encoding="utf-8") as handle:
+            eq(handle.read(), "new\n", "a brief hold: saved once it lets go")
+        eq(sorted(os.listdir(folder)), ["templates.yaml"], "…no temp file left")
+        if os.name != "nt":
+            return                                           # (elsewhere a reader never blocks a replace)
+        holder = open(path, encoding="utf-8")                  # a hold that outlasts the retries
+        try:
+            files_view.write_text_file(path, "newer\n", False, False)
+            ok(False, "a lasting hold must refuse the Save")
+        except PermissionError:
+            pass
+        finally:
+            holder.close()
+        with open(path, encoding="utf-8") as handle:
+            eq(handle.read(), "new\n", "a lasting hold: the file as it was")
+        eq(sorted(os.listdir(folder)), ["templates.yaml"], "…and no temp file left")
 
 
 def test_template_mode_in_the_files_panel():
@@ -730,10 +786,95 @@ def test_a_reload_keeps_the_chosen_rule_of_two_alike():
         _done(root)
 
 
+def test_a_save_never_fails_on_the_builders_read():
+    """C-025 refute round 8 (#1) through the real FilesPanel: every check reads the templates.yaml a fire reads, and
+    the loader parsed it INSIDE its `open` - a Save pressed while the worker parsed it failed ("Access is denied":
+    Windows replaces no file a reader holds), 2 Saves in 4 in the refuter's run. The worker held inside that parse
+    now, a Save goes through: saved, the file the text, no temp file left; the check then completes."""
+    import threading
+    from ruamel.yaml import YAML
+    root = _tk()
+    if root is None:
+        return
+    template_doc.Session = _session
+    real_load, inside, release = YAML.load, threading.Event(), threading.Event()
+    try:
+        with _NoDialogs() as dialogs, tempfile.TemporaryDirectory() as project:
+            path = _project(project)
+            config.use_project(project)
+            panel = _panel(root, project)
+            statuses = []
+            panel.on_status = statuses.append
+            panel._load(path)
+            mode, text = panel._template, panel._textw
+            applied, apply = [], mode._apply
+            mode._apply = lambda result: (applied.append(result[1]), apply(result))
+            ok(_pump(root, lambda: applied[-1:] == [mode._request]), "(the first check)")
+
+            def held(self, stream):                          # the worker, parsing the saved file, waits here
+                if threading.current_thread().name == "template-builder" and \
+                        os.path.normcase(str(getattr(stream, "name", ""))) == os.path.normcase(path):
+                    inside.set()
+                    release.wait(10)
+                return real_load(self, stream)
+            YAML.load = held
+            text.insert("1.0", "# saved while the builder reads\n")
+            ok(_pump(root, inside.is_set, 5), "the worker is inside the saved file's parse")
+            save = [w for w in _widgets(panel.editor, ttk.Button) if w.cget("text").startswith("Save")]
+            save[0].invoke()
+            eq(statuses[-1:], ["saved templates.yaml"], "the Save went through")
+            with open(path, encoding="utf-8") as handle:
+                eq(handle.read(), text.get("1.0", "end-1c"), "…the file is the text")
+            eq(sorted(os.listdir(os.path.dirname(path))), ["reactions.csv", "templates.yaml"], "…no temp file left")
+            ok(not panel._unsaved_changes(), "…clean")
+            release.set()
+            YAML.load = real_load
+            ok(_pump(root, lambda: not mode._editing and applied[-1:] == [mode._request]), "the check completes")
+            eq(dialogs.asked, [], "no dialog asked")
+    finally:
+        release.set()
+        YAML.load = real_load
+        template_doc.Session = _REAL_SESSION
+        config.use_project(None)
+        _done(root)
+
+
+def test_open_project_copy_goes_to_the_one_that_runs():
+    """C-025 refute round 8 (#3) through the real FilesPanel: with the project's own templates.yaml in its SHARED
+    tier, the shipped file offered 'Create project copy' - which put the shipped file at tier 1, over the project's
+    own. It offers 'Open project copy' now, and that opens the copy that runs."""
+    root = _tk()
+    if root is None:
+        return
+    try:
+        with _NoDialogs() as dialogs, tempfile.TemporaryDirectory() as project:
+            _project(project, templates=None)
+            shared = os.path.join(project, "config_project", "shared", "chain_reactions", "templates.yaml")
+            os.makedirs(os.path.dirname(shared))
+            with open(shared, "w", encoding="utf-8") as handle:
+                handle.write("mine: x\n")
+            config.use_project(project)
+            panel = _panel(root, project)
+            panel._load(_SHIPPED)
+            root.update()
+            buttons = _buttons(panel.editor)
+            ok("Open project copy" in buttons and "Create project copy" not in buttons, f"the button ({buttons})")
+            panel._project_copy(_SHIPPED)
+            root.update()
+            eq(os.path.normcase(panel._cur), os.path.normcase(shared), "the project's own copy is shown - the one that runs")
+            tier1 = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions", "templates.yaml")
+            ok(not os.path.exists(tier1), "nothing made at tier 1")
+            eq(dialogs.asked, [], "no dialog asked")
+    finally:
+        config.use_project(None)
+        _done(root)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_template_mode", [
         ("project_copy_helpers", test_project_copy_helpers),
+        ("a_save_bridges_a_readers_brief_hold", test_a_save_bridges_a_readers_brief_hold),
         ("template_mode_in_the_files_panel", test_template_mode_in_the_files_panel),
         ("every_edit_reaches_the_template_mode", test_every_edit_reaches_the_template_mode),
         ("the_session_works_off_the_tk_thread", test_the_session_works_off_the_tk_thread),
@@ -744,4 +885,6 @@ if __name__ == "__main__":
         ("a_check_queued_behind_a_reload_is_dropped", test_a_check_queued_behind_a_reload_is_dropped),
         ("a_save_rechecks_the_file_a_fire_reads", test_a_save_rechecks_the_file_a_fire_reads),
         ("a_reload_keeps_the_chosen_rule_of_two_alike", test_a_reload_keeps_the_chosen_rule_of_two_alike),
+        ("a_save_never_fails_on_the_builders_read", test_a_save_never_fails_on_the_builders_read),
+        ("open_project_copy_goes_to_the_one_that_runs", test_open_project_copy_goes_to_the_one_that_runs),
     ]))

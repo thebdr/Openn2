@@ -453,6 +453,103 @@ def test_a_templates_file_a_fire_cannot_read_is_the_fires_finding():
             config.use_project(None)
 
 
+def _cp1252_project(project, templates_text, params_text="project_code: 8X\n"):
+    """A project whose templates.yaml is saved as cp1252 (not UTF-8) - its path."""
+    from pipeline5.systems import catalog
+    rx = os.path.join(project, "config_project", "systems", catalog.by_id("siemens_s7_safety").id, "chain_reactions")
+    os.makedirs(rx)
+    os.makedirs(os.path.join(project, "config_project", "shared"))
+    with open(os.path.join(project, "config_project", "shared", "project_params.yaml"), "w", encoding="utf-8") as h:
+        h.write(params_text)
+    with open(os.path.join(rx, "reactions.csv"), "w", encoding="utf-8") as h:
+        h.write("name,fire_when,source_table,condition,action,target,template,comment\n"
+                "belts,after_300,signals,,file,gen/{$tag}.scl,belt,\n")
+    path = os.path.join(rx, "templates.yaml")
+    with open(path, "w", encoding="cp1252", newline="\n") as h:
+        h.write(templates_text)
+    return path
+
+
+def test_the_fires_own_finding_comes_first():
+    """C-025 refute round 8 (#4): round 7 promised the fire's rx_templates_unreadable FIRST in the lint, and the
+    preview the finding a fire gives - unasserted: the pin's document had no other problem, and no case broke the
+    templates file and the params at once (the fire loads the templates first: its ONLY finding is
+    rx_templates_unreadable). Both pinned: the saved file's problem leads the document's own; with the params
+    unreadable too, the lint lists the fire's finding first and the preview says it - not the params'."""
+    import tempfile
+    from pipeline5 import config
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.table import Table
+    from pipeline5.workbench import files_view
+
+    def database(_system=None):
+        table = Table("signals", columns=["uid", "tag"], key_columns=["tag"])
+        table.add(tag="B1")
+        return Database([table])
+
+    text = "# Température\nbelt: |-\n  REGION {$tag}\n  {$tagg}\n  END_REGION\n"     # + a missing field
+    for params_text in ("project_code: 8X\n", "broken: [unclosed\n"):
+        with tempfile.TemporaryDirectory() as project, tempfile.TemporaryDirectory() as out, \
+                tempfile.TemporaryDirectory() as sandbox:
+            path = _cp1252_project(project, text, params_text)
+            config.use_project(project)
+            original_dir = config.database_dir
+            config.database_dir = lambda: sandbox
+            try:
+                _db, findings = engine.fire("after_300", database(), hooks=("before_300", "after_300"), files_root=out)
+                eq([f.type for f in findings], ["rx_templates_unreadable"], f"({params_text!r}: the fire's ONLY finding)")
+                fired = f"{findings[0].type}: {findings[0].detail}"
+                doc = td.parse(files_view.read_text_file(path)["text"])
+                session = td.Session(path, hooks={"before_300": None, "after_300": database})
+                placed = session.check(doc, session.rules[0])
+                eq(placed[0].message.split(" - a fire reads")[0], fired, f"{params_text!r}: the fire's finding FIRST")
+                ok(len(placed) >= 2 and any("tagg" in p.message for p in placed[1:]),
+                   f"…before the document's own problems: {[p.message for p in placed]}")
+                eq(session.preview_text(doc, session.rules[0], 0).splitlines()[0], fired,
+                   f"{params_text!r}: the preview says the fire's finding (the templates load first)")
+            finally:
+                config.database_dir = original_dir
+                config.use_project(None)
+
+
+def test_the_saved_read_never_holds_the_file_while_it_parses():
+    """C-025 refute round 8 (#1): every check reads the templates.yaml a fire reads - and the loader parsed INSIDE
+    its `open`, so for the whole parse Windows refused to replace the file: a Save pressed meanwhile failed (the
+    Files tab saves by replacing), its temp file left beside it. The loader reads, closes, then parses now: a
+    replace while the check parses succeeds."""
+    import tempfile
+    from ruamel.yaml import YAML
+    from pipeline5 import config
+    real_load, replaced = YAML.load, []
+    with tempfile.TemporaryDirectory() as project:
+        path = _cp1252_project(project, "belt: |-\n  REGION {$tag}\n")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("belt: |-\n  REGION {$tag}\n")              # (UTF-8: the file loads)
+        config.use_project(project)
+
+        def load(self, stream):
+            if os.path.normcase(str(getattr(stream, "name", ""))) == os.path.normcase(path):
+                with open(path + ".new", "w", encoding="utf-8") as handle:
+                    handle.write("belt: |-\n  REGION {$tag} saved\n")
+                try:                                                 # a Save, while the check parses
+                    os.replace(path + ".new", path)
+                    replaced.append("ok")
+                except OSError as error:
+                    replaced.append(type(error).__name__)
+                    os.remove(path + ".new")
+            return real_load(self, stream)
+        YAML.load = load
+        try:
+            session = td.Session(path, hooks={"before_300": None, "after_300": None})
+            eq(session.saved_problem(), None, "(the saved file loads)")
+        finally:
+            YAML.load = real_load
+            config.use_project(None)
+        eq(replaced, ["ok"], "a replace while the saved file is parsed: done - the file is not held open")
+        with open(path, encoding="utf-8") as handle:
+            eq(handle.read(), "belt: |-\n  REGION {$tag} saved\n", "…the saved text on disk")
+
+
 def test_the_dry_settle_writes_nothing():
     """The Session models a settled before_300 with a DRY fire of it - an absolute file target included
     (a scratch output root did not catch one: every view would have appended to the real file). The
@@ -703,6 +800,9 @@ if __name__ == "__main__":
         ("unreadable_params_block_as_the_fire_blocks", test_unreadable_params_block_as_the_fire_blocks),
         ("a_templates_file_a_fire_cannot_read_is_the_fires_finding",
          test_a_templates_file_a_fire_cannot_read_is_the_fires_finding),
+        ("the_fires_own_finding_comes_first", test_the_fires_own_finding_comes_first),
+        ("the_saved_read_never_holds_the_file_while_it_parses",
+         test_the_saved_read_never_holds_the_file_while_it_parses),
         ("the_dry_settle_writes_nothing", test_the_dry_settle_writes_nothing),
         ("a_quoted_template_with_newline_escapes_is_exact", test_a_quoted_template_with_newline_escapes_is_exact),
         ("a_reload_discards_the_build_it_overtook", test_a_reload_discards_the_build_it_overtook),

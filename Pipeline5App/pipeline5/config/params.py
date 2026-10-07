@@ -70,11 +70,18 @@ def resolve_sheet(pattern, available):
 # --- project params (the nested project_params.yaml schema) -------------------------------------- #
 def _read_yaml(path: str) -> dict:
     """Parse a YAML file to plain dicts/lists ({} if empty). Single-quoted values (the JS-style sheet
-    regexes) are taken literally - no escape processing - so a '\\d' survives."""
+    regexes) are taken literally - no escape processing - so a '\\d' survives. The file is READ and closed,
+    then parsed (a stream named as the file: every message the same): held open across the parse it refused
+    the Files tab's Save - Windows replaces no file a reader holds (C-025 refute round 8: the template
+    builder reads the file a fire reads on every check)."""
+    import io
     from ruamel.yaml import YAML
     parser = YAML(typ="safe")
     with open(path, encoding="utf-8") as handle:
-        return parser.load(handle) or {}
+        text = handle.read()
+    stream = io.StringIO(text)
+    stream.name = path
+    return parser.load(stream) or {}
 
 
 def _resolve_path(base: str, value) -> str:

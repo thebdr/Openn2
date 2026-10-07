@@ -905,14 +905,15 @@ class Session:
     def _checks(self, doc: Doc, rule) -> list:
         from pipeline5.phases.chain_reactions import engine
         hooks = tuple(self.hooks) or None
+        params = None if self.params_problem else self.params   # what `$_params` renders (unloaded: unknown)
         if rule is None:
-            return place(doc, engine.lint(doc.templates, None, None, hooks))
+            return place(doc, engine.lint(doc.templates, None, None, hooks, params))
         halt = self.halt(rule.fire_when)
         if halt:                                          # the main leg never fires: nothing it would report
-            placed = place(doc, engine.lint(doc.templates, None, None, hooks)) + [
+            placed = place(doc, engine.lint(doc.templates, None, None, hooks, params)) + [
                 Placed(None, None, f"the run stops before {rule.fire_when} fires - {halt}", "warning", "rule")]
         else:
-            placed = place(doc, engine.lint(doc.templates, rule, self.view(rule, doc.templates)[0], hooks))
+            placed = place(doc, engine.lint(doc.templates, rule, self.view(rule, doc.templates)[0], hooks, params))
         seen = {(p.start, p.end, p.message) for p in placed}
         fires = not halt
         for leg in self.legs.get(rule.fire_when, {}):
@@ -921,7 +922,7 @@ class Session:
                 placed.append(Placed(None, None, f"on the {leg} leg: {leg_halt}", "warning", "rule"))
                 continue
             fires = True
-            for p in place(doc, engine.lint(doc.templates, rule, self.view(rule, doc.templates, leg)[0], hooks)):
+            for p in place(doc, engine.lint(doc.templates, rule, self.view(rule, doc.templates, leg)[0], hooks, params)):
                 if (p.start, p.end, p.message) not in seen:
                     seen.add((p.start, p.end, p.message))
                     placed.append(Placed(p.start, p.end, f"on the {leg} leg: {p.message}", p.severity, p.label))
