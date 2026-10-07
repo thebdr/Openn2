@@ -98,7 +98,7 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   - a format spec on a JSON value - a list or an object in the rows (`{$type:>5}` - it fails on the
     rows that hold one; a JSON column that holds text is just text) - or one some values of the
     column do not take (`{$qty:,}` over a column holding text: `,` takes numbers only - it fails on
-    those rows);
+    those rows), in the rule's file target too (`db/DB{$db_number:04d}.scl`);
   - an empty hole `{}` (it renders nothing - write `{{}}` for literal braces);
   - `{{$x}}`, which is the literal text `{$x}` - a hole in braces is `{{{$x}}}`.
 
@@ -113,10 +113,17 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   break other than a newline (a `\r` escape, U+2028 ...) is placed on its first line and marked
   *(approximate)*: YAML joins those lines, or the render splits where the document does not, so a
   column there is not a column of the document.
+
+  When the document you edit IS the templates.yaml a fire reads, a fire reads it as SAVED. If that
+  file does not load - another editor saved it in an encoding other than UTF-8 (an "ANSI" save: its
+  accented characters show as `�` here) - every fire with rules is blocked (`rx_templates_unreadable`),
+  and the list says so first, whatever the text in the editor. Retype those characters and **Save**:
+  the file is written in UTF-8, and Save checks it again.
 - **Rule and row.** Pick a rule from your `reactions.csv`, and a source row of the table it reads at
-  its hook. The rows are what that hook's fire GETS - not the Database folder (later phases re-save
-  that). For `after_300` the builder runs the run's own steps, in memory - nothing is saved or
-  written:
+  its hook. The rule stays picked when the rules reload (↻, after a run, on a project or system
+  switch) - the same one of two identical lines. The rows are what that hook's fire GETS - not the
+  Database folder (later phases re-save that). For `after_300` the builder runs the run's own steps,
+  in memory - nothing is saved or written:
   - staging itself, over your current source documents, through the run's gate - your finding
     [treatments](guide://treatments) applied (a big project takes a moment; the preview says so while it
     builds, and the editor stays live meanwhile);

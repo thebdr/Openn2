@@ -379,7 +379,8 @@ def load_seed_members() -> list:
 
 
 # --- chain reactions (the rule engine's config pair - see phases/chain_reactions/engine.py) ------- #
-_RULE_COLUMNS = ("name", "fire_when", "action", "target", "template")   # what a reactions.csv header names
+_RULE_COLUMNS = ("name", "fire_when", "source_table", "condition", "action", "target", "template")  # a header
+                                      # names every one, once (the comment column is optional - it changes nothing)
 
 
 def load_reactions() -> list:
@@ -391,8 +392,11 @@ def load_reactions() -> list:
     compiler reports it (refuter round 6: it used to vanish here, silently) - so is one whose only
     content sits PAST the header's columns (C-024 refute round 21). The header is the first line that is
     not blank (`_config_header` - C-024 refute round 22: a blank first line read as an EMPTY header, every
-    rule lost to unnamed rx_bad_rule findings); one that does not name the rule columns raises (a headerless
-    file would read its first rule AS the header - lost, silently): the engine reports rx_rules_unreadable."""
+    rule lost to unnamed rx_bad_rule findings); one that does not name EVERY rule column but the comment, or
+    names a rule column twice, raises (a headerless file would read its first rule AS the header - lost, silently; a
+    misspelt `Condition` / `source table` column read every rule's condition / source as EMPTY - every row
+    matched, or one fire - C-024 refute round 24): the engine reports rx_rules_unreadable. A column the
+    rules do not read (an author's own notes) is left alone."""
     path = find("chain_reactions/reactions.csv")
     if not path or not os.path.exists(path):
         return []
@@ -404,7 +408,12 @@ def load_reactions() -> list:
         missing = [column for column in _RULE_COLUMNS if column not in header]
         if missing:
             raise ValueError(f"{path}: its header row names no {', '.join(missing)} column - got "
-                             f"{header} (a headerless file reads its first rule as the header)")
+                             f"{header} (a headerless file reads its first rule as the header; a "
+                             f"misspelt column reads as empty in every rule)")
+        doubled = [column for column in _RULE_COLUMNS if header.count(column) > 1]
+        if doubled:
+            raise ValueError(f"{path}: its header row names the {', '.join(doubled)} column more than once - "
+                             f"got {header} (a rule would read only the last one)")
         for raw in csv.DictReader(handle, fieldnames=header):
             extra = raw.pop(None, None) or []
             if not any((v or "").strip() for v in raw.values() if isinstance(v, str)) \

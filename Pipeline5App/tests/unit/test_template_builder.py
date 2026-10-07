@@ -899,6 +899,42 @@ def test_an_empty_sources_preview_keeps_the_fires_finding():
     _sandboxed(body)
 
 
+def test_a_targets_format_spec_is_tried_on_its_values():
+    """C-025 refute round 7 (#2): round 6 tried a format spec on the values the rule's rows hold in every template
+    line, range end and row value - not in the rule's file TARGET: `db/DB{$db_number:04d}.scl` linted clean while the
+    fire stops at the first row holding text (rx_bad_template). The target's holes are judged the same way now, on
+    the spec itself: lint = preview = fire."""
+    def database():
+        table = Table("blocks", columns=["uid", "name", "db_number"], key_columns=["name"])
+        table.add(name="A", db_number="12")                     # numeric text: the conversion takes it
+        table.add(name="B", db_number="n/a")                    # text: `04d` fails on it
+        return Database([table])
+    target = "db/DB{$db_number:04d}.scl"
+    rule = _rule(action="file", source_table="blocks", target=target, template="plain")
+    templates = {"plain": "x"}
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            eq([(p.template, p.where, target[p.start:p.end], p.severity, p.message)
+                for p in engine.lint(templates, rule, database())],
+               [(None, "target", "04d", "warning", f"rule 'r1': target {target!r}: format spec '04d' fails on some "
+                 "values of $db_number (e.g. 'n/a') - the fire fails on the rows holding them")],
+               "the lint warns, on the target's spec")
+            shown = [engine.preview(rule, row, templates=templates, params={}, database=database(), files_root=out)
+                     for row in (0, 1)]
+            _, findings = engine.fire("after_300", database(), rules=[rule], templates=templates, params={},
+                                      files_root=out)
+            eq([(f.type, f.detail) for f in findings],
+               [("rx_bad_template", f"target {target!r}: bad format spec '04d' for value 'n/a': could not convert "
+                 "string to float: 'n/a'")], "(the fire: refused on the row holding text)")
+            eq(shown[1].problem, (findings[0].type, findings[0].detail), "row 1's preview: the fire's finding")
+            eq((shown[0].problem, os.path.relpath(shown[0].path, out), shown[0].text),
+               (None, os.path.join("db", "DB0012.scl"), "x"), "row 0's preview: the file the fire wrote before it")
+            with open(os.path.join(out, "db", "DB0012.scl"), encoding="utf-8") as handle:
+                eq(handle.read(), shown[0].text + "\n", "(…the fire wrote exactly the preview)")
+    _sandboxed(body)
+
+
 def test_a_row_read_warning_sits_on_its_own_token():
     """C-025 refute round 6 (#5): a missing column was found by searching its name from the call on - `{count(signals,
     "name" = $name)}` squiggled the string, `{lookup(signals, tag, first(nodes, $name = "x"), name)}` squiggled the
@@ -954,4 +990,5 @@ if __name__ == "__main__":
         ("a_format_spec_is_tried_on_the_value_the_hole_yields", test_a_format_spec_is_tried_on_the_value_the_hole_yields),
         ("an_empty_sources_preview_keeps_the_fires_finding", test_an_empty_sources_preview_keeps_the_fires_finding),
         ("a_row_read_warning_sits_on_its_own_token", test_a_row_read_warning_sits_on_its_own_token),
+        ("a_targets_format_spec_is_tried_on_its_values", test_a_targets_format_spec_is_tried_on_its_values),
     ]))

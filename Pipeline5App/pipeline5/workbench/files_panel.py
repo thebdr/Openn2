@@ -488,6 +488,8 @@ class FilesPanel(ttk.Frame):
             self._text_saved = content            # the saved text moved: an undo past it is a change again
             text.edit_modified(False)
             set_dirty(False)
+            if self._template is not None:        # a fire reads the SAVED file: the builder judges it afresh
+                self._template.refresh()          # (C-025 refute round 7 - one that did not load may load now)
             self.on_status(f"saved {os.path.basename(path)}")
             return "break"
 

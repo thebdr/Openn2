@@ -878,6 +878,54 @@ def test_spawns_are_saved_beside_a_ragged_record():
        "the unreadable record was rendered")
 
 
+def test_a_hidden_record_file_is_saved_whole_through_the_run_plan():
+    """C-024 refute round 24 (gap 1) through the REAL run-plan: run 2 with the audit HIDDEN rendered
+    rx_record_unwritable ("a file held open") while signals.csv held run 2's spawns and validation_issues run 2's
+    rx_file_write - the audit still run 1's, saying the refused rule ran ok: a record half one run's, half the last
+    (the save opened each file to append - Windows grants that on a hidden file - then re-created it, which Windows
+    refuses). The save writes in place now: run 2's record whole, the audit still hidden."""
+    if os.name != "nt":
+        return                                                # (a Windows attribute)
+    import ctypes
+    from ruamel.yaml import YAML
+    header = ["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"]
+    templates = ('diag:\n  - script_type: "DIAG"\n    mnemonic: "D-{$mnemonic}-run{$_params.rx_run}"\n'
+                 'line: |-\n  run {$_params.rx_run}\n')
+    rules = [header, ["spawn", "after_300", "signals", '$script_type = "A"', "add_rows", "signals", "diag", ""],
+             ["out", "after_300", "", "", "file", "rx/{$_params.rx_name}", "line", ""]]
+    params = dict(config.load_params())
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        params.update(rx_run="1", rx_name="ok.txt")
+        _rules_project(project, params, rules, templates)
+        config.use_project(project)
+        try:
+            SYSTEM.handlers["staging"](_Host().ctx())
+            db_dir = config.database_dir()
+            audit = os.path.join(db_dir, "chain_reactions_log.csv")
+            eq([(r["rule"], r["outcome"]) for r in _read_csv(audit)], [("spawn", "ok"), ("out", "ok")], "(run 1)")
+            params.update(rx_run="2", rx_name="NUL")                  # run 2: other spawns, a refused target
+            with open(os.path.join(project, "config_project", "shared", "project_params.yaml"), "w",
+                      encoding="utf-8") as handle:
+                YAML(typ="safe").dump(params, handle)
+            ctypes.windll.kernel32.SetFileAttributesW(audit, 0x2)
+            try:
+                host = _Host()
+                SYSTEM.handlers["staging"](host.ctx())
+                eq(ctypes.windll.kernel32.GetFileAttributesW(audit) & 0x2, 0x2, "(the audit is still hidden)")
+            finally:
+                ctypes.windll.kernel32.SetFileAttributesW(audit, 0x80)
+            eq(_rx_rendered(host), {("rx_file_write", "out")}, "run 2: the refused target - no rx_record_unwritable")
+            spawned = [r for r in _read_csv(os.path.join(db_dir, "signals.csv")) if r.get("script_type") == "DIAG"]
+            ok(spawned and all(r["mnemonic"].endswith("-run2") for r in spawned), "signals.csv: run 2's spawns")
+            eq([(r["rule"], r["created"], r["outcome"]) for r in _read_csv(audit)],
+               [("spawn", str(len(spawned)), "ok"), ("out", "0", "rx_file_write")], "the hidden audit: run 2's, whole")
+            eq([(r["type"], r["location"]) for r in _read_csv(os.path.join(db_dir, "validation_issues.csv"))
+                if r["type"].startswith("rx_")], [("rx_file_write", "out")], "…and the findings it audits")
+        finally:
+            config.use_project(previous_project)
+
+
 def _rules_project(project, params, rules, templates_text):
     """A minimal project carrying exactly `rules` (reactions.csv rows, header first) + `templates_text`."""
     import csv
@@ -992,6 +1040,8 @@ if __name__ == "__main__":
         ("a_device_name_target_is_refused_through_the_run_plan",
          _sandboxed(test_a_device_name_target_is_refused_through_the_run_plan)),
         ("spawns_are_saved_beside_a_ragged_record", _sandboxed(test_spawns_are_saved_beside_a_ragged_record)),
+        ("a_hidden_record_file_is_saved_whole_through_the_run_plan",
+         _sandboxed(test_a_hidden_record_file_is_saved_whole_through_the_run_plan)),
         ("a_blank_range_end_invents_nothing_on_the_real_fixture",
          _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),
         ("310_leg_appends_reaction_findings_to_the_existing_record",

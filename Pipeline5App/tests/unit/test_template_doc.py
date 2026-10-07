@@ -383,6 +383,76 @@ def test_unreadable_params_block_as_the_fire_blocks():
         config.load_params = original
 
 
+def test_a_templates_file_a_fire_cannot_read_is_the_fires_finding():
+    """C-025 refute round 7 (#1): the Files tab shows any file - one that is not UTF-8 too (an "ANSI" / cp1252 save of a
+    French comment), its undecodable bytes as U+FFFD - so the builder parsed the document, found nothing and previewed
+    a render, while every fire reads the SAVED file strictly and blocks every rule (rx_templates_unreadable, nothing
+    written). When the document IS the file a fire reads, the builder says the fire's own finding now - in the lint
+    (with or without a rule) and the preview - until the file loads; a document that is another file is about
+    itself (its note says so)."""
+    import tempfile
+    from pipeline5 import config
+    from pipeline5.systems import catalog
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.table import Table
+    from pipeline5.workbench import files_view
+    system = catalog.by_id("siemens_s7_safety")
+    text = "# Température des convoyeurs\nbelt: |-\n  REGION {$tag}\n  END_REGION\n"
+
+    def database(_system=None):
+        table = Table("signals", columns=["uid", "tag"], key_columns=["tag"])
+        table.add(tag="B1")
+        return Database([table])
+
+    with tempfile.TemporaryDirectory() as project, tempfile.TemporaryDirectory() as out, \
+            tempfile.TemporaryDirectory() as sandbox:
+        rx = os.path.join(project, "config_project", "systems", system.id, "chain_reactions")
+        os.makedirs(rx)
+        os.makedirs(os.path.join(project, "config_project", "shared"))
+        with open(os.path.join(project, "config_project", "shared", "project_params.yaml"), "w", encoding="utf-8") as h:
+            h.write("project_code: 8X\n")
+        with open(os.path.join(rx, "reactions.csv"), "w", encoding="utf-8") as h:
+            h.write("name,fire_when,source_table,condition,action,target,template,comment\n"
+                    "belts,after_300,signals,,file,gen/{$tag}.scl,belt,\n")
+        path = os.path.join(rx, "templates.yaml")
+        with open(path, "w", encoding="cp1252", newline="\n") as h:
+            h.write(text)
+        config.use_project(project)
+        original_dir = config.database_dir
+        config.database_dir = lambda: sandbox
+        try:
+            _db, findings = engine.fire("after_300", database(), hooks=("before_300", "after_300"), files_root=out)
+            eq(([f.type for f in findings], os.listdir(out)), (["rx_templates_unreadable"], []),
+               "(the fire reads the saved file: blocked, nothing written)")
+            fired = f"{findings[0].type}: {findings[0].detail}"
+            doc = td.parse(files_view.read_text_file(path)["text"])
+            eq((doc.error, doc.text.splitlines()[0]), (None, "# Temp�rature des convoyeurs"),
+               "the document - decoded as the Files tab shows it - parses")
+            session = td.Session(path, hooks={"before_300": None, "after_300": database})
+            eq(session.document_note(), "", "(this document IS the file a fire reads)")
+            for rule in (None, session.rules[0]):
+                eq([(p.start, p.severity, p.label, p.message) for p in session.check(doc, rule)],
+                   [(None, "error", "templates.yaml (saved)", fired + " - a fire reads the file as saved and blocks "
+                     "every rule it fires (saving this document replaces it, in UTF-8)")],
+                   f"the lint ({rule.name if rule else 'no rule'}): the fire's finding")
+            eq(session.preview_text(doc, session.rules[0], 0).splitlines(),
+               [fired, "(a fire reads the file as saved: it blocks every rule of after_300 - nothing to preview until "
+                "the file loads)"], "the preview: the fire's finding")
+            apart = td.Session(os.path.join(sandbox, "templates.yaml"), hooks={"before_300": None, "after_300": database})
+            ok(apart.document_note().startswith("note: a fire uses "), apart.document_note())
+            eq(apart.check(doc, apart.rules[0]), [], "another document: about itself")
+            files_view.write_text_file(path, doc.text, False, False)   # the Files tab's Save: UTF-8 now
+            eq(session.check(doc, session.rules[0]), [], "saved as UTF-8: the file loads - nothing to say")
+            shown = session.preview_text(doc, session.rules[0], 0).splitlines()
+            _db, findings = engine.fire("after_300", database(), hooks=("before_300", "after_300"), files_root=out)
+            eq(findings, [], "(the fire runs)")
+            with open(os.path.join(out, "gen", "B1.scl"), encoding="utf-8") as handle:
+                eq(shown[1:], handle.read().splitlines(), "…and the preview is the text it appends")
+        finally:
+            config.database_dir = original_dir
+            config.use_project(None)
+
+
 def test_the_dry_settle_writes_nothing():
     """The Session models a settled before_300 with a DRY fire of it - an absolute file target included
     (a scratch output root did not catch one: every view would have appended to the real file). The
@@ -631,6 +701,8 @@ if __name__ == "__main__":
         ("a_data_functions_predicate_completes_its_tables_columns",
          test_a_data_functions_predicate_completes_its_tables_columns),
         ("unreadable_params_block_as_the_fire_blocks", test_unreadable_params_block_as_the_fire_blocks),
+        ("a_templates_file_a_fire_cannot_read_is_the_fires_finding",
+         test_a_templates_file_a_fire_cannot_read_is_the_fires_finding),
         ("the_dry_settle_writes_nothing", test_the_dry_settle_writes_nothing),
         ("a_quoted_template_with_newline_escapes_is_exact", test_a_quoted_template_with_newline_escapes_is_exact),
         ("a_reload_discards_the_build_it_overtook", test_a_reload_discards_the_build_it_overtook),

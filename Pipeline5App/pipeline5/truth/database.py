@@ -10,10 +10,9 @@ the SAME declared schemas, fully typed - so a run can resume from a saved Databa
 """
 from __future__ import annotations
 
-import contextlib
 import os
 
-from pipeline5.truth.table import Table
+from pipeline5.truth.table import Table, write_files
 
 
 class Database:
@@ -52,30 +51,16 @@ class Database:
     def save(self, directory) -> None:
         """Write every table to `<directory>/<table>.csv` (creating the directory) - all or nothing, as far as a
         save can be: EVERY table rendered first (`Table.csv_bytes` - a value that cannot be written raises,
-        located), then EVERY file opened for writing without truncating it (a file another program holds
-        open - Excel's deny-write lock - or a read-only one raises there; a file this save created is removed
-        again), and only then written. A refused save leaves every file as it was: never a truncated table,
-        never a Database half this run's and half the last (C-024 refute round 22 + its implications check).
-        Only a failure DURING the writes - a full disk, a lock taken in between - can stop it part-way."""
+        located), then EVERY file opened for writing in place and locked (`write_files`: a file another program
+        holds open - Excel's deny-write lock - or locks, or a read-only one raises there; a file this save
+        created is removed again; a HIDDEN or SYSTEM file is written in place, never re-created - Windows
+        refuses that, C-024 refute round 24), and only then written. A refused save leaves every file as it
+        was: never a truncated table, never a Database half this run's and half the last (C-024 refute round
+        22 + its implications check). Only a failure DURING the writes - a full disk - can stop it part-way."""
         payloads = [(os.path.join(directory, f"{table.name}.csv"), table.csv_bytes())
                     for table in self._tables.values()]
         os.makedirs(directory, exist_ok=True)
-        created = []
-        try:
-            for path, _data in payloads:                    # every file writable BEFORE any is truncated
-                existed = os.path.exists(path)
-                with open(path, "ab"):
-                    pass
-                if not existed:
-                    created.append(path)
-        except OSError:
-            for path in created:
-                with contextlib.suppress(OSError):
-                    os.remove(path)
-            raise
-        for path, data in payloads:
-            with open(path, "wb") as handle:
-                handle.write(data)
+        write_files(payloads)
 
     def load(self, directory) -> "Database":
         """Read each declared table from `<directory>/<table>.csv` if present; an absent file leaves

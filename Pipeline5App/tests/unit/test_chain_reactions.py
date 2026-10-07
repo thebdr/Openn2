@@ -1375,6 +1375,115 @@ def test_a_field_name_or_a_value_the_save_cannot_store_never_empties_a_table():
     _sandboxed(body)()
 
 
+def test_a_hidden_or_locked_file_never_leaves_a_record_half_saved():
+    """C-024 refute round 24 (gap 1): the save checked each file by opening it to APPEND, then re-created it to
+    write. Windows grants the first on a HIDDEN file and refuses the second: with the audit hidden, the spawns and
+    the findings were this fire's while the audit stayed the last one's - rx_record_unwritable blaming "a file held
+    open", the audit saying ok for a rule whose finding was recorded. Another program's byte-range lock passed the
+    check too, and the save truncated that table to 0 bytes. The save writes in place now (a hidden file saved
+    whole) and locks every file before it writes any (a lock: rx_record_unwritable, every file as it was)."""
+    if os.name != "nt":
+        return                                                # (Windows attributes and locks)
+    import ctypes
+    import msvcrt
+
+    def snapshot(directory):
+        files = {}
+        for name in sorted(os.listdir(directory)):
+            with open(os.path.join(directory, name), "rb") as handle:
+                files[name] = handle.read()
+        return files
+
+    def read(path):
+        with open(path, newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle))
+
+    def body(sandbox):
+        rules = [_rule(), _rule(name="r2", action="file", source_table="", condition="", target="rx/x.txt",
+                                template="bad")]
+        with tempfile.TemporaryDirectory() as out:
+            engine.fire("after_300", _db(), rules=rules, templates={**_ROW_TPL, "bad": "x"}, params={}, files_root=out)
+            log = os.path.join(sandbox, "chain_reactions_log.csv")
+            ctypes.windll.kernel32.SetFileAttributesW(log, 0x2)       # the audit HIDDEN
+            try:
+                templates = {"rows": [{"label": "run2-{$name}"}], "bad": "{$nope}"}
+                _, findings = engine.fire("after_300", _db(), rules=rules, templates=templates, params={},
+                                          files_root=out)
+                eq(ctypes.windll.kernel32.GetFileAttributesW(log) & 0x2, 0x2, "(the audit is still hidden)")
+            finally:
+                ctypes.windll.kernel32.SetFileAttributesW(log, 0x80)
+            eq([(f.type, f.location) for f in findings], [("rx_bad_template", "r2")], "no rx_record_unwritable")
+            eq([row["label"] for row in read(os.path.join(sandbox, "dst.csv"))], ["run2-D1", "run2-D2"],
+               "the spawns: this fire's")
+            eq([(row["rule"], row["created"], row["outcome"]) for row in read(log)],
+               [("r1", "2", "ok"), ("r2", "0", "rx_bad_template")], "the hidden audit: this fire's too, whole")
+            eq([(row["type"], row["location"]) for row in read(os.path.join(sandbox, "validation_issues.csv"))],
+               [("rx_bad_template", "r2")], "…and the findings it audits")
+            saved = snapshot(sandbox)
+            holder = open(os.path.join(sandbox, "dst.csv"), "r+b")    # another program locks bytes 6..9 of a
+            holder.seek(6)                                            # table the save writes (not a record file:
+            msvcrt.locking(holder.fileno(), msvcrt.LK_NBLCK, 4)      # one is READ first - rx_record_unreadable)
+            try:
+                _, findings = engine.fire("after_300", _db(), rules=[_rule()],
+                                          templates={"rows": [{"label": "run3-{$name}"}]}, params={}, files_root=out)
+            finally:
+                holder.seek(6)
+                msvcrt.locking(holder.fileno(), msvcrt.LK_UNLCK, 4)
+                holder.close()
+            eq([f.type for f in findings], ["rx_record_unwritable"], "a lock: the record's finding")
+            ok("(a file held open by another program?)" in findings[0].detail, findings[0].detail)
+            eq(snapshot(sandbox), saved, "…every file as it was - the locked table not truncated, no record half saved")
+    _sandboxed(body)()
+
+
+def test_a_misspelt_or_doubled_rule_column_is_never_silent():
+    """C-024 refute round 24 (gap 2): a reactions.csv header had to name five rule columns only - a misspelt
+    `Condition` / `conditions` / ` condition` read every rule's condition as EMPTY (every row matched), a misspelt
+    `Source_Table` every source as empty (one fire, no row), audited ok and nothing reported. A header names EVERY
+    rule column but the comment now, each once - else the file is unreadable (rx_rules_unreadable, nothing fired); a
+    column the rules do not read (an author's own) is left alone, and the comment column may go."""
+    from pipeline5.config import loaders
+    real_find = loaders.find
+    good = "name,fire_when,source_table,condition,action,target,template,comment"
+    line = 'doors,after_300,src,"$kind = ""door""",add_rows,dst,rows,'
+
+    def body(sandbox):
+        path = os.path.join(sandbox, "reactions.csv")
+        loaders.find = lambda rel: path if rel == "chain_reactions/reactions.csv" else real_find(rel)
+
+        def fire(header, row):
+            with open(path, "w", encoding="utf-8", newline="") as handle:
+                handle.write(header + "\r\n" + row + "\r\n")
+            database, findings = engine.fire("after_300", _db(), templates=_ROW_TPL, params={},
+                                             hooks=("before_300", "after_300"))
+            return [f.type for f in findings], [r["label"] for r in database["dst"]]
+        try:
+            eq(fire(good, line), ([], ["spawn-D1", "spawn-D2"]), "(the header as shipped: the doors only)")
+            for header, column in ((good.replace("condition", "Condition"), "condition"),
+                                   (good.replace("condition", "conditions"), "condition"),
+                                   (good.replace("condition", " condition"), "condition"),
+                                   (good.replace("source_table", "Source_Table"), "source_table")):
+                eq(fire(header, line), (["rx_rules_unreadable"], []), f"{header!r}: unreadable - nothing fired")
+                try:
+                    config.load_reactions()
+                    ok(False, f"{header!r} must not load")
+                except ValueError as error:
+                    ok(str(error).startswith(f"{path}: its header row names no {column} column - got "), str(error))
+            eq(fire(good + ",condition", line + ',"$kind = ""motor"""'), (["rx_rules_unreadable"], []),
+               "a rule column named twice: unreadable (a rule would read only the last)")
+            try:
+                config.load_reactions()
+                ok(False, "a doubled column must not load")
+            except ValueError as error:
+                ok(str(error).startswith(f"{path}: its header row names the condition column more than once - "),
+                   str(error))
+            eq(fire(good + ",owner", line + ",me"), ([], ["spawn-D1", "spawn-D2"]), "an author's own column: left alone")
+            eq(fire(good.replace(",comment", ""), line[:-1]), ([], ["spawn-D1", "spawn-D2"]), "no comment column: fine")
+        finally:
+            loaders.find = real_find
+    _sandboxed(body)()
+
+
 def test_every_path_windows_would_misdirect_is_refused_before_the_write():
     """C-025 refute round 5 (#2, #5) + C-024 refute round 22's notes, the engine half. Win32 takes a `\\\\?\\`
     path AS WRITTEN - a '/' is no separator, '.' / '..' / an empty name are not resolved: every fire failed at
@@ -1521,6 +1630,9 @@ if __name__ == "__main__":
          test_a_findings_text_the_record_cannot_store_is_recorded_escaped),
         ("a_field_name_or_a_value_the_save_cannot_store_never_empties_a_table",
          test_a_field_name_or_a_value_the_save_cannot_store_never_empties_a_table),
+        ("a_hidden_or_locked_file_never_leaves_a_record_half_saved",
+         test_a_hidden_or_locked_file_never_leaves_a_record_half_saved),
+        ("a_misspelt_or_doubled_rule_column_is_never_silent", test_a_misspelt_or_doubled_rule_column_is_never_silent),
         ("every_path_windows_would_misdirect_is_refused_before_the_write",
          test_every_path_windows_would_misdirect_is_refused_before_the_write),
         ("fire_empty_hook_is_a_strict_noop", test_fire_empty_hook_is_a_strict_noop),

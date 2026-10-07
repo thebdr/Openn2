@@ -891,10 +891,19 @@ class Session:
     def check(self, doc: Doc, rule) -> list:
         """engine.lint on the document - in the rule's context when one is chosen, on every leg that
         fires its hook (what only another leg rejects says so). A leg the run halts on says THAT instead -
-        no checks of a fire that never happens - and the other legs are checked all the same."""
-        from pipeline5.phases.chain_reactions import engine
+        no checks of a fire that never happens - and the other legs are checked all the same. First, when
+        this document IS the file a fire reads and that file, as saved, does not load: the fire's own
+        finding (`saved_problem` - it blocks every rule)."""
         if doc.error is not None:
             return place(doc, [])
+        saved = self.saved_problem()
+        first = [] if saved is None else [Placed(None, None, f"{saved[0]}: {saved[1]} - a fire reads the file as "
+                                                 "saved and blocks every rule it fires (saving this document "
+                                                 "replaces it, in UTF-8)", "error", "templates.yaml (saved)")]
+        return first + self._checks(doc, rule)
+
+    def _checks(self, doc: Doc, rule) -> list:
+        from pipeline5.phases.chain_reactions import engine
         hooks = tuple(self.hooks) or None
         if rule is None:
             return place(doc, engine.lint(doc.templates, None, None, hooks))
@@ -921,6 +930,19 @@ class Session:
                                  f"not load, a fire blocks every rule of the hook: {self.params_problem}",
                                  "error", "rule"))
         return placed
+
+    def saved_problem(self):
+        """(type, detail) of the finding every fire with rules gives when the templates.yaml it reads - THIS
+        document's file, as saved - does not load (`engine.saved_templates_problem`: the fire's own loader, a
+        strict UTF-8 read, then YAML), or None: it loads, or this document is not the file a fire reads. The
+        Files tab shows any file - one that is not UTF-8 too, its undecodable bytes as U+FFFD - so this document
+        can parse while the fire is blocked (C-025 refute round 7); an unsaved edit fixes nothing until it is
+        saved. Read afresh on every check: a Save, an external edit or a run may change it."""
+        from pipeline5.phases.chain_reactions import engine
+        if not self.path or self.document_note():
+            return None
+        problem = engine.saved_templates_problem()
+        return None if problem is None else (problem.type, problem.detail)
 
     def document_note(self) -> str:
         """A note when this document is NOT the templates.yaml a fire uses (its lint and preview are
@@ -949,6 +971,11 @@ class Session:
                                       "(no fire, so nothing to preview)"] +
                              [f"note: the {leg} leg fires {rule.fire_when} all the same, over its own Database - "
                               "its problems are in the problems list ('on the ... leg')" for leg in firing])
+        saved = self.saved_problem()                      # (the fire loads the templates before the params)
+        if saved is not None:
+            return "\n".join(lines + [f"{saved[0]}: {saved[1]}",
+                                      f"(a fire reads the file as saved: it blocks every rule of {rule.fire_when} - "
+                                      "nothing to preview until the file loads)"])
         if self.params_problem:
             return "\n".join(lines + [f"rx_params_unreadable: the project params do not load - a fire blocks "
                                       f"every rule of {rule.fire_when}: {self.params_problem}"])

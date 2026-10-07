@@ -73,6 +73,21 @@ def _work(jobs: queue.Queue, results: queue.Queue, session) -> None:
                 results.put(("check", number, None, None, error))
 
 
+def _chosen(labels, index: int) -> tuple:
+    """The rule at `index` of `labels` as a reload carries it: (its label, which occurrence of that label)."""
+    label = labels[index] if 0 <= index < len(labels) else ""
+    return label, list(labels[:max(0, index)]).count(label)
+
+
+def _reselect(labels, chosen) -> int:
+    """Where the chosen rule is among the reloaded `labels`: the SAME occurrence of its label - two identical
+    reactions.csv lines are two rules (C-025 refute round 7: the first was taken after every reload, the label
+    unchanged while the checks judged the other rule) - else its last one; no such label: no rule (0)."""
+    label, occurrence = chosen
+    at = [i for i, text in enumerate(labels) if text == label]
+    return at[min(occurrence, len(at) - 1)] if at else 0
+
+
 class TemplateMode:
     def __init__(self, text: tk.Text, bar, lower, *, mode: str = "dark", session=None, path=None):
         self.text, self.mode = text, mode
@@ -88,7 +103,8 @@ class TemplateMode:
         self._context = template_doc.Context()             # the newest rule context (completions read it)
 
         ttk.Label(bar, text="Rule:").pack(side="left")
-        self.rule_box = ttk.Combobox(bar, state="readonly", width=52, values=self.session.rule_labels())
+        self._labels = self.session.rule_labels()          # the rule box's values, as Python holds them
+        self.rule_box = ttk.Combobox(bar, state="readonly", width=52, values=self._labels)
         self.rule_box.current(0)
         self.rule_box.pack(side="left", padx=(2, 8))
         self.rule_box.bind("<<ComboboxSelected>>", lambda _e: self.on_rule())
@@ -156,7 +172,7 @@ class TemplateMode:
         """↻: the worker re-reads the rules and rebuilds the hook databases (after the build it may be
         running - never racing it), then the labels come back and a fresh check follows."""
         self._request += 1
-        self._jobs.put(("reload", self._request, self.rule_box.get()))
+        self._jobs.put(("reload", self._request, _chosen(self._labels, self.rule_box.current())))
 
     # --- the refresh: parse + paint here, check + preview on the worker ------------------------------ #
     def schedule(self) -> None:
@@ -213,8 +229,9 @@ class TemplateMode:
                 if error is not None:
                     self._failed(error)
                 else:
-                    self.rule_box.configure(values=payload)
-                    self.rule_box.current(payload.index(chosen) if chosen in payload else 0)
+                    self._labels = list(payload)
+                    self.rule_box.configure(values=self._labels)
+                    self.rule_box.current(_reselect(self._labels, chosen))
                     self.on_rule()                           # a fresh check against the reloaded rules
             else:
                 checks.append(result)

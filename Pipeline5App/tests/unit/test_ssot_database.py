@@ -97,6 +97,57 @@ def test_a_refused_save_leaves_every_file_as_it_was():
         eq(len(Database([Table("a", ["uid", "v"])]).load(d)["a"]), 2, "…this run's rows")
 
 
+def test_a_hidden_system_or_locked_file_saves_whole_or_not_at_all():
+    """C-024 refute round 24: the save's check opened each file to APPEND ("ab") - which Windows grants on a HIDDEN
+    or SYSTEM file - then re-created it to write ("wb"), which Windows refuses on such a file: the tables before it
+    were already this run's (a Database half new, half old - the audit saying a rule ran ok whose finding was
+    recorded). And another program's byte-range lock passed the check too: the save then truncated that file to 0
+    bytes. Every file is written IN PLACE now (a hidden / system one keeps its attribute), and locked whole before
+    any is written - a lock anywhere in a file refuses the save with every file as it was."""
+    if os.name != "nt":
+        return                                                   # (Windows attributes and locks)
+    import ctypes
+    import msvcrt
+    attributes = ctypes.windll.kernel32.GetFileAttributesW
+    set_attributes = ctypes.windll.kernel32.SetFileAttributesW
+    hidden, system, normal = 0x2, 0x4, 0x80
+    a = Table("a", ["uid", "v"], key_columns=["v"])
+    b = Table("b", ["uid", "v"], key_columns=["v"])
+    with tempfile.TemporaryDirectory() as d:
+        for flag in (hidden, system):
+            a.rows, b.rows = [], []
+            a.add(v="one")
+            b.add(v="a long first value")
+            Database([a, b]).save(d)
+            path = os.path.join(d, "b.csv")
+            set_attributes(path, flag)
+            try:
+                a.add(v="three")
+                b.rows = []
+                b.add(v="two")                                   # SHORTER than before: cut to its new length
+                Database([a, b]).save(d)
+                eq(_files(d), {"a.csv": a.csv_bytes(), "b.csv": b.csv_bytes()}, f"0x{flag:x}: saved whole, byte for byte")
+                eq(attributes(path) & flag, flag, f"0x{flag:x}: …in place - the attribute kept")
+            finally:
+                set_attributes(path, normal)
+        saved = _files(d)
+        a.add(v="four")                                          # a change a successful save would write
+        fresh = Table("c", ["uid", "v"])                         # a table with no file yet, saved BEFORE b
+        holder = open(os.path.join(d, "b.csv"), "r+b")           # another program locks bytes 5..9 of b.csv
+        holder.seek(5)
+        msvcrt.locking(holder.fileno(), msvcrt.LK_NBLCK, 5)
+        try:
+            raises(PermissionError, lambda: Database([a, fresh, b]).save(d))
+        finally:
+            holder.seek(5)
+            msvcrt.locking(holder.fileno(), msvcrt.LK_UNLCK, 5)
+            holder.close()
+        eq(_files(d), saved, "a lock anywhere in a file: every file as it was - none truncated, c.csv made and removed")
+        Database([a, fresh, b]).save(d)
+        eq(_files(d), {"a.csv": a.csv_bytes(), "b.csv": b.csv_bytes(), "c.csv": fresh.csv_bytes()},
+           "the lock gone: saved whole")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("database", [
@@ -105,4 +156,6 @@ if __name__ == "__main__":
         ("access_forms", test_access_forms),
         ("duplicate_table_name_rejected", test_duplicate_table_name_rejected),
         ("a_refused_save_leaves_every_file_as_it_was", test_a_refused_save_leaves_every_file_as_it_was),
+        ("a_hidden_system_or_locked_file_saves_whole_or_not_at_all",
+         test_a_hidden_system_or_locked_file_saves_whole_or_not_at_all),
     ]))

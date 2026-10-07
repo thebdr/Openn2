@@ -17,11 +17,68 @@ revisions and other tables can foreign-key to it.
 """
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
 import json
+import os
 
 from pipeline5.truth.content_hash import uid as content_uid
+
+try:                                  # Windows: another program's byte-range lock is refused BEFORE any write
+    import msvcrt
+except ImportError:                   # elsewhere file locks are advisory - nothing to probe
+    msvcrt = None
+
+_LOCK_SPAN = 0x7FFFFFFF               # msvcrt.locking takes a C long: every byte a table file can have, past its end
+
+
+def write_files(payloads) -> None:
+    """Write each `(path, bytes)` - all or nothing, as far as a write can be (C-001): EVERY file is opened
+    for writing before any is written, WITHOUT truncating it - an existing one IN PLACE ("r+b", never re-created:
+    Windows refuses to re-create ("wb") a HIDDEN or SYSTEM file it opens in place - C-024 refute round 24: the
+    tables before such a file were already this run's), a missing one created ("xb", removed again when the write
+    is refused) - and, on Windows, LOCKED whole against every other handle (another program's byte-range lock on
+    any of its bytes refuses it). A file held open with a deny-write share (Excel), a read-only one or a locked one
+    raises there, with every file as it was. Then each is written in place and cut to its new length under that
+    lock: only a failure DURING the writes (a full disk) can stop it part-way - no lock can be taken in between."""
+    payloads = list(payloads)
+    opened, created = [], []                          # opened: [handle, locked]
+    try:
+        for path, _data in payloads:
+            try:
+                handle = open(path, "r+b")
+            except FileNotFoundError:
+                handle = open(path, "xb")
+                created.append(path)
+            opened.append([handle, False])
+            if msvcrt is not None:
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, _LOCK_SPAN)
+                opened[-1][1] = True
+    except OSError:
+        _release(opened)
+        for path in created:
+            with contextlib.suppress(OSError):
+                os.remove(path)
+        raise
+    try:
+        for (handle, _locked), (_path, data) in zip(opened, payloads):
+            handle.write(data)
+            handle.truncate()
+    finally:
+        _release(opened)
+
+
+def _release(opened) -> None:
+    """Unlock (from byte 0, as locked) and close every handle `write_files` opened - each on its own."""
+    for handle, locked in opened:
+        if locked:
+            with contextlib.suppress(OSError):
+                handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, _LOCK_SPAN)
+        with contextlib.suppress(OSError):
+            handle.close()
 
 
 def encode_cell(value) -> str:
@@ -180,10 +237,9 @@ class Table:
     def write_csv(self, path) -> None:
         """Write the table as a comma CSV (`csv_bytes`) - rendered and encoded IN FULL before the file is
         opened: a table that cannot be written raises with its previous file intact, never truncated
-        (C-024 refute round 22: a failed save emptied signals.csv)."""
-        data = self.csv_bytes()
-        with open(path, "wb") as handle:
-            handle.write(data)
+        (C-024 refute round 22: a failed save emptied signals.csv) - and written as `write_files` writes
+        (in place, locked: a file another program locks is refused before it is touched - round 24)."""
+        write_files([(path, self.csv_bytes())])
 
     def read_csv(self, path) -> "Table":
         """Load rows from a comma CSV into this table's schema; the declared `json_columns` are

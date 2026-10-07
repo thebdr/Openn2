@@ -121,6 +121,43 @@ def test_write_rejects_structured_value_in_plain_column():
                 eq(handle.read(), before, f"{bad!r}: the previous file intact")
 
 
+def test_write_goes_in_place_and_never_through_a_lock():
+    """C-024 refute round 24, `write_csv`'s half: it re-created its file ("wb") - Windows refuses that on a HIDDEN
+    file - and truncated a file another program holds a byte-range lock on, to 0 bytes. It writes as `Database.save`
+    does now (`write_files`): in place (the attribute kept, a shorter text cut to its length), and a lock refuses
+    it with the previous file intact."""
+    if os.name != "nt":
+        return
+    import ctypes
+    import msvcrt
+    t = Table("t", ["uid", "a"])
+    t.add(uid="x", a="a long first value")
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "t.csv")
+        t.write_csv(path)
+        ctypes.windll.kernel32.SetFileAttributesW(path, 0x2)
+        try:
+            t.rows[0]["a"] = "short"
+            t.write_csv(path)
+            with open(path, "rb") as handle:
+                eq(handle.read(), b"uid,a\r\nx,short\r\n", "a hidden file: written in place, cut to its length")
+            eq(ctypes.windll.kernel32.GetFileAttributesW(path) & 0x2, 0x2, "…still hidden")
+        finally:
+            ctypes.windll.kernel32.SetFileAttributesW(path, 0x80)
+        holder = open(path, "r+b")
+        holder.seek(8)
+        msvcrt.locking(holder.fileno(), msvcrt.LK_NBLCK, 3)       # another program locks bytes 8..10
+        try:
+            t.rows[0]["a"] = "changed"
+            raises(PermissionError, lambda: t.write_csv(path))
+        finally:
+            holder.seek(8)
+            msvcrt.locking(holder.fileno(), msvcrt.LK_UNLCK, 3)
+            holder.close()
+        with open(path, "rb") as handle:
+            eq(handle.read(), b"uid,a\r\nx,short\r\n", "a locked file: the previous file intact, never truncated")
+
+
 def test_read_locates_a_bad_json_cell():
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "t.csv")
@@ -201,6 +238,7 @@ if __name__ == "__main__":
         ("undeclared_columns_are_preserved", test_undeclared_columns_are_preserved),
         ("extra_columns_sorted_deterministically", test_extra_columns_sorted_deterministically),
         ("write_rejects_structured_value_in_plain_column", test_write_rejects_structured_value_in_plain_column),
+        ("write_goes_in_place_and_never_through_a_lock", test_write_goes_in_place_and_never_through_a_lock),
         ("read_locates_a_bad_json_cell", test_read_locates_a_bad_json_cell),
         ("read_rejects_ragged_row_and_duplicate_header", test_read_rejects_ragged_row_and_duplicate_header),
         ("iter_len_extend", test_iter_len_extend),

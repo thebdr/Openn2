@@ -757,6 +757,14 @@ class Preview:
             self.problem = (self.problem[0], _storable(self.problem[1]))
 
 
+def saved_templates_problem():
+    """The fire's own verdict on the ACTIVE templates.yaml as saved: the rx_templates_unreadable finding every
+    fire with rules gives (the same `_load` - a strict UTF-8 read, then YAML), or None when it loads. The
+    template builder asks it when its document IS that file (C-025 refute round 7: the Files tab shows a file
+    that is not UTF-8 too, its undecodable bytes as U+FFFD - the document parsed while every fire was blocked)."""
+    return _load(config.load_reaction_templates, "rx_templates_unreadable", TEMPLATES_FILE)[1]
+
+
 def db_layer(database) -> dict:
     """The E1 `_db` layer a fire builds over `database` ({} for none) - {table: its complete rows}.
     The builder computes it ONCE per hook and hands it to every `preview` (it re-previews on each
@@ -902,8 +910,8 @@ def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -
     problems, fields, tables, json, json_fields = [], None, None, None, None
     values = None
     if rule is not None:
-        fields, tables, json, json_fields = _lint_rule(rule, templates, database, hooks, problems)
         values = _column_values(rule, database)
+        fields, tables, json, json_fields = _lint_rule(rule, templates, database, hooks, problems, values)
     text_start = rule.template if rule is not None and rule.action == "file" else None
     problems.extend(tempemplator.lint(templates, start=text_start, fields=fields, tables=tables,
                                       json=json, json_fields=json_fields, values=values))
@@ -925,17 +933,18 @@ def lint(templates: dict, rule: Rule | None = None, database=None, hooks=None) -
                 if isinstance(value, str):
                     found = tempemplator.lint_line(value, fields=fields if own else None, tables=tables if own else None,
                                                    json=json_fields if own else None,
-                                                   values=(lambda path: values(None, path) if "." not in path else ())
-                                                   if own and values is not None else None)
+                                                   values=_own_values(values) if own and values is not None else None)
                     problems.extend(tempemplator.Problem(name, (number, str(column)), s, e, message, severity)
                                     for s, e, message, severity in found)
     return problems
 
 
-def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> tuple:
+def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list, values) -> tuple:
     """The rule's own problems (appended, template=None) -> its E1 (fields, tables, {table: JSON columns},
     the source row's JSON fields); fields None when the source table is absent (every hole would read
-    as missing - one problem says why)."""
+    as missing - one problem says why). A file target's holes are judged as a text line's: a format spec
+    on the values the rule's rows hold there too (`values` - C-025 refute round 7: `DB{$db:04d}.scl` linted
+    clean while the fire stops at the first row holding text)."""
     def problem(message, where=None, start=0, end=0, severity="error"):
         problems.append(tempemplator.Problem(None, where, start, end, f"rule {rule.name!r}: {message}", severity))
 
@@ -959,7 +968,8 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list) -> 
         problem(_unknown_table("target", rule.target))
     if rule.action == "file":
         for start, end, message, severity in tempemplator.lint_line(rule.target, fields=fields, tables=tables,
-                                                                    json=json_fields, stored=False):
+                                                                    json=json_fields, stored=False,
+                                                                    values=_own_values(values)):
             problem(f"target {rule.target!r}: {message}", "target", start, end, severity)
         refusal = _literal_refusal(rule.target)
         if refusal is not None:
@@ -989,6 +999,12 @@ def _column_values(rule: Rule, database):
             cache[(name, column)] = tuple(found.values())
         return cache[(name, column)]
     return values
+
+
+def _own_values(values):
+    """`_column_values` read for the rule's OWN row (a top-level `$col` - a deeper path is a JSON sub-key): what a
+    row value's or the target's format spec is tried on."""
+    return lambda path: values(None, path) if "." not in path else ()
 
 
 def _json_valued(table) -> frozenset:

@@ -12,7 +12,7 @@ from pipeline5.systems import catalog
 from pipeline5.truth.database import Database
 from pipeline5.truth.table import Table
 from pipeline5.workbench import files_view, template_doc
-from tkinter import ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 SYSTEM = catalog.by_id("siemens_s7_safety")
 _SHIPPED = os.path.join(SYSTEM.config_root, "chain_reactions", "templates.yaml")
@@ -120,6 +120,27 @@ def _problem_rows(mode, needle: str) -> list:
 def _tagged(text, tag):
     ranges = text.tag_ranges(tag)
     return [text.get(ranges[i], ranges[i + 1]) for i in range(0, len(ranges), 2)]
+
+
+class _NoDialogs:
+    """No REAL dialog may open on the desktop while a test runs (a modal window waits for a person): each one is
+    recorded and answered No / cancelled - the test then fails on `asked`."""
+    _DIALOGS = ((messagebox, ("askyesno", "askokcancel", "askyesnocancel", "askquestion", "askretrycancel",
+                              "showinfo", "showwarning", "showerror")),
+                (simpledialog, ("askstring", "askinteger", "askfloat")),
+                (filedialog, ("askopenfilename", "askopenfilenames", "asksaveasfilename", "askdirectory")))
+
+    def __enter__(self):
+        self.asked, self.saved = [], []
+        for module, names in self._DIALOGS:
+            for name in names:
+                self.saved.append((module, name, getattr(module, name)))
+                setattr(module, name, lambda *args, _name=name, **_kwargs: self.asked.append((_name, *args[:2])))
+        return self
+
+    def __exit__(self, *_exc):
+        for module, name, real in self.saved:
+            setattr(module, name, real)
 
 
 def test_project_copy_helpers():
@@ -580,6 +601,135 @@ def test_a_check_queued_behind_a_reload_is_dropped():
         _done(root)
 
 
+def test_a_save_rechecks_the_file_a_fire_reads():
+    """C-025 refute round 7 (#1) through the real FilesPanel: a templates.yaml saved as cp1252 opens (its é shown as
+    U+FFFD) and the builder said "no problems" while every fire reads the SAVED file and is blocked. The problems list
+    and the preview say the fire's rx_templates_unreadable now; an unsaved edit lifts nothing (the fire reads the
+    file); Save re-checks - the file UTF-8 now, the problem gone, the preview back."""
+    root = _tk()
+    if root is None:
+        return
+    template_doc.Session = _session
+    try:
+        with _NoDialogs() as dialogs, tempfile.TemporaryDirectory() as project:
+            path = _project(project)
+            with open(path, "w", encoding="cp1252", newline="\n") as handle:
+                handle.write("# Température\n" + _TEMPLATES)
+            config.use_project(project)
+            panel = _panel(root, project)
+            panel._load(path)
+            mode, text = panel._template, panel._textw
+            applied, apply = [], mode._apply
+            mode._apply = lambda result: (applied.append(result[1]), apply(result))
+            ok(_pump(root, lambda: _problem_rows(mode, "rx_templates_unreadable")), "the fire's finding is listed")
+            eq(text.get("1.0", "1.end"), "# Temp�rature", "(the pane shows the undecodable byte as U+FFFD)")
+            mode.rule_box.current(1)
+            mode.on_rule()
+            ok(_pump(root, lambda: mode.preview.get("1.0", "end-1c").startswith("rx_templates_unreadable: ")),
+               f"…the preview says it: {mode.preview.get('1.0', 'end-1c')!r}")
+            text.delete("1.6", "1.7")
+            text.insert("1.6", "é")                              # the é retyped: an unsaved edit
+            ok(_pump(root, lambda: not mode._editing and applied[-1:] == [mode._request]), "(the edit is re-checked)")
+            ok(_problem_rows(mode, "rx_templates_unreadable"), "an unsaved edit lifts nothing - a fire reads the file")
+            save = [w for w in _widgets(panel.editor, ttk.Button) if w.cget("text").startswith("Save")]
+            save[0].invoke()
+            ok(_pump(root, lambda: not _problem_rows(mode, "rx_templates_unreadable"), 5),
+               f"Save re-checks: the problem gone ({_problem_rows(mode, '')})")
+            ok(_pump(root, lambda: mode.preview.get("1.0", "end-1c").startswith("APPEND")), "…the preview back")
+            with open(path, "rb") as handle:
+                eq(handle.read().split(b"\n")[0], "# Température".encode("utf-8"), "(the file: UTF-8 now)")
+            eq(dialogs.asked, [], "no dialog asked")
+    finally:
+        template_doc.Session = _REAL_SESSION
+        config.use_project(None)
+        _done(root)
+
+
+def test_a_reload_keeps_the_chosen_rule_of_two_alike():
+    """C-025 refute round 7 (#3): after a reload - the ↻ button, the Files tab's refresh after every run and on a
+    project / system switch - the view re-found the chosen rule by its LABEL: the first of two alike (round 6: two
+    identical reactions.csv lines are two rules), its label unchanged while the checks and the preview judged the
+    other rule. The same occurrence of the label is chosen now."""
+    from pipeline5.phases.chain_reactions import engine
+    from pipeline5.workbench import template_mode
+    labels = ["(none)", "a", "b", "a"]
+    eq([template_mode._reselect(labels, template_mode._chosen(labels, i)) for i in range(4)], [0, 1, 2, 3],
+       "each rule its own place - the second 'a' too")
+    eq(template_mode._reselect(["(none)", "x", "a", "b", "a"], template_mode._chosen(labels, 3)), 4,
+       "a rule added before them: the same occurrence")
+    eq(template_mode._reselect(["(none)", "a"], template_mode._chosen(labels, 3)), 1, "one of the two gone: the one left")
+    eq(template_mode._reselect(["(none)", "b"], template_mode._chosen(labels, 1)), 0, "its label gone: no rule")
+    root = _tk()
+    if root is None:
+        return
+    rules = ("name,fire_when,source_table,condition,action,target,template,comment\n"
+             "cnt,after_300,,,file,gen/c.txt,cnt_txt,\n"
+             "sp,after_300,signals,,add_rows,dst,rows,\n"
+             "cnt,after_300,,,file,gen/c.txt,cnt_txt,\n")
+    templates = 'cnt_txt: |-\n  dst has {count(dst)} rows\nrows:\n  - label: "L-{$tag}"\n'
+
+    def database():
+        base = _signals()
+        base.add_table(Table("dst", columns=["uid", "label", "spawned_by", "source_uid"], key_columns=["label"]))
+        return base
+
+    template_doc.Session = lambda path=None: _REAL_SESSION(path, hooks={"before_300": None,
+                                                                         "after_300": lambda system: database()})
+    try:
+        with _NoDialogs() as dialogs, tempfile.TemporaryDirectory() as proj, tempfile.TemporaryDirectory() as out, \
+                tempfile.TemporaryDirectory() as dbdir:
+            path = _project(proj, templates)
+            with open(os.path.join(os.path.dirname(path), "reactions.csv"), "w", encoding="utf-8") as handle:
+                handle.write(rules)
+            config.use_project(proj)
+            original_db = config.database_dir
+            config.database_dir = lambda: dbdir
+            try:
+                header, *lines = rules.splitlines()
+                compiled, _findings = engine.compile_rules([dict(zip(header.split(","), line.split(","))) for line in lines])
+                engine.fire("after_300", database(), rules=compiled, templates=template_doc.parse(templates).templates,
+                            params={}, files_root=out, hooks=("before_300", "after_300"))
+                with open(os.path.join(out, "gen", "c.txt"), encoding="utf-8") as handle:
+                    fired = handle.read().splitlines()
+                eq(fired, ["dst has 0.0 rows", "dst has 2.0 rows"], "(the fire: the first cnt before sp, the second after)")
+                panel = _panel(root, proj)
+                panel._load(path)
+                mode = panel._template
+                applied, apply = [], mode._apply
+                mode._apply = lambda result: (applied.append(result[1]), apply(result))
+
+                def shown():
+                    text = mode.preview.get("1.0", "end-1c")
+                    return text.splitlines()[1:2] if text.startswith("APPEND") else None
+                mode.rule_box.current(3)                                # the user picks the SECOND cnt
+                mode.on_rule()
+                ok(_pump(root, lambda: applied[-1:] == [mode._request] and shown() == fired[1:]),
+                   f"the second cnt: its own fire's line ({shown()})")
+                for reload in (panel.refresh, mode.reload):             # after a run / a switch, and the ↻ button
+                    before = mode._request
+                    reload()
+                    ok(_pump(root, lambda: mode._request >= before + 2 and applied[-1:] == [mode._request]),
+                       f"{reload.__name__}: the reloaded rules' check comes back")
+                    eq((mode.rule_box.current(), shown()), (3, fired[1:]),
+                       f"{reload.__name__}: still the second cnt - its own fire's line")
+                with open(os.path.join(os.path.dirname(path), "reactions.csv"), "w", encoding="utf-8") as handle:
+                    handle.write("\n".join([header, "x,after_300,,,file,gen/x.txt,cnt_txt,", *lines]) + "\n")
+                for number in (1, 2):                                   # a rule added before them: the same one at
+                    before = mode._request                              # its new place - and so on the next reload
+                    mode.reload()
+                    ok(_pump(root, lambda: mode._request >= before + 2 and applied[-1:] == [mode._request]),
+                       f"reload {number} over the changed rules: its check comes back")
+                    eq((mode.rule_box.current(), shown()), (4, fired[1:]),
+                       f"reload {number} over the changed rules: the second cnt, at its new place")
+                eq(dialogs.asked, [], "no dialog asked")
+            finally:
+                config.database_dir = original_db
+    finally:
+        template_doc.Session = _REAL_SESSION
+        config.use_project(None)
+        _done(root)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_template_mode", [
@@ -592,4 +742,6 @@ if __name__ == "__main__":
         ("the_shipped_file_is_read_only_until_copied", test_the_shipped_file_is_read_only_until_copied),
         ("every_viewer_keeps_the_shipped_config_read_only", test_every_viewer_keeps_the_shipped_config_read_only),
         ("a_check_queued_behind_a_reload_is_dropped", test_a_check_queued_behind_a_reload_is_dropped),
+        ("a_save_rechecks_the_file_a_fire_reads", test_a_save_rechecks_the_file_a_fire_reads),
+        ("a_reload_keeps_the_chosen_rule_of_two_alike", test_a_reload_keeps_the_chosen_rule_of_two_alike),
     ]))
