@@ -60,6 +60,15 @@ files, imports/exports PLC blocks.
   support by design**: pre-format-2 folders (`IoControllersList.csv` + wide
   `IoDevicesList.csv`) are handled by the old stable application version, not here —
   do not re-add converters or fallbacks.
+- **Hardware regeneration** (`TiaPortalOpenness.Hardware.cs CreateIoDevices`): a station whose
+  name already exists anywhere in the project (ungrouped or in a device group, case-insensitive)
+  is skipped with a `WARNING` together with all its modules; the run continues and ends with a
+  `N of M IO device(s) created, K SKIPPED (already in project)` summary line. Correction workflow
+  by design: delete the stations to refresh in TIA, generate again with "Use existing IO
+  controllers". Modules are only plugged on the run that creates their station - an existing
+  station is never completed, compared or slot-matched (a module change = delete + regenerate
+  its station). Do not add tolerance/compatibility checks. Controllers are not covered: in
+  "Create new IO controllers" mode an existing Plc still fails the run.
 - **Hardware config editor** (`HardwareConfigEditorWindow.cs` +
   `01_Constructor/HardwareConfigDocument.cs`): tree explorer with regex search,
   add/duplicate/delete/edit of stations and modules (Ctrl+Click multi-select,
@@ -215,9 +224,15 @@ files, imports/exports PLC blocks.
    dialog and honor each choice. Station rows with custom parameters (e.g. Lumberg
    `Item(..)…Addr(i).StartAddress=…` / `PrmData(n)=<hex>`) must land on the
    auto-created sub-items after module plugging — verify against a fresh dump.
-6. **Negative test:** select V18 at startup, try attaching to a running V19 instance —
+6. **Regenerate on the same project** ("Use existing IO controllers"): every station already in
+   the project logs `WARNING: IoDevice <name> (...) already exists in the project - station SKIPPED
+   with its N module(s)`, nothing is created and the summary line reads
+   `0 of M IO device(s) created, M SKIPPED (already in project)`. Delete one station in TIA and
+   generate again: exactly that station comes back with all its modules, IP/PN number and
+   parameters, the others stay untouched.
+7. **Negative test:** select V18 at startup, try attaching to a running V19 instance —
    expect an error in the log, not a crash.
-7. **Attribute dump:** on an attached project, "Dump Device Attributes" with an empty
+8. **Attribute dump:** on an attached project, "Dump Device Attributes" with an empty
    filter writes a file under `AttributeDumps\` (log shows path + device/node/attribute
    counts); a name filter limits the dumped devices; an invalid regex logs an error;
    "Cancel Operation" stops between devices and marks the file `# CANCELLED`.

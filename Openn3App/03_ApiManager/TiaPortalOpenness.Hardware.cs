@@ -304,10 +304,23 @@ namespace Openn._03_ApiManager
         /// <summary>
         /// Creates every configured I/O device, connects it to its controller's
         /// subnet/IO system, assigns IP + PROFINET device number and plugs its modules.
+        /// A station whose name already exists in the project (ungrouped or in any
+        /// device group) is SKIPPED together with all its modules, with a warning -
+        /// the correction workflow is: delete the stations to refresh in TIA, then
+        /// generate again. Modules are only ever plugged on the run that creates
+        /// their station; an existing station is never completed or compared
+        /// (no compatibility / slot matching by design).
         /// </summary>
         private void CreateIoDevices(IList<Tuple<HwIoD._Device, IList<HwIoD._Submodule>>> _devicesList)
         {
+            //snapshot of the device names already in the project; case-insensitive on
+            //purpose (a name differing only in case is skipped rather than risking the
+            //TIA name conflict). The loader guarantees unique station names within the
+            //configuration, so the set needs no update while creating.
+            var existingNames = new HashSet<string>(CollectAllDevices().Select(x => x.Name), StringComparer.OrdinalIgnoreCase);
+
             int createdCount = 0;
+            int skippedCount = 0;
             foreach (var d in _devicesList)
             {
                 //cooperative cancel: single Openness calls cannot be interrupted, so we
@@ -315,8 +328,19 @@ namespace Openn._03_ApiManager
                 if (TiaWorker.CurrentCancellation.IsCancellationRequested)
                 {
                     Log("Hardware generation CANCELLED - " + createdCount + " of " + _devicesList.Count +
-                        " IO device(s) created (project not saved - close it in TIA without saving to roll back)");
+                        " IO device(s) created" + SkippedSuffix(skippedCount) +
+                        " (project not saved - close it in TIA without saving to roll back)");
                     return;
+                }
+
+                if (existingNames.Contains(d.Item1.name))
+                {
+                    int moduleCount = d.Item2.Count(s => !string.IsNullOrEmpty(s.name));
+                    Log("WARNING: IoDevice " + d.Item1.name + " (" + HwDb.Identifier[d.Item1.identifier].comment + ") already exists in the project - " +
+                        "station SKIPPED with its " + moduleCount + " module(s). To refresh it, delete the station in TIA and generate again. \n" +
+                        "Line: " + d.Item1.srcRow.ToString() + " File: " + d.Item1.srcFileName);
+                    skippedCount++;
+                    continue;
                 }
 
                 var _device = project.UngroupedDevicesGroup.Devices.CreateWithItem(HwDb.Identifier[d.Item1.identifier].identifier, d.Item1.name, d.Item1.name);
@@ -358,7 +382,13 @@ namespace Openn._03_ApiManager
                 Log("IoDevice Creation Ok: IoDevice " + _device.Name + " (" + HwDb.Identifier[d.Item1.identifier].comment + " has been created");
                 createdCount++;
             }
+
+            Log("IoDevice generation finished: " + createdCount + " of " + _devicesList.Count + " IO device(s) created" + SkippedSuffix(skippedCount));
         }
+
+        /// <summary>", N SKIPPED (already in project)" for the generation summary lines; "" when nothing was skipped.</summary>
+        private static string SkippedSuffix(int skippedCount) =>
+            skippedCount > 0 ? ", " + skippedCount + " SKIPPED (already in project)" : string.Empty;
 
         /// <summary>
         /// Plugs each configured module into the first free slot of the device rack
