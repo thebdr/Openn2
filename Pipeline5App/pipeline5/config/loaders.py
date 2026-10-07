@@ -396,7 +396,8 @@ def load_reactions() -> list:
     names a rule column twice, raises (a headerless file would read its first rule AS the header - lost, silently; a
     misspelt `Condition` / `source table` column read every rule's condition / source as EMPTY - every row
     matched, or one fire - C-024 refute round 24): the engine reports rx_rules_unreadable. A column the
-    rules do not read (an author's own notes) is left alone."""
+    rules do not read - an author's own notes, the comment, the empty-named ones Excel pads a wider used range
+    with - is left alone, named twice too (round 25)."""
     path = find("chain_reactions/reactions.csv")
     if not path or not os.path.exists(path):
         return []

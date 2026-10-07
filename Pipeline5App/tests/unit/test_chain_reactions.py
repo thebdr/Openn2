@@ -1442,7 +1442,10 @@ def test_a_misspelt_or_doubled_rule_column_is_never_silent():
     `Condition` / `conditions` / ` condition` read every rule's condition as EMPTY (every row matched), a misspelt
     `Source_Table` every source as empty (one fire, no row), audited ok and nothing reported. A header names EVERY
     rule column but the comment now, each once - else the file is unreadable (rx_rules_unreadable, nothing fired); a
-    column the rules do not read (an author's own) is left alone, and the comment column may go."""
+    column the rules do not read (an author's own, the comment, the empty-named ones Excel pads a wider range with)
+    is left alone - named twice too - and the comment column may go. Round 25: each rule column named twice is
+    pinned (a check narrowed to one column let a doubled `target` spawn into the last copy's table, audited ok), and
+    so are the shapes left alone (a check over the whole header refused an Excel-saved file's `,,`)."""
     from pipeline5.config import loaders
     real_find = loaders.find
     good = "name,fire_when,source_table,condition,action,target,template,comment"
@@ -1470,16 +1473,26 @@ def test_a_misspelt_or_doubled_rule_column_is_never_silent():
                     ok(False, f"{header!r} must not load")
                 except ValueError as error:
                     ok(str(error).startswith(f"{path}: its header row names no {column} column - got "), str(error))
-            eq(fire(good + ",condition", line + ',"$kind = ""motor"""'), (["rx_rules_unreadable"], []),
-               "a rule column named twice: unreadable (a rule would read only the last)")
-            try:
-                config.load_reactions()
-                ok(False, "a doubled column must not load")
-            except ValueError as error:
-                ok(str(error).startswith(f"{path}: its header row names the condition column more than once - "),
-                   str(error))
-            eq(fire(good + ",owner", line + ",me"), ([], ["spawn-D1", "spawn-D2"]), "an author's own column: left alone")
-            eq(fire(good.replace(",comment", ""), line[:-1]), ([], ["spawn-D1", "spawn-D2"]), "no comment column: fine")
+            second = {"name": "doors_again", "fire_when": "after_300", "source_table": "",   # the last copy's
+                      "condition": '"$kind = ""motor"""', "action": "add_rows", "target": "other",  # value would
+                      "template": "rows"}                                                          # be read
+            for column, value in second.items():
+                eq(fire(good + "," + column, line + "," + value), (["rx_rules_unreadable"], []),
+                   f"{column} named twice: unreadable (a rule would read only the last copy)")
+                try:
+                    config.load_reactions()
+                    ok(False, f"a doubled {column} must not load")
+                except ValueError as error:
+                    ok(str(error).startswith(f"{path}: its header row names the {column} column more than once - "),
+                       str(error))
+            for header, row, why in ((good + ",owner", line + ",me", "an author's own column"),
+                                     (good + ",owner,owner", line + ",me,you", "an author's own column named twice"),
+                                     (good + ",,", line + ",,", "the empty-named columns Excel pads a range with"),
+                                     (good.replace("condition,", "condition,,"),
+                                      line.replace('""",', '""",,'), "an empty-named column between rule columns"),
+                                     (good + ",comment", line + ",again", "the comment named twice"),
+                                     (good.replace(",comment", ""), line[:-1], "no comment column")):
+                eq(fire(header, row), ([], ["spawn-D1", "spawn-D2"]), f"{why}: left alone - the doors only")
         finally:
             loaders.find = real_find
     _sandboxed(body)()
