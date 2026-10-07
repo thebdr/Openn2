@@ -265,6 +265,40 @@ def test_cematrix_matches_a_dotted_ce():
         addresses.configure_address_format(None, None)
 
 
+def test_absorb_spawned_makes_a_generated_signal_first_class():
+    """C-030: a row an after_300 reaction spawned into `signals` is derived like a document row - the canonical
+    address, the resolved type, the FLDs, the tag table - keeps the tag name its rule set, carries its
+    provenance as `source_cell` (never a Sheet!Cell link) and a uid stable run to run and unique per spawn;
+    document rows are untouched; absorbing twice changes nothing."""
+    from pipeline5.config import paths
+    from pipeline5.truth.database import Database
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    paths.use_system(SYSTEM)
+    sig = signals_table(["functional_unit", "location", "device", "script_type", "bit"])
+    doc = sig.add(functional_unit="=TRIB", location="-AEP01", device="-K34001", script_type="KQ", bit="Q2272.1",
+                  source_cell="NET!O10", name_in_tagtable="Contactor Output [ =TRIB-AEP01-K34001 ]")
+    doc_before = dict(doc)
+    for n in (1, 2):                                   # one source spawning TWO rows (two row specs)
+        sig.add_row({"functional_unit": "=TRIB", "location": "-AEP01", "device": "-K34001", "script_type": "KB",
+                     "bit": "I 2272.1", "name_in_tagtable": f"QBAD_{n}", "spawned_by": "qbad",
+                     "source_uid": doc["uid"]})
+    db = Database([sig])
+    eq(staging.absorb_spawned(db, params={}), 2, "two generated rows absorbed")
+    gen = [r for r in sig.rows if r.get("spawned_by")]
+    g = gen[0]
+    eq(g["bit"], "I2272.1", "the canonical address")
+    eq((g.get("type") or {}).get("type_id"), "KB", "the shipped type resolved")
+    eq((g["iol_FLD"], g["combined_FLD"]), ("=TRIB-AEP01-K34001",) * 2, "the FLDs derived")
+    eq((g["name_in_tagtable"], g["tagtable"]), ("QBAD_1", "SAFETY_Contactors"), "the rule's tag name kept, the table derived")
+    eq([r["source_cell"] for r in gen], [f"qbad:{doc['uid']}", f"qbad:{doc['uid']}#2"], "provenance, never a doc link")
+    uids = [r["uid"] for r in sig.rows]
+    eq(len(set(uids)), 3, "every uid unique")
+    eq(sig.rows[0], doc_before, "the document row untouched")
+    staging.absorb_spawned(db, params={})
+    eq([r["uid"] for r in sig.rows], uids, "idempotent - the same uids again")
+    ok(staging.is_generated(g) and not staging.is_generated(doc), "is_generated")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("staging", [
@@ -283,4 +317,5 @@ if __name__ == "__main__":
         ("load_io_list_no_match_returns_empty", test_load_io_list_no_match_returns_empty),
         ("read_view_stores_the_canonical_address", test_read_view_stores_the_canonical_address),
         ("cematrix_matches_a_dotted_ce", test_cematrix_matches_a_dotted_ce),
+        ("absorb_spawned_makes_a_generated_signal_first_class", test_absorb_spawned_makes_a_generated_signal_first_class),
     ]))

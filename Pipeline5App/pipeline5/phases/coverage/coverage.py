@@ -69,7 +69,10 @@ def is_signal(row) -> bool:
 
 
 def row_kind(row) -> str:
-    """'signal' | 'channel' (untyped row with an I/Q address = a raw module point) | 'structural'."""
+    """'signal' | 'generated' (a signal a chain reaction spawned - [[C-030]]) | 'channel' (untyped row with an
+    I/Q address = a raw module point) | 'structural'."""
+    if str(row.get("spawned_by") or "").strip():
+        return "generated"
     if is_signal(row):
         return "signal"
     return "channel" if str(row.get("bit", "") or "").strip()[:1].upper() in ("I", "Q") else "structural"
@@ -232,7 +235,7 @@ def attribute(rows, outputs) -> dict:
         for s in STAGES:
             rec[s] = "|".join(sorted(place[s]))
         rec["outputs"] = len(landed)
-        rec["flag"] = "ORPHAN" if (kind == "signal" and not landed) else ""
+        rec["flag"] = "ORPHAN" if (kind in ("signal", "generated") and not landed) else ""
         if rec["flag"] == "ORPHAN":
             orphans.append(rec)
         records.append(rec)
@@ -240,7 +243,7 @@ def attribute(rows, outputs) -> dict:
     unplaced = find_unplaced(outputs["db_members"], outputs["consumed"])
     stage_counts = {s: sum(1 for rec in records if rec[s]) for s in STAGES}
     kind_counts = {k: sum(1 for rec in records if rec["kind"] == k)
-                   for k in ("signal", "channel", "structural")}
+                   for k in ("signal", "generated", "channel", "structural")}
     stats = {"rows": len(records), "kinds": kind_counts, "stages": stage_counts,
              "orphans": len(orphans), "unplaced": len(unplaced),
              "generated_dbs": sorted(outputs["db_members"]),
@@ -271,7 +274,9 @@ def render_txt(result) -> str:
     L = ["PIPELINE COVERAGE REPORT  (phase 910)",
          "=" * 52,
          f"Staged rows: {st['rows']}   "
-         f"(signals {st['kinds']['signal']}, raw I/O channels {st['kinds']['channel']}, "
+         f"(signals {st['kinds']['signal']}, "
+         + (f"generated {st['kinds']['generated']}, " if st["kinds"].get("generated") else "")
+         + f"raw I/O channels {st['kinds']['channel']}, "
          f"structural {st['kinds']['structural']})",
          "Source: the SSOT tables (the BuilderData exports are their projection).",
          ""]

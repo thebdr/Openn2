@@ -748,6 +748,7 @@ class Session:
             self.generation += 1                          # caches - a build or a view started before is discarded
             self.notes, self.rows_ok, self.rows, self.rules = notes, rows_ok, rows, rules
             self.system, self.hooks, self.legs = system, hooks, legs
+            self.absorbs = dict(getattr(system, "reaction_absorbs", None) or {})
             self.language = getattr(system, "template_language", "") or None
             self.params, self.params_problem, self.active = params, params_problem, templates_file
             self._bases, self._halts, self._views = {}, {}, {}
@@ -1010,9 +1011,13 @@ class Session:
         if shown.rows:
             lines.append(f"SPAWN into {rule.target}:")
             lines += ["  " + ", ".join(f"{k}={v!r}" for k, v in row_values.items()) for row_values in shown.rows]
-            if database is not None and rule.target in database and self._restaged(rule):
+            if rule.target in (getattr(self, "absorbs", {}) or {}).get(rule.fire_when, ()):
+                lines.append(f"note: these rows are GENERATED {rule.target} - every generation phase re-fires "
+                             "this rule and absorbs them, so they reach generation (tags, blocks, hardware, "
+                             "coverage - C-030)")
+            elif database is not None and rule.target in database and self._restaged(rule):
                 lines.append(f"note: later phases re-stage {rule.target} from the source documents - these rows "
-                             "reach the saved Database, not generation (C-024's known boundary)")
+                             "reach the saved Database, not generation")
         for leg in self.legs.get(rule.fire_when, {}):
             lines.append(f"note: the {leg} leg also fires {rule.fire_when}, over its own Database - what only "
                          "it rejects is in the problems list ('on the ... leg')")

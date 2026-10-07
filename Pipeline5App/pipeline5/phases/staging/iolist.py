@@ -200,20 +200,74 @@ def _finalize_identity(params: dict, rows: list) -> None:
     for row in rows:
         if not row.get("source_cell") and row.get("source_row"):
             row["source_cell"] = f"{row.get('source_sheet', '')}!{fu_col}{row['source_row']}"
-        row["iol_FLD"] = identity.fld(row)
-        row["ce_FLD"] = identity.ce_fld(row)
-        row["combined_FLD"] = identity.combined_fld(row)
-        row["IsSorterArea"] = _is_sorter_area(row, sorter_names)
+        _derive_identity(row, signal_diag, sorter_names)
+    _add_node_address_ranges(rows)   # positional I/Q byte ranges: a node owns the rows beneath it
+
+
+def _derive_identity(row: dict, signal_diag: dict, sorter_names: set, keep: frozenset = frozenset()) -> None:
+    """ONE row's derived identity from its current fields: the FLDs, `IsSorterArea`, the per-type diagnosis
+    text and the PLC tag name/table. `keep` names derived fields a caller already SET and that win over the
+    derivation when non-empty (a generated signal's rule may name its tag - [[C-030]])."""
+    row["iol_FLD"] = identity.fld(row)
+    row["ce_FLD"] = identity.ce_fld(row)
+    row["combined_FLD"] = identity.combined_fld(row)
+    row["IsSorterArea"] = _is_sorter_area(row, sorter_names)
+    if not ("diag_desc" in keep and row.get("diag_desc")):
         diag_template = signal_diag.get(str((row.get("type") or {}).get("type_id", "")).upper(),
                                         {}).get("diag_desc", "")
         row["diag_desc"] = identity.interp(diag_template, row)   # the resolved per-type diagnosis text
-        if identity.is_io_signal(row) and identity.tag_name(row):
-            row["name_in_tagtable"] = identity.tag_name(row)
-            row["tagtable"] = identity.tagtable(row)
+    if "name_in_tagtable" in keep and row.get("name_in_tagtable"):
+        if identity.is_io_signal(row):
+            row["tagtable"] = row.get("tagtable") or identity.tagtable(row)
         else:
-            row["name_in_tagtable"] = ""
-            row["tagtable"] = ""
-    _add_node_address_ranges(rows)   # positional I/Q byte ranges: a node owns the rows beneath it
+            row["name_in_tagtable"], row["tagtable"] = "", ""
+    elif identity.is_io_signal(row) and identity.tag_name(row):
+        row["name_in_tagtable"] = identity.tag_name(row)
+        row["tagtable"] = identity.tagtable(row)
+    else:
+        row["name_in_tagtable"] = ""
+        row["tagtable"] = ""
+
+
+# --- generated signals: the after_300 reactions' spawned rows made first-class ([[C-030]]) ------------- #
+_RULE_SET_FIELDS = frozenset({"name_in_tagtable", "tagtable", "diag_desc"})
+
+
+def is_generated(row) -> bool:
+    """A signal a chain reaction spawned (no document row behind it - its provenance is `spawned_by`)."""
+    return bool(str(row.get("spawned_by") or "").strip())
+
+
+def absorb_spawned(database, params: dict | None = None) -> int:
+    """Make every GENERATED signal (an after_300 add_rows spawn into `signals`) a first-class staged signal,
+    derived exactly as a document row: the address in the canonical spelling ([[C-022]]), the resolved `type`,
+    the FLDs, the diagnosis text and the PLC tag name/table (a name/table/diagnosis text the RULE set is kept),
+    then a stable uid. A generated signal has no document cell: its `source_cell` is its provenance
+    `<rule>:<source uid>` (+ `#n` for the n-th row one source spawns) - never a Sheet!Cell link - so the uid
+    is stable run to run and unique per spawn. It is not part of the positional node ranges (it sits under
+    no node in the document). Idempotent. Returns how many rows were absorbed."""
+    if database is None or "signals" not in database:
+        return 0
+    table = database["signals"]
+    spawned = [r for r in table.rows if is_generated(r)]
+    if not spawned:
+        return 0
+    params = params or config.load_params()
+    signal_types = config.load_signal_types()
+    signal_diag = config.load_signal_diagnosis()
+    sorter_names = _sorter_area_names(params)
+    seen: dict = {}
+    for row in spawned:
+        row["bit"] = _canonical_addr(row.get("bit"))
+        row["type"] = config.resolve_type(signal_types, row.get("script_type"))
+        origin = f"{str(row.get('spawned_by')).strip()}:{str(row.get('source_uid') or '').strip()}"
+        seen[origin] = seen.get(origin, 0) + 1
+        row["source_cell"] = origin if seen[origin] == 1 else f"{origin}#{seen[origin]}"
+        row["source_sheet"], row["source_row"] = "", ""
+        _derive_identity(row, signal_diag, sorter_names, keep=_RULE_SET_FIELDS)
+        row["uid"] = ""
+        row["uid"] = table.stamped(row)["uid"]
+    return len(spawned)
 
 
 def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:

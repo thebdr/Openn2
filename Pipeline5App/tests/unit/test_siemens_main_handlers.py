@@ -1015,6 +1015,93 @@ def test_sub_phase_dispatch():
     ok("RSLT" in host2.levels(), "the 110 validator reports a RSLT")
 
 
+def _qbad_project(project, params):
+    """A PROJECT whose after_300 rule spawns, for every contactor output, its QBAD signal at the input of the
+    same offset, named as the 05 Output Feedback block references it (the FVT convention, [[C-030]])."""
+    import csv
+    from ruamel.yaml import YAML
+    shared = os.path.join(project, "config_project", "shared")
+    rx_dir = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions")
+    os.makedirs(shared)
+    os.makedirs(rx_dir)
+    with open(os.path.join(shared, "project_params.yaml"), "w", encoding="utf-8") as handle:
+        YAML(typ="safe").dump(params, handle)
+    with open(os.path.join(rx_dir, "reactions.csv"), "w", encoding="utf-8", newline="") as handle:
+        csv.writer(handle).writerows([
+            ["name", "fire_when", "source_table", "condition", "action", "target", "template", "comment"],
+            ["qbad", "after_300", "signals", "$script_type ~ /^KQ/ and $bit ~ /^Q/", "add_rows", "signals",
+             "qbad_rows", "the QBAD of every contactor output"]])
+    with open(os.path.join(rx_dir, "templates.yaml"), "w", encoding="utf-8") as handle:
+        handle.write("qbad_rows:\n"
+                     "  - script_type: \"KB\"\n"
+                     "    bit: \"{regex_replace($bit, /^Q/, 'I')}\"\n"
+                     "    functional_unit: \"{$functional_unit}\"\n"
+                     "    location: \"{$location}\"\n"
+                     "    device: \"{$device}\"\n"
+                     "    name_in_tagtable: \"QBAD_{$name_in_tagtable}\"\n")
+
+
+def _plc_tag_names(out_root):
+    import glob
+    from openpyxl import load_workbook
+    names = {}
+    for path in glob.glob(os.path.join(out_root, "**", "PLCTags*.xlsx"), recursive=True):
+        wb = load_workbook(path, read_only=True)
+        for row in wb["PLC Tags"].iter_rows(min_row=2, values_only=True):
+            names[row[0]] = row[3]
+        wb.close()
+    return names
+
+
+def test_generated_signals_reach_generation():
+    """C-030 through the REAL run-plan: a project rule spawns a QBAD per contactor output; 300 stages them as
+    first-class signals (saved, provenance, unique uids); a LONE 510 button - no 300 before it in this host -
+    re-fires the rule in memory and emits their tags at the input of the same offset; coverage counts them
+    as generated and none is an ORPHAN; validation (100) judges the documents only."""
+    params = config.load_params()
+    previous_project = config.active_project()
+    with tempfile.TemporaryDirectory() as project:
+        _qbad_project(project, params)
+        config.use_project(project)
+        try:
+            host = _Host()
+            SYSTEM.handlers["staging"](host.ctx())
+            sig = _read_csv(os.path.join(config.database_dir(), "signals.csv"))
+            kq = {r["uid"]: r for r in sig if r["script_type"].startswith("KQ") and r["bit"].startswith("Q")}
+            gen = [r for r in sig if r.get("spawned_by") == "qbad"]
+            ok(kq and len(gen) == len(kq), f"one QBAD per contactor output ({len(gen)} / {len(kq)})")
+            g = gen[0]
+            k = kq[g["source_uid"]]
+            eq(g["bit"], "I" + k["bit"][1:], "the input of the same offset")
+            eq(g["name_in_tagtable"], "QBAD_" + k["name_in_tagtable"], "the name the 05 block references")
+            ok(g["source_cell"].startswith("qbad:") and "!" not in g["source_cell"], g["source_cell"])
+            eq(len({r["uid"] for r in sig}), len(sig), "every uid unique")
+            ok(any("generated" in m for lv, m in host.lines if lv == "RSLT"), "the RSLT line counts them")
+
+            lone = _Host()
+            SYSTEM.handlers["data_blocks"](lone.ctx(), only=510)
+            tags = _plc_tag_names(config.output_root())
+            eq(tags.get(g["name_in_tagtable"]), "%" + g["bit"], "a lone 510 emits the generated tag")
+            ok(all(("QBAD_" + r["name_in_tagtable"]) in tags for r in kq.values()), "every QBAD tag emitted")
+
+            cov = _Host()
+            SYSTEM.handlers["reporting"](cov.ctx())
+            report = [os.path.join(dp, f) for dp, _d, fs in os.walk(config.output_root()) for f in fs
+                      if f == "io_project_coverage_report.txt"]
+            text = open(report[0], encoding="utf-8").read()
+            ok(f"generated {len(gen)}," in text, "coverage counts the generated signals")
+            orphan_part = text.split("ORPHAN", 1)[1].split("UNPLACED", 1)[0]
+            ok("qbad:" not in orphan_part, "no generated signal is an ORPHAN")
+
+            val = _Host()
+            SYSTEM.handlers["validation"](val.ctx())
+            located = [f for batch in val.rendered for f in batch
+                       if str(getattr(f, "location", "")).startswith("qbad:")]
+            eq(located, [], "validation judges the documents only")
+        finally:
+            config.use_project(previous_project)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("siemens_main_handlers", [
@@ -1044,6 +1131,7 @@ if __name__ == "__main__":
          _sandboxed(test_a_hidden_record_file_is_saved_whole_through_the_run_plan)),
         ("a_blank_range_end_invents_nothing_on_the_real_fixture",
          _sandboxed(test_a_blank_range_end_invents_nothing_on_the_real_fixture)),
+        ("generated_signals_reach_generation", _sandboxed(test_generated_signals_reach_generation)),
         ("310_leg_appends_reaction_findings_to_the_existing_record",
          _sandboxed(test_310_leg_appends_reaction_findings_to_the_existing_record)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),

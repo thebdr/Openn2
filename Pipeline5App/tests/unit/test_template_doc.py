@@ -870,6 +870,39 @@ def test_a_rule_is_one_of_the_sessions_rules():
             config.database_dir = original
 
 
+def test_preview_says_which_spawns_reach_generation():
+    """C-030: a spawn into a table the system ABSORBS (Siemens after_300: signals) is previewed as a GENERATED row
+    that reaches generation; a spawn into another re-staged table reaches only the saved Database."""
+    import tempfile
+    from pipeline5 import config
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.table import Table
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    eq(SYSTEM.reaction_absorbs, {"after_300": ("signals",)}, "the shipped Siemens run-plan absorbs after_300 signals")
+
+    def staged(system):
+        src = Table("src", columns=["uid", "name"], key_columns=["name"])
+        src.add(name="K1")
+        return Database([src, Table("dst", columns=["uid", "label", "spawned_by", "source_uid"], key_columns=["label"])])
+
+    rules = [{"name": "A", "fire_when": "after_300", "source_table": "src", "condition": "", "action": "add_rows",
+              "target": "dst", "template": "rows"}]
+    doc = td.parse('rows:\n  - label: "L-{$name}"\n')
+    original = config.database_dir
+    with tempfile.TemporaryDirectory() as sandbox:
+        config.database_dir = lambda: sandbox
+        try:
+            session = td.Session(None, rows=rules, hooks={"after_300": staged}, params={})
+            plain = session.preview_text(doc, session.rules[0], 0)
+            ok("reach the saved Database, not generation" in plain and "GENERATED" not in plain, plain)
+            session.absorbs = {"after_300": ("dst",)}
+            absorbed = session.preview_text(doc, session.rules[0], 0)
+            ok("GENERATED dst" in absorbed and "reach generation" in absorbed and "saved Database" not in absorbed,
+               absorbed)
+        finally:
+            config.database_dir = original
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("template_doc", [
@@ -900,4 +933,5 @@ if __name__ == "__main__":
         ("a_reload_discards_the_build_it_overtook", test_a_reload_discards_the_build_it_overtook),
         ("other_line_breaks_are_approximate", test_other_line_breaks_are_approximate),
         ("a_rule_is_one_of_the_sessions_rules", test_a_rule_is_one_of_the_sessions_rules),
+        ("preview_says_which_spawns_reach_generation", test_preview_says_which_spawns_reach_generation),
     ]))

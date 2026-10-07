@@ -287,6 +287,39 @@ REACTION_HOOKS = {"before_300": None, "after_300": _staged_database}
 _REACTION_HOOKS = tuple(REACTION_HOOKS)
 # the OTHER legs that fire a hook over a different Database - the builder lints each rule against them too
 REACTION_LEGS = {"after_300": {"310 Stage I/O List": _iolist_database}}
+# the staged tables whose spawns this run-plan ABSORBS into generation ([[C-030]] - `_stage_generation`)
+REACTION_ABSORBS = {"after_300": ("signals",)}
+
+
+def _stage_generation(ctx):
+    """The staging every GENERATION phase (400-900) builds on ([[C-030]]): the documents staged, then - when
+    the rules give `after_300` business - the after_300 reactions re-fired IN MEMORY over it (write=False:
+    no file appended, no record written - phase 300 owns those) and their spawned signals absorbed as
+    first-class staged signals. So a generated signal reaches tags, blocks, hardware and coverage from any
+    phase button exactly as from Run-all, and is never stale (the rules read the current documents).
+    Validation (100) and the fill (200) judge / write the DOCUMENTS and stage without them. A blocking
+    staging finding skips the reactions (the generation guard); the engine dark - no rules, as shipped -
+    is a strict no-op. Returns (database, staging findings)."""
+    from pipeline5 import config
+    from pipeline5.findings import gate as run
+    from pipeline5.phases.chain_reactions import engine as reactions
+    from pipeline5.phases.staging import iolist as staging
+    database, findings = staging.stage(system=ctx.system)
+    if run.has_blocking(findings):
+        return database, findings
+    try:
+        rows = config.load_reactions()
+    except Exception:  # noqa: BLE001 - an unreadable rule index: phase 300 reports it; generation goes on
+        return database, findings
+    if not reactions.has_business("after_300", rows, _REACTION_HOOKS):
+        return database, findings
+    database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS, write=False)
+    generated = staging.absorb_spawned(database)
+    if generated:
+        ctx.emit("INFO", f"  {generated} generated signal(s) absorbed (the after_300 reactions, re-fired in memory)")
+    if rx:
+        ctx.emit("WARN", f"  after_300 reactions: {len(rx)} finding(s) - run 300 Staging to see them")
+    return database, findings
 
 
 def run_staging(ctx, only=None):
@@ -323,6 +356,7 @@ def run_staging(ctx, only=None):
             ctx.emit("INFO", f"  before_300 reaction {row['rule']}: {row['outcome']} "
                              f"({row['created']} created) - not recorded, staging halted")
         return
+    generated = 0
     if run.has_blocking(findings):
         # downgraded in the registry: staging proceeds, but the reactions never run on a raw FAIL (the
         # generation guard of every phase) - nothing settled, nothing fired, so an empty no-I/O-sheet
@@ -340,9 +374,13 @@ def run_staging(ctx, only=None):
         database, rx = reactions.fire("after_300", database, hooks=_REACTION_HOOKS)
         if rx:
             ctx.render(rx, label="after_300 reactions")
+        generated = staging.absorb_spawned(database)      # [[C-030]]: the spawns, first-class + re-saved
+        if generated:
+            database.save(config.database_dir())
     signals = database["signals"]
     suffix = "  (I/O List only - run 320 for the C&E)" if only == 310 else ""
-    ctx.emit("RSLT", f"  staged {len(signals)} signals{suffix} "
+    gen = f" ({generated} generated)" if generated else ""
+    ctx.emit("RSLT", f"  staged {len(signals)} signals{gen}{suffix} "
                      f"-> {os.path.join(config.database_dir(), 'signals.csv')}")
 
 
@@ -362,7 +400,7 @@ def run_data_blocks(ctx, only=None):
     ctx.emit("PHASE", label)
     ctx.status("data blocks…")
     findings = []
-    database, f = staging.stage(system=ctx.system); findings += f
+    database, f = _stage_generation(ctx); findings += f
     if not run.has_blocking(f):
         database, f = datablocks.build(database, system=ctx.system); findings += f
     if not ctx.gate(findings, label="500 (300 staging + 520 data blocks)"):
@@ -402,7 +440,7 @@ def run_interfaces(ctx, only=None):
     ctx.emit("PHASE", "410 Generate Interfaces" if only == 410 else "400 Interfaces Generation")
     ctx.status("interfaces…")
     findings = []
-    database, f = staging.stage(system=ctx.system); findings += f
+    database, f = _stage_generation(ctx); findings += f
     if not run.has_blocking(f):
         database, f = datablocks.build(database, system=ctx.system); findings += f
     if not ctx.gate(findings, label="400 (300 staging + 520 prereq)"):
@@ -447,7 +485,7 @@ def run_diagnosis(ctx, only=None):
     ctx.emit("PHASE", label)
     ctx.status("diagnosis…")
     findings = []
-    database, f = staging.stage(system=ctx.system); findings += f
+    database, f = _stage_generation(ctx); findings += f
     if not run.has_blocking(f):
         database, f = datablocks.build(database, system=ctx.system); findings += f
     if not ctx.gate(findings, label="600 (300 staging + 520 prereq)"):
@@ -481,7 +519,7 @@ def run_hardware(ctx, only=None):
     ctx.emit("PHASE", label)
     ctx.status("hardware…")
     findings = []
-    database, f = staging.stage(system=ctx.system); findings += f
+    database, f = _stage_generation(ctx); findings += f
     if not run.has_blocking(f):
         database, f = hardware.build(database); findings += f
     if not ctx.gate(findings, label="700 (300 staging + hardware)"):
@@ -507,7 +545,7 @@ def run_software(ctx, only=None):
     ctx.emit("PHASE", label)
     ctx.status("software…")
     findings = []
-    database, f = staging.stage(system=ctx.system); findings += f
+    database, f = _stage_generation(ctx); findings += f
     if not run.has_blocking(f):
         database, f = datablocks.build(database, system=ctx.system); findings += f
     if not ctx.gate(findings, label="800 (300 staging + 520 prereq)"):
@@ -558,7 +596,7 @@ def run_reporting(ctx, only=None):
     ctx.emit("PHASE", "910 Generate Pipeline Coverage Report" if only == 910 else "900 Reporting  (910 Pipeline Coverage)")
     ctx.status("coverage…")
     findings = []
-    database, f = staging.stage(system=ctx.system); findings += f
+    database, f = _stage_generation(ctx); findings += f
     if not run.has_blocking(findings):
         database, f = datablocks.build(database, system=ctx.system); findings += f
     if not run.has_blocking(findings):

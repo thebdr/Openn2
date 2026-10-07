@@ -227,6 +227,10 @@ class System:
                                          # (Siemens after_300: the 310 Stage-I/O-List leg, no C&E) - each built
                                          # like a hook's loader (its leg's gate; WouldNotFire) - the builder
                                          # lints each rule against them too (C-025)
+    reaction_absorbs: dict = field(default_factory=dict)  # {hook: (staged table, ...)} - the tables whose
+                                         # spawns the run-plan ABSORBS into generation (Siemens after_300:
+                                         # signals - the generated signals, C-030); the builder's preview says
+                                         # which spawns reach generation and which only the saved Database
     template_language: str = ""          # the langs.json key of the language this system's TEXT templates
                                          # generate - the template builder's base highlight ("" = none)
 

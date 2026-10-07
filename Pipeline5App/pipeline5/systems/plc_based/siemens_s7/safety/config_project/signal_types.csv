@@ -30,6 +30,7 @@ KI4/4,Contactor Feedback Input,Safety,KI,4,no,SAFETY_Contactors,Contactor Feedba
 KQ,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
 KQ1/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
 KQ2/2,Contactor Output,Safety,,,no,SAFETY_Contactors,Contactor Output [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
+KB,Contactor Output Value Status (QBAD),Safety,,,no,SAFETY_Contactors,QBAD_Contactor Output [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
 R*,Emergency Reset GLOBAL,Safety,,,no,RESET,Emergency Reset GLOBAL Command [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn
 R#,Emergency Reset Area #,Safety,,,yes,RESET,Emergency Reset Command Area {$desc_1b} [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn
 Z#,Emergency Status Feedback Area #,Safety,,,yes,SAFETY_Status,Emergency Status Feedback Area {$desc_1b} [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
