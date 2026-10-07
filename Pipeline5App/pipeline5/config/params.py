@@ -329,7 +329,8 @@ def load_params(path: str | None = None) -> dict:
     path = path or params_file()
     params = _read_yaml(path)
     base = os.path.dirname(os.path.abspath(path))
-    for key in ("iolist_path", "iolist_previous_path", "matrix_path", "matrix_previous_path"):
+    # + a project's own DeviceTypesDatabase ([[C-028]] round 3), resolved like the documents
+    for key in ("iolist_path", "iolist_previous_path", "matrix_path", "matrix_previous_path", "device_types_db"):
         if params.get(key):
             params[key] = _resolve_path(base, params[key])
     return params

@@ -359,6 +359,35 @@ def test_address_notation_in_changes_report():
         addresses.configure_address_format(None, None)
 
 
+def test_respelled_addresses_are_no_change_in_every_classifier():
+    """C-022 refute round 3: a revision that only RE-SPELLS its addresses in the project's notation (`I645.1` ->
+    `I.645.1`, an Excel apostrophe added) is no change - through classify_iolist (intact, no structural row),
+    classify_ce (no address row) and classify_area (no correction)."""
+    from pipeline5.truth import addresses
+    addresses.configure_address_format(r"(?P<direction>[IQ])\.?(?P<byte>\d+)\.(?P<bit>\d+)", None)
+    try:
+        iol = [{"old": _row(i, profinet_name="N1", functional_unit="=S1", device=f"-K{i}", desc_l1="PB", bit=f"I645.{i}"),
+                "new": _row(i, profinet_name="N1", functional_unit="=S1", device=f"-K{i}", desc_l1="PB",
+                            bit=(f"I.645.{i}" if i % 2 else f"'I645.{i}")),
+                "tier": "T1", "confidence": "high"} for i in range(8)]
+        res = classify.classify_iolist({"pairs": iol, "removed": [], "added": []}, WEIGHTS)
+        eq((res["intact"], res["changed"], res["structural_rows"]), (8, 0, 0), "I/O List: all intact")
+        ce = [{"old": {"address": f"Q74{i}.0", "module": "M", "slot": "1", "pin": "1", "description": "D", "type": "T",
+                       "AREA 1": "X"},
+               "new": {"address": f"Q.74{i}.0", "module": "M", "slot": "1", "pin": "1", "description": "D", "type": "T",
+                       "AREA 1": "X"}} for i in range(8)]
+        res = classify.classify_ce({"pairs": ce, "removed": [], "added": []}, ["AREA 1"], ["AREA 1"],
+                                   {"address": "critical"})
+        eq((res["intact"], res["changed"], res["correction_count"]), (8, 0, 0), "C&E: no address row")
+        area = [{"old": _arow("AREA 1", f"-K{i}", "L1", f"Q74{i}.0", "PUMP"),
+                 "new": _arow("AREA 1", f"-K{i}", "L1", f"Q.74{i}.0", "PUMP"), "moved": False} for i in range(8)]
+        res = classify.classify_area({"pairs": area, "removed": [], "added": []}, {"AREA 1": 8}, {"AREA 1": 8},
+                                     {"digital_output": "critical"})
+        eq(res["correction_count"], 0, "AREA: no correction")
+    finally:
+        addresses.configure_address_format(None, None)
+
+
 TESTS = [
     ("norm_keys", test_norm_keys),
     ("assign_nodes", test_assign_nodes),
@@ -388,6 +417,7 @@ TESTS = [
     ("area_real_device_tag_change_stays", test_area_real_device_tag_change_stays),
     ("read_error_degrades", test_read_error_degrades),
     ("address_notation_in_changes_report", test_address_notation_in_changes_report),
+    ("respelled_addresses_are_no_change_in_every_classifier", test_respelled_addresses_are_no_change_in_every_classifier),
 ]
 
 if __name__ == "__main__":

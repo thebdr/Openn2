@@ -369,6 +369,82 @@ def test_resolve_addr_template_ignores_case():
     eq(hardware._resolve_addr_template("%i%+6 | %q%", 10, 20), "16 | 20")
 
 
+def test_project_device_types_db_is_what_700_reads_and_places():
+    """C-028 refute round 3: a project whose params name its own DeviceTypesDatabase (`device_types_db`) gets ITS
+    values - phase 700 reads it, and 700b places a copy beside Stations.csv for the importer (which reads a local
+    one first); with no param nothing is placed, and a stray local copy is reported (it would override the
+    shared one for the importer), never deleted."""
+    from pipeline5 import config
+    from pipeline5.config.loaders import load_device_types_db
+    from pipeline5.config.paths import DEVICE_TYPES_DB_DEFAULT
+    from pipeline5.truth.signals import signals_table
+    shared = open(DEVICE_TYPES_DB_DEFAULT, encoding="utf-8-sig").read()
+    assert "<DI1/2>Ch(#).Failsafe_SensorSupply=8<DI1/2>" in shared
+    rows = _sfb_rows([("-K30004", "I10.0", "DI1/2", "6ES7136-6BA01-0CA0")])
+    original, original_db = config.load_params, config.database_dir
+    with tempfile.TemporaryDirectory() as d:
+        config.database_dir = lambda: d             # build() saves its tables - never into the repo
+        own = os.path.join(d, "MyDeviceTypes.csv")
+        with open(own, "w", encoding="utf-8") as f:
+            f.write(shared.replace("<DI1/2>Ch(#).Failsafe_SensorSupply=8<DI1/2>",
+                                   "<DI1/2>Ch(#).Failsafe_SensorEvaluation=0<DI1/2>"))
+        sig = signals_table(sorted({k for r in rows for k in r}))
+        for r in rows:
+            sig.add(**r)
+        out = os.path.join(d, "hw")
+        try:
+            config.load_params = lambda path=None: {"device_types_db": own}
+            db, _f = hardware.build(Database([sig]))
+            text = " | ".join(str(v) for v in db["hardware_modules"].rows[0].values())
+            ok("Ch(0).Failsafe_SensorEvaluation=0" in text and "SensorSupply" not in text,
+               f"700 read the project's database: {text}")
+            res = hardware_csv.project(db, out_dir=out)
+            eq(open(res["device_types_db"], encoding="utf-8").read(), open(own, encoding="utf-8").read(),
+               "700b placed the project's database beside Stations.csv")
+            config.load_params = lambda path=None: {}
+            res = hardware_csv.project(db, out_dir=out)
+            eq(res["device_types_db"], "", "no param: nothing placed")
+            eq([(f.type, f.severity) for f in res["findings"]], [("hw_local_dtd", "WARN")], "the stray copy reported")
+            ok(os.path.isfile(os.path.join(out, "DeviceTypesDatabase.csv")), "never deleted")
+        finally:
+            config.load_params, config.database_dir = original, original_db
+    eq(load_device_types_db({"device_types_db": ""})["by_id"]["103040357"]["dev_type"], "IoDevice",
+       "a blank param reads the shared database")
+
+
+def test_col_ag_keys_matched_the_importers_way():
+    """C-028 refute round 3: col AG sets a dropped entry whatever its key's case or spacing, and through one
+    `(a-b)` range - the importer reads it so; an AG entry with no value sets nothing."""
+    from pipeline5.config.loaders import load_device_types_db
+    dtd = load_device_types_db()
+    pins = [("-K1", "I1484.0", "", "103040357")]
+
+    def left(ag):
+        _s, _m, f = hardware.extract(_sfb_rows(pins, {"hardware_params": ag}), dtd)
+        w = [x.detail for x in f if x.type == "hw_addr_unresolved"]
+        return w[0] if w else ""
+    ok("2 start-address entries" in left("Item(1).Item(2).Item(0).Addr(0-1).StartAddress = 1484"), "a range")
+    ok("2 start-address entries" in left("item(1).item(2).item(0).addr(1).StartAddress = 1484"), "lower case")
+    ok("2 start-address entries" in left("Item(1).Item(2).Item(0).Addr(1) . StartAddress = 1484"), "spacing")
+    ok("3 start-address entries" in left("Item(1).Item(2).Item(0).Addr(1).StartAddress ="), "no value: still left")
+
+
+def test_lowercase_placeholder_without_rows_is_dropped():
+    """C-028 refute round 3: a hand-typed lower-case `%q%` whose direction has no row is dropped and warned like
+    `%Q%` - never a literal placeholder in Stations.csv."""
+    dtd = {"by_id": {"BOX": _dtd_rec("BOX", "IoDevice", io_addr="Item(0).Addr(0).StartAddress = %i% | "
+                                     "Item(0).Addr(1).StartAddress = %q% | Item(1).Addr(1).StartAddress = %q%+2")},
+           "default_cards": {}}
+    rows = [{"script_type": "PA", "type_hw": "PA", "part_no": "BOX", "profinet_name": "n1", "profinet_ip": "1.2.3.4",
+             "functional_unit": "=X", "slot": "-K1", "bit": "", "source_sheet": "NET", "source_row": 2},
+            {"script_type": "", "part_no": "BOX", "slot": "-K1", "bit": "I20.0", "source_sheet": "NET", "source_row": 3}]
+    stations, _m, findings = hardware.extract(rows, dtd)
+    ok("%" not in stations[0]["custom_parameters"], stations[0]["custom_parameters"])
+    eq(_start_addresses(stations[0]), {"Item(0).Addr(0).StartAddress": "20"}, "the input placed")
+    warn = [f.detail for f in findings if f.type == "hw_addr_unresolved"]
+    ok(len(warn) == 1 and "2 start-address entries" in warn[0], warn)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("hardware", [
@@ -391,4 +467,7 @@ if __name__ == "__main__":
         ("sfb_without_input_rows_drops_the_i_entries", test_sfb_without_input_rows_drops_the_i_entries),
         ("col_ag_placing_a_dropped_entry_is_not_left_to_tia", test_col_ag_placing_a_dropped_entry_is_not_left_to_tia),
         ("resolve_addr_template_ignores_case", test_resolve_addr_template_ignores_case),
+        ("project_device_types_db_is_what_700_reads_and_places", test_project_device_types_db_is_what_700_reads_and_places),
+        ("col_ag_keys_matched_the_importers_way", test_col_ag_keys_matched_the_importers_way),
+        ("lowercase_placeholder_without_rows_is_dropped", test_lowercase_placeholder_without_rows_is_dropped),
     ]))

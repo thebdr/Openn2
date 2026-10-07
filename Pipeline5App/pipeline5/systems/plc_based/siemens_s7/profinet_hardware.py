@@ -158,6 +158,18 @@ def _merge_params(*blobs) -> str:
 
 
 _UNRESOLVED_RX = re.compile(r"%([IQ])%", re.IGNORECASE)
+_KEY_RANGE_RX = re.compile(r"\((\d+)-(\d+)\)")
+
+
+def _param_keys(key: str) -> set:
+    """A parameter key as the importer (Openn3App's CustomParameterParser) reads it: each `.` step trimmed, case
+    ignored, ONE `(a-b)` range expanded - `Item(0).Addr(0-1).StartAddress` sets Addr(0) AND Addr(1)."""
+    k = ".".join(step.strip() for step in str(key).split(".")).strip().lower()
+    m = _KEY_RANGE_RX.search(k)
+    if not m:
+        return {k}
+    a, b = sorted((int(m.group(1)), int(m.group(2))))
+    return {f"{k[:m.start()]}({i}){k[m.end():]}" for i in range(a, b + 1)}
 
 
 def _resolve_addr_template(template, i_base, q_base) -> str:
@@ -239,9 +251,13 @@ def extract(rows, dtd) -> tuple:
         if unresolved:
             kept = [e for e in kept if e not in unresolved]
             io_addr = " | ".join(kept)
-            # an entry the head's Hardware Parameters (col AG) set is placed by them - not left to TIA
-            ag_keys = {p.split("=", 1)[0].strip() for p in hw_params.split("|") if "=" in p}
-            left = [e for e in unresolved if e.split("=", 1)[0].strip() not in ag_keys]
+            # an entry the head's Hardware Parameters (col AG) set - with a value - is placed by them, not left to TIA;
+            # keys compared the importer's way (round 3: case, spacing, one `(a-b)` range)
+            ag_keys = set()
+            for p in hw_params.split("|"):
+                if "=" in p and p.split("=", 1)[1].strip():
+                    ag_keys |= _param_keys(p.split("=", 1)[0])
+            left = [e for e in unresolved if not _param_keys(e.split("=", 1)[0]) <= ag_keys]
             if left:
                 where = _where(row)
                 missing = sorted({m.group(1).upper() for e in left for m in _UNRESOLVED_RX.finditer(e)})
@@ -380,7 +396,8 @@ def build(database: Database | None = None) -> tuple:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
     rows = list(database["signals"])
-    stations, modules, findings = extract(rows, config.load_device_types_db())
+    # the project's own database when its params name one (`device_types_db`, [[C-028]] round 3), else the shared
+    stations, modules, findings = extract(rows, config.load_device_types_db(config.load_params()))
     if run.has_blocking(findings):                  # raw-FAIL guard: never write BuilderData on a FAIL
         return database, findings
 

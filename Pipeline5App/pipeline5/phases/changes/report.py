@@ -87,7 +87,13 @@ def _designation(fld) -> str:
 
 def _decompose(addr) -> tuple | None:
     """A PLC address -> (prefix, [coords]) or None. Handles both Siemens-compact `I922.0` (coords
-    [922, 0]) and node-qualified `I.10.0.0` (coords [10, 0, 0]). The LAST coord is always the bit."""
+    [922, 0]) and node-qualified `I.10.0.0` (coords [10, 0, 0]). The LAST coord is always the bit. An address
+    in the configured NOTATION reads through it first ([[C-022]] round 3 - a notation of other letters, `E10.1`,
+    keeps its direction-flip highlight)."""
+    from pipeline5.truth import addresses
+    p = addresses.parse(str(addr or "").strip().lstrip("'"))
+    if p is not None:
+        return p[0], [str(p[1]), str(p[2])]
     m = _ADDR_RE.match(str(addr or ""))
     return (m.group(1).upper(), m.group(2).split(".")) if m else None
 

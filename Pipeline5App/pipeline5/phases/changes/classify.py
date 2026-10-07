@@ -83,8 +83,8 @@ _ADDR = re.compile(r"^([A-Za-z]+)\s*(\d+)(?:\.(\d+))?$")
 def _parse_addr(value):
     """(prefix, byte, bit|None) of a document address: the configured NOTATION first ([[C-022]] - a dotted
     `I.645.1` is `('I', 645, 1)`), then the generic letters+byte[.bit] form (`IW256`, `O12.0`)."""
-    p = addresses.parse(value)
-    if p is not None:
+    p = addresses.parse(norm(value))                 # norm first: an Excel text-guard apostrophe is no part
+    if p is not None:                                # of the address (round 3)
         return p
     m = _ADDR.match(norm(value))
     if not m:
@@ -96,7 +96,7 @@ def _same(field, a, b) -> bool:
     """Whether a field's two values are the same: an ADDRESS field on the canonical key ([[C-022]] - a revision
     that only re-spells `I645.1` as `I.645.1` changes nothing), every other field on `norm`."""
     if field in _ADDR_FIELDS:
-        return addresses.key(a) == addresses.key(b)
+        return addresses.key(norm(a)) == addresses.key(norm(b))
     return norm(a) == norm(b)
 
 

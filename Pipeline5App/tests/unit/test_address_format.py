@@ -199,6 +199,68 @@ def test_broad_direction_class_reads_the_stored_canonical():
         _restore()
 
 
+def _tier1(project, text):
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    d = os.path.join(project, "config_project", "systems", SYSTEM.id)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "address_format.yaml"), "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def test_unusable_project_notation_never_raises():
+    """C-022 refute round 3: a project notation that will not load (a group named wrong, a bad regex, not a
+    mapping) NEVER raises out of the project switch - the switch completes, the TIA default is installed, the
+    problem is kept - and staging turns it into the blocking `stg_address_format` FAIL; fixed, the next read
+    clears it."""
+    import tempfile
+    from pipeline5 import config
+    from pipeline5.config import paths
+    from pipeline5.phases.staging import iolist as staging
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    paths.use_system(SYSTEM)
+    previous = paths.active_project()
+    try:
+        for bad in ("pattern: '(?P<direction>[IQ])(\\d+)\\.(?P<bit>\\d+)'\n",     # (?P<byte>...) missing
+                    "pattern: '(?P<direction>[IQ]'\n",                               # not a regex
+                    "- just a list\n"):                                              # not a mapping
+            with tempfile.TemporaryDirectory() as project:
+                _tier1(project, bad)
+                paths.use_project(project)                    # must not raise
+                eq(paths.active_project(), project, "the switch completed")
+                ok(config.address_format_problem(), "the problem is kept")
+                eq(addresses.canonical("I10.3"), "I10.3", "the TIA default installed meanwhile")
+                found = staging.notation_findings()
+                eq([(f.type, f.severity) for f in found], [("stg_address_format", "FAIL")], bad)
+                _tier1(project, "pattern: '(?P<direction>[IQ])\\.?(?P<byte>\\d+)\\.(?P<bit>\\d+)'\n")
+                eq(staging.notation_findings(), [], "fixed: the next read clears it")
+                eq(addresses.canonical("I.645.1"), "I645.1", "and installs the edited notation")
+                paths.use_project(previous)
+    finally:
+        paths.use_project(previous)
+        _restore()
+
+
+def test_launch_order_installs_the_project_notation():
+    """C-022 refute round 3: at launch the project opens BEFORE a system is active (auto-reopen); the system
+    switch that follows installs the project's tier-1 notation."""
+    import tempfile
+    from pipeline5.config import paths
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    previous_project, previous_system = paths.active_project(), paths.active_system()
+    with tempfile.TemporaryDirectory() as project:
+        _tier1(project, "pattern: '(?P<direction>[IQ])\\.?(?P<byte>\\d+)\\.(?P<bit>\\d+)'\n")
+        try:
+            paths.use_system(None)
+            paths.use_project(project)
+            ok(not addresses.format_ok("I.645.1"), "no system yet: the tier-1 system notation is not visible")
+            paths.use_system(SYSTEM)
+            eq(addresses.canonical("I.645.1"), "I645.1", "the system switch installs it")
+        finally:
+            paths.use_project(previous_project)
+            paths.use_system(SYSTEM if previous_system else None)
+            _restore()
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("address_format", [
@@ -214,4 +276,6 @@ if __name__ == "__main__":
         ("optional_group_notation_never_crashes", test_optional_group_notation_never_crashes),
         ("notation_without_a_named_group_is_refused", test_notation_without_a_named_group_is_refused),
         ("broad_direction_class_reads_the_stored_canonical", test_broad_direction_class_reads_the_stored_canonical),
+        ("unusable_project_notation_never_raises", test_unusable_project_notation_never_raises),
+        ("launch_order_installs_the_project_notation", test_launch_order_installs_the_project_notation),
     ]))

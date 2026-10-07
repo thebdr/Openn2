@@ -244,6 +244,8 @@ def attribute(rows, outputs) -> dict:
     stage_counts = {s: sum(1 for rec in records if rec[s]) for s in STAGES}
     kind_counts = {k: sum(1 for rec in records if rec["kind"] == k)
                    for k in ("signal", "generated", "channel", "structural")}
+    if not kind_counts["generated"]:                  # no reactions: the stats keep their pre-C-030 shape
+        del kind_counts["generated"]
     stats = {"rows": len(records), "kinds": kind_counts, "stages": stage_counts,
              "orphans": len(orphans), "unplaced": len(unplaced),
              "generated_dbs": sorted(outputs["db_members"]),

@@ -74,18 +74,45 @@ def use_project(root: str | None) -> None:
     _refresh_address_format()
 
 
-def _refresh_address_format() -> None:
+_ADDRESS_FORMAT_PROBLEM: str | None = None
+
+
+def refresh_address_format() -> str | None:
     """Resolve `address_format.yaml` through the 4-tier walk and inject it into truth.addresses
-    (P-010). No tier shipping one -> the TIA default. Lazy imports: paths sits below resolver."""
+    (P-010). No tier shipping one -> the TIA default. Called on a project / system switch AND at the
+    start of every document read (staging, the change report), so an edit saved in the Files tab
+    applies to the next run ([[C-022]] refute round 3). NEVER raises: a notation that will not load - an
+    unreadable YAML, not a mapping, a bad regex, a missing named group - installs the TIA default and is
+    RETURNED (kept for `address_format_problem`), so staging reports it as a blocking finding instead
+    of a crashed launch or a half-switched project. Lazy imports: paths sits below resolver."""
+    global _ADDRESS_FORMAT_PROBLEM
     from pipeline5.config.resolver import find
     from pipeline5.truth.addresses import configure_address_format
-    path = find("address_format.yaml")
-    if not path:
+    path = None
+    try:
+        path = find("address_format.yaml")
+        if not path:
+            configure_address_format(None, None)
+        else:
+            from pipeline5.config.params import _read_yaml
+            data = _read_yaml(path)
+            data = {} if data is None else data
+            if not isinstance(data, dict):
+                raise ValueError("not a mapping of `pattern:` / `direction_tokens:`")
+            configure_address_format(data.get("pattern"), data.get("direction_tokens"))
+        _ADDRESS_FORMAT_PROBLEM = None
+    except Exception as error:  # noqa: BLE001 - any unusable notation: the default + the problem, never a crash
         configure_address_format(None, None)
-        return
-    from pipeline5.config.params import _read_yaml
-    data = _read_yaml(path) or {}
-    configure_address_format(data.get("pattern"), data.get("direction_tokens"))
+        _ADDRESS_FORMAT_PROBLEM = f"{path or 'address_format.yaml'}: {error}"
+    return _ADDRESS_FORMAT_PROBLEM
+
+
+def address_format_problem() -> str | None:
+    """Why the configured notation did not load at its last refresh (None: it did, or none is configured)."""
+    return _ADDRESS_FORMAT_PROBLEM
+
+
+_refresh_address_format = refresh_address_format    # the switch hooks' name
 
 
 def use_builtin() -> None:

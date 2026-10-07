@@ -116,6 +116,9 @@ def run_validation(ctx, only=None):
     from pipeline5.phases.validation import cematrix_checks as matrix
     from pipeline5.phases.validation import runner as validation
     from pipeline5.findings import messages
+    notation = staging.notation_findings()            # [[C-022]]: an unusable notation stops the reads here
+    if notation and not ctx.gate(notation, label="100 the I/O address notation"):
+        return
     if only is None:
         from pipeline5.findings import report_renderer as iorender
         ctx.emit("PHASE", f"100 {i18n.tr('ph_validation', ctx.lang)}  (110 + 120 + 130 + 140 + 150)")
@@ -528,7 +531,10 @@ def run_hardware(ctx, only=None):
         ctx.emit("WARN", "  700 produced no tables (a blocking finding) - nothing further")
         return
     res = hardware_csv.project(database)
-    ctx.emit("RSLT", f"  700: {res['stations']} stations + {res['modules']} modules -> {config.hardware_dir()}")
+    if res["findings"]:
+        ctx.render(res["findings"], label="700 BuilderData")
+    own = f" (+ the project's {os.path.basename(res['device_types_db'])})" if res.get("device_types_db") else ""
+    ctx.emit("RSLT", f"  700: {res['stations']} stations + {res['modules']} modules{own} -> {config.hardware_dir()}")
 
 
 def run_software(ctx, only=None):
@@ -614,7 +620,8 @@ def run_reporting(ctx, only=None):
     res = coverage.project(database, system=ctx.system)
     ctx.render(proj, label="900 coverage")
     st = res["stats"]
-    ctx.emit("RSLT", f"  910 coverage: {st['rows']} rows (sig {st['kinds']['signal']}/"
+    gen = f"gen {st['kinds']['generated']}/" if st["kinds"].get("generated") else ""
+    ctx.emit("RSLT", f"  910 coverage: {st['rows']} rows (sig {st['kinds']['signal']}/{gen}"
                      f"chan {st['kinds']['channel']}/struct {st['kinds']['structural']}), "
                      f"{st['orphans']} ORPHAN, {st['unplaced']} UNPLACED -> {res['txt']}")
 

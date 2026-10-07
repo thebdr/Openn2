@@ -347,6 +347,17 @@ def staged_database(colmap) -> Database:
     return Database([signals_table([m["canonical"] for m in colmap]), diagnosis_cabinets_table()])
 
 
+def notation_findings() -> list:
+    """Re-read the I/O address notation ([[C-022]] refute round 3 - on EVERY document read, so an edit applies
+    to the next run) -> [] or the blocking `stg_address_format` FAIL: a notation that will not load means the
+    documents' addresses would be misread (the TIA default is installed meanwhile) - never a crash."""
+    problem = config.refresh_address_format()
+    if not problem:
+        return []
+    return [_f("stg_address_format", "FAIL", "the I/O address notation does not load - the documents' "
+               f"addresses cannot be read: {problem}", "address_format.yaml")]
+
+
 def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> tuple:
     """Phase 310 - Stage I/O List: read the I/O List into the `signals` table WITHOUT the C&E enrichment
     (no matrix_areas / ce_* / numerazione_linea -> `combined_FLD` == `iol_FLD`, `IsSorterArea` ''), plus the
@@ -355,6 +366,7 @@ def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> 
     (320) layers the C&E on top; `stage_iolist` then `annotate_cematrix` == the full `stage`. `save=False`
     lets `stage` build in memory and write once after the C&E pass."""
     params = params or config.load_params()
+    notation = notation_findings()
     signal_types = config.load_signal_types()
     io_path = params.get("iolist_path")
     colmap = config.load_column_map("IoList")
@@ -364,18 +376,18 @@ def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> 
 
     rows, matched = _read_iolist(params, signal_types, io_path)
     if not matched:                                   # the required input is absent -> halt before anything
-        return database, [_f("stg_no_io_sheet", "FAIL",
-                             f"no I/O sheet matched {config.get_param(params, 'iolist_params.sheets')!r} "
-                             f"in {io_path}", io_path or "")]   # raw-FAIL guard: nothing written
+        return database, notation + [_f("stg_no_io_sheet", "FAIL",
+                                        f"no I/O sheet matched {config.get_param(params, 'iolist_params.sheets')!r} "
+                                        f"in {io_path}", io_path or "")]   # raw-FAIL guard: nothing written
 
     _finalize_identity(params, rows)                  # the I/O-List identity (C&E fields still absent)
     for row in rows:
         table.add_row(row)
     if system is None or system.capabilities.needs_diagnosis_blocks:   # capability gate, never a type-id
         _load_cabinets(io_path, cab_table)
-    if save:
+    if save and not notation:                         # raw-FAIL guard: a misread notation writes nothing
         database.save(config.database_dir())
-    return database, []
+    return database, notation
 
 
 def annotate_cematrix(database, params: dict | None = None, save: bool = True) -> tuple:

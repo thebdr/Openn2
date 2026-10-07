@@ -83,6 +83,7 @@ def build_report(params: dict | None = None, stamp: str | None = None) -> dict:
     """Assemble the full classified result for both documents. `stamp` is the generated-at label (defaults
     to now; injected for deterministic tests)."""
     params = params or config.load_params()
+    config.refresh_address_format()                   # [[C-022]]: the documents are read in the CURRENT notation
     weights = config.load_change_weights()
     iol = _compare_iolist(params.get("iolist_previous_path"), params.get("iolist_path"), params, weights)
     cem = _compare_cematrix(params.get("matrix_previous_path"), params.get("matrix_path"), params, weights)
