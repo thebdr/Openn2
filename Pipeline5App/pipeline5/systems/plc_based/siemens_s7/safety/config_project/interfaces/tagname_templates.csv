@@ -4,6 +4,7 @@ W,PNC_Q_{$interface_name}-{$interface_id}_{$desc_l1} {$desc_l1b} [ {$iol_FLD} ]
 PA,PNC_Q_{$interface_name}-{$interface_id}_{$desc_l1} {$desc_l1b} [ {$iol_FLD} {$profinet_name} {$profinet_ip} ]
 PW,PNC_Q_{$interface_name}-{$interface_id}_{$desc_l1} {$desc_l1b} [ {$iol_FLD} {$profinet_name} {$profinet_ip} ]
 E1/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
+E,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
 E2/2,PNC_Q_{$interface_name}-{$interface_id}_Emergency Push Button [ {$combined_FLD} ]
 B1/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
 B2/2,PNC_Q_{$interface_name}-{$interface_id}_Safety Breaker [ {$combined_FLD} ]

@@ -48,6 +48,11 @@ def _anchor_lookup(anchor_map: dict, fld: str):
 # roles
 STANDALONE, ANCHOR, CHANNEL_2, RESET, PATTERN = "standalone", "anchor", "channel_2", "reset", "pattern"
 SERIES_PRIMARY, SERIES_SIBLING, FLD_INHERIT, MANUAL = "series_primary", "series_sibling", "fld_inherit", "manual"
+# a channel family's other two members (C-027 refute round 1 + the single-row e-stop type E, 2026-10-07):
+# SINGLE = an anchor type with no channel - one row carrying both channels, complete on its own (E);
+# FOLLOWER = a channel-less member that is not an anchor - it inherits its object's index by FLD but is
+# never the anchor's partner (EL, the lamp: a two-row e-stop missing its CH2 stays an orphan)
+SINGLE, FOLLOWER = "single", "follower"
 
 
 # --- the PL4 adapter helpers over a staged signals dict ---------------------------------------- #
@@ -109,7 +114,12 @@ def role_of(res) -> str:
     if fam.link == LINK_PATTERN:
         return PATTERN
     if fam.link == LINK_CHANNEL:
-        return ANCHOR if ch == "1" else CHANNEL_2
+        if ch == "1":
+            return ANCHOR
+        if ch == "2":
+            return CHANNEL_2
+        anchors = {a.strip().upper() for a in (fam.anchor or "").split("|") if a.strip()}
+        return SINGLE if st in anchors else FOLLOWER
     if fam.link == LINK_SERIES:
         if st.startswith("KQ"):
             return ANCHOR
@@ -162,9 +172,9 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
     # Pass 1: anchors / standalone / reset / pattern consume their counters in row order
     for res in indexable:
         role = role_of(res)
-        if role in (ANCHOR, STANDALONE, RESET):
+        if role in (ANCHOR, SINGLE, STANDALONE, RESET):
             res.index = _take(counters, _counter_key(res), res.ex_index)
-            if role == ANCHOR:
+            if role in (ANCHOR, SINGLE):
                 _register_anchor(fld_anchor[res.family.key], res.fld, res.index)
         elif role == PATTERN:
             key = res.family.key
@@ -179,7 +189,7 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
             ch2_flds[res.family.key].add(res.fld)
     for res in indexable:
         role = role_of(res)
-        if role == CHANNEL_2:
+        if role in (CHANNEL_2, FOLLOWER):
             got = _anchor_lookup(fld_anchor.get(res.family.key, {}), res.fld)
             if got:
                 res.index = got

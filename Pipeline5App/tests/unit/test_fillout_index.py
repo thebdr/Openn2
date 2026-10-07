@@ -57,24 +57,31 @@ def test_family_for_longest_prefix():
 
 
 def test_shipped_el_joins_emergency_pb():
-    """C-027: the SHIPPED object_families - EL (the lamp of a luminous e-stop) is a member of the emergency_pb
-    family: it takes the index of the E1/2 with the same designation (the channel-2 inherit) and counts as that
-    E1/2's partner (a single-row CH1\\CH2 e-stop with a lamp is no orphan). A lamp with no e-stop of its
-    designation stays unresolved; an e-stop with neither E2/2 nor lamp is still an orphan."""
+    """C-027 + C-029: the SHIPPED object_families. A single-row e-stop (E - both channels on one row, checked in
+    hardware) is complete by itself; a two-row e-stop (E1/2) still needs its E2/2. The lamp (EL) is a FOLLOWER:
+    it takes the index of the e-stop with its designation but is never that e-stop's partner - a lamp does not
+    complete a two-row e-stop missing its CH2 (C-027 refute round 1). A lamp with no e-stop stays unresolved."""
     shipped = fam.load_object_families()
     el = fam.family_for("EL", shipped)
     eq((el.key, el.link), ("E", LINK_CHANNEL), "EL -> the emergency_pb family (channel link)")
+    eq(ix.role_of(ix._Res(_row("u", "E"), shipped, "")), ix.SINGLE, "E (an anchor type, no channel) -> single")
+    eq(ix.role_of(ix._Res(_row("u", "EL"), shipped, "")), ix.FOLLOWER, "EL (not an anchor, no channel) -> follower")
+    eq(ix.role_of(ix._Res(_row("u", "E1/2", channel="1"), shipped, "")), ix.ANCHOR, "E1/2 stays the paired anchor")
     rows = [_row("e1", "E1/2", fld="=ES-1", channel="1", source_row=1),
             _row("f1", "E2/2", fld="=ES-1", channel="2", source_row=2),
             _row("l1", "EL", fld="=ES-1", source_row=3),
-            _row("e2", "E1/2", fld="=ES-2", channel="1", source_row=4),      # single row + lamp
+            _row("s2", "E", fld="=ES-2", source_row=4),                 # one row, both channels + its lamp
             _row("l2", "EL", fld="=ES-2", source_row=5),
-            _row("e3", "E1/2", fld="=ES-3", channel="1", source_row=6),      # no partner at all
-            _row("l9", "EL", fld="=ES-9", source_row=7)]                    # a lamp with no e-stop
+            _row("s3", "E", fld="=ES-3", source_row=6),                 # one row, no lamp
+            _row("e4", "E1/2", fld="=ES-4", channel="1", source_row=7),  # CH1 + a lamp, CH2 missing
+            _row("l4", "EL", fld="=ES-4", source_row=8),
+            _row("l9", "EL", fld="=ES-9", source_row=9)]                # a lamp with no e-stop
     got = ix.assign_indices(rows, shipped)
     eq((got["e1"], got["f1"], got["l1"]), ("0001", "0001", "0001"), "the pair + its lamp share the index")
-    eq((got["e2"], got["l2"]), ("0002", "0002"), "a single-row e-stop with a lamp resolves; the lamp inherits")
-    eq(got["e3"], INPUT_REQUIRED, "an e-stop with neither E2/2 nor lamp stays an orphan")
+    eq((got["s2"], got["l2"]), ("0002", "0002"), "a single-row e-stop is complete; its lamp inherits")
+    eq(got["s3"], "0003", "a single-row e-stop without a lamp is complete too")
+    eq(got["e4"], INPUT_REQUIRED, "a lamp does NOT complete a two-row e-stop missing its CH2")
+    eq(got["l4"], "0004", "that lamp still follows its e-stop's index")
     eq(got["l9"], INPUT_REQUIRED, "a lamp whose designation has no e-stop is unresolved")
 
 

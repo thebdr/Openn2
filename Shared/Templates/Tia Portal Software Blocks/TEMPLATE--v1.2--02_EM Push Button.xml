@@ -162,6 +162,12 @@
         <Component Name="!!ITERATOR_STRINGS$$" />
       </Symbol>
     </Access>
+    <Access Scope="LiteralConstant" UId="72">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>TRUE</ConstantValue>
+      </Constant>
+    </Access>
     <Call UId="31">
       <CallInfo Name="00_Push-Button_Input" BlockType="FB">
         <Instance Scope="GlobalVariable" UId="32">
@@ -228,7 +234,7 @@
       <NameCon UId="31" Name="NormOpenDiag" />
     </Wire>
     <Wire UId="55">
-      <OpenCon UId="34" />
+      <IdentCon UId="72" />
       <NameCon UId="31" Name="ON_Lamp" />
     </Wire>
     <Wire UId="56">

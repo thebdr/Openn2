@@ -24,6 +24,9 @@ def test_node_passthrough():
 
 def test_in_ladder():
     eq(_t(bit="I0.0", desc_l1="EMERGENCY PUSH-BUTTON PRESSED", desc_l1b="CH1"), "E1/2", "emergency push-button")
+    eq(_t(bit="I0.0", desc_l1="EMERGENCY PUSH-BUTTON PRESSED", desc_l1b="CH2"), "E2/2", "its channel-2 row")
+    eq(_t(bit="I0.0", desc_l1="EMERGENCY PUSH BUTTON PRESSED", desc_l1b="CH1/CH2 =ES-0035"), "E",
+       "ONE row naming both channels -> the single-row type E (C-029)")
     eq(_t(bit="I0.1", desc_l1="FEEDBACK SAFETY RELAY"), "KI", "safety relay feedback")
     eq(_t(bit="I0.2", desc_l1="DOOR OPEN", desc_l1b="CH2"), "DI2/2", "door channel input")
     eq(_t(bit="I0.3", desc_l1="DOOR OPEN", desc_l1b="RESET"), "DR", "door reset")

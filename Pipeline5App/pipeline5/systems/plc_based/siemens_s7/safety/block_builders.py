@@ -114,7 +114,7 @@ def _fld_key(row) -> str:
 @builds("02_EM Push Button")
 def build_02_em_push_button(db: Database) -> Table:
     """One 00_Push-Button_Input FB instance per node: the node's emergency-stop INPUTS - both
-    E1/2 emergency-push-buttons AND B1/2 safety-breakers (grouped by node, in address order),
+    E1/2 / E (single-row) emergency-push-buttons AND B1/2 safety-breakers (grouped by node, in address order),
     chunked to the FB's 4 channels. The v1.2 template carries 12 !!ITERATOR_STRINGS$$ in document
     order - the IN_1..4 bare-symbol quartet, the 01_PushButton.<member> quartet, then the Lamp_1..4
     bare-symbol quartet - so the iterator is the padded name_in_db quartet emitted TWICE (same values,
@@ -128,7 +128,7 @@ def build_02_em_push_button(db: Database) -> Table:
         if _fld_key(lamp) and lamp.get("name_in_tagtable"):
             lamps.setdefault(_fld_key(lamp), lamp["name_in_tagtable"])
     t = Table("02_EM Push Button")
-    for node, members in _group_by_node(db, "E1/2", "B1/2"):
+    for node, members in _group_by_node(db, "E1/2", "E", "B1/2"):
         ident = f"{node['profinet_name']} {node['profinet_ip']}".strip()
         for i, chunk in enumerate(_chunked(members, SLOTS), start=1):
             inst = f"EMPB_{node['profinet_name']}_{i}"
@@ -149,7 +149,7 @@ def build_02_em_push_button(db: Database) -> Table:
 # Zone-cumulative groups (03): per AREA, AND the group's DB members -> a 02_COM."AREA n <LABEL>" coil.
 # Each group is ONE signal type -> ONE DB, so nameOfDB is scalar and the iterator is sized exactly.
 ZONE_GROUPS = [
-    ("PB",              ("E1/2",)),     # always (every area has push buttons)
+    ("PB",              ("E1/2", "E")),  # always (every area has push buttons; E = the single-row form)
     ("FDB",             ("KQ",)),       # always (every area has contactor feedback)
     ("SAFETY_BREAKERS", ("B1/2",)),     # only when the area has a breaker
     ("DOORS",           ("DI1/2",)),    # only when the area has a door safety input

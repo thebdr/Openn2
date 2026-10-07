@@ -632,6 +632,50 @@ def test_shipped_v12_template_lamp_slots():
                 wired[c.get("UId")] = names[0]
     eq([wired.get(u) for u in slots[8:]], ["Lamp_1", "Lamp_2", "Lamp_3", "Lamp_4"],
        "slots 9-12 drive the lamp outputs")
+    # refute round 1 (user decision 2026-10-07): the FB lights a lamp only while ON_Lamp is TRUE - an open
+    # ON_Lamp left every wired lamp dark; it is driven by a TRUE literal
+    true_lits = {a.get("UId") for a in root.iter() if local(a) == "Access" and a.get("Scope") == "LiteralConstant"
+                 and any(local(v) == "ConstantValue" and (v.text or "").strip().upper() == "TRUE" for v in a.iter())}
+    eq(sorted(n for u, n in wired.items() if u in true_lits), ["ON_Lamp"], "ON_Lamp <- TRUE")
+
+
+def test_single_row_e_joins_02_and_03():
+    """C-029: a single-row e-stop (E) is a push-button channel of 02 EM Push Button (with its lamp) and makes
+    its area's PB group in 03 Zone Cumulative, alongside E1/2."""
+    node = _node("n1", "1.2.3.4", i0="0", i1="20", q0="0", q1="20")
+    rows = [{"script_type": "E", "bit": "I0.0", "name_in_db": "PB_S", "iol_FLD": "=ES-1"},
+            {"script_type": "E1/2", "bit": "I0.1", "name_in_db": "PB_P", "iol_FLD": "=ES-2"},
+            {"script_type": "EL", "bit": "Q0.0", "iol_FLD": "=ES-1", "name_in_tagtable": "LAMP 1"}]
+    t = builders.build_02_em_push_button(Database([node] + rows))
+    eq(len(t), 1, "one chunk")
+    it = t.rows[0]["ITERATOR_STRINGS"]
+    eq(sorted(it[:2]), ["PB_P", "PB_S"], "both e-stop forms are channels")
+    eq(it[8 + it.index("PB_S")], "LAMP 1", "the single-row e-stop's lamp on its channel")
+    eq(it[8 + it.index("PB_P")], builders.PAD, "no lamp for the other")
+    rows3 = [{"script_type": "E", "matrix_areas": ["AREA 1"], "areas_description": ["Infeed"],
+              "name_in_db": "PB_S", "datablocks": ["01_Pushbutton"]},
+             {"script_type": "KQ", "matrix_areas": ["AREA 1"], "areas_description": ["Infeed"],
+              "name_in_db": "FDB_A", "datablocks": ["03_FDBACK"]}]
+    t3 = builders.build_03_zone_cumulative(Database(rows3))
+    eq([r["02_COM.{db_element}"] for r in t3.rows], ["AREA 1 PB", "AREA 1 FDB"], "E makes the area's PB group")
+
+
+def test_shipped_pushbutton_members_take_e():
+    """C-029: the SHIPPED 01_Pushbutton / 02_COM member rules give a single-row e-stop (E) its push-button
+    member and its area's PB member, exactly as an E1/2."""
+    from pipeline5.config import paths, loaders
+    from pipeline5.phases.datablocks import generator as datablocks
+    paths.use_system(SYSTEM)
+    defs = [d for d in loaders.load_db_definitions() if d["db_name"] in ("01_Pushbutton", "02_COM")]
+    els = [e for e in loaders.load_db_elements() if e["db_name"] in ("01_Pushbutton", "02_COM")]
+    rows = [{"uid": "u1", "script_type": "E", "combined_FLD": "=ES-1", "matrix_areas": ["AREA 1"]},
+            {"uid": "u2", "script_type": "E1/2", "combined_FLD": "=ES-2", "matrix_areas": ["AREA 2"]}]
+    g, _inst, _f = datablocks.generate(rows, defs, els, loaders.load_db_types())
+    names = [m["name"] for m in g["01_Pushbutton"]["members"]]
+    ok("Emergency Push Button [ =ES-1 ]" in names and "Emergency Push Button [ =ES-2 ]" in names,
+       f"both forms are 01_Pushbutton members: {names}")
+    com = [m["name"] for m in g["02_COM"]["members"]]
+    ok("AREA 1 PB" in com and "AREA 2 PB" in com, f"both areas get a PB member: {com}")
 
 
 if __name__ == "__main__":
@@ -648,6 +692,8 @@ if __name__ == "__main__":
         ("builder_02_lamps_by_fld", test_builder_02_lamps_by_fld),
         ("shipped_el_tag_identity", test_shipped_el_tag_identity),
         ("shipped_v12_template_lamp_slots", test_shipped_v12_template_lamp_slots),
+        ("single_row_e_joins_02_and_03", test_single_row_e_joins_02_and_03),
+        ("shipped_pushbutton_members_take_e", test_shipped_pushbutton_members_take_e),
         ("area_descriptions_reads_list_cells", test_area_descriptions_reads_list_cells),
         ("builder_03_zone_cumulative_per_area_group", test_builder_03_zone_cumulative_per_area_group),
         ("builder_04_estop_feature_types", test_builder_04_estop_feature_types),
