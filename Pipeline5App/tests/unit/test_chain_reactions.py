@@ -1420,11 +1420,12 @@ def test_a_hidden_or_locked_file_never_leaves_a_record_half_saved():
             eq([(row["type"], row["location"]) for row in read(os.path.join(sandbox, "validation_issues.csv"))],
                [("rx_bad_template", "r2")], "…and the findings it audits")
             saved = snapshot(sandbox)
-            holder = open(os.path.join(sandbox, "dst.csv"), "r+b")    # another program locks bytes 6..9 of a
-            holder.seek(6)                                            # table the save writes (not a record file:
-            msvcrt.locking(holder.fileno(), msvcrt.LK_NBLCK, 4)      # one is READ first - rx_record_unreadable)
-            try:
-                _, findings = engine.fire("after_300", _db(), rules=[_rule()],
+            holder = open(os.path.join(sandbox, "src.csv"), "r+b")    # another program locks bytes 6..9 of a table
+            holder.seek(6)                                            # the save writes AFTER the fire's spawns (not
+            msvcrt.locking(holder.fileno(), msvcrt.LK_NBLCK, 4)      # a record file: one is READ first - unreadable)
+            try:                                                      # dst listed first: a lock met only at src's
+                base = _db()                                          # write would leave dst this fire's
+                _, findings = engine.fire("after_300", Database([base["dst"], base["src"]]), rules=[_rule()],
                                           templates={"rows": [{"label": "run3-{$name}"}]}, params={}, files_root=out)
             finally:
                 holder.seek(6)
