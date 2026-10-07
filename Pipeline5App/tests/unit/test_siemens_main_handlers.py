@@ -1102,7 +1102,7 @@ def test_generated_signals_reach_generation():
             config.use_project(previous_project)
 
 
-def _rules_project(project, params, rules, templates):
+def _absorb_project(project, params, rules, templates):
     """A PROJECT with its own after_300 rules (`rules` = data rows of reactions.csv) and templates.yaml text."""
     import csv
     from ruamel.yaml import YAML
@@ -1159,8 +1159,8 @@ def test_generated_signals_change_only_their_own_outputs():
     params = config.load_params()
     previous_project = config.active_project()
     with tempfile.TemporaryDirectory() as on, tempfile.TemporaryDirectory() as off:
-        _rules_project(on, params, [_QBAD_RULE], _QBAD_TPL)
-        _rules_project(off, params, [], "")
+        _absorb_project(on, params, [_QBAD_RULE], _QBAD_TPL)
+        _absorb_project(off, params, [], "")
         try:
             config.use_project(off)
             _run_all(_Host())
@@ -1187,7 +1187,7 @@ def test_lone_buttons_in_a_fresh_project():
     with tempfile.TemporaryDirectory() as ref, tempfile.TemporaryDirectory() as a, \
             tempfile.TemporaryDirectory() as b:
         for p in (ref, a, b):
-            _rules_project(p, params, [_QBAD_RULE], _QBAD_TPL)
+            _absorb_project(p, params, [_QBAD_RULE], _QBAD_TPL)
         try:
             config.use_project(ref)
             _run_all(_Host())
@@ -1224,7 +1224,7 @@ def test_cascade_orphan_and_validation_see_absorbed_rows():
            "lost_rows:\n  - script_type: \"KQ\"\n    functional_unit: \"=NOWHERE\"\n    device: \"-K999\"\n"
            "    bit: \"Q999.7\"\n    desc_l1: \"EMERGENCY\"\n")
     with tempfile.TemporaryDirectory() as project:
-        _rules_project(project, params, rules, tpl)
+        _absorb_project(project, params, rules, tpl)
         try:
             config.use_project(project)
             host = _Host()
