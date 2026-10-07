@@ -5,7 +5,7 @@ the KQ/KI series (primary inherit + sibling contiguity + ki_without_kq); a stand
 pattern (Z) shared index; an unresolved (channel_fld_mismatch) -> "<input required>". A faithful clean-
 room port verification of PL3's index_assign over PL4's signals-dict model.
 """
-from _harness import run, eq
+from _harness import run, eq, ok
 from pipeline5.phases.fillout import index_assign as ix
 from pipeline5.phases.fillout import type_families as fam
 from pipeline5.phases.fillout.type_families import (
@@ -197,11 +197,50 @@ def test_is_indexable():
     eq(ix.is_indexable(_res(_row("u", "DL", type_present=False))), True, "untyped but a family member -> indexable")
 
 
+def test_shipped_e_matches_e12():
+    """C-029 refute round 2: the SHIPPED type E gets everything an E1/2 gets - the e-stop tag table, the same
+    rendered tag name, the C&E mandate, diagnosis (pressed / released) and interface tag name - and has NO
+    channel, so a lone E typed from the shipped config is complete in the 200 index."""
+    from pipeline5.config import paths, loaders
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    from pipeline5.truth import identity
+    paths.use_system(SYSTEM)
+    types = loaders.load_signal_types()
+    e, pair = loaders.resolve_type(types, "E"), loaders.resolve_type(types, "E1/2")
+    ok(e is not None, "E is a shipped type")
+    eq(e.get("channel"), "", "one row - no channel")
+    for k in ("category", "tagtable_name", "ce_mandatory", "io_comment"):
+        eq(e.get(k), pair.get(k), f"E's {k} = E1/2's")
+    row = {"combined_FLD": "=ES-1", "iol_FLD": "=ES-1"}
+    eq(identity.tag_name(dict(row, script_type="E", type=e)),
+       identity.tag_name(dict(row, script_type="E1/2", type=pair)), "the same tag name")
+    diag = loaders.load_signal_diagnosis()
+    ok(diag.get("E") and diag.get("E") == diag.get("E1/2"), "the same diagnosis (pressed / released)")
+    names = loaders.load_interface_tagnames()
+    ok(names.get("E") and names.get("E") == names.get("E1/2"), "the same interface tag name")
+    lone = {"uid": "s", "script_type": "E", "type": e, "functional_unit": "=ES-1", "location": "", "device": "",
+            "source_row": 1, "index": ""}
+    eq(ix.assign_indices([lone], fam.load_object_families(), from_scratch=True)["s"], "0001",
+       "a lone E typed from the shipped config is complete")
+
+
+def test_single_with_channel_2_is_flagged():
+    """C-029 refute round 2: an E2/2 on the designation of a ONE-row e-stop (E) is a contradiction - flagged
+    (`<input required>`), never a silent inherit of the E's index; the E itself keeps its index."""
+    shipped = fam.load_object_families()
+    rows = [_row("s", "E", fld="=ES-5", source_row=1),
+            _row("c", "E2/2", fld="=ES-5", channel="2", source_row=2)]
+    got = ix.assign_indices(rows, shipped, from_scratch=True)
+    eq((got["s"], got["c"]), ("0001", INPUT_REQUIRED), "the E2/2 beside an E is flagged")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("fillout_index", [
         ("family_for_longest_prefix", test_family_for_longest_prefix),
         ("shipped_el_joins_emergency_pb", test_shipped_el_joins_emergency_pb),
+        ("shipped_e_matches_e12", test_shipped_e_matches_e12),
+        ("single_with_channel_2_is_flagged", test_single_with_channel_2_is_flagged),
         ("role_of_each_link", test_role_of_each_link),
         ("channel2_fld_inherit", test_channel2_fld_inherit),
         ("channel2_fld_mismatch_unresolved", test_channel2_fld_mismatch_unresolved),

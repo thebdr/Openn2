@@ -320,6 +320,55 @@ def test_format2_projection():
            "a module data row (PotentialGroup + by-type channel params)")
 
 
+def test_sfb_base_is_the_lowest_row_whatever_the_order():
+    """C-028 refute round 2: the base is the LOWEST address per direction, not the first row listed."""
+    from pipeline5.config.loaders import load_device_types_db
+    pins = [("", "Q1485.0", "", "103040357"), ("", "Q1484.0", "", "103040357"),
+            ("", "I1485.0", "", "103040357"), ("-K1", "I1484.0", "", "103040357")]
+    stations, _m, _f = hardware.extract(_sfb_rows(pins), load_device_types_db())
+    got = _start_addresses(stations[0])
+    eq((got["Item(1).Item(2).Item(0).Addr(0).StartAddress"], got["Item(1).Item(2).Item(0).Addr(1).StartAddress"]),
+       ("1484", "1484"), "the lowest input and output rows are the bases, listed last")
+
+
+def test_sfb_without_input_rows_drops_the_i_entries():
+    """C-028 refute round 2: the mirror case - a station with only output rows drops its `%I%` entries and its
+    WARN names the INPUT direction only."""
+    from pipeline5.config.loaders import load_device_types_db
+    rows = _sfb_rows([("-K1", "Q1484.0", "", "103040357")])
+    stations, _m, findings = hardware.extract(rows, load_device_types_db())
+    ok("%I%" not in stations[0]["custom_parameters"], "no literal %I% reaches Stations.csv")
+    eq(_start_addresses(stations[0]), {"Item(1).Item(2).Item(0).Addr(1).StartAddress": "1484",
+                                       "Item(1).Item(2).Item(2).Addr(1).StartAddress": "1490",
+                                       "Item(1).Item(2).Item(1).Addr(1).StartAddress": "1496"},
+       "the output entries placed, the input ones dropped")
+    warn = [f for f in findings if f.type == "hw_addr_unresolved"]
+    eq(len(warn), 1, "one WARN")
+    ok("no input row" in warn[0].detail and "output" not in warn[0].detail, warn[0].detail)
+
+
+def test_col_ag_placing_a_dropped_entry_is_not_left_to_tia():
+    """C-028 refute round 2: an entry the head's Hardware Parameters (col AG) set reaches Stations.csv and is not
+    counted as left to TIA; when AG sets every dropped entry there is no WARN at all."""
+    from pipeline5.config.loaders import load_device_types_db
+    dtd = load_device_types_db()
+    q0 = "Item(1).Item(2).Item(0).Addr(1).StartAddress"
+    pins = [("-K1", "I1484.0", "", "103040357")]
+    stations, _m, findings = hardware.extract(_sfb_rows(pins, {"hardware_params": f"{q0} = 1484"}), dtd)
+    eq(_start_addresses(stations[0]).get(q0), "1484", "the AG entry is placed")
+    warn = [f for f in findings if f.type == "hw_addr_unresolved"]
+    ok(len(warn) == 1 and "2 start-address entries" in warn[0].detail, [f.detail for f in warn])
+    every = " | ".join(f"Item(1).Item(2).Item({i}).Addr(1).StartAddress = {a}" for i, a in ((0, 1484), (2, 1490), (1, 1496)))
+    _s, _m, findings = hardware.extract(_sfb_rows(pins, {"hardware_params": every}), dtd)
+    eq([f for f in findings if f.type == "hw_addr_unresolved"], [], "AG places every dropped entry -> no WARN")
+
+
+def test_resolve_addr_template_ignores_case():
+    """C-028 refute round 2: a hand-typed lower-case placeholder resolves like the upper-case one (the drop
+    check already ignored case - a `%i%` was dropped with a false 'no input row')."""
+    eq(hardware._resolve_addr_template("%i%+6 | %q%", 10, 20), "16 | 20")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("hardware", [
@@ -338,4 +387,8 @@ if __name__ == "__main__":
         ("shipped_fdi_dd_channel_block", test_shipped_fdi_dd_channel_block),
         ("sfb_without_output_rows_drops_the_q_entries", test_sfb_without_output_rows_drops_the_q_entries),
         ("sfb_base_is_the_lowest_row_and_col_ag_overrides", test_sfb_base_is_the_lowest_row_and_col_ag_overrides),
+        ("sfb_base_is_the_lowest_row_whatever_the_order", test_sfb_base_is_the_lowest_row_whatever_the_order),
+        ("sfb_without_input_rows_drops_the_i_entries", test_sfb_without_input_rows_drops_the_i_entries),
+        ("col_ag_placing_a_dropped_entry_is_not_left_to_tia", test_col_ag_placing_a_dropped_entry_is_not_left_to_tia),
+        ("resolve_addr_template_ignores_case", test_resolve_addr_template_ignores_case),
     ]))

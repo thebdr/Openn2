@@ -168,7 +168,7 @@ def _resolve_addr_template(template, i_base, q_base) -> str:
         if base is None:
             return m.group(0)
         return str(base + (int(plus) if plus else 0))
-    return re.sub(r"%([IQ])%\s*(?:\+\s*(\d+))?", repl, template or "")
+    return re.sub(r"%([IQ])%\s*(?:\+\s*(\d+))?", repl, template or "", flags=re.IGNORECASE)
 
 
 def _channel(addr, card_start_byte) -> int:
@@ -235,18 +235,23 @@ def extract(rows, dtd) -> tuple:
         # written as a literal the importer cannot read - TIA places that submodule itself ([[C-028]])
         kept = [e for e in (p.strip() for p in io_addr.split("|")) if e]
         unresolved = [e for e in kept if _UNRESOLVED_RX.search(e)]
+        hw_params = str(row.get("hardware_params") or "")
         if unresolved:
             kept = [e for e in kept if e not in unresolved]
             io_addr = " | ".join(kept)
-            where = _where(row)
-            missing = sorted({m.group(1).upper() for e in unresolved for m in _UNRESOLVED_RX.finditer(e)})
-            findings.append(_f("hw_addr_unresolved", "WARN",
-                               f"station {str(row.get('profinet_name') or '').strip()!r} ({model}): no "
-                               + " / ".join({"I": "input", "Q": "output"}[d] for d in missing)
-                               + f" row to place {len(unresolved)} start-address entr"
-                               + ("y" if len(unresolved) == 1 else "ies") + " - left to TIA",
-                               where, str(row.get("uid", "")), doc=_io_doc() if "!" in where else ""))
-        station_params = _merge_params(io_addr, str(row.get("hardware_params") or ""))
+            # an entry the head's Hardware Parameters (col AG) set is placed by them - not left to TIA
+            ag_keys = {p.split("=", 1)[0].strip() for p in hw_params.split("|") if "=" in p}
+            left = [e for e in unresolved if e.split("=", 1)[0].strip() not in ag_keys]
+            if left:
+                where = _where(row)
+                missing = sorted({m.group(1).upper() for e in left for m in _UNRESOLVED_RX.finditer(e)})
+                findings.append(_f("hw_addr_unresolved", "WARN",
+                                   f"station {str(row.get('profinet_name') or '').strip()!r} ({model}): no "
+                                   + " / ".join({"I": "input", "Q": "output"}[d] for d in missing)
+                                   + f" row to place {len(left)} start-address entr"
+                                   + ("y" if len(left) == 1 else "ies") + " - left to TIA",
+                                   where, str(row.get("uid", "")), doc=_io_doc() if "!" in where else ""))
+        station_params = _merge_params(io_addr, hw_params)
         stations.append({
             "role": cur["role"], "station_name": str(row.get("profinet_name") or "").strip(),
             "model_id": model, "ip_address": str(row.get("profinet_ip") or "").strip(),

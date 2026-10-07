@@ -159,6 +159,46 @@ def test_project_tier_overrides_the_notation():
     _restore()
 
 
+def test_optional_group_notation_never_crashes():
+    """C-022 (refute round 2): a notation whose bit group is OPTIONAL (word addresses `IW256` match) treats a
+    match without a bit as no address - staging and validation never crash on it."""
+    addresses.configure_address_format(r"(?P<direction>[IQ])W?(?P<byte>\d+)(?:\.(?P<bit>\d+))?", None)
+    try:
+        eq(addresses.parse("IW256"), None, "no bit -> no address")
+        eq(addresses.canonical("IW256"), "IW256", "left as written")
+        eq(addresses.addr_byte("IW256"), None)
+        addresses.format_ok("IW256")                  # no exception
+        eq(addresses.canonical("I10.3"), "I10.3", "a full address still parses")
+    finally:
+        _restore()
+
+
+def test_notation_without_a_named_group_is_refused():
+    """C-022 (refute round 2): a notation that names no direction / byte / bit group is a config error at load,
+    never a silent no-address for every cell; the active notation is left as it was."""
+    try:
+        addresses.configure_address_format(r"(?P<direction>[IQ])(\d+)\.(?P<bit>\d+)", None)
+        ok(False, "a pattern without (?P<byte>...) must be refused")
+    except ValueError as e:
+        ok("byte" in str(e), str(e))
+    eq(addresses.canonical("I10.3"), "I10.3", "the previous notation still active")
+    _restore()
+
+
+def test_broad_direction_class_reads_the_stored_canonical():
+    """C-022 (refute round 2): a notation whose direction class also matches the canonical letters (here any
+    letter, tokens E/A) still reads the STORED canonical `I10.1` - an unmapped token falls through to the
+    canonical spelling - while a letter of neither is no address."""
+    addresses.configure_address_format(r"(?P<direction>[A-Z])(?P<byte>\d+)\.(?P<bit>\d+)",
+                                       {"input": ["E"], "output": ["A"]})
+    try:
+        eq(addresses.canonical("E10.1"), "I10.1", "the notation's input token")
+        eq(addresses.addr_byte("I10.1"), ("I", 10), "the stored canonical spelling")
+        eq(addresses.addr_byte("M10.1"), None, "a letter of neither form")
+    finally:
+        _restore()
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("address_format", [
@@ -171,4 +211,7 @@ if __name__ == "__main__":
         ("canonical_spelling_reads_under_any_notation", test_canonical_spelling_reads_under_any_notation),
         ("whitespace_inside_a_cell", test_whitespace_inside_a_cell),
         ("project_tier_overrides_the_notation", test_project_tier_overrides_the_notation),
+        ("optional_group_notation_never_crashes", test_optional_group_notation_never_crashes),
+        ("notation_without_a_named_group_is_refused", test_notation_without_a_named_group_is_refused),
+        ("broad_direction_class_reads_the_stored_canonical", test_broad_direction_class_reads_the_stored_canonical),
     ]))

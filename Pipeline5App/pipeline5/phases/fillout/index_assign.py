@@ -166,6 +166,7 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
 
     counters: dict = {}
     fld_anchor: dict = defaultdict(dict)     # family.key -> {fld -> index}
+    single_anchor: dict = defaultdict(dict)  # family.key -> {fld -> index} of the SINGLE (one-row) objects
     pattern_idx: dict = {}                    # family.key -> shared index
     indexable = [res for res in results if is_indexable(res)]
 
@@ -176,6 +177,8 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
             res.index = _take(counters, _counter_key(res), res.ex_index)
             if role in (ANCHOR, SINGLE):
                 _register_anchor(fld_anchor[res.family.key], res.fld, res.index)
+            if role == SINGLE:
+                _register_anchor(single_anchor[res.family.key], res.fld, res.index)
         elif role == PATTERN:
             key = res.family.key
             if key not in pattern_idx:
@@ -189,7 +192,11 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
             ch2_flds[res.family.key].add(res.fld)
     for res in indexable:
         role = role_of(res)
-        if role in (CHANNEL_2, FOLLOWER):
+        if role == CHANNEL_2 and _anchor_lookup(single_anchor.get(res.family.key, {}), res.fld):
+            # a channel-2 row beside a ONE-row object (E): the pair was typed as a single - a contradiction,
+            # never a silent inherit ([[C-029]] refute round 2: a CH1 row whose text mentions CH2)
+            _unresolved(res, "single_with_channel_2", error=True)
+        elif role in (CHANNEL_2, FOLLOWER):
             got = _anchor_lookup(fld_anchor.get(res.family.key, {}), res.fld)
             if got:
                 res.index = got

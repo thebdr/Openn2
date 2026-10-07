@@ -74,7 +74,12 @@ def configure_address_format(pattern: str | None, direction_tokens: dict | None)
         _format["rx"] = re.compile(_DEFAULT_PATTERN, re.IGNORECASE)
         _format["tokens"] = dict(_DEFAULT_TOKENS)
         return
-    _format["rx"] = re.compile(pattern, re.IGNORECASE)
+    rx = re.compile(pattern, re.IGNORECASE)
+    missing = [g for g in ("direction", "byte", "bit") if g not in rx.groupindex]
+    if missing:                       # a notation must name all three - else every address read fails silently
+        raise ValueError(f"address_format.yaml: the pattern {pattern!r} names no group "
+                         + ", ".join(f"(?P<{g}>...)" for g in missing))
+    _format["rx"] = rx
     tokens = direction_tokens or {}
     _format["tokens"] = {
         "input": tuple(str(x).upper() for x in (tokens.get("input") or ("I",))),
@@ -113,8 +118,8 @@ def parse(value):
             if d is not None:
                 try:
                     return d, int(m.group("byte")), int(m.group("bit"))
-                except (ValueError, IndexError):
-                    pass
+                except (ValueError, IndexError, TypeError):   # TypeError: an OPTIONAL group that matched
+                    pass                                       # nothing (`IW256` under `(?:\.(?P<bit>\d+))?`)
     m = _CANONICAL_RX.fullmatch(compact)
     if m:
         return m.group("direction").upper(), int(m.group("byte")), int(m.group("bit"))

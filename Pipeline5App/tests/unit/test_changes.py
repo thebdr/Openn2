@@ -340,6 +340,25 @@ def test_read_error_degrades():
     ok(html.startswith("<!DOCTYPE html>") and "</html>" in html, "degraded result still renders")
 
 
+def test_address_notation_in_changes_report():
+    """C-022 completion (refute round 2): the before/after report reads the documents' addresses through the
+    configured notation - a dotted re-map is the same systematic event as its canonical spelling, and a
+    revision that only re-spells an address changes nothing."""
+    from pipeline5.truth import addresses
+    addresses.configure_address_format(r"(?P<direction>[IQ])\.?(?P<byte>\d+)\.(?P<bit>\d+)", None)
+    try:
+        dotted = [(f"Q.{740 + i // 8}.{i % 8}", f"Q.{840 + i // 8}.{i % 8}") for i in range(16)]
+        canon = [(o.replace("Q.", "Q"), n.replace("Q.", "Q")) for o, n in dotted]
+        ev_d, ev_c = classify.detect_address_event(dotted), classify.detect_address_event(canon)
+        ok(ev_d is not None and ev_c is not None, "both spellings are a systematic re-map")
+        eq((ev_d["rows"], ev_d["byte_rules"]), (ev_c["rows"], ev_c["byte_rules"]), "the same event")
+        ok(ev_d["member"]("Q.741.3", "Q.841.3"), "a dotted pair is a member")
+        ok(classify._same("bit", "I645.1", "I.645.1"), "a re-spelling only is no address change")
+        ok(not classify._same("bit", "I645.1", "I.645.2"), "a real change still is one")
+    finally:
+        addresses.configure_address_format(None, None)
+
+
 TESTS = [
     ("norm_keys", test_norm_keys),
     ("assign_nodes", test_assign_nodes),
@@ -368,6 +387,7 @@ TESTS = [
     ("area_device_tag_noise", test_area_device_tag_noise),
     ("area_real_device_tag_change_stays", test_area_real_device_tag_change_stays),
     ("read_error_degrades", test_read_error_degrades),
+    ("address_notation_in_changes_report", test_address_notation_in_changes_report),
 ]
 
 if __name__ == "__main__":
