@@ -560,13 +560,22 @@ def test_record_attaches_atomically_and_spawns_survive_a_ragged_record():
 def test_a_condition_failing_at_evaluation_is_a_bad_condition():
     """Refuter round 9: every rx_bad_condition pin failed at COMPILE; a condition that compiles but
     raises a located ExprError when EVALUATED (a bad group reference) must still be rx_bad_condition,
-    never relabelled rx_rule_crashed (a different audit outcome and treatment uid)."""
+    never relabelled rx_rule_crashed (a different audit outcome and treatment uid). C-025 refute round 9: a
+    LITERAL replacement re.sub refuses fails every evaluation - it is refused at COMPILE now (the rule dropped,
+    no audit row); a replacement only the data builds still fails when evaluated."""
     def body(sandbox):
         database, findings = engine.fire("after_300", _db(),
-                                         rules=[_rule(condition='regex_replace($name, /(D)/, "\\\\9") = "x"')],
+                                         rules=[_rule(condition='regex_replace($name, /(D)/, concat("\\\\", "9")) = "x"')],
                                          templates=_ROW_TPL, params={})
         eq([x.type for x in findings], ["rx_bad_condition"], "an evaluation-time ExprError")
         eq(_log(database), [("after_300", "r1", 0, 0, "rx_bad_condition")])
+        literal = 'regex_replace($name, /(D)/, "\\\\9") = "x"'
+        database, findings = engine.fire("after_300", _db(), rules=[_rule(condition=literal)], templates=_ROW_TPL,
+                                         params={})
+        eq([(x.type, x.location, x.detail) for x in findings],
+           [("rx_bad_condition", "r1", f"condition {literal!r}: regex_replace: bad replacement '\\\\9': invalid group "
+                                       "reference 9 at position 1")], "a literal one: refused at compile")
+        eq(_log(database), [], "…the rule dropped - no fire, no audit row")
     _sandboxed(body)()
 
 
@@ -1534,6 +1543,54 @@ def test_content_a_doubled_column_holds_is_never_skipped():
                "an author's column named twice, content in its FIRST copy only: reaches the compiler")
             eq(fire(good + ",,,", line + ",,,", ",,,,,,,,,,"), ([], ["spawn-D1", "spawn-D2"], [("doors", "ok")]),
                "a line blank in every cell, padding included: skipped")
+            for blank in (",, ,,,,,", "\t,,,,,,,", " ,,,,,,,", ",,,,,,,, ,\t, "):   # (round 27: whitespace is
+                eq(fire(good + ",,,", line + ",,,", blank), ([], ["spawn-D1", "spawn-D2"], [("doors", "ok")]),   # blank)
+                   f"a line whose cells hold only whitespace ({blank!r}): skipped - no phantom rule")
+        finally:
+            loaders.find = real_find
+    _sandboxed(body)()
+
+
+def test_a_templates_file_that_is_no_mapping_is_unreadable():
+    """C-024 refute round 27: a templates.yaml that parses but names no template - its top level a list (an indent
+    short), a text, a number, `true` - was never rx_templates_unreadable: each rule crashed (rx_rule_crashed,
+    TypeError) or was told its template is missing, one record per rule at its own phase, while the builder's
+    document said "must be a mapping" and a params file of the same shape is unreadable. The loader refuses it now:
+    the fire's ONE file-level finding (phase 0), every rule of the hook audited with it, nothing spawned or written -
+    on both hooks; the builder's saved-file check agrees."""
+    from pipeline5.config import loaders
+    real_find = loaders.find
+    rules = [_rule(), _rule(name="r2", action="file", source_table="", condition="", target="rx/x.txt",
+                   template="header")]
+    detail = "chain_reactions/templates.yaml does not load: templates.yaml must be a mapping of named templates"
+
+    def body(sandbox):
+        path = os.path.join(sandbox, "templates.yaml")
+        loaders.find = lambda rel: path if rel == "chain_reactions/templates.yaml" else real_find(rel)
+        try:
+            with tempfile.TemporaryDirectory() as out:
+                for text in ("- rows\n- header\n", "- rows:\n    - label: x\n", "rows and header\n", "42\n", "true\n"):
+                    with open(path, "w", encoding="utf-8") as handle:
+                        handle.write(text)
+                    eq(engine.saved_templates_problem().detail, detail, f"{text!r}: (the builder's saved-file check)")
+                    for hook in ("before_300", "after_300"):
+                        hooked = [dict(rule, fire_when=hook) for rule in rules]
+                        database, findings = engine.fire(hook, None if hook == "before_300" else _db(), rules=hooked,
+                                                         params={}, files_root=out, hooks=("before_300", "after_300"))
+                        if hook == "before_300":
+                            database, findings = database.log_rows, database.findings   # (the Deferred)
+                            audit = [(r["rule"], r["outcome"]) for r in database]
+                        else:
+                            audit = [(r["rule"], r["outcome"]) for r in database[engine.LOG_TABLE]]
+                            eq([r["label"] for r in database["dst"]], [], f"{text!r} {hook}: nothing spawned")
+                        eq([(f.type, f.phase, f.detail) for f in findings], [("rx_templates_unreadable", 0, detail)],
+                           f"{text!r} {hook}: ONE file-level finding")
+                        eq(audit, [("r1", "rx_templates_unreadable"), ("r2", "rx_templates_unreadable")],
+                           f"{text!r} {hook}: every rule audited with it")
+                eq(os.listdir(out), [], "nothing written")
+                with open(path, "w", encoding="utf-8") as handle:
+                    handle.write("")
+                eq(engine.saved_templates_problem(), None, "(an empty file: no templates - loads)")
         finally:
             loaders.find = real_find
     _sandboxed(body)()
@@ -1689,6 +1746,7 @@ if __name__ == "__main__":
          test_a_hidden_or_locked_file_never_leaves_a_record_half_saved),
         ("a_misspelt_or_doubled_rule_column_is_never_silent", test_a_misspelt_or_doubled_rule_column_is_never_silent),
         ("content_a_doubled_column_holds_is_never_skipped", test_content_a_doubled_column_holds_is_never_skipped),
+        ("a_templates_file_that_is_no_mapping_is_unreadable", test_a_templates_file_that_is_no_mapping_is_unreadable),
         ("every_path_windows_would_misdirect_is_refused_before_the_write",
          test_every_path_windows_would_misdirect_is_refused_before_the_write),
         ("fire_empty_hook_is_a_strict_noop", test_fire_empty_hook_is_a_strict_noop),

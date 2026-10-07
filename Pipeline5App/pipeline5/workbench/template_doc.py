@@ -166,8 +166,9 @@ def parse(text: str) -> Doc:
         mark = getattr(error, "problem_mark", None) or getattr(error, "context_mark", None)
         where = offset(mark.line, mark.column) if mark is not None else 0
         return Doc(text, {}, {}, (min(where, len(text)), f"templates.yaml does not load: {error}"))
-    if not isinstance(templates, dict):
-        return Doc(text, {}, {}, (0, "templates.yaml must be a mapping of named templates"))
+    if not isinstance(templates, dict):                       # (the fire's loader refuses it, in these words)
+        from pipeline5.config.loaders import TEMPLATES_NOT_A_MAPPING
+        return Doc(text, {}, {}, (0, TEMPLATES_NOT_A_MAPPING))
     try:
         tree = YAML().load(text)
     except Exception:  # noqa: BLE001 - the safe load passed; positions are a convenience
@@ -915,7 +916,7 @@ class Session:
         else:
             placed = place(doc, engine.lint(doc.templates, rule, self.view(rule, doc.templates)[0], hooks, params))
         seen = {(p.start, p.end, p.message) for p in placed}
-        fires = not halt
+        fires = not halt and not self._unfired(rule)      # (a rule on a hook never fired loads no params either)
         for leg in self.legs.get(rule.fire_when, {}):
             leg_halt = self.halt(rule.fire_when, leg)
             if leg_halt:
@@ -931,6 +932,11 @@ class Session:
                                  f"not load, a fire blocks every rule of the hook: {self.params_problem}",
                                  "error", "rule"))
         return placed
+
+    def _unfired(self, rule) -> bool:
+        """Whether the run-plan never fires `rule`'s hook (the declared hooks name others): the fire drops the rule
+        - rx_unfired_hook - before it loads the templates or the params (C-025 refute round 9)."""
+        return bool(self.hooks) and rule.fire_when not in self.hooks
 
     def saved_problem(self):
         """(type, detail) of the finding every fire with rules gives when the templates.yaml it reads - THIS
@@ -972,12 +978,13 @@ class Session:
                                       "(no fire, so nothing to preview)"] +
                              [f"note: the {leg} leg fires {rule.fire_when} all the same, over its own Database - "
                               "its problems are in the problems list ('on the ... leg')" for leg in firing])
-        saved = self.saved_problem()                      # (the fire loads the templates before the params)
-        if saved is not None:
+        unfired = self._unfired(rule)                     # the fire drops it before it loads any file (round 9):
+        saved = None if unfired else self.saved_problem()  # its finding is the hook's - engine.preview's guard
+        if saved is not None:                             # (the fire loads the templates before the params)
             return "\n".join(lines + [f"{saved[0]}: {saved[1]}",
                                       f"(a fire reads the file as saved: it blocks every rule of {rule.fire_when} - "
                                       "nothing to preview until the file loads)"])
-        if self.params_problem:
+        if self.params_problem and not unfired:
             return "\n".join(lines + [f"rx_params_unreadable: the project params do not load - a fire blocks "
                                       f"every rule of {rule.fire_when}: {self.params_problem}"])
         database, layer = self.view(rule, doc.templates)

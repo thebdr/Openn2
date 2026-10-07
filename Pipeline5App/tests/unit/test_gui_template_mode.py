@@ -190,6 +190,10 @@ def test_project_copy_helpers():
                 pass
             tier1 = os.path.join(root, "config_project", "systems", SYSTEM.id, "chain_reactions", "templates.yaml")
             ok(not os.path.exists(tier1), "nothing made at tier 1 - the project's own copy still runs")
+            with open(tier1, "w", encoding="utf-8") as handle:     # round 9 (#5): BOTH project tiers hold a copy -
+                handle.write("first: x\n")                         # the resolver runs tier 1, and so does the button
+            eq(os.path.normcase(find("chain_reactions/templates.yaml")), os.path.normcase(tier1), "(tier 1 runs)")
+            eq(files_view.project_copy_target(_SHIPPED), (tier1, None), "both tiers: the copy that runs - tier 1")
         finally:
             config.use_project(None)
 
@@ -864,6 +868,15 @@ def test_open_project_copy_goes_to_the_one_that_runs():
             eq(os.path.normcase(panel._cur), os.path.normcase(shared), "the project's own copy is shown - the one that runs")
             tier1 = os.path.join(project, "config_project", "systems", SYSTEM.id, "chain_reactions", "templates.yaml")
             ok(not os.path.exists(tier1), "nothing made at tier 1")
+            os.makedirs(os.path.dirname(tier1), exist_ok=True)      # round 9 (#5): both tiers - tier 1 runs
+            with open(tier1, "w", encoding="utf-8") as handle:
+                handle.write("first: x\n")
+            panel.refresh()
+            panel._load(_SHIPPED)
+            root.update()
+            panel._project_copy(_SHIPPED)
+            root.update()
+            eq(os.path.normcase(panel._cur), os.path.normcase(tier1), "both tiers: tier 1 is shown - the one that runs")
             eq(dialogs.asked, [], "no dialog asked")
     finally:
         config.use_project(None)

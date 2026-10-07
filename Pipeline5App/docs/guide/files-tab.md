@@ -90,7 +90,11 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
     a table loop variable its row (`{where(signals):>5}`, `{count(signals):s}` - every render fails);
   - a project parameter the template cannot use - its value is the same for every row, so the render
     fails wherever it is reached: a format spec it does not take (`{$_params.code:04d}` with
-    `code: 8X`), a range end it gives that is not a whole number (`1..{$_params.n}` with `n: 2.5`).
+    `code: 8X`; a date parameter takes a date's format - `{$_params.release:%Y-%m}`), a range end it
+    gives that is not a whole number (`1..{$_params.n}` with `n: 2.5`; a blank one is an empty range);
+  - a hole that fails whatever the row holds: a constant one whose render fails (`{"8X":04d}`), or a
+    `regex_replace` replacement the pattern cannot take - a group it does not have (`"\1"` with no
+    `( )` group), a letter escape (`"\s"`) - the fire refuses every row that reaches it.
 
   Warnings flag renders that succeed but probably are not what you meant:
   - a `where` that reads its own loop variable, or an `@if` that reads a loop row's missing column

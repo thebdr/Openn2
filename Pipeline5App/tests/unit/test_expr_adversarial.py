@@ -348,6 +348,33 @@ def test_lookup_and_unique_edges():
     eq(expr.evaluate("unique(type, signals)", ctx), ["DI", "DO"], "unique first-seen distinct")
 
 
+def test_a_replacement_re_sub_refuses_is_a_located_error():
+    """C-025 refute round 9 (#1), the C-002 surface: re.sub parses a replacement before it tries any match, so a
+    LITERAL one it refuses - a group the pattern lacks, a letter escape - fails every render, matched or not; the
+    builder's lint compiles only, and approved it. It is a located ExprError at COMPILE now, with the runtime's own
+    message (expr.check / check_template report it). And an unknown group NAME (`\\g<x>`) - Python raises
+    IndexError there, not re.error - escaped as a raw exception at render: a located ExprError now."""
+    def compile_error(src):
+        try:
+            expr.evaluate(src, {"x": "a-b"})
+        except ExprError as error:
+            return str(error)
+        return None
+    eq(compile_error(r'regex_replace($x, /-/, "\1")'),
+       r"regex_replace: bad replacement '\\1': invalid group reference 1 at position 1", "a group the pattern lacks")
+    eq(compile_error(r'regex_replace($x, /(a)(b)/, "\3")'),
+       r"regex_replace: bad replacement '\\3': invalid group reference 3 at position 1", "a group past the pattern's")
+    eq(compile_error(r'regex_replace($x, /-/, "\s")'), r"regex_replace: bad replacement '\\s': bad escape \s at "
+       "position 0", "a letter escape")
+    eq(compile_error(r'regex_replace($x, /-/, "\g<x>")'),
+       r"regex_replace: bad replacement '\\g<x>': unknown group name 'x'", "an unknown group NAME: located too")
+    eq([i.message for i in expr.check(r'regex_replace($x, /-/, "\1") = "z"')],
+       [r"regex_replace: bad replacement '\\1': invalid group reference 1 at position 1"], "expr.check reports it")
+    eq(expr.evaluate(r'regex_replace($x, /(a)-(b)/, "\2<\1>")', {"x": "a-b"}), "b<a>", "a valid one renders")
+    eq(expr.evaluate(r'regex_replace($x, /-/, $r)', {"x": "a-b", "r": "+"}), "a+b", "a data replacement: at render")
+    raises(ExprError, lambda: expr.render(r'{regex_replace($x, /-/, $r)}', {"x": "a-b", "r": r"\g<x>"}, mode="strict"))
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("expr_adversarial", [
@@ -378,4 +405,5 @@ if __name__ == "__main__":
         ("node_of_boundaries", test_node_of_boundaries),
         ("node_of_bad_byte_columns_skipped", test_node_of_bad_byte_columns_skipped),
         ("lookup_and_unique_edges", test_lookup_and_unique_edges),
+        ("a_replacement_re_sub_refuses_is_a_located_error", test_a_replacement_re_sub_refuses_is_a_located_error),
     ]))

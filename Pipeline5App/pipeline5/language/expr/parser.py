@@ -356,7 +356,10 @@ class _Parser:
     def _regex_replace(self):
         """regex_replace(value, /re/, replacement) - every match of the (implicit-IGNORECASE) regex in
         `value` replaced by `replacement` (re.sub semantics: \\1 group backrefs work). `value` and
-        `replacement` are full expressions; the pattern is a /regex/ literal (like extract's)."""
+        `replacement` are full expressions; the pattern is a /regex/ literal (like extract's). A LITERAL
+        replacement re.sub refuses (a group the pattern lacks, `\\s`) fails every render - whatever the
+        value, matched or not: it is a located error HERE, at compile, with the runtime's message (C-025
+        refute round 9: the builder's lint, which compiles, approved it)."""
         self._eat("(")
         value = self._or()
         self._eat(",")
@@ -365,8 +368,13 @@ class _Parser:
             raise ExprError(f"regex_replace: 2nd arg must be a /regex/ in {self.src!r}")
         pat = _compile_regex(rx, self.src)
         self._eat(",")
+        kind, val = self._peek()
+        after = self.toks[self.i + 1][1] if self.i + 1 < len(self.toks) else None
+        literal = _unescape(val[1:-1]) if kind == "string" and after == ")" else None
         replacement = self._or()
         self._eat(")")
+        if literal is not None:
+            runtime.regex_replace("", pat, literal)         # raises the runtime's own located ExprError
         return lambda ctx: runtime.regex_replace(value(ctx), pat, runtime.s(replacement(ctx)))
 
     def _slice(self):

@@ -88,10 +88,11 @@ def regex_replace(text, pattern, replacement: str) -> str:
     """Every match of `pattern` in `text` replaced by `replacement` (re.sub semantics - `\\1` group
     backrefs work; implicit IGNORECASE is baked into `pattern` by the parser). No match -> the text
     unchanged. A bad group reference in the replacement raises a located ExprError (fail-loud, like
-    a bad format spec)."""
+    a bad format spec) - an unknown group NAME too (`\\g<x>`: Python raises IndexError there, not
+    re.error - it escaped as a crash; C-025 refute round 9)."""
     try:
         return pattern.sub(replacement, s(text))
-    except re.error as e:
+    except (re.error, IndexError) as e:
         raise ExprError(f"regex_replace: bad replacement {replacement!r}: {e}")
 
 

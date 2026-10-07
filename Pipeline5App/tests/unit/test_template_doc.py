@@ -512,6 +512,46 @@ def test_the_fires_own_finding_comes_first():
                 config.use_project(None)
 
 
+def test_a_rule_on_a_hook_never_fired_previews_the_fires_finding():
+    """C-025 refute round 9 (#4): a rule on a hook the run-plan never fires (`after_30`) is dropped by every fire -
+    rx_unfired_hook - before the templates or the params load. With templates.yaml not UTF-8, or the params
+    unreadable, the builder previewed THAT file's finding ("it blocks every rule of after_30") and its check added
+    rx_params_unreadable - findings no fire gives for the rule. The hook is judged first now, as the halt is."""
+    import tempfile
+    from pipeline5 import config
+    from pipeline5.workbench import files_view
+    rules = [{"name": "belts", "fire_when": "after_30", "source_table": "", "condition": "", "action": "file",
+              "target": "gen/x.txt", "template": "belt", "comment": ""}]
+    for params_text, label in (("project_code: 8X\n", "templates.yaml not UTF-8"), ("broken: [unclosed\n", "both")):
+        with tempfile.TemporaryDirectory() as project, tempfile.TemporaryDirectory() as out, \
+                tempfile.TemporaryDirectory() as sandbox:
+            path = _cp1252_project(project, "# Température\nbelt: |-\n  X\n", params_text)
+            config.use_project(project)
+            original_dir = config.database_dir
+            config.database_dir = lambda: sandbox
+            try:
+                hooks = ("before_300", "after_300")
+                fired = [(f.type, f.location) for hook in hooks
+                         for f in engine.fire(hook, None if hook == "before_300" else _empty(), rules=rules,
+                                              hooks=hooks, files_root=out, write=False)[1]]
+                eq(sorted(set(fired)), [("rx_unfired_hook", "belts")], f"({label}: every fire's only finding)")
+                doc = td.parse(files_view.read_text_file(path)["text"])
+                session = td.Session(path, rows=rules, hooks={"before_300": None, "after_300": lambda s: _empty()})
+                shown = session.preview_text(doc, session.rules[0], 0).splitlines()
+                eq(shown[0], "rx_unfired_hook: hook 'after_30' is never fired by this run-plan (it fires: before_300, "
+                             "after_300)", f"{label}: the preview says the fire's finding")
+                eq([p.message for p in session.check(doc, session.rules[0]) if "rx_params_unreadable" in p.message],
+                   [], f"{label}: no params finding for a rule no fire reaches")
+            finally:
+                config.database_dir = original_dir
+                config.use_project(None)
+
+
+def _empty():
+    from pipeline5.truth.database import Database
+    return Database([])
+
+
 def test_the_saved_read_never_holds_the_file_while_it_parses():
     """C-025 refute round 8 (#1): every check reads the templates.yaml a fire reads - and the loader parsed INSIDE
     its `open`, so for the whole parse Windows refused to replace the file: a Save pressed meanwhile failed (the
@@ -801,6 +841,8 @@ if __name__ == "__main__":
         ("a_templates_file_a_fire_cannot_read_is_the_fires_finding",
          test_a_templates_file_a_fire_cannot_read_is_the_fires_finding),
         ("the_fires_own_finding_comes_first", test_the_fires_own_finding_comes_first),
+        ("a_rule_on_a_hook_never_fired_previews_the_fires_finding",
+         test_a_rule_on_a_hook_never_fired_previews_the_fires_finding),
         ("the_saved_read_never_holds_the_file_while_it_parses",
          test_the_saved_read_never_holds_the_file_while_it_parses),
         ("the_dry_settle_writes_nothing", test_the_dry_settle_writes_nothing),

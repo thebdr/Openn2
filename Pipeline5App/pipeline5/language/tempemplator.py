@@ -557,7 +557,9 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
             issues.extend((start + i.start, start + i.end, i.message, "error") for i in syntax)
             if syntax:
                 continue                                    # malformed: its fields cannot be read
-            problem = _spec_problem(spec) if spec is not None else None
+            bare = _BARE.fullmatch(expression.strip())          # a known `$_params` value: judged by ITSELF (a date
+            by_value = bool(bare) and bare.group(1).startswith("_params.") and isinstance(params, dict)   # takes
+            problem = _spec_problem(spec) if spec is not None and not by_value else None   # `%Y` - round 9)
             if problem:
                 issues.append((end - 1 - len(spec), end - 1, problem, "error"))
             paths = expr.hole_paths(text[start + 1:end - 1]) or ()
@@ -569,6 +571,11 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
             trouble = _spec_on_kind(expression, spec, loops, values, params) if spec and not problem else None
             if trouble:                                     # the kind the value IS (round 6)
                 issues.append((end - 1 - len(spec), end - 1, *trouble))
+            elif not problem and not paths and not row_reads(expression):
+                try:                                        # a CONSTANT hole: every render is this one (round 9 -
+                    render_text(text[start:end], {})        # `{"8X":04d}` linted clean, every fire failed)
+                except (ExprError, TempemplatorError) as error:
+                    issues.append((start, end, f"{error} - a constant: every render reaching it fails", "error"))
             issues.extend((s, e, message, "warning") for s, e, message in _row_read_problems(
                 start + 1, expression, tables) if (s, e, message, "warning") not in issues)
             for path in sorted(paths):
@@ -986,8 +993,9 @@ class _Lint:
                     except ValueError as error:
                         self.add(template, line_no, where, where + len(text), str(error))
                 elif not issues and self.params is not None and _params_only(text):
-                    try:                                    # an end the project params alone give: a constant
-                        _end_value(render_text(text, {"_params": self.params}), iterable)
+                    try:                                    # an end the project params alone give: a constant,
+                        _end_value(render_text(text, {"_params": self.params}).strip(), iterable)   # stripped as
+                                                            # `_iterate` strips it (a blank one: no iteration)
                     except ValueError as error:             # (C-025 refute round 8)
                         self.add(template, line_no, where, where + len(text),
                                  f"{error} - from the project params: every render reaching it fails")

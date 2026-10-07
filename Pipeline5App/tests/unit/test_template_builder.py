@@ -994,6 +994,80 @@ def test_a_params_value_a_spec_or_a_range_end_cannot_take_is_an_error():
     _sandboxed(body)
 
 
+def test_a_hole_that_fails_whatever_the_data_is_an_error():
+    """C-025 refute round 9 (#1): a hole that fails on EVERY row, whatever the data, linted clean - the lint checked
+    syntax only: a `regex_replace` replacement re.sub refuses (parsed before any match: a group the pattern lacks,
+    `\\s`, an unknown group name) and a CONSTANT hole whose render fails (`{"8X":04d}`). Errors now - the first at
+    compile (the C-002 surface: every lint that compiles reports it), the second rendered as every fire renders it:
+    in a text line, an untaken branch (lint = the preview of the row taking it = the fire), a row value, a target and
+    a predicate; a valid replacement (`<\\1>` with a group) and a constant that renders stay clean."""
+    import tempfile
+    bad = r'regex_replace($name, /-/, "\1")'
+    message = r"regex_replace: bad replacement '\\1': invalid group reference 1 at position 1"
+    templates = {"m": '@if $kind = "motor"\nM-{' + bad + '}\n@else\nD-{$name}\n@end',
+                 "s": r'{regex_replace($name, /-/, "\s")}', "g": r'{regex_replace($name, /-/, "\g<x>")}',
+                 "c": 'X-{"8X":04d}', "p": "@if " + bad + ' = "x"\ny\n@end',
+                 "ok": r'{regex_replace($name, /(\w)/, "<\1>")}{"12":04d}{concat("A", "B")}',
+                 "rows": [{"label": "L-{" + bad + "}"}]}
+    found = sorted((p.template, p.where, p.message) for p in engine.lint(templates) if p.severity == "error")
+    eq(found, sorted([("m", 2, message), ("rows", (1, "label"), message), ("p", 1, message),
+                      ("s", 1, r"regex_replace: bad replacement '\\s': bad escape \s at position 0"),
+                      ("g", 1, r"regex_replace: bad replacement '\\g<x>': unknown group name 'x'"),
+                      ("c", 1, "bad format spec '04d' for value '8X': could not convert string to float: '8X' - a "
+                               "constant: every render reaching it fails")]),
+       "each an error, where it sits - none in the valid template")
+    target = "gen/{" + bad + "}.txt"
+    rule = _rule(action="file", source_table="src", target=target, template="ok")
+    eq([(p.where, p.message) for p in engine.lint(templates, rule, _database()) if p.severity == "error"
+        and p.template is None], [("target", f"rule 'r1': target {target!r}: {message}")], "a target's too")
+
+    def body():
+        branch = _rule(action="file", source_table="src", target="out.txt", template="m")
+        with tempfile.TemporaryDirectory() as out:
+            _, findings = engine.fire("after_300", _database(), rules=[branch], templates=templates, params={},
+                                      files_root=out)
+            eq([(f.type, f.detail) for f in findings], [("rx_bad_template", f"template 'm' line 2: {message}")],
+               "(the fire: the motor row refused)")
+            door, motor = (engine.preview(branch, row, templates=templates, params={}, database=_database(),
+                                          files_root=out) for row in (0, 1))
+            eq((door.problem, door.text), (None, "D-D1"), "the door row's preview: rendered (the branch untaken)")
+            eq(motor.problem, (findings[0].type, findings[0].detail), "the motor row's: the fire's finding")
+            with open(os.path.join(out, "out.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "D-D1\n", "(the door row written before it)")
+    _sandboxed(body)
+
+
+def test_a_params_date_and_a_blank_range_end_render_as_the_fire_renders_them():
+    """C-025 refute round 9 (#2, #3) - two false errors of round 8's `$_params` check. The params loader types
+    `release: 2026-10-07` as a date, which takes a strftime spec (`%Y-%m`) - yet the generic "no value can satisfy"
+    check (text, int, float only) ran first; a known `$_params` value is judged by itself now (`%Y-%m-%d` still an
+    error - its `d` converts to an int, as in the fire). And a range end the params give as whitespace is blank once
+    stripped - an empty range, as `_iterate` strips it - not "must be numbers". Lint = preview = fire."""
+    import datetime
+    import tempfile
+    params = {"release": datetime.date(2026, 10, 7), "blank": " ", "three": " 3 "}
+    templates = {"d": "built {$_params.release:%Y-%m}", "e": "built {$_params.release:%Y-%m-%d}",
+                 "r": "@for $i in 1..{$_params.blank}: x{$i}\ndone", "t": "@for $i in 1..{$_params.three}: x{$i}"}
+    eq(sorted((p.template, p.message) for p in engine.lint(templates, params=params) if p.severity == "error"),
+       [("e", "bad format spec '%Y-%m-%d' for $_params.release - the project parameter is datetime.date(2026, 10, 7): "
+              "every render reaching it fails (bad format spec '%Y-%m-%d' for value datetime.date(2026, 10, 7): float() "
+              "argument must be a string or a real number, not 'datetime.date')")],
+       "the date under %Y-%m and the whitespace / spaced range ends: clean; %Y-%m-%d: an error")
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            for name, text in (("d", "built 2026-10"), ("r", "done"), ("t", "x1\nx2\nx3")):
+                rule = _rule(action="file", source_table="", condition="", target=f"{name}.txt", template=name)
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
+                                          files_root=out)
+                shown = engine.preview(rule, 0, templates=templates, params=params, database=_database(),
+                                       files_root=out)
+                with open(os.path.join(out, f"{name}.txt"), encoding="utf-8") as handle:
+                    eq((findings, shown.problem, shown.text, handle.read()), ([], None, text, text + "\n"),
+                       f"{name!r}: the fire and the preview render it")
+    _sandboxed(body)
+
+
 def test_a_row_read_warning_sits_on_its_own_token():
     """C-025 refute round 6 (#5): a missing column was found by searching its name from the call on - `{count(signals,
     "name" = $name)}` squiggled the string, `{lookup(signals, tag, first(nodes, $name = "x"), name)}` squiggled the
@@ -1052,4 +1126,7 @@ if __name__ == "__main__":
         ("a_targets_format_spec_is_tried_on_its_values", test_a_targets_format_spec_is_tried_on_its_values),
         ("a_params_value_a_spec_or_a_range_end_cannot_take_is_an_error",
          test_a_params_value_a_spec_or_a_range_end_cannot_take_is_an_error),
+        ("a_hole_that_fails_whatever_the_data_is_an_error", test_a_hole_that_fails_whatever_the_data_is_an_error),
+        ("a_params_date_and_a_blank_range_end_render_as_the_fire_renders_them",
+         test_a_params_date_and_a_blank_range_end_render_as_the_fire_renders_them),
     ]))
