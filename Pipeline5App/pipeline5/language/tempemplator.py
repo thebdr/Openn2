@@ -335,21 +335,33 @@ def _params_value(expression: str, params) -> tuple:
     return found.group(1), expr.evaluate("$" + found.group(1), {"_params": params})
 
 
+def _known(body: str, params) -> str | None:
+    """What a hole's value is known from WITHOUT a row: "constant" (it reads no field and no table), "params" (it reads
+    the project params alone, and they are known), else None - the row's data decides it (judged at render). A known
+    hole renders the same at every fire, so the lint renders it as they do (rounds 8-11: the manual's own guard idiom
+    `{coalesce($_params.release, ""):%Y-%m}` got the generic spec check's false error)."""
+    expression = _split_spec(body)[0].strip()
+    if row_reads(expression):
+        return None
+    paths = expr.hole_paths(body)
+    if not paths:
+        return "constant"
+    if isinstance(params, dict) and all(path.split(".", 1)[0] == "_params" for path in paths):
+        return "params"
+    return None
+
+
 def _constant_end(text: str, params) -> str | None:
-    """How a range end with holes is CONSTANT - "params" (every hole a constant or a known `$_params` path, one at
-    least), "constant" (every hole reads no field and no table) - or None: its value is the data's (judged at
-    render). A constant end renders the same at every fire, so the lint renders it as they do (rounds 8-10)."""
+    """How a range end with holes is KNOWN - "params" (every hole known, one from the params), "constant" (every hole a
+    constant) - or None: its value is the data's (judged at render)."""
     kinds = set()
     for kind, start, end in _scan(text):
         if kind != "hole":
             continue
-        expression = _split_spec(text[start + 1:end - 1])[0].strip()
-        if _params_value(expression, params)[0] is not None:
-            kinds.add("params")
-        elif not expr.hole_paths(text[start + 1:end - 1]) and not row_reads(expression):
-            kinds.add("constant")
-        else:
+        known = _known(text[start + 1:end - 1], params)
+        if known is None:
             return None
+        kinds.add(known)
     return ("params" if "params" in kinds else "constant") if kinds else None
 
 
@@ -581,10 +593,9 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
             if syntax:
                 continue                                    # malformed: its fields cannot be read
             paths = expr.hole_paths(text[start + 1:end - 1]) or ()
-            constant = not paths and not row_reads(expression)  # a known `$_params` value or a constant: judged by
-            by_value = constant or _params_value(expression, params)[0] is not None   # ITSELF (a date takes `%Y`;
-            problem = _spec_problem(spec) if spec is not None and not by_value else None   # a blank one any spec -
-            if problem:                                                                     # rounds 9-10)
+            known = _known(text[start + 1:end - 1], params)    # a constant / the params' value: judged by ITSELF (a
+            problem = _spec_problem(spec) if spec is not None and known is None else None   # date takes `%Y`; a
+            if problem:                                                                      # blank any spec)
                 issues.append((end - 1 - len(spec), end - 1, problem, "error"))
             if spec and not problem and json and len(paths) == 1:
                 path = next(iter(paths))
@@ -594,11 +605,12 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
             trouble = _spec_on_kind(expression, spec, loops, values, params) if spec and not problem else None
             if trouble:                                     # the kind the value IS (round 6)
                 issues.append((end - 1 - len(spec), end - 1, *trouble))
-            elif not problem and constant:
-                try:                                        # a CONSTANT hole: every render is this one (round 9 -
-                    render_text(text[start:end], {})        # `{"8X":04d}` linted clean, every fire failed)
-                except (ExprError, TempemplatorError) as error:
-                    issues.append((start, end, f"{error} - a constant: every render reaching it fails", "error"))
+            elif not problem and known is not None:
+                try:                                        # a KNOWN hole: every render is this one (round 9 -
+                    render_text(text[start:end], {"_params": params} if known == "params" else {})   # `{"8X":04d}`
+                except (ExprError, TempemplatorError) as error:                                   # linted clean)
+                    source = "a constant" if known == "constant" else "from the project params"
+                    issues.append((start, end, f"{error} - {source}: every render reaching it fails", "error"))
             issues.extend((s, e, message, "warning") for s, e, message in _row_read_problems(
                 start + 1, expression, tables) if (s, e, message, "warning") not in issues)
             for path in sorted(paths):

@@ -1175,6 +1175,53 @@ def test_a_constant_failure_is_judged_wherever_it_is_built():
     _sandboxed(body)
 
 
+def test_a_hole_reading_a_table_or_the_params_is_judged_as_it_renders():
+    """C-025 refute round 11 (#2, #3 + its note): a TABLE read makes a hole data - the lint must never fold it as a
+    constant (three guards, unpinned: removing them refused a `coalesce(lookup(...), "\\1")` replacement, a
+    `1..{if(count(src) > 0, "2", "x")}` end and an `{if(count(src) > 0, "7", "x"):03d}` hole that every fire renders);
+    a field only a replacement reads is the hole's (the strict missing field - lint = preview = fire); and a hole that
+    reads the project params ALONE is known - judged by its value: the manual's guard idiom
+    `{coalesce($_params.release, ""):%Y-%m}` renders (it got the generic spec check's false error), one the params
+    make fail is an error."""
+    import datetime
+    import tempfile
+    params = {"release": datetime.date(2026, 10, 7), "code": "8X", "n": 2.5}
+    templates = {"rep": '{regex_replace($name, /1/, coalesce(lookup(src, kind, "door", name), "\\1"))}',
+                 "end": '@for $i in 1..{if(count(src) > 0, "2", "x")}: y{$i}',
+                 "spec": '{if(count(src) > 0, "7", "x"):03d}',
+                 "guard": '{coalesce($_params.release, ""):%Y-%m}',
+                 "code": '{coalesce($_params.code, "x"):04d}', "pend": '@for $i in 1..{coalesce($_params.n, "3")}: z',
+                 "typo": "{regex_replace($name, /-/, $sepp)}"}
+    errors = sorted((p.template, p.message) for p in engine.lint(templates, params=params) if p.severity == "error")
+    eq(errors, [("code", "bad format spec '04d' for value '8X': could not convert string to float: '8X' - from the "
+                         "project params: every render reaching it fails"),
+                ("pend", "range ends must be whole, finite numbers: '1..{coalesce($_params.n, \"3\")}' ('2.5') - from "
+                         "the project params: every render reaching it fails")],
+       "a table read is data (none); the guard idiom renders; what the params make fail is an error")
+    rule = _rule(action="file", source_table="src", condition="", target="t.txt", template="typo")
+    eq([p.message for p in engine.lint(templates, rule, _database(), params=params) if p.template == "typo"],
+       ["missing field $sepp - not in scope here (the strict render raises)"], "a field only the replacement reads")
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            for name, text in (("rep", "DD1\nMD1"), ("end", "y1\ny2\ny1\ny2"), ("spec", "007\n007"),
+                               ("guard", "2026-10\n2026-10")):
+                rule = _rule(action="file", source_table="src", condition="", target=f"{name}.txt", template=name)
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
+                                          files_root=out)
+                with open(os.path.join(out, f"{name}.txt"), encoding="utf-8") as handle:
+                    eq((findings, handle.read()), ([], text + "\n"), f"{name!r}: the fire renders it - the lint clean")
+            for name in ("code", "pend", "typo"):
+                rule = _rule(action="file", source_table="src", condition="", target=f"{name}.txt", template=name)
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates=templates, params=params,
+                                          files_root=out)
+                shown = engine.preview(rule, 0, templates=templates, params=params, database=_database(),
+                                       files_root=out)
+                eq([f.type for f in findings], ["rx_bad_template"], f"{name!r}: (the fire refuses it)")
+                eq(shown.problem, (findings[0].type, findings[0].detail), f"{name!r}: the preview = the fire")
+    _sandboxed(body)
+
+
 def test_a_row_read_warning_sits_on_its_own_token():
     """C-025 refute round 6 (#5): a missing column was found by searching its name from the call on - `{count(signals,
     "name" = $name)}` squiggled the string, `{lookup(signals, tag, first(nodes, $name = "x"), name)}` squiggled the
@@ -1238,4 +1285,6 @@ if __name__ == "__main__":
          test_a_params_date_and_a_blank_range_end_render_as_the_fire_renders_them),
         ("a_nested_params_value_is_judged_by_itself", test_a_nested_params_value_is_judged_by_itself),
         ("a_constant_failure_is_judged_wherever_it_is_built", test_a_constant_failure_is_judged_wherever_it_is_built),
+        ("a_hole_reading_a_table_or_the_params_is_judged_as_it_renders",
+         test_a_hole_reading_a_table_or_the_params_is_judged_as_it_renders),
     ]))

@@ -74,21 +74,29 @@ def _read_yaml(path: str) -> dict:
     then parsed (a stream named as the file: every message the same): held open across the parse it refused
     the Files tab's Save - Windows replaces no file a reader holds (C-025 refute round 8: the template
     builder reads the file a fire reads on every check)."""
-    return _load_yaml(path) or {}
+    return _load_yaml(path)[1] or {}
 
 
-def _load_yaml(path: str):
-    """`_read_yaml`'s parse, the top level as YAML gives it: None for an EMPTY file (no document, comments only),
-    else whatever it holds - a falsy `[]` / `0` / `false` too (a loader that needs a mapping tells them apart -
-    C-024 refute round 28)."""
+def _load_yaml(path: str) -> tuple:
+    """(has_document, value) - `_read_yaml`'s parse, the top level as YAML gives it (a falsy `[]` / `0` / `false`
+    too), and whether the file holds a document at all: blank lines and comments only hold none; `null`, `~`, a
+    bare `---` hold one - a null one (both load as None - a loader that needs a mapping tells them apart: C-024
+    refute rounds 28-29)."""
     import io
     from ruamel.yaml import YAML
-    parser = YAML(typ="safe")
     with open(path, encoding="utf-8") as handle:
         text = handle.read()
     stream = io.StringIO(text)
     stream.name = path
-    return parser.load(stream)
+    value = YAML(typ="safe").load(stream)
+    return (True, value) if value is not None else (has_yaml_document(text), None)
+
+
+def has_yaml_document(text: str) -> bool:
+    """Whether YAML `text` holds a document - a null one (`null`, `~`, a bare `---`) included; blank lines and
+    comments only hold none. Composed, not loaded: both load as None."""
+    from ruamel.yaml import YAML
+    return YAML(typ="safe").compose(text) is not None
 
 
 def _resolve_path(base: str, value) -> str:

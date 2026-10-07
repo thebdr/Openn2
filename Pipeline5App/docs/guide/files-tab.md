@@ -92,12 +92,15 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
     the same for every row, so the render fails wherever it is reached: a format spec it does not take
     (`{$_params.code:04d}` with `code: 8X`; a date parameter takes a date's format -
     `{$_params.release:%Y-%m}`), a range end it gives that is not a whole number (`1..{$_params.n}`
-    with `n: 2.5`; a blank one is an empty range);
+    with `n: 2.5`; a blank one is an empty range). A hole that reads the parameters alone is judged by
+    what it renders with them: the guard idiom `{coalesce($_params.release, ""):%Y-%m}` is clean
+    while `release` is a date, `{coalesce($_params.code, "x"):04d}` with `code: 8X` an error;
   - a hole that fails whatever the row holds: a constant one whose render fails (`{"8X":04d}`), a range
     end of constants (`1..{"2.5"}`), or a `regex_replace` replacement the pattern cannot take - a group
     it does not have (`"\1"` with no `( )` group), a letter escape (`"\s"`) - written as it is or built
-    from constants (`concat("\1", "_")`): the fire refuses every row that reaches it. (A replacement
-    that reads a field, a table, or a name a `let` around it binds is the row's: judged as it renders.)
+    from constants (`concat("\1", "_")`): the fire refuses every row that reaches it. (A hole, a
+    range end or a replacement that reads a field, a table - `count(signals)`, `lookup(...)` - or a
+    name a `let` around it binds is the row's: judged as it renders.)
 
   Warnings flag renders that succeed but probably are not what you meant:
   - a `where` that reads its own loop variable, or an `@if` that reads a loop row's missing column

@@ -66,10 +66,27 @@ def test_a_yaml_error_is_located():
     ok(doc.text[placed[0].start:].startswith(("more", "\n", "bad", " [")) or placed[0].start >= doc.text.index("bad"),
        f"at the broken line or after it ({placed[0].start})")
     eq(td.parse("- a\n- b\n").error[1], "templates.yaml must be a mapping of named templates", "a list")
-    for falsy in ("[]\n", "false\n", "0\n", "''\n"):                 # C-024 refute round 28: a FALSY top level is no
+    for falsy in ("[]\n", "false\n", "0\n", "''\n", "null\n", "~\n", "---\n"):   # C-024 rounds 28-29: a FALSY top
+                                                                     # level, a NULL document, is no
         eq(td.parse(falsy).error, (0, "templates.yaml must be a mapping of named templates"), f"{falsy!r}")  # mapping
     for empty in ("", "# only a comment\n", "\n"):                   # - as the fire's loader; an EMPTY document is
         eq((td.parse(empty).error, td.parse(empty).templates), (None, {}), f"{empty!r}: no templates")   # none
+
+
+def test_a_merge_key_or_an_omap_parses_as_the_loader_reads_it():
+    """C-025 refute round 11 (#1): a key a YAML merge `<<` or an `!!omap` brought records no position in the round-trip
+    tree - ruamel answers None, and the parse crashed (TypeError): the template mode's every check, preview and
+    highlight stopped while the fire read the file and fired. The parse reads such an entry as the loader does, its
+    positions unknown (placed on the entry's key)."""
+    from ruamel.yaml import YAML
+    for text in ('spawn_a: [&diag {label: "A-{$name}"}]\nspawn_b: [<<: *diag]\nnote: "{$name:03D}"\n',
+                 'base: &b {label: "x"}\nrows: [<<: *b]\nnote: "{$name:03D}"\n',
+                 '!!omap\n- rows: [{label: "y"}]\n- note: "{$name:03D}"\n'):
+        doc = td.parse(text)
+        eq((doc.error, doc.templates), (None, YAML(typ="safe").load(text)), f"{text!r}: the loader's reading")
+        found = [p.message for p in td.place(doc, engine.lint(doc.templates)) if p.label.startswith("note")]
+        eq(len(found), 1, f"{text!r}: the lint shown - {found}")
+        ok("bad format spec '03D'" in found[0], found[0])
 
 
 def test_two_layer_highlight():
@@ -858,6 +875,7 @@ if __name__ == "__main__":
     sys.exit(run("template_doc", [
         ("positions_are_exact", test_positions_are_exact),
         ("a_yaml_error_is_located", test_a_yaml_error_is_located),
+        ("a_merge_key_or_an_omap_parses_as_the_loader_reads_it", test_a_merge_key_or_an_omap_parses_as_the_loader_reads_it),
         ("two_layer_highlight", test_two_layer_highlight),
         ("problems_land_on_the_culprit", test_problems_land_on_the_culprit),
         ("completions", test_completions),

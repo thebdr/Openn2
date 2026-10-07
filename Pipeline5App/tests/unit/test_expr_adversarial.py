@@ -375,6 +375,37 @@ def test_a_replacement_re_sub_refuses_is_a_located_error():
     raises(ExprError, lambda: expr.render(r'{regex_replace($x, /-/, $r)}', {"x": "a-b", "r": r"\g<x>"}, mode="strict"))
 
 
+def test_a_replacement_reads_and_binds_as_the_rest_of_its_hole():
+    """C-024 refute round 29 (G1, G2): C-025 round 10 parses a `regex_replace` replacement with its OWN sub-parser
+    (to tell a constant one) - its free fields MERGED into the hole's, the enclosing let's names passed down; none of
+    it was pinned here. A field only the replacement reads is the hole's: strict says it is missing, keep keeps the
+    hole; a name the hole's own let binds is no field. A replacement CONSTANT in itself (concat, parentheses, an inner
+    let) is refused at compile with the runtime's message; one reading a name an enclosing let binds, or a table, is
+    data - compiled clean, judged as it renders (evaluated without them it would be refused falsely)."""
+    eq(expr.hole_paths("regex_replace($x, /-/, $typo)"), frozenset({"x", "typo"}), "the replacement's field: the hole's")
+    try:
+        expr.render("{regex_replace($x, /-/, $typo)}", {"x": "a-b"}, mode="strict")
+        ok(False, "strict: a field only the replacement reads is missing")
+    except ExprError as error:
+        ok(str(error).startswith("render(strict): missing field $typo"), str(error))
+    eq(expr.render("{regex_replace($x, /-/, $typo)}", {"x": "a-b"}, mode="keep"), "{regex_replace($x, /-/, $typo)}",
+       "keep: the hole kept")
+    hole = '{let(s := "+"; regex_replace($x, /-/, $s))}'
+    eq((expr.hole_paths(hole[1:-1]), expr.render(hole, {"x": "a-b"}, mode="strict")), (frozenset({"x"}), "a+b"),
+       "a name the hole's let binds: no field - the replacement reads it")
+    group = r"regex_replace: bad replacement '\\1': invalid group reference 1 at position 1"
+    for replacement, message in ((r'concat("\1", "_")', group.replace(r"'\\1'", r"'\\1_'")), (r'("\1")', group),
+                                 (r'let(v := "\1"; $v)', group)):
+        eq([issue.message for issue in expr.check(f"regex_replace($x, /-/, {replacement})")], [message],
+           f"{replacement}: constant in itself - refused at compile")
+    outer = r'{let(n := "1"; regex_replace($name, /(D)/, concat("x\\", $n)))}'
+    table = r'{regex_replace($name, /(D)/, concat("x\\", lookup(grp, key, "door", g)))}'
+    ctx = {"name": "D1", "_db": {"grp": [{"key": "door", "g": "1"}]}}
+    for text in (outer, table):
+        eq((expr.check_template(text), expr.render(text, ctx, mode="strict")), ([], "xD1"),
+           f"{text}: data (an enclosing let's name / a table) - compiled clean, rendered")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("expr_adversarial", [
@@ -406,4 +437,6 @@ if __name__ == "__main__":
         ("node_of_bad_byte_columns_skipped", test_node_of_bad_byte_columns_skipped),
         ("lookup_and_unique_edges", test_lookup_and_unique_edges),
         ("a_replacement_re_sub_refuses_is_a_located_error", test_a_replacement_re_sub_refuses_is_a_located_error),
+        ("a_replacement_reads_and_binds_as_the_rest_of_its_hole",
+         test_a_replacement_reads_and_binds_as_the_rest_of_its_hole),
     ]))

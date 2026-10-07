@@ -166,8 +166,10 @@ def parse(text: str) -> Doc:
         mark = getattr(error, "problem_mark", None) or getattr(error, "context_mark", None)
         where = offset(mark.line, mark.column) if mark is not None else 0
         return Doc(text, {}, {}, (min(where, len(text)), f"templates.yaml does not load: {error}"))
-    if templates is None:                                     # an EMPTY document: no templates (a falsy `[]` /
-        templates = {}                                        # `false` is no mapping - C-024 refute round 28)
+    if templates is None:                                     # an EMPTY document - blank / comments: no templates;
+        from pipeline5.config.params import has_yaml_document  # a NULL one (`null`, `~`, `---`) or a falsy `[]` is
+        if not has_yaml_document(text):                       # no mapping - as the fire's loader (C-024 refute
+            templates = {}                                    # rounds 28-29)
     if not isinstance(templates, dict):                       # (the fire's loader refuses it, in these words)
         from pipeline5.config.loaders import TEMPLATES_NOT_A_MAPPING
         return Doc(text, {}, {}, (0, TEMPLATES_NOT_A_MAPPING))
@@ -215,11 +217,16 @@ def _child(tree, key):
 
 
 def _mark(node, part: str, key) -> tuple:
-    """(line, column) of a mapping's key / value in the round-trip tree - (None, None) when unknown."""
+    """(line, column) of a mapping's key / value in the round-trip tree - (None, None) when unknown (a key a YAML
+    merge `<<` or an `!!omap` brought records none: ruamel answers None, and the parse crashed - C-025 refute round
+    11: the editor's every check stopped while the fire read the file)."""
     try:
         for candidate in node:                  # the rt tree may key it as another type (123 vs "123")
             if str(candidate) == str(key):
-                return getattr(node.lc, part)(candidate)
+                found = getattr(node.lc, part)(candidate)
+                if isinstance(found, (tuple, list)) and len(found) == 2:
+                    return found[0], found[1]
+                return None, None
     except Exception:  # noqa: BLE001
         pass
     return None, None

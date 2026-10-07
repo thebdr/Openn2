@@ -1570,7 +1570,8 @@ def test_a_templates_file_that_is_no_mapping_is_unreadable():
         try:
             with tempfile.TemporaryDirectory() as out:
                 for text in ("- rows\n- header\n", "- rows:\n    - label: x\n", "rows and header\n", "42\n", "true\n",
-                             "[]\n", "0\n", "false\n", "''\n", "0.0\n"):      # (round 28: a FALSY one too)
+                             "[]\n", "0\n", "false\n", "''\n", "0.0\n",       # (round 28: a FALSY one too;
+                             "null\n", "~\n", "--- null\n", "---\n"):         # round 29: a NULL document too)
                     with open(path, "w", encoding="utf-8") as handle:
                         handle.write(text)
                     eq(engine.saved_templates_problem().detail, detail, f"{text!r}: (the builder's saved-file check)")
@@ -1627,6 +1628,43 @@ def test_a_replacement_inside_a_predicate_or_a_let_names_its_own_cause():
                                               files_root=out)
                     eq([(f.type, f.detail) for f in findings], [("rx_bad_template", detail)],
                        f"{hole} in {rule['template']} -> {rule['target']}: the replacement's own cause")
+    _sandboxed(body)()
+
+
+def test_a_replacements_fields_are_its_holes_through_the_fire():
+    """C-024 refute round 29 (G1, G2) through the fire: the replacement's own sub-parser (C-025 round 10) must hand
+    its fields to the hole - a typo only the replacement reads is the strict render's missing field (a text line, a
+    row value) or the loop-column error, never a render that writes and audits ok - and its enclosing let's names
+    down (a name the hole binds renders). A condition whose replacement is CONSTANT in itself is refused at compile
+    even over an empty source, where no evaluation would ever meet it."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out:
+            typo = "regex_replace($name, /D/, $typo)"
+            for rule, templates, needle in (
+                    (_rule(action="file", condition="", target="t.txt", template="t"), {"t": "n={" + typo + "}"},
+                     "missing field $typo"),
+                    (_rule(condition="", template="r"), {"r": [{"label": "L{" + typo + "}"}]}, "missing field $typo"),
+                    (_rule(action="file", source_table="", condition="", target="l.txt", template="l"),
+                     {"l": "@for $r in src: {regex_replace($r.name, /D/, $r.nmae)}"}, "nmae")):
+                database, findings = engine.fire("after_300", _db(), rules=[rule], templates=templates, params={},
+                                                 files_root=out)
+                eq([(f.type, needle in f.detail) for f in findings], [("rx_bad_template", True)],
+                   f"{templates}: the replacement's field judged as the hole's - {[f.detail for f in findings]}")
+                eq([row["label"] for row in database["dst"]], [], "(nothing spawned)")
+            eq(os.listdir(out), [], "nothing written")
+            rule = _rule(action="file", condition="", target="s.txt", template="s")
+            _, findings = engine.fire("after_300", _db(), rules=[rule], params={}, files_root=out,
+                                      templates={"s": '{let(sep := "+"; regex_replace($name, /D/, $sep))}'})
+            with open(os.path.join(out, "s.txt"), encoding="utf-8") as handle:
+                eq((findings, handle.read()), ([], "+1\n+2\nM1\n"), "a name the hole's let binds: rendered")
+            empty = Database([Table("src", columns=["uid", "kind", "name"], key_columns=["name"]),
+                              Table("dst", columns=["uid", "label", "spawned_by", "source_uid"], key_columns=["label"])])
+            condition = 'regex_replace($name, /-/, concat("\\\\1", "_")) = "x"'
+            database, findings = engine.fire("after_300", empty, rules=[_rule(condition=condition)],
+                                             templates=_ROW_TPL, params={})
+            eq([(f.type, f.location) for f in findings], [("rx_bad_condition", "r1")],
+               "a constant concat-built replacement in a condition: refused at compile - over an EMPTY source too")
+            eq(_log(database), [], "…the rule dropped, no audit row")
     _sandboxed(body)()
 
 
@@ -1783,6 +1821,7 @@ if __name__ == "__main__":
         ("a_templates_file_that_is_no_mapping_is_unreadable", test_a_templates_file_that_is_no_mapping_is_unreadable),
         ("a_replacement_inside_a_predicate_or_a_let_names_its_own_cause",
          test_a_replacement_inside_a_predicate_or_a_let_names_its_own_cause),
+        ("a_replacements_fields_are_its_holes_through_the_fire", test_a_replacements_fields_are_its_holes_through_the_fire),
         ("every_path_windows_would_misdirect_is_refused_before_the_write",
          test_every_path_windows_would_misdirect_is_refused_before_the_write),
         ("fire_empty_hook_is_a_strict_noop", test_fire_empty_hook_is_a_strict_noop),
