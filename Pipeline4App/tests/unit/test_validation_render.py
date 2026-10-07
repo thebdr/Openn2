@@ -25,6 +25,22 @@ def test_address_format_and_kind():
     eq((address.kind("i7.0"), address.norm("  q 0.1 ")), ("I", "Q0.1"))
 
 
+def test_address_normalize_dotted():
+    nd = address.normalize_dotted
+    eq(nd("I.645.1"), "I645.1", "the dot after the area letter dropped")
+    eq(nd("Q.1484.0"), "Q1484.0")
+    eq(nd("q.2.3"), "q2.3", "case kept; only the dot goes")
+    eq(nd(" I.645.1"), " I645.1", "leading space kept (the readers strip/normalize)")
+    eq(nd("I645.1"), "I645.1", "already standard -> unchanged")
+    eq(nd("I.645"), "I.645", "not a full byte.bit address -> unchanged")
+    eq(nd("I.0.1.2.3"), "I0.1.2.3", "4-part form too")
+    eq(nd("X.1.0"), "X.1.0", "not an I/Q/O area -> unchanged")
+    eq(nd(""), "", "blank")
+    eq(nd(None), None, "a non-string passes through")
+    ok(not address.format_ok("I.645.1") and address.format_ok(nd("I.645.1")),
+       "the raw dotted form fails the format check; its normalized form passes")
+
+
 # --- the renderer ------------------------------------------------------------------------------ #
 def test_banner_lines_and_render():
     findings = [_banner(110, "Validate I/O List"),
@@ -119,6 +135,7 @@ if __name__ == "__main__":
     import sys
     sys.exit(run("validation_render", [
         ("address_format_and_kind", test_address_format_and_kind),
+        ("address_normalize_dotted", test_address_normalize_dotted),
         ("banner_lines_and_render", test_banner_lines_and_render),
         ("info_block_columns", test_info_block_columns),
         ("crosscheck_cmp_and_dual_link", test_crosscheck_cmp_and_dual_link),

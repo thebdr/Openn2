@@ -14,7 +14,7 @@ import os
 
 from pipeline4.core import config
 from pipeline4.io import workbook as wbk
-from pipeline4.domain.validation import model as vm
+from pipeline4.domain.validation import address as adr, model as vm
 
 
 def build_io_index(rows) -> dict:
@@ -58,12 +58,15 @@ def read_ce_refs(params: dict) -> tuple:
     """Read every C&E reference -> (refs, sheet_count). Each ref:
     {sheet, addr(norm), raw_addr, key(FLD), raw_fld, loc('sheet!cell')}. Reads the CAUSE&EFFECT MATRIX
     (address col F + FLD cols J/K/L) + the AREA n sheets (address col C keyed by concat_id col A) via the
-    PL4 matrix_params. May raise FileLockedError."""
+    PL4 matrix_params. May raise FileLockedError. With matrix_params.normalize_dotted_address the raw
+    address is rewritten 'I.x.y' -> 'Ix.y' first (it then meets the staged, normalized I/O List bits)."""
     path = params.get("matrix_path") or ""
     doc = os.path.basename(path)
     cemap = {m["canonical"]: m["column"] for m in config.load_column_map("CE")}
     areamap = {m["canonical"]: m["column"] for m in config.load_column_map("AREA")}
     refs, sheets = [], 0
+    dotted = bool(config.get_param(params, "matrix_params.normalize_dotted_address", False))
+    norm_addr = adr.normalize_dotted if dotted else (lambda v: v)
 
     # --- CAUSE&EFFECT MATRIX: address (col F) + matrix-side FLD (cols J/K/L) --- #
     mhr = int(config.get_param(params, "matrix_params.ce_sheet.header_row", 2) or 2)
@@ -76,7 +79,7 @@ def read_ce_refs(params: dict) -> tuple:
     if mv is not None:
         sheets += 1
         for r in mv.data_rows():
-            raw_a = mv.text(r, cemap["address"])
+            raw_a = norm_addr(mv.text(r, cemap["address"]))
             fu, lo, de = (mv.text(r, cemap["functional_unit"]), mv.text(r, cemap["location"]),
                           mv.text(r, cemap["device"]))
             a, k = vm.addr(raw_a), vm.key(fu, lo, de)
@@ -94,7 +97,7 @@ def read_ce_refs(params: dict) -> tuple:
     for av in avs:
         sheets += 1
         for r in av.data_rows():
-            raw_a = av.text(r, areamap["address"])
+            raw_a = norm_addr(av.text(r, areamap["address"]))
             a = vm.addr(raw_a)
             if not a:
                 continue

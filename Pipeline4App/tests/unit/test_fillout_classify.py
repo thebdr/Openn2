@@ -47,6 +47,10 @@ def test_out_ladder():
     eq(_t(bit="Q0.0", desc_l1="SAFETY RELAY"), "KQ", "safety relay output (desc1)")
     eq(_t(bit="Q0.1", desc_l1="DOOR OPEN"), "DQ", "door open output")
     eq(_t(bit="Q0.2", desc_l1="DOOR", desc_l1b="LAMP"), "DL", "door lamp")
+    eq(_t(bit="Q1484.0", desc_l1="EMERGENCY PUSH BUTTON LAMP", desc_l1b="=ES-0001"), "EL", "e-stop lamp")
+    eq(_t(bit="Q1484.1", desc_l1="EMERGENCY PUSH-BUTTON", desc_l1b="LAMP =ES-0002"), "EL", "e-stop lamp, split")
+    eq(_t(bit="I1484.0", desc_l1="EMERGENCY PUSH BUTTON PRESSED", desc_l1b="CH1"), "E1/2",
+       "the button itself (an input) stays E1/2")
     eq(_t(bit="Q0.3", desc_l1="OUTPUT", desc_l1b="EMERGENCY AREA 2"), "Z2", "emergency-area output")
     eq(_t(bit="Q0.4", desc_l1="SOME UNRECOGNISED OUTPUT"), "<input required>", "OUT catch-all -> sentinel")
 

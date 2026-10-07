@@ -17,12 +17,21 @@ import re
 from openpyxl.utils import column_index_from_string as _ci
 
 from pipeline4.core import config
+from pipeline4.domain.validation import address as _address
 from pipeline4.io import workbook
 
 
 def _norm(value) -> str:
     """Address/marker key: whitespace removed, upper-cased."""
     return "".join(str(value or "").split()).upper()
+
+
+def _addr_key(params: dict):
+    """The C&E address key function: `_norm`, after the dotted-area rewrite ('I.x.y' -> 'Ix.y') when the
+    project sets matrix_params.normalize_dotted_address (so it meets the staged, normalized I/O List bits)."""
+    if config.get_param(params, "matrix_params.normalize_dotted_address", False):
+        return lambda v: _norm(_address.normalize_dotted(_s(v)))
+    return _norm
 
 
 def _s(value) -> str:
@@ -53,6 +62,7 @@ def area_lookup(params: dict) -> tuple:
     cemap = {m["canonical"]: m["column"] for m in config.load_column_map("CE")}
     areamap = {m["canonical"]: m["column"] for m in config.load_column_map("AREA")}
     area_re = _area_regex(params)
+    addr_key = _addr_key(params)
 
     # --- CAUSE&EFFECT MATRIX: input address -> areas marked X + the matrix-side FLD ---
     area_cols = []   # ordered (col_index, area_name) of the matrix EFFECT/area columns
@@ -68,7 +78,7 @@ def area_lookup(params: dict) -> tuple:
             if name and (area_re is None or area_re.search(name)):
                 area_cols.append((c, name))
         for r in range(dr, ws.max_row + 1):
-            addr = _norm(ws.cell(r, addr_c).value)
+            addr = addr_key(ws.cell(r, addr_c).value)
             if not addr:
                 continue
             inputs[addr] = {
@@ -86,7 +96,7 @@ def area_lookup(params: dict) -> tuple:
     for sheet in area_sheets:
         a = wb[sheet]
         for r in range(adr, a.max_row + 1):
-            q = _norm(a.cell(r, out_addr_c).value)
+            q = addr_key(a.cell(r, out_addr_c).value)
             if not q:
                 continue
             entry = outputs.setdefault(q, {"areas": [], "numerazione_linea": ""})

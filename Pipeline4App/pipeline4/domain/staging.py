@@ -26,6 +26,7 @@ from pipeline4.core.keys import uid as content_uid
 from pipeline4.domain import identity, matrix
 from pipeline4.domain.diagnosis_entries import diagnosis_cabinets_table
 from pipeline4.domain.signals import signals_table
+from pipeline4.domain.validation import address
 from pipeline4.io import workbook
 
 _DIAGBLOCKS_SHEETS = frozenset({"diagnosisblocks", "diagnosticblocks"})   # current + legacy spelling
@@ -128,14 +129,18 @@ def load_diagnosis_blocks(io_path: str) -> dict:
     return out
 
 
-def _read_view(view, colmap, strike_exclude, signal_types) -> list:
+def _read_view(view, colmap, strike_exclude, signal_types, normalize_address=False) -> list:
     """The kept rows of one sheet: a dict per data row keyed by canonical column, + source provenance +
-    the resolved `type`. Drops fully-empty, Skip-Reason, and (when excluding) struck rows."""
+    the resolved `type`. Drops fully-empty, Skip-Reason, and (when excluding) struck rows.
+    `normalize_address` (iolist_params.normalize_dotted_address) rewrites a dotted-area 'I.x.y' bit to
+    'Ix.y', so every downstream phase sees the standard form."""
     rows = []
     for r in view.data_rows():
         if all(view.text(r, m["column"]) == "" for m in colmap):
             continue
         row = {m["canonical"]: view.text(r, m["column"]) for m in colmap}
+        if normalize_address and "bit" in row:
+            row["bit"] = address.normalize_dotted(row["bit"])
         row["source_row"] = r
         row["source_sheet"] = view.name
         if _skip_reason_present(row.get("skip_reason")):
@@ -156,6 +161,7 @@ def _read_iolist(params: dict, signal_types: dict, io_path: str) -> tuple:
     strike_exclude = str(config.get_param(params, "validation_params.global.strike_handling", "exclude")
                          ).strip().lower() == "exclude"
     sheet_pattern = config.get_param(params, "iolist_params.sheets")
+    normalize_address = bool(config.get_param(params, "iolist_params.normalize_dotted_address", False))
 
     # merge the per-type diagnosis attrs onto each type record BEFORE resolving (so the staged `type`
     # object carries in_diag/diag_logic/tristate/tristate_desc - in_diag also lights up the phase-400
@@ -175,7 +181,7 @@ def _read_iolist(params: dict, signal_types: dict, io_path: str) -> tuple:
 
     rows = []
     for view in views:
-        rows.extend(_read_view(view, colmap, strike_exclude, signal_types))
+        rows.extend(_read_view(view, colmap, strike_exclude, signal_types, normalize_address))
     views[0].close()
     return rows, matched
 

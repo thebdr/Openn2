@@ -107,6 +107,22 @@ def test_iolist_addr_format_and_fg():
     ok(("addr_format", "FAIL") in found and ("fg_exclusion", "FAIL") in found)
 
 
+def test_iolist_addr_format_dotted_convention():
+    """'I.645.1' FAILs addr_format by default; with iolist_params.normalize_dotted_address (the project's
+    declared convention) 110 judges the address as staging reads it -> no FAIL. A malformed address still
+    FAILs either way."""
+    def run_with(normalize):
+        v = StubView("IO", config.load_column_map("IoList"), {
+            2: _iorow(functional_unit="=S1", bit="I.645.1"),
+            3: _iorow(functional_unit="=S2", bit="I:0.0"),
+        })
+        return [f for f in _run_iolist([v], {"iolist_params": {"sheets": "IO", "header_row": 1,
+                                                                "normalize_dotted_address": normalize}})
+                if f.type == "addr_format"]
+    eq(sorted(f.location for f in run_with(False)), ["IO!G2", "IO!G3"], "default: the dotted form FAILs")
+    eq([f.location for f in run_with(True)], ["IO!G3"], "convention on: only the Rockwell colon FAILs")
+
+
 def test_iolist_dup_ip_and_fld():
     cm = config.load_column_map("IoList")
     v = StubView("IO", cm, {
@@ -180,6 +196,7 @@ if __name__ == "__main__":
         ("iolist_missing", test_iolist_missing),
         ("iolist_clean_row_passes", test_iolist_clean_row_passes),
         ("iolist_addr_format_and_fg", test_iolist_addr_format_and_fg),
+        ("iolist_addr_format_dotted_convention", test_iolist_addr_format_dotted_convention),
         ("iolist_dup_ip_and_fld", test_iolist_dup_ip_and_fld),
         ("iolist_permanent_part_and_ts", test_iolist_permanent_part_and_ts),
         ("iolist_col_wrong_header", test_iolist_col_wrong_header),

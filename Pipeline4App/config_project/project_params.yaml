@@ -13,9 +13,11 @@ iolist_params:
   header_row: 1
   insert_interface_sheets: true                           # the interface sheets created as output are added to the workbook
   diag_bits_range: [0, 62]                                # valid diagnosis bit range (inclusive); ph200 §8 diag allocation reads this (node non-P up from min / P down from max)
+  normalize_dotted_address: false                         # true: the document writes 'I.645.1' -> read as 'I645.1' (staging; 110 judges the read form)
 
 matrix_params:
   sorter_areas: [1]                                       # the Sorter area numbers (matched against the C&E areas)
+  normalize_dotted_address: false                         # true: the C&E writes 'I.645.1' -> read as 'I645.1' (C&E annotation + 130/140)
 
   ce_sheet:
     name: "CAUSE&EFFECT MATRIX"       # a single sheet name, a list of names or a regular expression

@@ -61,6 +61,9 @@ def run_iolist(params: dict) -> list:
     hr = int(config.get_param(params, "iolist_params.header_row", 1) or 1)
     strike_error = str(config.get_param(params, "validation_params.global.strike_handling", "exclude")).lower() == "error"
     perm = {_clean(p) for p in (config.get_param(params, "validation_params.iolist.permanent_parts", []) or [])}
+    # the project's declared dotted-area convention ('I.x.y'): judge the address as staging will read it
+    dotted = bool(config.get_param(params, "iolist_params.normalize_dotted_address", False))
+    as_read = adr.normalize_dotted if dotted else (lambda a: a)
 
     try:
         views = wbk.open_sheets(io_path, sheet_pat, hr, doc_label=doc)
@@ -134,7 +137,7 @@ def run_iolist(params: dict) -> list:
             if g and f:
                 out.append(vm.entry("FAIL", 110, "fg_exclusion", location=v.location(r, col["bit"]), doc=doc, info=info))
             # address format
-            if g and not adr.format_ok(g):
+            if g and not adr.format_ok(as_read(g)):
                 out.append(vm.entry("FAIL", 110, "addr_format", location=v.location(r, col["bit"]), doc=doc, info=info))
             # permanent part (A / W)
             if thw in ("A", "W"):

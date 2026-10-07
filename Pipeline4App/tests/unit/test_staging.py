@@ -80,6 +80,92 @@ def test_read_view_keeps_struck_when_not_excluding():
         v.close()
 
 
+def test_read_view_normalizes_dotted_address():
+    """iolist_params.normalize_dotted_address: the staged bit is 'Ix.y' (the document keeps 'I.x.y')."""
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "io.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "NET SAFETY 50"
+        for col, head in zip("ABCDEF", ["FU", "Loc", "Dev", "Type", "Bit", "Skip"]):
+            ws[f"{col}1"] = head
+        ws["A2"] = "S1"; ws["D2"] = "DI1/2"; ws["E2"] = "I.645.1"
+        ws["A3"] = "S2"; ws["D3"] = "DI1/2"; ws["E3"] = "Q12.3"
+        wb.save(p)
+        v = workbook.open_sheet(p, "NET SAFETY 50", 1)
+        eq([r["bit"] for r in staging._read_view(v, _COLMAP, True, _TYPES)], ["I.645.1", "Q12.3"],
+           "default: the bit as written")
+        eq([r["bit"] for r in staging._read_view(v, _COLMAP, True, _TYPES, normalize_address=True)],
+           ["I645.1", "Q12.3"], "normalized: the dotted area dropped, a standard bit untouched")
+        v.close()
+
+
+def test_read_iolist_honors_normalize_param():
+    """The project parameter iolist_params.normalize_dotted_address reaches the reader (the shipped
+    column map: functional unit O, bit G)."""
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "io.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "NET SAFETY 50"
+        ws["O2"], ws["G2"] = "S1", "I.645.1"
+        wb.save(p)
+        for flag, want in ((False, "I.645.1"), (True, "I645.1")):
+            params = {"iolist_params": {"sheets": "NET SAFETY 50", "header_row": 1,
+                                        "normalize_dotted_address": flag}}
+            rows, matched = staging._read_iolist(params, {}, p)
+            eq((matched, [r["bit"] for r in rows]), (["NET SAFETY 50"], [want]), f"normalize={flag}")
+
+
+def _ce_workbook(path):
+    """A minimal C&E: the matrix (header 2, data 5; address F, FLD J/K/L, area column N) + one AREA sheet
+    (header 3, data 4; sigla A, address C) - both addresses in the dotted-area form."""
+    wb = Workbook()
+    m = wb.active
+    m.title = "CAUSE&EFFECT MATRIX"
+    m["F2"], m["J2"], m["K2"], m["L2"], m["N2"] = "BIT (ADDRESS)", "FUNCTIONAL UNIT", "LOCATION", "DEVICE", "AREA 1"
+    m["F5"], m["J5"], m["K5"], m["L5"], m["N5"] = "I.0.1", "S1", "-AE01", "-S1", "X"
+    a = wb.create_sheet("AREA 1")
+    a["A3"], a["C3"] = "SIGLA CONTATTORE", "DIGITAL OUTPUT"
+    a["A4"], a["C4"] = "S1-AE01-Q1", "Q.1.0"
+    wb.save(path)
+
+
+def _ce_params(path, normalize):
+    return {"matrix_path": path, "matrix_params": {
+        "normalize_dotted_address": normalize,
+        "ce_sheet": {"name": "CAUSE&EFFECT MATRIX", "header_row": 2, "data_row": 5},
+        "area_sheets": {"name": "/AREA\\s?\\d{1,2}/gmi", "header_row": 3, "data_row": 4}}}
+
+
+def test_matrix_area_lookup_normalizes_dotted_address():
+    """matrix_params.normalize_dotted_address: the C&E annotation keys meet the staged 'Ix.y' bits."""
+    from pipeline4.domain import matrix
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "ce.xlsx"); _ce_workbook(p)
+        ins, outs, _ = matrix.area_lookup(_ce_params(p, False))
+        eq((sorted(ins), sorted(outs)), (["I.0.1"], ["Q.1.0"]), "default: keyed as written")
+        ins, outs, _ = matrix.area_lookup(_ce_params(p, True))
+        eq((sorted(ins), sorted(outs)), (["I0.1"], ["Q1.0"]), "normalized keys")
+        eq(ins["I0.1"]["areas"], ["AREA 1"], "the X mark still lands on its area")
+        rows = [{"bit": "I0.1"}, {"bit": "Q1.0"}]
+        matrix.annotate(_ce_params(p, True), rows)
+        eq([r.get("matrix_areas") for r in rows], [["AREA 1"], ["AREA 1"]],
+           "a normalized staged bit finds its C&E input + its AREA-sheet output")
+
+
+def test_ce_refs_read_normalizes_dotted_address():
+    """The 130/140 C&E reader honors the same matrix_params.normalize_dotted_address."""
+    from pipeline4.domain.validation import ce_refs
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "ce.xlsx"); _ce_workbook(p)
+        refs, _ = ce_refs.read_ce_refs(_ce_params(p, False))
+        eq(sorted(r["addr"] for r in refs), ["I.0.1", "Q.1.0"], "default: as written")
+        refs, _ = ce_refs.read_ce_refs(_ce_params(p, True))
+        eq(sorted(r["addr"] for r in refs), ["I0.1", "Q1.0"], "normalized: meets the staged bits")
+        eq(sorted(r["raw_addr"] for r in refs), ["I0.1", "Q1.0"], "the displayed address is the read form too")
+
+
 def test_is_sorter_area_number_to_name():
     names = staging._sorter_area_names({"matrix_params": {"sorter_areas": [1]}})
     eq(names, {"AREA 1"}, "sorter number 1 -> area name 'AREA 1'")
@@ -211,6 +297,10 @@ if __name__ == "__main__":
         ("combined_fld_appends_ce_when_different", test_combined_fld_appends_ce_when_different),
         ("read_view_drops_skip_and_struck", test_read_view_drops_skip_and_struck),
         ("read_view_keeps_struck_when_not_excluding", test_read_view_keeps_struck_when_not_excluding),
+        ("read_view_normalizes_dotted_address", test_read_view_normalizes_dotted_address),
+        ("read_iolist_honors_normalize_param", test_read_iolist_honors_normalize_param),
+        ("matrix_area_lookup_normalizes_dotted_address", test_matrix_area_lookup_normalizes_dotted_address),
+        ("ce_refs_read_normalizes_dotted_address", test_ce_refs_read_normalizes_dotted_address),
         ("is_sorter_area_number_to_name", test_is_sorter_area_number_to_name),
         ("node_address_ranges_positional", test_node_address_ranges_positional),
         ("node_address_range_empty_when_no_addressed_rows", test_node_address_range_empty_when_no_addressed_rows),

@@ -56,6 +56,28 @@ def test_family_for_longest_prefix():
     eq(fam.family_for("", _FAMS), None, "blank -> None")
 
 
+def test_shipped_el_joins_emergency_pb():
+    """The shipped object_families: EL (the lamp of a luminous e-stop) is a member of the emergency_pb
+    family - it takes the index of the E1/2 with the same FLD (the channel-2 inherit), and it counts as
+    that E1/2's partner (a single-row CH1\\CH2 e-stop with a lamp is not an orphan). A lamp with no e-stop
+    of its FLD stays unresolved; an e-stop with neither E2/2 nor lamp is still an orphan."""
+    shipped = fam.load_object_families()
+    el = fam.family_for("EL", shipped)
+    eq((el.key, el.link), ("E", LINK_CHANNEL), "EL -> the emergency_pb family (channel link)")
+    rows = [_row("e1", "E1/2", fld="=ES-1", channel="1", source_row=1),
+            _row("f1", "E2/2", fld="=ES-1", channel="2", source_row=2),
+            _row("l1", "EL", fld="=ES-1", source_row=3),
+            _row("e2", "E1/2", fld="=ES-2", channel="1", source_row=4),      # single row + lamp
+            _row("l2", "EL", fld="=ES-2", source_row=5),
+            _row("e3", "E1/2", fld="=ES-3", channel="1", source_row=6),      # no partner at all
+            _row("l9", "EL", fld="=ES-9", source_row=7)]                    # a lamp with no e-stop
+    got = ix.assign_indices(rows, shipped)
+    eq((got["e1"], got["f1"], got["l1"]), ("0001", "0001", "0001"), "the pair + its lamp share the index")
+    eq((got["e2"], got["l2"]), ("0002", "0002"), "a single-row e-stop with a lamp resolves; the lamp inherits")
+    eq(got["e3"], INPUT_REQUIRED, "an e-stop with neither E2/2 nor lamp stays an orphan")
+    eq(got["l9"], INPUT_REQUIRED, "a lamp whose FLD has no e-stop is unresolved")
+
+
 # --- role_of for each link kind ------------------------------------------------------------------ #
 def test_role_of_each_link():
     eq(ix.role_of(_res(_row("u", "E1/2", channel="1"))), ix.ANCHOR, "channel ch1 -> anchor")
@@ -172,6 +194,7 @@ if __name__ == "__main__":
     import sys
     sys.exit(run("fillout_index", [
         ("family_for_longest_prefix", test_family_for_longest_prefix),
+        ("shipped_el_joins_emergency_pb", test_shipped_el_joins_emergency_pb),
         ("role_of_each_link", test_role_of_each_link),
         ("channel2_fld_inherit", test_channel2_fld_inherit),
         ("channel2_fld_mismatch_unresolved", test_channel2_fld_mismatch_unresolved),

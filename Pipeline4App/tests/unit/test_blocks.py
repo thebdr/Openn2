@@ -114,7 +114,27 @@ def test_builder_02_em_push_button_groups_inputs():
     eq(len(t), 1, "4 inputs (E1/2 + B1/2) -> one chunk of 4")
     eq(t.rows[0]["instanceOf-00_Push-Button_Input"], "EMPB_n1_1")
     quartet = ["PB0", "PB1", "PB2", "BRK0"]
-    eq(t.rows[0]["ITERATOR_STRINGS"], quartet + quartet, "the padded quartet emitted twice")
+    pads = [builders.PAD] * 4
+    eq(t.rows[0]["ITERATOR_STRINGS"], quartet + quartet + pads,
+       "the padded quartet emitted twice, then the lamp quartet (no EL rows -> all PAD)")
+
+
+def test_builder_02_lamps_by_fld():
+    """v1.2: Lamp_1..4 = each channel's EL lamp (the EL row with the same I/O-List FLD, its PLC tag);
+    PAD for a breaker / a button without a lamp / an unused slot. The FLD match ignores spacing + case."""
+    node = _node("n1", "1.2.3.4", i0="0", i1="20", q0="0", q1="20")
+    ins = [{"script_type": "E1/2", "bit": "I0.0", "name_in_db": "PB0", "iol_FLD": "=ES -0001"},
+           {"script_type": "E1/2", "bit": "I0.1", "name_in_db": "PB1", "iol_FLD": "=ES -0002"},   # no lamp
+           {"script_type": "B1/2", "bit": "I0.2", "name_in_db": "BRK0", "iol_FLD": "=TRIB -Q11501"}]
+    lamps = [{"script_type": "EL", "bit": "Q0.0", "iol_FLD": "=es-0001", "name_in_tagtable": "LAMP ES-0001"},
+             {"script_type": "EL", "bit": "Q0.5", "iol_FLD": "=ES-0001", "name_in_tagtable": "LAMP DUP"},  # 2nd: ignored
+             {"script_type": "EL", "bit": "Q0.6", "iol_FLD": "=ES-0099", "name_in_tagtable": "LAMP ORPHAN"}]
+    t = builders.build_02_em_push_button(Database([node] + ins + lamps))
+    eq(len(t), 1, "the 3 inputs -> one chunk; the EL rows are not channels")
+    it = t.rows[0]["ITERATOR_STRINGS"]
+    eq(len(it), 12, "3 quartets -> the v1.2 template's 12 iterator slots")
+    eq(it[8:], ["LAMP ES-0001", builders.PAD, builders.PAD, builders.PAD],
+       "lamp by FLD (first one), PAD for the lamp-less button, the breaker and the unused slot")
 
 
 def test_area_descriptions_reads_list_cells():
@@ -577,6 +597,7 @@ if __name__ == "__main__":
         ("builder_06_feedback_error_chunks_to_8", test_builder_06_feedback_error_chunks_to_8),
         ("builder_07_speed_control_pairs_encoders", test_builder_07_speed_control_pairs_encoders),
         ("builder_02_em_push_button_groups_inputs", test_builder_02_em_push_button_groups_inputs),
+        ("builder_02_lamps_by_fld", test_builder_02_lamps_by_fld),
         ("area_descriptions_reads_list_cells", test_area_descriptions_reads_list_cells),
         ("builder_03_zone_cumulative_per_area_group", test_builder_03_zone_cumulative_per_area_group),
         ("builder_04_estop_feature_types", test_builder_04_estop_feature_types),

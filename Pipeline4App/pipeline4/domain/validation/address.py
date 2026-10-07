@@ -10,6 +10,17 @@ from __future__ import annotations
 import re
 
 _NUMERIC = re.compile(r"\d+(?:\.\d+)*$")
+_DOTTED_AREA = re.compile(r"^(\s*[IQOiqo])\.(?=\s*\d+\s*\.\s*\d)")
+
+
+def normalize_dotted(value):
+    """A project convention writes a dot after the area letter ('I.645.1', 'Q.1484.0'). Drop that one dot
+    -> the standard form ('I645.1', 'Q1484.0'); anything else (already standard, blank, a non-address)
+    is returned unchanged. Applied where the documents are READ when the project turns on
+    `iolist_params` / `matrix_params` `normalize_dotted_address`."""
+    if not isinstance(value, str):
+        return value
+    return _DOTTED_AREA.sub(r"\1", value, count=1)
 
 
 def norm(value) -> str:
