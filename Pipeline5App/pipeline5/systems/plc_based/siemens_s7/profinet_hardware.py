@@ -19,6 +19,10 @@ for both severities, so the uid - which excludes severity - survives a descripti
 level. Note: doc-validation 110 deliberately exempts `.1`-suffixed IPs from `ip_duplicated`, so this
 build-side skip is where the redundant-CPU pair is handled.
 
+A model's station I/O address template (DTD col 7, `%I%`/`%Q%`[+N]) is placed at the station's LOWEST I/O-List
+address per direction. A direction with no row leaves its entries unplaceable: they are DROPPED (never written as
+a literal `%Q%` the importer cannot convert) with a **`hw_addr_unresolved` WARN** - TIA places that submodule.
+
 - **Station**: name = Profinet name, Model Id = Part No (spaces stripped), Subnet from the IP, group =
   `<FunctionalUnit>_IODevices` - EMPTY for the Plc head (the PLC stays at the TIA root; OP honors Group
   for every row, 2026-07-07). Custom Parameters = the DTD "I/O Addresses Parameter" (`%I%`/`%Q%` -> the
@@ -153,6 +157,9 @@ def _merge_params(*blobs) -> str:
     return " | ".join(values[k] if values[k] is not None else k for k in order)
 
 
+_UNRESOLVED_RX = re.compile(r"%([IQ])%", re.IGNORECASE)
+
+
 def _resolve_addr_template(template, i_base, q_base) -> str:
     """Replace %I%/%Q% (with optional +N) by the device start bytes."""
     def repl(m):
@@ -224,6 +231,21 @@ def extract(rows, dtd) -> tuple:
         q_base = min(sig_q) if sig_q else None
 
         io_addr = _resolve_addr_template(rec["io_addr_params"], i_base, q_base)
+        # an entry whose %I%/%Q% found no base (the station has no row of that direction) is DROPPED, never
+        # written as a literal the importer cannot read - TIA places that submodule itself ([[C-028]])
+        kept = [e for e in (p.strip() for p in io_addr.split("|")) if e]
+        unresolved = [e for e in kept if _UNRESOLVED_RX.search(e)]
+        if unresolved:
+            kept = [e for e in kept if e not in unresolved]
+            io_addr = " | ".join(kept)
+            where = _where(row)
+            missing = sorted({m.group(1).upper() for e in unresolved for m in _UNRESOLVED_RX.finditer(e)})
+            findings.append(_f("hw_addr_unresolved", "WARN",
+                               f"station {str(row.get('profinet_name') or '').strip()!r} ({model}): no "
+                               + " / ".join({"I": "input", "Q": "output"}[d] for d in missing)
+                               + f" row to place {len(unresolved)} start-address entr"
+                               + ("y" if len(unresolved) == 1 else "ies") + " - left to TIA",
+                               where, str(row.get("uid", "")), doc=_io_doc() if "!" in where else ""))
         station_params = _merge_params(io_addr, str(row.get("hardware_params") or ""))
         stations.append({
             "role": cur["role"], "station_name": str(row.get("profinet_name") or "").strip(),

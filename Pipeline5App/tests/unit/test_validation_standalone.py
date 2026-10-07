@@ -5,6 +5,8 @@ import re
 
 from openpyxl.utils import column_index_from_string as _ci, get_column_letter
 
+import os
+
 from _harness import run, eq, ok
 from pipeline5 import config
 from pipeline5.phases.validation import iolist_checks as iolist
@@ -175,6 +177,48 @@ def test_ce_area_outputs_only_and_dup():
     ok(("dup_addr", "FAIL") in found, "a repeated address within a sheet -> dup_addr")
 
 
+_DOTTED = r"(?P<direction>[IQ])\.?(?P<byte>\d+)\.(?P<bit>\d+)"
+
+
+def test_iolist_dotted_notation_well_formed():
+    """C-022 completion: under the project's dotted notation a dotted address is well formed (no 110
+    addr_format); under the TIA default the same cell is malformed."""
+    from pipeline5.truth import addresses
+    rows = {2: _iorow(functional_unit="=S1", bit="I.645.1", type_hw="KI")}
+    found_default = _types(_run_iolist([StubView("IO", config.load_column_map("IoList"), rows)]))
+    ok(("addr_format", "FAIL") in found_default, "TIA notation: a dot after the direction is malformed")
+    addresses.configure_address_format(_DOTTED, None)
+    try:
+        found = _types(_run_iolist([StubView("IO", config.load_column_map("IoList"), rows)]))
+        ok(("addr_format", "FAIL") not in found, "the project notation: well formed")
+    finally:
+        addresses.configure_address_format(None, None)
+
+
+def test_ce_dotted_kinds_and_dup():
+    """C-022 completion: the C&E checks (120) read the canonical spelling - the kind of a dotted address,
+    and a duplicate written once dotted and once canonical."""
+    from pipeline5.truth import addresses
+    addresses.configure_address_format(_DOTTED, None)
+    try:
+        ce = config.load_column_map("CE")
+        ca = {m["canonical"]: m["column"] for m in ce}["address"]
+        mv = StubView("MATRIX", ce, {6: {ca: "Q.0.0"}, 7: {ca: "I.1.0"}})
+        ok(("matrix_addr_kind", "FAIL") in _types(_run_ce(mv, [])), "a dotted output on the matrix is wrong")
+        mv2 = StubView("MATRIX", ce, {6: {ca: "I.1.0"}, 7: {ca: "I1.0"}})
+        found_m = _types(_run_ce(mv2, []))
+        ok(("dup_addr", "FAIL") in found_m, "I.1.0 and I1.0 on the matrix are one address -> dup_addr")
+        ok(("matrix_addr_kind", "FAIL") not in found_m, "dotted inputs on the matrix are fine")
+        area = config.load_column_map("AREA")
+        aa = {m["canonical"]: m["column"] for m in area}["address"]
+        av = StubView("AREA 1", area, {5: {aa: "Q.1.0"}, 6: {aa: "Q1.0"}})
+        found = _types(_run_ce(None, [av]))
+        ok(("dup_addr", "FAIL") in found, "Q.1.0 and Q1.0 are one address -> dup_addr")
+        ok(("area_addr_kind", "FAIL") not in found, "dotted outputs on an AREA sheet are fine")
+    finally:
+        addresses.configure_address_format(None, None)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("validation_standalone", [
@@ -187,4 +231,6 @@ if __name__ == "__main__":
         ("ce_absent_skips", test_ce_absent_skips),
         ("ce_matrix_inputs_only", test_ce_matrix_inputs_only),
         ("ce_area_outputs_only_and_dup", test_ce_area_outputs_only_and_dup),
+        ("iolist_dotted_notation_well_formed", test_iolist_dotted_notation_well_formed),
+        ("ce_dotted_kinds_and_dup", test_ce_dotted_kinds_and_dup),
     ]))

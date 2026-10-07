@@ -16,5 +16,6 @@ priority,gate,when,type,comment
 41,Out,"clean($desc_l1) ~ /DOOR.*OPEN$|SOLENOID.*CONTROL/",DQ,door open / solenoid control (desc part 1)
 42,Out,"clean($desc_l1b) ~ /(SAFE.*(RELAY|CONTACTOR)|CUT.OFF.*AREA)/",KQ,safety relay / cut-off area (desc part 2)
 43,Out,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /DOOR.*LAMP/",DL,door lamp
+43,Out,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /EMERGENCY PUSH.BUTTON LAMP/",EL,emergency push-button lamp
 44,Out,"clean($desc_l1b) ~ /EMERGENCY AREA \d/","Z{extract(clean($desc_l1b),/AREA ./,-1:)}",emergency-area output
 45,Out,"len(clean(join(' ', $desc_l1, $desc_l1b))) > 3",<input required>,OUT catch-all -> sentinel

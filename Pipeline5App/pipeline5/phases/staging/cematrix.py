@@ -18,6 +18,7 @@ from openpyxl.utils import column_index_from_string as _ci
 
 from pipeline5 import config
 from pipeline5.documents import xlsx_reader as workbook
+from pipeline5.truth.addresses import key as _addr_key   # [[C-022]]: the canonical spelling
 
 
 def _norm(value) -> str:
@@ -68,7 +69,7 @@ def area_lookup(params: dict) -> tuple:
             if name and (area_re is None or area_re.search(name)):
                 area_cols.append((c, name))
         for r in range(dr, ws.max_row + 1):
-            addr = _norm(ws.cell(r, addr_c).value)
+            addr = _addr_key(ws.cell(r, addr_c).value)
             if not addr:
                 continue
             inputs[addr] = {
@@ -86,7 +87,7 @@ def area_lookup(params: dict) -> tuple:
     for sheet in area_sheets:
         a = wb[sheet]
         for r in range(adr, a.max_row + 1):
-            q = _norm(a.cell(r, out_addr_c).value)
+            q = _addr_key(a.cell(r, out_addr_c).value)
             if not q:
                 continue
             entry = outputs.setdefault(q, {"areas": [], "numerazione_linea": ""})
@@ -118,7 +119,7 @@ def annotate(params: dict, rows: list) -> list:
     inputs, outputs, area_desc = area_lookup(params)
     found = {}
     for row in rows:
-        bit = _norm(row.get("bit"))
+        bit = _addr_key(row.get("bit"))
         head = bit[:1]
         if head == "I":
             found[id(row)] = dict(inputs.get(bit) or {})

@@ -204,6 +204,67 @@ def test_dup_type_index_findings():
     eq(staging._dup_type_index_findings(signals_table(cols)), [], "no rows -> no findings")
 
 
+_DOTTED = r"(?P<direction>[IQ])\.?(?P<byte>\d+)\.(?P<bit>\d+)"
+
+
+def test_read_view_stores_the_canonical_address():
+    """C-022 completion: under a dotted project notation the staged `bit` is the canonical spelling, so every
+    later phase sees one spelling; a canonical cell stays as it is."""
+    from pipeline5.truth import addresses
+    addresses.configure_address_format(_DOTTED, None)
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "io.xlsx")
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "NET SAFETY 50"
+            for col, head in zip("ABCDEF", ["FU", "Loc", "Dev", "Type", "Bit", "Skip"]):
+                ws[f"{col}1"] = head
+            ws["A2"] = "S1"; ws["B2"] = "+SG1"; ws["C2"] = "-B1"; ws["D2"] = "DI1/2"; ws["E2"] = "I.645.1"
+            ws["A3"] = "S2"; ws["B3"] = "+SG2"; ws["C3"] = "-B2"; ws["D3"] = "DI1/2"; ws["E3"] = "I645.2"
+            wb.save(p)
+            v = workbook.open_sheet(p, "NET SAFETY 50", 1)
+            rows = staging._read_view(v, _COLMAP, True, _TYPES)
+            v.close()
+        eq([r["bit"] for r in rows], ["I645.1", "I645.2"], "a dotted cell stored canonical; a canonical one kept")
+    finally:
+        addresses.configure_address_format(None, None)
+
+
+def test_cematrix_matches_a_dotted_ce():
+    """C-022 completion (FVT LaPoste): the C&E written in the project's notation (`I.645.1` on the matrix,
+    `Q.742.0` on an AREA sheet) matches the staged canonical rows - areas, C&E designation, line number."""
+    from pipeline5.phases.staging import cematrix
+    from pipeline5.truth import addresses
+    addresses.configure_address_format(_DOTTED, None)
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "ce.xlsx")
+            wb = Workbook()
+            m = wb.active
+            m.title = "CAUSE&EFFECT MATRIX"
+            m["F2"] = "BIT (ADDRESS)"; m["S2"] = "AREA 1"; m["T2"] = "AREA 2"
+            m["F5"] = "I.645.1"; m["J5"] = "=TRIB"; m["K5"] = "-CA01"; m["L5"] = "-B1"; m["S5"] = "X"
+            a = wb.create_sheet("AREA 1")
+            a["A3"] = "SIGLA"; a["B3"] = "NUMERAZIONE LINEA"; a["C3"] = "DIGITAL OUTPUT"
+            a["A4"] = "=TRIB-MA01-AEC2-K50001"; a["B4"] = "=TRIB-MA01-AEC2"; a["C4"] = "Q.742.0"
+            for c in (m["J5"], a["A4"], a["B4"]):
+                c.data_type = "s"            # a designation, not a formula (openpyxl reads a leading "=" as one)
+            wb.save(p)
+            params = {"matrix_path": p, "matrix_params": {
+                "ce_sheet": {"name": "CAUSE&EFFECT MATRIX", "header_row": 2, "data_row": 5},
+                "area_sheets": {"name": "/^AREA \\d/", "header_row": 3, "data_row": 4}}}
+            rows = [{"bit": "I645.1"}, {"bit": "Q742.0"}, {"bit": "I1.0"}]
+            cematrix.annotate(params, rows)
+        eq(rows[0].get("matrix_areas"), ["AREA 1"], "the dotted matrix address matched the staged input")
+        eq((rows[0].get("ce_functional_unit"), rows[0].get("ce_device")), ("=TRIB", "-B1"), "its C&E designation")
+        eq(rows[1].get("matrix_areas"), ["AREA 1"], "the dotted AREA-sheet address matched the staged output")
+        eq(rows[1].get("numerazione_linea"), "=TRIB-MA01-AEC2", "its line number")
+        ok(not rows[2].get("matrix_areas"), "an address the C&E does not list stays without areas")
+    finally:
+        addresses.configure_address_format(None, None)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("staging", [
@@ -220,4 +281,6 @@ if __name__ == "__main__":
         ("finalize_identity_ce_overwrite", test_finalize_identity_ce_overwrite),
         ("annotate_cematrix_records_and_restamps", test_annotate_cematrix_records_and_restamps),
         ("load_io_list_no_match_returns_empty", test_load_io_list_no_match_returns_empty),
+        ("read_view_stores_the_canonical_address", test_read_view_stores_the_canonical_address),
+        ("cematrix_matches_a_dotted_ce", test_cematrix_matches_a_dotted_ce),
     ]))

@@ -34,8 +34,10 @@ def is_output(value) -> bool:
 def format_ok(value) -> bool:
     """True when `value` is an acceptable address (or not an address attempt at all). False only for a
     malformed dotted/colon address: a Rockwell colon, a bad leading letter, a non-numeric byte/segment,
-    or a dot-count other than 2 or 4."""
-    a = norm(value)
+    or a dot-count other than 2 or 4. Judged on the CANONICAL spelling ([[C-022]]): an address written in
+    the active notation (a project's `I.645.1`) is a well-formed address; under the TIA default the
+    canonical spelling is the value itself, so the verdict is unchanged."""
+    a = norm(canonical(value))
     if not a:
         return True                       # empty: nothing to validate
     if ":" in a:
@@ -89,28 +91,70 @@ def _canonical(direction: str):
     return None
 
 
+# --- the CANONICAL spelling ([[C-022]] completion) ------------------------------------------------- #
+# The notation is INPUT-only: a document cell is parsed through it, and what the pipeline stores and emits
+# is the canonical spelling `<I|Q><byte>.<bit>` (the TIA form - tags prefix '%'). Staging stores it in the
+# signals table, so every later phase sees one spelling whatever the documents write.
+_CANONICAL_RX = re.compile(r"(?P<direction>[IQ])(?P<byte>\d+)\.(?P<bit>\d+)", re.IGNORECASE)
+
+
+def parse(value):
+    """(canonical 'I'|'Q', byte, bit) of an address written in the ACTIVE notation - or already in the
+    canonical spelling (what staging stores, so a stored address parses under any notation); None when
+    the cell is not an address. Whitespace inside the cell is tolerated (`I 12.3`, `I. 645.1`) - the
+    tolerance the matching key and the hardware / block address readers already have: the cell is
+    tried as written (trimmed - a notation may spell a space), then with all whitespace removed."""
+    s = str(value if value is not None else "").strip()
+    compact = "".join(s.split())
+    for cell in dict.fromkeys((s, compact)):
+        m = _format["rx"].fullmatch(cell)
+        if m:
+            d = _canonical(m.group("direction"))
+            if d is not None:
+                try:
+                    return d, int(m.group("byte")), int(m.group("bit"))
+                except (ValueError, IndexError):
+                    pass
+    m = _CANONICAL_RX.fullmatch(compact)
+    if m:
+        return m.group("direction").upper(), int(m.group("byte")), int(m.group("bit"))
+    return None
+
+
+def canonical(value):
+    """The canonical spelling of an address cell (`I.645.1` under a dotted notation -> `I645.1`); any value
+    that is not an address in the active notation comes back UNCHANGED (an ID, a blank, a typo - left for
+    the format check to judge)."""
+    p = parse(value)
+    if p is None:
+        return value
+    d, byte, bit = p
+    return f"{d}{byte}.{bit}"
+
+
+def key(value) -> str:
+    """Address KEY for matching across documents: the canonical spelling, whitespace removed, upper-cased -
+    so the I/O List and the C&E match whatever notation each writes."""
+    return norm(canonical(value))
+
+
 def has_io_prefix(bit) -> bool:
     """True when the cell STARTS with one of the notation's direction tokens - the taggable-I/O
-    predicate (`identity.is_io_signal`), deliberately looser than a full address parse."""
+    predicate (`identity.is_io_signal`), deliberately looser than a full address parse. The canonical
+    letters I / Q count under any notation - staging stores the canonical spelling ([[C-022]])."""
     first = str(bit or "").strip().upper()[:1]
-    return first in _format["tokens"]["input"] or first in _format["tokens"]["output"]
+    return (first in _format["tokens"]["input"] or first in _format["tokens"]["output"]
+            or first in ("I", "Q"))
 
 
 # --- positional Profinet-node lookup (moved from the diagnosis chapter - coupling truths #2/#g) --- #
 def addr_byte(bit):
     """(canonical 'I'|'Q', byte) parsed from the ACTIVE notation's full address (`I100.3` ->
     ('I', 100) under the TIA default); None when the cell is not an address. The kernel's node
-    ranges (I_/Q_ startByte/endByte) key on the CANONICAL direction, whatever the system spells."""
-    m = _format["rx"].fullmatch(str(bit or "").strip())
-    if not m:
-        return None
-    kind_ = _canonical(m.group("direction"))
-    if kind_ is None:
-        return None
-    try:
-        return kind_, int(m.group("byte"))
-    except (ValueError, IndexError):
-        return None
+    ranges (I_/Q_ startByte/endByte) key on the CANONICAL direction, whatever the system spells. The
+    canonical spelling staging stores ([[C-022]]) is read too, under any notation - ONE parser, `parse`."""
+    p = parse(bit)
+    return (p[0], p[1]) if p else None
 
 
 def node_of(rows, row):

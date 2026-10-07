@@ -224,6 +224,24 @@ def test_duplicate_interface_tag_links_the_source_signal_row():
     eq((dups[0].doc, dups[0].doc2), ("IOList.xlsx", ""), "doc only on a Sheet!Cell location")
 
 
+def test_canonical_address_tagged_under_a_project_notation():
+    """C-022 completion: staging stores the canonical spelling, so under a project notation whose direction
+    tokens are not I/Q (here the German `%E645-1`) the signal is still taggable and its tag address is the
+    TIA `%I645.1` - never the document's spelling."""
+    from pipeline5.truth import addresses
+    addresses.configure_address_format(r"%(?P<direction>[EA])(?P<byte>\d+)-(?P<bit>\d+)",
+                                       {"input": ["E"], "output": ["A"]})
+    try:
+        sig = {"script_type": "DI1/2", "bit": addresses.canonical("%E645-1"), "name_in_tagtable": "PB STOP",
+               "tagtable": "EMERGENCY_PushButtons",
+               "type": {"type_id": "DI1/2", "category": "Safety", "io_comment": "[ {$script_type} ]"}}
+        res, rows, _p = _project(signals=[sig])
+        eq(res["io_count"], 1, "the canonical spelling is a taggable I/O signal under any notation")
+        eq(rows[1][3], "%I645.1", "the tag address is the canonical spelling, %-prefixed")
+    finally:
+        addresses.configure_address_format(None, None)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("io_tags", [
@@ -240,4 +258,6 @@ if __name__ == "__main__":
         ("duplicate_name_across_tables_is_by_design", test_duplicate_name_across_tables_is_by_design),
         ("duplicate_interface_tag_links_the_source_signal_row",
          test_duplicate_interface_tag_links_the_source_signal_row),
+        ("canonical_address_tagged_under_a_project_notation",
+         test_canonical_address_tagged_under_a_project_notation),
     ]))

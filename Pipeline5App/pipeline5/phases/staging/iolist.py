@@ -138,6 +138,7 @@ def _read_view(view, colmap, strike_exclude, signal_types) -> list:
         if all(view.text(r, m["column"]) == "" for m in colmap):
             continue
         row = {m["canonical"]: view.text(r, m["column"]) for m in colmap}
+        row["bit"] = _canonical_addr(row.get("bit"))      # [[C-022]]: stored canonical, whatever the notation
         row["source_row"] = r
         row["source_sheet"] = view.name
         if _skip_reason_present(row.get("skip_reason")):
@@ -243,6 +244,7 @@ def _is_sorter_area(row: dict, sorter_names: set) -> str:
 # the configurable per-system notation (P-010) - one parser for staging, diagnosis,
 # coverage, and the risky-index fill.
 from pipeline5.truth.addresses import addr_byte as _addr_byte  # noqa: E402
+from pipeline5.truth.addresses import canonical as _canonical_addr  # noqa: E402
 
 
 def _add_node_address_ranges(rows) -> None:

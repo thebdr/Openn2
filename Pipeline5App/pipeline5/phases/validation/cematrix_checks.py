@@ -43,7 +43,7 @@ def run_ce_matrix(params: dict) -> list:
             seen = {}
             for r in mv.data_rows():
                 raw_a = mv.text(r, cemap["address"])
-                a = adr.norm(raw_a)
+                a = adr.key(raw_a)
                 if not a:
                     continue
                 refs += 1
@@ -66,7 +66,7 @@ def run_ce_matrix(params: dict) -> list:
             seen = {}
             for r in av.data_rows():
                 raw_a = av.text(r, areamap["address"])
-                a = adr.norm(raw_a)
+                a = adr.key(raw_a)
                 if not a:
                     continue
                 refs += 1

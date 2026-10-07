@@ -62,7 +62,7 @@
 </Sections></Interface>
       <IsIECCheckEnabled>false</IsIECCheckEnabled>
       <MemoryLayout>Optimized</MemoryLayout>
-      <Name>TEMPLATE--v1.1--02_EM Push Button</Name>
+      <Name>TEMPLATE--v1.2--02_EM Push Button</Name>
       <Namespace />
       <Number>5</Number>
       <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
@@ -76,7 +76,8 @@
             <AttributeList>
               <Culture>en-US</Culture>
               <Text>v1.0 First emission
-1.1 Aligned Syntax to signal_types.csv of the py_builder</Text>
+1.1 Aligned Syntax to signal_types.csv of the py_builder
+1.2 Lamp_1..4 wired to the EL lamp tags (3rd iterator quartet)</Text>
             </AttributeList>
           </MultilingualTextItem>
         </ObjectList>
@@ -138,6 +139,26 @@
     <Access Scope="GlobalVariable" UId="30">
       <Symbol>
         <Component Name="01_PushButton" />
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="43">
+      <Symbol>
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="44">
+      <Symbol>
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="45">
+      <Symbol>
+        <Component Name="!!ITERATOR_STRINGS$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="46">
+      <Symbol>
         <Component Name="!!ITERATOR_STRINGS$$" />
       </Symbol>
     </Access>
@@ -260,19 +281,19 @@
     </Wire>
     <Wire UId="68">
       <NameCon UId="31" Name="Lamp_1" />
-      <OpenCon UId="43" />
+      <IdentCon UId="43" />
     </Wire>
     <Wire UId="69">
       <NameCon UId="31" Name="Lamp_2" />
-      <OpenCon UId="44" />
+      <IdentCon UId="44" />
     </Wire>
     <Wire UId="70">
       <NameCon UId="31" Name="Lamp_3" />
-      <OpenCon UId="45" />
+      <IdentCon UId="45" />
     </Wire>
     <Wire UId="71">
       <NameCon UId="31" Name="Lamp_4" />
-      <OpenCon UId="46" />
+      <IdentCon UId="46" />
     </Wire>
   </Wires>
 </FlgNet></NetworkSource>

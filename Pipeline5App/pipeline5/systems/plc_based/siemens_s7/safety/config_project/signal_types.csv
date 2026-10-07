@@ -5,6 +5,7 @@ PA,Fieldbus Alarm,Diag,,,no,,,[ {$script_type} {$index}  {$drawing} ],no
 PW,Fieldbus Warning,Diag,,,no,,,[ {$script_type} {$index}  {$drawing} ],no
 E1/2,Emergency Push Button,Safety,E,1,no,EMERGENCY_PushButtons,Emergency Push Button [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
 E2/2,Emergency Push Button,Safety,E,2,no,,,[ {$script_type} {$index}  {$drawing} ],no
+EL,Emergency Push Button Lamp,Std,,,no,EMERGENCY_PushButtons,Emergency Push Button Lamp [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
 B1/2,Safety Breaker,Safety,B,1,no,SAFETY_Breakers,Safety Breaker [ {$combined_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
 B2/2,Safety Breaker,Safety,B,2,no,,,[ {$script_type} {$index}  {$drawing} ],no
 N1/2,Safety Encoder Sensor 1,Safety,N,1,no,SAFETY_Encoders,Safety Encoder {$index} Sensor 1 [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn

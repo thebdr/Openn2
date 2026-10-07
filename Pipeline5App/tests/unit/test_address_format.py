@@ -4,6 +4,8 @@ The Siemens pattern must parse byte/bit-EXACTLY like PL4's literal parser; a syn
 notation (German-style E/A directions, dash separator) must work with ZERO code change - only
 config - and map to the kernel's CANONICAL I/Q directions.
 """
+import os
+
 from _harness import run, eq, ok
 
 from pipeline5.truth import addresses
@@ -38,7 +40,9 @@ def test_alternate_notation_is_config_only():
     try:
         eq(addresses.addr_byte("%E10-1"), ("I", 10), "E maps to the canonical input direction")
         eq(addresses.addr_byte("%A2-0"), ("Q", 2), "A maps to the canonical output direction")
-        eq(addresses.addr_byte("I100.3"), None, "the TIA spelling no longer matches")
+        eq(addresses.addr_byte("I100.3"), ("I", 100),
+           "the TIA spelling is the CANONICAL one staging stores - it reads under any notation (C-022)")
+        eq(addresses.addr_byte("E100.3"), None, "a spelling of neither form is no address")
         ok(addresses.has_io_prefix("%") is False and addresses.has_io_prefix("E77"),
            "the prefix predicate follows the configured tokens")
     finally:
@@ -67,6 +71,94 @@ def test_node_of_uses_the_canonical_direction():
         _restore()
 
 
+_DOTTED = r"(?P<direction>[IQ])\.?(?P<byte>\d+)\.(?P<bit>\d+)"
+
+
+def test_canonical_spelling_default_unchanged():
+    """C-022 completion: under the TIA default the canonical spelling is the address itself (its direction
+    letter upper-cased); a value that is no address comes back unchanged; format_ok keeps its verdicts."""
+    _restore()
+    eq(addresses.canonical("I10.3"), "I10.3")
+    eq(addresses.canonical("q1484.0"), "Q1484.0", "the canonical direction letter is upper-case")
+    for v in ("", None, "PA", "I100", "I.645.1", "I:0.0", "M10.1"):
+        eq(addresses.canonical(v), v, f"{v!r} is no address in the TIA notation -> unchanged")
+    ok(addresses.format_ok("I10.3") and not addresses.format_ok("I.645.1") and not addresses.format_ok("I:0.0"),
+       "the default verdicts: a dot after the direction is malformed under TIA")
+    eq(addresses.key(" I 10.3 "), "I10.3", "the key strips whitespace")
+
+
+def test_dotted_project_notation():
+    """C-022 completion (FVT LaPoste): a project notation with a dot after the direction (`I.645.1`). The
+    canonical spelling is `I645.1`; both spellings parse, key alike and pass the format check; a malformed
+    dotted value still fails."""
+    addresses.configure_address_format(_DOTTED, None)
+    try:
+        eq(addresses.canonical("I.645.1"), "I645.1")
+        eq(addresses.canonical("Q.1484.0"), "Q1484.0")
+        eq(addresses.canonical("I645.1"), "I645.1", "the canonical spelling itself is accepted")
+        eq(addresses.key("I.645.1"), addresses.key("I645.1"), "I/O List and C&E match whatever spelling")
+        eq(addresses.addr_byte("I.645.1"), ("I", 645))
+        eq(addresses.parse("Q.1484.7"), ("Q", 1484, 7))
+        ok(addresses.format_ok("I.645.1") and addresses.format_ok("Q.1484.0"), "the notation's addresses are well formed")
+        ok(not addresses.format_ok("I.645") and not addresses.format_ok("I.645.x"), "a malformed dotted value still fails")
+        ok(addresses.is_input(addresses.key("I.645.1")) and addresses.is_output(addresses.key("Q.1484.0")),
+           "the kind is read on the canonical key")
+    finally:
+        _restore()
+
+
+def test_canonical_spelling_reads_under_any_notation():
+    """What staging STORES (the canonical spelling) reads back under ANY notation - the node ranges,
+    diagnosis, coverage and the tag predicate read the stored address; a spelling of neither form does not."""
+    addresses.configure_address_format(r"%(?P<direction>[EA])(?P<byte>\d+)-(?P<bit>\d+)",
+                                       {"input": ["E"], "output": ["A"]})
+    try:
+        eq(addresses.canonical("%E10-1"), "I10.1", "the German spelling stored canonical")
+        eq(addresses.addr_byte("I10.1"), ("I", 10), "the stored spelling reads back")
+        ok(addresses.has_io_prefix("I10.1"), "a stored address keeps its tag")
+        eq(addresses.addr_byte("E10.1"), None, "a spelling of neither form is no address")
+    finally:
+        _restore()
+
+
+def test_whitespace_inside_a_cell():
+    """C-022 completion (refute round 1): whitespace inside an address cell is tolerated the same way by the
+    canonical spelling, the key and the node-range reader - `I 12.3` is stored `I12.3`, so its tag is `%I12.3`
+    and its node range covers byte 12."""
+    _restore()
+    eq(addresses.canonical("I 12.3"), "I12.3")
+    eq(addresses.addr_byte("I 12.3"), ("I", 12))
+    eq(addresses.canonical(" PA "), " PA ", "a non-address stays as written")
+    addresses.configure_address_format(_DOTTED, None)
+    try:
+        eq(addresses.key("I. 645.1"), addresses.key("I.645.1"), "a stray space keys like the clean dotted spelling")
+        eq(addresses.canonical("I. 645.1"), "I645.1")
+    finally:
+        _restore()
+
+
+def test_project_tier_overrides_the_notation():
+    """C-022: a project's tier-1 `config_project/systems/<sid>/address_format.yaml` installs its notation on
+    use_project (the FVT project's route); closing the project restores the system default."""
+    import tempfile
+    from pipeline5.config import paths
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    paths.use_system(SYSTEM)
+    with tempfile.TemporaryDirectory() as d:
+        sysdir = os.path.join(d, "config_project", "systems", SYSTEM.id)
+        os.makedirs(sysdir)
+        with open(os.path.join(sysdir, "address_format.yaml"), "w", encoding="utf-8") as f:
+            f.write("pattern: '(?P<direction>[IQ])\\.?(?P<byte>\\d+)\\.(?P<bit>\\d+)'\n")
+        paths.use_project(d)
+        try:
+            ok(addresses.format_ok("I.645.1"), "the project notation is active")
+            eq(addresses.canonical("I.645.1"), "I645.1")
+        finally:
+            paths.use_project(None)
+    ok(not addresses.format_ok("I.645.1"), "closing the project restores the TIA default")
+    _restore()
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("address_format", [
@@ -74,4 +166,9 @@ if __name__ == "__main__":
         ("alternate_notation_is_config_only", test_alternate_notation_is_config_only),
         ("refresh_injects_from_the_tiers", test_refresh_injects_from_the_tiers),
         ("node_of_uses_the_canonical_direction", test_node_of_uses_the_canonical_direction),
+        ("canonical_spelling_default_unchanged", test_canonical_spelling_default_unchanged),
+        ("dotted_project_notation", test_dotted_project_notation),
+        ("canonical_spelling_reads_under_any_notation", test_canonical_spelling_reads_under_any_notation),
+        ("whitespace_inside_a_cell", test_whitespace_inside_a_cell),
+        ("project_tier_overrides_the_notation", test_project_tier_overrides_the_notation),
     ]))
