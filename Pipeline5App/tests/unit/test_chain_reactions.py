@@ -1498,6 +1498,47 @@ def test_a_misspelt_or_doubled_rule_column_is_never_silent():
     _sandboxed(body)()
 
 
+def test_content_a_doubled_column_holds_is_never_skipped():
+    """C-024 refute round 26: a line was judged blank on the row as read, which keeps only the LAST copy of a column
+    named twice - and Excel names every padding column '' (round 25: left alone). A rule typed 8 columns to the right
+    (round 21's overflow case) in an Excel-saved file - another row reaching further right, so every line is padded -
+    sat in padding columns 1-7, its last padding cell empty: read as blank and skipped - no finding, no audit row. So
+    was an author's column named twice with content in its first copy only. Every raw cell decides now: such a line
+    reaches the compiler, rx_bad_rule - as without the padding."""
+    from pipeline5.config import loaders
+    real_find = loaders.find
+    good = "name,fire_when,source_table,condition,action,target,template,comment"
+    line = 'doors,after_300,src,"$kind = ""door""",add_rows,dst,rows,'
+    shifted = 'motors,after_300,src,"$kind = ""motor""",add_rows,dst,rows'      # its 7 cells, typed 8 to the right
+
+    def body(sandbox):
+        path = os.path.join(sandbox, "reactions.csv")
+        loaders.find = lambda rel: path if rel == "chain_reactions/reactions.csv" else real_find(rel)
+
+        def fire(*lines):
+            with open(path, "w", encoding="utf-8", newline="") as handle:
+                handle.write("\r\n".join(lines) + "\r\n")
+            database, findings = engine.fire("after_300", _db(), templates=_ROW_TPL, params={},
+                                             hooks=("before_300", "after_300"))
+            return ([(f.type, f.location) for f in findings], [r["label"] for r in database["dst"]],
+                    [(r["rule"], r["outcome"]) for r in database[engine.LOG_TABLE]])
+        try:
+            unnamed = [("rx_bad_rule", "<unnamed rule>")]
+            eq(fire(good, line, "," * 8 + shifted), (unnamed, ["spawn-D1", "spawn-D2"], [("doors", "ok")]),
+               "(no padding: the shifted rule is round 21's rx_bad_rule)")
+            eq(fire(good + "," * 8, line + "," * 7 + "x", "," * 8 + shifted + ","),
+               (unnamed, ["spawn-D1", "spawn-D2"], [("doors", "ok")]),
+               "Excel's padding (another row wider): the rule in padding columns 1-7 - still rx_bad_rule, never skipped")
+            eq(fire(good + ",notes,notes", line + ",,", "," * 8 + "first,"),
+               (unnamed, ["spawn-D1", "spawn-D2"], [("doors", "ok")]),
+               "an author's column named twice, content in its FIRST copy only: reaches the compiler")
+            eq(fire(good + ",,,", line + ",,,", ",,,,,,,,,,"), ([], ["spawn-D1", "spawn-D2"], [("doors", "ok")]),
+               "a line blank in every cell, padding included: skipped")
+        finally:
+            loaders.find = real_find
+    _sandboxed(body)()
+
+
 def test_every_path_windows_would_misdirect_is_refused_before_the_write():
     """C-025 refute round 5 (#2, #5) + C-024 refute round 22's notes, the engine half. Win32 takes a `\\\\?\\`
     path AS WRITTEN - a '/' is no separator, '.' / '..' / an empty name are not resolved: every fire failed at
@@ -1647,6 +1688,7 @@ if __name__ == "__main__":
         ("a_hidden_or_locked_file_never_leaves_a_record_half_saved",
          test_a_hidden_or_locked_file_never_leaves_a_record_half_saved),
         ("a_misspelt_or_doubled_rule_column_is_never_silent", test_a_misspelt_or_doubled_rule_column_is_never_silent),
+        ("content_a_doubled_column_holds_is_never_skipped", test_content_a_doubled_column_holds_is_never_skipped),
         ("every_path_windows_would_misdirect_is_refused_before_the_write",
          test_every_path_windows_would_misdirect_is_refused_before_the_write),
         ("fire_empty_hook_is_a_strict_noop", test_fire_empty_hook_is_a_strict_noop),

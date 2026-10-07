@@ -388,7 +388,9 @@ def load_reactions() -> list:
     rule - {name, fire_when, source_table, condition, action, target, template, comment}, strings
     verbatim (the engine compiles + validates them into located findings, never a crash here). A
     system that ships no reactions file simply has no rules ([] - absence of rules is not an error).
-    Only fully BLANK lines are skipped; a row with content but no `name` is passed through so the
+    Only fully BLANK lines are skipped - judged on every raw cell (C-024 refute round 26: judged on the row
+    as read, a column named twice - Excel's empty-named padding - showed only its last copy, and a rule typed
+    into the padding vanished); a row with content but no `name` is passed through so the
     compiler reports it (refuter round 6: it used to vanish here, silently) - so is one whose only
     content sits PAST the header's columns (C-024 refute round 21). The header is the first line that is
     not blank (`_config_header` - C-024 refute round 22: a blank first line read as an EMPTY header, every
@@ -415,12 +417,12 @@ def load_reactions() -> list:
         if doubled:
             raise ValueError(f"{path}: its header row names the {', '.join(doubled)} column more than once - "
                              f"got {header} (a rule would read only the last one)")
-        for raw in csv.DictReader(handle, fieldnames=header):
-            extra = raw.pop(None, None) or []
-            if not any((v or "").strip() for v in raw.values() if isinstance(v, str)) \
-                    and not any((v or "").strip() for v in extra):
-                continue
-            rows.append(raw)
+        for cells in csv.reader(handle):
+            if not any(cell.strip() for cell in cells):        # blank only when EVERY raw cell is - a column named
+                continue                                        # twice counts in each copy (round 26: Excel's ''
+            raw = dict.fromkeys(header)                         # padding hid a rule typed into it)
+            raw.update(zip(header, cells))                      # (a doubled ignored column: its last copy; content
+            rows.append(raw)                                    # past the header is no column - it names no rule)
     return rows
 
 
