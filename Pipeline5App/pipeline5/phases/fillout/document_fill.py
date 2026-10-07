@@ -209,9 +209,11 @@ def _compute_fill(database, params: dict, only) -> tuple:
         row["type"] = config.resolve_type(signal_types, classify.unmark(row.get("script_type")))
 
     # 220 - index assignment over the (re-typed) rows.
-    idx = index_assign.assign_indices(rows, families)
+    reasons: dict = {}
+    idx = index_assign.assign_indices(rows, families, reasons=reasons)
     for row in rows:
         row["index"] = idx.get(row["uid"], row.get("index", ""))
+        row["_index_reason"] = reasons.get(row["uid"], "")
 
     # 230/240 - diagnosis allocation. `existing` = {full_name -> cabinet_id} from the staged
     # diagnosis_cabinets table (stable-id idempotency); `place` = {uid -> (diag_cabinet, diag_bit)}.
@@ -311,7 +313,11 @@ def fill_out(database, params: dict | None = None, only=None) -> dict:
                 cell_edits[sheet][f"{ad}{rownum}"] = row["index"]
                 if ix != INPUT_REQUIRED:
                     indexed += 1
-            if ix == INPUT_REQUIRED and not _skipped(row):
+            contradiction = index_assign.CONTRADICTIONS.get(row.get("_index_reason") or "")
+            if contradiction and not _skipped(row):        # a TYPE contradiction: reported even with an index
+                unresolved.append((row, ad, contradiction))
+                findings.append(_f("fill_type_contradiction", "FAIL", contradiction, f"{sheet}!{ad}{rownum}"))
+            elif ix == INPUT_REQUIRED and not _skipped(row):
                 unresolved.append((row, ad, "the object index could not be auto-assigned (ungroupable member)"))
                 findings.append(_f("fill_unresolved", "FAIL",
                                    "the index could not be auto-assigned - fill it in the source I/O List",
@@ -430,11 +436,13 @@ def risky_assignments(rows: list, families: list, node_key: dict) -> tuple:
     from collections import defaultdict
     existing, seen = defaultdict(list), defaultdict(set)
     unresolved = defaultdict(list)                                  # (node, family.key, script_type) -> rows
+    reasons: dict = {}                                              # a TYPE contradiction is never "risky-filled"
+    index_assign.assign_indices(rows, families, reasons=reasons)    # ([[C-029]] round 3 - the type is wrong)
     for r in sorted(rows, key=lambda r: (str(r.get("source_sheet") or ""), int(r.get("source_row") or 0))):
         st = (r.get("script_type") or "").strip()
         fam = family_for(st, families)
         nk = node_key.get(r["uid"])
-        if fam is None or nk is None:
+        if fam is None or nk is None or reasons.get(r["uid"]) in index_assign.CONTRADICTIONS:
             continue
         idx = str(r.get("index") or "").strip()
         if idx == INPUT_REQUIRED:

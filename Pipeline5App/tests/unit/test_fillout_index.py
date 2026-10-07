@@ -234,6 +234,58 @@ def test_single_with_channel_2_is_flagged():
     eq((got["s"], got["c"]), ("0001", INPUT_REQUIRED), "the E2/2 beside an E is flagged")
 
 
+def test_contradiction_reported_even_with_an_index():
+    """C-029 refute round 3: in a NORMAL fill (existing indices kept) an E2/2 beside a one-row E that already
+    carries an index - typed in, risky-filled, or from before the CH1 row became E - is STILL reported: its
+    index is kept, the reason says the type is wrong."""
+    shipped = fam.load_object_families()
+    rows = [_row("s", "E", fld="=ES-5", source_row=1, index="0001"),
+            _row("c", "E2/2", fld="=ES-5", channel="2", source_row=2, index="0001")]
+    reasons = {}
+    got = ix.assign_indices(rows, shipped, reasons=reasons)
+    eq(got["c"], "0001", "the human index kept")
+    eq(reasons, {"c": "single_with_channel_2"}, "the contradiction reported anyway")
+    ok("not the index" in ix.CONTRADICTIONS["single_with_channel_2"], "the advice is the type, not the index")
+
+
+def test_two_objects_on_one_designation_are_flagged():
+    """C-029 refute round 3: a one-row E beside another E, or beside an E1/2 (whichever comes first), is a
+    second object on one designation - flagged, never two indices / diag bits / channels."""
+    shipped = fam.load_object_families()
+    reasons = {}
+    got = ix.assign_indices([_row("a", "E", fld="=ES-6", source_row=1),
+                             _row("b", "E", fld="=ES-6", source_row=2)], shipped, from_scratch=True, reasons=reasons)
+    eq((got["a"], got["b"], reasons), ("0001", INPUT_REQUIRED, {"b": "single_with_anchor"}), "E + E")
+    reasons = {}
+    got = ix.assign_indices([_row("p", "E1/2", fld="=ES-7", channel="1", source_row=1),
+                             _row("s", "E", fld="=ES-7", source_row=2)], shipped, from_scratch=True, reasons=reasons)
+    eq(reasons.get("s"), "single_with_anchor", "E1/2 then E")
+    reasons = {}
+    got = ix.assign_indices([_row("s", "E", fld="=ES-8", source_row=1),
+                             _row("p", "E1/2", fld="=ES-8", channel="1", source_row=2),
+                             _row("c", "E2/2", fld="=ES-8", channel="2", source_row=3)],
+                            shipped, from_scratch=True, reasons=reasons)
+    eq(reasons, {"p": "single_with_anchor", "c": "single_with_channel_2"}, "E then E1/2 + E2/2")
+
+
+def test_contradictions_are_range_aware():
+    """C-029 refute round 3: an E on one component of a device RANGE and an E1/2 + E2/2 pair authored on the
+    range are the same designation - flagged; an E on a designation outside the range is not."""
+    shipped = fam.load_object_families()
+    reasons = {}
+    ix.assign_indices([_row("s", "E", fld="=X-S1", source_row=1),
+                       _row("p", "E1/2", fld="=X-S1..2", channel="1", source_row=2),
+                       _row("c", "E2/2", fld="=X-S1..2", channel="2", source_row=3)],
+                      shipped, from_scratch=True, reasons=reasons)
+    eq(reasons, {"p": "single_with_anchor", "c": "single_with_channel_2"}, "the E sits on the range's component")
+    reasons = {}
+    got = ix.assign_indices([_row("s", "E", fld="=X-S9", source_row=1),
+                             _row("p", "E1/2", fld="=X-S1..2", channel="1", source_row=2),
+                             _row("c", "E2/2", fld="=X-S1..2", channel="2", source_row=3)],
+                            shipped, from_scratch=True, reasons=reasons)
+    eq((reasons, got["p"], got["c"]), ({}, "0002", "0002"), "outside the range: no contradiction")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("fillout_index", [
@@ -241,6 +293,9 @@ if __name__ == "__main__":
         ("shipped_el_joins_emergency_pb", test_shipped_el_joins_emergency_pb),
         ("shipped_e_matches_e12", test_shipped_e_matches_e12),
         ("single_with_channel_2_is_flagged", test_single_with_channel_2_is_flagged),
+        ("contradiction_reported_even_with_an_index", test_contradiction_reported_even_with_an_index),
+        ("two_objects_on_one_designation_are_flagged", test_two_objects_on_one_designation_are_flagged),
+        ("contradictions_are_range_aware", test_contradictions_are_range_aware),
         ("role_of_each_link", test_role_of_each_link),
         ("channel2_fld_inherit", test_channel2_fld_inherit),
         ("channel2_fld_mismatch_unresolved", test_channel2_fld_mismatch_unresolved),

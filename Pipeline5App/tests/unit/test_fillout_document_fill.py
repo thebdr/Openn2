@@ -95,9 +95,48 @@ def test_fill_is_idempotent_noop_drops_backup():
         eq(res2["filled"], 0, "nothing re-filled (AB already present)")
 
 
+def test_fill_reports_a_type_contradiction_with_an_index():
+    """C-029 refute round 3 through the real fill: a one-row E (its description names CH1 and CH2) and an E2/2
+    row on the same designation WITH an index already in AD -> the fill_type_contradiction FAIL and the
+    _UnresolvedIndex row carry the TYPE advice; the human index is kept; the risky fill never assigns it."""
+    from pipeline5.phases.fillout import index_assign
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "io.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = _SHEET
+        for col, head in (("F", "ID"), ("G", "Bit"), ("K", "Desc1"), ("L", "Desc2"), ("O", "FU"), ("R", "Type")):
+            ws[f"{col}1"] = head
+        ws["F2"] = "5"; ws["R2"] = "PLC"; ws["K2"] = "MAIN PLC NODE"
+        ws["G3"] = "I0.0"; ws["K3"] = "EMERGENCY PUSH-BUTTON PRESSED"; ws["L3"] = "CH1 (CH2 ON NEXT ROW)"; ws["O3"] = "=ES-1"
+        ws["G4"] = "I0.1"; ws["K4"] = "EMERGENCY PUSH-BUTTON PRESSED"; ws["L4"] = "CH2"; ws["O4"] = "=ES-1"
+        ws["AD4"] = "0001"                                    # an index already there (typed in / risky-filled)
+        wb.save(p)
+        params = _params(p)
+        database, _ = staging.stage(params, system=catalog.by_id("siemens_s7_safety"))
+        res = fill.fill_out(database, params)
+        wb = load_workbook(p)
+        ws = wb[_SHEET]
+        eq((ws["AB3"].value, ws["AB4"].value), ("E", "E2/2"), "typed E + E2/2")
+        eq(ws["AD4"].value, "0001", "the human index kept")
+        fails = [f for f in res["findings"] if f.type == "fill_type_contradiction"]
+        eq(len(fails), 1, "the contradiction is a blocking FAIL")
+        ok("not the index" in fails[0].detail and fails[0].location.endswith("4"), fails[0].detail)
+        reasons = [str(c.value) for row in wb["_UnresolvedIndex"].iter_rows() for c in row if c.value]
+        ok(any(index_assign.CONTRADICTIONS["single_with_channel_2"] in r for r in reasons), reasons)
+    rows = [{"uid": "s", "script_type": "E", "type": {"channel": ""}, "functional_unit": "=ES-1", "location": "",
+             "device": "", "source_row": 1, "index": "0001"},
+            {"uid": "c", "script_type": "E2/2", "type": {"channel": "2"}, "functional_unit": "=ES-1", "location": "",
+             "device": "", "source_row": 2, "index": "<input required>"}]
+    from pipeline5.phases.fillout import type_families
+    assigns, _left = fill.risky_assignments(rows, type_families.load_object_families(), {"s": "n1", "c": "n1"})
+    eq(assigns, [], "the risky fill never assigns a type contradiction")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("fillout_fill", [
         ("fill_ab_ac_modes_and_unresolved", _sandboxed(test_fill_ab_ac_modes_and_unresolved)),
+        ("fill_reports_a_type_contradiction_with_an_index", _sandboxed(test_fill_reports_a_type_contradiction_with_an_index)),
         ("fill_is_idempotent_noop_drops_backup", _sandboxed(test_fill_is_idempotent_noop_drops_backup)),
     ]))
