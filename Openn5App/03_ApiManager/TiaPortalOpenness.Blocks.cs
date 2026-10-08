@@ -188,7 +188,12 @@ namespace Openn._03_ApiManager
                 Log("Can't create instance DBs: no Plc Software found in the project");
                 return BatchOutcome.Failed;
             }
+            return CreateInstanceDbsCore(csvPath, baseFolder, plcSoftware);
+        }
 
+        /// <summary>Same, into a given PLC software (the workspace import resolves the PLC from the item's folder).</summary>
+        private BatchOutcome CreateInstanceDbsCore(string csvPath, string baseFolder, PlcSoftware plcSoftware)
+        {
             var parseErrors = new List<string>();
             IList<Openn._02_Converter.InstanceDbSpec> specs = Openn._02_Converter.InstanceDbListParser.Parse(csvPath, parseErrors);
             if (parseErrors.Count > 0)
@@ -445,19 +450,22 @@ namespace Openn._03_ApiManager
             return QueueRoute.Unknown;
         }
 
-        /// <summary>Per-file failure decision in the import queue (UI thread; worker waits): Retry / Abort / Ignore.</summary>
-        private static System.Windows.Forms.DialogResult AskFileDecision(string fileLabel, string error)
+        /// <summary>
+        /// Per-file failure decision (UI thread; worker waits): Retry / Abort / Ignore. Shared by the import
+        /// queue (the default context) and the workspace import.
+        /// </summary>
+        private static System.Windows.Forms.DialogResult AskFileDecision(string fileLabel, string error, string context = "Import queue")
         {
             var application = System.Windows.Application.Current;
             if (application == null) return System.Windows.Forms.DialogResult.Abort; //no UI: fail safe
 
             return application.Dispatcher.Invoke(() =>
                 System.Windows.Forms.MessageBox.Show(
-                    "Import queue step failed for \"" + fileLabel + "\":\n\n" + (error ?? "see the log for details") + "\n\n" +
+                    context + " step failed for \"" + fileLabel + "\":\n\n" + (error ?? "see the log for details") + "\n\n" +
                     "Retry  -  process this file again\n" +
-                    "Abort  -  stop the import queue (project stays unsaved)\n" +
+                    "Abort  -  stop the " + context.ToLowerInvariant() + " (project stays unsaved)\n" +
                     "Ignore -  skip this file and continue",
-                    "Openn5 - Import Queue",
+                    "Openn5 - " + context,
                     System.Windows.Forms.MessageBoxButtons.AbortRetryIgnore,
                     System.Windows.Forms.MessageBoxIcon.Warning));
         }

@@ -36,7 +36,8 @@ namespace Openn
             Log("Using " + OpennessSetup.SelectedInstallation.DisplayName + ": " + OpennessSetup.SelectedInstallation.EngineeringDllPath);
 
             InitializeGraphicComponents();
-            LoadHardwareConfiguration();
+            InitializeWorkspaceTab();
+            RunStartupSequence();
         }
 
         private void InitializeGraphicComponents()
@@ -54,7 +55,18 @@ namespace Openn
             lblSharedRoot.Content = "Shared handoff tree: " + AppPaths.SharedRoot;
         }
 
-        private async void LoadHardwareConfiguration()
+        /// <summary>
+        /// Startup: the Workspace tab is the primary surface, so its catalog is listed first (no TIA needed; it
+        /// also points the Hardware tab at the workspace's hardware folder), then the Hardware tab's csv config
+        /// is loaded, the running instances are listed and the one-shot auto-attach runs - as before.
+        /// </summary>
+        private async void RunStartupSequence()
+        {
+            await RescanWorkspaceAsync(quietWhenBusy: true);
+            await LoadHardwareConfigurationAsync();
+        }
+
+        private async Task LoadHardwareConfigurationAsync()
         {
             string folder = tbHardwareCsvPath.Text;
             await RunBackend(() => TiaWorker.Run(() => HardwareConfigLoader.LoadAll(folder)));
@@ -271,17 +283,13 @@ namespace Openn
         // ----- Project tab: whole-project import / export (the Pipeline5 round-trip) -----
 
         /// <summary>
-        /// Classifies the BuilderData workspace (contract v1 "#!openn" headers, legacy markers as
-        /// fallback) and logs the catalog: kinds, statuses, files needing attention. No TIA needed.
+        /// Rescans the Workspace tab's root (contract v1 "#!openn" headers, legacy markers as fallback) and
+        /// logs the catalog summary: kinds, statuses, files needing attention. No TIA needed.
         /// </summary>
         private async void btnScanWorkspace_Click(object sender, RoutedEventArgs e)
         {
-            string root = AppPaths.BuilderDataDir;
-            await RunBackend(() => TiaWorker.Run(() =>
-            {
-                var catalog = Openn._00_Contract.WorkspaceCatalog.Scan(root);
-                foreach (string line in catalog.Summary()) Log(line);
-            }));
+            await RescanWorkspaceAsync();
+            LogWorkspaceCatalog();
         }
 
         private async void btnImportFullProject_Click(object sender, RoutedEventArgs e)
@@ -377,9 +385,9 @@ namespace Openn
             await RunBackend(() => TiaWorker.Run(() => tia.DumpDeviceAttributes(deviceNameFilter)));
         }
 
-        private void btnImportHardwareCsv_Click(object sender, RoutedEventArgs e)
+        private async void btnImportHardwareCsv_Click(object sender, RoutedEventArgs e)
         {
-            LoadHardwareConfiguration();
+            await LoadHardwareConfigurationAsync();
         }
 
         private void btnBrowseHwConfigCsv_Click(object sender, RoutedEventArgs e)

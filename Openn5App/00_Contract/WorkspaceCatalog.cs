@@ -190,9 +190,15 @@ namespace Openn._00_Contract
         }
 
         /// <summary>Importable items in import order: kind rank, then PLC, then path (00_, 01_, ... prefixes keep working).</summary>
-        public IEnumerable<WorkspaceItem> InImportOrder() =>
-            Items.Where(i => i.Importable)
-                 .OrderBy(i => i.KindInfo.ImportOrder)
+        public IEnumerable<WorkspaceItem> InImportOrder() => OrderForImport(Items.Where(i => i.Importable));
+
+        /// <summary>
+        /// Any set of items (e.g. a selection) in import order - the same keys as InImportOrder: kind rank
+        /// (unknown kinds last), then PLC, then path.
+        /// </summary>
+        public static IEnumerable<WorkspaceItem> OrderForImport(IEnumerable<WorkspaceItem> items) =>
+            (items ?? Enumerable.Empty<WorkspaceItem>())
+                 .OrderBy(i => i.KindInfo != null ? i.KindInfo.ImportOrder : int.MaxValue)
                  .ThenBy(i => i.Plc ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                  .ThenBy(i => i.RelativePath, StringComparer.OrdinalIgnoreCase);
 

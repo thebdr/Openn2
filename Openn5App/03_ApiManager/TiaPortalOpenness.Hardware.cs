@@ -38,19 +38,21 @@ namespace Openn._03_ApiManager
         /// Entry point of the hardware generation. Either creates the I/O controllers
         /// from scratch or attaches to controllers that already exist in the project,
         /// then creates all I/O devices and stamps Author/Comment on every device.
+        /// Returns true when the run went through to the end, false when it stopped
+        /// early (precondition failed, controller missing, cancelled) - every reason is logged.
         /// </summary>
-        public void CreateDevices(bool? CreateNewIoControllers = true)
+        public bool CreateDevices(bool? CreateNewIoControllers = true)
         {
             if (project == null)
             {
                 Log("ERROR \n TIA PROJECT not attached.");
-                return;
+                return false;
             }
 
             if (HwIoC.DevicesList == null || HwIoC.DevicesList.Count == 0)
             {
                 Log("ERROR \n No I/O Controllers loaded - import a valid hardware configuration first.");
-                return;
+                return false;
             }
 
             //check if first I/O Controller is of Plc Type
@@ -59,7 +61,7 @@ namespace Openn._03_ApiManager
                 Log("IoController : " + HwIoC.DevicesList[0].name + " is not of \"Plc\" type." + "\n" +
                                 "Line: " + HwIoC.DevicesList[0].srcRow.ToString() + " File: " + HwIoC.DevicesList[0].srcFileName + "\n" +
                                 "First device in Csv file must be a Plc");
-                return;
+                return false;
             }
 
             project.ShowHwEditor(Siemens.Engineering.HW.View.Network); //show the network editor
@@ -71,19 +73,20 @@ namespace Openn._03_ApiManager
             else
             {
                 if (AttachIoControllers(project) == false)
-                    return;
+                    return false;
             }
 
             CreateIoDevices(HwIoD.DevicesList);
 
             if (TiaWorker.CurrentCancellation.IsCancellationRequested)
-                return; //the loop that observed the cancel has already logged it
+                return false; //the loop that observed the cancel has already logged it
 
             foreach (var a in project.UngroupedDevicesGroup.Devices)
             {
                 SetAttribute(a.DeviceItems, "Author", "bdragoi");
                 SetAttribute(a.DeviceItems, "Comment", "Tia Portal Openness");
             }
+            return true;
         }
 
         #region I/O controllers
