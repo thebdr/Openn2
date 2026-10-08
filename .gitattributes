@@ -1,0 +1,2 @@
+# the frozen PL4 parity reference is compared BYTE-FOR-BYTE - never touch its line endings
+Pipeline5App/tests/parity/pl4_reference/** -text
