@@ -27,7 +27,7 @@ from pipeline5.truth.content_hash import uid as content_uid
 from pipeline5.truth import identity
 from pipeline5.phases.staging import cematrix as matrix
 from pipeline5.truth.diagnosis import diagnosis_cabinets_table
-from pipeline5.truth.signals import signals_table
+from pipeline5.truth.signals import signals_table, is_generated   # noqa: F401 - re-exported
 from pipeline5.documents import xlsx_reader as workbook
 
 _DIAGBLOCKS_SHEETS = frozenset({"diagnosisblocks", "diagnosticblocks"})   # current + legacy spelling
@@ -69,6 +69,21 @@ def _dup_type_index_findings(table) -> list:
             out.append(_f("stg_dup_type_index", "FAIL",
                           f"duplicated {st} index {idx} - a (script_type, index) pair must be unique"
                           + (f" (also at {others})" if others else ""), _norm(row.get("source_cell"))))
+    return out
+
+
+def generated_dup_findings(table) -> list:
+    """The staging duplicate checks (`stg_dup_signal_uid`, `stg_dup_type_index`) over the table AFTER the
+    generated signals were absorbed, kept for the groups a GENERATED row is in - a spawn duplicating a document
+    row (or another spawn) halts generation as the same pair in the document would ([[C-030]] round 1)."""
+    gen = [r for r in table.rows if is_generated(r)]
+    if not gen:
+        return []
+    uids = {r.get("uid") for r in gen}
+    cells = {_norm(r.get("source_cell")) for r in gen}
+    out = [f for f in _dup_findings(table) if f.location in uids]
+    out += [f for f in _dup_type_index_findings(table)
+            if f.location in cells or any(c and c in f.detail for c in cells)]
     return out
 
 
@@ -138,6 +153,7 @@ def _read_view(view, colmap, strike_exclude, signal_types) -> list:
         if all(view.text(r, m["column"]) == "" for m in colmap):
             continue
         row = {m["canonical"]: view.text(r, m["column"]) for m in colmap}
+        row["bit"] = _canonical_addr(row.get("bit"))      # [[C-022]]: stored canonical, whatever the notation
         row["source_row"] = r
         row["source_sheet"] = view.name
         if _skip_reason_present(row.get("skip_reason")):
@@ -199,20 +215,72 @@ def _finalize_identity(params: dict, rows: list) -> None:
     for row in rows:
         if not row.get("source_cell") and row.get("source_row"):
             row["source_cell"] = f"{row.get('source_sheet', '')}!{fu_col}{row['source_row']}"
-        row["iol_FLD"] = identity.fld(row)
-        row["ce_FLD"] = identity.ce_fld(row)
-        row["combined_FLD"] = identity.combined_fld(row)
-        row["IsSorterArea"] = _is_sorter_area(row, sorter_names)
+        _derive_identity(row, signal_diag, sorter_names)
+    _add_node_address_ranges(rows)   # positional I/Q byte ranges: a node owns the rows beneath it
+
+
+def _derive_identity(row: dict, signal_diag: dict, sorter_names: set, keep: frozenset = frozenset()) -> None:
+    """ONE row's derived identity from its current fields: the FLDs, `IsSorterArea`, the per-type diagnosis
+    text and the PLC tag name/table. `keep` names derived fields a caller already SET and that win over the
+    derivation when non-empty (a generated signal's rule may name its tag - [[C-030]])."""
+    row["iol_FLD"] = identity.fld(row)
+    row["ce_FLD"] = identity.ce_fld(row)
+    row["combined_FLD"] = identity.combined_fld(row)
+    row["IsSorterArea"] = _is_sorter_area(row, sorter_names)
+    if not ("diag_desc" in keep and row.get("diag_desc")):
         diag_template = signal_diag.get(str((row.get("type") or {}).get("type_id", "")).upper(),
                                         {}).get("diag_desc", "")
         row["diag_desc"] = identity.interp(diag_template, row)   # the resolved per-type diagnosis text
-        if identity.is_io_signal(row) and identity.tag_name(row):
-            row["name_in_tagtable"] = identity.tag_name(row)
-            row["tagtable"] = identity.tagtable(row)
+    set_table = row.get("tagtable") if "tagtable" in keep else ""     # a table the RULE set, kept on its own
+    if "name_in_tagtable" in keep and row.get("name_in_tagtable"):
+        if identity.is_io_signal(row):
+            row["tagtable"] = set_table or identity.tagtable(row)
         else:
-            row["name_in_tagtable"] = ""
-            row["tagtable"] = ""
-    _add_node_address_ranges(rows)   # positional I/Q byte ranges: a node owns the rows beneath it
+            row["name_in_tagtable"], row["tagtable"] = "", ""
+    elif identity.is_io_signal(row) and identity.tag_name(row):
+        row["name_in_tagtable"] = identity.tag_name(row)
+        row["tagtable"] = set_table or identity.tagtable(row)
+    else:
+        row["name_in_tagtable"] = ""
+        row["tagtable"] = ""
+
+
+# --- generated signals: the after_300 reactions' spawned rows made first-class ([[C-030]]) ------------- #
+_RULE_SET_FIELDS = frozenset({"name_in_tagtable", "tagtable", "diag_desc"})
+
+
+
+
+def absorb_spawned(database, params: dict | None = None) -> int:
+    """Make every GENERATED signal (an after_300 add_rows spawn into `signals`) a first-class staged signal,
+    derived exactly as a document row: the address in the canonical spelling ([[C-022]]), the resolved `type`,
+    the FLDs, the diagnosis text and the PLC tag name/table (a name/table/diagnosis text the RULE set is kept),
+    then a stable uid. A generated signal has no document cell: its `source_cell` is its provenance
+    `<rule>:<source uid>` (+ `#n` for the n-th row one source spawns) - never a Sheet!Cell link - so the uid
+    is stable run to run and unique per spawn. It is not part of the positional node ranges (it sits under
+    no node in the document). Idempotent. Returns how many rows were absorbed."""
+    if database is None or "signals" not in database:
+        return 0
+    table = database["signals"]
+    spawned = [r for r in table.rows if is_generated(r)]
+    if not spawned:
+        return 0
+    params = params or config.load_params()
+    signal_types = config.load_signal_types()
+    signal_diag = config.load_signal_diagnosis()
+    sorter_names = _sorter_area_names(params)
+    seen: dict = {}
+    for row in spawned:
+        row["bit"] = _canonical_addr(row.get("bit"))
+        row["type"] = config.resolve_type(signal_types, row.get("script_type"))
+        origin = f"{str(row.get('spawned_by')).strip()}:{str(row.get('source_uid') or '').strip()}"
+        seen[origin] = seen.get(origin, 0) + 1
+        row["source_cell"] = origin if seen[origin] == 1 else f"{origin}#{seen[origin]}"
+        row["source_sheet"], row["source_row"] = "", ""
+        _derive_identity(row, signal_diag, sorter_names, keep=_RULE_SET_FIELDS)
+        row["uid"] = ""
+        row["uid"] = table.stamped(row)["uid"]
+    return len(spawned)
 
 
 def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
@@ -243,6 +311,7 @@ def _is_sorter_area(row: dict, sorter_names: set) -> str:
 # the configurable per-system notation (P-010) - one parser for staging, diagnosis,
 # coverage, and the risky-index fill.
 from pipeline5.truth.addresses import addr_byte as _addr_byte  # noqa: E402
+from pipeline5.truth.addresses import canonical as _canonical_addr  # noqa: E402
 
 
 def _add_node_address_ranges(rows) -> None:
@@ -291,6 +360,17 @@ def staged_database(colmap) -> Database:
     return Database([signals_table([m["canonical"] for m in colmap]), diagnosis_cabinets_table()])
 
 
+def notation_findings() -> list:
+    """Re-read the I/O address notation ([[C-022]] refute round 3 - on EVERY document read, so an edit applies
+    to the next run) -> [] or the blocking `stg_address_format` FAIL: a notation that will not load means the
+    documents' addresses would be misread (the TIA default is installed meanwhile) - never a crash."""
+    problem = config.refresh_address_format()
+    if not problem:
+        return []
+    return [_f("stg_address_format", "FAIL", "the I/O address notation does not load - the documents' "
+               f"addresses cannot be read: {problem}", "address_format.yaml")]
+
+
 def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> tuple:
     """Phase 310 - Stage I/O List: read the I/O List into the `signals` table WITHOUT the C&E enrichment
     (no matrix_areas / ce_* / numerazione_linea -> `combined_FLD` == `iol_FLD`, `IsSorterArea` ''), plus the
@@ -299,6 +379,7 @@ def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> 
     (320) layers the C&E on top; `stage_iolist` then `annotate_cematrix` == the full `stage`. `save=False`
     lets `stage` build in memory and write once after the C&E pass."""
     params = params or config.load_params()
+    notation = notation_findings()
     signal_types = config.load_signal_types()
     io_path = params.get("iolist_path")
     colmap = config.load_column_map("IoList")
@@ -308,18 +389,18 @@ def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> 
 
     rows, matched = _read_iolist(params, signal_types, io_path)
     if not matched:                                   # the required input is absent -> halt before anything
-        return database, [_f("stg_no_io_sheet", "FAIL",
-                             f"no I/O sheet matched {config.get_param(params, 'iolist_params.sheets')!r} "
-                             f"in {io_path}", io_path or "")]   # raw-FAIL guard: nothing written
+        return database, notation + [_f("stg_no_io_sheet", "FAIL",
+                                        f"no I/O sheet matched {config.get_param(params, 'iolist_params.sheets')!r} "
+                                        f"in {io_path}", io_path or "")]   # raw-FAIL guard: nothing written
 
     _finalize_identity(params, rows)                  # the I/O-List identity (C&E fields still absent)
     for row in rows:
         table.add_row(row)
     if system is None or system.capabilities.needs_diagnosis_blocks:   # capability gate, never a type-id
         _load_cabinets(io_path, cab_table)
-    if save:
+    if save and not notation:                         # raw-FAIL guard: a misread notation writes nothing
         database.save(config.database_dir())
-    return database, []
+    return database, notation
 
 
 def annotate_cematrix(database, params: dict | None = None, save: bool = True) -> tuple:

@@ -28,6 +28,8 @@ from pipeline5.config.paths import (  # noqa: F401
     use_project,
     use_builtin,
     use_system,
+    refresh_address_format,
+    address_format_problem,
     active_system,
     set_multi_system,
     builtin_shared_config_dir,

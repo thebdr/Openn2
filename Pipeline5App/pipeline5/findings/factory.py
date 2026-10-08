@@ -34,8 +34,10 @@ def key(*parts) -> str:
 
 
 def addr(value) -> str:
-    """Address key: whitespace removed, upper-cased."""
-    return "".join(str(value if value is not None else "").split()).upper()
+    """Address key: the canonical spelling ([[C-022]] - an I/O List and a C&E written in the project's
+    notation match each other and the staged rows), whitespace removed, upper-cased."""
+    from pipeline5.truth.addresses import key as _addr_key   # truth sits below findings (L1)
+    return _addr_key(value)
 
 
 def raw(value) -> str:

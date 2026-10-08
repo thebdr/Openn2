@@ -71,5 +71,31 @@ def project(database: Database | None = None, out_dir: str | None = None) -> dic
     modules = list(database["hardware_modules"]) if "hardware_modules" in database else []
     spath = _write(out_dir, "Stations.csv", _format2(_STATIONS_FMT2, _STATIONS_HDR, stations, _STATIONS_KEYS))
     mpath = _write(out_dir, "Modules.csv", _format2(_MODULES_FMT2, _MODULES_HDR, modules, _MODULES_KEYS))
+    dtd_path, findings = _place_device_types_db(out_dir)
     return {"dir": out_dir, "stations": len(stations), "modules": len(modules),
-            "stations_path": spath, "modules_path": mpath, "findings": []}
+            "stations_path": spath, "modules_path": mpath, "device_types_db": dtd_path, "findings": findings}
+
+
+_LOCAL_DTD = "DeviceTypesDatabase.csv"
+
+
+def _place_device_types_db(out_dir: str) -> tuple:
+    """The importer (Openn3App) reads a DeviceTypesDatabase.csv BESIDE Stations.csv first, else the shared one -
+    so a project whose params name its own database (`device_types_db`) gets a copy of it placed there: phase
+    700 and the importer read the SAME file ([[C-028]] round 3). The shared database (no param) places
+    nothing; a copy already there is reported (it would override the shared one for the importer), never
+    deleted. Returns (the placed path or '', findings)."""
+    import shutil
+    from pipeline5.findings.finding import Finding
+    own = str((config.load_params() or {}).get("device_types_db") or "").strip()
+    local = os.path.join(out_dir, _LOCAL_DTD)
+    if own:
+        if os.path.abspath(own) != os.path.abspath(local):
+            shutil.copyfile(own, local)
+        return local, []
+    if os.path.isfile(local):
+        return "", [Finding(phase=700, type="hw_local_dtd", severity="WARN", location=local,
+                            detail=f"{_LOCAL_DTD} beside Stations.csv overrides the shared DeviceTypesDatabase for "
+                                   "the importer, but the project params name none (device_types_db) - phase 700 "
+                                   "read the shared one; remove the copy or name it in the params")]
+    return "", []

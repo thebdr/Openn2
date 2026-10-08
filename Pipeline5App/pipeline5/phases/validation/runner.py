@@ -64,7 +64,9 @@ def run_validation(database=None, params: dict | None = None, out_dir: str | Non
 
     # record only the ISSUES (FAIL/ERROR/WARN) into validation_issues - PASS/INFO/SKIP are report-only noise.
     record(database, [f for f in findings if f.severity in _TREATABLE])
-    database.save(config.database_dir())
+    # save ONLY the validator's own output: the staged signals it judged are the DOCUMENTS' - re-saving them
+    # would drop the generated signals phase 300 saved ([[C-030]] round 1: validation judges the documents only)
+    Database([database["validation_issues"]]).save(config.database_dir())
 
     # apply the treatment registry (read-only) -> the EFFECTIVE severity the report shows.
     applied = treatments.apply(findings, treatments.load())

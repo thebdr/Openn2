@@ -19,6 +19,10 @@ for both severities, so the uid - which excludes severity - survives a descripti
 level. Note: doc-validation 110 deliberately exempts `.1`-suffixed IPs from `ip_duplicated`, so this
 build-side skip is where the redundant-CPU pair is handled.
 
+A model's station I/O address template (DTD col 7, `%I%`/`%Q%`[+N]) is placed at the station's LOWEST I/O-List
+address per direction. A direction with no row leaves its entries unplaceable: they are DROPPED (never written as
+a literal `%Q%` the importer cannot convert) with a **`hw_addr_unresolved` WARN** - TIA places that submodule.
+
 - **Station**: name = Profinet name, Model Id = Part No (spaces stripped), Subnet from the IP, group =
   `<FunctionalUnit>_IODevices` - EMPTY for the Plc head (the PLC stays at the TIA root; OP honors Group
   for every row, 2026-07-07). Custom Parameters = the DTD "I/O Addresses Parameter" (`%I%`/`%Q%` -> the
@@ -54,7 +58,7 @@ from pipeline5.findings import gate as run
 from pipeline5.truth.database import Database
 from pipeline5.findings.finding import Finding, record
 from pipeline5.truth.table import Table
-from pipeline5.truth.signals import signals_table
+from pipeline5.truth.signals import signals_table, is_generated
 
 HEAD_PLC = "PLC"
 HEAD_CM = "PLCCARDCM"
@@ -153,6 +157,21 @@ def _merge_params(*blobs) -> str:
     return " | ".join(values[k] if values[k] is not None else k for k in order)
 
 
+_UNRESOLVED_RX = re.compile(r"%([IQ])%", re.IGNORECASE)
+_KEY_RANGE_RX = re.compile(r"\((\d+)-(\d+)\)")
+
+
+def _param_keys(key: str) -> set:
+    """A parameter key as the importer (Openn3App's CustomParameterParser) reads it: each `.` step trimmed, case
+    ignored, ONE `(a-b)` range expanded - `Item(0).Addr(0-1).StartAddress` sets Addr(0) AND Addr(1)."""
+    k = ".".join(step.strip() for step in str(key).split(".")).strip().lower()
+    m = _KEY_RANGE_RX.search(k)
+    if not m:
+        return {k}
+    a, b = sorted((int(m.group(1)), int(m.group(2))))
+    return {f"{k[:m.start()]}({i}){k[m.end():]}" for i in range(a, b + 1)}
+
+
 def _resolve_addr_template(template, i_base, q_base) -> str:
     """Replace %I%/%Q% (with optional +N) by the device start bytes."""
     def repl(m):
@@ -161,7 +180,7 @@ def _resolve_addr_template(template, i_base, q_base) -> str:
         if base is None:
             return m.group(0)
         return str(base + (int(plus) if plus else 0))
-    return re.sub(r"%([IQ])%\s*(?:\+\s*(\d+))?", repl, template or "")
+    return re.sub(r"%([IQ])%\s*(?:\+\s*(\d+))?", repl, template or "", flags=re.IGNORECASE)
 
 
 def _channel(addr, card_start_byte) -> int:
@@ -224,7 +243,31 @@ def extract(rows, dtd) -> tuple:
         q_base = min(sig_q) if sig_q else None
 
         io_addr = _resolve_addr_template(rec["io_addr_params"], i_base, q_base)
-        station_params = _merge_params(io_addr, str(row.get("hardware_params") or ""))
+        # an entry whose %I%/%Q% found no base (the station has no row of that direction) is DROPPED, never
+        # written as a literal the importer cannot read - TIA places that submodule itself ([[C-028]])
+        kept = [e for e in (p.strip() for p in io_addr.split("|")) if e]
+        unresolved = [e for e in kept if _UNRESOLVED_RX.search(e)]
+        hw_params = str(row.get("hardware_params") or "")
+        if unresolved:
+            kept = [e for e in kept if e not in unresolved]
+            io_addr = " | ".join(kept)
+            # an entry the head's Hardware Parameters (col AG) set - with a value - is placed by them, not left to TIA;
+            # keys compared the importer's way (round 3: case, spacing, one `(a-b)` range)
+            ag_keys = set()
+            for p in hw_params.split("|"):
+                if "=" in p and p.split("=", 1)[1].strip():
+                    ag_keys |= _param_keys(p.split("=", 1)[0])
+            left = [e for e in unresolved if not _param_keys(e.split("=", 1)[0]) <= ag_keys]
+            if left:
+                where = _where(row)
+                missing = sorted({m.group(1).upper() for e in left for m in _UNRESOLVED_RX.finditer(e)})
+                findings.append(_f("hw_addr_unresolved", "WARN",
+                                   f"station {str(row.get('profinet_name') or '').strip()!r} ({model}): no "
+                                   + " / ".join({"I": "input", "Q": "output"}[d] for d in missing)
+                                   + f" row to place {len(left)} start-address entr"
+                                   + ("y" if len(left) == 1 else "ies") + " - left to TIA",
+                                   where, str(row.get("uid", "")), doc=_io_doc() if "!" in where else ""))
+        station_params = _merge_params(io_addr, hw_params)
         stations.append({
             "role": cur["role"], "station_name": str(row.get("profinet_name") or "").strip(),
             "model_id": model, "ip_address": str(row.get("profinet_ip") or "").strip(),
@@ -281,6 +324,8 @@ def extract(rows, dtd) -> tuple:
             })
 
     for row in rows or []:
+        if is_generated(row):                    # a generated signal sits under no head in the document - a
+            continue                             # POSITIONAL walk never gives it to a station ([[C-030]] round 1)
         role = _role(row)
         if role is not None:
             finalize()
@@ -353,7 +398,8 @@ def build(database: Database | None = None) -> tuple:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
     rows = list(database["signals"])
-    stations, modules, findings = extract(rows, config.load_device_types_db())
+    # the project's own database when its params name one (`device_types_db`, [[C-028]] round 3), else the shared
+    stations, modules, findings = extract(rows, config.load_device_types_db(config.load_params()))
     if run.has_blocking(findings):                  # raw-FAIL guard: never write BuilderData on a FAIL
         return database, findings
 

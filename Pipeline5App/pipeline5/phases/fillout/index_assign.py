@@ -48,6 +48,11 @@ def _anchor_lookup(anchor_map: dict, fld: str):
 # roles
 STANDALONE, ANCHOR, CHANNEL_2, RESET, PATTERN = "standalone", "anchor", "channel_2", "reset", "pattern"
 SERIES_PRIMARY, SERIES_SIBLING, FLD_INHERIT, MANUAL = "series_primary", "series_sibling", "fld_inherit", "manual"
+# a channel family's other two members (C-027 refute round 1 + the single-row e-stop type E, 2026-10-07):
+# SINGLE = an anchor type with no channel - one row carrying both channels, complete on its own (E);
+# FOLLOWER = a channel-less member that is not an anchor - it inherits its object's index by FLD but is
+# never the anchor's partner (EL, the lamp: a two-row e-stop missing its CH2 stays an orphan)
+SINGLE, FOLLOWER = "single", "follower"
 
 
 # --- the PL4 adapter helpers over a staged signals dict ---------------------------------------- #
@@ -109,7 +114,12 @@ def role_of(res) -> str:
     if fam.link == LINK_PATTERN:
         return PATTERN
     if fam.link == LINK_CHANNEL:
-        return ANCHOR if ch == "1" else CHANNEL_2
+        if ch == "1":
+            return ANCHOR
+        if ch == "2":
+            return CHANNEL_2
+        anchors = {a.strip().upper() for a in (fam.anchor or "").split("|") if a.strip()}
+        return SINGLE if st in anchors else FOLLOWER
     if fam.link == LINK_SERIES:
         if st.startswith("KQ"):
             return ANCHOR
@@ -149,23 +159,51 @@ def _unresolved(res, reason: str, error: bool = False) -> None:
         res.error = reason
 
 
-def assign_indices(rows: list, families: list, *, from_scratch: bool = False) -> dict:
+# The TYPE contradictions of a channel family ([[C-029]] refute rounds 2-3): an index never settles them - they
+# are reported whether or not the row already carries one (a human index is kept), and the advice is the type.
+CONTRADICTIONS = {
+    "single_with_channel_2": "a channel-2 row on the designation of a ONE-row object (e.g. E - its description "
+                             "names both channels): correct the script type or the description, not the index",
+    "single_with_anchor": "a second object on one designation (a ONE-row object - e.g. E - beside another, or "
+                          "beside a channel-1 row): correct the script type or the description, not the index",
+}
+
+
+def _contradiction(res, reason: str) -> None:
+    """Flag a type contradiction: ALWAYS reported (unresolved + the reason); a human index is kept, a computed
+    one is replaced by the sentinel."""
+    ex = (res.ex_index or "").strip()
+    res.unresolved, res.unresolved_reason, res.error = True, reason, reason
+    res.index = ex if ex and ex != INPUT_REQUIRED else INPUT_REQUIRED
+
+
+def assign_indices(rows: list, families: list, *, from_scratch: bool = False, reasons: dict | None = None) -> dict:
     """Compute the INDEX per is_indexable staged signal row -> {uid: index}. `from_scratch` blanks the
-    pre-filled index (a fresh compute); otherwise a digit ex_index seeds/preserves the counter."""
+    pre-filled index (a fresh compute); otherwise a digit ex_index seeds/preserves the counter. `reasons`, when
+    given, receives {uid: reason} for every unresolved row - the CONTRADICTIONS included even where a human
+    index was kept."""
     results = [_Res(r, families, "" if from_scratch else (r.get("index") or "")) for r in rows]
 
     counters: dict = {}
     fld_anchor: dict = defaultdict(dict)     # family.key -> {fld -> index}
+    single_anchor: dict = defaultdict(dict)  # family.key -> {fld -> index} of the SINGLE (one-row) objects
     pattern_idx: dict = {}                    # family.key -> shared index
     indexable = [res for res in results if is_indexable(res)]
 
     # Pass 1: anchors / standalone / reset / pattern consume their counters in row order
     for res in indexable:
         role = role_of(res)
-        if role in (ANCHOR, STANDALONE, RESET):
+        if role in (ANCHOR, SINGLE) and (
+                (role == SINGLE and _anchor_lookup(fld_anchor[res.family.key], res.fld))
+                or (role == ANCHOR and _anchor_lookup(single_anchor[res.family.key], res.fld))):
+            _contradiction(res, "single_with_anchor")      # a one-row object beside another object (round 3)
+            continue
+        if role in (ANCHOR, SINGLE, STANDALONE, RESET):
             res.index = _take(counters, _counter_key(res), res.ex_index)
-            if role == ANCHOR:
+            if role in (ANCHOR, SINGLE):
                 _register_anchor(fld_anchor[res.family.key], res.fld, res.index)
+            if role == SINGLE:
+                _register_anchor(single_anchor[res.family.key], res.fld, res.index)
         elif role == PATTERN:
             key = res.family.key
             if key not in pattern_idx:
@@ -179,7 +217,13 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
             ch2_flds[res.family.key].add(res.fld)
     for res in indexable:
         role = role_of(res)
-        if role == CHANNEL_2:
+        if res.unresolved_reason in CONTRADICTIONS:
+            continue                                       # flagged in pass 1
+        if role == CHANNEL_2 and _anchor_lookup(single_anchor.get(res.family.key, {}), res.fld):
+            # a channel-2 row beside a ONE-row object (E): the pair was typed as a single - a contradiction,
+            # never a silent inherit, reported even when the row carries an index ([[C-029]] rounds 2-3)
+            _contradiction(res, "single_with_channel_2")
+        elif role in (CHANNEL_2, FOLLOWER):
             got = _anchor_lookup(fld_anchor.get(res.family.key, {}), res.fld)
             if got:
                 res.index = got
@@ -225,4 +269,6 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False) ->
                 _unresolved(res, "ki_without_kq")
                 current = None
 
+    if reasons is not None:
+        reasons.update({res.uid: res.unresolved_reason for res in indexable if res.unresolved_reason})
     return {res.uid: res.index for res in indexable}

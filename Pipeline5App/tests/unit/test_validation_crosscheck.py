@@ -1,6 +1,8 @@
 """Phase 100c - the two cross-checks (130 CEM->IOL, 140 IOL->CEM) + the ce_refs indexes. Hermetic: the
 index builders over synthetic rows, and the run_* functions with `ce_refs.read_ce_refs` monkeypatched to
 synthetic C&E refs + a synthetic `signals` Database (no workbook I/O)."""
+import os
+
 from _harness import run, eq, ok
 from pipeline5.truth.database import Database as DB
 from pipeline5.truth.table import Table as CoreTable
@@ -123,6 +125,45 @@ def test_xcheck_ce_absent_skips():
        [("ce_absent", "SKIP")])
 
 
+def test_xcheck_dotted_notation_matches_canonical():
+    """C-022 completion (refute round 1): under the project's dotted notation the C&E's `I.645.1` / `Q.742.0`
+    - read by the REAL C&E reader - match the staged canonical `I645.1` / `Q742.0`: 130 finds address + FLD,
+    140 a full match; nothing FAILs."""
+    import tempfile
+    from openpyxl import Workbook
+    from pipeline5.truth import addresses
+    addresses.configure_address_format(r"(?P<direction>[IQ])\.?(?P<byte>\d+)\.(?P<bit>\d+)", None)
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "ce.xlsx")
+            wb = Workbook()
+            m = wb.active
+            m.title = "CAUSE&EFFECT MATRIX"
+            m["F2"] = "BIT (ADDRESS)"
+            m["F5"] = "I.645.1"; m["J5"] = "TRIB"; m["K5"] = "+CA01"; m["L5"] = "-B1"
+            a = wb.create_sheet("AREA 1")
+            a["A3"] = "SIGLA"; a["C3"] = "DIGITAL OUTPUT"
+            a["A4"] = "TRIB+CA01-K1"; a["C4"] = "Q.742.0"
+            wb.save(p)
+            params = {"matrix_path": p, "iolist_path": "io.xlsx", "matrix_params": {
+                "ce_sheet": {"name": "CAUSE&EFFECT MATRIX", "header_row": 2, "data_row": 5},
+                "area_sheets": {"name": "/^AREA \\d/", "header_row": 3, "data_row": 4}}}
+            db = _signals([
+                {"uid": "1", "functional_unit": "TRIB", "location": "+CA01", "device": "-B1", "bit": "I645.1",
+                 "source_cell": "IO!O2", "desc_l1": "emergency", "type": {"type_id": "X", "ce_mandatory": "yes"}},
+                {"uid": "2", "functional_unit": "TRIB", "location": "+CA01", "device": "-K1", "bit": "Q742.0",
+                 "source_cell": "IO!O3", "desc_l1": "emergency", "type": {"type_id": "Y", "ce_mandatory": "yes"}}])
+            f130 = crosscheck.run_xcheck_cem_iol(db, params)
+            f140 = crosscheck.run_xcheck_iol_cem(db, params)
+        ok({("cem_addr_ok", "PASS"), ("cem_fld_ok", "PASS")} <= _types(f130), "130: the dotted C&E address found")
+        ok(not any(f.severity == "FAIL" for f in f130), "130: nothing FAILs")
+        eq(sorted(f.location for f in f140 if f.type == "iol_cem_match"), ["IO!O2", "IO!O3"],
+           "140: both staged rows fully matched")
+        eq({t for t, s in _types(f140)} - {"iol_cem_summary"}, {"iol_cem_match"}, "140: no other verdict")
+    finally:
+        addresses.configure_address_format(None, None)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("validation_crosscheck", [
@@ -132,4 +173,5 @@ if __name__ == "__main__":
         ("xcheck_cem_iol", test_xcheck_cem_iol),
         ("xcheck_iol_cem_decision_tree", test_xcheck_iol_cem_decision_tree),
         ("xcheck_ce_absent_skips", test_xcheck_ce_absent_skips),
+        ("xcheck_dotted_notation_matches_canonical", test_xcheck_dotted_notation_matches_canonical),
     ]))

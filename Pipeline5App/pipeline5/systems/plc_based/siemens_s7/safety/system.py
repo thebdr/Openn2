@@ -67,6 +67,7 @@ SYSTEM = System(
     config_root=os.path.join(os.path.dirname(os.path.abspath(__file__)), "config_project"),
     reaction_hooks=_main.REACTION_HOOKS,
     reaction_legs=_main.REACTION_LEGS,
+    reaction_absorbs=_main.REACTION_ABSORBS,
     template_language="scl",
 )
 

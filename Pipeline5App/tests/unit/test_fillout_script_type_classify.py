@@ -24,6 +24,9 @@ def test_node_passthrough():
 
 def test_in_ladder():
     eq(_t(bit="I0.0", desc_l1="EMERGENCY PUSH-BUTTON PRESSED", desc_l1b="CH1"), "E1/2", "emergency push-button")
+    eq(_t(bit="I0.0", desc_l1="EMERGENCY PUSH-BUTTON PRESSED", desc_l1b="CH2"), "E2/2", "its channel-2 row")
+    eq(_t(bit="I0.0", desc_l1="EMERGENCY PUSH BUTTON PRESSED", desc_l1b="CH1/CH2 =ES-0035"), "E",
+       "ONE row naming both channels -> the single-row type E (C-029)")
     eq(_t(bit="I0.1", desc_l1="FEEDBACK SAFETY RELAY"), "KI", "safety relay feedback")
     eq(_t(bit="I0.2", desc_l1="DOOR OPEN", desc_l1b="CH2"), "DI2/2", "door channel input")
     eq(_t(bit="I0.3", desc_l1="DOOR OPEN", desc_l1b="RESET"), "DR", "door reset")
@@ -47,6 +50,10 @@ def test_out_ladder():
     eq(_t(bit="Q0.0", desc_l1="SAFETY RELAY"), "KQ", "safety relay output (desc1)")
     eq(_t(bit="Q0.1", desc_l1="DOOR OPEN"), "DQ", "door open output")
     eq(_t(bit="Q0.2", desc_l1="DOOR", desc_l1b="LAMP"), "DL", "door lamp")
+    eq(_t(bit="Q1484.0", desc_l1="EMERGENCY PUSH BUTTON LAMP", desc_l1b="=ES-0001"), "EL", "e-stop lamp (C-027)")
+    eq(_t(bit="Q1484.1", desc_l1="EMERGENCY PUSH-BUTTON", desc_l1b="LAMP =ES-0002"), "EL", "e-stop lamp, split")
+    eq(_t(bit="I1484.0", desc_l1="EMERGENCY PUSH BUTTON PRESSED", desc_l1b="CH1"), "E1/2",
+       "the button itself (an input) stays E1/2")
     eq(_t(bit="Q0.3", desc_l1="OUTPUT", desc_l1b="EMERGENCY AREA 2"), "Z2", "emergency-area output")
     eq(_t(bit="Q0.4", desc_l1="SOME UNRECOGNISED OUTPUT"), "<input required>", "OUT catch-all -> sentinel")
 

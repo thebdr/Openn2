@@ -17,6 +17,7 @@ import re
 from collections import defaultdict
 
 from pipeline5.phases.changes.match import norm, fld, desc
+from pipeline5.truth import addresses
 
 TIER_RANK = {"minor": 1, "major": 2, "critical": 3}
 _MIN_SYSTEMATIC = 8          # a field needs at least this many changed rows to be a "systematic" event
@@ -80,10 +81,23 @@ _ADDR = re.compile(r"^([A-Za-z]+)\s*(\d+)(?:\.(\d+))?$")
 
 
 def _parse_addr(value):
+    """(prefix, byte, bit|None) of a document address: the configured NOTATION first ([[C-022]] - a dotted
+    `I.645.1` is `('I', 645, 1)`), then the generic letters+byte[.bit] form (`IW256`, `O12.0`)."""
+    p = addresses.parse(norm(value))                 # norm first: an Excel text-guard apostrophe is no part
+    if p is not None:                                # of the address (round 3)
+        return p
     m = _ADDR.match(norm(value))
     if not m:
         return None
     return m.group(1), int(m.group(2)), (int(m.group(3)) if m.group(3) is not None else None)
+
+
+def _same(field, a, b) -> bool:
+    """Whether a field's two values are the same: an ADDRESS field on the canonical key ([[C-022]] - a revision
+    that only re-spells `I645.1` as `I.645.1` changes nothing), every other field on `norm`."""
+    if field in _ADDR_FIELDS:
+        return addresses.key(norm(a)) == addresses.key(norm(b))
+    return norm(a) == norm(b)
 
 
 def detect_address_event(changes: list) -> dict | None:
@@ -165,7 +179,7 @@ def _detect_systematic(pairs: list, fields: list, weights: dict) -> dict:
         if field not in _ADDR_FIELDS and field not in _RESCHEME_FIELDS:
             continue                                          # semantic field - never a re-scheme
         changes = [(p["old"].get(field), p["new"].get(field)) for p in pairs
-                   if norm(p["old"].get(field)) != norm(p["new"].get(field))]
+                   if not _same(field, p["old"].get(field), p["new"].get(field))]
         event = detect_address_event(changes) if field in _ADDR_FIELDS else detect_value_event(changes)
         if event:
             event["field"], event["tier"] = field, _tier(weights, field)
@@ -231,7 +245,7 @@ def classify_iolist(match_result: dict, weights: dict) -> dict:
     for pair in pairs:
         old, new = pair["old"], pair["new"]
         node = old.get("_node", "")
-        changed_fields = [f for f in fields if norm(old.get(f)) != norm(new.get(f))]
+        changed_fields = [f for f in fields if not _same(f, old.get(f), new.get(f))]
         has_desc = bool(norm(old.get("desc_l1")) or norm(old.get("desc_l1b")))
         if not has_desc:                                      # an unused channel - out of the defect analysis
             if not changed_fields:
@@ -409,7 +423,7 @@ def classify_ce(match_result: dict, old_areas: list, new_areas: list, weights: d
     is an UPGRADE. Added cause rows that form a coherent contiguous block are an upgrade, else corrections."""
     pairs = match_result["pairs"]
     addr_changes = [(p["old"].get("address"), p["new"].get("address")) for p in pairs
-                    if norm(p["old"].get("address")) != norm(p["new"].get("address"))]
+                    if not _same("address", p["old"].get("address"), p["new"].get("address"))]
     events = {}
     addr_event = detect_address_event(addr_changes)
     if addr_event:
@@ -435,7 +449,7 @@ def classify_ce(match_result: dict, old_areas: list, new_areas: list, weights: d
         for area in new_area_cols:
             if norm(new_eff.get(area)) and not norm(old_eff.get(area)):
                 rollout_rows += 1
-        addr_changed = norm(old.get("address")) != norm(new.get("address"))
+        addr_changed = not _same("address", old.get("address"), new.get("address"))
         if addr_changed:
             addr_rows += 1                        # the C&E address is grouped + counted, not itemized
         itemized = [f for f in _CE_COMPARE if f != "address" and norm(old.get(f)) != norm(new.get(f))]
@@ -543,7 +557,7 @@ def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weight
     _korder = {"extended": 0, "moved": 1, "reduced": 2}
     membership.sort(key=lambda m: (_korder[m["kind"]], -len(m["added"]), -len(m["removed"]), m["device_tag"] or ""))
     addr_changes = [(p["old"].get("digital_output"), p["new"].get("digital_output")) for p in pairs
-                    if norm(p["old"].get("digital_output")) != norm(p["new"].get("digital_output"))]
+                    if not _same("digital_output", p["old"].get("digital_output"), p["new"].get("digital_output"))]
     addr_event = detect_address_event(addr_changes)
     events = {}
     if addr_event:
@@ -557,7 +571,7 @@ def classify_area(match_result: dict, counts_old: dict, counts_new: dict, weight
         old, new = pair["old"], pair["new"]
         genuine = []
         for f in _AREA_COMPARE:
-            if norm(old.get(f)) == norm(new.get(f)):
+            if _same(f, old.get(f), new.get(f)):
                 continue
             ev = events.get(f)
             if ev and ev["member"](old.get(f), new.get(f)):

@@ -117,6 +117,100 @@ def test_station_io_addr_and_ag_override():
        "%I% -> device start byte (40), then col-AG appended last")
 
 
+def test_shipped_sfb_v2_station_addresses():
+    """C-028: the SHIPPED DeviceTypesDatabase places an SFB-PN V2's three data submodules at the station's own
+    I/O-List base (FS data +0, Diagnosis and FB-Interface +6, Functional data +12 - inputs and outputs), so the
+    I/O List's pin rows (X1 at the base, X2 +1, DI +7, the DO lamp at the output base) land on the hardware.
+    The FVT shape: a compact GSD station, its signal rows carrying no card slot of their own."""
+    from pipeline5.config.loaders import load_device_types_db
+    dtd = load_device_types_db()
+    rec = dtd["by_id"].get("103040357")
+    ok(rec is not None and rec["dev_type"] == "IoDevice", "the SFB V2 is a shipped IoDevice")
+    head = {"script_type": "PA", "type_hw": "PA", "part_no": "103040357", "profinet_name": "n0085-es-k1",
+            "profinet_ip": "192.168.20.85", "functional_unit": "=ES", "slot": "-K1", "bit": "",
+            "source_sheet": "NET", "source_row": 985}
+    pins = [("-K1", "I1484.0"), ("", "I1485.0"), ("", "I1491.0"), ("", "Q1484.0"),
+            ("-K1", "I1484.7"), ("", "I1485.7"), ("", "I1491.7"), ("", "Q1484.7")]
+    rows = [head] + [{"script_type": "", "part_no": "103040357", "slot": s, "bit": b, "source_sheet": "NET",
+                      "source_row": 986 + i} for i, (s, b) in enumerate(pins)]
+    stations, modules, findings = hardware.extract(rows, dtd)
+    eq(len(stations), 1, "one station")
+    eq([f.type for f in findings if f.severity == "FAIL"], [], "the model is known: no hw_device_not_in_dtd")
+    eq(modules, [], "a compact station: no card rows (its pin rows are auto-plugged)")
+    got = {p.split("=", 1)[0].strip(): p.split("=", 1)[1].strip()
+           for p in stations[0]["custom_parameters"].split("|") if "StartAddress" in p}
+    eq(got, {"Item(1).Item(2).Item(0).Addr(0).StartAddress": "1484", "Item(1).Item(2).Item(0).Addr(1).StartAddress": "1484",
+             "Item(1).Item(2).Item(2).Addr(0).StartAddress": "1490", "Item(1).Item(2).Item(2).Addr(1).StartAddress": "1490",
+             "Item(1).Item(2).Item(1).Addr(0).StartAddress": "1496", "Item(1).Item(2).Item(1).Addr(1).StartAddress": "1496"},
+       "FS data at the base, Diagnosis +6, Functional +12 - inputs and outputs")
+    defaults = {e.split("=", 1)[0].strip(): e.split("=", 1)[1].strip() for e in rec["params"].split("|") if "=" in e}
+    eq(defaults, {"Item(1).Item(2).Item(0).Failsafe_FDestinationAddress": "IP[3]",
+                  "Item(1).Item(2).Item(0).Failsafe_FMonitoringtime": "250",
+                  "Item(1).Item(2).Item(0).Failsafe_FParameterSignatureIndividualParameters": "123358913",
+                  "Item(1).Item(2).Item(0).PrmData(1-8)": "06 01 01"},
+       "the model-wide F-parameter defaults the importer applies (F-destination = the IP's last octet)")
+
+
+def _sfb_rows(pins, head_extra=None):
+    head = {"script_type": "PA", "type_hw": "PA", "part_no": "103040357", "profinet_name": "n0085-es-k1",
+            "profinet_ip": "192.168.20.85", "functional_unit": "=ES", "slot": "-K1", "bit": "",
+            "source_sheet": "NET", "source_row": 985, "source_cell": "NET!O985"}
+    head.update(head_extra or {})
+    return [head] + [{"script_type": t, "part_no": pn, "slot": sl, "bit": bit, "source_sheet": "NET",
+                      "source_row": 986 + i} for i, (sl, bit, t, pn) in enumerate(pins)]
+
+
+def _start_addresses(station):
+    return {e.split("=", 1)[0].strip(): e.split("=", 1)[1].strip()
+            for e in station["custom_parameters"].split("|") if "StartAddress" in e}
+
+
+def test_shipped_fdi_dd_channel_block():
+    """C-028 (the database's F-DI door-diagnosis block): a DD row on the shipped 6ES7136-6BA01-0CA0 card gets
+    the card's DD block at its own channel - sensor evaluation off, sensor supply 8."""
+    from pipeline5.config.loaders import load_device_types_db
+    rows = _sfb_rows([("-K30004", "I10.0", "DI1/2", "6ES7136-6BA01-0CA0"),
+                      ("-K30004", "I10.2", "DD", "6ES7136-6BA01-0CA0")])
+    _stations, modules, _f = hardware.extract(rows, load_device_types_db())
+    eq(len(modules), 1, "one F-DI card")
+    text = " | ".join(str(v) for v in modules[0].values())
+    ok("Ch(2).Failsafe_SensorEvaluation=0" in text and "Ch(2).Failsafe_SensorSupply=8" in text,
+       "the DD block at channel 2")
+    ok("Ch(0).Failsafe_SensorSupply=8" in text, "the DI1/2 block at channel 0")
+
+
+def test_sfb_without_output_rows_drops_the_q_entries():
+    """C-028 (refute round 1): a station with no output row cannot place its `%Q%` entries - they are DROPPED
+    (never a literal `%Q%` the importer cannot convert) with a hw_addr_unresolved WARN; the inputs still land."""
+    from pipeline5.config.loaders import load_device_types_db
+    rows = _sfb_rows([("-K1", "I1484.0", "", "103040357"), ("", "I1485.0", "", "103040357")])
+    stations, _m, findings = hardware.extract(rows, load_device_types_db())
+    ok("%Q%" not in stations[0]["custom_parameters"] and "%I%" not in stations[0]["custom_parameters"],
+       "no unresolved template reaches Stations.csv")
+    eq(_start_addresses(stations[0]), {"Item(1).Item(2).Item(0).Addr(0).StartAddress": "1484",
+                                       "Item(1).Item(2).Item(2).Addr(0).StartAddress": "1490",
+                                       "Item(1).Item(2).Item(1).Addr(0).StartAddress": "1496"},
+       "the input entries placed, the output ones dropped")
+    warn = [f for f in findings if f.type == "hw_addr_unresolved"]
+    eq([f.severity for f in warn], ["WARN"], "one WARN for the station")
+    ok("output" in warn[0].detail and "3 start-address entries" in warn[0].detail, warn[0].detail)
+    eq(warn[0].location, "NET!O985", "it links the head's I/O-List row")
+
+
+def test_sfb_base_is_the_lowest_row_and_col_ag_overrides():
+    """C-028 boundary (documented): the station base is its LOWEST I/O-List address per direction - a box whose
+    X1 (+0) row is missing shifts its layout; the head's Hardware Parameters (col AG) override an entry."""
+    from pipeline5.config.loaders import load_device_types_db
+    pins = [("-K1", "I1485.0", "", "103040357"), ("", "I1491.0", "", "103040357"), ("", "Q1484.0", "", "103040357")]
+    stations, _m, _f = hardware.extract(_sfb_rows(pins), load_device_types_db())
+    eq(_start_addresses(stations[0])["Item(1).Item(2).Item(0).Addr(0).StartAddress"], "1485",
+       "no +0 input row: the lowest input row is taken as the base")
+    fix = {"hardware_params": "Item(1).Item(2).Item(0).Addr(0).StartAddress = 1484"}
+    stations, _m, _f = hardware.extract(_sfb_rows(pins, fix), load_device_types_db())
+    eq(_start_addresses(stations[0])["Item(1).Item(2).Item(0).Addr(0).StartAddress"], "1484",
+       "the head's col-AG entry overrides the template's")
+
+
 def test_missing_dtd_fail_and_switch_warning():
     rows = [
         {"script_type": "PLC", "part_no": "UNKNOWN_CPU", "profinet_name": "n1",
@@ -226,6 +320,131 @@ def test_format2_projection():
            "a module data row (PotentialGroup + by-type channel params)")
 
 
+def test_sfb_base_is_the_lowest_row_whatever_the_order():
+    """C-028 refute round 2: the base is the LOWEST address per direction, not the first row listed."""
+    from pipeline5.config.loaders import load_device_types_db
+    pins = [("", "Q1485.0", "", "103040357"), ("", "Q1484.0", "", "103040357"),
+            ("", "I1485.0", "", "103040357"), ("-K1", "I1484.0", "", "103040357")]
+    stations, _m, _f = hardware.extract(_sfb_rows(pins), load_device_types_db())
+    got = _start_addresses(stations[0])
+    eq((got["Item(1).Item(2).Item(0).Addr(0).StartAddress"], got["Item(1).Item(2).Item(0).Addr(1).StartAddress"]),
+       ("1484", "1484"), "the lowest input and output rows are the bases, listed last")
+
+
+def test_sfb_without_input_rows_drops_the_i_entries():
+    """C-028 refute round 2: the mirror case - a station with only output rows drops its `%I%` entries and its
+    WARN names the INPUT direction only."""
+    from pipeline5.config.loaders import load_device_types_db
+    rows = _sfb_rows([("-K1", "Q1484.0", "", "103040357")])
+    stations, _m, findings = hardware.extract(rows, load_device_types_db())
+    ok("%I%" not in stations[0]["custom_parameters"], "no literal %I% reaches Stations.csv")
+    eq(_start_addresses(stations[0]), {"Item(1).Item(2).Item(0).Addr(1).StartAddress": "1484",
+                                       "Item(1).Item(2).Item(2).Addr(1).StartAddress": "1490",
+                                       "Item(1).Item(2).Item(1).Addr(1).StartAddress": "1496"},
+       "the output entries placed, the input ones dropped")
+    warn = [f for f in findings if f.type == "hw_addr_unresolved"]
+    eq(len(warn), 1, "one WARN")
+    ok("no input row" in warn[0].detail and "output" not in warn[0].detail, warn[0].detail)
+
+
+def test_col_ag_placing_a_dropped_entry_is_not_left_to_tia():
+    """C-028 refute round 2: an entry the head's Hardware Parameters (col AG) set reaches Stations.csv and is not
+    counted as left to TIA; when AG sets every dropped entry there is no WARN at all."""
+    from pipeline5.config.loaders import load_device_types_db
+    dtd = load_device_types_db()
+    q0 = "Item(1).Item(2).Item(0).Addr(1).StartAddress"
+    pins = [("-K1", "I1484.0", "", "103040357")]
+    stations, _m, findings = hardware.extract(_sfb_rows(pins, {"hardware_params": f"{q0} = 1484"}), dtd)
+    eq(_start_addresses(stations[0]).get(q0), "1484", "the AG entry is placed")
+    warn = [f for f in findings if f.type == "hw_addr_unresolved"]
+    ok(len(warn) == 1 and "2 start-address entries" in warn[0].detail, [f.detail for f in warn])
+    every = " | ".join(f"Item(1).Item(2).Item({i}).Addr(1).StartAddress = {a}" for i, a in ((0, 1484), (2, 1490), (1, 1496)))
+    _s, _m, findings = hardware.extract(_sfb_rows(pins, {"hardware_params": every}), dtd)
+    eq([f for f in findings if f.type == "hw_addr_unresolved"], [], "AG places every dropped entry -> no WARN")
+
+
+def test_resolve_addr_template_ignores_case():
+    """C-028 refute round 2: a hand-typed lower-case placeholder resolves like the upper-case one (the drop
+    check already ignored case - a `%i%` was dropped with a false 'no input row')."""
+    eq(hardware._resolve_addr_template("%i%+6 | %q%", 10, 20), "16 | 20")
+
+
+def test_project_device_types_db_is_what_700_reads_and_places():
+    """C-028 refute round 3: a project whose params name its own DeviceTypesDatabase (`device_types_db`) gets ITS
+    values - phase 700 reads it, and 700b places a copy beside Stations.csv for the importer (which reads a local
+    one first); with no param nothing is placed, and a stray local copy is reported (it would override the
+    shared one for the importer), never deleted."""
+    from pipeline5 import config
+    from pipeline5.config.loaders import load_device_types_db
+    from pipeline5.config.paths import DEVICE_TYPES_DB_DEFAULT
+    from pipeline5.truth.signals import signals_table
+    shared = open(DEVICE_TYPES_DB_DEFAULT, encoding="utf-8-sig").read()
+    assert "<DI1/2>Ch(#).Failsafe_SensorSupply=8<DI1/2>" in shared
+    rows = _sfb_rows([("-K30004", "I10.0", "DI1/2", "6ES7136-6BA01-0CA0")])
+    original, original_db = config.load_params, config.database_dir
+    with tempfile.TemporaryDirectory() as d:
+        config.database_dir = lambda: d             # build() saves its tables - never into the repo
+        own = os.path.join(d, "MyDeviceTypes.csv")
+        with open(own, "w", encoding="utf-8") as f:
+            f.write(shared.replace("<DI1/2>Ch(#).Failsafe_SensorSupply=8<DI1/2>",
+                                   "<DI1/2>Ch(#).Failsafe_SensorEvaluation=0<DI1/2>"))
+        sig = signals_table(sorted({k for r in rows for k in r}))
+        for r in rows:
+            sig.add(**r)
+        out = os.path.join(d, "hw")
+        try:
+            config.load_params = lambda path=None: {"device_types_db": own}
+            db, _f = hardware.build(Database([sig]))
+            text = " | ".join(str(v) for v in db["hardware_modules"].rows[0].values())
+            ok("Ch(0).Failsafe_SensorEvaluation=0" in text and "SensorSupply" not in text,
+               f"700 read the project's database: {text}")
+            res = hardware_csv.project(db, out_dir=out)
+            eq(open(res["device_types_db"], encoding="utf-8").read(), open(own, encoding="utf-8").read(),
+               "700b placed the project's database beside Stations.csv")
+            config.load_params = lambda path=None: {}
+            res = hardware_csv.project(db, out_dir=out)
+            eq(res["device_types_db"], "", "no param: nothing placed")
+            eq([(f.type, f.severity) for f in res["findings"]], [("hw_local_dtd", "WARN")], "the stray copy reported")
+            ok(os.path.isfile(os.path.join(out, "DeviceTypesDatabase.csv")), "never deleted")
+        finally:
+            config.load_params, config.database_dir = original, original_db
+    eq(load_device_types_db({"device_types_db": ""})["by_id"]["103040357"]["dev_type"], "IoDevice",
+       "a blank param reads the shared database")
+
+
+def test_col_ag_keys_matched_the_importers_way():
+    """C-028 refute round 3: col AG sets a dropped entry whatever its key's case or spacing, and through one
+    `(a-b)` range - the importer reads it so; an AG entry with no value sets nothing."""
+    from pipeline5.config.loaders import load_device_types_db
+    dtd = load_device_types_db()
+    pins = [("-K1", "I1484.0", "", "103040357")]
+
+    def left(ag):
+        _s, _m, f = hardware.extract(_sfb_rows(pins, {"hardware_params": ag}), dtd)
+        w = [x.detail for x in f if x.type == "hw_addr_unresolved"]
+        return w[0] if w else ""
+    ok("2 start-address entries" in left("Item(1).Item(2).Item(0).Addr(0-1).StartAddress = 1484"), "a range")
+    ok("2 start-address entries" in left("item(1).item(2).item(0).addr(1).StartAddress = 1484"), "lower case")
+    ok("2 start-address entries" in left("Item(1).Item(2).Item(0).Addr(1) . StartAddress = 1484"), "spacing")
+    ok("3 start-address entries" in left("Item(1).Item(2).Item(0).Addr(1).StartAddress ="), "no value: still left")
+
+
+def test_lowercase_placeholder_without_rows_is_dropped():
+    """C-028 refute round 3: a hand-typed lower-case `%q%` whose direction has no row is dropped and warned like
+    `%Q%` - never a literal placeholder in Stations.csv."""
+    dtd = {"by_id": {"BOX": _dtd_rec("BOX", "IoDevice", io_addr="Item(0).Addr(0).StartAddress = %i% | "
+                                     "Item(0).Addr(1).StartAddress = %q% | Item(1).Addr(1).StartAddress = %q%+2")},
+           "default_cards": {}}
+    rows = [{"script_type": "PA", "type_hw": "PA", "part_no": "BOX", "profinet_name": "n1", "profinet_ip": "1.2.3.4",
+             "functional_unit": "=X", "slot": "-K1", "bit": "", "source_sheet": "NET", "source_row": 2},
+            {"script_type": "", "part_no": "BOX", "slot": "-K1", "bit": "I20.0", "source_sheet": "NET", "source_row": 3}]
+    stations, _m, findings = hardware.extract(rows, dtd)
+    ok("%" not in stations[0]["custom_parameters"], stations[0]["custom_parameters"])
+    eq(_start_addresses(stations[0]), {"Item(0).Addr(0).StartAddress": "20"}, "the input placed")
+    warn = [f.detail for f in findings if f.type == "hw_addr_unresolved"]
+    ok(len(warn) == 1 and "2 start-address entries" in warn[0], warn)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("hardware", [
@@ -240,4 +459,15 @@ if __name__ == "__main__":
         ("duplicate_ip_stations_skipped", test_duplicate_ip_stations_skipped),
         ("fill_tables_and_uids", test_fill_tables_and_uids),
         ("format2_projection", test_format2_projection),
+        ("shipped_sfb_v2_station_addresses", test_shipped_sfb_v2_station_addresses),
+        ("shipped_fdi_dd_channel_block", test_shipped_fdi_dd_channel_block),
+        ("sfb_without_output_rows_drops_the_q_entries", test_sfb_without_output_rows_drops_the_q_entries),
+        ("sfb_base_is_the_lowest_row_and_col_ag_overrides", test_sfb_base_is_the_lowest_row_and_col_ag_overrides),
+        ("sfb_base_is_the_lowest_row_whatever_the_order", test_sfb_base_is_the_lowest_row_whatever_the_order),
+        ("sfb_without_input_rows_drops_the_i_entries", test_sfb_without_input_rows_drops_the_i_entries),
+        ("col_ag_placing_a_dropped_entry_is_not_left_to_tia", test_col_ag_placing_a_dropped_entry_is_not_left_to_tia),
+        ("resolve_addr_template_ignores_case", test_resolve_addr_template_ignores_case),
+        ("project_device_types_db_is_what_700_reads_and_places", test_project_device_types_db_is_what_700_reads_and_places),
+        ("col_ag_keys_matched_the_importers_way", test_col_ag_keys_matched_the_importers_way),
+        ("lowercase_placeholder_without_rows_is_dropped", test_lowercase_placeholder_without_rows_is_dropped),
     ]))

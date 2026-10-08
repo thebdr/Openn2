@@ -104,28 +104,44 @@ def build_00_commissioning(db: Database) -> Table:
     return t
 
 
+def _fld_key(row) -> str:
+    """The I/O-List FLD AS WRITTEN (`iol_FLD`) as the lamp match key - the same designation the 200 index
+    pairs the e-stop family on, so the block and the I/O List never disagree on which lamp is whose
+    ([[C-027]] refute round 1); '' when the row has none."""
+    return str(row.get("iol_FLD") or "")
+
+
 @builds("02_EM Push Button")
 def build_02_em_push_button(db: Database) -> Table:
     """One 00_Push-Button_Input FB instance per node: the node's emergency-stop INPUTS - both
-    E1/2 emergency-push-buttons AND B1/2 safety-breakers (grouped by node, in address order),
-    chunked to the FB's 4 channels. The v1.1 template carries 8 !!ITERATOR_STRINGS$$ in document
-    order - the IN_1..4 bare-symbol quartet, then the 01_PushButton.<member> quartet - so the iterator
-    is the padded name_in_db quartet emitted TWICE (same values, padded identically). Bypass_ET200 is
-    the node's '<profinet_name> <profinet_ip>' (the same 00_Commissioning member as block 00)."""
-    SLOTS = 4   # the FB's 4 channels (IN_1..4 / 01_PushButton.<member>_1..4)
+    E1/2 / E (single-row) emergency-push-buttons AND B1/2 safety-breakers (grouped by node, in address order),
+    chunked to the FB's 4 channels. The v1.2 template carries 12 !!ITERATOR_STRINGS$$ in document
+    order - the IN_1..4 bare-symbol quartet, the 01_PushButton.<member> quartet, then the Lamp_1..4
+    bare-symbol quartet - so the iterator is the padded name_in_db quartet emitted TWICE (same values,
+    padded identically) followed by the lamp quartet: each channel's EL lamp output = the EL row with
+    the same I/O-List FLD (the lamp of that push-button; the first one when several), its PLC tag;
+    PAD when the channel has none (a breaker, a button without a lamp). Bypass_ET200 is the node's
+    '<profinet_name> <profinet_ip>' (the same 00_Commissioning member as block 00)."""
+    SLOTS = 4   # the FB's 4 channels (IN_1..4 / 01_PushButton.<member>_1..4 / Lamp_1..4)
+    lamps: dict = {}
+    for lamp in db.by_type("EL"):
+        if _fld_key(lamp) and lamp.get("name_in_tagtable"):
+            lamps.setdefault(_fld_key(lamp), lamp["name_in_tagtable"])
     t = Table("02_EM Push Button")
-    for node, members in _group_by_node(db, "E1/2", "B1/2"):
+    for node, members in _group_by_node(db, "E1/2", "E", "B1/2"):
         ident = f"{node['profinet_name']} {node['profinet_ip']}".strip()
         for i, chunk in enumerate(_chunked(members, SLOTS), start=1):
             inst = f"EMPB_{node['profinet_name']}_{i}"
             names = [m["name_in_db"] for m in chunk]
             names += [PAD] * (SLOTS - len(names))            # pad the quartet to the 4 fixed slots
+            lamp_tags = [lamps.get(_fld_key(m), PAD) for m in chunk]   # lamps has no '' key
+            lamp_tags += [PAD] * (SLOTS - len(lamp_tags))
             t.add(
                 template_type="01",
                 **{"instanceOf-00_Push-Button_Input": inst},
                 **{"00_Commissioning.{db_element}": ident},
                 NetworkComment=f"{inst} {node['profinet_ip']}",
-                ITERATOR_STRINGS=names + names,              # 2 quartets: IN_1..4 then 01_PushButton.<member>
+                ITERATOR_STRINGS=names + names + lamp_tags,  # 3 quartets: IN_1..4, 01_PushButton.<member>, Lamp_1..4
             )
     return t
 
@@ -133,7 +149,7 @@ def build_02_em_push_button(db: Database) -> Table:
 # Zone-cumulative groups (03): per AREA, AND the group's DB members -> a 02_COM."AREA n <LABEL>" coil.
 # Each group is ONE signal type -> ONE DB, so nameOfDB is scalar and the iterator is sized exactly.
 ZONE_GROUPS = [
-    ("PB",              ("E1/2",)),     # always (every area has push buttons)
+    ("PB",              ("E1/2", "E")),  # always (every area has push buttons; E = the single-row form)
     ("FDB",             ("KQ",)),       # always (every area has contactor feedback)
     ("SAFETY_BREAKERS", ("B1/2",)),     # only when the area has a breaker
     ("DOORS",           ("DI1/2",)),    # only when the area has a door safety input
