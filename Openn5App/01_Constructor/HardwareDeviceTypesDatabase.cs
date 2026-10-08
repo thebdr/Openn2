@@ -30,7 +30,7 @@ namespace Openn._01_Constructor
 
         /// <summary>
         /// Locates DeviceTypesDatabase.csv for a hardware-config folder. The monorepo splits
-        /// the two: Pipeline3 writes Stations.csv + Modules.csv into the BuilderData
+        /// the two: Pipeline5 writes Stations.csv + Modules.csv into the BuilderData
         /// HardwareConfiguration folder, while the hand-maintained device database is a shared
         /// input under Shared\HardwareConfigBuilderData. So prefer a copy beside the config
         /// (legacy / self-contained / test layout), else fall back to the shared input.

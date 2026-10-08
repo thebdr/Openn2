@@ -599,7 +599,7 @@ namespace Openn._03_ApiManager
                     "Abort  -  stop the whole hardware generation (project stays unsaved)\n" +
                     "Ignore -  skip this module and continue - DANGEROUS: the following\n" +
                     "          I/O addresses and custom parameters may no longer match",
-                    "Openn2 - Plug Module Error",
+                    "Openn5 - Plug Module Error",
                     System.Windows.Forms.MessageBoxButtons.AbortRetryIgnore,
                     System.Windows.Forms.MessageBoxIcon.Warning));
         }

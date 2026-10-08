@@ -81,7 +81,7 @@ namespace Openn._03_ApiManager
 
             using (var writer = new StreamWriter(dumpPath, false, Encoding.UTF8))
             {
-                writer.WriteLine("# Openn2 attribute dump - " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                writer.WriteLine("# Openn5 attribute dump - " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                 writer.WriteLine("# Project: " + project.Name);
                 writer.WriteLine("# Device filter: " + (filter == null ? "(all devices)" : deviceNameFilter));
                 writer.WriteLine("#");

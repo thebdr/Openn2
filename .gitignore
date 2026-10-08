@@ -46,3 +46,15 @@ Openn3App/lib/Siemens.Engineering.dll
 Openn3App/GeneratedBlocks/
 Openn3App/AttributeDumps/
 Openn3App/Logs/
+
+# Openn5App (C#, OP5 — the PL5 counterpart) — build output, NuGet, and exe-local working dirs
+Openn5App/obj/
+Openn5App/bin/
+Openn5App/packages/
+Openn5App/lib/*.pdf
+Openn5App/lib/Siemens.Engineering.dll
+Openn5App/GeneratedBlocks/
+Openn5App/AttributeDumps/
+Openn5App/Logs/
+Openn5App/TiaProjects/
+Openn5App/*.csproj.user

@@ -39,9 +39,11 @@ namespace Openn._01_Constructor
             foreach (string e in stations.Errors) errors.Add(e);
             foreach (string e in modules.Errors) errors.Add(e);
             if (stations.FormatVersion > CurrentFormatVersion)
-                errors.Add(StationsFileName + " declares format " + stations.FormatVersion + " but this version of Openn2 supports up to format " + CurrentFormatVersion);
+                errors.Add(StationsFileName + " declares format " + stations.FormatVersion + " but this version of Openn5 supports up to format " + CurrentFormatVersion);
             if (modules.FormatVersion > CurrentFormatVersion)
-                errors.Add(ModulesFileName + " declares format " + modules.FormatVersion + " but this version of Openn2 supports up to format " + CurrentFormatVersion);
+                errors.Add(ModulesFileName + " declares format " + modules.FormatVersion + " but this version of Openn5 supports up to format " + CurrentFormatVersion);
+            CheckHeader(stations, StationsFileName, Openn._00_Contract.InputKind.HwStations, errors);
+            CheckHeader(modules, ModulesFileName, Openn._00_Contract.InputKind.HwModules, errors);
 
             var controllers = new List<HardwareIoControllers._Controller>();
             var devices = new List<HardwareIoDevices._Device>();
@@ -72,6 +74,34 @@ namespace Openn._01_Constructor
                 controllers.Count + " controller(s), " + devices.Count + " IO device(s), " +
                 modulesByStation.Values.Sum(m => m.Count) + " module(s)");
             return true;
+        }
+
+        /// <summary>
+        /// Contract v1: the csv opens with a "#!openn" header declaring its kind. A valid header
+        /// of another kind, or with a newer schema, is an error (all-or-nothing like every other
+        /// loader check); the legacy "#!format=2" tag and a missing header are still accepted
+        /// with a warning until Pipeline5 stamps its output.
+        /// </summary>
+        private static void CheckHeader(CsvTable table, string fileName, Openn._00_Contract.InputKind expectedKind, IList<string> errors)
+        {
+            Openn._00_Contract.OpennHeader header = table.Header;
+            Openn._00_Contract.InputKindInfo expected = Openn._00_Contract.InputKindInfo.For(expectedKind);
+            switch (header.Status)
+            {
+                case Openn._00_Contract.HeaderStatus.Ok:
+                    if (header.KindInfo.Kind != expectedKind)
+                        errors.Add(fileName + " header declares kind " + header.KindId + " - expected " + expected.Id);
+                    break;
+                case Openn._00_Contract.HeaderStatus.Invalid:
+                    foreach (string problem in header.Problems) errors.Add(fileName + " header: " + problem);
+                    break;
+                case Openn._00_Contract.HeaderStatus.Legacy:
+                    Log("WARNING: " + fileName + " carries only the legacy #!format=" + header.LegacyFormat + " tag - contract v1 expects a #!openn header (kind: " + expected.Id + ")");
+                    break;
+                default:
+                    Log("WARNING: " + fileName + " has no #!openn header - contract v1 expects one (kind: " + expected.Id + ")");
+                    break;
+            }
         }
 
         /// <summary>

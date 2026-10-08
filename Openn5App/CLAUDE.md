@@ -1,14 +1,15 @@
-# Openn2 — TIA Portal Openness automation tool
-
-> **FROZEN — 2026-10-08.** OP3 (`Openn3App`, exe `Openn2.exe`) is the shipped counterpart of PL3/PL4 and
-> receives **no further development**. Do not add features here; do not refactor; a change is acceptable only
-> as a bug fix that a shipped PL3/PL4 project needs, mirrored from OP5 where it already exists. All new work
-> goes to `Openn5App` (OP5, the PL5 counterpart, started 2026-10-07 as a copy of this app). The last feature
-> taken in before the freeze is the PN/PN coupler transfer-area support (dump + generation), identical in OP5.
+# Openn5 — TIA Portal Openness automation tool
 
 WPF app (.NET Framework 4.8, old-style csproj) that drives Siemens TIA Portal via the
 Openness API: attaches to/creates TIA projects, generates PROFINET hardware from csv
 files, imports/exports PLC blocks.
+
+**OP5** is the Pipeline5 (PL5) counterpart, created 2026-10-07 as a copy of `Openn3App/` (OP3 - the stable,
+shipped pair with PL3/PL4; **never edit OP3 for OP5 work**, it is the fallback and the reference). What OP5
+changes: the **input contract** with PL5 - a VCI-shaped handoff workspace, a `#!openn` header on every file and
+a kind taxonomy (`00_Contract/`, spec in `Shared\PL5_OP5_contract.md`) - and, next, a friendlier UI built on
+that catalog instead of per-path buttons. Everything below that is not marked OP5 is inherited from OP3 and
+still true. I/O controllers stay as they are (no existence tolerance; "Use existing IO controllers" mode).
 
 ## Build
 
@@ -19,7 +20,9 @@ files, imports/exports PLC blocks.
 - On machines without TIA Portal, drop a V18 dll into `lib\` (see `lib/README.md`).
   Never commit that dll, never copy it next to the exe (the reference is
   `Private=False` — an Openness requirement; a copied dll would break version selection).
-- Build with Visual Studio (`Openn.sln`) or `msbuild Openn.csproj /p:Configuration=Debug`.
+- Build with Visual Studio (`Openn5.sln`) or `msbuild Openn5.csproj /p:Configuration=Debug` (output
+  `bin\Debug\Openn5.exe`; old-style csproj - a new .cs needs its own `<Compile Include>` entry). The NuGet
+  `packages\` folder is gitignored; copy it from `Openn3App\packages` or restore it when it is missing.
 - V21+ is deliberately unsupported (breaking Openness changes).
 
 ## Architecture — key invariants
@@ -56,11 +59,29 @@ files, imports/exports PLC blocks.
   "Cancel Operation" button trips the token. Never `Thread.Abort` the worker. Nothing
   is ever auto-saved — a cancelled/aborted generation is rolled back by closing the
   project in TIA without saving.
+- **Contract layer (OP5)** (`00_Contract/`, Siemens-free): `InputKind` = the taxonomy of everything OpennN
+  manages (`hw/device-types`, `hw/stations`, `hw/modules`, `sw/udt`, `sw/tag-table`, `sw/data-block`,
+  `sw/instance-db`, `sw/block-gen`, `sw/code-block`, `sw/source`, `sw/block-template`, `doc/*`), each with its
+  TIA folder, import route, import order and supported schema; `OpennHeader` = the `#!openn ... #!end` header
+  every handoff file opens with (`kind`, `schema`, `producer`, `generated` required; `run`, `plc`, `target`, ...
+  optional; csv lines / XML first comment / `//` source lines / `<file>.openn` sidecar; Excel padding tolerated;
+  a bare `#!format=N` = `Legacy`); `WorkspaceCatalog.Scan(root)` = classifies every file of a workspace
+  (header first, legacy markers second), places it from the VCI-shaped path (`<PLC>/Program blocks/<group>`,
+  `Devices & networks`, `Templates`; the legacy BuilderData folders are mapped too), checks header vs location
+  consistency and `run` staleness. Statuses: Ready / Legacy / NeedsHeader (importable) vs Invalid / Stale /
+  Unclassified (never imported) / Ignored. "Scan BuilderData" (Project tab) logs the catalog; `CsvTable.Header`
+  + `HardwareConfigLoader.CheckHeader` consume it (wrong kind or newer schema = load error; legacy / missing
+  header = warning until PL5 stamps its output); `BlockXmlGenerator` resolves a relative `template=` via the
+  csv folder, then `Templates\` at each level up to the workspace root, then `Shared\Templates\Tia Portal
+  Software Blocks`. The spec (`Shared\PL5_OP5_contract.md`) and these three files change together. Test without
+  TIA: `[Reflection.Assembly]::LoadFrom(".\bin\Debug\Openn5.exe")`, then
+  `$asm.GetType("Openn._00_Contract.WorkspaceCatalog").GetMethod("Scan").Invoke($null, [object[]]@([string]$root))`
+  and print `.Summary()` (no Siemens type is touched).
 - **Hardware config** (`01_Constructor/`): csv "format 2" — `Stations.csv` +
   `Modules.csv` + `DeviceTypesDatabase.csv`; `,` delimited (`CsvTable` default; fields
   with a comma or `"` are `"`-quoted, and custom parameters use `|` internally so they
-  never need quoting), `#` comments, `#!format=2` tag (a delimiter-padded directive line
-  like `#!format=2,,,,` from Excel is tolerated), parsed by `CsvTable`.
+  never need quoting), `#` comments, the `#!openn` header (OP5 contract v1; the legacy
+  `#!format=2` tag, Excel-padded `#!format=2,,,,` or not, is still accepted with a warning), parsed by `CsvTable`.
   `HardwareConfigLoader` validates the whole folder before
   publishing anything (all-or-nothing, every error with file/line). **No legacy
   support by design**: pre-format-2 folders (`IoControllersList.csv` + wide
@@ -177,22 +198,22 @@ files, imports/exports PLC blocks.
   between files; nothing saved.
 - **Input/output paths** (`10_StandardFunctions/AppPaths.cs`): defaults are resolved from the exe
   location, never hardcoded. `AppPaths` walks up from the exe to the monorepo `Shared` folder (the
-  one with `HardwareConfigBuilderData`/`OutputTree`) and hands back the Pipeline3↔Openn2 surface:
+  one with `HardwareConfigBuilderData`/`OutputTree`) and hands back the Pipeline5↔Openn5 surface:
   hardware config `…\BuilderData\HardwareConfiguration` (Stations+Modules), block-gen / instance-DB
   csv `…\BuilderData\SoftwareBlocks\CreationInfo`, import-ready blocks + the import-queue intake
   `…\BuilderData\SoftwareBlocks\ImportReady`, the block-export sink `…\ExportedData\SoftwareBlocks`.
   `DeviceTypesDatabase.csv` is a shared **input** under `Shared\HardwareConfigBuilderData` (not
   beside the generated Stations/Modules), so `HardwareDeviceTypesDatabase.ResolvePath` prefers a copy
-  beside the config folder and otherwise falls back to the shared one. Openn2-internal working dirs
+  beside the config folder and otherwise falls back to the shared one. Openn5-internal working dirs
   (the TIA project, `GeneratedBlocks`, `AttributeDumps`, `Logs`) stay next to the exe. `CsvTable`
   opens config files `FileShare.ReadWrite` and closes them before parsing, so a load never locks the
-  csv against Pipeline3 regenerating it (or Excel).
+  csv against Pipeline5 regenerating it (or Excel).
 - **Project round-trip** (`03_ApiManager/TiaPortalOpenness.Project.cs` + the "Project" tab): whole-project
-  import/export against the Shared tree, the consumer/producer for Pipeline3's (deferred) phase **920** TIA
+  import/export against the Shared tree, the consumer/producer for Pipeline5's (deferred) phase **920** TIA
   project coverage. **Import** (BuilderData → TIA), fixed order with a button each + "Import Full Project":
   hardware (loads `HardwareConfigDir` then the existing `CreateDevices`) → UDTs → IO tags → data blocks →
   instance DBs → software blocks. UDTs/IO-tags are **one XML per object** imported via
-  `TypeGroup.Types.Import` / `TagTableGroup.TagTables.Import` (Pipeline3 emits the XML; the `PLCTags.xlsx`
+  `TypeGroup.Types.Import` / `TagTableGroup.TagTables.Import` (Pipeline5 emits the XML; the `PLCTags.xlsx`
   stays only for manual TIA tag import — **no Excel library is used**). Data vs software blocks are split by the
   first `<SW.Blocks.*>` element of each ImportReady xml (`GlobalDB` ⇒ data block), `.db`/`.scl` go through
   `ExternalSourceGroup.ExternalSources.CreateFromFile` + `GenerateBlocksFromSource`. **Export** (TIA →
@@ -257,3 +278,8 @@ files, imports/exports PLC blocks.
    filter writes a file under `AttributeDumps\` (log shows path + device/node/attribute
    counts); a name filter limits the dumped devices; an invalid regex logs an error;
    "Cancel Operation" stops between devices and marks the file `# CANCELLED`.
+9. **Scan BuilderData** (OP5, no TIA needed): on today's PL5 tree the log shows `layout: legacy BuilderData
+   folders`, `workspace config: missing`, `29 file(s): 27 classified, 0 unclassified, 2 ignored` and every kind
+   Legacy / NeedsHeader. On a headered tree the files show Ready; a header whose `target` contradicts the
+   folder shows `[Invalid]`; a file whose `run` differs from the workspace config shows `[Stale]`; a file
+   directly under a PLC folder or in a non-TIA folder shows `[Invalid]`.
