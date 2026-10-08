@@ -81,8 +81,8 @@ import re
 from collections import namedtuple
 
 from pipeline5.language import expr
-from pipeline5.language.expr import ExprError
-from pipeline5.language.expr.parser import free_paths, row_reads, value_kind
+from pipeline5.language.expr import ExprError, runtime
+from pipeline5.language.expr.parser import free_paths, params_replacements, row_reads, value_kind
 from pipeline5.language.expr.render import _split_spec
 
 _MAX_DEPTH = 32          # @use nesting backstop (the cycle guard catches loops; this catches towers)
@@ -351,6 +351,37 @@ def _known(body: str, params) -> str | None:
     return None
 
 
+def known_value(body: str, params) -> str | None:
+    """What a KNOWN hole (`_known`) renders at every fire - None for a data hole, or for one whose render fails
+    (`lint_line` says so). A file target's known holes are judged as the text they render (C-025 refute round 12)."""
+    known = _known(body, params)
+    if known is None:
+        return None
+    try:
+        return render_text("{" + body + "}", {"_params": params} if known == "params" else {})
+    except (ExprError, TempemplatorError):
+        return None
+
+
+def replacement_problems(expression: str, params) -> list:
+    """(start, end, error) of each `regex_replace` replacement in `expression` that reads the project params ALONE
+    (`params_replacements`) and that re.sub refuses with their value: every evaluation reaching it fails, whatever
+    the row (C-025 refute round 12 - `regex_replace($name, /^/, $_params.out_dir)` with `out_dir: C:\\out` linted
+    clean). None judged while the params are unknown."""
+    if not isinstance(params, dict):
+        return []
+    out = []
+    for found in params_replacements(expression) or ():
+        try:
+            runtime.regex_replace("", found.pattern, runtime.s(found.value({"_params": params})))
+        except ExprError as error:
+            out.append((*found.span, str(error)))
+    return out
+
+
+_FROM_PARAMS = " - from the project params: every render reaching it fails"
+
+
 def _constant_end(text: str, params) -> str | None:
     """How a range end with holes is KNOWN - "params" (every hole known, one from the params), "constant" (every hole a
     constant) - or None: its value is the data's (judged at render)."""
@@ -569,9 +600,11 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
     `params` = the project params a fire renders `$_params` with (None = unknown): a constant, so a format
     spec its value does not take fails every render reaching it."""
     loops = loops or {}
+    if "_params" in loops:                                  # a loop var named `_params` hides the params in its
+        params = None                                       # body: `$_params` reads the loop's value (round 12)
     names = None if fields is None else set(fields) | set(loops)
     runs = list(_scan(text))
-    issues = _surrogate_problems(text, runs) if stored else []
+    issues = _surrogate_problems(text, runs, params) if stored else []
     for index, (kind, start, end) in enumerate(runs):
         if kind == "lone":
             issues.append((start, end, str(_lone_brace(text, start)), "error"))
@@ -611,6 +644,9 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
                 except (ExprError, TempemplatorError) as error:                                   # linted clean)
                     source = "a constant" if known == "constant" else "from the project params"
                     issues.append((start, end, f"{error} - {source}: every render reaching it fails", "error"))
+            if known is None:                               # a data hole: a replacement the params alone give
+                issues.extend((start + 1 + s, start + 1 + e, error + _FROM_PARAMS, "error")   # is judged by itself
+                              for s, e, error in replacement_problems(expression, params))   # (round 12)
             issues.extend((s, e, message, "warning") for s, e, message in _row_read_problems(
                 start + 1, expression, tables) if (s, e, message, "warning") not in issues)
             for path in sorted(paths):
@@ -628,32 +664,39 @@ def lint_line(text: str, *, fields=None, loops=None, tables=None, json=None, sto
     return issues
 
 
-def _surrogate_problems(text: str, runs: list) -> list:
+def _surrogate_problems(text: str, runs: list, params=None) -> list:
     """Text UTF-8 cannot store (a lone surrogate - a YAML `\\uD83D\\uDE00` escape pair decodes to two) where
-    the render STORES it: in literal text an error (the fire refuses every row), in a hole whose value is
-    constant an error when that value holds one, in a data-dependent hole a warning (the fire refuses the
-    rows whose render outputs it). A predicate or a range end is never stored - never judged here."""
+    the render STORES it: in literal text an error (the fire refuses every row); in a KNOWN hole (`_known` - a
+    constant, or the project params alone: the same at every fire) an error when what it renders holds one - a
+    params value too, nothing when it does not (C-025 refute round 12); in a data-dependent hole a warning (the
+    fire refuses the rows whose render outputs it). A predicate or a range end is never stored - never judged here."""
     out = []
     for kind, start, end in runs:
         lone = next((i for i in range(start, end) if "\ud800" <= text[i] <= "\udfff"), None)
-        if lone is None:
-            continue
-        where = f"{text[lone]!r} (a lone surrogate) cannot be stored as UTF-8"
         if kind != "hole":
-            out.append((lone, lone + 1, f"{where} - the fire refuses every row: write the character itself", "error"))
+            if lone is not None:
+                out.append((lone, lone + 1, f"{_unstorable(text[lone])} - the fire refuses every row: write the "
+                                            "character itself", "error"))
             continue
-        expression = _split_spec(text[start + 1:end - 1])[0]
-        if not expr.hole_paths(text[start + 1:end - 1]) and not row_reads(expression):
-            try:                                            # a constant: what it renders IS stored
-                value = render_text(text[start:end], {})
+        known = _known(text[start + 1:end - 1], params)
+        if known is not None:
+            try:                                            # every render is this one: what it renders IS stored
+                value = render_text(text[start:end], {"_params": params} if known == "params" else {})
             except (ExprError, TempemplatorError):
                 continue                                    # (the render's own error is judged elsewhere)
-            if any("\ud800" <= ch <= "\udfff" for ch in value):
-                out.append((lone, lone + 1, f"{where} - this hole always renders it: the fire refuses every "
-                                            "row", "error"))
+            bad = next((ch for ch in value if "\ud800" <= ch <= "\udfff"), None)
+            if bad is not None:
+                out.append(((lone, lone + 1) if lone is not None else (start, end))
+                           + (f"{_unstorable(bad)} - this hole always renders it: the fire refuses every row", "error"))
             continue
-        out.append((lone, lone + 1, f"{where} - a row whose render outputs it is refused by the fire", "warning"))
+        if lone is not None:
+            out.append((lone, lone + 1, f"{_unstorable(text[lone])} - a row whose render outputs it is refused by the "
+                                        "fire", "warning"))
     return out
+
+
+def _unstorable(ch: str) -> str:
+    return f"{ch!r} (a lone surrogate) cannot be stored as UTF-8"
 
 
 def _row_read_problems(base: int, expression: str, tables, row_scope: bool = False) -> list:
@@ -1016,6 +1059,7 @@ class _Lint:
             if not low.strip() or not high.strip():
                 self.add(template, line_no, at, at + len(iterable), f"a range end is missing: {iterable!r}")
                 return frozenset()
+            params = None if "_params" in (loops or {}) else self.params   # (a loop var `_params` hides them)
             ends = []                                       # the ends known now (a blank one: None)
             for fragment, offset in ((low, 0), (high, len(low) + 2)):
                 text = fragment.strip()
@@ -1030,9 +1074,9 @@ class _Lint:
                         ends.append(_end_value(render_text(text, {}), iterable))
                     except ValueError as error:
                         self.add(template, line_no, where, where + len(text), str(error))
-                elif not issues and (constant := _constant_end(text, self.params)):
+                elif not issues and (constant := _constant_end(text, params)):
                     try:                                    # an end the project params / constants alone give,
-                        ends.append(_end_value(render_text(text, {"_params": self.params or {}}).strip(),   # as
+                        ends.append(_end_value(render_text(text, {"_params": params or {}}).strip(),   # as
                                                iterable))   # `_iterate` strips it - a blank one: no iteration
                     except ValueError as error:             # (rounds 8-10)
                         source = "from the project params" if constant == "params" else "a constant"
@@ -1069,6 +1113,10 @@ class _Lint:
             self.add(template, line_no, at + issue.start, at + issue.end, issue.message)
         if syntax:
             return
+        if table is None:                                   # an @if sees the params (a `where`, its ROW alone): a
+            params = None if "_params" in (loops or {}) else self.params   # replacement they alone give fails
+            for s, e, error in replacement_problems(pred, params):        # every render reaching it (round 12)
+                self.add(template, line_no, at + s, at + e, error + _FROM_PARAMS)
         for s, e, message in _row_read_problems(0, pred, self.tables, row_scope=table is not None):
             self.add(template, line_no, at + s, at + e, message, "warning")
         for path in sorted(free_paths(pred) or ()) if table is None and loops else ():

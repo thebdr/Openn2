@@ -94,7 +94,12 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
     `{$_params.release:%Y-%m}`), a range end it gives that is not a whole number (`1..{$_params.n}`
     with `n: 2.5`; a blank one is an empty range). A hole that reads the parameters alone is judged by
     what it renders with them: the guard idiom `{coalesce($_params.release, ""):%Y-%m}` is clean
-    while `release` is a date, `{coalesce($_params.code, "x"):04d}` with `code: 8X` an error;
+    while `release` is a date, `{coalesce($_params.code, "x"):04d}` with `code: 8X` an error. A
+    `regex_replace` replacement that reads the parameters alone is judged with their value too -
+    `regex_replace($name, /^/, $_params.out_dir)` with `out_dir: C:\out` (a `\o` re.sub refuses) - in
+    a text line, an `@if`, a row value, a target and the rule's condition (inside a `where` or a
+    `count(...)` row test, `$_params` is that row's column: blank). A loop variable named `_params`
+    hides the parameters in its loop;
   - a hole that fails whatever the row holds: a constant one whose render fails (`{"8X":04d}`), a range
     end of constants (`1..{"2.5"}`), or a `regex_replace` replacement the pattern cannot take - a group
     it does not have (`"\1"` with no `( )` group), a letter escape (`"\s"`) - written as it is or built
@@ -119,15 +124,18 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
 
   Errors too: text a file cannot store - a `\uD83D\uDE00` escape pair in a double-quoted value is
   two lone surrogates to YAML, which UTF-8 cannot write. Write the character itself: in literal text,
-  in a hole that always renders it (`{"..."}`) or in a row template's field NAME (a column the table
-  cannot store) the fire refuses every row - an error; a hole that renders it only from some rows'
+  in a hole that always renders it (`{"..."}`, or a project parameter holding it: `{$_params.title}`)
+  or in a row template's field NAME (a column the table cannot store) the fire refuses every row - an
+  error (a default the parameters never let render is nothing); a hole that renders it only from some rows'
   data is a warning (the fire refuses those rows); in a comparison it is never written - but it
   never matches a real character either.
 
   A problem inside a multi-line PLAIN (unquoted) value, a folded `>` block, or a value holding a line
   break other than a newline (a `\r` escape, U+2028 ...) is placed on its first line and marked
   *(approximate)*: YAML joins those lines, or the render splits where the document does not, so a
-  column there is not a column of the document.
+  column there is not a column of the document. An entry a YAML merge (`<<: *base`) or an `!!omap`
+  brings is placed on the text its anchor wrote; an anchor or a tag before a value (`&x |-`,
+  `!!str |-`) changes nothing.
 
   When the document you edit IS the templates.yaml a fire reads, a fire reads it as SAVED. If that
   file does not load - another editor saved it in an encoding other than UTF-8 (an "ANSI" save: its
@@ -152,7 +160,9 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   - a column typo inside a loop;
   - the rule itself: a template of the wrong kind, a hook the run never fires, a target the fire
     refuses for every row - judged on its literal text (a hole may render anything: the fire judges
-    it row by row, and the preview shows that row's verdict):
+    it row by row, and the preview shows that row's verdict) - and a hole that reads only constants
+    or project parameters as the text it renders at every fire (`{$_params.out_dir}/gen.txt` with
+    `out_dir` unset is `/gen.txt`, `out/{$_params.name}.txt` with `name: NUL` a device name):
     - a `:` other than a drive's, anywhere in the target as written (a `..` after it removes nothing;
       a server or share name included) - a drive is ONE letter A-Z (`C:/`, `\\?\C:\`, `\\./C:/` -
       Windows reads any mix of slashes in a `\\.\` / `\\?\` prefix), or one holes may complete

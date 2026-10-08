@@ -101,7 +101,7 @@ def _field_thunk(name: str):
 class _Parser:
     def __init__(self, toks, src, scope: Scope | None, free: set | None = None, bound=frozenset(),
                  reads: list | None = None, in_row: bool = False, free_at: dict | None = None,
-                 check_literals: bool = True):
+                 check_literals: bool = True, replacements: list | None = None):
         self.toks, self.i, self.src, self.scope = toks, 0, src, scope
         # the FREE top-level fields (read from the caller's ctx) - a data-function predicate's `$col`
         # (the iterated ROW's column) and a let-bound name are NOT free (see `free_fields`)
@@ -116,6 +116,8 @@ class _Parser:
         # `free_paths`, `row_reads` - does not: it would give up on the hole, and the strict render's token-scan
         # fallback counted a predicate's row column / a let-bound name as missing (C-024 refute round 28)
         self.check_literals = check_literals
+        # every regex_replace replacement parsed (a `_Replacement`) - shared like `reads` (see `params_replacements`)
+        self.replacements = replacements if replacements is not None else []
 
     def _peek(self):
         return self.toks[self.i] if self.i < len(self.toks) else (None, None)
@@ -376,7 +378,7 @@ class _Parser:
         self._eat(",")
         start, reads = self.i, len(self.reads)
         sub = _Parser(self.toks, self.src, self.scope, set(), self.bound, self.reads, self.in_row, {},
-                      self.check_literals)                 # (its own free set: what the replacement itself reads)
+                      self.check_literals, self.replacements)   # (its own free set: what the replacement reads)
         sub.i = self.i
         replacement = sub._or()
         self.i = sub.i
@@ -384,10 +386,12 @@ class _Parser:
         for path, at in sub.free_at.items():
             self.free_at.setdefault(path, at)
         outer = any(kind == "field" and val[1:].split(".", 1)[0] in self.bound for kind, val in self.toks[start:self.i])
+        data = outer or len(self.reads) != reads           # a table read / a name an enclosing let binds: data
+        self.replacements.append(_Replacement(pat, replacement, frozenset(sub.free), data, self.in_row, start, self.i))
         self._eat(")")
-        if self.check_literals and not sub.free and not outer and len(self.reads) == reads:   # CONSTANT in itself:
-            runtime.regex_replace("", pat, runtime.s(replacement({})))   # no field, no table, no name an enclosing
-        return lambda ctx: runtime.regex_replace(value(ctx), pat, runtime.s(replacement(ctx)))   # let binds (data)
+        if self.check_literals and not sub.free and not data:   # CONSTANT in itself: no field, no table, no name
+            runtime.regex_replace("", pat, runtime.s(replacement({})))   # an enclosing let binds (data)
+        return lambda ctx: runtime.regex_replace(value(ctx), pat, runtime.s(replacement(ctx)))
 
     def _slice(self):
         """Parse a slice/index: `a:b`, `:b`, `a:`, or a bare `a` (an index). Returns (lo, hi, is_index)."""
@@ -430,7 +434,7 @@ class _Parser:
             self._eat(":=")
             # compile the binding expr in the CURRENT (accumulating) scope
             sub = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names), self.reads,
-                          self.in_row, self.free_at, self.check_literals)
+                          self.in_row, self.free_at, self.check_literals, self.replacements)
             sub.i = self.i
             expr_fn = sub._or()
             self.i = sub.i
@@ -444,7 +448,7 @@ class _Parser:
             self._eat(",")
         # body compiled in the scope extended with all bound names
         body_parser = _Parser(self.toks, self.src, scope, self.free, self.bound | frozenset(names), self.reads,
-                              self.in_row, self.free_at, self.check_literals)
+                              self.in_row, self.free_at, self.check_literals, self.replacements)
         body_parser.i = self.i
         body_fn = body_parser._or()
         self.i = body_parser.i
@@ -471,7 +475,7 @@ class _Parser:
         Its fields go to a PRIVATE set: a row column is not a free field of the enclosing hole - they are
         recorded as the function's ROW reads instead."""
         sub = _Parser(self.toks, self.src, None, set(), reads=self.reads, in_row=True,
-                      check_literals=self.check_literals)
+                      check_literals=self.check_literals, replacements=self.replacements)
         sub.i = self.i
         fn = sub._or()
         self.i = sub.i
@@ -585,6 +589,43 @@ class _Read(NamedTuple):
     at: int
     table_at: int
     column_at: dict
+
+
+class _Replacement(NamedTuple):
+    """One `regex_replace` replacement as parsed (see `params_replacements`) - positions as TOKEN indices."""
+    pattern: object             # the compiled /regex/
+    value: object               # the replacement's thunk
+    free: frozenset             # the paths it reads from the caller's ctx
+    data: bool                  # it reads a table, or a name an enclosing let binds: data at render
+    in_row: bool                # inside a data function's ROW predicate (`$_params` there is the row's column)
+    start: int                  # its first token
+    end: int                    # past its last token
+
+
+class Replacement(NamedTuple):
+    """A `regex_replace` replacement whose value is the project params' ALONE (`params_replacements`)."""
+    pattern: object             # the compiled /regex/ (re.sub's)
+    value: object               # value({"_params": params}) -> what every render passes re.sub
+    span: tuple                 # (start, end) of the replacement in the text
+
+
+@functools.lru_cache(maxsize=4096)
+def params_replacements(text: str):
+    """Each `regex_replace` replacement in an expression that reads the project params ALONE - `$_params...` paths
+    only: no other field, no table, no name an enclosing let binds, not inside a data function's row predicate. Its
+    value is the same at every fire, so re.sub's verdict on it is too: the template builder judges it with the
+    params (C-025 refute round 12 - a CONSTANT one is the compile's, round 10). A tuple of `Replacement`; None when
+    the text does not parse. A structural read, as `free_paths`."""
+    try:
+        parser = _Parser(_tokenize(text), text, None, check_literals=False)
+        parser.parse()
+    except ExprError:
+        return None
+    spans = [m.span() for m in _TOKEN_RE.finditer(text) if m.lastgroup is not None]
+    return tuple(Replacement(found.pattern, found.value, (spans[found.start][0], spans[found.end - 1][1]))
+                 for found in parser.replacements
+                 if found.free and not found.data and not found.in_row
+                 and all(path.split(".", 1)[0] == "_params" for path in found.free))
 
 
 class RowRead(NamedTuple):

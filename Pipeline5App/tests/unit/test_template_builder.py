@@ -1243,6 +1243,204 @@ def test_a_row_read_warning_sits_on_its_own_token():
     eq(placed(line), [("nodez", line.rindex("nodez"))], "an unknown table on the call's table word")
 
 
+
+def _refusal(pattern: str, value) -> str:
+    """The runtime's own refusal of `value` as a `regex_replace` replacement for /pattern/ (the message under test
+    is re.sub's - its wording is Python's, read here rather than spelled)."""
+    import re
+    from pipeline5.language.expr import ExprError, runtime
+    try:
+        runtime.regex_replace("", re.compile(pattern, re.IGNORECASE), runtime.s(value))
+    except ExprError as error:
+        return str(error)
+    raise AssertionError(f"{value!r} is a valid replacement for /{pattern}/")
+
+
+def test_a_replacement_the_params_alone_give_is_judged_with_them():
+    """C-025 refute round 12 (#1, MEDIUM): a `regex_replace` replacement that reads the project params ALONE is the
+    same at every fire, so re.sub's verdict on it is too - yet only a CONSTANT one was judged (the parser cannot know
+    the params): `regex_replace($name, /^/, $_params.out_dir)` with `out_dir: C:\\out\\gen` (a bad escape), a lone
+    `\\`, a `\\1` the pattern has no group for - in a text line, a guard, an @if, a row value, a target, a branch no
+    row takes and the rule's condition - linted clean while every fire refused. Judged with the params now: lint =
+    preview = fire; a valid value clean; inside a data function's predicate or a `where` - `$_params` is the ROW's
+    column there, blank - never judged, and the fire renders them."""
+    import tempfile
+    b = chr(92)
+    params = {"out_dir": "C:" + b + "out" + b + "gen", "sep": b, "grp": b + "1", "ok": "x"}
+    suffix = " - from the project params: every render reaching it fails"
+    texts = {"dir": ("{regex_replace($name, /^/, $_params.out_dir)}", "^", params["out_dir"]),
+             "sep": ("{regex_replace($name, /D/, $_params.sep)}", "D", b),
+             "guard": ('{regex_replace($name, /D/, coalesce($_params.grp, "-"))}', "D", b + "1"),
+             "pred": ('@if regex_replace($name, /D/, $_params.grp) = "x"\nyes\n@end', "D", b + "1"),
+             "untaken": ('@if $kind = "valve"\n{regex_replace($name, /D/, $_params.grp)}\n@end', "D", b + "1")}
+    fine = {"ok": ("{regex_replace($name, /D/, $_params.ok)}", "x1\nM1\n"),
+            "in_row": ('{count(src, regex_replace($name, /D/, $_params.grp) = "x")}', "0.0\n0.0\n"),
+            "where": ('@for $r in src where regex_replace($name, /D/, $_params.grp) = "x"\n{$r.name}\n@end', "\n\n")}
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            for name, (text, pattern, value) in texts.items():
+                rule = _rule(action="file", source_table="src", target=f"{name}.txt", template=name)
+                found = [p.message for p in engine.lint({name: text}, rule, _database(), params=params)
+                         if p.severity == "error"]
+                eq(found, [_refusal(pattern, value) + suffix], f"{name!r}: the lint")
+                database = _database()
+                database["src"].add(kind="valve", name="V1")   # (the row taking the untaken branch)
+                _, findings = engine.fire("after_300", database, rules=[rule], templates={name: text}, params=params,
+                                          files_root=out)
+                eq([f.type for f in findings], ["rx_bad_template"], f"{name!r}: the fire refuses it")
+                ok(findings[0].detail.endswith(_refusal(pattern, value)), findings[0].detail)
+                row = 2 if name == "untaken" else 0
+                shown = engine.preview(rule, row, templates={name: text}, params=params, database=database,
+                                       files_root=out)
+                eq(shown.problem, (findings[0].type, findings[0].detail), f"{name!r}: the preview = the fire")
+            for name, (text, written) in fine.items():
+                rule = _rule(action="file", source_table="src", target=f"{name}.txt", template=name)
+                eq([p.message for p in engine.lint({name: text}, rule, _database(), params=params)
+                    if p.severity == "error"], [], f"{name!r}: clean")
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates={name: text},
+                                          params=params, files_root=out)
+                eq(findings, [], f"{name!r}: the fire renders it")
+                with open(os.path.join(out, f"{name}.txt"), encoding="utf-8") as handle:
+                    eq(handle.read(), written, f"{name!r}: …this")
+            rows = {"rows": [{"label": "L{regex_replace($name, /^/, $_params.out_dir)}"}]}
+            found = [(p.where, p.message) for p in engine.lint(rows, _rule(), _database(), params=params)
+                     if p.severity == "error"]
+            eq(found, [((1, "label"), _refusal("^", params["out_dir"]) + suffix)], "a row value")
+            _, findings = engine.fire("after_300", _database(), rules=[_rule()], templates=rows, params=params)
+            eq([f.type for f in findings], ["rx_bad_template"], "…the fire refuses it")
+            target = "out/{regex_replace($name, /D/, $_params.grp)}.txt"
+            rule = _rule(action="file", source_table="src", target=target, template="t")
+            found = [p.message for p in engine.lint({"t": "x"}, rule, _database(), params=params)
+                     if p.where == "target"]
+            eq(found, [f"rule 'r1': target {target!r}: " + _refusal("D", b + "1") + suffix], "a target")
+            _, findings = engine.fire("after_300", _database(), rules=[rule], templates={"t": "x"}, params=params,
+                                      files_root=out)
+            eq([f.type for f in findings], ["rx_bad_template"], "…the fire refuses it")
+            condition = 'regex_replace($name, /D/, $_params.grp) = "x"'
+            rule = _rule(action="file", source_table="src", condition=condition, target="c.txt", template="t")
+            found = [p.message for p in engine.lint({"t": "x"}, rule, _database(), params=params)
+                     if p.where == "condition"]
+            eq(found, [f"rule 'r1': condition {condition!r}: " + _refusal("D", b + "1") + " - from the project "
+                       "params: the condition fails on every row (rx_bad_condition)"], "the condition")
+            _, findings = engine.fire("after_300", _database(), rules=[rule], templates={"t": "x"}, params=params,
+                                      files_root=out)
+            eq([(f.type, f.detail) for f in findings], [("rx_bad_condition", _refusal("D", b + "1"))],
+               "…the fire refuses it")
+            shown = engine.preview(rule, 0, templates={"t": "x"}, params=params, database=_database(), files_root=out)
+            eq(shown.problem, (findings[0].type, findings[0].detail), "…the preview = the fire")
+    _sandboxed(body)
+
+
+def test_a_known_hole_rendering_a_lone_surrogate_is_an_error():
+    """C-025 refute round 12 (#2): text UTF-8 cannot store was judged on the TEMPLATE's text alone - a params value
+    holding a lone surrogate (`load_params` decodes a YAML `\\uD83D\\uDE00` pair into two) linted clean, a guard with a
+    surrogate default only a warning, while every fire refused. A KNOWN hole (a constant, the params alone) is judged
+    by what it renders: an error when that holds one, nothing when it does not - lint = preview = fire."""
+    import tempfile
+    pair = "\ud83d\ude00"
+    params = {"title": pair, "plain": "ok"}
+    message = ("'\\ud83d' (a lone surrogate) cannot be stored as UTF-8 - this hole always renders it: the fire "
+               "refuses every row")
+    texts = {"bare": "T={$_params.title}", "guard": 'T={coalesce($_params.title, "")}',
+             "default": 'T={coalesce($_params.missing, "' + pair + '")}', "plain": "T={$_params.plain}",
+             "unused": 'T={coalesce($_params.plain, "' + pair + '")}'}     # a default the params never let render
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            for name, text in texts.items():
+                rule = _rule(action="file", source_table="src", target=f"{name}.txt", template=name)
+                found = [(p.severity, p.message) for p in engine.lint({name: text}, rule, _database(), params=params)
+                         if "surrogate" in p.message]
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates={name: text},
+                                          params=params, files_root=out)
+                if name in ("plain", "unused"):
+                    eq((found, findings), ([], []), f"{name!r}: a known hole rendering no surrogate - nothing, no warning")
+                    continue
+                eq(found, [("error", message)], f"{name!r}: the lint")
+                eq([f.type for f in findings], ["rx_bad_template"], f"{name!r}: the fire refuses every row")
+                shown = engine.preview(rule, 0, templates={name: text}, params=params, database=_database(),
+                                       files_root=out)
+                eq(shown.problem, (findings[0].type, findings[0].detail), f"{name!r}: the preview = the fire")
+            rows = {"rows": [{"label": 'L{coalesce($_params.title, "")}'}]}
+            eq([(p.where, p.severity, p.message) for p in engine.lint(rows, _rule(), _database(), params=params)
+                if "surrogate" in p.message], [((1, "label"), "error", message)], "a row value")
+            _, findings = engine.fire("after_300", _database(), rules=[_rule()], templates=rows, params=params)
+            eq([f.type for f in findings], ["rx_bad_template"], "…the fire refuses it")
+    _sandboxed(body)
+
+
+def test_a_target_whose_holes_are_known_is_judged_as_it_renders():
+    """C-025 refute round 12 (#3): a target was judged on its LITERAL text, each hole read as "any text" - but a hole
+    reading the params alone, or a constant, renders ONE text at every fire: `{$_params.out_dir}/gen.txt` with the
+    key unset (a rooted path), the guide's own `{$_params.drive}:/gen.txt` unset, `out/{$_params.name}.txt` with
+    `NUL`, `out/{$_params.name}` with `a.`, a `?` / `|` from the params, `{"NUL"}.txt` - linted clean while every
+    fire refused. Every hole known: the rendered target judged by the fire's own guard; some known: their text read
+    as literal - lint = preview = fire; a known value the fire takes clean."""
+    import tempfile
+    if os.name != "nt":
+        return                                              # (the Windows path guard)
+    known = [("{$_params.out_dir}/gen.txt", {}, "/gen.txt"), ("{$_params.drive}:/gen.txt", {}, ":/gen.txt"),
+             ("out/{$_params.name}.txt", {"name": "NUL"}, "out/NUL.txt"),
+             ("out/{$_params.name}", {"name": "a."}, "out/a."),
+             ("out/{$_params.sub}/x.txt", {"sub": "a?b"}, "out/a?b/x.txt"),
+             ('out/{coalesce($_params.sub, "a|b")}/x.txt', {}, "out/a|b/x.txt"),
+             ('{"NUL"}.txt', {}, "NUL.txt")]
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            def judged(target, params):
+                rule = _rule(action="file", source_table="src", target=target, template="t")
+                found = [p.message for p in engine.lint({"t": "x"}, rule, _database(), params=params)
+                         if p.where == "target"]
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates={"t": "x"},
+                                          params=params, files_root=out)
+                shown = engine.preview(rule, 0, templates={"t": "x"}, params=params, database=_database(),
+                                       files_root=out)
+                return found, findings, shown
+            for target, params, rendered in known:
+                found, findings, shown = judged(target, params)
+                eq([f.type for f in findings], ["rx_file_write"], f"{target!r}: (the fire refuses it)")
+                reason = findings[0].detail.split("': ", 1)[1]
+                eq(found, [f"rule 'r1': target {target!r} renders {rendered!r} at every fire - cannot write "
+                           f"{rendered!r}: {reason} - the fire refuses every row (rx_file_write)"], f"{target!r}: the lint")
+                eq(shown.problem, (findings[0].type, findings[0].detail), f"{target!r}: the preview = the fire")
+            target = "out/{$_params.sub}/{$name}.txt"           # a known hole beside a data one: its text is literal
+            found, findings, shown = judged(target, {"sub": "a|b"})
+            eq([f.type for f in findings], ["rx_file_write"], "(the fire refuses it)")
+            reason = findings[0].detail.split("': ", 1)[1]
+            eq(found, [f"rule 'r1': target {target!r}: {reason} - the fire refuses every row (rx_file_write)"],
+               "a known hole's text read as literal beside a data hole")
+            eq(shown.problem, (findings[0].type, findings[0].detail), "…the preview = the fire")
+            found, findings, shown = judged("out/{$_params.name}.txt", {"name": "ok"})
+            eq((found, findings, shown.problem), ([], [], None), "a known value the fire takes: clean")
+            eq(open(os.path.join(out, "out", "ok.txt"), encoding="utf-8").read(), "x\nx\n", "…and written")
+    _sandboxed(body)
+
+
+def test_a_loop_variable_named_params_hides_the_params():
+    """C-025 refute round 12 (#5): round 11's known holes took any `$_params` for the project params - a loop variable
+    NAMED `_params` too: `@for $_params in 1..3: {$_params:03d}` got a false error (the params under `03d`), a nested
+    `1..{$_params}` "range ends must be numbers", while the fire writes both. Inside such a loop `$_params` is the
+    loop's value: nothing is judged from the params there."""
+    import tempfile
+    params = {"code": "8X"}
+    texts = {"spec": ("@for $_params in 1..3: {$_params:03d}", "001\n002\n003\n"),
+             "end": ("@for $_params in 1..2\n@for $j in 1..{$_params}: z{$j}\n@end", "z1\nz1\nz2\n")}
+
+    def body():
+        with tempfile.TemporaryDirectory() as out:
+            for name, (text, once) in texts.items():
+                rule = _rule(action="file", source_table="src", target=f"{name}.txt", template=name)
+                eq([p.message for p in engine.lint({name: text}, rule, _database(), params=params)
+                    if p.severity == "error"], [], f"{name!r}: clean")
+                _, findings = engine.fire("after_300", _database(), rules=[rule], templates={name: text},
+                                          params=params, files_root=out)
+                eq(findings, [], f"{name!r}: the fire writes it")
+                eq(open(os.path.join(out, f"{name}.txt"), encoding="utf-8").read(), once * 2, f"{name!r}: …this")
+    _sandboxed(body)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("template_builder", [
@@ -1287,4 +1485,11 @@ if __name__ == "__main__":
         ("a_constant_failure_is_judged_wherever_it_is_built", test_a_constant_failure_is_judged_wherever_it_is_built),
         ("a_hole_reading_a_table_or_the_params_is_judged_as_it_renders",
          test_a_hole_reading_a_table_or_the_params_is_judged_as_it_renders),
+        ("a_replacement_the_params_alone_give_is_judged_with_them",
+         test_a_replacement_the_params_alone_give_is_judged_with_them),
+        ("a_known_hole_rendering_a_lone_surrogate_is_an_error",
+         test_a_known_hole_rendering_a_lone_surrogate_is_an_error),
+        ("a_target_whose_holes_are_known_is_judged_as_it_renders",
+         test_a_target_whose_holes_are_known_is_judged_as_it_renders),
+        ("a_loop_variable_named_params_hides_the_params", test_a_loop_variable_named_params_hides_the_params),
     ]))
