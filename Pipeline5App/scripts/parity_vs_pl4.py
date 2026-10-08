@@ -16,6 +16,9 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
       * the VCI-shaped workspace (contract §4): PL5's `Devices & networks/`, `Templates/`, `<PLC>/Program
         blocks/`, `<PLC>/PLC tags/` compare against the reference's legacy folders (the §4.1 mapping);
         `.openn/workspace.openn.config` and the `.openn` sidecars are PL5-only by design
+      * the coupler transfer areas (C-031, contract §2.1): the `TransferArea-*` rows of `hardware_modules.csv`
+        and `Modules.csv` are PL5-only (PL4 never emitted them) - dropped from the PL5 side only, counted in the
+        verdict; a reference row of that model would still be a difference
 The verdict is the EXIT CODE (0 = parity): the policy lives in the command, not in log prose.
 
 Run:         <python> scripts/parity_vs_pl4.py
@@ -175,6 +178,20 @@ def _xlsx_cells(path: str):
 
 
 _WORKSPACE = "TiaPortalProjectInterface/BuilderData/"
+_TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
+_MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
+SANCTIONED = {"transfer_area_rows": 0}
+
+
+def _drop_transfer_areas(rel: str, data: bytes) -> bytes:
+    """The PL5-only coupler transfer-area rows (C-031) out of a PL5 module table - every other byte kept."""
+    if os.path.basename(rel) not in _MODULE_TABLES:
+        return data
+    text = data.decode("utf-8")
+    lines = text.splitlines(keepends=True)
+    kept = [line for line in lines if not _TRANSFER_AREA_ROW.search(line.rstrip())]
+    SANCTIONED["transfer_area_rows"] += len(lines) - len(kept)
+    return "".join(kept).encode("utf-8")
 
 
 def _legacy_rel(rel: str):
@@ -235,7 +252,7 @@ def compare(a_root: str, b_root: str, label: str) -> list:
             if not headered:
                 diffs.append(f"{label}: no #!openn header: {rel}")
         da = _norm_text(open(a[rel], "rb").read())
-        db = _norm_text(raw_b)
+        db = _norm_text(_drop_transfer_areas(rel, raw_b))
         if da != db:
             diffs.append(f"{label}: bytes differ: {rel}")
     return diffs
@@ -284,7 +301,8 @@ def main() -> int:
             for d in diffs:
                 print("  ", d)
             return 1
-        print("PARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations)")
+        print("PARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations; "
+              f"{SANCTIONED['transfer_area_rows']} PL5-only transfer-area rows)")
         return 0
 
 

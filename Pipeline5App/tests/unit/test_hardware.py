@@ -449,6 +449,122 @@ def test_lowercase_placeholder_without_rows_is_dropped():
     ok(len(warn) == 1 and "2 start-address entries" in warn[0], warn)
 
 
+# --- C-031: coupler transfer areas ---------------------------------------------------------------- #
+def _ta_dtd():
+    dtd = _dtd()
+    for model, key in (("TransferArea-IN", "PartnerToLocalLength"), ("TransferArea-OUT", "LocalToPartnerLength")):
+        dtd["by_id"][model.upper()] = dict(_dtd_rec(model, "TransferArea", f"{model} area"), params=f"{key}=128")
+    return dtd
+
+
+def _coupler_rows(*iocs, head=None):
+    """A PLC + one coupler head (`-K6`) + the given IOC rows under it (+ one DI card after them)."""
+    rows = [dict(_rows()[0]),
+            dict({"script_type": "PA", "type_hw": "PA", "part_no": "COUPLER", "profinet_name": "n6",
+                  "profinet_ip": "192.168.50.6", "functional_unit": "=S1", "slot": "-K6", "bit": "",
+                  "source_sheet": "NS50", "source_row": 3}, **(head or {}))]
+    for n, (index, bit, extra) in enumerate(iocs):
+        rows.append(dict({"script_type": "IOC", "index": index, "bit": bit, "slot": "", "uid": f"ioc{n}",
+                          "source_sheet": "NS50", "source_row": 4 + n}, **(extra or {})))
+    rows.append({"script_type": "A", "part_no": "DI16", "slot": "-C1", "bit": "I0.0", "source_sheet": "NS50",
+                 "source_row": 9})
+    return rows
+
+
+def test_coupler_interfaces_become_transfer_areas():
+    """C-031: each IOC row under a coupler's head = `<name>_IN` (I Addr = base) + `<name>_OUT` (Q Addr = base) in
+    document order, positions 1..n after the cards; the length written only where the IOC row's col AG sets it
+    (the database default is the importer's); a `+DIAG` Index names its areas without the marker; an
+    address-spelled base gives its byte; an IOC row with a Slot is still no card."""
+    rows = _coupler_rows(("SORTER-01", "10000", {"hardware_params": "PartnerToLocalLength = 64"}),
+                         ("SORTER+DIAG-02", "I20000.0", {"slot": "-K6X"}))
+    _stations, modules, findings = hardware.extract(rows, _ta_dtd())
+    eq(findings, [], "nothing to report")
+    coupler = [(m["slot"], m["module_name"], m["model_id"], m["i_addr"], m["q_addr"], m["custom_parameters"],
+                m["comment"], m["source_signal"]) for m in modules if m["station_name"] == "n6"]
+    eq(coupler, [
+        (1, "-C1", "DI16", 0, 0, "PotentialGroup=1 | Ch(0).Filter=1", "DI 16x24VDC", ""),
+        (2, "COUPLER:PS", "COUPLER:PS", "", "", "", "Power Supply", ""),
+        (1, "SORTER-01_IN", "TransferArea-IN", 10000, "", "PartnerToLocalLength = 64", "TransferArea-IN area", "ioc0"),
+        (2, "SORTER-01_OUT", "TransferArea-OUT", "", 10000, "", "TransferArea-OUT area", "ioc0"),
+        (3, "SORTER-02_IN", "TransferArea-IN", 20000, "", "", "TransferArea-IN area", "ioc1"),
+        (4, "SORTER-02_OUT", "TransferArea-OUT", "", 20000, "", "TransferArea-OUT area", "ioc1"),
+    ], "the card + the default card, then 2 areas per interface - never a card from an IOC row")
+    rows = _coupler_rows(("SORTER-01", "I2.0", None))
+    rows[-1]["bit"] = "I8.0"
+    stations, _m, _f = hardware.extract(rows, _ta_dtd())
+    eq(stations[1]["custom_parameters"], "8", "the station base is its lowest I/O row - an IOC base is no I/O row")
+
+
+def test_transfer_area_base_must_be_a_byte():
+    """C-031: an IOC base that is not a byte is a blocking FAIL (nothing written - build()'s raw-FAIL guard); a
+    transfer-area model missing from the database is a blocking `hw_device_not_in_dtd`."""
+    from pipeline5.findings import gate
+    _s, modules, findings = hardware.extract(_coupler_rows(("SORTER-01", "AREA", None)), _ta_dtd())
+    eq([(f.type, f.severity, f.location) for f in findings], [("hw_ta_base_invalid", "FAIL", "[NS50] row 4")])
+    ok("'AREA' is not a byte" in findings[0].detail, findings[0].detail)
+    ok(gate.has_blocking(findings), "blocking - 700 writes no BuilderData")
+    eq([m for m in modules if m["model_id"].startswith("TransferArea")], [], "no area")
+    _s, modules, findings = hardware.extract(_coupler_rows(("SORTER-01", "10000", None)), _dtd())
+    eq([(f.type, f.severity) for f in findings], [("hw_device_not_in_dtd", "FAIL")] * 2, "IN and OUT models missing")
+    ok("'TransferArea-IN'" in findings[0].detail and "'TransferArea-OUT'" in findings[1].detail)
+
+
+def test_transfer_area_base_from_the_coupler_start():
+    """C-031 (user 2026-10-08, FVT: "use offsets in column AB for the couplers' start address"): an IOC row with no
+    Bit of its own takes its coupler head's start (`coupler_start`); its own Bit wins; neither = the blocking FAIL."""
+    def bases(rows):
+        _s, modules, findings = hardware.extract(rows, _ta_dtd())
+        return [(m["module_name"], m["i_addr"], m["q_addr"]) for m in modules
+                if m["model_id"].startswith("TransferArea")], [(f.type, f.severity) for f in findings]
+    eq(bases(_coupler_rows(("FVTGENERIC-05", "", None), head={"coupler_start": "14000"})),
+       ([("FVTGENERIC-05_IN", 14000, ""), ("FVTGENERIC-05_OUT", "", 14000)], []), "the coupler's start")
+    eq(bases(_coupler_rows(("FVTGENERIC-05", "10000", None), head={"coupler_start": "14000"}))[0],
+       [("FVTGENERIC-05_IN", 10000, ""), ("FVTGENERIC-05_OUT", "", 10000)], "the IOC row's own Bit wins")
+    areas, findings = bases(_coupler_rows(("FVTGENERIC-05", "", None)))
+    eq((areas, findings), ([], [("hw_ta_base_invalid", "FAIL")]), "no Bit, no coupler start")
+    _s, _m, found = hardware.extract(_coupler_rows(("FVTGENERIC-05", "", None)), _ta_dtd())
+    ok("base '' is not a byte" in found[0].detail and "coupler's start" in found[0].detail, found[0].detail)
+
+
+def test_ioc_rows_without_a_coupler_warn():
+    """C-031: an IOC row under the PLC head (an I-device - not modelled) or before any head gets no area and a
+    WARN; one under a SKIPPED head (not in the database) goes with its station silently - the head is reported."""
+    plc = dict(_rows()[0])
+    ioc = {"script_type": "IOC", "index": "SORTER-01", "bit": "10000", "source_sheet": "NS50", "source_row": 3}
+    _s, modules, findings = hardware.extract([dict(ioc, source_row=1), plc, ioc], _ta_dtd())
+    eq(modules, [], "no area")
+    eq([(f.type, f.severity, f.location) for f in findings],
+       [("hw_ta_no_iodevice", "WARN", "[NS50] row 1"), ("hw_ta_no_iodevice", "WARN", "[NS50] row 3")])
+    ok("before any station head" in findings[0].detail and "under the Plc head 'n1'" in findings[1].detail,
+       [f.detail for f in findings])
+    _s, _m, findings = hardware.extract(_coupler_rows(("SORTER-01", "10000", None), head={"part_no": "NOPE"}),
+                                        _ta_dtd())
+    eq([f.type for f in findings], ["hw_device_not_in_dtd"], "only the skipped head is reported")
+
+
+def test_unroutable_ioc_hardware_parameters_warn():
+    """C-031: an IOC row's Hardware Parameters entry that names no area's length is a WARN and not written; the
+    lengths go to their own areas."""
+    rows = _coupler_rows(("SORTER-01", "10000", {"hardware_params": "LocalToPartnerLength=32 | Foo=1 | "
+                                                                      "PartnerToLocalLength=16"}))
+    _s, modules, findings = hardware.extract(rows, _ta_dtd())
+    areas = {m["module_name"]: m["custom_parameters"] for m in modules if m["model_id"].startswith("TransferArea")}
+    eq(areas, {"SORTER-01_IN": "PartnerToLocalLength=16", "SORTER-01_OUT": "LocalToPartnerLength=32"})
+    eq([(f.type, f.severity) for f in findings], [("hw_ta_param_unrouted", "WARN")])
+    ok("Foo=1" in findings[0].detail and "not written" in findings[0].detail, findings[0].detail)
+
+
+def test_shipped_transfer_area_defaults():
+    """C-031 (user 2026-10-08): the default area length, 128 bytes, lives in the shipped DeviceTypesDatabase."""
+    from pipeline5.config.loaders import load_device_types_db
+    by_id = load_device_types_db({})["by_id"]
+    eq([(by_id[m]["dev_type"], by_id[m]["order"], by_id[m]["params"])
+        for m in ("TRANSFERAREA-IN", "TRANSFERAREA-OUT", "TRANSFERAREA-IN_OUT")],
+       [("TransferArea", "IN", "PartnerToLocalLength=128"), ("TransferArea", "OUT", "LocalToPartnerLength=128"),
+        ("TransferArea", "IN_OUT", "PartnerToLocalLength=128 | LocalToPartnerLength=128")])
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("hardware", [
@@ -474,4 +590,10 @@ if __name__ == "__main__":
         ("project_device_types_db_is_what_700_reads_and_places", test_project_device_types_db_is_what_700_reads_and_places),
         ("col_ag_keys_matched_the_importers_way", test_col_ag_keys_matched_the_importers_way),
         ("lowercase_placeholder_without_rows_is_dropped", test_lowercase_placeholder_without_rows_is_dropped),
+        ("coupler_interfaces_become_transfer_areas", test_coupler_interfaces_become_transfer_areas),
+        ("transfer_area_base_must_be_a_byte", test_transfer_area_base_must_be_a_byte),
+        ("transfer_area_base_from_the_coupler_start", test_transfer_area_base_from_the_coupler_start),
+        ("ioc_rows_without_a_coupler_warn", test_ioc_rows_without_a_coupler_warn),
+        ("unroutable_ioc_hardware_parameters_warn", test_unroutable_ioc_hardware_parameters_warn),
+        ("shipped_transfer_area_defaults", test_shipped_transfer_area_defaults),
     ]))

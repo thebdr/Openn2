@@ -166,6 +166,179 @@ def test_template_native_elements():
            "Q20000.0", "the SAME native row computes per-base (20000 -> Q20000.0)")
 
 
+# --- C-031: the interface is a transfer area ------------------------------------------------------ #
+def _ta_dtd(in_len="128", out_len="128"):
+    return {"by_id": {"TRANSFERAREA-IN": {"model_id": "TransferArea-IN", "params": f"PartnerToLocalLength={in_len}"},
+                      "TRANSFERAREA-OUT": {"model_id": "TransferArea-OUT", "params": f"LocalToPartnerLength={out_len}"}},
+            "default_cards": {}}
+
+
+def test_interface_name_and_base_byte():
+    eq(interfaces.interface_name("SORTER+DIAG-02"), "SORTER-02", "the +DIAG marker is no part of the name")
+    eq(interfaces.interface_name(" FVTGENERIC-03 "), "FVTGENERIC-03")
+    eq([interfaces.base_byte(v) for v in ("10000", " 20000 ", "I10000.0", "Q20.0", "AREA", "", None, "1.5")],
+       [10000, 20000, 10000, 20, None, None, None, None], "a bare byte or an address's byte (the notation); else None")
+
+
+def test_ioc_base_from_the_coupler_start():
+    """C-031 (user 2026-10-08): an IOC row with no Bit takes the start of the coupler it sits under - the head row's
+    `coupler_start` (FVT: column AB) - by the same positional rule as phase 700 (`station_role`); its own Bit wins;
+    a generated row in between belongs to no head; two bit-less interfaces of one coupler share its start, and the
+    overlap check stops them."""
+    rows = [{"script_type": "IOC", "index": "X-09", "source_cell": "S!O1"},                       # before any head
+            {"script_type": "PA", "type_hw": "PA", "coupler_start": "14000", "source_cell": "S!O2"},
+            {"script_type": "KB", "spawned_by": "qbad", "source_cell": "qbad:x"},                 # generated
+            {"script_type": "IOC", "index": "FVTGENERIC-05", "source_cell": "S!O3"},
+            {"script_type": "IOC", "index": "FVTGENERIC-06", "bit": "10000", "source_cell": "S!O4"},
+            {"script_type": "PA", "type_hw": "PA", "source_cell": "S!O5"},
+            {"script_type": "IOC", "index": "FVTGENERIC-07", "source_cell": "S!O6"},
+            {"script_type": "PA", "type_hw": "PA", "coupler_start": "16000", "source_cell": "S!O7"},
+            {"script_type": "IOC", "index": "SORTER-01", "source_cell": "S!O8"},
+            {"script_type": "IOC", "index": "SORTER-02", "source_cell": "S!O9"}]
+    records, _f = interfaces.find_interfaces(rows)
+    eq([(r["instance"], r["base"]) for r in records],
+       [("X-09", ""), ("FVTGENERIC-05", "14000"), ("FVTGENERIC-06", "10000"), ("FVTGENERIC-07", ""),
+        ("SORTER-01", "16000"), ("SORTER-02", "16000")])
+    size = {r["instance"]: {"I": 2, "Q": 2} for r in records}
+    length = {r["instance"]: {"I": 128, "Q": 128} for r in records}
+    found = interfaces.area_findings(records, size, length, [])
+    eq([(f.type, f.location) for f in found],
+       [("if_base_invalid", "S!O1"), ("if_base_invalid", "S!O6"), ("if_area_overlap", "S!O8"), ("if_area_overlap", "S!O8")],
+       "no base before a head / under a head without a start; the two areas sharing 16000 overlap (IN and OUT)")
+
+
+def test_area_lengths_default_and_override():
+    eq(interfaces.area_lengths({}, _ta_dtd()), {"I": 128, "Q": 128}, "the database defaults")
+    eq(interfaces.area_lengths({"hardware_params": "partnertolocallength = 64"}, _ta_dtd()), {"I": 64, "Q": 128},
+       "the IOC row's own key wins, read the importer's way (case, spacing)")
+    eq(interfaces.area_lengths({"hardware_params": "LocalToPartnerLength=abc"}, _ta_dtd()), {"I": 128, "Q": None})
+    eq(interfaces.area_lengths({}, {"by_id": {}}), {"I": None, "Q": None}, "nothing configured -> unknown")
+    eq(interfaces.route_area_params("LocalToPartnerLength=32 | Foo=1 | PartnerToLocalLength=16"),
+       ({"I": "PartnerToLocalLength=16", "Q": "LocalToPartnerLength=32"}, ["Foo=1"]))
+
+
+def test_mapping_by_name_number_and_diag_name():
+    """C-031: the `Interfaces` cell names an interface by `<TYPE>-<NN>` (any case, the `+DIAG` marker optional) or,
+    as the PL3 column did, by its number; several names per cell, `|`-separated."""
+    names = ("SORTER+DIAG-02", "SORTER-02")
+    for cell in ("sorter-02", "SORTER+DIAG-02", "02", "FVTGENERIC-03 | SORTER-02"):
+        ok(interfaces._maps_to("02", names, cell), cell)
+    for cell in ("SORTER-03", "SORTER-022", "", None, "FVTGENERIC-03"):
+        ok(not interfaces._maps_to("02", names, cell), cell)
+    rows = [{"script_type": "DI1/2", "interface_mapping": "FVTGENERIC-03|sorter-02", "plc_binding": '"07_DOOR"."D1"'},
+            {"script_type": "DI1/2", "interface_mapping": "SORTER-01", "plc_binding": '"07_DOOR"."D2"'}]
+    elems, _f = interfaces.collect_mirror_set(rows, index="02", is_diag=False, diag_rules=[], if_rules=[], names=names)
+    eq([e.mirror_name for e in elems], ['"07_DOOR"."D1"'], "only the door that names SORTER-02")
+
+
+def test_unknown_interface_name_warns():
+    rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "10000", "source_cell": "NET!O7"},
+            {"script_type": "IOC", "index": "FVTGENERIC-03", "bit": "11000", "source_cell": "NET!O8"},
+            {"script_type": "DI1/2", "interface_mapping": "SORTER-01|SORTR-01|03|04", "functional_unit": "=A",
+             "location": "-B", "device": "-C", "source_cell": "NET!O20", "uid": "u1"},
+            {"script_type": "DI1/2", "interface_mapping": "fvtgeneric-03", "source_cell": "NET!O21"}]
+    records, _f = interfaces.find_interfaces(rows)
+    found = interfaces.mapping_findings(rows, records)
+    eq([(f.type, f.severity, f.location, f.source_uid) for f in found], [("if_mapping_unknown", "WARN", "NET!O20", "u1")])
+    ok(found[0].detail.endswith("names no interface: SORTR-01, 04"), found[0].detail)
+
+
+def _recs(*iocs):
+    rows = [{"script_type": "IOC", "index": index, "bit": bit, "source_cell": f"NET!O{n}", "uid": f"i{n}"}
+            for n, (index, bit) in enumerate(iocs, 1)]
+    return interfaces.find_interfaces(rows)[0]
+
+
+def test_area_findings_overflow_overlap_and_base():
+    """C-031's blocking checks: a layout past its area (quiet at the exact limit), two areas overlapping (quiet
+    when adjacent), an area over an I/O-List address of ITS direction, a base that is no byte; an area of unknown
+    length a WARN."""
+    a = interfaces.area_findings
+    recs = _recs(("SORTER-01", "10000"))
+    eq(a(recs, {"SORTER-01": {"I": 128, "Q": 128}}, {"SORTER-01": {"I": 128, "Q": 128}}, []), [], "exactly full")
+    found = a(recs, {"SORTER-01": {"I": 2, "Q": 130}}, {"SORTER-01": {"I": 128, "Q": 128}}, [])
+    eq([(f.type, f.severity, f.location) for f in found], [("if_area_overflow", "FAIL", "NET!O1")])
+    ok("130 bytes laid out on SORTER-01_OUT, the area holds 128 (LocalToPartnerLength)" in found[0].detail,
+       found[0].detail)
+
+    two = _recs(("SORTER-01", "10000"), ("SORTER+DIAG-02", "I10100.0"))
+    sizes = {"SORTER-01": {"I": 2, "Q": 2}, "SORTER+DIAG-02": {"I": 2, "Q": 2}}
+    lens = {"SORTER-01": {"I": 128, "Q": 128}, "SORTER+DIAG-02": {"I": 128, "Q": 128}}
+    found = a(two, sizes, lens, [])
+    eq([f.type for f in found], ["if_area_overlap"] * 2, "the IN pair and the OUT pair")
+    ok("SORTER-01_IN (I10000..10127) and SORTER-02_IN (I10100..10227) overlap" in found[0].detail, found[0].detail)
+    adjacent = _recs(("SORTER-01", "10000"), ("SORTER+DIAG-02", "10128"))
+    eq(a(adjacent, sizes, lens, []), [], "adjacent areas do not overlap")
+
+    signals = [{"script_type": "DI1/2", "bit": "I10050.3", "source_cell": "NET!O30", "uid": "s1"},
+               {"script_type": "A", "bit": "I10051.0", "source_cell": "NET!O31"},
+               {"script_type": "KQ", "bit": "Q9999.7", "source_cell": "NET!O32"},
+               {"script_type": "IOC", "bit": "I10000.0", "source_cell": "NET!O33"}]
+    found = a(recs, {"SORTER-01": {"I": 2, "Q": 2}}, {"SORTER-01": {"I": 128, "Q": 128}}, signals)
+    eq([(f.type, f.severity, f.location, f.source_uid) for f in found], [("if_area_overlap", "FAIL", "NET!O30", "s1")],
+       "the I area over two input rows (reported once, at the first); the Q row below the area; the IOC row is the base")
+    ok("overlaps 2 I/O-List addresses, the first I10050.3" in found[0].detail, found[0].detail)
+
+    found = a(_recs(("SORTER-01", "AREA")), {"SORTER-01": {"I": 999, "Q": 999}}, {"SORTER-01": {"I": 1, "Q": 1}}, [])
+    eq([(f.type, f.severity) for f in found], [("if_base_invalid", "FAIL")], "no base: nothing else checked")
+    found = a(recs, {"SORTER-01": {"I": 999, "Q": 2}}, {"SORTER-01": {"I": None, "Q": 128}}, [])
+    eq([(f.type, f.severity) for f in found], [("if_area_length_unknown", "WARN")], "an unknown length is not checked")
+
+
+def test_io_address_side1_generic_syntax():
+    """The <GENERIC> / FVTGENERIC sheets' syntax, `I<size_modifier><base+offset>[.<bit>]` - their LET mirrored
+    (found by C-031's FVT run: the old reader left `Q<size_modifier>3256[.2]`); the SORTER syntax unchanged."""
+    f = interfaces.io_address_side1
+    g = "I<size_modifier><base+offset>[.<bit>]"
+    eq(f(g, 3256, "Q", "BOOL", 0, 2), "Q3256.2", "a BOOL keeps the optional bit, no size letter")
+    eq(f(g, 10000, "<", "BOOL", 1, None), "I10001.0", "a blank bit is 0")
+    eq(f(g, 10000, "I", "WORD", 4, None), "IW10004", "a WORD drops the optional part and takes W")
+    eq(f(g, 10000, ">", "WORD", 6, None), "QW10006")
+    eq(f("I<base+offset>/.<bit>", 10000, "Q", "BOOL", 1, 3), "Q10001.3", "the SORTER syntax as before")
+    eq(f("I<base+offset>/.<bit>", 10000, "I", "WORD", 4, None), "I10004", "(its LET: TEXTBEFORE '/')")
+
+
+def test_layout_extent_words():
+    E = interfaces._Elem
+    eq(interfaces.layout_extent(0, []), 0)
+    eq(interfaces.layout_extent(1, []), 2, "a template's lone BOOL byte rounds up to its word")
+    eq(interfaces.layout_extent(2, [E("X", "a", offset_byte=10, bit=0)]), 12, "a mirrored BOOL block is a word")
+    eq(interfaces.layout_extent(8, [E("W", "w", data_type="WORD", offset_byte=16)]), 18, "a WORD is 2 bytes")
+
+
+def _signals_db(rows):
+    table = signals_table(sorted({k for r in rows for k in r}))
+    for r in rows:
+        table.add(**r)
+    return Database([table])
+
+
+def test_build_interfaces_checks_the_real_layout():
+    """C-031 through the real 400 build: the template's rows + the mirrored block measured against the area (the
+    IOC row's own length key, routed), the `<GENERIC>` fallback warned for a machine type with no sheet; tables
+    written either way (the handler's gate halts the projections)."""
+    from pipeline5 import config
+    rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "10000", "source_cell": "NET!O7", "uid": "i1",
+             "hardware_params": "LocalToPartnerLength=2"},
+            {"script_type": "IOC", "index": "FVT_GENERIC-03", "bit": "11000", "source_cell": "NET!O8", "uid": "i2"},
+            {"script_type": "DI1/2", "interface_mapping": "SORTER-01", "plc_binding": '"07_DOOR"."D1"',
+             "source_cell": "NET!O20", "uid": "d1"}]
+    original_db = config.database_dir
+    with tempfile.TemporaryDirectory() as d:
+        tpl = os.path.join(d, "t.xlsx"); _native_template(tpl)
+        config.database_dir = lambda: d                        # build_interfaces saves - never into the repo
+        try:
+            db, found = interfaces.build_interfaces(_signals_db(rows), template_path=tpl, dtd=_ta_dtd())
+        finally:
+            config.database_dir = original_db
+    got = [(f.type, f.severity, f.location) for f in found if f.type.startswith(("if_area", "if_sheet", "if_base"))]
+    eq(got, [("if_sheet_fallback", "WARN", "NET!O8"), ("if_area_overflow", "FAIL", "NET!O7")])
+    ok("machine type 'FVT' has no sheet" in found[[f.type for f in found].index("if_sheet_fallback")].detail)
+    ok("12 bytes laid out on SORTER-01_OUT, the area holds 2" in
+       next(f.detail for f in found if f.type == "if_area_overflow"), "the door mirrored at Q10 (word -> 12)")
+    eq(len(db["interfaces"]), 2, "the tables are written")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("interfaces", [
@@ -181,4 +354,13 @@ if __name__ == "__main__":
         ("collect_mirror_set_direct_follower_iflrule_and_dedup", test_collect_mirror_set_direct_follower_iflrule_and_dedup),
         ("collect_mirror_set_not_mirrored_finding", test_collect_mirror_set_not_mirrored_finding),
         ("template_native_elements", test_template_native_elements),
+        ("interface_name_and_base_byte", test_interface_name_and_base_byte),
+        ("ioc_base_from_the_coupler_start", test_ioc_base_from_the_coupler_start),
+        ("area_lengths_default_and_override", test_area_lengths_default_and_override),
+        ("mapping_by_name_number_and_diag_name", test_mapping_by_name_number_and_diag_name),
+        ("unknown_interface_name_warns", test_unknown_interface_name_warns),
+        ("area_findings_overflow_overlap_and_base", test_area_findings_overflow_overlap_and_base),
+        ("io_address_side1_generic_syntax", test_io_address_side1_generic_syntax),
+        ("layout_extent_words", test_layout_extent_words),
+        ("build_interfaces_checks_the_real_layout", test_build_interfaces_checks_the_real_layout),
     ]))

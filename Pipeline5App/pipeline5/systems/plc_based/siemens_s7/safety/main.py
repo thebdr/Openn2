@@ -442,6 +442,10 @@ def run_data_blocks(ctx, only=None):
     if only in (None, 510):
         ctx.status("I/O tags…")
         database, iface_findings = interfaces.build_interfaces(database)
+        if run.has_blocking(iface_findings):         # [[C-031]]: an interface tag outside its transfer area
+            if not ctx.gate(iface_findings, label="510 I/O tags (400 interfaces)"):
+                return
+            iface_findings = []                      # downgraded by the registry - the gate rendered them
         res = io_tags.project(database)
         if not res["path"]:               # duplicate tags: the raw-FAIL guard skipped the write
             if ctx.gate(iface_findings + res["findings"], label="510 I/O tags"):
@@ -474,7 +478,10 @@ def run_interfaces(ctx, only=None):
         ctx.emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
         return
     database, iface_findings = interfaces.build_interfaces(database)
-    ctx.render(iface_findings, label="400 interfaces")
+    # a transfer-area FAIL ([[C-031]]: a base that is no byte, a layout past its area, an overlap) halts the
+    # projections - the IF_ workbooks and the SCL would carry addresses the coupler does not hold
+    if not ctx.gate(iface_findings, label="400 interfaces"):
+        return
     result = interface_xlsx.project(database)
     n_if, n_el = len(database["interfaces"]), len(database["interface_elements"])
     ctx.emit("RSLT", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "

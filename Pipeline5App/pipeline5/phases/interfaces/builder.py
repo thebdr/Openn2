@@ -23,8 +23,8 @@ from pipeline5 import config
 from pipeline5.truth.database import Database
 from pipeline5.findings.finding import Finding, record
 from pipeline5.truth.table import Table
-from pipeline5.truth import identity
-from pipeline5.truth.signals import signals_table
+from pipeline5.truth import addresses, identity
+from pipeline5.truth.signals import signals_table, is_generated, station_role
 
 from pipeline5.truth.identity import INTERFACE_TRIGGER_TYPE as TRIGGER_TYPE  # shared vocabulary
 
@@ -46,6 +46,93 @@ def _io_doc() -> str:
 GENERIC_SHEET = "<GENERIC>"
 _DIAG_RE = re.compile(r"\+\s*DIAG", re.IGNORECASE)   # the +DIAG marker in an IOC Index
 _DIR_TO_IO = {"<": "I", ">": "Q"}
+_BYTE_RX = re.compile(r"\s*\d+\s*")
+
+# The coupler transfer areas ([[C-031]]): an interface is one IN and one OUT area of its coupler. Direction ->
+# (the DeviceTypesDatabase model id, its length key) - the names of Shared/PL5_OP5_contract.md §2.1; the default
+# length is the model's parameter in the database (configuration), a different size the IOC row's Hardware
+# Parameters entry of the same key.
+TRANSFER_AREAS = {"I": ("TransferArea-IN", "PartnerToLocalLength"),
+                  "Q": ("TransferArea-OUT", "LocalToPartnerLength")}
+
+
+def interface_name(index_field) -> str:
+    """An interface's name - its IOC Index without the `+DIAG` marker (`SORTER+DIAG-02` -> `SORTER-02`): what the
+    `Interfaces` column names it by and what its transfer areas are called after ([[C-031]])."""
+    return _DIAG_RE.sub("", str(index_field or "")).strip()
+
+
+def ioc_base(ioc, head) -> str:
+    """An IOC row's base cell ([[C-031]]): its own Bit, else the start of the coupler it sits under - the head row's
+    `coupler_start` cell (a project maps that column; FVT: the address-builder byte, column AB - user 2026-10-08)."""
+    own = str(ioc.get("bit") or "").strip()
+    return own or (str((head or {}).get("coupler_start") or "").strip())
+
+
+def ioc_bases(rows) -> dict:
+    """{id(IOC row): its base cell} over the document rows in order - each IOC row under the last head before it
+    (`station_role`, the positional rule phase 700 walks; generated rows sit under no head)."""
+    out, head = {}, None
+    for r in rows or []:
+        if is_generated(r):
+            continue
+        if station_role(r) is not None:
+            head = r
+        elif str(r.get("script_type") or "").strip().upper() == TRIGGER_TYPE:
+            out[id(r)] = ioc_base(r, head)
+    return out
+
+
+def base_byte(value):
+    """The base byte in an IOC row's Bit cell: a bare byte (`10000` - the PL3 spelling) or an address in the
+    active notation / the canonical one (`I10000.0`, `Q10000.0`) - its byte; None when it is neither."""
+    s = str(value if value is not None else "")
+    if _BYTE_RX.fullmatch(s):
+        return int(s)
+    parsed = addresses.parse(s)
+    return parsed[1] if parsed else None
+
+
+def _param_value(blob, key):
+    """The value of `key=...` in a `|`-separated parameter blob (the key compared case- and space-insensitively);
+    None when absent."""
+    want = "".join(str(key).split()).lower()
+    for entry in str(blob or "").split("|"):
+        if "=" in entry:
+            k, v = entry.split("=", 1)
+            if "".join(k.split()).lower() == want:
+                return v.strip()
+    return None
+
+
+def area_lengths(row, dtd) -> dict:
+    """{'I': bytes|None, 'Q': bytes|None} - an IOC row's transfer-area lengths: its Hardware Parameters' length
+    key, else the database model's default ([[C-031]]); None when neither gives a positive whole number."""
+    by_id = (dtd or {}).get("by_id", {})
+    out = {}
+    for direction, (model, key) in TRANSFER_AREAS.items():
+        value = _param_value(row.get("hardware_params"), key)
+        if value is None and model.upper() in by_id:
+            value = _param_value(by_id[model.upper()].get("params"), key)
+        n = int(value) if value is not None and _BYTE_RX.fullmatch(value) else 0
+        out[direction] = n if n > 0 else None
+    return out
+
+
+def route_area_params(blob) -> tuple:
+    """An IOC row's Hardware Parameters split onto its two areas: ({'I': 'PartnerToLocalLength=64', 'Q': ...},
+    [the entries naming no area]) - an area's own length key goes to that area, anything else is unroutable."""
+    routed, unrouted = {"I": [], "Q": []}, []
+    for entry in (e.strip() for e in str(blob or "").split("|")):
+        if not entry:
+            continue
+        key = "".join(entry.split("=", 1)[0].split()).lower()
+        direction = next((d for d, (_m, k) in TRANSFER_AREAS.items() if k.lower() == key), None)
+        if direction is None:
+            unrouted.append(entry)
+        else:
+            routed[direction].append(entry)
+    return {d: " | ".join(v) for d, v in routed.items()}, unrouted
 
 
 def annotate_interface_tagnames(database: Database, tagnames: dict | None = None) -> None:
@@ -146,7 +233,9 @@ def _to_int(value):
 def io_address_side1(isynt, base, direction, data_type, offset, bit) -> str:
     """Mirror the IF_ sheet's `I/O Address Side 1` LET, in pure Python (Excel-independent): pick the I
     (input '<') / Q (output '>') format (qSynt = SUBSTITUTE(iSynt,'I','Q')); for BOOL drop '/' +
-    substitute <bit>, else TEXTBEFORE('/'); then substitute <base+offset> with base+offset. '' when there
+    substitute <bit>, else TEXTBEFORE('/'); then substitute <base+offset> with base+offset. The template's
+    second syntax (`I<size_modifier><base+offset>[.<bit>]` - <GENERIC>, FVTGENERIC) mirrors ITS sheet's LET
+    (the [optional] part, the size letter). '' when there
     is no direction / the inputs are blank. `direction` accepts the SSOT '<'/'>' OR the table's 'I'/'Q'.
     Stored on each interface_element at 400 (phase 510 reads the column); 400e's IF_ seed reuses it."""
     d = str(direction or "").strip()
@@ -158,7 +247,20 @@ def io_address_side1(isynt, base, direction, data_type, offset, bit) -> str:
         return ""
     if not synt or base is None or offset is None:
         return ""
-    if str(data_type or "").strip().upper() == "BOOL":
+    is_bool = str(data_type or "").strip().upper() == "BOOL"
+    if "[" in synt or "<size_modifier>" in synt:
+        # the <GENERIC>-style syntax (`I<size_modifier><base+offset>[.<bit>]`), its sheet's LET mirrored: a BOOL
+        # keeps the [optional] part (brackets dropped) and no size letter; any other type drops the [optional]
+        # part and takes its type's first letter (WORD -> `IW10004`); a blank bit is 0
+        if is_bool:
+            synt, size = synt.replace("[", "").replace("]", ""), ""
+        else:
+            if "[" in synt and "]" in synt:
+                synt = synt.split("[", 1)[0] + synt.split("]", 1)[1]
+            size = str(data_type or "").strip()[:1]
+        return (synt.replace("<size_modifier>", size).replace("<base+offset>", str(base + offset))
+                .replace("<bit>", str(bit if bit is not None else 0)))
+    if is_bool:
         synt = synt.replace("/", "").replace("<bit>", str(bit if bit is not None else 0))
     else:
         synt = synt.split("/", 1)[0]
@@ -182,10 +284,22 @@ def _index_in(index, mapping) -> bool:
     return any(_idx_key(tok) == want for tok in str(mapping or "").split("|") if tok.strip())
 
 
+def _tokens(mapping) -> list:
+    return [t.strip() for t in str(mapping or "").split("|") if t.strip()]
+
+
+def _maps_to(index, names, mapping) -> bool:
+    """True iff the `Interfaces` cell `mapping` names this interface: by a name in `names` (case-insensitive -
+    `SORTER-02`, `SORTER+DIAG-02`) or, as the PL3 column did, by its number (`_index_in`) ([[C-031]])."""
+    wanted = {str(n).strip().upper() for n in names if str(n or "").strip()}
+    return _index_in(index, mapping) or any(t.upper() in wanted for t in _tokens(mapping))
+
+
 def find_interfaces(rows) -> tuple:
     """One record per IOC row of the staged signals. Returns (records, findings); an IOC row with no
     Index is a `if_ioc_no_index` WARN + skipped."""
     records, findings = [], []
+    bases = ioc_bases(rows)
     for r in rows or []:
         if str(r.get("script_type", "") or "").strip().upper() != TRIGGER_TYPE:
             continue
@@ -198,11 +312,13 @@ def find_interfaces(rows) -> tuple:
         machine_type, index = parse_instance(instance)
         records.append({
             "instance": instance, "machine_type": machine_type, "index": index,
+            "name": interface_name(instance),
             "is_diag": _detect_diag(instance),
-            "base": str(r.get("bit", "") or "").strip(),
+            "base": bases.get(id(r), str(r.get("bit", "") or "").strip()),   # own Bit, else the coupler's start
             "base_node": str(r.get("id_node", "") or "").strip(),
             "device": str(r.get("device", "") or "").strip(),
             "ip": str(r.get("profinet_ip", "") or "").strip(), "source": loc,
+            "row": r,
         })
     return records, findings
 
@@ -259,6 +375,36 @@ def template_last_used_byte(template_path, sheet_name) -> dict:
     finally:
         wb.close()
     return last
+
+
+def _size(data_type) -> int:
+    return 2 if str(data_type or "").strip().upper() == "WORD" else 1
+
+
+def template_extent(template_path, sheet_name) -> dict:
+    """Bytes the template sheet's own rows occupy per direction - named or spare, a WORD 2 bytes: {'I': n, 'Q': n}
+    (0 when none). Part of what an interface's transfer area must hold ([[C-031]])."""
+    extent = {"I": 0, "Q": 0}
+    wb = load_workbook(template_path, data_only=True)
+    try:
+        if sheet_name not in wb.sheetnames:
+            return extent
+        found = _find_data_table(wb[sheet_name])
+        if not found:
+            return extent
+        _name, _c1, r1, _c2, r2, hdr = found
+        dcol, ocol, tcol = hdr.get("Direction </>"), hdr.get("I/O Offset Byte"), hdr.get("Data Type")
+        if not dcol or not ocol:
+            return extent
+        ws = wb[sheet_name]
+        for r in range(r1 + 1, r2 + 1):
+            d = _DIR_TO_IO.get(str(ws.cell(r, dcol).value or "").strip())
+            o = ws.cell(r, ocol).value
+            if d and isinstance(o, (int, float)):
+                extent[d] = max(extent[d], int(o) + _size(ws.cell(r, tcol).value if tcol else None))
+    finally:
+        wb.close()
+    return extent
 
 
 def template_input_format(template_path, sheet_name) -> str:
@@ -333,10 +479,11 @@ def _rule_tagname(rule, row, member, direction) -> str:
     return identity.interp_keep(rule.get("interface_tagname", ""), ctx) or member
 
 
-def collect_mirror_set(rows, *, index, is_diag, diag_rules, if_rules) -> tuple:
+def collect_mirror_set(rows, *, index, is_diag, diag_rules, if_rules, names=()) -> tuple:
     """Ordered list of _Elem to mirror onto interface `index`, plus findings (`if_signal_not_mirrored` WARN
     per picked signal with no db_element/tag):
-      (a) signals whose interface_mapping lists this index (or every in_diag signal when is_diag) -> Q;
+      (a) signals whose `Interfaces` cell names this interface - one of `names`, or its number `index`
+          ([[C-031]]) - (or every in_diag signal when is_diag) -> Q;
       (c) their diagnosis_logic_rules followers -> Q (DB members, TIA-qualified);
       (d) their interface_elements followers -> the rule's direction (the only I source).
     Deduped on (direction, script_type, mirror_name). NOTE: the +DIAG in_diag auto-mirror needs the
@@ -358,7 +505,7 @@ def collect_mirror_set(rows, *, index, is_diag, diag_rules, if_rules) -> tuple:
         st = str(r.get("script_type", "") or "").strip()
         if st.upper() == TRIGGER_TYPE:                      # never mirror the IOC rows themselves
             continue
-        picked = _index_in(index, r.get("interface_mapping"))
+        picked = _maps_to(index, names, r.get("interface_mapping"))
         if not picked and is_diag and (r.get("type") or {}).get("in_diag"):
             picked = True
         if not picked:
@@ -447,11 +594,97 @@ def allocate_bytes(elems, last, gap) -> None:
                 byte += ((len(g) + 15) // 16) * 2
 
 
-def build_interfaces(database: Database | None = None, template_path: str | None = None) -> tuple:
+def layout_extent(template_bytes, elems) -> int:
+    """Bytes one direction of an interface occupies: the template sheet's rows and every laid-out element, rounded
+    up to a whole 2-byte word (the allocation reserves words) - what its transfer area must hold ([[C-031]])."""
+    used = max([int(template_bytes or 0)]
+               + [e.offset_byte + _size(e.data_type) for e in elems if e.offset_byte is not None])
+    return used + used % 2
+
+
+def _where(row) -> str:
+    return str(row.get("source_cell") or "").strip() or f"{row.get('source_sheet', '')}!{row.get('source_row', '')}"
+
+
+def mapping_findings(rows, records) -> list:
+    """An `if_mapping_unknown` WARN per signal whose `Interfaces` cell holds a name / number that matches no
+    interface (a typo would silently mirror nothing) ([[C-031]])."""
+    names = {str(n).upper() for rec in records for n in (rec["instance"], rec["name"]) if n}
+    numbers = {_idx_key(rec["index"]) for rec in records} - {None}
+    out = []
+    for r in rows or []:
+        st = str(r.get("script_type", "") or "").strip()
+        if st.upper() == TRIGGER_TYPE:
+            continue
+        unknown = [t for t in _tokens(r.get("interface_mapping")) if t.upper() not in names and _idx_key(t) not in numbers]
+        if unknown:
+            out.append(_f("if_mapping_unknown", "WARN",
+                          f"{st} {identity.fld(r)}: Interfaces names no interface: {', '.join(unknown)}",
+                          _where(r), str(r.get("uid", "")), doc=_io_doc()))
+    return out
+
+
+def area_findings(records, extents, lengths, rows) -> list:
+    """[[C-031]]'s checks over the interfaces' transfer areas, `extents` / `lengths` = {instance: {'I': n, 'Q': n}}
+    (bytes laid out / the area length, None = unknown): blocking FAILs for a base that is no byte
+    (`if_base_invalid`), a layout reaching past its area (`if_area_overflow`), two areas overlapping or an area
+    over an I/O-List address of its direction (`if_area_overlap`); an area of unknown length is a WARN
+    (`if_area_length_unknown` - not checked)."""
+    out, areas = [], []
+    doc = _io_doc()
+    for rec in records:
+        row, name = rec.get("row") or {}, rec["name"] or rec["instance"]
+        base = base_byte(rec["base"])
+        if base is None:
+            out.append(_f("if_base_invalid", "FAIL",
+                          f"interface {rec['instance']!r}: base {rec['base']!r} is not a byte (the IOC row's Bit - "
+                          "`10000` or `I10000.0` - or its coupler's start) - its transfer areas and tags cannot be "
+                          "placed",
+                          rec["source"], str(row.get("uid", "")), doc=doc))
+            continue
+        unknown = [d for d in ("I", "Q") if lengths[rec["instance"]].get(d) is None]
+        if unknown:
+            out.append(_f("if_area_length_unknown", "WARN",
+                          f"interface {rec['instance']!r}: no transfer-area length for "
+                          + " / ".join(TRANSFER_AREAS[d][0] for d in unknown)
+                          + " (neither the DeviceTypesDatabase nor the IOC row's Hardware Parameters) - not checked",
+                          rec["source"], str(row.get("uid", "")), doc=doc))
+        for d in ("I", "Q"):
+            length = lengths[rec["instance"]].get(d)
+            if length is None:
+                continue
+            used = extents[rec["instance"]].get(d, 0)
+            suffix = "_IN" if d == "I" else "_OUT"
+            if used > length:
+                out.append(_f("if_area_overflow", "FAIL",
+                              f"interface {rec['instance']!r}: {used} bytes laid out on {name}{suffix}, the area "
+                              f"holds {length} ({TRANSFER_AREAS[d][1]}) - enlarge it in the IOC row's Hardware "
+                              "Parameters or map fewer signals",
+                              rec["source"], str(row.get("uid", "")), doc=doc))
+            areas.append((d, base, base + length, name + suffix, rec))
+    for i, (d, start, end, label, rec) in enumerate(areas):
+        for d2, start2, end2, label2, _rec2 in areas[i + 1:]:
+            if d == d2 and start < end2 and start2 < end:
+                out.append(_f("if_area_overlap", "FAIL",
+                              f"transfer areas {label} ({d}{start}..{end - 1}) and {label2} ({d}{start2}..{end2 - 1}) "
+                              "overlap", rec["source"], str((rec.get("row") or {}).get("uid", "")), doc=doc))
+        hits = [r for r in rows or [] if str(r.get("script_type", "") or "").strip().upper() != TRIGGER_TYPE
+                and (p := addresses.parse(r.get("bit"))) and p[0] == d and start <= p[1] < end]
+        if hits:
+            out.append(_f("if_area_overlap", "FAIL",
+                          f"transfer area {label} ({d}{start}..{end - 1}) overlaps {len(hits)} I/O-List address"
+                          + ("" if len(hits) == 1 else "es") + f", the first {hits[0].get('bit')}",
+                          _where(hits[0]), str(hits[0].get("uid", "")), doc=doc))
+    return out
+
+
+def build_interfaces(database: Database | None = None, template_path: str | None = None, dtd: dict | None = None) -> tuple:
     """400b: per IOC instance, collect its mirror set + lay out the bytes -> the `interfaces` +
     `interface_elements` tables. Runs `annotate_interface_tagnames` first (the Signal Name Side 1 base
     needs name_in_db/name_in_tagtable). Records the findings to `validation_issues` + saves the Database.
-    Returns (database, findings) - the WARN-only `if_ioc_no_index` / `if_signal_not_mirrored` report."""
+    Returns (database, findings) - the `if_ioc_no_index` / `if_signal_not_mirrored` / `if_mapping_unknown` /
+    `if_sheet_fallback` WARNs and the transfer-area checks of `area_findings` ([[C-031]]; `dtd` = the
+    DeviceTypesDatabase holding the default area lengths, loaded from the params when None)."""
     if database is None:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
@@ -459,23 +692,39 @@ def build_interfaces(database: Database | None = None, template_path: str | None
     rows = list(database["signals"])
     template_path = template_path or config.INTERFACE_TEMPLATE
     records, findings = find_interfaces(rows)
+    findings += mapping_findings(rows, records)
     diag_rules, if_rules = config.load_diagnosis_logic_rules(), config.load_interface_elements()
     sheet_names = template_sheet_names(template_path)
+    if records and dtd is None:
+        dtd = config.load_device_types_db(config.load_params())
 
     isynt_by_sheet: dict = {}
+    extent_by_sheet: dict = {}
+    extents, lengths = {}, {}
     itab, etab = interfaces_table(), interface_elements_table()
     for rec in records:
         sheet = choose_sheet(sheet_names, rec["machine_type"])
+        if sheet == GENERIC_SHEET and str(rec["machine_type"]).upper() != GENERIC_SHEET.strip("<>").upper():
+            findings.append(_f("if_sheet_fallback", "WARN",
+                               f"interface {rec['instance']!r}: machine type {rec['machine_type']!r} has no sheet in "
+                               f"{os.path.basename(template_path)} - {GENERIC_SHEET} used",
+                               rec["source"], str(rec["row"].get("uid", "")), doc=_io_doc()))
         elems, f = collect_mirror_set(rows, index=rec["index"], is_diag=rec["is_diag"],
-                                      diag_rules=diag_rules, if_rules=if_rules)
+                                      diag_rules=diag_rules, if_rules=if_rules,
+                                      names=(rec["instance"], rec["name"]))
         findings += f
         allocate_bytes(elems, template_last_used_byte(template_path, sheet), config.INTERFACE_CUSTOM_GAP)
         if sheet not in isynt_by_sheet:
             isynt_by_sheet[sheet] = template_input_format(template_path, sheet)
-        isynt, base = isynt_by_sheet[sheet], _to_int(rec["base"])
+            extent_by_sheet[sheet] = template_extent(template_path, sheet)
+        isynt, base = isynt_by_sheet[sheet], base_byte(rec["base"])
         # the template's SHIPPED native interface signals (offsets fixed by the template, NO allocation) +
         # the mirror block (allocated above). Native first - they're the template's top rows.
         native = template_native_elements(template_path, sheet, rec["index"], base, isynt)
+        extents[rec["instance"]] = {d: layout_extent(extent_by_sheet[sheet][d],
+                                                     [e for e in native + elems if e.direction == d])
+                                    for d in ("I", "Q")}
+        lengths[rec["instance"]] = area_lengths(rec["row"], dtd)
         itab.add(instance=rec["instance"], machine_type=rec["machine_type"], interface_id=rec["index"],
                  is_diag=rec["is_diag"], base_address=rec["base"], base_node=rec["base_node"],
                  device=rec["device"], ip=rec["ip"], template_sheet=sheet, source=rec["source"])
@@ -490,6 +739,7 @@ def build_interfaces(database: Database | None = None, template_path: str | None
                      signal_name=identity.interp_keep(e.signal_name, fill), expression=e.mirror_name,
                      diag_cabinet=e.diag_cabinet, swp_cabinet=e.swp_cabinet, diag_bit=e.diag_bit,
                      source=e.source, source_signal=(e.src_row or {}).get("uid", ""))
+    findings += area_findings(records, extents, lengths, rows)
 
     for table in (itab, etab):
         if table.name in database:

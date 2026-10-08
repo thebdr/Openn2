@@ -1325,6 +1325,60 @@ def test_cascade_orphan_and_validation_see_absorbed_rows():
             config.use_project(previous_project)
 
 
+def test_a_transfer_area_fail_halts_the_interface_outputs():
+    """C-031 through the real handlers, on the fixture's two IOC interfaces under the coupler n0006-mc1-cc1-k66201
+    (SORTER-01 at 10000, SORTER+DIAG-02 at 20000): with the shipped database 700 writes the coupler's four areas
+    into Modules.csv; a project database whose OUT area holds 2 bytes makes 400 halt before the IF_ workbooks and
+    the SCL, and the 510 leg before PLCTags - while 700 still writes the areas (the overflow is the layout's)."""
+    import csv
+    import glob
+    from pipeline5.config.paths import DEVICE_TYPES_DB_DEFAULT
+    out_root = p5paths._BUILTIN_OUTPUT
+
+    def areas():
+        path = glob.glob(os.path.join(out_root, "**", "Modules.csv"), recursive=True)
+        ok(len(path) == 1, path)
+        text = _unstamped(open(path[0], "rb").read()).decode("utf-8")
+        rows = [r for r in csv.reader(line for line in text.splitlines() if line and not line.startswith("#"))]
+        return [(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows if r[3].startswith("TransferArea")]
+
+    expected = [("n0006-mc1-cc1-k66201", "1", "SORTER-01_IN", "TransferArea-IN", "10000", ""),
+                ("n0006-mc1-cc1-k66201", "2", "SORTER-01_OUT", "TransferArea-OUT", "", "10000"),
+                ("n0006-mc1-cc1-k66201", "3", "SORTER-02_IN", "TransferArea-IN", "20000", ""),
+                ("n0006-mc1-cc1-k66201", "4", "SORTER-02_OUT", "TransferArea-OUT", "", "20000")]
+    host = _Host()
+    SYSTEM.handlers["hardware"](host.ctx())
+    eq(host.halted, False)
+    eq(areas(), expected, "the shipped database: two areas per interface, I / Q Addr = the base")
+
+    small = os.path.join(p5paths._BUILTIN_DATABASE, "SmallAreas.csv")
+    with open(DEVICE_TYPES_DB_DEFAULT, encoding="utf-8") as src, open(small, "w", encoding="utf-8") as dst:
+        dst.write(src.read().replace("),LocalToPartnerLength=128,,", "),LocalToPartnerLength=2,,"))
+    original = config.load_params
+    config.load_params = lambda path=None: dict(original(path), device_types_db=small)
+    try:
+        host = _Host()
+        SYSTEM.handlers["interfaces"](host.ctx())
+        eq(host.halted, True, "400 halts on the overflow")
+        overflow = [f for batch in host.rendered for f in batch if f.type == "if_area_overflow"]
+        eq(sorted(f.detail.split(":")[0] for f in overflow), ["interface 'SORTER+DIAG-02'", "interface 'SORTER-01'"])
+        eq(glob.glob(os.path.join(out_root, "**", "IF_*.xlsx"), recursive=True), [], "no IF_ workbook")
+        eq(glob.glob(os.path.join(out_root, "**", "*.scl"), recursive=True), [], "no MachineInterfaces SCL")
+        ok("RSLT" not in host.levels(), host.lines)
+
+        host = _Host()
+        SYSTEM.handlers["data_blocks"](host.ctx(), only=510)
+        eq(host.halted, True, "the 510 leg halts on the same interfaces")
+        eq(glob.glob(os.path.join(out_root, "**", "PLCTags*.xlsx"), recursive=True), [], "no PLCTags")
+
+        host = _Host()
+        SYSTEM.handlers["hardware"](host.ctx())
+        eq(host.halted, False, "700 is not the layout's judge")
+        eq(areas(), expected, "the areas are still written")
+    finally:
+        config.load_params = original
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("siemens_main_handlers", [
@@ -1362,4 +1416,6 @@ if __name__ == "__main__":
          _sandboxed(test_310_leg_appends_reaction_findings_to_the_existing_record)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),
         ("run_all_writes_a_ready_op5_workspace", _sandboxed(test_run_all_writes_a_ready_op5_workspace)),
+        ("a_transfer_area_fail_halts_the_interface_outputs",
+         _sandboxed(test_a_transfer_area_fail_halts_the_interface_outputs)),
     ]))

@@ -33,6 +33,10 @@ a literal `%Q%` the importer cannot convert) with a **`hw_addr_unresolved` WARN*
   Comment = the DTD comment. Custom Parameters = `PotentialGroup=1` on the first card + the DTD "Parameters
   by Signal Type" blocks (`Ch(#)` -> the signal's channel) then col-AG (override, last). Default cards
   (DTD ids `<PARENT>:SUFFIX`) add one row per station of PARENT.
+- **Transfer areas** ([[C-031]]): an IOC row (an interface) under a coupler's head is never a card - the coupler
+  gets `<name>_IN` (TransferArea-IN, I Addr = the IOC base) and `<name>_OUT` (TransferArea-OUT, Q Addr = the
+  base) per interface, positions 1..n, after the cards; the area length is the model's DTD default (applied by
+  the importer) unless the IOC row's col AG sets that area's length key (written, routed to its area).
 
 DTD col-5 "Parameters" are applied by OP4 itself and are NEVER written here; only col-6 "Parameters by
 Signal Type", col-7 "I/O Addresses Parameter", and I/O List col-AG are written, AG last.
@@ -58,10 +62,11 @@ from pipeline5.findings import gate as run
 from pipeline5.truth.database import Database
 from pipeline5.findings.finding import Finding, record
 from pipeline5.truth.table import Table
-from pipeline5.truth.signals import signals_table, is_generated
+from pipeline5.truth.signals import signals_table, is_generated, station_role
+from pipeline5.truth.identity import INTERFACE_TRIGGER_TYPE
+from pipeline5.phases.interfaces.builder import (TRANSFER_AREAS, base_byte, interface_name, ioc_base,
+                                                route_area_params)
 
-HEAD_PLC = "PLC"
-HEAD_CM = "PLCCARDCM"
 _ADDR = re.compile(r"\s*([IQ])\s*(\d+)\.(\d+)", re.IGNORECASE)
 
 
@@ -118,15 +123,7 @@ def _subnet(ip) -> str:
     return f"Subnet{p[2]}" if len(p) == 4 else ""
 
 
-def _role(row):
-    s = str(row.get("script_type") or "").strip().upper()
-    if s == HEAD_PLC:
-        return "Plc"
-    if s == HEAD_CM:
-        return "PlcCardCm"
-    if str(row.get("type_hw") or "").strip()[:1].upper() == "P":
-        return "IoDevice"
-    return None
+_role = station_role                      # the head rule every positional reader shares (truth/signals.py)
 
 
 def plc_station_name(rows) -> str:
@@ -232,6 +229,66 @@ def _where(row) -> str:
     return str(row.get("source_cell") or "").strip() or fallback
 
 
+def _is_ioc(row) -> bool:
+    return str(row.get("script_type") or "").strip().upper() == INTERFACE_TRIGGER_TYPE
+
+
+def _ioc_without_coupler(row, where_text) -> Finding:
+    where = _where(row)
+    return _f("hw_ta_no_iodevice", "WARN",
+              f"interface {str(row.get('index') or '').strip()!r} {where_text}: no transfer area (an interface is an "
+              "area of the coupler whose head it sits under - an I-device is not modelled)",
+              where, str(row.get("uid", "")), doc=_io_doc() if "!" in where else "")
+
+
+def _transfer_areas(station, head, iocs, by_id, findings) -> list:
+    """A coupler's transfer-area module rows ([[C-031]]): per IOC row under its head, in document order,
+    `<name>_IN` (TransferArea-IN, I Addr = the base) and `<name>_OUT` (TransferArea-OUT, Q Addr = the base),
+    positions 1..n; the base = the IOC row's Bit, else the head's `coupler_start` (`ioc_base`). Lengths: the database model's default is applied by the importer - only the IOC row's own
+    length key (Hardware Parameters) is written, routed to its area; another entry is a `hw_ta_param_unrouted`
+    WARN. A base that is no byte is a blocking `hw_ta_base_invalid`, a model missing from the database a
+    blocking `hw_device_not_in_dtd`."""
+    out, position = [], 0
+    for ioc in iocs:
+        name = interface_name(ioc.get("index"))
+        if not name:                                    # 400 reports the IOC row without an Index
+            continue
+        where = _where(ioc)
+        doc = _io_doc() if "!" in where else ""
+        cell = ioc_base(ioc, head)
+        base = base_byte(cell)
+        if base is None:
+            findings.append(_f("hw_ta_base_invalid", "FAIL",
+                               f"interface {name!r} on {station!r}: base {cell!r} is not a byte (the IOC row's Bit - "
+                               "`10000` or `I10000.0` - or its coupler's start) - its transfer areas cannot be placed",
+                               where, str(ioc.get("uid", "")), doc=doc))
+            continue
+        routed, unrouted = route_area_params(ioc.get("hardware_params"))
+        if unrouted:
+            findings.append(_f("hw_ta_param_unrouted", "WARN",
+                               f"interface {name!r} on {station!r}: Hardware Parameters entr"
+                               + ("y " if len(unrouted) == 1 else "ies ") + " | ".join(unrouted)
+                               + " name no transfer area (only " + " / ".join(k for _m, k in TRANSFER_AREAS.values())
+                               + ") - not written", where, str(ioc.get("uid", "")), doc=doc))
+        for direction, suffix in (("I", "_IN"), ("Q", "_OUT")):
+            model = TRANSFER_AREAS[direction][0]
+            rec = by_id.get(model.upper())
+            if rec is None:
+                findings.append(_f("hw_device_not_in_dtd", "FAIL",
+                                   f"transfer-area model {model!r} (interface {name!r} on {station!r}) not in "
+                                   "DeviceTypesDatabase - skipped", where, str(ioc.get("uid", "")), doc=doc))
+                continue
+            position += 1
+            out.append({
+                "station_name": station, "slot": position, "module_name": name + suffix,
+                "model_id": rec["model_id"],
+                "i_addr": base if direction == "I" else "", "q_addr": base if direction == "Q" else "",
+                "custom_parameters": routed[direction], "comment": rec["comment"],
+                "source_signal": str(ioc.get("uid", "")),
+            })
+    return out
+
+
 # --- the single-pass extract -> snake_case station/module rows + findings ------------------------ #
 def extract(rows, dtd) -> tuple:
     """One ordered pass -> (stations, modules, findings). A head with no DTD model is a
@@ -243,13 +300,16 @@ def extract(rows, dtd) -> tuple:
     stations, modules, findings = [], [], []
     cur = None
     seen_ips = {}          # ip -> the FIRST generated station's {name, where} - the dedup anchor
+    any_head = False       # an IOC row before the first head has no station; after a SKIPPED head it goes with it
 
     def finalize():
         if cur is None:
             return
         row, model, rec = cur["row"], cur["model"], cur["rec"]
-        sig_i = [a[1] for s in cur["signals"] if (a := parse_address(s.get("bit"))) and a[0] == "I"]
-        sig_q = [a[1] for s in cur["signals"] if (a := parse_address(s.get("bit"))) and a[0] == "Q"]
+        iocs = [s for s in cur["signals"] if _is_ioc(s)]        # interfaces: transfer areas, never cards / I/O
+        io_rows = [s for s in cur["signals"] if not _is_ioc(s)]
+        sig_i = [a[1] for s in io_rows if (a := parse_address(s.get("bit"))) and a[0] == "I"]
+        sig_q = [a[1] for s in io_rows if (a := parse_address(s.get("bit"))) and a[0] == "Q"]
         i_base = min(sig_i) if sig_i else None
         q_base = min(sig_q) if sig_q else None
 
@@ -292,10 +352,13 @@ def extract(rows, dtd) -> tuple:
             "source_signal": str(row.get("uid", "")),
         })
         if cur["role"] != "IoDevice":
+            for s in iocs:
+                findings.append(_ioc_without_coupler(s, f"under the {cur['role']} head "
+                                                        f"{str(row.get('profinet_name') or '').strip()!r}"))
             return
 
         cards, order = {}, []
-        for s in cur["signals"]:
+        for s in io_rows:
             slot = str(s.get("slot") or "").strip()
             if not slot or slot == cur["head_tag"]:          # auto-plugged card: the device's own tag
                 continue
@@ -334,11 +397,14 @@ def extract(rows, dtd) -> tuple:
                 "source_signal": "",
             })
 
+        modules.extend(_transfer_areas(str(row.get("profinet_name") or "").strip(), row, iocs, by_id, findings))
+
     for row in rows or []:
         if is_generated(row):                    # a generated signal sits under no head in the document - a
             continue                             # POSITIONAL walk never gives it to a station ([[C-030]] round 1)
         role = _role(row)
         if role is not None:
+            any_head = True
             finalize()
             ip = str(row.get("profinet_ip") or "").strip()
             name = str(row.get("profinet_name") or row.get("device") or "").strip()
@@ -380,6 +446,8 @@ def extract(rows, dtd) -> tuple:
                 seen_ips[ip] = {"name": name, "where": _where(row)}
         elif cur is not None:
             cur["signals"].append(row)
+        elif not any_head and _is_ioc(row):
+            findings.append(_ioc_without_coupler(row, "before any station head"))
     finalize()
     return stations, modules, findings
 

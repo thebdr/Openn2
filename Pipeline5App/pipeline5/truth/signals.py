@@ -49,6 +49,21 @@ def is_generated(row) -> bool:
     return bool(str((row or {}).get("spawned_by") or "").strip())
 
 
+def station_role(row):
+    """The station a document row OPENS - the I/O List's head rows: Script Type `PLC` -> 'Plc', `PlcCardCm` ->
+    'PlcCardCm', a Type (col R) starting with `P` -> 'IoDevice'; None for any other row. The rows after a head,
+    up to the next one, are its own - the positional rule every station reader shares (phase 700's stations, phase
+    400's coupler start of an IOC row - [[C-031]])."""
+    s = str(row.get("script_type") or "").strip().upper()
+    if s == "PLC":
+        return "Plc"
+    if s == "PLCCARDCM":
+        return "PlcCardCm"
+    if str(row.get("type_hw") or "").strip()[:1].upper() == "P":
+        return "IoDevice"
+    return None
+
+
 def signals_table(iolist_columns) -> Table:
     """Build the empty `signals` Table: `uid`, then the raw IoList canonical columns VERBATIM (in their
     given order), then the enriched columns (those not already a raw column). `iolist_columns` is the
