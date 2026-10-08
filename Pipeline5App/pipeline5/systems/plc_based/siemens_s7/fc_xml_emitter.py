@@ -15,7 +15,9 @@ single `A Card=N`. UIds restart at 21 per network, global object IDs run sequent
 Output format MATCHES the exported-template byte conventions: **UTF-8 BOM + CRLF + indented multi-line** (a
 double BOM / LF-only / single-line file fails the Openness importer at line 1). The PL4 `blocks.table.Table`
 has the same interface PL3's emitter expects (rows are plain dicts; `ITERATOR_STRINGS` is a real list), so the
-emitter body is a verbatim port. The engine emits these to `blocks_import_dir` and DROPS the block's CSV.
+emitter body is a verbatim port. The engine emits these to the PLC's `Program blocks` folder of the OP5
+workspace, the contract-v1 `#!openn` header (`sw/code-block`) as the first comment after the declaration,
+and DROPS the block's CSV.
 
 Place in the flow: phase 800 / 820 "Generate Blocks" (run_software in
 src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) - the build engine
@@ -24,14 +26,21 @@ src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) - the build engine
 src://pipeline5/systems/plc_based/siemens_s7/safety/block_builders.py through the system's emitter
 table (src://pipeline5/systems/plc_based/siemens_s7/safety/system.py) to `write_fc_xml`. Reads the
 reconstructed builder Table (from the `software_blocks` + `software_block_members` SSOT tables);
-writes BuilderData/SoftwareBlocks/ImportReady/<name>.xml (`blocks_import_dir` in
-src://pipeline5/config/paths.py). Template XMLs live in `Shared/Templates/Tia Portal Software
-Blocks/` (resolved by src://pipeline5/systems/plc_based/siemens_s7/template_scanner.py).
+writes BuilderData/<PLC>/Program blocks/<name>.xml (`program_blocks_dir` of
+src://pipeline5/systems/plc_based/siemens_s7/output_layout.py; the header from
+src://pipeline5/systems/plc_based/siemens_s7/openn_header.py). Template XMLs live in
+`Shared/Templates/Tia Portal Software Blocks/` (resolved by
+src://pipeline5/systems/plc_based/siemens_s7/template_scanner.py).
 """
 from __future__ import annotations
 
 import os
+import re
 
+from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+
+PHASE = 820
+_TEMPLATE_PREFIX = re.compile(r"^TEMPLATE--v([\d.]+)--")
 FLGNET_NS = "http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4"
 _ATTR_END = "</AttributeList>"
 NL = "\r\n"
@@ -436,19 +445,30 @@ def fdback_fc(table, template_path, block_name,
 
 # emit KIND -> renderer. WHICH blocks use an emitter is declared at registration
 # (`@builds(name, emit="fc_xml"|"fdback_xml")` in the user-coded builders.py) - the hardcoded name-set is
-# retired (UI_REFRESH_PLAN F). The engine emits these to blocks_import_dir (UTF-8 BOM + CRLF) and drops the CSV.
+# retired (UI_REFRESH_PLAN F). The engine emits these to the PLC's Program blocks (UTF-8 BOM + CRLF) and drops the CSV.
 EMIT_FUNCS = {"fc_xml": and_coil_fc, "fdback_xml": fdback_fc}
 
 
-def write_fc_xml(name, table, template_path, out_dir, kind) -> str:
+def template_label(template_path: str) -> str:
+    """`<name> v<version>` of a `TEMPLATE--vX.Y--<name>` template - the provenance an XML header can hold
+    (an XML comment cannot contain the `--` of the file name)."""
+    stem = os.path.splitext(os.path.basename(str(template_path)))[0]
+    m = _TEMPLATE_PREFIX.match(stem)
+    return f"{stem[m.end():]} v{m.group(1)}" if m else stem
+
+
+def write_fc_xml(name, table, template_path, out_dir, kind, plc=None) -> str:
     """Emit `name`'s FC XML for the declared `kind` ('fc_xml' | 'fdback_xml') into out_dir/<name>.xml
-    as UTF-8 BOM + CRLF (the exported-Openness convention). The KIND arrives from the caller (the
-    system's emitter table routes it) - this module no longer consults any registry. Returns the
-    path, or '' when the template is missing."""
+    as UTF-8 BOM + CRLF (the exported-Openness convention), the `#!openn` header (`sw/code-block`, the
+    run, `plc` + the TIA folder) as the first comment after the declaration. The KIND arrives from the
+    caller (the system's emitter table routes it) - this module no longer consults any registry. Returns
+    the path, or '' when the template is missing."""
     emit = EMIT_FUNCS.get(kind)
     if emit is None or not template_path or not os.path.exists(template_path):
         return ""
-    xml = emit(table, template_path, name)
+    xml = header.stamp_xml(emit(table, template_path, name),
+                           header.fields("sw/code-block", PHASE, plc=plc, target=header.PROGRAM_BLOCKS,
+                                         source=f"software_blocks (template {template_label(template_path)})"))
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"{name}.xml")
     with open(path, "w", encoding="utf-8-sig", newline="") as f:    # single BOM; newline='' keeps our CRLF

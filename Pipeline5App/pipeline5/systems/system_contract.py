@@ -138,6 +138,12 @@ class OutputLayout:
     def dirs(self) -> dict:
         raise NotImplementedError
 
+    def delivery_dirs(self, database) -> dict:
+        """The dirs ONE generation writes into, derived from the staged database - a system may place a
+        delivery under a folder named after a staged fact (Siemens: the software under the PLC station's
+        own folder). Same keys as `dirs()`; the writers' default when no dir is passed explicitly."""
+        raise NotImplementedError
+
 
 class BuilderRegistry:
     """Instance-based port of PL4 `domain/blocks/registry.py` - one registry PER SYSTEM.
@@ -192,6 +198,9 @@ class PhaseContext:
     records: object = None   # callable(records) -> None: post PRE-RENDERED structured log records
     halt: object = None      # callable() -> None: mark the RUN halted (Run-all stops the chain)
     lang: str = "en"
+    run: str = ""            # the host's id of THIS generation - one per button press (Run-all: one for the
+                             # whole chain); what a system stamps as the run id of everything it writes
+                             # (Siemens: the contract-v1 `run`). "" = the handler mints its own.
 
 
 @dataclass(frozen=True)

@@ -339,6 +339,8 @@ def test_scl_project_synthetic_template():
         open(tpl, "w", encoding="utf-8").write(_SCL_TEMPLATE)
         res = diagnosis_scl.project(db, out_dir=d, template_path=tpl)
         text = open(res["path"], encoding="utf-8-sig").read()
+        ok(text.startswith("//#!openn\n//#! kind: sw/source\n") and "//#! name: 06_Diagnostic for OPC\n" in text,
+           "the contract-v1 header opens the source; `name` = the FUNCTION, which differs from the file name")
         ok('FUNCTION "06_Diagnostic for OPC"' in text, "rename applied end-to-end")
         ok("Tristate_DW" in text, "the tt=2 cabinet 2 renders tristate")
 

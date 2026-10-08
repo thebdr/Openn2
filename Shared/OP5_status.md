@@ -32,7 +32,7 @@ once PL5 has consumed it or fold what still matters into the contract.
    transfer-area models; the `_AutoPluggedCard` rows are retired (removed from the shared csv and the Passing
    fixture — TIA-auto-plugged submodules are addressed through the head's station row, `Item(1).Item(3).Item(0).…`).
 
-## 3. What PL5 owes (contract §6, unchanged — none started as of today)
+## 3. What PL5 owes (contract §6) — **done 2026-10-08 by the PL5 session** (see the contract's §6 status, §8 steps 2+3 and Appendix A; left: §6.7 the hand-maintained files, and the TIA smoke of step 1 / step 3)
 
 - `#!openn` header on every BuilderData file (csv lines / XML first comment / `//` source lines / `.openn`
   sidecar for `PLCTags.xlsx`), `run` id per generation + `.openn/workspace.openn.config`.

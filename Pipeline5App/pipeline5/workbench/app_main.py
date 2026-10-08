@@ -195,13 +195,23 @@ class App:
         systems = project.project_systems(root) if root else []
         return systems or [catalog.by_id("siemens_s7_safety")]
 
-    def _ctx(self) -> PhaseContext:
+    @staticmethod
+    def _generation_id() -> str:
+        """ONE id per button press - a phase, a sub-phase, a special, or Run-all as a whole: what a system
+        stamps as the run id of everything it writes in this generation (the Siemens handoff: contract v1
+        `run` - a file of an older generation is stale for OP5). `YYYYMMDD-HHMMSS-xxxx`, UTC."""
+        import datetime
+        import secrets
+        return datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(2)
+
+    def _ctx(self, run: str = "") -> PhaseContext:
         """The PhaseContext for one run - the seams a system handler reports through (worker thread):
-        everything lands in the queue for the drain pump; nothing touches Tk."""
+        everything lands in the queue for the drain pump; nothing touches Tk. `run` = this button press's
+        generation id (`_generation_id`), the same for every phase of a Run-all."""
         return PhaseContext(system=self._system, emit=self._emit, status=self._status,
                             gate=self._gate, render=self._render,
                             records=lambda recs: self._q.put(("records", recs)),
-                            halt=self._halt, lang=self.lang)
+                            halt=self._halt, lang=self.lang, run=run)
 
     def _halt(self) -> None:
         """A handler-declared halt (the severity contract) - Run-all stops the chain here."""
@@ -251,10 +261,11 @@ class App:
         """Runs OFF the main thread: dispatch to the system's phase handler (or Run-all); never touch
         Tk here."""
         self._run_halted = False
+        run = self._generation_id()                   # one generation id per button press (Run-all included)
         try:
             if number == 0:
                 self._backup_before("run_pipeline")   # one backup per button press, not per chain leg
-                self._run_all()
+                self._run_all(run)
             else:
                 phase = self._system.phases.by_number(number)
                 handler = self._system.handlers.get(phase.handler) if (phase and phase.handler) else None
@@ -263,14 +274,15 @@ class App:
                     self._emit("WARN", f"  phase {number} not implemented yet")
                 else:
                     self._backup_before(number)
-                    handler(self._ctx())
+                    handler(self._ctx(run))
         except Exception:  # noqa: BLE001 - a handler crash must never take the window down
             self._emit("ERRR", f"handler for {label} crashed:\n{traceback.format_exc()}")
         finally:
             self._q.put(("done",))
 
-    def _run_all(self):
-        """Run the active system's `run_plan` with live per-phase progress + halt-on-FAIL: a phase whose
+    def _run_all(self, run: str = ""):
+        """Run the active system's `run_plan` with live per-phase progress + halt-on-FAIL (`run` = the
+        generation id every phase of the chain shares): a phase whose
         gate halts on a blocking finding sets `self._run_halted`, and the chain stops there (the
         remaining phases are skipped). Each handler is self-contained / re-stages its own
         prerequisites - a future engine optimizes this to a stage-once shared database."""
@@ -282,7 +294,7 @@ class App:
             self._status(f"[{i}/{len(order)}] {number} {name}…")
             self._emit("INFO", f"[{i}/{len(order)}] running {number} {name}")
             try:
-                self._system.handlers[phase.handler](self._ctx())
+                self._system.handlers[phase.handler](self._ctx(run))
             except Exception:  # noqa: BLE001 - attribute the crash to THIS phase, stop the chain like a halt
                 self._emit("ERRR", f"  {number} {name} crashed:\n{traceback.format_exc()}")
                 self._emit("FAIL", f"  Run Pipeline aborted at {number} {name} - "
@@ -329,7 +341,7 @@ class App:
                 self._emit("WARN", f"  special {handler_key!r} is not wired for this system")
             else:
                 self._backup_before(handler_key)
-                handler(self._ctx())
+                handler(self._ctx(self._generation_id()))
         except Exception:  # noqa: BLE001
             self._emit("ERRR", f"{handler_key} crashed:\n{traceback.format_exc()}")
         finally:
@@ -354,7 +366,7 @@ class App:
                 self._emit("WARN", f"  sub-phase {number} is not runnable")
             else:
                 self._backup_before(number)
-                handler(self._ctx(), only=number)
+                handler(self._ctx(self._generation_id()), only=number)
         except Exception:  # noqa: BLE001 - a handler crash must never take the window down
             self._emit("ERRR", f"sub-phase {number} crashed:\n{traceback.format_exc()}")
         finally:

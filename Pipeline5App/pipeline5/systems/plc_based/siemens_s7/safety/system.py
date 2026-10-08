@@ -26,15 +26,15 @@ from pipeline5.systems.system_contract import BuilderRegistry, System, SystemCap
 
 
 def _emit_scl(block, table, ctx):
-    """emit='scl': a ready SCL FUNCTION source shipped to ImportReady (no CreationInfo CSV)."""
-    return _scl.write_scl(block["name"], table, ctx["import_dir"])
+    """emit='scl': a ready SCL FUNCTION source shipped to the PLC's Program blocks (no CreationInfo CSV)."""
+    return _scl.write_scl(block["name"], table, ctx["import_dir"], plc=ctx.get("plc"))
 
 
 def _emit_fc(kind):
-    """emit='fc_xml'/'fdback_xml': a ready SW.Blocks.FC XML shipped to ImportReady (no CSV)."""
+    """emit='fc_xml'/'fdback_xml': a ready SW.Blocks.FC XML shipped to the PLC's Program blocks (no CSV)."""
     def write(block, table, ctx):
         return _fc_xml.write_fc_xml(block["name"], table, block["template_ref"],
-                                    ctx["import_dir"], kind)
+                                    ctx["import_dir"], kind, plc=ctx.get("plc"))
     return write
 
 
@@ -60,6 +60,7 @@ SYSTEM = System(
         "scl": _emit_scl,
         "fc_xml": _emit_fc("fc_xml"),
         "fdback_xml": _emit_fc("fdback_xml"),
+        "instance_dbs": _creation_csv.write_instance_dbs_emit,   # the 830 InstanceDBs.csv (not a block kind)
     },
     builders=BuilderRegistry(),
     templates=_templates,

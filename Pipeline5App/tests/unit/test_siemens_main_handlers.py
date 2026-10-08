@@ -34,7 +34,8 @@ class _Host:
     gate/render mirror App._gate/_render - the treatments registry is APPLIED and the halt flag
     follows the EFFECTIVE severity (the severity contract), not the raw one."""
 
-    def __init__(self):
+    def __init__(self, run: str = ""):
+        self.run = run             # the generation id (the App mints one per button press, contract v1 `run`)
         self.lines = []            # every (level, message) a handler emitted
         self.rendered = []         # every findings/records batch handed to gate/render/records
         self.halted = False
@@ -49,6 +50,7 @@ class _Host:
             records=lambda recs: self.rendered.append(list(recs)),
             halt=self._halt,
             lang="en",
+            run=self.run,
         )
 
     def _apply(self, findings):
@@ -1140,15 +1142,89 @@ def _builder_data(out_root):
         for name in files:
             path = os.path.join(dirpath, name)
             rel = os.path.relpath(path, out_root).replace(os.sep, "/")
-            if "BuilderData" not in rel:
-                continue
+            if "BuilderData" not in rel or name.endswith(".openn"):
+                continue                 # the workspace config / a header sidecar: per generation by design
             if name.endswith(".xlsx"):
                 wb = load_workbook(path, read_only=True)
                 tree[rel] = {ws.title: [list(r) for r in ws.iter_rows(values_only=True)] for ws in wb.worksheets}
                 wb.close()
             else:
-                tree[rel] = open(path, "rb").read()
+                tree[rel] = _unstamped(open(path, "rb").read())
     return tree
+
+
+def _unstamped(raw: bytes) -> bytes:
+    """The bytes without the contract-v1 `#!openn` header: its `run` and `generated` differ per
+    generation by design (contract §6.2); the content below it must not."""
+    from pipeline5.systems.plc_based.siemens_s7 import openn_header
+    try:
+        return openn_header.strip_header(raw.decode("utf-8")).encode("utf-8")
+    except UnicodeDecodeError:
+        return raw
+
+
+def test_run_all_writes_a_ready_op5_workspace():
+    """Contract v1, the producer side (Shared/PL5_OP5_contract.md §3, §4, §6): after Run-all the BuilderData
+    tree is the VCI-shaped workspace - the config names the run, every file carries a valid header with THAT
+    run (one id for the whole chain), the PLC folder is the Plc station of Stations.csv, the hardware sits
+    at the workspace root, the software under `<PLC>/Program blocks`, the tag workbook under `<PLC>/PLC
+    tags` with its sidecar, the template copies under `Templates/`, no legacy folder; a lone 700 afterwards
+    mints a new run - the config follows it and the other phases' files are stale (their run differs) -
+    nothing is swept."""
+    from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+    plc = "n0001-mc1-cc1-k65501"
+    host = _Host(run="run-all-1")
+    _run_all(host)
+    eq(host.halted, False, "the clean fixture does not halt")
+    root = os.path.join(config.output_root(), "TiaPortalProjectInterface", "BuilderData")
+    cfg_path = os.path.join(root, ".openn", "workspace.openn.config")
+    cfg = header.read_header(cfg_path, header.WORKSPACE_REQUIRED)
+    eq((cfg.status, cfg.get("run"), cfg.get("contract"), cfg.get("plcs"), cfg.get("templates")),
+       ("ok", "run-all-1", "1", plc, "Templates"), f"the workspace config: {cfg.problems}")
+    files = sorted(os.path.relpath(os.path.join(dp, f), root).replace(os.sep, "/")
+                   for dp, _d, fs in os.walk(root) for f in fs)
+    ok("Devices & networks/Stations.csv" in files and "Devices & networks/Modules.csv" in files, files)
+    ok(f"{plc}/PLC tags/PLCTags.xlsx" in files and f"{plc}/PLC tags/PLCTags.xlsx.openn" in files, files)
+    blocks = [f for f in files if f.startswith(f"{plc}/Program blocks/")]
+    ok(any(f.endswith(".xml") for f in blocks) and any(f.endswith(".csv") for f in blocks)
+       and any(f.endswith(".scl") for f in blocks) and f"{plc}/Program blocks/InstanceDBs.csv" in files, blocks)
+    ok(any(f.startswith("Templates/TEMPLATE--") for f in files), files)
+    ok(not any(f.startswith(("HardwareConfiguration/", "SoftwareBlocks/", "PlcTags/")) for f in files),
+       "the legacy layout is not written any more")
+    bad = []
+    for rel in files:
+        if rel.startswith(".openn/") or rel.endswith(".openn"):
+            continue
+        h = header.read_header(os.path.join(root, rel))
+        top = rel.split("/")[0]
+        if h.status != "ok" or h.get("run") != "run-all-1":
+            bad.append((rel, h.status, h.get("run"), h.problems))
+        elif top == "Devices & networks" and (h.get("plc") or h.get("target") != "Devices & networks"):
+            bad.append((rel, "hardware placement", h.get("plc"), h.get("target")))
+        elif top == "Templates" and h.get("kind") != "sw/block-template":
+            bad.append((rel, "template kind", h.get("kind")))
+        elif top == plc and (h.get("plc") != plc or h.get("target") != rel.split("/")[1]):
+            bad.append((rel, "plc/target vs location", h.get("plc"), h.get("target")))
+    eq(bad, [], "every file: a valid header, the chain's run, plc/target agreeing with its location")
+    kinds = {rel: header.read_header(os.path.join(root, rel)).get("kind") for rel in files if not rel.endswith(".openn")}
+    eq(kinds["Devices & networks/Stations.csv"], "hw/stations")
+    eq(kinds["Devices & networks/Modules.csv"], "hw/modules")
+    eq(kinds[f"{plc}/Program blocks/InstanceDBs.csv"], "sw/instance-db")
+    eq(kinds[f"{plc}/Program blocks/02_COM.xml"], "sw/data-block")
+    eq(kinds[f"{plc}/Program blocks/03_Zone Cumulative.xml"], "sw/code-block")
+    eq(kinds[f"{plc}/Program blocks/04_ESTOP.csv"], "sw/block-gen")
+    eq(kinds[f"{plc}/Program blocks/Diagnostic_for_OPC.scl"], "sw/source")
+    eq(header.read_header(os.path.join(root, plc, "Program blocks", "Diagnostic_for_OPC.scl")).get("name"),
+       "06_Diagnostic for OPC", "the FUNCTION's name, which differs from the file's")
+    # a lone phase button afterwards: ITS run - the others' files are stale for OP5, nothing is deleted
+    before = set(files)
+    SYSTEM.handlers["hardware"](_Host(run="lone-700").ctx())
+    eq(header.read_header(cfg_path, header.WORKSPACE_REQUIRED).get("run"), "lone-700", "the config follows the lone run")
+    eq(header.read_header(os.path.join(root, "Devices & networks", "Stations.csv")).get("run"), "lone-700")
+    eq(header.read_header(os.path.join(root, plc, "PLC tags", "PLCTags.xlsx")).get("run"), "run-all-1",
+       "untouched by the lone phase = stale for OP5 (its run differs from the workspace's)")
+    after = set(os.path.relpath(os.path.join(dp, f), root).replace(os.sep, "/") for dp, _d, fs in os.walk(root) for f in fs)
+    eq(after, before, "a generation never sweeps: stale files stay for OP5 to list")
 
 
 def test_generated_signals_change_only_their_own_outputs():
@@ -1173,7 +1249,7 @@ def test_generated_signals_change_only_their_own_outputs():
         finally:
             config.use_project(previous_project)
     changed = sorted(k for k in set(base) | set(with_rule) if base.get(k) != with_rule.get(k))
-    ok(changed and all("PlcTags" in k for k in changed), f"only the PLC tag tables change: {changed}")
+    ok(changed and all("PLC tags" in k for k in changed), f"only the PLC tag tables change: {changed}")
     gen = [r for r in sig if r.get("spawned_by") == "qbad"]
     created = sum(int(r["created"]) for r in log if r["rule"] == "qbad")
     ok(created > 0 and len(gen) == created, f"after Run-all the saved signals hold the {created} generated rows ({len(gen)})")
@@ -1202,9 +1278,9 @@ def test_lone_buttons_in_a_fresh_project():
             no_log_b = not os.path.exists(os.path.join(config.database_dir(), "chain_reactions_log.csv"))
         finally:
             config.use_project(previous_project)
-    tag_files = [k for k in tags if "PlcTags" in k]
+    tag_files = [k for k in tags if "PLC tags" in k]
     ok(tag_files and all(tags[k] == ref_tree.get(k) for k in tag_files), "a lone 510 = Run-all's tags (the QBADs incl.)")
-    hw_files = [k for k in hw if "HardwareConfiguration" in k]
+    hw_files = [k for k in hw if "Devices & networks" in k]
     ok(hw_files and all(hw[k] == ref_tree.get(k) for k in hw_files), "a lone 700 = Run-all's hardware")
     ok(no_log_a and no_log_b, "a generation button writes no reaction record")
 
@@ -1285,4 +1361,5 @@ if __name__ == "__main__":
         ("310_leg_appends_reaction_findings_to_the_existing_record",
          _sandboxed(test_310_leg_appends_reaction_findings_to_the_existing_record)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),
+        ("run_all_writes_a_ready_op5_workspace", _sandboxed(test_run_all_writes_a_ready_op5_workspace)),
     ]))

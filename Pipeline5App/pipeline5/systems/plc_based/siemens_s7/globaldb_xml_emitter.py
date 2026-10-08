@@ -18,16 +18,21 @@ one of 520's DBs. Ownership is driven by the database, not a hardcoded name list
 Place in the flow: the 500 header / 520 "Generate Data Blocks" button (run_data_blocks in
 src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) calls `project` right after the 520
 build (src://pipeline5/phases/datablocks/generator.py). Reads the `db_blocks` + `db_members` SSOT
-tables; writes BuilderData/SoftwareBlocks/ImportReady/<DB>.xml (`blocks_import_dir` in
-src://pipeline5/config/paths.py) - kept byte-stable to PL3's ImportReady because OP4 imports it
-(the format-preserving parity contract; verified per member + per DB attribute at the PL4 port).
+tables; writes BuilderData/<PLC>/Program blocks/<DB>.xml (`program_blocks_dir` of
+src://pipeline5/systems/plc_based/siemens_s7/output_layout.py), each opening with the contract-v1
+`#!openn` header (src://pipeline5/systems/plc_based/siemens_s7/openn_header.py) as the first comment
+after the declaration - the body is kept byte-stable to PL3's ImportReady because OP5 imports it (the
+format-preserving parity contract; verified per member + per DB attribute at the PL4 port; the header is
+the oracle's allowed difference since contract v1).
 """
 from __future__ import annotations
 
 import os
 
-from pipeline5 import config
+from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
 
+PHASE = 520
 _XML_IFACE_NS = "http://www.siemens.com/automation/Openness/SW/Interface/v5"
 
 
@@ -143,8 +148,11 @@ def project(database, output_dir: str | None = None) -> int:
     `db_members` grouped by db_name in row order. Only the DBs `db_blocks` records are (over)written;
     files for DBs another phase owns are left untouched (no hardcoded keep-list - the table is the
     ownership record). DBs are name-sorted so the placeholder `<Number>` is stable. Defaults to the
-    BuilderData ImportReady surface. Returns the count written."""
-    output_dir = output_dir or config.blocks_import_dir()
+    workspace's `<PLC>/Program blocks` (the PLC from the staged facts); every XML opens with the `#!openn`
+    header (`sw/data-block`, the run, the PLC + TIA folder - the PLC omitted when an explicit `output_dir`
+    is used and the facts name none). Returns the count written."""
+    plc = LAYOUT.plc_folder(database, required=output_dir is None)
+    output_dir = output_dir or LAYOUT.program_blocks_dir(plc)
     blocks = {r["db_name"]: r for r in database["db_blocks"]}
     members_by_db: dict = {}
     for m in database["db_members"]:
@@ -158,7 +166,9 @@ def project(database, output_dir: str | None = None) -> int:
               ("prog_lang", "memory_layout", "opc_ua", "webserver", "only_load_memory",
                "write_protected", "retain_reserve", "memory_reserve")}
         db["members"] = members_by_db.get(db_name, [])
+        stamp = header.fields("sw/data-block", PHASE, plc=plc, target=header.PROGRAM_BLOCKS,
+                              source="db_blocks + db_members")
         with open(os.path.join(output_dir, f"{db_name}.xml"), "w", encoding="utf-8-sig", newline="") as handle:
-            handle.write(db_xml(db_name, db, number))
+            handle.write(header.stamp_xml(db_xml(db_name, db, number), stamp))
         count += 1
     return count

@@ -2,7 +2,9 @@
 
 **Audience:** the PL session (`Pipeline5App/`, PL5) and the OP session (`Openn5App/`, OP5).
 **Status:** contract **1, draft**. OP5 side implemented (classification, header parsing, legacy acceptance,
-scan command); PL5 side **not started** — PL5 still emits the legacy layout and the `#!format=2` tag.
+scan command); PL5 side implemented 2026-10-08 (migration steps 2 + 3: the header on every surface, the run
+id + workspace config, the VCI shape — the legacy layout and the `#!format=2` tag are no longer written).
+Open: step 1 (TIA's acceptance of the XML header comment before `<Document>`) is still unverified on a real import.
 **Supersedes** the "format-preserving" regime of `PL4_OP4_coordination.md` for the v5 pair only: PL3/PL4 + OP3
 stay untouched and shippable; OP5 reads today's PL5 output **with warnings**; PL5 adopts v1 one surface at a time.
 
@@ -110,6 +112,10 @@ A block of `#!` directive lines — the `#!format=2` idea, made complete:
   contains the delimiter (`"#! producer: Pipeline5 5.0, phase 700",,,`) are undone before parsing. Therefore a
   value must not **end** with the csv delimiter.
 - A file whose header is a bare `#!format=N` is `Legacy`; no `#!` line at all is `Missing`.
+- **PL5 (2026-10-08):** writes the csv lines unpadded and no `#!format=2` line any more (`schema: 2` carries the
+  format number). A template file name holds `--`, which an XML comment cannot, so an XML header never names a
+  template file: a template copy's `source` is the hand-maintained original's folder
+  (`Shared/Templates/Tia Portal Software Blocks`), a code block's `source` names its template as `<name> v<version>`.
 
 ### 3.2 Keys
 
@@ -119,7 +125,7 @@ A block of `#!` directive lines — the `#!format=2` idea, made complete:
 | `schema` | yes | integer; must not be newer than the schema OP5 supports for that kind |
 | `producer` | yes | free text: tool + version (+ phase) |
 | `generated` | yes | ISO 8601 date-time (UTC `Z` preferred) |
-| `run` | recommended | the producer's run id. OP5 compares it with the workspace config's `run`: a different run = **stale** leftover, not imported |
+| `run` | recommended | the producer's run id. OP5 compares it with the workspace config's `run`: a different run = **stale** leftover, not imported. PL5 (user decision 2026-10-08): one fresh id per **generation** = one button press — Run-all is one id for every phase of its chain, a single phase button mints its own, so after a lone phase the other phases' files are Stale until regenerated (nothing is swept); the id is `YYYYMMDD-HHMMSS-xxxx` |
 | `project` | recommended | the PL5 project (`project_code`) |
 | `plc` | optional | TIA PLC device name; must equal the `<PLC>` folder the file sits in |
 | `target` | optional | TIA folder path (`Program blocks/00_Safety`); must equal the file's location |
@@ -158,6 +164,8 @@ The XML header does **not** use the strings `<!--Begin Template-->` / `<!--End T
 ```
 
 Required: `contract`, `producer`, `generated`. `run` enables stale detection. `plcs` lists the PLC folders.
+PL5 writes it at the start of every generation, before the first BuilderData write (`output_layout.begin_generation`);
+`plcs` = the `Plc` station name(s) of Stations.csv.
 
 ---
 
@@ -189,6 +197,16 @@ BuilderData/                                   ← the workspace (name kept; PL5
 - OP5 **exports** into the same shape (`ExportedData/<PLC>/…`, hardware as `Devices & networks/<project>.aml`).
 - Multi-system PL5 projects produce one workspace per system (`Output/<system>/TiaPortalProjectInterface/BuilderData`).
   OP5 lets the user pick the workspace root; the default stays `Shared/OutputTree/TiaPortalProjectInterface/BuilderData`.
+- **PL5 writes this shape only** (user decision 2026-10-08: no legacy copy beside it — a legacy root folder would make
+  the scan's layout verdict "legacy"). The PLC folder = the `Plc` station's name, taken from the `hardware_stations`
+  table or, before phase 700 ran, from the I/O List's PLC head row (the same rule phase 700 applies); no PLC head = a
+  pointed error, no workspace. PL5 never sweeps: an existing legacy tree (`HardwareConfiguration/`, `SoftwareBlocks/`,
+  `PlcTags/`) must be deleted once by hand — OP5 v1 still reads it, with warnings, until then.
+- `Templates/` holds PL5's copies of the hand-maintained templates, each stamped `sw/block-template` with the
+  generation's `run` (a copy an older generation left behind is Stale) and `source` = the original's folder; the
+  block-gen csvs keep `$ template=Templates/<file>.xml`, which OP5 resolves by walking up to the workspace root (§7.3).
+  A `DeviceTypesDatabase.csv` copy (a project's own database, placed beside Stations.csv) stays byte-exact: it carries
+  a header once the hand-maintained original does (§6.7).
 
 ### 4.1 Legacy layout → workspace mapping (OP5 v1 reads both)
 
@@ -241,6 +259,14 @@ BuilderData/                                   ← the workspace (name kept; PL5
 7. Templates (`Shared/Templates/Tia Portal Software Blocks`, hand-maintained) and `DeviceTypesDatabase.csv` get a
    header when next edited (PL5's loaders already skip `#` lines).
 
+**PL5 status (2026-10-08):** 1–5 done — `pipeline5/systems/plc_based/siemens_s7/openn_header.py` renders the header
+in its three wrappings + the sidecar, holds the run id and writes the workspace config; `output_layout.py` is the
+workspace (the VCI dirs, the PLC folder, `begin_generation`); every writer stamps its surface; the host
+(`workbench/app_main.py`) mints one generation id per button press and hands it in as `PhaseContext.run`;
+`scripts/parity_vs_pl4.py` strips the header and maps the shape onto the frozen PL4 reference (a workspace file
+without a header is a difference); `scripts/run_pipeline.py` generates a workspace headless. 6: the `#!openn` row
+in the Files-tab grid is accepted as cosmetic. 7: not started (the hand-maintained files are unchanged).
+
 ## 7. Consumer obligations (OP5)
 
 1. Classify before importing; log the catalog summary; never import `Invalid` / `Stale` / `Unclassified`.
@@ -250,6 +276,9 @@ BuilderData/                                   ← the workspace (name kept; PL5
 4. Keep the hardware existence policy (skip existing stations with modules); keep I/O controllers as they are.
 5. Reflect every contract change in `Openn5App/00_Contract/` (`InputKind.cs` = §2, `OpennHeader.cs` = §3,
    `WorkspaceCatalog.cs` = §4-5) and in this document, in the same commit.
+6. A template copy in `Templates/` opens with its `sw/block-template` header comment; `BlockXmlGenerator` copies the
+   template head verbatim, so a generated block XML would inherit that comment — OP5 must drop it (or re-stamp the
+   generated XML `sw/code-block`, producer Openn5) before `Blocks.Import`. Same gate as step 1 of §8.
 
 ---
 
@@ -259,8 +288,8 @@ BuilderData/                                   ← the workspace (name kept; PL5
 |---|---|---|---|
 | 0 | OP5 | contract layer + "Scan BuilderData" command (done) | scan of today's tree: 29 files, 27 classified, 0 unclassified, 2 ignored, all `Legacy`/`NeedsHeader` |
 | 1 | **TIA** | **verify that `Blocks.Import` / `Types.Import` / `TagTables.Import` accept an XML comment before `<Document>`** (and that a VCI workspace does) | import one headered DB XML into the playground project. If TIA refuses: XML headers move to the sidecar form (§3.3 last row), the rest of the contract is unchanged |
-| 2 | PL5 | headers on the four surfaces + workspace config + run id, legacy layout kept | OP5 scan shows `Ready` everywhere; parity oracle green with the new allowed difference |
-| 3 | PL5 | VCI shape (PLC folder, `Devices & networks`, `Templates/`) | OP5 scan: layout "VCI shape"; OP5 full import ≡ OP3 import of the legacy tree (TIA smoke) |
+| 2 | PL5 | **done 2026-10-08** — headers on every surface + workspace config + run id (the legacy layout is NOT kept beside the new shape: user decision) | OP5 scan: `Ready` everywhere (Appendix A); parity oracle green with the header + shape as allowed differences |
+| 3 | PL5 | **done 2026-10-08** — VCI shape (PLC folder = the Plc station, `Devices & networks`, `Templates/`, `<PLC>/PLC tags` + sidecar) | OP5 scan: layout "VCI shape" (Appendix A); OP5 full import ≡ OP3 import of the legacy tree (TIA smoke) — still to run |
 | 4 | OP5 | workspace-driven import (catalog → routes) replaces the per-folder buttons; workspace root selectable; export stamping | import of a PL5 workspace from a project `Output/` folder |
 | 5 | both | retire legacy acceptance (OP5 v2) | OP5 refuses an unheadered file with a pointed message |
 
@@ -280,25 +309,33 @@ BuilderData/                                   ← the workspace (name kept; PL5
 
 ---
 
-## Appendix A — current state of the builtin tree (OP5 scan, 2026-10-07)
+## Appendix A — the builtin tree (OP5 scan)
+
+**After the PL5 implementation (2026-10-08** — `scripts/run_pipeline.py` over the builtin config, then the Appendix B
+scan**):**
 
 ```
-Workspace scan: Z:\Source\Repos\_Openn2\Shared\OutputTree\TiaPortalProjectInterface\BuilderData
-  layout: legacy BuilderData folders (HardwareConfiguration, SoftwareBlocks, PlcTags, ...) - contract v1 expects the VCI shape
-  workspace config: missing (.openn\workspace.openn.config)
-  29 file(s): 27 classified, 0 unclassified, 2 ignored
-  hw/stations              1 file(s)   ready 0, legacy 1, needs-header 0, invalid 0, stale 0
-  hw/modules               1 file(s)   ready 0, legacy 1, needs-header 0, invalid 0, stale 0
-  sw/data-block           11 file(s)   ready 0, legacy 11, needs-header 0, invalid 0, stale 0
-  sw/instance-db           1 file(s)   ready 0, legacy 1, needs-header 0, invalid 0, stale 0
-  sw/block-gen             7 file(s)   ready 0, legacy 7, needs-header 0, invalid 0, stale 0
-  sw/code-block            1 file(s)   ready 0, legacy 1, needs-header 0, invalid 0, stale 0
-  sw/source                5 file(s)   ready 0, legacy 0, needs-header 5, invalid 0, stale 0
-  27 importable file(s) without a #!openn header (legacy / extension classification) - the producer should stamp them (contract v1).
+Workspace scan: Z:\Source\Repos\_Openn5\Shared\OutputTree\TiaPortalProjectInterface\BuilderData
+  layout: VCI shape (<PLC>/Program blocks | PLC tags | PLC data types + Devices & networks)
+  workspace config: Ok, contract 1, project 8XXX, producer Pipeline5 5.0, run 20261008-120906-e378
+  35 file(s): 32 classified, 0 unclassified, 3 ignored
+  hw/stations              1 file(s)   ready 1, legacy 0, needs-header 0, invalid 0, stale 0
+  hw/modules               1 file(s)   ready 1, legacy 0, needs-header 0, invalid 0, stale 0
+  sw/data-block           11 file(s)   ready 11, legacy 0, needs-header 0, invalid 0, stale 0
+  sw/instance-db           1 file(s)   ready 1, legacy 0, needs-header 0, invalid 0, stale 0
+  sw/block-gen             7 file(s)   ready 7, legacy 0, needs-header 0, invalid 0, stale 0
+  sw/code-block            1 file(s)   ready 1, legacy 0, needs-header 0, invalid 0, stale 0
+  sw/source                3 file(s)   ready 3, legacy 0, needs-header 0, invalid 0, stale 0
+  sw/block-template        7 file(s)   ready 7, legacy 0, needs-header 0, invalid 0, stale 0
 ```
 
-The five `sw/source` files are the PL3-era `.db` leftovers plus the two `.scl` files — exactly the files a `run`
-stamp would flag as stale.
+The 3 ignored files are the workspace config, `PLCTags.xlsx` (`doc/plc-tags-workbook`, its header read from the
+sidecar - listed, never imported) and the sidecar itself. The PL3-era `.db` leftovers are gone with the legacy tree
+(a fresh workspace; an old project tree keeps them as Legacy until it is cleaned once, §4).
+
+**Before (2026-10-07, the legacy tree):** 29 files, 27 classified, 0 unclassified, 2 ignored — every kind `Legacy`
+(the `#!format=2` tag / the csv and XML markers) or `NeedsHeader` (the five `sw/source` files: the PL3-era `.db`
+leftovers plus the two `.scl`), layout "legacy BuilderData folders", workspace config missing.
 
 ## Appendix B — reference implementation
 
@@ -308,3 +345,10 @@ stamp would flag as stale.
 - `Openn5App/00_Contract/WorkspaceCatalog.cs` — scan + classification + consistency + stale detection (§4-5).
 - No Siemens dependency: the three classes load from `Openn5.exe` by reflection without TIA, so PL5 can be checked
   against the real parser from a script (see the OP5 `CLAUDE.md`, "Contract layer").
+- PL5 side: `Pipeline5App/pipeline5/systems/plc_based/siemens_s7/openn_header.py` (§3: the three wrappings, the
+  sidecar, the run id, the workspace config, and a parser mirroring `OpennHeader.cs` for the round-trip tests),
+  `output_layout.py` (§4: the workspace, the PLC folder, `begin_generation`), `tests/unit/test_openn_header.py`
+  (the key rules, the Excel-padding round trip, the layout) and `tests/unit/test_siemens_main_handlers.py`
+  (`run_all_writes_a_ready_op5_workspace`: the whole chain, headers checked file by file, the lone-button
+  staleness). `scripts/run_pipeline.py` regenerates a workspace headless; the parity oracle
+  `scripts/parity_vs_pl4.py` strips the header and maps the shape onto the frozen PL4 reference.

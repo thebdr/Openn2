@@ -1,5 +1,5 @@
 """Phase 400 - project the `interface_elements` SSOT table to **`10_Machine Interfaces.scl`** (the
-configured `interfaces.scl_file`; the TIA import surface, beside the diagnosis SCL in ImportReady):
+configured `interfaces.scl_file`; the TIA import surface, beside the diagnosis SCL in the PLC's Program blocks):
 ONE ASSIGNMENT PER INTERFACED SIGNAL, grouped in a REGION per interface, the line per DIRECTION
 (the template sheet's `Direction </>` column - `>` = Q, out toward the partner; `<` = I, in from
 the partner; the SSOT stores I/Q):
@@ -22,8 +22,10 @@ UTF-8 BOM + CRLF like every SCL surface. A pure projection - returns findings, r
 Place in the flow: the 400 header / 410 "Generate Interfaces" (run_interfaces in
 src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) calls `project` after the 400 build
 (src://pipeline5/phases/interfaces/builder.py). Reads the `interface_elements` SSOT table; writes
-BuilderData/SoftwareBlocks/ImportReady/<the configured scl_file> (`blocks_import_dir` in
-src://pipeline5/config/paths.py). `generation_params.yaml` resolves through the 4-tier walk
+BuilderData/<PLC>/Program blocks/<the configured scl_file> (`program_blocks_dir` of
+src://pipeline5/systems/plc_based/siemens_s7/output_layout.py), the contract-v1 `#!openn` header
+(`sw/source`, src://pipeline5/systems/plc_based/siemens_s7/openn_header.py) as its first `//` lines.
+`generation_params.yaml` resolves through the 4-tier walk
 (src://pipeline5/config/resolver.py).
 
 Decision history: renamed from `MachineInterfaces.scl` to the configured `10_Machine
@@ -39,7 +41,10 @@ from pipeline5 import config
 from pipeline5.language import expr
 from pipeline5.truth.database import Database
 from pipeline5.findings.finding import Finding
+from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
 
+PHASE = 400
 _IO_TO_DIR = {"Q": ">", "I": "<"}      # the SSOT direction -> the sheet's `Direction </>` glyph
 
 
@@ -114,7 +119,7 @@ def render_lines(elements, templates: dict) -> tuple:
 
 def project(database: Database | None = None, out_dir: str | None = None) -> dict:
     """Write the configured `interfaces.scl_file` (default `10_Machine Interfaces.scl`) from the
-    `interface_elements` table into `out_dir` (defaults to `config.blocks_import_dir()`). The
+    `interface_elements` table into `out_dir` (defaults to the workspace's `<PLC>/Program blocks`). The
     FUNCTION is named after the file's stem. Returns {path, assignments, interfaces, findings};
     no elements -> nothing written (path '')."""
     if database is None:
@@ -134,12 +139,14 @@ def project(database: Database | None = None, out_dir: str | None = None) -> dic
                   "BEGIN",
                   *body,
                   "END_FUNCTION"]
-    out_dir = out_dir or config.blocks_import_dir()
+    plc = LAYOUT.plc_folder(database, required=out_dir is None)
+    out_dir = out_dir or LAYOUT.program_blocks_dir(plc)
     os.makedirs(out_dir, exist_ok=True)
     legacy = os.path.join(out_dir, "MachineInterfaces.scl")   # the pre-rename output (2026-07-07):
     if params["file"] != "MachineInterfaces.scl" and os.path.exists(legacy):
         os.remove(legacy)                                     # it must not survive as a 2nd import
     path = os.path.join(out_dir, params["file"])
+    stamp = header.fields("sw/source", PHASE, plc=plc, target=header.PROGRAM_BLOCKS, source="interface_elements")
     with open(path, "w", encoding="utf-8-sig", newline="") as handle:
-        handle.write("\r\n".join(text_lines) + "\r\n")
+        handle.write(header.stamp_source("\r\n".join(text_lines) + "\r\n", stamp))
     return {"path": path, "assignments": n_assign, "interfaces": n_regions, "findings": findings}

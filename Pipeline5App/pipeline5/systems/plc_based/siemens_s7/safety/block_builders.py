@@ -19,7 +19,7 @@ the staged `signals` (with the 520 write-back fields `name_in_db`/`datablocks`/`
 is why 800 requires 520), records the results to the `software_blocks` + `software_block_members`
 SSOT tables, and projects each Table through the emit kind declared at registration:
   csv    -> src://pipeline5/systems/plc_based/siemens_s7/creation_info_csv.py   (CreationInfo)
-  scl    -> src://pipeline5/systems/plc_based/siemens_s7/scl_emitter.py          (ImportReady .scl)
+  scl    -> src://pipeline5/systems/plc_based/siemens_s7/scl_emitter.py          (a ready .scl in the PLC's Program blocks)
   fc_xml | fdback_xml -> src://pipeline5/systems/plc_based/siemens_s7/fc_xml_emitter.py (ready FC XML)
 """
 from __future__ import annotations
@@ -226,7 +226,7 @@ def build_03_diagnostic_nodes(db: Database) -> Table:
     a PA head -> "PROFINET_NODES_ALARM", a PW head -> "PROFINET_NODES_WARNING" (the same `row where
     $script_type` domains as the 520 config members), member = '<profinet_name> <profinet_ip>', source
     = "10_PN_NETWORK".SUBNET_<subnet>[<last octet>]. `scl_emit` renders it as a ready SCL FUNCTION,
-    one REGION per subnet - the block ships as ImportReady/<name>.scl, no CreationInfo CSV."""
+    one REGION per subnet - the block ships as <PLC>/Program blocks/<name>.scl, no CreationInfo CSV."""
     t = Table("03_Diagnostic Nodes")
     for r in db.rows:
         st = str(r.get("script_type", "")).strip().upper()

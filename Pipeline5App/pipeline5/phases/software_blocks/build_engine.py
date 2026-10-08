@@ -12,7 +12,6 @@ read these tables across all builders) + the direct-FC-XML emit land with 800c.
 """
 from __future__ import annotations
 
-import csv
 import os
 import shutil
 
@@ -97,6 +96,24 @@ def build(database: DB | None = None, system=None) -> tuple:
     return database, findings
 
 
+class _Delivery:
+    """The system's delivery dirs for THIS generation (`output_layout.delivery_dirs(database)`), resolved
+    LAZILY - the layout derives its PLC folder from the staged facts, so it is only asked for a dir that
+    was not passed explicitly. `plc` = the resolved PLC name (the writers' header), None until asked."""
+
+    def __init__(self, system, database):
+        self._system, self._database, self._dirs = system, database, None
+
+    def __getitem__(self, key: str) -> str:
+        if self._dirs is None:
+            self._dirs = self._system.output_layout.delivery_dirs(self._database)
+        return self._dirs[key]
+
+    @property
+    def plc(self):
+        return self._dirs.get("plc") if self._dirs else None
+
+
 def _drop_stale_csv(out_dir: str, name: str) -> None:
     """Remove a block's leftover CreationInfo CSV (a ready-emitted block - FC XML / SCL - ships no CSV;
     a stale one from an earlier run must not survive as an apparent surface)."""
@@ -106,23 +123,27 @@ def _drop_stale_csv(out_dir: str, name: str) -> None:
 
 
 def project(database: DB | None = None, out_dir: str | None = None, import_dir: str | None = None,
-            system=None) -> dict:
-    """Project `software_blocks` + `software_block_members` -> the `$/#/%/@` CreationInfo CSVs in `out_dir`
-    (defaults to `config.blocks_creation_dir()`), each block's template XML COPIED to `<out_dir>/Templates/`
-    and referenced RELATIVELY (`$ template=Templates/<file>.xml` - the CreationInfo folder is
-    self-contained; an absolute PL path is meaningless on the OP machine). A block with a READY-emit
-    registration instead ships to `import_dir` (defaults to `config.blocks_import_dir()`) and its CSV is
-    DROPPED (a stale one removed; no template ships either): `emit="fc_xml"` -> a `SW.Blocks.FC` XML,
-    `emit="scl"` -> an SCL FUNCTION source (`scl_emit`). A pure projection (`findings: []`). Returns
-    {'dir', 'files', 'xml_files', 'scl_files', 'count', 'findings'} ('count'/'files' = the CSVs only)."""
+            system=None, tpl_dir: str | None = None) -> dict:
+    """Project `software_blocks` + `software_block_members` -> the `$/#/%/@` CreationInfo CSVs in `out_dir`,
+    each block's template XML COPIED to `tpl_dir` and referenced RELATIVELY (`$ template=Templates/<file>.xml`
+    - an absolute PL path is meaningless on the OP machine). A block with a READY-emit registration instead
+    ships to `import_dir` and its CSV is DROPPED (a stale one removed; no template ships either):
+    `emit="fc_xml"` -> a `SW.Blocks.FC` XML, `emit="scl"` -> an SCL FUNCTION source (`scl_emit`). A dir not
+    passed comes from the system's `output_layout.delivery_dirs(database)` (the Siemens workspace: the csvs
+    and the ready blocks under `<PLC>/Program blocks`, the templates under the workspace's `Templates/`);
+    an explicit `out_dir` keeps its templates beside it (`<out_dir>/Templates`). The writers get the
+    delivery's `plc` (their header's PLC) when the layout resolved it. A pure projection (`findings: []`).
+    Returns {'dir', 'files', 'xml_files', 'scl_files', 'count', 'findings'} ('count'/'files' = the CSVs only)."""
     if system is None:
         raise RuntimeError("engine.project requires a System (its emitter table)")
     if database is None:
         database = DB([software_blocks_table(), software_block_members_table()]).load(config.database_dir())
-    out_dir = out_dir or config.blocks_creation_dir()
-    import_dir = import_dir or config.blocks_import_dir()
+    delivery = _Delivery(system, database)
+    if out_dir is None:
+        out_dir = delivery["blocks_creation"]
+        tpl_dir = tpl_dir or delivery["templates"]
+    tpl_dir = tpl_dir or os.path.join(out_dir, "Templates")
     os.makedirs(out_dir, exist_ok=True)
-    tpl_dir = os.path.join(out_dir, "Templates")
     members: dict = {}
     if "software_block_members" in database:
         for m in database["software_block_members"]:
@@ -138,15 +159,17 @@ def project(database: DB | None = None, out_dir: str | None = None, import_dir: 
         if kind not in system.emitters:
             raise KeyError(f"system {system.id!r} declares no emitter for kind {kind!r} "
                            f"(block {b['name']!r})")
-        ctx = {"import_dir": import_dir, "out_dir": out_dir, "tpl_dir": tpl_dir}
-        if kind == "scl":                                        # a ready SCL FUNCTION -> ImportReady
+        if kind != "csv" and import_dir is None:
+            import_dir = delivery["blocks_import"]
+        ctx = {"import_dir": import_dir, "out_dir": out_dir, "tpl_dir": tpl_dir, "plc": delivery.plc}
+        if kind == "scl":                                        # a ready SCL FUNCTION -> the PLC's Program blocks
             scl_files.append(system.emitters[kind](b, table, ctx))
             _drop_stale_csv(out_dir, b["name"])
             continue
         if kind == "csv":                                        # the template-fill CreationInfo surface
             files.append(system.emitters[kind](b, table, ctx))
             continue
-        xml_path = system.emitters[kind](b, table, ctx)          # a ready XML -> ImportReady, CSV dropped
+        xml_path = system.emitters[kind](b, table, ctx)          # a ready XML -> the PLC's Program blocks, CSV dropped
         if xml_path:
             xml_files.append(xml_path)
         _drop_stale_csv(out_dir, b["name"])
@@ -233,24 +256,25 @@ def _config_instance_rows(database: DB) -> list:
     return [(r["instance_name"], r["fb"]) for r in database["instance_dbs"]]
 
 
-def write_instance_dbs(database: DB, out_dir: str | None = None) -> dict:
-    """Write InstanceDBs.csv (the CreateInstanceDB surface) into `out_dir` (defaults to
-    `config.blocks_creation_dir()`): the builders' instanceOf-<FB> cells FIRST, then the 520 config
-    families, deduped by Name (first-seen). Plain UTF-8 (no BOM), csv.writer CRLF - NOT the GlobalDB-XML
-    BOM rule. Port of PL3 engine.write_instance_dbs. A pure projection (`findings: []`)."""
+def write_instance_dbs(database: DB, out_dir: str | None = None, system=None) -> dict:
+    """Collect the instance DBs (the CreateInstanceDB surface): the builders' instanceOf-<FB> cells FIRST,
+    then the 520 config families, deduped by Name (first-seen) - and hand the (name, fb) pairs to the
+    system's `instance_dbs` emitter, which owns the file format (Siemens: `InstanceDBs.csv` with the
+    contract-v1 header). `out_dir` defaults to the system's delivery dir (the PLC's Program blocks). Port
+    of PL3 engine.write_instance_dbs. A pure projection (`findings: []`). Returns {'path', 'count',
+    'findings'}."""
+    if system is None:
+        raise RuntimeError("engine.write_instance_dbs requires a System (its instance_dbs emitter)")
+    if "instance_dbs" not in system.emitters:
+        raise KeyError(f"system {system.id!r} declares no emitter for kind 'instance_dbs'")
     pairs = _builder_instance_rows(database) + _config_instance_rows(database)
     seen, deduped = set(), []
     for name, fb in pairs:
         if name and name not in seen:
             seen.add(name)
             deduped.append((name, fb))
-    out_dir = out_dir or config.blocks_creation_dir()
-    os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, "InstanceDBs.csv")
-    with open(path, "w", newline="", encoding="utf-8") as handle:
-        w = csv.writer(handle)
-        w.writerow(["#", "Instance DBs created directly via CreateInstanceDB"])
-        w.writerow(["%", "Name", "InstanceOf", "Number", "Folder"])
-        for name, fb in deduped:
-            w.writerow(["@", name, fb, "", fb])
+    delivery = _Delivery(system, database)
+    if out_dir is None:
+        out_dir = delivery["blocks_creation"]
+    path = system.emitters["instance_dbs"](deduped, {"out_dir": out_dir, "plc": delivery.plc})
     return {"path": path, "count": len(deduped), "findings": []}

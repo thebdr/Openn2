@@ -1,6 +1,7 @@
-"""The 800 SCL emitter: a builder registered with `emit="scl"` ships a READY SCL FUNCTION source to
-ImportReady (UTF-8 BOM + CRLF - the 620 `Diagnostic_for_OPC.scl` conventions) instead of a
-CreationInfo CSV; the engine drops the block's stale CSV like it does for the FC-XML emitters.
+"""The 800 SCL emitter: a builder registered with `emit="scl"` ships a READY SCL FUNCTION source to the
+PLC's `Program blocks` (UTF-8 BOM + CRLF - the 620 `Diagnostic_for_OPC.scl` conventions; the contract-v1
+`#!openn` header as its first `//` lines) instead of a CreationInfo CSV; the engine drops the block's stale
+CSV like it does for the FC-XML emitters.
 
 03_Diagnostic Nodes (user spec 2026-07-07): one assignment per PROFINET node member -
     "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5" := "10_PN_NETWORK".SUBNET_50[5];
@@ -16,12 +17,17 @@ src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) - the build engine
 src://pipeline5/systems/plc_based/siemens_s7/safety/block_builders.py) through
 `SYSTEM.emitters["scl"]` (src://pipeline5/systems/plc_based/siemens_s7/safety/system.py) to
 `write_scl`. Reads the builder's Table (reconstructed from `software_blocks` +
-`software_block_members`); writes BuilderData/SoftwareBlocks/ImportReady/<name>.scl
-(`blocks_import_dir` in src://pipeline5/config/paths.py).
+`software_block_members`); writes BuilderData/<PLC>/Program blocks/<name>.scl
+(src://pipeline5/systems/plc_based/siemens_s7/output_layout.py; the header from
+src://pipeline5/systems/plc_based/siemens_s7/openn_header.py).
 """
 from __future__ import annotations
 
 import os
+
+from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+
+PHASE = 820
 
 
 def diagnostic_nodes_scl(table, name: str) -> str:
@@ -54,10 +60,12 @@ def diagnostic_nodes_scl(table, name: str) -> str:
 SCL_RENDERERS = {"03_Diagnostic Nodes": diagnostic_nodes_scl}
 
 
-def write_scl(name: str, table, out_dir: str) -> str:
+def write_scl(name: str, table, out_dir: str, plc: str | None = None) -> str:
     """Render + write `out_dir`/<name>.scl as UTF-8 BOM + CRLF (the exported-TIA-source convention
-    the 620 SCL also uses). Returns the path."""
-    text = SCL_RENDERERS[name](table, name)
+    the 620 SCL also uses), the `#!openn` header (`sw/source`, the run, `plc` + the TIA folder) first.
+    Returns the path."""
+    stamp = header.fields("sw/source", PHASE, plc=plc, target=header.PROGRAM_BLOCKS, source="software_blocks")
+    text = header.stamp_source(SCL_RENDERERS[name](table, name), stamp)
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"{name}.scl")
     with open(path, "w", encoding="utf-8-sig", newline="") as f:    # single BOM; keep our CRLF

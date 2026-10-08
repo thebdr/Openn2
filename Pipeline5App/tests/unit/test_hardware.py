@@ -308,14 +308,18 @@ def test_format2_projection():
         ok(not sraw.startswith(b"\xef\xbb\xbf"), "no BOM (matches the reference)")
         ok(sraw.count(b"\n") > 0 and sraw.count(b"\n") == sraw.count(b"\r\n"), "CRLF only")
         s = sraw.decode("utf-8")
-        ok(s.startswith("#!format=2,,,,,,,,,\r\n"), "Stations format-2 tag (9 columns since Connector)")
+        ok(s.startswith("#!openn\r\n#! kind: hw/stations\r\n#! schema: 2\r\n#! producer: Pipeline5 5.0 (phase 700)\r\n"),
+           "the contract-v1 header opens the file: hw/stations, schema 2 (= format 2), the producer")
+        ok("\r\n#! run: " in s and "\r\n#! target: Devices & networks\r\n" in s and "\r\n#!end\r\n# Role," in s,
+           "the run id, the TIA folder, then the descriptive header comment right after #!end")
+        ok("#!format=" not in s, "the bare format tag is gone (schema carries the format number)")
         ok("# Role,Station Name,Model Id,IP Address,PN Number (empty:last IP Octet)" in s, "descriptive header")
         ok("Group = folder/subfolder/...,Connector," in s, "the header names the appended Connector column")
         ok("Plc,n1,CPU1,192.168.50.1,,Subnet50,,,-X1" in s,
            "the Plc data row: EMPTY Group (root), connector appended LAST")
         ok(",=S1_IODevices," in s, "the IoDevice row keeps the FU device group")
         m = open(res["modules_path"], "rb").read().decode("utf-8")
-        ok(m.startswith("#!format=2,,,,,,,\r\n"), "Modules format-2 tag")
+        ok(m.startswith("#!openn\r\n#! kind: hw/modules\r\n#! schema: 2\r\n"), "Modules: the hw/modules header, schema 2")
         ok("n6,1,-C1,DI16,0,0,PotentialGroup=1 | Ch(0).Filter=1 | Ch(1).Filter=1,DI 16x24VDC" in m,
            "a module data row (PotentialGroup + by-type channel params)")
 

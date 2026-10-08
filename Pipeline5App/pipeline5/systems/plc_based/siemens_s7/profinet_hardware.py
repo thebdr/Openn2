@@ -129,6 +129,17 @@ def _role(row):
     return None
 
 
+def plc_station_name(rows) -> str:
+    """The Plc head's station name - its PROFINET name, exactly what Stations.csv calls it (and so the
+    PLC folder of the OP5 workspace, contract v1 §4) - among staged signal rows; '' when none."""
+    for row in rows:
+        if _role(row) == "Plc":
+            name = str(row.get("profinet_name") or "").strip()
+            if name:
+                return name
+    return ""
+
+
 def parse_address(value):
     """An I/O-List `bit` cell -> the ('I'|'Q', byte, bit) triple, e.g. 'I 12.3' -> ('I', 12, 3);
     None when the cell isn't an I/Q dotted address (a blank / a head row)."""

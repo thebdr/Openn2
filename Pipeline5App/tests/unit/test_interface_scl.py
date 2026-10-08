@@ -95,7 +95,9 @@ def test_project_file_shape():
         ok(raw.startswith(b"\xef\xbb\xbf"), "UTF-8 BOM")
         ok(b"\r\n" in raw and b"\n" == raw[-1:], "CRLF lines")
         text = raw.decode("utf-8-sig")
-        ok(text.startswith('FUNCTION "10_Machine Interfaces" : Void'),
+        ok(text.startswith("//#!openn\r\n//#! kind: sw/source\r\n") and "//#! target: Program blocks\r\n" in text,
+           "the contract-v1 header in its // wrapping opens the source")
+        ok(text.split("//#!end\r\n", 1)[1].startswith('FUNCTION "10_Machine Interfaces" : Void'),
            "the FUNCTION is named after the configured file's stem")
         ok(text.rstrip().endswith("END_FUNCTION"), "the FUNCTION footer")
         ok('    "TARGET" := "PNC_I_S1 RUN";' in text.replace("\r\n", "\n"),

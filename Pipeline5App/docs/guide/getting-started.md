@@ -3,7 +3,9 @@
 Pipeline5 builds a TIA Portal project from two hand-authored documents - the **I/O List** and the
 **Cause & Effect Matrix** - through a chain of phases. Every datum a phase reads, infers, or creates
 lands in the **SSOT database** (`Database/` - CSV tables with JSON cells); the `BuilderData/` export
-files are byte-stable projections of those tables.
+files are byte-stable projections of those tables - the OP5 handoff workspace (VCI-shaped: `Devices &
+networks/`, `Templates/`, `<PLC>/Program blocks/`, `<PLC>/PLC tags/`), every file opening with a `#!openn`
+header that names its kind and the generation that wrote it (`Shared/PL5_OP5_contract.md`).
 
 ## A typical session
 

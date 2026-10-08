@@ -2,9 +2,9 @@
 
 The single owner of the `_PROJECT_ROOT` state: `use_project()` points the whole app (config loaders,
 the SSOT `Database/` folder, the `Output/` tree) at a project - or back at the builtin `Shared/`.
-Delivery-tree dirs (the TIA `BuilderData/` surfaces) are TRANSITIONAL here: they move to the Siemens
-system's `output_layout` at migration step 4 (PL5 plan, coupling #3); the neutral dirs
-(ProjectDocumentation/Reports) stay kernel.
+The delivery-tree dirs (the TIA `BuilderData/` workspace) live with the Siemens system's `output_layout`
+(migration step 4, PL5 plan coupling #3 - landed with the OP5 contract v1, 2026-10-08); only the neutral
+dirs (ProjectDocumentation/Reports) are kernel, plus `output_root()` the layout builds on.
 """
 from __future__ import annotations
 
@@ -158,40 +158,16 @@ def output_root() -> str:
     return base
 
 
-def blocks_import_dir() -> str:
-    """The phase-520 GlobalDB-XML BuilderData surface (`<DB>.xml`), under the output root - what OP4
-    imports. Byte-stable to PL3's `ImportReady/` (the 02_COM.xml there is phase-800-owned)."""
-    return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "SoftwareBlocks", "ImportReady")
-
-
 def interfaces_dir() -> str:
     """The phase-400 `IF_*.xlsx` output - DOCUMENTATION/intermediate under ProjectDocumentation, NOT a
     BuilderData import surface (510 reads the IF_ sheets inserted into the I/O List, not these files)."""
     return os.path.join(output_root(), "ProjectDocumentation", "InformationDatabase", "Interfaces")
 
 
-def io_tags_dir() -> str:
-    """The phase-510 I/O Tags BuilderData surface (`PLCTags.xlsx`), under the output root - what OP4
-    imports. The leaf is `PlcTags` to match PL3's OUTPUT_PATHS['io_tags_dir'] (the OP-import contract path)."""
-    return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "PlcTags")
-
-
 def diaglist_dir() -> str:
     """The phase-610 DiagList output (`DiagList_IO.csv` + `DiagList_Logic.csv`) - DOCUMENTATION under
     ProjectDocumentation (NOT a BuilderData import surface; matches PL3's DiagnosisData path)."""
     return os.path.join(output_root(), "ProjectDocumentation", "InformationDatabase", "DiagnosisData")
-
-
-def hardware_dir() -> str:
-    """The phase-700 Hardware BuilderData surface (`Stations.csv` + `Modules.csv`), under the output root
-    - what OP4 imports. Matches PL3's OUTPUT_PATHS['hardware_dir'] (the OP-import contract path)."""
-    return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "HardwareConfiguration")
-
-
-def blocks_creation_dir() -> str:
-    """The phase-800 Software CreationInfo BuilderData surface (the `$/#/%/@` template-fill CSVs +
-    `InstanceDBs.csv`), under the output root - what OP4 imports. Matches PL3's `blocks_creation_dir`."""
-    return os.path.join(output_root(), "TiaPortalProjectInterface", "BuilderData", "SoftwareBlocks", "CreationInfo")
 
 
 def coverage_dir() -> str:

@@ -16,13 +16,17 @@ import, so each 2nd+ occurrence is an `iotag_duplicate` FAIL linking BOTH produc
 (the raw-FAIL guard). The same name on TWO tables stays legal: one signal mirrors into several IF_
 tables by design.
 
-Output -> `config.io_tags_dir()`/PLCTags.xlsx (sheets "PLC Tags" + "TagTable Properties"; all values text).
+Output -> `<PLC>/PLC tags/PLCTags.xlsx` (sheets "PLC Tags" + "TagTable Properties"; all values text) + its
+`PLCTags.xlsx.openn` sidecar - the contract-v1 `#!openn` header of a binary file (`doc/plc-tags-workbook`:
+OP5 lists the workbook, the TIA GUI imports it; the tag-table XML is contract §9.1).
 
 Place in the flow: the 500 header / 510 "Generate I/O Tags" (run_data_blocks only=510 in
 src://pipeline5/systems/plc_based/siemens_s7/safety/main.py), after the 520 build + the interface
 build. Reads the `signals` + `interface_elements` SSOT tables; the tag assembly + duplicate
 detection are the system-neutral src://pipeline5/phases/io_tags/collector.py; writes
-BuilderData/PlcTags/PLCTags.xlsx (`io_tags_dir` in src://pipeline5/config/paths.py).
+BuilderData/<PLC>/PLC tags/PLCTags.xlsx + .openn (`plc_tags_dir` of
+src://pipeline5/systems/plc_based/siemens_s7/output_layout.py; the sidecar from
+src://pipeline5/systems/plc_based/siemens_s7/openn_header.py).
 
 Decision history: the duplicate-tag gate is a production fix (2026-07-06, the FVX pilot) - TIA
 rejects the WHOLE import on one duplicate, so shipping a broken workbook silently was worse than
@@ -42,7 +46,10 @@ from pipeline5.truth.database import Database
 from pipeline5.findings.finding import Finding, record_standalone
 from pipeline5.truth import identity
 from pipeline5.truth.signals import signals_table
+from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
 
+PHASE = 510
 
 from pipeline5.phases.io_tags.collector import (
     IF_PREFIX,
@@ -72,9 +79,11 @@ def _group_tables(tags) -> dict:
     return out
 
 
-def write_plc_tags(tags, out_dir) -> str:
+def write_plc_tags(tags, out_dir, plc=None) -> str:
     """Write PLCTags.xlsx: a "PLC Tags" sheet (one row per tag, sorted by Path) + a "TagTable Properties"
-    sheet (one row per distinct Path). All values text; Hmi flags the literal 'True'. Returns the path."""
+    sheet (one row per distinct Path). All values text; Hmi flags the literal 'True'. Beside it the
+    `PLCTags.xlsx.openn` sidecar (the header: `doc/plc-tags-workbook`, the run, `plc`, `PLC tags`).
+    Returns the workbook's path."""
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, TAG_TABLE_FILE)
     tables = _group_tables(tags)
@@ -92,11 +101,14 @@ def write_plc_tags(tags, out_dir) -> str:
         _append_text_row(props, [table, "", ""])
     wb.save(path)
     wb.close()
+    header.write_sidecar(path, header.fields("doc/plc-tags-workbook", PHASE, plc=plc, target=header.PLC_TAGS,
+                                             source="signals + interface_elements"))
     return path
 
 
 def project(database: Database | None = None, out_dir: str | None = None) -> dict:
-    """Project the two SSOT sources to `out_dir`/PLCTags.xlsx (out_dir defaults to `config.io_tags_dir()`).
+    """Project the two SSOT sources to `out_dir`/PLCTags.xlsx (+ its .openn sidecar; out_dir defaults to the
+    workspace's `<PLC>/PLC tags`).
     Returns {'path', 'total', 'io_count', 'iface_count', 'tables', 'findings'} - `findings` = the
     `iotag_no_address` WARNs + the `iotag_duplicate` FAILs (the caller renders/gates them). On a duplicate
     tag the workbook is NOT written (`run.has_blocking` raw-FAIL guard - never hand OP4 a broken import
@@ -106,7 +118,8 @@ def project(database: Database | None = None, out_dir: str | None = None) -> dic
     if database is None:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
-    out_dir = out_dir or config.io_tags_dir()
+    plc = LAYOUT.plc_folder(database, required=out_dir is None)
+    out_dir = out_dir or LAYOUT.plc_tags_dir(plc)
     io = io_signal_tags(database)
     iface, findings = interface_tags(database)
     tags = io + iface
@@ -115,6 +128,6 @@ def project(database: Database | None = None, out_dir: str | None = None) -> dic
         record_standalone([f for f in findings if f.type == "iotag_duplicate"])
         path = ""
     else:
-        path = write_plc_tags(tags, out_dir)
+        path = write_plc_tags(tags, out_dir, plc)
     return {"path": path, "total": len(tags), "io_count": len(io), "iface_count": len(iface),
             "tables": sorted({t["path"] for t in tags}), "findings": findings}

@@ -242,6 +242,23 @@ def test_canonical_address_tagged_under_a_project_notation():
         addresses.configure_address_format(None, None)
 
 
+def test_sidecar_header_beside_the_workbook():
+    """Contract v1: a binary file's header lives in `<file>.openn` beside it - PLCTags.xlsx.openn says
+    doc/plc-tags-workbook under `PLC tags` (no plc line here: the synthetic signals name no PLC head)."""
+    sigs = [{"script_type": "DI1/2", "bit": "I1.0", "name_in_tagtable": "PB",
+             "type": {"category": "Safety", "io_comment": ""}}]
+    db = _db(signals=sigs)
+    with tempfile.TemporaryDirectory() as d:
+        res = io_tags.project(db, out_dir=d)
+        side = res["path"] + ".openn"
+        ok(os.path.exists(side), "PLCTags.xlsx.openn beside the workbook")
+        text = open(side, encoding="utf-8", newline="").read()
+        ok(text.startswith("#!openn\r\n#! kind: doc/plc-tags-workbook\r\n#! schema: 1\r\n"
+                           "#! producer: Pipeline5 5.0 (phase 510)\r\n")
+           and "\r\n#! run: " in text and text.endswith("#! source: signals + interface_elements\r\n#!end\r\n"), text)
+        ok("#! target: PLC tags\r\n" in text and "#! plc:" not in text, "the TIA folder; no PLC from synthetic signals")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("io_tags", [
@@ -260,4 +277,5 @@ if __name__ == "__main__":
          test_duplicate_interface_tag_links_the_source_signal_row),
         ("canonical_address_tagged_under_a_project_notation",
          test_canonical_address_tagged_under_a_project_notation),
+        ("sidecar_header_beside_the_workbook", test_sidecar_header_beside_the_workbook),
     ]))

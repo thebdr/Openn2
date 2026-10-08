@@ -30,6 +30,7 @@ def test_emitters_declare_ready_kinds():
     ok("scl" in SYSTEM.emitters and "fc_xml" in SYSTEM.emitters and "fdback_xml" in SYSTEM.emitters,
        "the three READY kinds are declared")
     ok("csv" in SYSTEM.emitters, "since step 4 the CreationInfo csv IS a declared emitter too")
+    ok("instance_dbs" in SYSTEM.emitters, "the 830 InstanceDBs.csv writer is the system's too (contract v1: its header)")
 
 
 def test_builders_proxy_reflects_module_registry():

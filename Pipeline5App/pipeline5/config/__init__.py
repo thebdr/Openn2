@@ -3,8 +3,8 @@
 WHERE TO LOOK (the package split; every name re-exported here so `config.X` call sites are stable):
 
   paths.py    WHERE things live: APP_ROOT/SHARED, the active-project state (`use_project`), every
-              directory helper (Database/, the output tree, the config-area subdirs). The TIA delivery
-              dirs are transitional - they move to the Siemens system's output_layout at step 4.
+              directory helper (Database/, the output root, the config-area subdirs). The TIA delivery
+              dirs live with the Siemens system's output_layout (step 4, landed with contract v1).
   params.py   YAML parameters: project_params (`load_params`/`get_param`), the app-UI prefs
               (`load_app_ui` + `save_app_*`), the Documents-tab paths, generation params, the Files-tab
               structure, and sheet-pattern resolution (`resolve_sheet(s)`).
@@ -39,12 +39,8 @@ from pipeline5.config.paths import (  # noqa: F401
     database_dir,
     user_input_dir,
     output_root,
-    blocks_import_dir,
     interfaces_dir,
-    io_tags_dir,
     diaglist_dir,
-    hardware_dir,
-    blocks_creation_dir,
     coverage_dir,
     validation_report_dir,
     gui_log_dir,

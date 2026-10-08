@@ -239,7 +239,10 @@ def test_project_writes_only_its_own_dbs():
         eq(count, 1, "one GlobalDB written")
         ok(os.path.exists(os.path.join(d, "02_COM.xml")), "a non-db_blocks file is left alone (no hardcoded keep)")
         raw = open(os.path.join(d, "07_DOOR.xml"), "rb").read()
-        ok(raw.startswith(b"\xef\xbb\xbf"), "UTF-8 BOM")
+        ok(raw.startswith(b'\xef\xbb\xbf<?xml version="1.0" encoding="utf-8"?>\r\n<!--\r\n#!openn\r\n#! kind: sw/data-block\r\n#! schema: 1\r\n'),
+           "UTF-8 BOM, the declaration, then the contract-v1 header as the first comment")
+        ok(b"\r\n#! target: Program blocks\r\n" in raw and b"#!end\r\n-->\r\n<Document>\r\n" in raw,
+           "the TIA folder; the comment closes right before the Document")
         ok(b"\r\n" in raw and not raw.endswith(b"\r\n"), "CRLF line endings, no trailing newline")
         text = raw.decode("utf-8-sig")
         ok("AlwaysFALSE" in text and "Door Closed [ S1-D1 ]" in text, "seeds + member present")

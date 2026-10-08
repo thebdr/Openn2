@@ -332,6 +332,18 @@ def _stage_generation(ctx):
     return database, findings
 
 
+def _begin_generation(ctx, database) -> dict:
+    """Open the OP5 workspace generation before a phase's first BuilderData write (contract v1 §6.2): the
+    run id (the host's `ctx.run` - one per button press; Run-all shares it across its phases) and
+    `.openn/workspace.openn.config`, written once per run - the log says where the workspace is the first
+    time. Returns the generation's delivery dirs (`delivery_dirs` - the PLC folder from the staged facts)."""
+    from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
+    run, written = LAYOUT.begin_generation(database, ctx.run)
+    if written:
+        ctx.emit("INFO", f"  OP5 workspace {LAYOUT.workspace_root()}  (run {run} - files of older runs are stale)")
+    return LAYOUT.delivery_dirs(database)
+
+
 def run_staging(ctx, only=None):
     """Phase 300: stage the configured I/O List -> the signals table -> Database/signals.csv. The oracle
     splits it: 310 Stage I/O List (`stage_iolist` - I/O List only, no C&E) / 320 Stage C&E Matrix (the
@@ -420,12 +432,13 @@ def run_data_blocks(ctx, only=None):
     if "db_blocks" not in database:
         ctx.emit("WARN", "  520 produced no tables (a blocking prereq was downgraded but yielded no data) - nothing further")
         return
+    dirs = _begin_generation(ctx, database)
     if only in (None, 520):
         n_dbs, n_members = len(database["db_blocks"]), len(database["db_members"])
         ctx.emit("RSLT", f"  {n_members} db_members across {n_dbs} DBs (+ {len(database['instance_dbs'])} "
                          f"instance DBs) -> {os.path.join(config.database_dir(), 'db_members.csv')}")
         count = datablock_xml.project(database)
-        ctx.emit("RSLT", f"  projected {count} GlobalDB XMLs -> {config.blocks_import_dir()}")
+        ctx.emit("RSLT", f"  projected {count} GlobalDB XMLs -> {dirs['blocks_import']}")
     if only in (None, 510):
         ctx.status("I/O tags…")
         database, iface_findings = interfaces.build_interfaces(database)
@@ -437,7 +450,7 @@ def run_data_blocks(ctx, only=None):
             return
         ctx.render(iface_findings + res["findings"], label="510 I/O tags")
         ctx.emit("RSLT", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
-                         f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {config.io_tags_dir()}")
+                         f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {dirs['io_tags']}")
 
 
 def run_interfaces(ctx, only=None):
@@ -467,6 +480,7 @@ def run_interfaces(ctx, only=None):
     ctx.emit("RSLT", f"  {n_if} interfaces, {n_el} mirrored elements -> {len(result['created'])} "
                      f"IF_*.xlsx in {config.interfaces_dir()}")
     from pipeline5.systems.plc_based.siemens_s7 import interface_scl_emitter as interface_scl
+    _begin_generation(ctx, database)
     scl = interface_scl.project(database)
     ctx.render(scl["findings"], label="430 MachineInterfaces SCL")
     if scl["path"]:
@@ -510,6 +524,7 @@ def run_diagnosis(ctx, only=None):
     if only in (None, 610):
         res = diaglist_csv.project(database); rendered += res["findings"]
     if only in (None, 620):
+        _begin_generation(ctx, database)
         scl = diagnosis_scl.project(database); rendered += scl["findings"]
     ctx.render(rendered, label="600 diagnosis")
     if res is not None:
@@ -539,11 +554,12 @@ def run_hardware(ctx, only=None):
     if "hardware_stations" not in database:
         ctx.emit("WARN", "  700 produced no tables (a blocking finding) - nothing further")
         return
+    dirs = _begin_generation(ctx, database)
     res = hardware_csv.project(database)
     if res["findings"]:
         ctx.render(res["findings"], label="700 BuilderData")
     own = f" (+ the project's {os.path.basename(res['device_types_db'])})" if res.get("device_types_db") else ""
-    ctx.emit("RSLT", f"  700: {res['stations']} stations + {res['modules']} modules{own} -> {config.hardware_dir()}")
+    ctx.emit("RSLT", f"  700: {res['stations']} stations + {res['modules']} modules{own} -> {dirs['hardware']}")
 
 
 def run_software(ctx, only=None):
@@ -571,23 +587,24 @@ def run_software(ctx, only=None):
     database, blk_findings = engine.build(database, system=ctx.system)
     # the verbose per-block log (user spec): each generated block, its template (when a shipped
     # one exists), the declared output surface, and the builder function that produced it
-    surface = {"csv": "CreationInfo CSV", "fc_xml": "FC XML (ImportReady)",
-               "scl": "SCL (ImportReady)"}
+    surface = {"csv": "CreationInfo CSV", "fc_xml": "FC XML (Program blocks)",
+               "scl": "SCL (Program blocks)"}
     for r in engine.block_report(database, ctx.system):
         tmpl = f"  template={r['template_stem']}" if r["template_stem"] else ""
         inst_note = f" + {r['instances']} instance DBs" if r["instances"] else ""
         ctx.emit("INFO", f"  {r['name']}  <-  {r['builder']}(){tmpl}  ->  "
                          f"{surface.get(r['emit'], r['emit'])}, {r['rows']} rows{inst_note}")
+    dirs = _begin_generation(ctx, database)
     rendered, res, inst = list(blk_findings), None, None
     if only in (None, 820):
         res = engine.project(database, system=ctx.system); rendered += res["findings"]
     if only in (None, 830):
-        inst = engine.write_instance_dbs(database)
+        inst = engine.write_instance_dbs(database, system=ctx.system)
     ctx.render(rendered, label="800 software")
     if res is not None:
         ctx.emit("RSLT", f"  820: {len(database['software_blocks'])} blocks -> {res['count']} "
                          f"CreationInfo CSVs + {len(res['xml_files'])} FC XML + "
-                         f"{len(res.get('scl_files', []))} SCL -> {config.blocks_creation_dir()}")
+                         f"{len(res.get('scl_files', []))} SCL -> {dirs['blocks_creation']}")
     if inst is not None:
         ctx.emit("RSLT", f"  830 InstanceDBs: {inst['count']} instance DBs -> {inst['path']}")
 

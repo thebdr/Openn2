@@ -17,8 +17,11 @@ src://pipeline5/systems/plc_based/siemens_s7/safety/main.py) calls `project` aft
 (src://pipeline5/phases/diagnosis/builder.py). Reads the `diagnosis_entries` + `diagnosis_cabinets`
 SSOT tables + the signals' per-type tristate flag; fills the `06_Diagnostic for OPC.scl` template
 (`DIAG_SCL_TEMPLATE` in src://pipeline5/config/paths.py); writes
-BuilderData/SoftwareBlocks/ImportReady/Diagnostic_for_OPC.scl (`blocks_import_dir`). The generation
-knobs come from `generation_params.yaml` via the 4-tier walk (src://pipeline5/config/resolver.py).
+BuilderData/<PLC>/Program blocks/Diagnostic_for_OPC.scl (`program_blocks_dir` of
+src://pipeline5/systems/plc_based/siemens_s7/output_layout.py), the contract-v1 `#!openn` header
+(`sw/source`, `name: 06_Diagnostic for OPC` - the FUNCTION's name differs from the file's) as its first
+`//` lines. The generation knobs come from `generation_params.yaml` via the 4-tier walk
+(src://pipeline5/config/resolver.py).
 """
 from __future__ import annotations
 
@@ -30,8 +33,12 @@ from pipeline5.language import expr
 from pipeline5.truth.database import Database
 from pipeline5.findings.finding import Finding
 from pipeline5.phases.diagnosis.builder import _int_or_none
+from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
 from pipeline5.truth.diagnosis import diagnosis_cabinets_table, diagnosis_entries_table
 from pipeline5.truth.signals import signals_table
+
+PHASE = 620
 
 
 def _f(type: str, severity: str, detail: str, location: str = "") -> Finding:
@@ -216,7 +223,8 @@ def project(database: Database | None = None, out_dir: str | None = None,
         database = Database([signals_table([m["canonical"] for m in colmap]),
                              diagnosis_cabinets_table(), diagnosis_entries_table()]).load(config.database_dir())
     template_path = template_path or config.DIAG_SCL_TEMPLATE
-    out_dir = out_dir or config.blocks_import_dir()
+    plc = LAYOUT.plc_folder(database, required=out_dir is None)
+    out_dir = out_dir or LAYOUT.program_blocks_dir(plc)
     os.makedirs(out_dir, exist_ok=True)
     if not os.path.exists(template_path):
         return {"dir": out_dir, "path": None, "cabinets": 0, "entries": 0,
@@ -225,8 +233,12 @@ def project(database: Database | None = None, out_dir: str | None = None,
     entries = _scl_entries(database)
     text = render_scl(_blocks(database), entries, open(template_path, encoding="utf-8-sig").read(),
                       _tristate_cabinets(database))
+    function = re.search(r'FUNCTION\s+"([^"]+)"', text)
+    stamp = header.fields("sw/source", PHASE, plc=plc, target=header.PROGRAM_BLOCKS,
+                          name=function.group(1) if function else None,
+                          source=f"diagnosis_entries + diagnosis_cabinets (template {os.path.basename(template_path)})")
     path = os.path.join(out_dir, DIAG_SCL_FILE)
     with open(path, "w", encoding="utf-8-sig", newline="\r\n") as fh:    # BOM + CRLF (the exported-template format)
-        fh.write(text)
+        fh.write(header.stamp_source(text, stamp).replace("\r\n", "\n"))   # one EOL translation, not two
     return {"dir": out_dir, "path": path, "cabinets": len({e["cabinet"] for e in entries}),
             "entries": len(entries), "findings": []}
