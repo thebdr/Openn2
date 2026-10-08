@@ -176,8 +176,9 @@ def _ta_dtd(in_len="128", out_len="128"):
 def test_interface_name_and_base_byte():
     eq(interfaces.interface_name("SORTER+DIAG-02"), "SORTER-02", "the +DIAG marker is no part of the name")
     eq(interfaces.interface_name(" FVTGENERIC-03 "), "FVTGENERIC-03")
-    eq([interfaces.base_byte(v) for v in ("10000", " 20000 ", "I10000.0", "Q20.0", "AREA", "", None, "1.5")],
-       [10000, 20000, 10000, 20, None, None, None, None], "a bare byte or an address's byte (the notation); else None")
+    eq([interfaces.base_byte(v) for v in ("10000", " 20000 ", "I10000.0", "Q20.0", "AREA", "", None, "1.5", "I10000.5")],
+       [10000, 20000, 10000, 20, None, None, None, None, None],
+       "a bare byte or an address's byte (the notation, bit 0 - an area starts on a whole byte); else None")
 
 
 def test_ioc_base_from_the_coupler_start():
@@ -205,16 +206,23 @@ def test_ioc_base_from_the_coupler_start():
     eq([(f.type, f.location) for f in found],
        [("if_base_invalid", "S!O1"), ("if_base_invalid", "S!O6"), ("if_area_overlap", "S!O8"), ("if_area_overlap", "S!O8")],
        "no base before a head / under a head without a start; the two areas sharing 16000 overlap (IN and OUT)")
+    copied = [{"script_type": "PA", "type_hw": "PA", "coupler_start": "5000"},
+              {"script_type": "IOC", "type_hw": "PA", "index": "FVTGENERIC-08"}]          # Type copied from the head
+    eq(list(interfaces.ioc_bases(copied).values()), ["5000"], "refute round 1: an IOC row typed PA is no head")
 
 
 def test_area_lengths_default_and_override():
     eq(interfaces.area_lengths({}, _ta_dtd()), {"I": 128, "Q": 128}, "the database defaults")
     eq(interfaces.area_lengths({"hardware_params": "partnertolocallength = 64"}, _ta_dtd()), {"I": 64, "Q": 128},
-       "the IOC row's own key wins, read the importer's way (case, spacing)")
-    eq(interfaces.area_lengths({"hardware_params": "LocalToPartnerLength=abc"}, _ta_dtd()), {"I": 128, "Q": None})
+       "the IOC row's own key wins in any spelling (700 writes it in the database's - the importer matches exactly)")
+    eq(interfaces.area_lengths({"hardware_params": "PartnerToLocalLength=64 | PartnerToLocalLength=32"}, _ta_dtd()),
+       {"I": 32, "Q": 128}, "the LAST entry wins - the importer applies them in order")
+    for bad in ("abc", "0", "-8", "128.0", ""):
+        eq(interfaces.area_lengths({"hardware_params": f"LocalToPartnerLength={bad}"}, _ta_dtd()), {"I": 128, "Q": None},
+           f"{bad!r}: an own value that is no length is NOT replaced by the default")
     eq(interfaces.area_lengths({}, {"by_id": {}}), {"I": None, "Q": None}, "nothing configured -> unknown")
-    eq(interfaces.route_area_params("LocalToPartnerLength=32 | Foo=1 | PartnerToLocalLength=16"),
-       ({"I": "PartnerToLocalLength=16", "Q": "LocalToPartnerLength=32"}, ["Foo=1"]))
+    eq(interfaces.area_params("LocalToPartnerLength=32 | Foo=1 | PartnerToLocalLength = 16 | Bar"),
+       ({"I": "16", "Q": "32"}, ["Foo=1", "Bar"]))
 
 
 def test_mapping_by_name_number_and_diag_name():
@@ -283,6 +291,12 @@ def test_area_findings_overflow_overlap_and_base():
     eq([(f.type, f.severity) for f in found], [("if_base_invalid", "FAIL")], "no base: nothing else checked")
     found = a(recs, {"SORTER-01": {"I": 999, "Q": 2}}, {"SORTER-01": {"I": None, "Q": 128}}, [])
     eq([(f.type, f.severity) for f in found], [("if_area_length_unknown", "WARN")], "an unknown length is not checked")
+    bad = _recs(("SORTER-01", "10000"))
+    bad[0]["row"]["hardware_params"] = "LocalToPartnerLength=0"
+    found = a(bad, {"SORTER-01": {"I": 2, "Q": 99}}, {"SORTER-01": {"I": 128, "Q": None}}, [])
+    eq([(f.type, f.severity) for f in found], [("if_area_length_invalid", "FAIL")],
+       "refute round 1: an own length of 0 is a blocking FAIL, not the unknown-length WARN")
+    ok("LocalToPartnerLength='0'" in found[0].detail, found[0].detail)
 
 
 def test_io_address_side1_generic_syntax():
@@ -339,6 +353,32 @@ def test_build_interfaces_checks_the_real_layout():
     eq(len(db["interfaces"]), 2, "the tables are written")
 
 
+def test_the_if_workbook_gets_the_resolved_base():
+    """C-031 refute round 1: an address-spelled base (`I20000.0`) or the coupler's start is stored RESOLVED in
+    `base_address` - the IF_ workbook's Base Address (and so its cached addresses and the inserted IF_ sheet) is the
+    byte the area and the tags use, never the template's 10000."""
+    from openpyxl import Workbook
+    from pipeline5 import config
+    from pipeline5.systems.plc_based.siemens_s7 import interface_xlsx_writer as writer
+    rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "I20000.0", "source_cell": "NET!O7", "uid": "i1"},
+            {"script_type": "PA", "type_hw": "PA", "coupler_start": "14000", "source_cell": "NET!O8", "uid": "h2"},
+            {"script_type": "IOC", "index": "SORTER-02", "source_cell": "NET!O9", "uid": "i2"}]
+    original_db = config.database_dir
+    with tempfile.TemporaryDirectory() as d:
+        tpl = os.path.join(d, "t.xlsx"); _native_template(tpl)
+        config.database_dir = lambda: d
+        try:
+            db, _found = interfaces.build_interfaces(_signals_db(rows), template_path=tpl, dtd=_ta_dtd())
+        finally:
+            config.database_dir = original_db
+    eq([(i["instance"], i["base_address"]) for i in db["interfaces"]], [("SORTER-01", "20000"), ("SORTER-02", "14000")])
+    wb = Workbook(); ws = wb.active
+    for c, v in enumerate(["Side", "Index", "Base Node", "Base Address"], 1):
+        ws.cell(1, c, v); ws.cell(2, c, [1, "01", 10, 10000][c - 1]); ws.cell(3, c, [2, "01", 10, 0][c - 1])
+    writer._plug(ws, db["interfaces"].rows[0]["base_address"], "", "", "01")
+    eq(ws.cell(2, 4).value, 20000, "the IF_ workbook's Side-1 Base Address")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("interfaces", [
@@ -363,4 +403,5 @@ if __name__ == "__main__":
         ("io_address_side1_generic_syntax", test_io_address_side1_generic_syntax),
         ("layout_extent_words", test_layout_extent_words),
         ("build_interfaces_checks_the_real_layout", test_build_interfaces_checks_the_real_layout),
+        ("the_if_workbook_gets_the_resolved_base", test_the_if_workbook_gets_the_resolved_base),
     ]))

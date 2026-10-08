@@ -64,8 +64,8 @@ from pipeline5.findings.finding import Finding, record
 from pipeline5.truth.table import Table
 from pipeline5.truth.signals import signals_table, is_generated, station_role
 from pipeline5.truth.identity import INTERFACE_TRIGGER_TYPE
-from pipeline5.phases.interfaces.builder import (TRANSFER_AREAS, base_byte, interface_name, ioc_base,
-                                                route_area_params)
+from pipeline5.phases.interfaces.builder import (TRANSFER_AREAS, area_params, base_byte, interface_name, ioc_base,
+                                                length_value)
 
 _ADDR = re.compile(r"\s*([IQ])\s*(\d+)\.(\d+)", re.IGNORECASE)
 
@@ -244,10 +244,12 @@ def _ioc_without_coupler(row, where_text) -> Finding:
 def _transfer_areas(station, head, iocs, by_id, findings) -> list:
     """A coupler's transfer-area module rows ([[C-031]]): per IOC row under its head, in document order,
     `<name>_IN` (TransferArea-IN, I Addr = the base) and `<name>_OUT` (TransferArea-OUT, Q Addr = the base),
-    positions 1..n; the base = the IOC row's Bit, else the head's `coupler_start` (`ioc_base`). Lengths: the database model's default is applied by the importer - only the IOC row's own
-    length key (Hardware Parameters) is written, routed to its area; another entry is a `hw_ta_param_unrouted`
-    WARN. A base that is no byte is a blocking `hw_ta_base_invalid`, a model missing from the database a
-    blocking `hw_device_not_in_dtd`."""
+    positions 1..n; the base = the IOC row's Bit, else the head's `coupler_start` (`ioc_base`). Lengths: the
+    database model's default is applied by the importer - only the IOC row's own length key (Hardware Parameters,
+    `area_params`: any spelling, the last entry winning) is written, in the database's spelling, on its own area;
+    another entry is a `hw_ta_param_unrouted` WARN. Blocking: a base that is no byte (`hw_ta_base_invalid`), a
+    length that is no positive whole number (`hw_ta_length_invalid`), a model missing from the database
+    (`hw_device_not_in_dtd`)."""
     out, position = [], 0
     for ioc in iocs:
         name = interface_name(ioc.get("index"))
@@ -263,7 +265,15 @@ def _transfer_areas(station, head, iocs, by_id, findings) -> list:
                                "`10000` or `I10000.0` - or its coupler's start) - its transfer areas cannot be placed",
                                where, str(ioc.get("uid", "")), doc=doc))
             continue
-        routed, unrouted = route_area_params(ioc.get("hardware_params"))
+        lengths, unrouted = area_params(ioc.get("hardware_params"))
+        invalid = [d for d, v in lengths.items() if v is not None and length_value(v) is None]
+        if invalid:
+            findings.append(_f("hw_ta_length_invalid", "FAIL",
+                               f"interface {name!r} on {station!r}: "
+                               + ", ".join(f"{TRANSFER_AREAS[d][1]}={lengths[d]!r}" for d in invalid)
+                               + " in its Hardware Parameters is no positive whole number of bytes",
+                               where, str(ioc.get("uid", "")), doc=doc))
+            continue
         if unrouted:
             findings.append(_f("hw_ta_param_unrouted", "WARN",
                                f"interface {name!r} on {station!r}: Hardware Parameters entr"
@@ -283,7 +293,9 @@ def _transfer_areas(station, head, iocs, by_id, findings) -> list:
                 "station_name": station, "slot": position, "module_name": name + suffix,
                 "model_id": rec["model_id"],
                 "i_addr": base if direction == "I" else "", "q_addr": base if direction == "Q" else "",
-                "custom_parameters": routed[direction], "comment": rec["comment"],
+                "custom_parameters": (f"{TRANSFER_AREAS[direction][1]}={length_value(lengths[direction])}"
+                                      if lengths[direction] is not None else ""),
+                "comment": rec["comment"],
                 "source_signal": str(ioc.get("uid", "")),
             })
     return out
@@ -300,7 +312,8 @@ def extract(rows, dtd) -> tuple:
     stations, modules, findings = [], [], []
     cur = None
     seen_ips = {}          # ip -> the FIRST generated station's {name, where} - the dedup anchor
-    any_head = False       # an IOC row before the first head has no station; after a SKIPPED head it goes with it
+    any_head = False       # an IOC row before the first head has no station
+    skipped = ""           # the last head SKIPPED (duplicate IP / not in the DTD) - its IOC rows get no area either
 
     def finalize():
         if cur is None:
@@ -401,7 +414,9 @@ def extract(rows, dtd) -> tuple:
 
     for row in rows or []:
         if is_generated(row):                    # a generated signal sits under no head in the document - a
-            continue                             # POSITIONAL walk never gives it to a station ([[C-030]] round 1)
+            if _is_ioc(row):                     # POSITIONAL walk never gives it to a station ([[C-030]] round 1)
+                findings.append(_ioc_without_coupler(row, "generated (no document row - under no head)"))
+            continue
         role = _role(row)
         if role is not None:
             any_head = True
@@ -419,7 +434,7 @@ def extract(rows, dtd) -> tuple:
                                    where, str(row.get("uid", "")), doc=io_doc if "!" in where else "",
                                    location2=first["where"],
                                    doc2=io_doc if "!" in first["where"] else ""))
-                cur = None
+                cur, skipped = None, name or _where(row)
                 continue
             model = _model_id(row.get("part_no"))
             rec = by_id.get(model.upper())
@@ -438,7 +453,7 @@ def extract(rows, dtd) -> tuple:
                                        + (f" ({name})" if name else "")
                                        + " not in DeviceTypesDatabase - skipped",
                                        where, str(row.get("uid", "")), doc=io_doc))
-                cur = None
+                cur, skipped = None, name or _where(row)
                 continue
             cur = {"role": role, "row": row, "model": model, "rec": rec,
                    "head_tag": str(row.get("slot") or "").strip(), "signals": []}
@@ -446,8 +461,9 @@ def extract(rows, dtd) -> tuple:
                 seen_ips[ip] = {"name": name, "where": _where(row)}
         elif cur is not None:
             cur["signals"].append(row)
-        elif not any_head and _is_ioc(row):
-            findings.append(_ioc_without_coupler(row, "before any station head"))
+        elif _is_ioc(row):
+            findings.append(_ioc_without_coupler(row, "before any station head" if not any_head
+                                                 else f"under the skipped station {skipped!r}"))
     finalize()
     return stations, modules, findings
 

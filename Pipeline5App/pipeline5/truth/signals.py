@@ -53,8 +53,11 @@ def station_role(row):
     """The station a document row OPENS - the I/O List's head rows: Script Type `PLC` -> 'Plc', `PlcCardCm` ->
     'PlcCardCm', a Type (col R) starting with `P` -> 'IoDevice'; None for any other row. The rows after a head,
     up to the next one, are its own - the positional rule every station reader shares (phase 700's stations, phase
-    400's coupler start of an IOC row - [[C-031]])."""
+    400's coupler start of an IOC row - [[C-031]]). A row typed `IOC` is an interface, never a head - whatever
+    its Type (an IOC row copied from its coupler's head keeps `PA` in col R)."""
     s = str(row.get("script_type") or "").strip().upper()
+    if s == "IOC":                                  # identity.INTERFACE_TRIGGER_TYPE (truth/identity.py)
+        return None
     if s == "PLC":
         return "Plc"
     if s == "PLCCARDCM":

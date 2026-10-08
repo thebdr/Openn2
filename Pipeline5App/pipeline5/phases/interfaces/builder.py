@@ -85,12 +85,13 @@ def ioc_bases(rows) -> dict:
 
 def base_byte(value):
     """The base byte in an IOC row's Bit cell: a bare byte (`10000` - the PL3 spelling) or an address in the
-    active notation / the canonical one (`I10000.0`, `Q10000.0`) - its byte; None when it is neither."""
+    active notation / the canonical one (`I10000.0`, `Q10000.0`) - its byte; None when it is neither, or when the
+    address names a bit other than 0 (an area starts on a whole byte - `I10000.5` is no base)."""
     s = str(value if value is not None else "")
     if _BYTE_RX.fullmatch(s):
         return int(s)
     parsed = addresses.parse(s)
-    return parsed[1] if parsed else None
+    return parsed[1] if parsed and parsed[2] == 0 else None
 
 
 def _param_value(blob, key):
@@ -105,34 +106,46 @@ def _param_value(blob, key):
     return None
 
 
-def area_lengths(row, dtd) -> dict:
-    """{'I': bytes|None, 'Q': bytes|None} - an IOC row's transfer-area lengths: its Hardware Parameters' length
-    key, else the database model's default ([[C-031]]); None when neither gives a positive whole number."""
-    by_id = (dtd or {}).get("by_id", {})
-    out = {}
-    for direction, (model, key) in TRANSFER_AREAS.items():
-        value = _param_value(row.get("hardware_params"), key)
-        if value is None and model.upper() in by_id:
-            value = _param_value(by_id[model.upper()].get("params"), key)
-        n = int(value) if value is not None and _BYTE_RX.fullmatch(value) else 0
-        out[direction] = n if n > 0 else None
-    return out
+def length_value(value):
+    """A transfer-area length: a positive whole number of bytes (`64`); None for anything else (`0`, `-8`,
+    `128.0`, `abc`, '')."""
+    s = str(value if value is not None else "")
+    return int(s) if _BYTE_RX.fullmatch(s) and int(s) > 0 else None
 
 
-def route_area_params(blob) -> tuple:
-    """An IOC row's Hardware Parameters split onto its two areas: ({'I': 'PartnerToLocalLength=64', 'Q': ...},
-    [the entries naming no area]) - an area's own length key goes to that area, anything else is unroutable."""
-    routed, unrouted = {"I": [], "Q": []}, []
+def area_params(blob) -> tuple:
+    """An IOC row's Hardware Parameters onto its two areas ([[C-031]]): ({'I': value|None, 'Q': value|None},
+    [the entries naming no area]). An area's length key is matched whatever its case and spacing - phase 700 writes
+    it back in the database's spelling, the importer matching attribute names exactly - and the LAST entry of a key
+    wins (the importer applies them in order); the value is returned raw (`length_value` judges it)."""
+    values, unrouted = {"I": None, "Q": None}, []
     for entry in (e.strip() for e in str(blob or "").split("|")):
         if not entry:
             continue
-        key = "".join(entry.split("=", 1)[0].split()).lower()
-        direction = next((d for d, (_m, k) in TRANSFER_AREAS.items() if k.lower() == key), None)
-        if direction is None:
+        key, sep, value = entry.partition("=")
+        canon = "".join(key.split()).lower()
+        direction = next((d for d, (_m, k) in TRANSFER_AREAS.items() if k.lower() == canon), None)
+        if direction is None or not sep:
             unrouted.append(entry)
         else:
-            routed[direction].append(entry)
-    return {d: " | ".join(v) for d, v in routed.items()}, unrouted
+            values[direction] = value.strip()
+    return values, unrouted
+
+
+def area_lengths(row, dtd) -> dict:
+    """{'I': bytes|None, 'Q': bytes|None} - an IOC row's transfer-area lengths ([[C-031]]): its own Hardware
+    Parameters length when it sets one (None when that value is no positive whole number - `area_findings` FAILs
+    it), else the database model's default (None when the database has none)."""
+    by_id = (dtd or {}).get("by_id", {})
+    overrides, _unrouted = area_params(row.get("hardware_params"))
+    out = {}
+    for direction, (model, key) in TRANSFER_AREAS.items():
+        if overrides[direction] is not None:
+            out[direction] = length_value(overrides[direction])
+        else:
+            rec = by_id.get(model.upper())
+            out[direction] = length_value(_param_value(rec.get("params"), key)) if rec else None
+    return out
 
 
 def annotate_interface_tagnames(database: Database, tagnames: dict | None = None) -> None:
@@ -642,7 +655,15 @@ def area_findings(records, extents, lengths, rows) -> list:
                           "placed",
                           rec["source"], str(row.get("uid", "")), doc=doc))
             continue
-        unknown = [d for d in ("I", "Q") if lengths[rec["instance"]].get(d) is None]
+        overrides, _unrouted = area_params(row.get("hardware_params"))
+        invalid = [d for d in ("I", "Q") if overrides[d] is not None and length_value(overrides[d]) is None]
+        if invalid:
+            out.append(_f("if_area_length_invalid", "FAIL",
+                          f"interface {rec['instance']!r}: "
+                          + ", ".join(f"{TRANSFER_AREAS[d][1]}={overrides[d]!r}" for d in invalid)
+                          + " in the IOC row's Hardware Parameters is no positive whole number of bytes",
+                          rec["source"], str(row.get("uid", "")), doc=doc))
+        unknown = [d for d in ("I", "Q") if lengths[rec["instance"]].get(d) is None and d not in invalid]
         if unknown:
             out.append(_f("if_area_length_unknown", "WARN",
                           f"interface {rec['instance']!r}: no transfer-area length for "
@@ -726,7 +747,8 @@ def build_interfaces(database: Database | None = None, template_path: str | None
                                     for d in ("I", "Q")}
         lengths[rec["instance"]] = area_lengths(rec["row"], dtd)
         itab.add(instance=rec["instance"], machine_type=rec["machine_type"], interface_id=rec["index"],
-                 is_diag=rec["is_diag"], base_address=rec["base"], base_node=rec["base_node"],
+                 is_diag=rec["is_diag"], base_address=str(base) if base is not None else rec["base"],
+                 base_node=rec["base_node"],
                  device=rec["device"], ip=rec["ip"], template_sheet=sheet, source=rec["source"])
         fill = {"interface_name": rec["machine_type"], "interface_id": rec["index"]}
         for e in native + elems:
