@@ -395,30 +395,38 @@ def _file_output(rule: Rule, templates: dict, scope: dict, files_root: str) -> t
         text = tempemplator.render_template(rule.template, templates, scope)
     except (ExprError, TempemplatorError) as error:
         return None, None, ("rx_bad_template", str(error))
+    path, why = _write_path(path, files_root)
+    if why is not None:
+        return None, None, ("rx_file_write", why)
+    unstorable = _unencodable(text)                                # the append would fail half-way
+    if unstorable:
+        return None, None, ("rx_bad_template", f"template {rule.template!r}: {unstorable}")
+    return path, text, None
+
+
+def _write_path(path: str, files_root: str) -> tuple:
+    """A RENDERED target judged as the fire judges it before any write -> (the file it appends to, None), or (None,
+    the rx_file_write detail). ONE judgement for the fire, its dry run and the builder's lint of a target whose holes
+    are all known (C-025 refute round 12)."""
     judged = path                                                  # the TARGET's own names are judged, never the
     # output root's (Windows 11 allows `aux.files`). Rooted without a drive (`/rx/a.txt`): joined, it lands at the
     # ROOT of the output root's drive - refused before any isabs test (Python < 3.13 calls it absolute: never
     # joined, it was written at the root of the current drive)
     if _WINDOWS and path[:1] in _SEPARATORS and path[1:2] not in _SEPARATORS:
-        return None, None, ("rx_file_write", f"cannot write {path!r}: a path rooted without a drive lands at the "
-                            "root of the output root's drive - write the drive, or a relative path")
+        return None, (f"cannot write {path!r}: a path rooted without a drive lands at the root of the output root's "
+                      "drive - write the drive, or a relative path")
     if not os.path.isabs(path):
         if ":" in path:                                            # `X:3.txt` would read as drive X: (a
-            return None, None, ("rx_file_write",                   # drive-relative escape - round 14)
-                                f"cannot write {path!r}: a ':' in a relative target (a drive letter, or a "
-                                "hidden NTFS stream) - use an absolute path for another drive")
+            return None, (f"cannot write {path!r}: a ':' in a relative target (a drive letter, or a hidden NTFS "
+                          "stream) - use an absolute path for another drive")   # drive-relative escape - round 14)
         path = os.path.join(files_root, path)
     refusal = _path_refusal(judged)
     if refusal is not None:                                        # Windows refuses it at open() - say why
-        return None, None, ("rx_file_write", f"cannot write {path!r}: {refusal}")
+        return None, f"cannot write {path!r}: {refusal}"
     colon = _colon_name(judged)                                    # NTFS would write a HIDDEN alternate data
     if colon is not None:                                          # stream - silent (refuter round 13: a `-X1:3`
-        return None, None, ("rx_file_write", f"cannot write {path!r}: a ':' in the name {colon!r} would write a "
-                            "hidden NTFS stream")                  # terminal name) - judged AS WRITTEN (C-025 round 6)
-    unstorable = _unencodable(text)                                # the append would fail half-way
-    if unstorable:
-        return None, None, ("rx_bad_template", f"template {rule.template!r}: {unstorable}")
-    return path, text, None
+        return None, f"cannot write {path!r}: a ':' in the name {colon!r} would write a hidden NTFS stream"
+    return path, None                                              # terminal name) - judged AS WRITTEN (C-025 round 6)
 
 
 def _path_refusal(path: str):
@@ -972,16 +980,28 @@ def _lint_rule(rule: Rule, templates: dict, database, hooks, problems: list, val
             fields = None
     if rule.action == "add_rows" and rule.target not in tables:
         problem(_unknown_table("target", rule.target))
+    for start, end, error in tempemplator.replacement_problems(rule.condition, params) if rule.condition else ():
+        problem(f"condition {rule.condition!r}: {error} - from the project params: the condition fails on every row "
+                "(rx_bad_condition)", "condition", start, end)   # (C-025 refute round 12)
     if rule.action == "file":
         for start, end, message, severity in tempemplator.lint_line(rule.target, fields=fields, tables=tables,
                                                                     json=json_fields, stored=False,
                                                                     values=_own_values(values), params=params):
             problem(f"target {rule.target!r}: {message}", "target", start, end, severity)
-        refusal = _literal_refusal(rule.target)
-        if refusal is not None:
-            start, end, why = refusal
-            problem(f"target {rule.target!r}: {why} - the fire refuses every row (rx_file_write)", "target",
-                    start, end)
+        atoms = _target_atoms(rule.target, params)
+        if any(kind == "hole" for kind, _s, _e in tempemplator.brace_runs(rule.target)) \
+                and all(ch is not None for ch, _s, _e in atoms):
+            rendered = "".join(ch for ch, _s, _e in atoms)     # every hole KNOWN (a constant, the params): the
+            _path, why = _write_path(rendered, "")              # target every fire writes, judged by the fire's own
+            if why is not None:                                 # guard (C-025 refute round 12)
+                problem(f"target {rule.target!r} renders {rendered!r} at every fire - {why} - the fire refuses every "
+                        "row (rx_file_write)", "target", 0, len(rule.target))
+        else:
+            refusal = _literal_refusal(rule.target, params)
+            if refusal is not None:
+                start, end, why = refusal
+                problem(f"target {rule.target!r}: {why} - the fire refuses every row (rx_file_write)", "target",
+                        start, end)
     return fields, tables, json, json_fields
 
 
@@ -1020,18 +1040,19 @@ def _json_valued(table) -> frozenset:
                      if any(isinstance(row.get(column), (list, dict)) for row in table.rows))
 
 
-def _literal_refusal(target: str):
+def _literal_refusal(target: str, params=None):
     """(start, end, why) of LITERAL target text the fire refuses whatever the row renders - None when there is
-    none. A hole is data: it may render any text (a separator, a drive, a device prefix - `{$p}//?/C:`), so a
-    literal is refused only where NO rendering of the holes lets the fire take it (the fire's own guards,
-    `_file_output` / `_path_refusal`, read on the literal text):
+    none. A data hole may render any text (a separator, a drive, a device prefix - `{$p}//?/C:`), so a literal is
+    refused only where NO rendering of the holes lets the fire take it (the fire's own guards, `_file_output` /
+    `_path_refusal`, read on the literal text); a KNOWN hole - a constant, the project params alone (`params`) -
+    renders the same text at every fire: it is read as that text (C-025 refute round 12):
     - a character a Windows path refuses (`<>"|*`, a control character) - and a '?' unless it may be a device
       prefix's (what precedes it may render two separators, and a separator or a hole follows);
     - a ':' unless it may be a DRIVE's: what precedes it may render exactly ONE ASCII letter, or a device prefix
       and one (`C:`, `{$d}:`, `{$p}C:`, `\\\\./C:` - C-024 refute round 19's note), and a separator or a hole
       follows;
     - on Windows the path shapes - see `_literal_path_refusal`."""
-    atoms = _target_atoms(target)
+    atoms = _target_atoms(target, params)
     for index, (ch, start, end) in enumerate(atoms):
         if ch is None:
             continue
@@ -1044,9 +1065,11 @@ def _literal_refusal(target: str):
     return _literal_path_refusal(atoms) if _WINDOWS else None
 
 
-def _target_atoms(target: str) -> list:
+def _target_atoms(target: str, params=None) -> list:
     """`target` as the fire renders it: (character, start, end) per LITERAL character - `{{` renders one brace -
-    and (None, start, end) per hole, which renders any text (a lone brace fails the render: lint_line says so)."""
+    a KNOWN hole's (`tempemplator.known_value`: a constant, the project params alone) as the characters it renders,
+    each spanning the hole, and (None, start, end) per data hole, which renders any text (a lone brace fails the
+    render: lint_line says so)."""
     atoms = []
     for kind, start, end in tempemplator.brace_runs(target):
         if kind == "text":
@@ -1054,7 +1077,8 @@ def _target_atoms(target: str) -> list:
         elif kind == "brace":
             atoms.append((target[start], start, end))
         else:
-            atoms.append((None, start, end))
+            value = tempemplator.known_value(target[start + 1:end - 1], params)
+            atoms.extend([(None, start, end)] if value is None else [(ch, start, end) for ch in value])
     return atoms
 
 

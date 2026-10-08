@@ -870,6 +870,38 @@ def test_a_rule_is_one_of_the_sessions_rules():
             config.database_dir = original
 
 
+
+def test_an_entry_a_merge_or_an_omap_brought_is_placed_on_its_text():
+    """C-025 refute round 12 (#4): round 11 parsed such entries but placed their problems at the document's START -
+    offset 0, zero-width, not even labelled approximate (`!!omap`, a top-level merge): the round-trip tree marks none
+    of their keys. The composed tree marks every node - a merged key's nodes are the ones its anchor wrote: the
+    squiggle sits on the culprit there. And a node's anchor / tag (`a: &x |-`, `!!str |-`) made a literal block
+    approximate - no template colours: placed exactly now, coloured."""
+    cases = {"omap": ('!!omap\n- rows: [{label: "y"}]\n- note: "{$name:03D}"\n', ["note line 1"]),
+             "top merge": ('base: &b\n  note: "{$name:03D}"\n<<: *b\n', ["note line 1"]),
+             "merged sequence": ('a: &a {t: "{$name:03D}"}\nb: &b {t: "fine"}\n<<: [*a, *b]\n', ["t line 1"]),
+             "row merge": ('spawn_a: [&d {label: "{$name:03D}"}]\nspawn_b: [<<: *d]\n',
+                           ["spawn_a entry 1 label", "spawn_b entry 1 label"]),
+             "anchored block": ("a: &x |-\n  {$name:03D}\n", ["a line 1"]),
+             "tagged block": ("a: !!str |-\n  {$name:03D}\n", ["a line 1"]),
+             "anchor, comment, break": ("a: &x # the block\n  |-\n  {$name:03D}\n", ["a line 1"]),
+             "anchored quoted": ('a: &q "{$name:03D}"\n', ["a line 1"]),
+             "anchored key": ("&k a: |-\n  {$name:03D}\n", ["a line 1"]),
+             "tagged key": ("!!str a: |-\n  {$name:03D}\n", ["a line 1"]),
+             "alias": ("a: &x |-\n  {$name:03D}\nb: *x\n", ["a line 1", "b line 1"])}
+    for title, (text, labels) in cases.items():
+        doc = td.parse(text)
+        eq(doc.error, None, f"{title}: it loads")
+        placed = [p for p in td.place(doc, engine.lint(doc.templates)) if "'03D'" in p.message]
+        eq(sorted(p.label for p in placed), labels, f"{title}: each problem, labelled exactly")
+        for p in placed:
+            eq((p.start, text[p.start:p.end]), (text.index("03D"), "03D"), f"{title}: {p.label} on the culprit")
+        for name, entry in doc.entries.items():
+            eq(text[entry.key[0]:entry.key[1]], name, f"{title}: {name}'s key placed on its name")
+    for text in ("a: &x |-\n  {$name:03D}\n", "a: !!str |-\n  {$name:03D}\n"):
+        eq(_tagged(td.parse(text), "tp_spec"), ["03D"], f"{text!r}: the template colours")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("template_doc", [
@@ -900,4 +932,6 @@ if __name__ == "__main__":
         ("a_reload_discards_the_build_it_overtook", test_a_reload_discards_the_build_it_overtook),
         ("other_line_breaks_are_approximate", test_other_line_breaks_are_approximate),
         ("a_rule_is_one_of_the_sessions_rules", test_a_rule_is_one_of_the_sessions_rules),
+        ("an_entry_a_merge_or_an_omap_brought_is_placed_on_its_text",
+         test_an_entry_a_merge_or_an_omap_brought_is_placed_on_its_text),
     ]))

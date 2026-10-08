@@ -28,6 +28,7 @@ use_refs - src://pipeline5/language/tempemplator.py).
 """
 from __future__ import annotations
 
+import bisect
 import os
 import re
 import threading
@@ -177,13 +178,19 @@ def parse(text: str) -> Doc:
         tree = YAML().load(text)
     except Exception:  # noqa: BLE001 - the safe load passed; positions are a convenience
         tree = None
+    composed = _Composed(text)                                # what the round-trip tree leaves unmarked
     entries = {}
     for raw_name, body in templates.items():
         name = str(raw_name)
         key_line, key_col = _mark(tree, "key", raw_name)
-        key = (offset(key_line, key_col), offset(key_line, key_col) + len(name)) if key_line is not None else (0, 0)
+        if key_line is None:
+            key_line, key_col = composed.mark((raw_name,), "key")
+        at = _content_at(text, offset(key_line, key_col)) if key_line is not None else None   # (past an `&anchor`)
+        key = (at, at + len(name)) if at is not None else (0, 0)
         if isinstance(body, str):
             line, col = _mark(tree, "value", raw_name)
+            if line is None:
+                line, col = composed.mark((raw_name,), "value")
             scalar = _scalar(text, starts, line, col, body) if line is not None else None
             entries[name] = Entry(name, "text", key, body=scalar, text=body)
         elif isinstance(body, list):
@@ -191,11 +198,13 @@ def parse(text: str) -> Doc:
             items = _child(tree, raw_name)
             for number, spec in enumerate(body, start=1):
                 item = items[number - 1] if items is not None and number - 1 < len(items) else None
-                if not isinstance(spec, dict) or not hasattr(item, "lc"):
+                if not isinstance(spec, dict):
                     continue
                 for column, value in spec.items():
                     if isinstance(value, str):
-                        line, col = _mark(item, "value", column)
+                        line, col = _mark(item, "value", column) if hasattr(item, "lc") else (None, None)
+                        if line is None:
+                            line, col = composed.mark((raw_name, number, column), "value")
                         entry.value_text[(number, str(column))] = value
                         if line is not None:
                             entry.values[(number, str(column))] = _scalar(text, starts, line, col, value)
@@ -203,6 +212,78 @@ def parse(text: str) -> Doc:
         else:
             entries[name] = Entry(name, "other", key)
     return Doc(text, templates, entries)
+
+
+class _Composed:
+    """Positions from the COMPOSED node tree, for what the round-trip tree leaves unmarked: a key a YAML merge `<<`
+    or an `!!omap` brought (C-025 refute round 12 - such an entry's problems sat at the document's start, a
+    zero-width squiggle). A merged key's nodes are the ones its anchor wrote: placed there, on the text the template
+    IS. Composed once, on the first need."""
+
+    def __init__(self, text: str):
+        self.text, self.loader, self.root = text, None, None
+
+    def mark(self, path: tuple, part: str) -> tuple:
+        """(line, column) of template `path[0]`'s key / value - or, `path` = (template, item number, field), of a
+        row template item's field value; (None, None) when not found."""
+        if self.loader is None:
+            from ruamel.yaml import YAML
+            self.loader = YAML(typ="safe")
+            try:
+                self.root = self.loader.compose(self.text)
+            except Exception:  # noqa: BLE001 - the safe load passed; positions are a convenience
+                self.root = None
+        from ruamel.yaml.nodes import SequenceNode
+        node = self.root
+        for depth, step in enumerate(path):
+            if depth == 1:                                  # a row template's item (numbered from 1)
+                items = node.value if isinstance(node, SequenceNode) else []
+                if not 0 < step <= len(items):
+                    return None, None
+                node = items[step - 1]
+                continue
+            pair = self._pair(node, step)
+            if pair is None:
+                return None, None
+            if depth == len(path) - 1:
+                mark = (pair[0] if part == "key" else pair[1]).start_mark
+                return mark.line, mark.column
+            node = pair[1]
+        return None, None
+
+    def _pair(self, node, key):
+        """The (key node, value node) the safe loader keeps for `key` in a composed mapping - its LAST pair."""
+        found = None
+        for key_node, value_node in _node_pairs(node):
+            try:
+                loaded = self.loader.constructor.construct_object(key_node, deep=True)
+            except Exception:  # noqa: BLE001 - matched as written
+                loaded = getattr(key_node, "value", None)
+            if str(loaded) == str(key):
+                found = (key_node, value_node)
+        return found
+
+
+def _node_pairs(node, seen: frozenset = frozenset()) -> list:
+    """(key node, value node) of a composed mapping as the safe loader reads them, in order - the keys a merge `<<`
+    brings before the mapping's own (the LAST pair of a key is the one kept: an own key wins, and an earlier mapping
+    of a merged sequence over a later one) - and an `!!omap`'s one-pair mappings, in order."""
+    from ruamel.yaml.nodes import MappingNode, SequenceNode
+    if id(node) in seen:                                    # (a recursive alias)
+        return []
+    seen = seen | {id(node)}
+    if isinstance(node, SequenceNode):
+        return [pair for item in node.value for pair in _node_pairs(item, seen)]
+    if not isinstance(node, MappingNode):
+        return []
+    merged, own = [], []
+    for key, value in node.value:
+        if key.tag == "tag:yaml.org,2002:merge":
+            for source in reversed(value.value if isinstance(value, SequenceNode) else [value]):
+                merged.extend(_node_pairs(source, seen))
+        else:
+            own.append((key, value))
+    return merged + own
 
 
 def _child(tree, key):
@@ -282,6 +363,25 @@ def _quoted_chars(text: str, at: int, value: str):
 _OTHER_BREAKS = re.compile("[\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]")   # splitlines() breaks besides \n
 
 
+def _content_at(text: str, at: int) -> int:
+    """`at` moved past a node's properties - an anchor `&x`, a tag `!!str` / `!local` / `!<...>` - and what
+    separates them from its content (blanks, a comment, line breaks)."""
+    while text[at:at + 1] in ("&", "!"):
+        while at < len(text) and text[at] not in " \t\r\n":
+            at += 1
+        while True:
+            while text[at:at + 1] in (" ", "\t"):
+                at += 1
+            if text[at:at + 1] == "#":                      # a comment, to the line's end
+                while at < len(text) and text[at] not in "\r\n":
+                    at += 1
+            if text[at:at + 1] in ("\r", "\n"):
+                at += 2 if text.startswith("\r\n", at) else 1
+                continue
+            break
+    return at
+
+
 def _scalar(text: str, starts: list, line: int, col: int, value: str) -> Scalar:
     """The content position of the scalar whose value starts at (line, col) - approximate when its value
     holds a line break besides `\\n` (the renderer splits on every one; the view's lines would not)."""
@@ -293,8 +393,12 @@ def _scalar(text: str, starts: list, line: int, col: int, value: str) -> Scalar:
 
 def _scalar_at(text: str, starts: list, line: int, col: int, value: str) -> Scalar:
     """The content position of the scalar whose value starts at (line, col) - a block (`|` exact, `>`
-    folded), a quoted or a plain scalar."""
+    folded), a quoted or a plain scalar; past its anchor / tag (`&x |-`, `!!str |-` - both trees mark the node
+    there: it was placed approximately, C-025 refute round 12)."""
     at = starts[min(line, len(starts) - 1)] + col
+    content = _content_at(text, at)
+    if content != at:
+        at, line = content, bisect.bisect_right(starts, content) - 1
     lead = text[at:at + 1]
     if lead in ("|", ">"):                      # a block: content from the next line, at its indent
         pieces = value.split("\n")

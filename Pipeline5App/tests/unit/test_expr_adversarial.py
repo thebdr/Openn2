@@ -406,6 +406,36 @@ def test_a_replacement_reads_and_binds_as_the_rest_of_its_hole():
            f"{text}: data (an enclosing let's name / a table) - compiled clean, rendered")
 
 
+
+def test_params_replacements_are_the_ones_the_params_alone_give():
+    """C-025 refute round 12: the template builder judges a `regex_replace` replacement that reads the project params
+    ALONE with their value (every render passes re.sub that value) - the parser records each replacement it parses,
+    and `params_replacements` gives exactly those: `$_params` paths only (a guard, a let INSIDE the replacement, a
+    nested call included) - never one that also reads another field, a table, or a name an ENCLOSING let binds
+    (data), nor one inside a data function's row predicate (`$_params` there is the ROW's column), nor a constant
+    (the compile's - round 10). Each with its own span and its value."""
+    from pipeline5.language.expr.parser import params_replacements
+    cases = {'regex_replace($name, /^/, $_params.out_dir)': ["$_params.out_dir"],
+             'regex_replace($name, /x/, coalesce($_params.grp, "-"))': ['coalesce($_params.grp, "-")'],
+             'regex_replace($n, /(x)/, let(v := $_params.a; concat($v, "1")))': ['let(v := $_params.a; concat($v, "1"))'],
+             'regex_replace(regex_replace($n, /a/, $_params.p), /b/, $_params.q)': ["$_params.p", "$_params.q"],
+             'regex_replace($n, /x/, regex_replace($_params.a, /y/, $_params.b))':
+                 ["regex_replace($_params.a, /y/, $_params.b)", "$_params.b"],
+             'let(x := "1"; regex_replace($n, /x/, $_params.a))': ["$_params.a"],
+             'let(y := regex_replace($n, /x/, $_params.b); $y)': ["$_params.b"],
+             'regex_replace($n, /x/, $sep)': [],
+             'regex_replace($n, /x/, concat($_params.a, $kind))': [],
+             'let(s := "-"; regex_replace($n, /x/, concat($_params.a, $s)))': [],
+             'regex_replace($n, /x/, concat($_params.a, lookup(t, k, "1", v)))': [],
+             'count(t, regex_replace($c, /x/, $_params.g) = "1")': [],
+             'regex_replace($n, /x/, "y")': []}
+    for text, expected in cases.items():
+        eq(sorted(text[s:e] for s, e in (found.span for found in params_replacements(text))), sorted(expected), text)
+    found = params_replacements('regex_replace($name, /x/, coalesce($_params.grp, "-"))')
+    eq([found[0].value({"_params": {"grp": "g"}}), found[0].value({"_params": {}})], ["g", "-"], "its value")
+    eq(params_replacements("regex_replace("), None, "unparseable: None")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("expr_adversarial", [
@@ -439,4 +469,6 @@ if __name__ == "__main__":
         ("a_replacement_re_sub_refuses_is_a_located_error", test_a_replacement_re_sub_refuses_is_a_located_error),
         ("a_replacement_reads_and_binds_as_the_rest_of_its_hole",
          test_a_replacement_reads_and_binds_as_the_rest_of_its_hole),
+        ("params_replacements_are_the_ones_the_params_alone_give",
+         test_params_replacements_are_the_ones_the_params_alone_give),
     ]))

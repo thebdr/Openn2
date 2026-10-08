@@ -1084,9 +1084,10 @@ def test_raw_exceptions_become_findings():
             with open(os.path.join(out_root, "blocker"), "w", encoding="utf-8") as handle:
                 handle.write("x")
             rule = _rule(action="file", target="blocker/{$name}.txt", template="txt")
-            _, findings = engine.fire("after_300", _db(), rules=[rule], templates={"txt": "t"},
-                                      params={}, files_root=out_root)
+            database, findings = engine.fire("after_300", _db(), rules=[rule], templates={"txt": "t"},
+                                             params={}, files_root=out_root)
             eq([x.type for x in findings], ["rx_file_write"], "an unwritable target is rx_file_write")
+            eq(_log(database), [("after_300", "r1", 2, 0, "rx_file_write")], "…nothing created (C-024 round 30)")
             if os.name == "nt":                          # the refuter's case: a quoted Siemens tag
                 rule = _rule(action="file", target='rx/"{$name}".scl', template="txt")
                 _, findings = engine.fire("after_300", _db(), rules=[rule], templates={"txt": "t"},
@@ -1800,6 +1801,60 @@ def test_a_typed_field_name_is_the_templates_problem():
     _sandboxed(body)()
 
 
+
+def test_an_os_refused_write_keeps_the_true_partial_count():
+    """C-024 refute round 30 (#1): `created` is counted as it goes - for the OS's own refusal of a write too (a file
+    held open, a permission, a FOLDER where the file goes), the one failure a file action meets after the render:
+    row 2 of 3 refused, the audit says 1 created (the line row 1 wrote) and only that file exists; row 1 refused, 0.
+    A count moved above the write ("count as rendered, then write" - as the dry fire counts) claimed a refused line."""
+    def body(sandbox):
+        with tempfile.TemporaryDirectory() as out_root:
+            for folder, name, created, files in (("second", "D2.txt", 1, ["D1.txt"]), ("first", "D1.txt", 0, [])):
+                os.makedirs(os.path.join(out_root, folder, name))     # that row's target: a folder - open() refuses
+                rule = _rule(action="file", condition="", target=folder + "/{$name}.txt", template="txt")
+                database, findings = engine.fire("after_300", _db(), rules=[rule], templates={"txt": "line {$name}"},
+                                                 params={}, files_root=out_root)
+                eq([x.type for x in findings], ["rx_file_write"], f"{folder}: the OS refuses {name}")
+                eq(_log(database), [("after_300", "r1", 3, created, "rx_file_write")],
+                   f"{folder}: …{created} created - the lines written before it")
+                folder_path = os.path.join(out_root, folder)
+                eq(sorted(n for n in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, n))), files,
+                   f"{folder}: …and only those files exist")
+            with open(os.path.join(out_root, "second", "D1.txt"), encoding="utf-8") as handle:
+                eq(handle.read(), "line D1\n", "…holding their lines")
+    _sandboxed(body)()
+
+
+def test_a_lone_unfired_rule_is_recorded_by_the_hooks_that_fire():
+    """C-024 refute round 30 (#2): an unfired hook is a rule-INDEX problem - every hook's business, rendered at each
+    fire, RECORDED once - but it was pinned only beside an active rule, whose fire records whatever it holds. The
+    ONLY rule on a typo'd `after_30`: before_300 defers it (a Deferred carrying the finding), the settle and
+    after_300 record it - one rx_unfired_hook row in validation_issues, in memory and on disk; the rule never runs."""
+    def body(sandbox):
+        src = Table("src", columns=["uid", "name"], key_columns=["name"])
+        src.add(name="D1")
+        database = Database([src])
+        rules = [_rule(name="belts", fire_when="after_30", action="file", condition="", target="rx/b.txt",
+                       template="t")]
+        hooks = ("before_300", "after_300")
+        with tempfile.TemporaryDirectory() as out_root:
+            deferred, rendered = engine.fire("before_300", None, rules=rules, templates={"t": "x"}, params={},
+                                             files_root=out_root, hooks=hooks)
+            eq([(x.type, x.location) for x in rendered], [("rx_unfired_hook", "belts")], "rendered at before_300")
+            ok(isinstance(deferred, engine.Deferred), f"…and deferred to the settle (got {type(deferred).__name__})")
+            eq(engine.settle(database, deferred), [], "the settle saves it")
+            database, rendered = engine.fire("after_300", database, rules=rules, templates={"t": "x"}, params={},
+                                             files_root=out_root, hooks=hooks)
+            eq([(x.type, x.location) for x in rendered], [("rx_unfired_hook", "belts")], "rendered at after_300")
+            eq([(r["type"], r["location"]) for r in database["validation_issues"]], [("rx_unfired_hook", "belts")],
+               "recorded ONCE")
+            with open(os.path.join(sandbox, "validation_issues.csv"), encoding="utf-8", newline="") as handle:
+                eq([(r["type"], r["location"]) for r in csv.DictReader(handle)], [("rx_unfired_hook", "belts")],
+                   "…on disk too")
+            eq(os.listdir(out_root), [], "the rule never ran")
+    _sandboxed(body)()
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("chain_reactions", [
@@ -1873,4 +1928,7 @@ if __name__ == "__main__":
         ("rules_fire_in_csv_order_and_only_their_hook", test_rules_fire_in_csv_order_and_only_their_hook),
         ("builtin_config_ships_empty_rules", test_builtin_config_ships_empty_rules),
         ("a_typed_field_name_is_the_templates_problem", test_a_typed_field_name_is_the_templates_problem),
+        ("an_os_refused_write_keeps_the_true_partial_count", test_an_os_refused_write_keeps_the_true_partial_count),
+        ("a_lone_unfired_rule_is_recorded_by_the_hooks_that_fire",
+         test_a_lone_unfired_rule_is_recorded_by_the_hooks_that_fire),
     ]))
