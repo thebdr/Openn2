@@ -1,0 +1,7 @@
+Diag Cabinet,Diag Bit,DevType,Index,Type,Address,ID,Desc L1,Desc L2,Diag Desc,Functional unit,Location,Device,Drawing name,Sheet,IP,PnName,TsRef,PLC_Binding
+011,04,Safety Encoder Failure,0001,A,I101.6,,SAFETY ENCODER FAILURE PHOTOCELL 1,,SAFETY ENCODER FAILURE =S1+PC1.CC1-X81001,=S1,+PC1.CC1,-X81001,8FVX_P1003,810,,,,"""04_SPEED"".""Safety Encoder 0001 Healthy [ =S1+PC1.CC1-X81001 ]"""
+011,05,Safety Encoder Failure,0002,A,I1101.6,,SAFETY ENCODER FAILURE PHOTOCELL 1,,SAFETY ENCODER FAILURE =S2+PC2.CC1-X81001,=S2,+PC2.CC1,-X81001,8FVX_P1003,810,,,,"""04_SPEED"".""Safety Encoder 0002 Healthy [ =S2+PC2.CC1-X81001 ]"""
+010,00,Safety Door Alarm - Not Properly Closed,0001,A,I120.0,,SAFETY DOOR OPEN CH1,,SAFETY DOOR OPEN =S1+SG1-B1,=S1,+SG1,-B1,8FVX_P1003,815,,,,"""07_DOOR"".""Door Alarm [ =S1+SG1-B1 ]"""
+010,09,Safety Door Alarm - Not Properly Closed,0002,A,I120.2,,SAFETY DOOR OPEN CH1,,SAFETY DOOR OPEN =S1+SG2-B1,=S1,+SG2,-B1,8FVX_P1003,815,,,,"""07_DOOR"".""Door Alarm [ =S1+SG2-B1 ]"""
+010,10,Safety Door Alarm - Not Properly Closed,0003,A,I1120.0,,SAFETY DOOR OPEN CH1,,SAFETY DOOR OPEN =S2+SG3-B1,=S2,+SG3,-B1,8FVX_P1003,815,,,,"""07_DOOR"".""Door Alarm [ =S2+SG3-B1 ]"""
+010,11,Safety Door Alarm - Not Properly Closed,0004,A,I1120.2,,SAFETY DOOR OPEN CH1,,SAFETY DOOR OPEN =S2+SG4-B1,=S2,+SG4,-B1,8FVX_P1003,815,,,,"""07_DOOR"".""Door Alarm [ =S2+SG4-B1 ]"""

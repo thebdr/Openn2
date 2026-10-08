@@ -1,0 +1,12 @@
+uid,db_name,prog_lang,memory_layout,opc_ua,webserver,only_load_memory,write_protected,retain_reserve,memory_reserve
+54643706d2,DiagnosticTags,DB,Optimized,true,true,false,false,false,
+7cc5b373ce,00_Commissioning,F_DB,Optimized,false,true,false,false,false,
+0c37b11845,01_Pushbutton,F_DB,Optimized,false,true,false,false,false,
+fdc856df7f,03_FDBACK,F_DB,Optimized,false,true,false,false,false,
+f3eef22347,03_FDBACK_RAW,F_DB,Optimized,false,true,false,false,false,
+91069089ce,04_SPEED,F_DB,Optimized,false,true,false,false,false,
+a3a91ebc7c,07_DOOR,F_DB,Optimized,false,true,false,false,false,
+b67318dccf,PROFINET_NODES_ALARM,DB,Optimized,true,true,false,false,false,
+fe6effd452,PROFINET_NODES_WARNING,DB,Optimized,true,true,false,false,false,
+89df8b6191,02_COM,F_DB,Optimized,false,true,false,false,false,
+a3240471ca,05_EM_STATE,F_DB,Optimized,false,true,false,false,false,

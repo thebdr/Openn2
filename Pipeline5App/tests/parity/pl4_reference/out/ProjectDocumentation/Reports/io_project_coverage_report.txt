@@ -1,0 +1,22 @@
+PIPELINE COVERAGE REPORT  (phase 910)
+====================================================
+Staged rows: 269   (signals 115, raw I/O channels 148, structural 6)
+Source: the SSOT tables (the BuilderData exports are their projection).
+
+Stage coverage (rows landing in each output):
+  400 interfaces     75
+  510 I/O tags       98
+  520 data blocks    37
+  600 diagnosis      73
+  700 hardware      261
+  800 software       61
+
+ORPHAN  (a signal that lands in no output): 0
+  -- none: every staged signal lands in at least one output --
+
+UNPLACED  (an output references a generated-DB member that was never created): 0
+  -- none: every emitted DB-member reference resolves to an actual member --
+
+Pipeline-generated data blocks: 00_Commissioning, 01_Pushbutton, 02_COM, 03_FDBACK, 03_FDBACK_RAW, 04_SPEED, 05_EM_STATE, 07_DOOR, DiagnosticTags, PROFINET_NODES_ALARM, PROFINET_NODES_WARNING
+
+Per-signal detail -> io_project_coverage_report.csv

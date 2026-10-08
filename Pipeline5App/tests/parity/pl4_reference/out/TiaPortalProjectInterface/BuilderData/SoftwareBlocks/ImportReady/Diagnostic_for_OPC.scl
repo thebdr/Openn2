@@ -1,0 +1,438 @@
+﻿FUNCTION "06_Diagnostic for OPC" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+	REGION =S1+MC1.CC1
+    "S1.CABINET000.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET000.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET000.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET000.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET000.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET000.STATE");
+    "S1.CABINET000.ALARM2"(
+        IN_29 := "PROFINET_NODES_ALARM"."n0006-mc1-cc1-k66201 192.168.50.6",
+        ML_29 := TRUE,
+        FL_29 := false,
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET000.ALARM2"
+    );
+    "S1.CABINET000.WARNING2"(
+        IN_30 := "PROFINET_NODES_WARNING"."n0010-mc1-cc1-k66001 192.168.50.10",
+        ML_30 := TRUE,
+        FL_30 := false,
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET000.WARNING2"
+    );
+	END_REGION
+
+	REGION =S1+MS1.CC1
+    "S1.CABINET001.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET001.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET001.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET001.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET001.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET001.STATE");
+    "S1.CABINET001.ALARM2"(
+        IN_30 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        ML_30 := TRUE,
+        FL_30 := false,
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET001.ALARM2"
+    );
+    "S1.CABINET001.ALARM1"(
+        IN_00 := "CIRCUIT BREAKER TRIPPED 400V INDUCTION LINE GROUP IN1.CC1 [ =S1+MS1.CC1-F09001 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_01 := "CIRCUIT BREAKER TRIPPED 400V INDUCTION LINE GROUP IN2.CC1 [ =S1+MS1.CC1-F09002 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_02 := "CIRCUIT BREAKER TRIPPED 400V UPSTREAM CABINET UL1.CC1 [ =S1+MS1.CC1-F09003 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_03 := "CIRCUIT BREAKER TRIPPED 400V UPSTREAM CABINET UL2.CC1 [ =S1+MS1.CC1-F09004 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_04 := "CIRCUIT BREAKER TRIPPED 400V  CHUTE CABINET DL1.CC1 [ =S1+MS1.CC1-F09005 ]",
+        ML_04 := FALSE,
+        FL_04 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_05 := "CIRCUIT BREAKER TRIPPED 400V  CHUTE CABINET DL2.CC1 [ =S1+MS1.CC1-F09101 ]",
+        ML_05 := FALSE,
+        FL_05 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_06 := "CIRCUIT BREAKER TRIPPED 400V  CHUTE CABINET DL2.CC1 [ =S1+MS1.CC1-F09102 ]",
+        ML_06 := FALSE,
+        FL_06 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET001.ALARM1"
+    );
+	END_REGION
+
+	REGION =S1+IN1.CC1
+    "S1.CABINET002.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET002.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET002.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET002.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET002.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET002.STATE");
+    "S1.CABINET002.WARNING1"(
+        IN_00 := "CIRCUIT BREAKER TRIPPED POWER INFEED 400V SAFETY IN1.CC1 [ =S1+IN1.CC1-F30001 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_01 := "POWER SUPPLY UNIT FAILURE IN1.CC1 [ =S1+IN1.CC1-T30001 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_02 := "CIRCUIT BREAKER TRIPPED POWER SUPPLY 24V SAFETY AND I/O  IN1.CC1 [ =S1+IN1.CC1-F30102 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_03 := "CIRCUIT BREAKER TRIPPED POWER SUPPLY 24V SWITCH IN1.CC1 [ =S1+IN1.CC1-F30101 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_04 := "PROFINET SWITCH FAULT  [ =S1+IN1.CC1-K60001 ]",
+        ML_04 := TRUE,
+        FL_04 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET002.WARNING1"
+    );
+	END_REGION
+
+	REGION =S1+IN2.CC1
+    "S1.CABINET003.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET003.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET003.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET003.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET003.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET003.STATE");
+    "S1.CABINET003.ALARM1"(
+        IN_00 := "CIRCUIT BREAKER TRIPPED POWER INFEED 400V SAFETY IN2.CC1 [ =S1+IN2.CC1-F30001 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_01 := "POWER SUPPLY UNIT FAILURE IN2.CC1 [ =S1+IN2.CC1-T30001 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_02 := "CIRCUIT BREAKER TRIPPED POWER SUPPLY 24V SAFETY AND I/O  IN2.CC1 [ =S1+IN2.CC1-F30102 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_03 := "CIRCUIT BREAKER TRIPPED POWER SUPPLY 24V SWITCH IN2.CC1 [ =S1+IN2.CC1-F30101 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_04 := "PROFINET SWITCH FAULT  [ =S1+IN2.CC1-K60001 ]",
+        ML_04 := TRUE,
+        FL_04 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET003.ALARM1"
+    );
+	END_REGION
+
+	REGION =S1+PC1.CC1
+    "S1.CABINET004.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET004.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET004.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET004.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET004.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET004.STATE");
+    "S1.CABINET004.ALARM2"(
+        IN_30 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        ML_30 := TRUE,
+        FL_30 := false,
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET004.ALARM2"
+    );
+    "S1.CABINET004.ALARM1"(
+        IN_00 := "03_FDBACK"."Contactor Feedback Error [ =S1+PC1.CC1-Q66401..2 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_01 := "03_FDBACK"."Contactor Feedback Error [ =S1+PC1.CC1-X80201 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_02 := "03_FDBACK"."Contactor Feedback Error [ =S1+PC1.CC1-Q80001 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET004.ALARM1"
+    );
+	END_REGION
+
+	REGION =S2+MS2.CC1
+    "S1.CABINET005.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET005.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET005.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET005.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET005.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET005.STATE");
+    "S1.CABINET005.ALARM2"(
+        IN_30 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        ML_30 := TRUE,
+        FL_30 := false,
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET005.ALARM2"
+    );
+    "S1.CABINET005.ALARM1"(
+        IN_00 := "CIRCUIT BREAKER TRIPPED 400V INDUCTION LINE GROUP IN1.CC1 [ =S2+MS2.CC1-F09001 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_01 := "CIRCUIT BREAKER TRIPPED 400V INDUCTION LINE GROUP IN2.CC1 [ =S2+MS2.CC1-F09002 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_02 := "CIRCUIT BREAKER TRIPPED 400V UPSTREAM CABINET UL1.CC1 [ =S2+MS2.CC1-F09003 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_03 := "CIRCUIT BREAKER TRIPPED 400V UPSTREAM CABINET UL2.CC1 [ =S2+MS2.CC1-F09004 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_04 := "CIRCUIT BREAKER TRIPPED 400V  CHUTE CABINET DL1.CC1 [ =S2+MS2.CC1-F09005 ]",
+        ML_04 := FALSE,
+        FL_04 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_05 := "CIRCUIT BREAKER TRIPPED 400V  CHUTE CABINET DL2.CC1 [ =S2+MS2.CC1-F09101 ]",
+        ML_05 := FALSE,
+        FL_05 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_06 := "CIRCUIT BREAKER TRIPPED 400V  CHUTE CABINET DL2.CC1 [ =S2+MS2.CC1-F09102 ]",
+        ML_06 := FALSE,
+        FL_06 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET005.ALARM1"
+    );
+	END_REGION
+
+	REGION =S2+IN3.CC1
+    "S1.CABINET006.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET006.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET006.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET006.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET006.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET006.STATE");
+    "S1.CABINET006.WARNING1"(
+        IN_00 := "CIRCUIT BREAKER TRIPPED POWER INFEED 400V SAFETY IN1.CC1 [ =S2+IN3.CC1-F30001 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_01 := "POWER SUPPLY UNIT FAILURE IN1.CC1 [ =S2+IN3.CC1-T30001 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_02 := "CIRCUIT BREAKER TRIPPED POWER SUPPLY 24V SAFETY AND I/O  IN1.CC1 [ =S2+IN3.CC1-F30102 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_03 := "CIRCUIT BREAKER TRIPPED POWER SUPPLY 24V SWITCH IN1.CC1 [ =S2+IN3.CC1-F30101 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_04 := "PROFINET SWITCH FAULT  [ =S2+IN3.CC1-K60001 ]",
+        ML_04 := TRUE,
+        FL_04 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET006.WARNING1"
+    );
+	END_REGION
+
+	REGION =S2+IN4.CC1
+    "S1.CABINET007.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET007.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET007.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET007.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET007.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET007.STATE");
+    "S1.CABINET007.ALARM1"(
+        IN_00 := "CIRCUIT BREAKER TRIPPED POWER INFEED 400V SAFETY IN2.CC1 [ =S2+IN4.CC1-F30001 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_01 := "POWER SUPPLY UNIT FAILURE IN2.CC1 [ =S2+IN4.CC1-T30001 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_02 := "CIRCUIT BREAKER TRIPPED POWER SUPPLY 24V SAFETY AND I/O  IN2.CC1 [ =S2+IN4.CC1-F30102 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_03 := "CIRCUIT BREAKER TRIPPED POWER SUPPLY 24V SWITCH IN2.CC1 [ =S2+IN4.CC1-F30101 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_04 := "PROFINET SWITCH FAULT  [ =S2+IN4.CC1-K60001 ]",
+        ML_04 := TRUE,
+        FL_04 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET007.ALARM1"
+    );
+	END_REGION
+
+	REGION =S2+PC2.CC1
+    "S1.CABINET008.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET008.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET008.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET008.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET008.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET008.STATE");
+    "S1.CABINET008.ALARM2"(
+        IN_30 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        ML_30 := TRUE,
+        FL_30 := false,
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET008.ALARM2"
+    );
+    "S1.CABINET008.ALARM1"(
+        IN_00 := "03_FDBACK"."Contactor Feedback Error [ =S2+PC2.CC1-Q66401..2 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        IN_01 := "03_FDBACK"."Contactor Feedback Error [ =S2+PC2.CC1-X80201 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        IN_02 := "03_FDBACK"."Contactor Feedback Error [ =S2+PC2.CC1-Q80001 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET008.ALARM1"
+    );
+	END_REGION
+
+	REGION =S1+FieldIODevices_1
+    "S1.CABINET009.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET009.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET009.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET009.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET009.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET009.STATE");
+    "S1.CABINET009.ALARM2"(
+        IN_28 := "PROFINET_NODES_ALARM"."n0031-sm73-xns1 192.168.51.31",
+        ML_28 := TRUE,
+        FL_28 := false,
+        IN_30 := "PROFINET_NODES_ALARM"."n0031-sm72-xns1 192.168.50.31",
+        ML_30 := TRUE,
+        FL_30 := false,
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET009.ALARM2",
+        Tristate_DW => "DiagnosticTags"."S1.CABINET009.WARNING2"
+    );
+	END_REGION
+
+	REGION =S1+SafetyDoors_1
+    "S1.CABINET010.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET010.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET010.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET010.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET010.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET010.STATE");
+    "S1.CABINET010.ALARM1"(
+        IN_00 := "07_DOOR"."Door Alarm [ =S1+SG1-B1 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_01 := "07_DOOR"."Door Closed SAFE_STATE [ =S1+SG1-B1 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_02 := "07_DOOR"."Door Alarm [ =S1+SG1-B1 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_03 := "07_DOOR"."Door Closed SAFE_STATE [ =S1+SG2-B1 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_04 := "07_DOOR"."Door Alarm [ =S1+SG2-B1 ]",
+        ML_04 := FALSE,
+        FL_04 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_05 := "07_DOOR"."Door Closed SAFE_STATE [ =S2+SG3-B1 ]",
+        ML_05 := FALSE,
+        FL_05 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        IN_06 := "07_DOOR"."Door Alarm [ =S2+SG3-B1 ]",
+        ML_06 := FALSE,
+        FL_06 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        IN_07 := "07_DOOR"."Door Closed SAFE_STATE [ =S2+SG4-B1 ]",
+        ML_07 := FALSE,
+        FL_07 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        IN_08 := "07_DOOR"."Door Alarm [ =S2+SG4-B1 ]",
+        ML_08 := FALSE,
+        FL_08 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        IN_09 := "07_DOOR"."Door Alarm [ =S1+SG2-B1 ]",
+        ML_09 := FALSE,
+        FL_09 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_10 := "07_DOOR"."Door Alarm [ =S2+SG3-B1 ]",
+        ML_10 := FALSE,
+        FL_10 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        IN_11 := "07_DOOR"."Door Alarm [ =S2+SG4-B1 ]",
+        ML_11 := FALSE,
+        FL_11 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET010.ALARM1",
+        Tristate_DW => "DiagnosticTags"."S1.CABINET010.WARNING1"
+    );
+	END_REGION
+
+	REGION =S1+SafetyEncoders_1
+    "S1.CABINET011.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET011.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET011.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET011.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET011.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET011.STATE");
+    "S1.CABINET011.ALARM1"(
+        IN_00 := "04_SPEED"."Safety Encoder 0001 Sensor 1 Healthy [ =S1+PC1.CC1-X81001 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_01 := "04_SPEED"."Safety Encoder 0001 Sensor 2 Healthy [ =S1+PC1.CC1-X81001 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_02 := "04_SPEED"."Safety Encoder 0002 Sensor 1 Healthy [ =S2+PC2.CC1-X81001 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        IN_03 := "04_SPEED"."Safety Encoder 0002 Sensor 2 Healthy [ =S2+PC2.CC1-X81001 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        IN_04 := "04_SPEED"."Safety Encoder 0001 Healthy [ =S1+PC1.CC1-X81001 ]",
+        ML_04 := FALSE,
+        FL_04 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_05 := "04_SPEED"."Safety Encoder 0002 Healthy [ =S2+PC2.CC1-X81001 ]",
+        ML_05 := FALSE,
+        FL_05 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET011.ALARM1",
+        Tristate_DW => "DiagnosticTags"."S1.CABINET011.WARNING1"
+    );
+	END_REGION
+
+	REGION =S1+SafetyBreakers_1
+    "S1.CABINET012.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET012.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET012.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET012.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET012.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET012.STATE");
+    "S1.CABINET012.ALARM1"(
+        IN_00 := "01_Pushbutton"."Safety Breaker [ =S1+MS1.CC1-Q67001 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_01 := "01_Pushbutton"."Safety Breaker [ =S2+MS2.CC1-Q67001 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET012.ALARM1",
+        Tristate_DW => "DiagnosticTags"."S1.CABINET012.WARNING1"
+    );
+	END_REGION
+
+	REGION =S1+FireAlarm_1
+    "S1.CABINET013.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET013.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET013.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET013.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET013.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET013.STATE");
+    "S1.CABINET013.ALARM1"(
+        IN_00 := "Fire Alarm [ =S1+MS1.CC1-X40001 ] F1/2",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_01 := "Fire Alarm [ =S2+MS2.CC1-X40001 ] F1/2",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET013.ALARM1",
+        Tristate_DW => "DiagnosticTags"."S1.CABINET013.WARNING1"
+    );
+	END_REGION
+
+	REGION =S1+EmergencyPushButtons_1
+    "S1.CABINET014.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET014.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET014.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET014.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET014.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET014.STATE");
+    "S1.CABINET014.ALARM1"(
+        IN_00 := "01_Pushbutton"."Emergency Push Button [ =S1+MS1.CC1-S67001 ]",
+        ML_00 := FALSE,
+        FL_00 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_01 := "01_Pushbutton"."Emergency Push Button [ =S1+PC1.CC1-X80101 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0012-pc1-cc1-k65001 192.168.50.12",
+        IN_02 := "01_Pushbutton"."Emergency Push Button [ =S2+MS2.CC1-S67001 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        IN_03 := "01_Pushbutton"."Emergency Push Button [ =S2+PC2.CC1-X80101 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0012-pc2-cc1-k65001 192.168.51.12",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET014.ALARM1",
+        Tristate_DW => "DiagnosticTags"."S1.CABINET014.WARNING1"
+    );
+	END_REGION
+
+	REGION =S1+EmergencyAreas_1
+    "S1.CABINET015.STATE"(ALARM1 := "DiagnosticTags"."S1.CABINET015.ALARM1",
+        ALARM2 := "DiagnosticTags"."S1.CABINET015.ALARM2",
+        WARNING1 := "DiagnosticTags"."S1.CABINET015.WARNING1",
+        WARNING2 := "DiagnosticTags"."S1.CABINET015.WARNING2",
+        STATE := "DiagnosticTags"."S1.CABINET015.STATE");
+    "S1.CABINET015.ALARM1"(
+        IN_01 := "Emergency Status Feedback Area  [ =S1+MS1.CC1-Q66501 ]",
+        ML_01 := FALSE,
+        FL_01 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_02 := "Emergency Status Feedback Area  [ =S1+MS1.CC1-Q66502 ]",
+        ML_02 := FALSE,
+        FL_02 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_03 := "Emergency Status Feedback Area  [ =S1+MS1.CC1-Q66503 ]",
+        ML_03 := FALSE,
+        FL_03 := "PROFINET_NODES_ALARM"."n0005-ms1-cc1-k65001 192.168.50.5",
+        IN_04 := "Emergency Status Feedback Area  [ =S2+MS2.CC1-Q66501 ]",
+        ML_04 := FALSE,
+        FL_04 := "PROFINET_NODES_ALARM"."n0005-ms2-cc1-k65001 192.168.51.5",
+        Alarm_Warning_DW := "DiagnosticTags"."S1.CABINET015.ALARM1",
+        Tristate_DW => "DiagnosticTags"."S1.CABINET015.WARNING1"
+    );
+	END_REGION
+END_FUNCTION
+

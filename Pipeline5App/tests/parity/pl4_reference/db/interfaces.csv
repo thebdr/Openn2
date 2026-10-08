@@ -1,0 +1,3 @@
+uid,instance,machine_type,interface_id,is_diag,base_address,base_node,device,ip,template_sheet,source
+272c7bbac8,SORTER-01,SORTER,01,false,10000,,-K66201,,SORTER,NET SAFETY 50!O7
+3041593271,SORTER+DIAG-02,SORTER,02,true,20000,,-K66201,,SORTER,NET SAFETY 50!O8

@@ -1,0 +1,947 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V18" />
+  <DocumentInfo>
+    <Created>2026-06-16T05:09:47.0620127Z</Created>
+    <ExportSetting>WithDefaults</ExportSetting>
+    <InstalledProducts>
+      <Product>
+        <DisplayName>Totally Integrated Automation Portal</DisplayName>
+        <DisplayVersion>V18 Update 5</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>TIA Portal Openness</DisplayName>
+        <DisplayVersion>V18 Update 5</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>TIA Portal Version Control Interface</DisplayName>
+        <DisplayVersion>V18</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>SINAMICS Startdrive Advanced</DisplayName>
+        <DisplayVersion>V18 SP2 Update 1</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>SINAMICS Startdrive G110M, G120, G120C, G120D, G120P, G115D</DisplayName>
+        <DisplayVersion>V18 SP2 Update 1</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>SINAMICS Startdrive G130, G150, S120, S150, SINAMICS MV, S210, G220, S200</DisplayName>
+        <DisplayVersion>V18 SP2 Update 1</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>STEP 7 Professional</DisplayName>
+        <DisplayVersion>V18 Update 5</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>STEP 7 Safety</DisplayName>
+        <DisplayVersion>V18</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>WinCC Advanced / Unified PC</DisplayName>
+        <DisplayVersion>V18 Update 5</DisplayVersion>
+      </Product>
+    </InstalledProducts>
+  </DocumentInfo>
+  <SW.Blocks.FC ID="0">
+    <AttributeList>
+      <AutoNumber>true</AutoNumber>
+      <HeaderAuthor />
+      <HeaderFamily />
+      <HeaderName />
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input" />
+  <Section Name="Output" />
+  <Section Name="InOut" />
+  <Section Name="Temp" />
+  <Section Name="Constant" />
+  <Section Name="Return">
+    <Member Name="Ret_Val" Datatype="Void" Accessibility="Public" />
+  </Section>
+</Sections></Interface>
+      <IsIECCheckEnabled>false</IsIECCheckEnabled>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>03_Zone Cumulative</Name>
+      <Namespace />
+      <Number>19</Number>
+      <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+      <UDABlockProperties />
+      <UDAEnableTagReadback>false</UDAEnableTagReadback>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>v1.0 First Emission</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S1+MS1.CC1-S67001 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S1+PC1.CC1-X80101 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="23">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S2+MS2.CC1-S67001 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="24">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S2+PC2.CC1-X80101 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="25">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 1 PB" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="26">
+                <TemplateValue Name="Card" Type="Cardinality">4</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="27" />
+            </Parts>
+            <Wires>
+              <Wire UId="28">
+                <IdentCon UId="21" />
+                <NameCon UId="26" Name="in1" />
+              </Wire>
+              <Wire UId="29">
+                <IdentCon UId="22" />
+                <NameCon UId="26" Name="in2" />
+              </Wire>
+              <Wire UId="30">
+                <IdentCon UId="23" />
+                <NameCon UId="26" Name="in3" />
+              </Wire>
+              <Wire UId="31">
+                <IdentCon UId="24" />
+                <NameCon UId="26" Name="in4" />
+              </Wire>
+              <Wire UId="32">
+                <NameCon UId="26" Name="out" />
+                <NameCon UId="27" Name="in" />
+              </Wire>
+              <Wire UId="33">
+                <IdentCon UId="25" />
+                <NameCon UId="27" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 1 PB - AREA 1 (Sorter)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="8" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="03_FDBACK" />
+                  <Component Name="Contactor Feedback Error [ =S1+PC1.CC1-Q66401..2 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="03_FDBACK" />
+                  <Component Name="Contactor Feedback Error [ =S1+PC1.CC1-X80201 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="23">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 1 FDB" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="24">
+                <TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="25" />
+            </Parts>
+            <Wires>
+              <Wire UId="26">
+                <IdentCon UId="21" />
+                <NameCon UId="24" Name="in1" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="in2" />
+              </Wire>
+              <Wire UId="28">
+                <NameCon UId="24" Name="out" />
+                <NameCon UId="25" Name="in" />
+              </Wire>
+              <Wire UId="29">
+                <IdentCon UId="23" />
+                <NameCon UId="25" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="9" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="10" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="11" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="12" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 1 FDB - AREA 1 (Sorter)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="13" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Safety Breaker [ =S1+MS1.CC1-Q67001 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 1 SAFETY_BREAKERS" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="23">
+                <TemplateValue Name="Card" Type="Cardinality">1</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="24" />
+            </Parts>
+            <Wires>
+              <Wire UId="25">
+                <IdentCon UId="21" />
+                <NameCon UId="23" Name="in1" />
+              </Wire>
+              <Wire UId="26">
+                <NameCon UId="23" Name="out" />
+                <NameCon UId="24" Name="in" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="14" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="15" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="16" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="17" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 1 SAFETY_BREAKERS - AREA 1 (Sorter)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="18" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="07_DOOR" />
+                  <Component Name="Door Closed SAFE_STATE [ =S1+SG1-B1 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="07_DOOR" />
+                  <Component Name="Door Closed SAFE_STATE [ =S1+SG2-B1 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="23">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 1 DOORS" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="24">
+                <TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="25" />
+            </Parts>
+            <Wires>
+              <Wire UId="26">
+                <IdentCon UId="21" />
+                <NameCon UId="24" Name="in1" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="in2" />
+              </Wire>
+              <Wire UId="28">
+                <NameCon UId="24" Name="out" />
+                <NameCon UId="25" Name="in" />
+              </Wire>
+              <Wire UId="29">
+                <IdentCon UId="23" />
+                <NameCon UId="25" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="19" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="20" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="21" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="22" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 1 DOORS - AREA 1 (Sorter)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="23" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S1+MS1.CC1-S67001 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S2+MS2.CC1-S67001 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="23">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S2+PC2.CC1-X80101 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="24">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 2 PB" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="25">
+                <TemplateValue Name="Card" Type="Cardinality">3</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="26" />
+            </Parts>
+            <Wires>
+              <Wire UId="27">
+                <IdentCon UId="21" />
+                <NameCon UId="25" Name="in1" />
+              </Wire>
+              <Wire UId="28">
+                <IdentCon UId="22" />
+                <NameCon UId="25" Name="in2" />
+              </Wire>
+              <Wire UId="29">
+                <IdentCon UId="23" />
+                <NameCon UId="25" Name="in3" />
+              </Wire>
+              <Wire UId="30">
+                <NameCon UId="25" Name="out" />
+                <NameCon UId="26" Name="in" />
+              </Wire>
+              <Wire UId="31">
+                <IdentCon UId="24" />
+                <NameCon UId="26" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="24" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="25" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="26" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="27" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 2 PB - Area 2 (Conveyors North)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="28" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="03_FDBACK" />
+                  <Component Name="Contactor Feedback Error [ =S1+PC1.CC1-X80201 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="03_FDBACK" />
+                  <Component Name="Contactor Feedback Error [ =S1+PC1.CC1-Q80001 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="23">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 2 FDB" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="24">
+                <TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="25" />
+            </Parts>
+            <Wires>
+              <Wire UId="26">
+                <IdentCon UId="21" />
+                <NameCon UId="24" Name="in1" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="in2" />
+              </Wire>
+              <Wire UId="28">
+                <NameCon UId="24" Name="out" />
+                <NameCon UId="25" Name="in" />
+              </Wire>
+              <Wire UId="29">
+                <IdentCon UId="23" />
+                <NameCon UId="25" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="29" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="30" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="31" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="32" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 2 FDB - Area 2 (Conveyors North)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="33" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S2+MS2.CC1-S67001 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S2+PC2.CC1-X80101 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="23">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 3 PB" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="24">
+                <TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="25" />
+            </Parts>
+            <Wires>
+              <Wire UId="26">
+                <IdentCon UId="21" />
+                <NameCon UId="24" Name="in1" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="in2" />
+              </Wire>
+              <Wire UId="28">
+                <NameCon UId="24" Name="out" />
+                <NameCon UId="25" Name="in" />
+              </Wire>
+              <Wire UId="29">
+                <IdentCon UId="23" />
+                <NameCon UId="25" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="34" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="35" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="36" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="37" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 3 PB - Area 3 (Conveyors East)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="38" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="03_FDBACK" />
+                  <Component Name="Contactor Feedback Error [ =S2+PC2.CC1-Q66401..2 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="03_FDBACK" />
+                  <Component Name="Contactor Feedback Error [ =S2+PC2.CC1-Q80001 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="23">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 3 FDB" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="24">
+                <TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="25" />
+            </Parts>
+            <Wires>
+              <Wire UId="26">
+                <IdentCon UId="21" />
+                <NameCon UId="24" Name="in1" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="in2" />
+              </Wire>
+              <Wire UId="28">
+                <NameCon UId="24" Name="out" />
+                <NameCon UId="25" Name="in" />
+              </Wire>
+              <Wire UId="29">
+                <IdentCon UId="23" />
+                <NameCon UId="25" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="39" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="40" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="41" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="42" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 3 FDB - Area 3 (Conveyors East)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="43" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Safety Breaker [ =S2+MS2.CC1-Q67001 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 3 SAFETY_BREAKERS" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="23">
+                <TemplateValue Name="Card" Type="Cardinality">1</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="24" />
+            </Parts>
+            <Wires>
+              <Wire UId="25">
+                <IdentCon UId="21" />
+                <NameCon UId="23" Name="in1" />
+              </Wire>
+              <Wire UId="26">
+                <NameCon UId="23" Name="out" />
+                <NameCon UId="24" Name="in" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="44" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="45" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="46" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="47" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 3 SAFETY_BREAKERS - Area 3 (Conveyors East)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="48" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="07_DOOR" />
+                  <Component Name="Door Closed SAFE_STATE [ =S2+SG3-B1 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="07_DOOR" />
+                  <Component Name="Door Closed SAFE_STATE [ =S2+SG4-B1 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="23">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 3 DOORS" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="24">
+                <TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="25" />
+            </Parts>
+            <Wires>
+              <Wire UId="26">
+                <IdentCon UId="21" />
+                <NameCon UId="24" Name="in1" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="in2" />
+              </Wire>
+              <Wire UId="28">
+                <NameCon UId="24" Name="out" />
+                <NameCon UId="25" Name="in" />
+              </Wire>
+              <Wire UId="29">
+                <IdentCon UId="23" />
+                <NameCon UId="25" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="49" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="50" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="51" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="52" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 3 DOORS - Area 3 (Conveyors East)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="53" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="01_Pushbutton" />
+                  <Component Name="Emergency Push Button [ =S2+PC2.CC1-X80101 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 4 PB" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="23">
+                <TemplateValue Name="Card" Type="Cardinality">1</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="24" />
+            </Parts>
+            <Wires>
+              <Wire UId="25">
+                <IdentCon UId="21" />
+                <NameCon UId="23" Name="in1" />
+              </Wire>
+              <Wire UId="26">
+                <NameCon UId="23" Name="out" />
+                <NameCon UId="24" Name="in" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="54" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="55" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="56" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="57" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 4 PB - Area 4 (Conveyors West)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="58" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+            <Parts>
+              <Access Scope="GlobalVariable" UId="21">
+                <Symbol>
+                  <Component Name="03_FDBACK" />
+                  <Component Name="Contactor Feedback Error [ =S2+PC2.CC1-Q66401..2 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="22">
+                <Symbol>
+                  <Component Name="03_FDBACK" />
+                  <Component Name="Contactor Feedback Error [ =S2+PC2.CC1-X80201 ]" />
+                </Symbol>
+              </Access>
+              <Access Scope="GlobalVariable" UId="23">
+                <Symbol>
+                  <Component Name="02_COM" />
+                  <Component Name="AREA 4 FDB" />
+                </Symbol>
+              </Access>
+              <Part Name="A" UId="24">
+                <TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>
+              </Part>
+              <Part Name="Coil" UId="25" />
+            </Parts>
+            <Wires>
+              <Wire UId="26">
+                <IdentCon UId="21" />
+                <NameCon UId="24" Name="in1" />
+              </Wire>
+              <Wire UId="27">
+                <IdentCon UId="22" />
+                <NameCon UId="24" Name="in2" />
+              </Wire>
+              <Wire UId="28">
+                <NameCon UId="24" Name="out" />
+                <NameCon UId="25" Name="in" />
+              </Wire>
+              <Wire UId="29">
+                <IdentCon UId="23" />
+                <NameCon UId="25" Name="operand" />
+              </Wire>
+            </Wires>
+          </FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_FBD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="59" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="60" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="61" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="62" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>AREA 4 FDB - Area 4 (Conveyors West)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="63" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="64" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>AND blocks with one output</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.FC>
+</Document>

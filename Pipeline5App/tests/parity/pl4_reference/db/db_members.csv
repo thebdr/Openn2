@@ -1,0 +1,190 @@
+uid,db_name,member,datatype,start_value,comment,retain,ext_accessible,ext_visible,ext_writable,setpoint,source
+8d6948fe93,DiagnosticTags,S1.CABINET000.STATE,UDInt,,,false,true,true,true,false,000
+e9dd4f9a90,DiagnosticTags,S1.CABINET001.STATE,UDInt,,,false,true,true,true,false,001
+538947b60d,DiagnosticTags,S1.CABINET002.STATE,UDInt,,,false,true,true,true,false,002
+10ac5a29d0,DiagnosticTags,S1.CABINET003.STATE,UDInt,,,false,true,true,true,false,003
+3a8a22ae1d,DiagnosticTags,S1.CABINET015.STATE,UDInt,,,false,true,true,true,false,015
+64c39a0aff,DiagnosticTags,S1.CABINET014.STATE,UDInt,,,false,true,true,true,false,014
+48e3047e2d,DiagnosticTags,S1.CABINET012.STATE,UDInt,,,false,true,true,true,false,012
+c7bd8331fa,DiagnosticTags,S1.CABINET013.STATE,UDInt,,,false,true,true,true,false,013
+da08138fc5,DiagnosticTags,S1.CABINET004.STATE,UDInt,,,false,true,true,true,false,004
+b1998064e4,DiagnosticTags,S1.CABINET011.STATE,UDInt,,,false,true,true,true,false,011
+511e5ffd05,DiagnosticTags,S1.CABINET010.STATE,UDInt,,,false,true,true,true,false,010
+0bc28e3740,DiagnosticTags,S1.CABINET009.STATE,UDInt,,,false,true,true,true,false,009
+86a5d157f8,DiagnosticTags,S1.CABINET005.STATE,UDInt,,,false,true,true,true,false,005
+5974531e59,DiagnosticTags,S1.CABINET006.STATE,UDInt,,,false,true,true,true,false,006
+abeebe88ee,DiagnosticTags,S1.CABINET007.STATE,UDInt,,,false,true,true,true,false,007
+3dc3886ea3,DiagnosticTags,S1.CABINET008.STATE,UDInt,,,false,true,true,true,false,008
+27aba17c68,DiagnosticTags,S1.CABINET000.ALARM1,UDInt,,,false,true,true,true,false,000
+4e6075f607,DiagnosticTags,S1.CABINET001.ALARM1,UDInt,,,false,true,true,true,false,001
+c3c3a77bd4,DiagnosticTags,S1.CABINET002.ALARM1,UDInt,,,false,true,true,true,false,002
+c9c1c6d83f,DiagnosticTags,S1.CABINET003.ALARM1,UDInt,,,false,true,true,true,false,003
+dc81e25cf0,DiagnosticTags,S1.CABINET015.ALARM1,UDInt,,,false,true,true,true,false,015
+5f32c6d03b,DiagnosticTags,S1.CABINET014.ALARM1,UDInt,,,false,true,true,true,false,014
+fb7191e71f,DiagnosticTags,S1.CABINET012.ALARM1,UDInt,,,false,true,true,true,false,012
+d80f639dda,DiagnosticTags,S1.CABINET013.ALARM1,UDInt,,,false,true,true,true,false,013
+7ba2422e12,DiagnosticTags,S1.CABINET004.ALARM1,UDInt,,,false,true,true,true,false,004
+f5e39d3c05,DiagnosticTags,S1.CABINET011.ALARM1,UDInt,,,false,true,true,true,false,011
+b139494130,DiagnosticTags,S1.CABINET010.ALARM1,UDInt,,,false,true,true,true,false,010
+85d65175dc,DiagnosticTags,S1.CABINET009.ALARM1,UDInt,,,false,true,true,true,false,009
+231610a20e,DiagnosticTags,S1.CABINET005.ALARM1,UDInt,,,false,true,true,true,false,005
+54b2a073f0,DiagnosticTags,S1.CABINET006.ALARM1,UDInt,,,false,true,true,true,false,006
+53453fb691,DiagnosticTags,S1.CABINET007.ALARM1,UDInt,,,false,true,true,true,false,007
+360339d073,DiagnosticTags,S1.CABINET008.ALARM1,UDInt,,,false,true,true,true,false,008
+e7f5f24006,DiagnosticTags,S1.CABINET000.ALARM2,UDInt,,,false,true,true,true,false,000
+71f717651d,DiagnosticTags,S1.CABINET001.ALARM2,UDInt,,,false,true,true,true,false,001
+88d904f674,DiagnosticTags,S1.CABINET002.ALARM2,UDInt,,,false,true,true,true,false,002
+cd1bcc577e,DiagnosticTags,S1.CABINET003.ALARM2,UDInt,,,false,true,true,true,false,003
+9803204b2c,DiagnosticTags,S1.CABINET015.ALARM2,UDInt,,,false,true,true,true,false,015
+59361abb06,DiagnosticTags,S1.CABINET014.ALARM2,UDInt,,,false,true,true,true,false,014
+334d6a70d8,DiagnosticTags,S1.CABINET012.ALARM2,UDInt,,,false,true,true,true,false,012
+4bb53f7ded,DiagnosticTags,S1.CABINET013.ALARM2,UDInt,,,false,true,true,true,false,013
+67eef28546,DiagnosticTags,S1.CABINET004.ALARM2,UDInt,,,false,true,true,true,false,004
+405d9e9c86,DiagnosticTags,S1.CABINET011.ALARM2,UDInt,,,false,true,true,true,false,011
+a945461f65,DiagnosticTags,S1.CABINET010.ALARM2,UDInt,,,false,true,true,true,false,010
+b66f8b49b3,DiagnosticTags,S1.CABINET009.ALARM2,UDInt,,,false,true,true,true,false,009
+4d6918f8d0,DiagnosticTags,S1.CABINET005.ALARM2,UDInt,,,false,true,true,true,false,005
+ec2089da32,DiagnosticTags,S1.CABINET006.ALARM2,UDInt,,,false,true,true,true,false,006
+2fd8a8f446,DiagnosticTags,S1.CABINET007.ALARM2,UDInt,,,false,true,true,true,false,007
+48056c1c12,DiagnosticTags,S1.CABINET008.ALARM2,UDInt,,,false,true,true,true,false,008
+a9911808d4,DiagnosticTags,S1.CABINET000.WARNING1,UDInt,,,false,true,true,true,false,000
+8d0da802b9,DiagnosticTags,S1.CABINET001.WARNING1,UDInt,,,false,true,true,true,false,001
+e79df1f884,DiagnosticTags,S1.CABINET002.WARNING1,UDInt,,,false,true,true,true,false,002
+90b8a130a1,DiagnosticTags,S1.CABINET003.WARNING1,UDInt,,,false,true,true,true,false,003
+f7119a4272,DiagnosticTags,S1.CABINET015.WARNING1,UDInt,,,false,true,true,true,false,015
+66cef4fa94,DiagnosticTags,S1.CABINET014.WARNING1,UDInt,,,false,true,true,true,false,014
+abe573415e,DiagnosticTags,S1.CABINET012.WARNING1,UDInt,,,false,true,true,true,false,012
+997a66b67a,DiagnosticTags,S1.CABINET013.WARNING1,UDInt,,,false,true,true,true,false,013
+6f1ea877de,DiagnosticTags,S1.CABINET004.WARNING1,UDInt,,,false,true,true,true,false,004
+94b0ad3e1c,DiagnosticTags,S1.CABINET011.WARNING1,UDInt,,,false,true,true,true,false,011
+1399fc7473,DiagnosticTags,S1.CABINET010.WARNING1,UDInt,,,false,true,true,true,false,010
+46576677ab,DiagnosticTags,S1.CABINET009.WARNING1,UDInt,,,false,true,true,true,false,009
+154ab1a5b9,DiagnosticTags,S1.CABINET005.WARNING1,UDInt,,,false,true,true,true,false,005
+0707131787,DiagnosticTags,S1.CABINET006.WARNING1,UDInt,,,false,true,true,true,false,006
+137b1b9c37,DiagnosticTags,S1.CABINET007.WARNING1,UDInt,,,false,true,true,true,false,007
+93d8942460,DiagnosticTags,S1.CABINET008.WARNING1,UDInt,,,false,true,true,true,false,008
+e5feb98d6b,DiagnosticTags,S1.CABINET000.WARNING2,UDInt,,,false,true,true,true,false,000
+14888d9e8b,DiagnosticTags,S1.CABINET001.WARNING2,UDInt,,,false,true,true,true,false,001
+7297b032c0,DiagnosticTags,S1.CABINET002.WARNING2,UDInt,,,false,true,true,true,false,002
+be7b364c26,DiagnosticTags,S1.CABINET003.WARNING2,UDInt,,,false,true,true,true,false,003
+dd08aff0ea,DiagnosticTags,S1.CABINET015.WARNING2,UDInt,,,false,true,true,true,false,015
+454f28fc6e,DiagnosticTags,S1.CABINET014.WARNING2,UDInt,,,false,true,true,true,false,014
+40022eac81,DiagnosticTags,S1.CABINET012.WARNING2,UDInt,,,false,true,true,true,false,012
+14ef74f154,DiagnosticTags,S1.CABINET013.WARNING2,UDInt,,,false,true,true,true,false,013
+18505f9073,DiagnosticTags,S1.CABINET004.WARNING2,UDInt,,,false,true,true,true,false,004
+35c61bcfd6,DiagnosticTags,S1.CABINET011.WARNING2,UDInt,,,false,true,true,true,false,011
+8cd49bfac5,DiagnosticTags,S1.CABINET010.WARNING2,UDInt,,,false,true,true,true,false,010
+9c7268bfd2,DiagnosticTags,S1.CABINET009.WARNING2,UDInt,,,false,true,true,true,false,009
+be1f3612f6,DiagnosticTags,S1.CABINET005.WARNING2,UDInt,,,false,true,true,true,false,005
+34f9e52255,DiagnosticTags,S1.CABINET006.WARNING2,UDInt,,,false,true,true,true,false,006
+2cb4988f0e,DiagnosticTags,S1.CABINET007.WARNING2,UDInt,,,false,true,true,true,false,007
+7be91722a0,DiagnosticTags,S1.CABINET008.WARNING2,UDInt,,,false,true,true,true,false,008
+703b2614b1,00_Commissioning,AlwaysFALSE,Bool,,,false,true,true,true,false,seed
+41b2f19db1,00_Commissioning,AlwaysTRUE,Bool,,,false,true,true,true,false,seed
+787feaf8f4,00_Commissioning,No Operation,Bool,,,false,true,true,true,false,seed
+ba2c0913b5,00_Commissioning,n0006-mc1-cc1-k66201 192.168.50.6,Bool,,,false,true,true,true,false,5914cd3d64
+ad0176758c,00_Commissioning,n0005-ms1-cc1-k65001 192.168.50.5,Bool,,,false,true,true,true,false,ca54d2abd7
+5de6bdba76,00_Commissioning,n0012-pc1-cc1-k65001 192.168.50.12,Bool,,,false,true,true,true,false,f6fa2df461
+d0f130277a,00_Commissioning,n0031-sm72-xns1 192.168.50.31,Bool,,,false,true,true,true,false,29c1ad3343
+4975655fb1,00_Commissioning,n0005-ms2-cc1-k65001 192.168.51.5,Bool,,,false,true,true,true,false,1192f3eaa3
+c781a2cb69,00_Commissioning,n0012-pc2-cc1-k65001 192.168.51.12,Bool,,,false,true,true,true,false,19f636d5a1
+a6f3a3aed2,00_Commissioning,n0031-sm73-xns1 192.168.51.31,Bool,,,false,true,true,true,false,2639cc93dd
+47b3ce6f38,01_Pushbutton,AlwaysFALSE,Bool,,,false,true,true,true,false,seed
+a60520e9d8,01_Pushbutton,AlwaysTRUE,Bool,,,false,true,true,true,false,seed
+e539a14afd,01_Pushbutton,No Operation,Bool,,,false,true,true,true,false,seed
+74ea5f63d8,01_Pushbutton,Emergency Push Button [ =S1+MS1.CC1-S67001 ],Bool,,,false,true,true,true,false,e179423512
+cd7834d720,01_Pushbutton,Emergency Push Button [ =S1+PC1.CC1-X80101 ],Bool,,,false,true,true,true,false,0d6fa7a23d
+4f745ff15d,01_Pushbutton,Emergency Push Button [ =S2+MS2.CC1-S67001 ],Bool,,,false,true,true,true,false,35ad36574b
+6bd50f9e1a,01_Pushbutton,Emergency Push Button [ =S2+PC2.CC1-X80101 ],Bool,,,false,true,true,true,false,fa7eff2ff7
+0a63f3568d,01_Pushbutton,Safety Breaker [ =S1+MS1.CC1-Q67001 ],Bool,,,false,true,true,true,false,5b8bbccee6
+d8e59139fa,01_Pushbutton,Safety Breaker [ =S2+MS2.CC1-Q67001 ],Bool,,,false,true,true,true,false,ac89a4470a
+568e437989,03_FDBACK,AlwaysFALSE,Bool,,,false,true,true,true,false,seed
+39c047d870,03_FDBACK,AlwaysTRUE,Bool,,,false,true,true,true,false,seed
+f108ccc769,03_FDBACK,No Operation,Bool,,,false,true,true,true,false,seed
+2460428024,03_FDBACK,Contactor Feedback Error [ =S1+PC1.CC1-Q66401..2 ],Bool,,,false,true,true,true,false,ee8c5b1a02
+221c0b929c,03_FDBACK,Contactor Feedback Error [ =S1+PC1.CC1-X80201 ],Bool,,,false,true,true,true,false,8b1ccf4b04
+84d4220833,03_FDBACK,Contactor Feedback Error [ =S1+PC1.CC1-Q80001 ],Bool,,,false,true,true,true,false,c92ca8315d
+3d518219c8,03_FDBACK,Contactor Feedback Error [ =S2+PC2.CC1-Q66401..2 ],Bool,,,false,true,true,true,false,656ce2e502
+182149bb0b,03_FDBACK,Contactor Feedback Error [ =S2+PC2.CC1-X80201 ],Bool,,,false,true,true,true,false,9428856c50
+4fda997efc,03_FDBACK,Contactor Feedback Error [ =S2+PC2.CC1-Q80001 ],Bool,,,false,true,true,true,false,4d6b4af602
+894c80747e,03_FDBACK_RAW,AlwaysFALSE,Bool,,,false,true,true,true,false,seed
+a679964aa8,03_FDBACK_RAW,AlwaysTRUE,Bool,,,false,true,true,true,false,seed
+d74b4e0865,03_FDBACK_RAW,No Operation,Bool,,,false,true,true,true,false,seed
+3f77fe81a2,03_FDBACK_RAW,Contactor Feedback Error [ =S1+PC1.CC1-Q66401..2 ],Bool,,,false,true,true,true,false,ee8c5b1a02
+3f7aee023b,03_FDBACK_RAW,Contactor Feedback Error [ =S1+PC1.CC1-X80201 ],Bool,,,false,true,true,true,false,8b1ccf4b04
+bacf85b2b3,03_FDBACK_RAW,Contactor Feedback Error [ =S1+PC1.CC1-Q80001 ],Bool,,,false,true,true,true,false,c92ca8315d
+3a0b6edf1a,03_FDBACK_RAW,Contactor Feedback Error [ =S2+PC2.CC1-Q66401..2 ],Bool,,,false,true,true,true,false,656ce2e502
+8abdbbd5b0,03_FDBACK_RAW,Contactor Feedback Error [ =S2+PC2.CC1-X80201 ],Bool,,,false,true,true,true,false,9428856c50
+1f9bff2596,03_FDBACK_RAW,Contactor Feedback Error [ =S2+PC2.CC1-Q80001 ],Bool,,,false,true,true,true,false,4d6b4af602
+f71766e92f,04_SPEED,AlwaysFALSE,Bool,,,false,true,true,true,false,seed
+67bb399641,04_SPEED,AlwaysTRUE,Bool,,,false,true,true,true,false,seed
+58da2f2a58,04_SPEED,No Operation,Bool,,,false,true,true,true,false,seed
+eb6f6b5398,04_SPEED,Safety Encoder 0001 Sensor 1 Healthy [ =S1+PC1.CC1-X81001 ],Bool,,,false,true,true,true,false,09a98d1dbb
+1e294d6ef3,04_SPEED,Safety Encoder 0002 Sensor 1 Healthy [ =S2+PC2.CC1-X81001 ],Bool,,,false,true,true,true,false,8ac3aea7b0
+e3306f3be0,04_SPEED,Safety Encoder 0001 Sensor 2 Healthy [ =S1+PC1.CC1-X81001 ],Bool,,,false,true,true,true,false,1fa17f2ddc
+15c2c35779,04_SPEED,Safety Encoder 0002 Sensor 2 Healthy [ =S2+PC2.CC1-X81001 ],Bool,,,false,true,true,true,false,f8b3d6c892
+c8664c1604,04_SPEED,Safety Encoder 0001 Healthy [ =S1+PC1.CC1-X81001 ],Bool,,,false,true,true,true,false,09a98d1dbb
+d32e7edfd0,04_SPEED,Safety Encoder 0002 Healthy [ =S2+PC2.CC1-X81001 ],Bool,,,false,true,true,true,false,8ac3aea7b0
+88d027f706,07_DOOR,AlwaysFALSE,Bool,,,false,true,true,true,false,seed
+9c74a7ae29,07_DOOR,AlwaysTRUE,Bool,,,false,true,true,true,false,seed
+3d788074ee,07_DOOR,No Operation,Bool,,,false,true,true,true,false,seed
+787ae003b8,07_DOOR,Door Closed SAFE_STATE [ =S1+SG1-B1 ],Bool,,,false,true,true,true,false,d00ddc3bb7
+706e6ee916,07_DOOR,Door Closed SAFE_STATE [ =S1+SG2-B1 ],Bool,,,false,true,true,true,false,07d80a5b09
+5811d76bad,07_DOOR,Door Closed SAFE_STATE [ =S2+SG3-B1 ],Bool,,,false,true,true,true,false,7fdd28671e
+a1c8d5767d,07_DOOR,Door Closed SAFE_STATE [ =S2+SG4-B1 ],Bool,,,false,true,true,true,false,d9bca8b9dd
+d007dc5202,07_DOOR,Door Closed DIAGNOSIS [ =S1+SG1-B1 ],Bool,,,false,true,true,true,false,0c5125b0d5
+76360441d1,07_DOOR,Door Closed DIAGNOSIS [ =S1+SG2-B1 ],Bool,,,false,true,true,true,false,0cf5643b86
+2812a9d5fc,07_DOOR,Door Closed DIAGNOSIS [ =S2+SG3-B1 ],Bool,,,false,true,true,true,false,e4f307efef
+ce301a7264,07_DOOR,Door Closed DIAGNOSIS [ =S2+SG4-B1 ],Bool,,,false,true,true,true,false,8906548306
+0505274998,07_DOOR,Door Alarm [ =S1+SG1-B1 ],Bool,,,false,true,true,true,false,28b4b77d0f
+18cd795b56,07_DOOR,Door Alarm [ =S1+SG2-B1 ],Bool,,,false,true,true,true,false,dd7d80bc87
+2c292bf554,07_DOOR,Door Alarm [ =S2+SG3-B1 ],Bool,,,false,true,true,true,false,b6378a7737
+9264e3398b,07_DOOR,Door Alarm [ =S2+SG4-B1 ],Bool,,,false,true,true,true,false,002e692cdf
+f7d9ec77aa,PROFINET_NODES_ALARM,AlwaysFALSE,Bool,,,false,true,true,true,false,seed
+101e619dcc,PROFINET_NODES_ALARM,AlwaysTRUE,Bool,,,false,true,true,true,false,seed
+1638a772a1,PROFINET_NODES_ALARM,No Operation,Bool,,,false,true,true,true,false,seed
+4e1753ef3a,PROFINET_NODES_ALARM,n0006-mc1-cc1-k66201 192.168.50.6,Bool,,,false,true,true,true,false,5914cd3d64
+106e17a678,PROFINET_NODES_ALARM,n0005-ms1-cc1-k65001 192.168.50.5,Bool,,,false,true,true,true,false,ca54d2abd7
+3eb470b330,PROFINET_NODES_ALARM,n0012-pc1-cc1-k65001 192.168.50.12,Bool,,,false,true,true,true,false,f6fa2df461
+9df3f98573,PROFINET_NODES_ALARM,n0031-sm72-xns1 192.168.50.31,Bool,,,false,true,true,true,false,29c1ad3343
+d23072986f,PROFINET_NODES_ALARM,n0005-ms2-cc1-k65001 192.168.51.5,Bool,,,false,true,true,true,false,1192f3eaa3
+94d613f9a9,PROFINET_NODES_ALARM,n0012-pc2-cc1-k65001 192.168.51.12,Bool,,,false,true,true,true,false,19f636d5a1
+51241580a5,PROFINET_NODES_ALARM,n0031-sm73-xns1 192.168.51.31,Bool,,,false,true,true,true,false,2639cc93dd
+b160b2f4de,PROFINET_NODES_WARNING,AlwaysFALSE,Bool,,,false,true,true,true,false,seed
+7c9ff18d21,PROFINET_NODES_WARNING,AlwaysTRUE,Bool,,,false,true,true,true,false,seed
+95d322c1eb,PROFINET_NODES_WARNING,No Operation,Bool,,,false,true,true,true,false,seed
+5e4657a441,PROFINET_NODES_WARNING,n0010-mc1-cc1-k66001 192.168.50.10,Bool,,,false,true,true,true,false,984d254518
+68328f91dc,PROFINET_NODES_WARNING,n0010-mc2-cc1-k66001 192.168.51.10,Bool,,,false,true,true,true,false,bc0768584d
+2c3527784a,02_COM,AlwaysFALSE,Bool,,,false,true,true,true,false,seed
+5716be7982,02_COM,AlwaysTRUE,Bool,,,false,true,true,true,false,seed
+4855ba48b2,02_COM,No Operation,Bool,,,false,true,true,true,false,seed
+4e324ba76f,02_COM,AREA 1 PB,Bool,,Zone cumulative: emergency push buttons - one per area that HAS E1/2 members,false,true,true,true,false,AREA 1
+b51f4b8771,02_COM,AREA 2 PB,Bool,,Zone cumulative: emergency push buttons - one per area that HAS E1/2 members,false,true,true,true,false,AREA 2
+6f36c85aa9,02_COM,AREA 3 PB,Bool,,Zone cumulative: emergency push buttons - one per area that HAS E1/2 members,false,true,true,true,false,AREA 3
+64ae926ae2,02_COM,AREA 4 PB,Bool,,Zone cumulative: emergency push buttons - one per area that HAS E1/2 members,false,true,true,true,false,AREA 4
+81ea9d4ec3,02_COM,AREA 1 FDB,Bool,,Zone cumulative: contactor feedback - one per area with KQ members,false,true,true,true,false,AREA 1
+9808d69186,02_COM,AREA 2 FDB,Bool,,Zone cumulative: contactor feedback - one per area with KQ members,false,true,true,true,false,AREA 2
+68f6ac5e85,02_COM,AREA 3 FDB,Bool,,Zone cumulative: contactor feedback - one per area with KQ members,false,true,true,true,false,AREA 3
+ae04c982b2,02_COM,AREA 4 FDB,Bool,,Zone cumulative: contactor feedback - one per area with KQ members,false,true,true,true,false,AREA 4
+45a6b56aea,02_COM,AREA 1 SAFETY_BREAKERS,Bool,,Zone cumulative: safety breakers - one per area with B1/2 members,false,true,true,true,false,AREA 1
+3016ee3526,02_COM,AREA 3 SAFETY_BREAKERS,Bool,,Zone cumulative: safety breakers - one per area with B1/2 members,false,true,true,true,false,AREA 3
+1d12711ccb,02_COM,AREA 1 DOORS,Bool,,Zone cumulative: safety doors - one per area with DI1/2 members,false,true,true,true,false,AREA 1
+3d7bd008b0,02_COM,AREA 3 DOORS,Bool,,Zone cumulative: safety doors - one per area with DI1/2 members,false,true,true,true,false,AREA 3
+9b1e111a47,05_EM_STATE,AREA 1 Q,Bool,,Per-area emergency state (referenced by the 04/05/08 builders),false,true,true,true,false,AREA 1
+f26f752008,05_EM_STATE,AREA 2 Q,Bool,,Per-area emergency state (referenced by the 04/05/08 builders),false,true,true,true,false,AREA 2
+0616c101b2,05_EM_STATE,AREA 3 Q,Bool,,Per-area emergency state (referenced by the 04/05/08 builders),false,true,true,true,false,AREA 3
+e5cec793aa,05_EM_STATE,AREA 4 Q,Bool,,Per-area emergency state (referenced by the 04/05/08 builders),false,true,true,true,false,AREA 4
+47e8d4ac8d,05_EM_STATE,AREA 1 Q_Delayed,Bool,,,false,true,true,true,false,AREA 1
+57dd347e92,05_EM_STATE,AREA 2 Q_Delayed,Bool,,,false,true,true,true,false,AREA 2
+754edb0c14,05_EM_STATE,AREA 3 Q_Delayed,Bool,,,false,true,true,true,false,AREA 3
+3f9f5b390e,05_EM_STATE,AREA 4 Q_Delayed,Bool,,,false,true,true,true,false,AREA 4
+53473c8ad2,05_EM_STATE,AREA 1 RESET,Bool,,,false,true,true,true,false,AREA 1
+e6167371c0,05_EM_STATE,AREA 2 RESET,Bool,,,false,true,true,true,false,AREA 2
+5a3e5e2955,05_EM_STATE,AREA 3 RESET,Bool,,,false,true,true,true,false,AREA 3
+4e0a44a36c,05_EM_STATE,AREA 4 RESET,Bool,,,false,true,true,true,false,AREA 4
+3fb4630df8,05_EM_STATE,AREA 1 POWER_CUT,Bool,,Per-area emergency power-cut coil written by the 04_ESTOP block (v1.1: one per area - was the sorter-only literal AREA 1 POWER_CUT; the _SAFETY_BREAKERS_COM/_SAFETY_DOORS_COM intermediates moved to the 02_COM cumulatives),false,true,true,true,false,AREA 1
+2f94141807,05_EM_STATE,AREA 2 POWER_CUT,Bool,,Per-area emergency power-cut coil written by the 04_ESTOP block (v1.1: one per area - was the sorter-only literal AREA 1 POWER_CUT; the _SAFETY_BREAKERS_COM/_SAFETY_DOORS_COM intermediates moved to the 02_COM cumulatives),false,true,true,true,false,AREA 2
+5fde4e306b,05_EM_STATE,AREA 3 POWER_CUT,Bool,,Per-area emergency power-cut coil written by the 04_ESTOP block (v1.1: one per area - was the sorter-only literal AREA 1 POWER_CUT; the _SAFETY_BREAKERS_COM/_SAFETY_DOORS_COM intermediates moved to the 02_COM cumulatives),false,true,true,true,false,AREA 3
+3cbe5d766d,05_EM_STATE,AREA 4 POWER_CUT,Bool,,Per-area emergency power-cut coil written by the 04_ESTOP block (v1.1: one per area - was the sorter-only literal AREA 1 POWER_CUT; the _SAFETY_BREAKERS_COM/_SAFETY_DOORS_COM intermediates moved to the 02_COM cumulatives),false,true,true,true,false,AREA 4
+0bb193d4c1,05_EM_STATE,SORTER_01_NOT_RUNNING,Bool,,One per sorter - nn = the safety-encoder index (as builders 07/08 number the sorters),false,true,true,true,false,0001
+99581136a6,05_EM_STATE,SORTER_02_NOT_RUNNING,Bool,,One per sorter - nn = the safety-encoder index (as builders 07/08 number the sorters),false,true,true,true,false,0002

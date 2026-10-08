@@ -1,0 +1,11 @@
+#!format=2,,,,,,,,,
+# Role,Station Name,Model Id,IP Address,PN Number (empty:last IP Octet),Subnet,Custom Parameters (separator= | ), Group = folder/subfolder/...,Connector,
+Plc,n0001-mc1-cc1-k65501,6ES7518-4FP00-0AB0,192.168.50.1,,Subnet50,,,X1-P1 R
+IoDevice,n0006-mc1-cc1-k66201,6ES7158-3AD10-0XA0,192.168.50.6,,Subnet50,,=S1_IODevices,X1-P1 R
+IoDevice,n0005-ms1-cc1-k65001,6ES7155-6AU01-0BN0,192.168.50.5,,Subnet50,,=S1_IODevices,X1-P1 R
+IoDevice,n0012-pc1-cc1-k65001,6ES7155-6AU01-0BN0,192.168.50.12,,Subnet50,,=S1_IODevices,X1-P1 R
+IoDevice,n0031-sm72-xns1,LU935023006,192.168.50.31,,Subnet50,Item(1).Item(3).Item(0).Addr(0-1).StartAddress = 920 | Item(1).Item(2).Item(0).Addr(0).StartAddress = 930,=S1_IODevices,X01
+PlcCardCm,n0001-mc2-cc1-k65501,6GK7542-1AX00-0XE0,192.168.51.1,,Subnet51,,=S2_IODevices,X1-P1 R
+IoDevice,n0005-ms2-cc1-k65001,6ES7155-6AU01-0BN0,192.168.51.5,,Subnet51,,=S2_IODevices,X1-P1 R
+IoDevice,n0012-pc2-cc1-k65001,6ES7155-6AU01-0BN0,192.168.51.12,,Subnet51,,=S2_IODevices,X1-P1 R
+IoDevice,n0031-sm73-xns1,LU935023006,192.168.51.31,,Subnet51,Item(1).Item(3).Item(0).Addr(0-1).StartAddress = 1920 | Item(1).Item(2).Item(0).Addr(0).StartAddress = 1930,=S2_IODevices,X01
