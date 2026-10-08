@@ -71,13 +71,16 @@ def ioc_base(ioc, head) -> str:
 
 def ioc_bases(rows) -> dict:
     """{id(IOC row): its base cell} over the document rows in order - each IOC row under the last head before it
-    (`station_role`, the positional rule phase 700 walks; generated rows sit under no head)."""
+    (`station_role`, the positional rule phase 700 walks; generated rows sit under no head). Only a coupler - an
+    IoDevice head - lends its start: under the PLC / a CM head an IOC row has its own Bit or no base (FVT's column AB
+    holds a byte on every row, the PLC's too - refute round 2)."""
     out, head = {}, None
     for r in rows or []:
         if is_generated(r):
             continue
-        if station_role(r) is not None:
-            head = r
+        role = station_role(r)
+        if role is not None:
+            head = r if role == "IoDevice" else None
         elif str(r.get("script_type") or "").strip().upper() == TRIGGER_TYPE:
             out[id(r)] = ioc_base(r, head)
     return out
@@ -637,14 +640,51 @@ def mapping_findings(rows, records) -> list:
     return out
 
 
+def _span(direction, start, end) -> str:
+    return f"{direction}{start}.." + (f"{end - 1}" if end is not None else "? (length unknown)")
+
+
+def overlap_problems(areas, rows, where=None) -> list:
+    """Where transfer areas collide ([[C-031]]): `areas` = [(direction, start, end, label, location, uid)] with
+    `end` None when the length is unknown - such an area still holds its first byte, so two areas at one start
+    collide whatever their lengths (refute round 2). Returns [(detail, location, uid)]: one per overlapping pair
+    (at the first area), one per area over I/O-List addresses of its direction (at the first address, with the
+    count; IOC rows are bases, not I/O; `where` = the calling phase's row locator). Phase 400 and phase 700 both
+    judge by it."""
+    out = []
+    spans = [(d, s, e if e is not None else s + 1, e, label, loc, uid) for d, s, e, label, loc, uid in areas]
+    for i, (d, start, stop, end, label, loc, uid) in enumerate(spans):
+        for d2, start2, stop2, end2, label2, _loc2, _uid2 in spans[i + 1:]:
+            if d == d2 and start < stop2 and start2 < stop:
+                out.append((f"transfer areas {label} ({_span(d, start, end)}) and {label2} "
+                            f"({_span(d2, start2, end2)}) overlap", loc, uid))
+        hits = [r for r in rows or [] if str(r.get("script_type", "") or "").strip().upper() != TRIGGER_TYPE
+                and (p := addresses.parse(r.get("bit"))) and p[0] == d and start <= p[1] < stop]
+        if hits:
+            out.append((f"transfer area {label} ({_span(d, start, end)}) overlaps {len(hits)} I/O-List address"
+                        + ("" if len(hits) == 1 else "es") + f", the first {hits[0].get('bit')}",
+                        (where or _where)(hits[0]), str(hits[0].get("uid", ""))))
+    return out
+
+
 def area_findings(records, extents, lengths, rows) -> list:
     """[[C-031]]'s checks over the interfaces' transfer areas, `extents` / `lengths` = {instance: {'I': n, 'Q': n}}
     (bytes laid out / the area length, None = unknown): blocking FAILs for a base that is no byte
     (`if_base_invalid`), a layout reaching past its area (`if_area_overflow`), two areas overlapping or an area
-    over an I/O-List address of its direction (`if_area_overlap`); an area of unknown length is a WARN
-    (`if_area_length_unknown` - not checked)."""
+    over an I/O-List address of its direction (`if_area_overlap`, `overlap_problems`), two interfaces of one name
+    (`if_name_duplicate` - their areas, tags and `Interfaces` cells would collide); an area of unknown length is a
+    WARN (`if_area_length_unknown` - its overflow not checked)."""
     out, areas = [], []
     doc = _io_doc()
+    first = {}
+    for rec in records:
+        key = str(rec["name"] or rec["instance"]).upper()
+        if key in first:
+            out.append(_f("if_name_duplicate", "FAIL",
+                          f"interfaces {first[key]['instance']!r} and {rec['instance']!r} are both named "
+                          f"{rec['name'] or rec['instance']!r} - their transfer areas, tags and Interfaces cells collide",
+                          rec["source"], str((rec.get("row") or {}).get("uid", "")), doc=doc))
+        first.setdefault(key, rec)
     for rec in records:
         row, name = rec.get("row") or {}, rec["name"] or rec["instance"]
         base = base_byte(rec["base"])
@@ -672,30 +712,20 @@ def area_findings(records, extents, lengths, rows) -> list:
                           rec["source"], str(row.get("uid", "")), doc=doc))
         for d in ("I", "Q"):
             length = lengths[rec["instance"]].get(d)
+            suffix = "_IN" if d == "I" else "_OUT"
+            areas.append((d, base, base + length if length is not None else None, name + suffix, rec["source"],
+                          str(row.get("uid", ""))))
             if length is None:
                 continue
             used = extents[rec["instance"]].get(d, 0)
-            suffix = "_IN" if d == "I" else "_OUT"
             if used > length:
                 out.append(_f("if_area_overflow", "FAIL",
                               f"interface {rec['instance']!r}: {used} bytes laid out on {name}{suffix}, the area "
                               f"holds {length} ({TRANSFER_AREAS[d][1]}) - enlarge it in the IOC row's Hardware "
                               "Parameters or map fewer signals",
                               rec["source"], str(row.get("uid", "")), doc=doc))
-            areas.append((d, base, base + length, name + suffix, rec))
-    for i, (d, start, end, label, rec) in enumerate(areas):
-        for d2, start2, end2, label2, _rec2 in areas[i + 1:]:
-            if d == d2 and start < end2 and start2 < end:
-                out.append(_f("if_area_overlap", "FAIL",
-                              f"transfer areas {label} ({d}{start}..{end - 1}) and {label2} ({d}{start2}..{end2 - 1}) "
-                              "overlap", rec["source"], str((rec.get("row") or {}).get("uid", "")), doc=doc))
-        hits = [r for r in rows or [] if str(r.get("script_type", "") or "").strip().upper() != TRIGGER_TYPE
-                and (p := addresses.parse(r.get("bit"))) and p[0] == d and start <= p[1] < end]
-        if hits:
-            out.append(_f("if_area_overlap", "FAIL",
-                          f"transfer area {label} ({d}{start}..{end - 1}) overlaps {len(hits)} I/O-List address"
-                          + ("" if len(hits) == 1 else "es") + f", the first {hits[0].get('bit')}",
-                          _where(hits[0]), str(hits[0].get("uid", "")), doc=doc))
+    for detail, location, uid in overlap_problems(areas, rows):
+        out.append(_f("if_area_overlap", "FAIL", detail, location, uid, doc=doc))
     return out
 
 

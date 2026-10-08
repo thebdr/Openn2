@@ -209,6 +209,11 @@ def test_ioc_base_from_the_coupler_start():
     copied = [{"script_type": "PA", "type_hw": "PA", "coupler_start": "5000"},
               {"script_type": "IOC", "type_hw": "PA", "index": "FVTGENERIC-08"}]          # Type copied from the head
     eq(list(interfaces.ioc_bases(copied).values()), ["5000"], "refute round 1: an IOC row typed PA is no head")
+    for head in ({"script_type": "PLC"}, {"script_type": "PlcCardCm"}):
+        under = [dict(head, coupler_start="5000"), {"script_type": "IOC", "index": "X-01"},
+                 {"script_type": "IOC", "index": "X-02", "bit": "9000"}]
+        eq(list(interfaces.ioc_bases(under).values()), ["", "9000"],
+           f"refute round 2: a {head['script_type']} head lends no start (FVT's AB holds a byte on every row)")
 
 
 def test_area_lengths_default_and_override():
@@ -297,6 +302,20 @@ def test_area_findings_overflow_overlap_and_base():
     eq([(f.type, f.severity) for f in found], [("if_area_length_invalid", "FAIL")],
        "refute round 1: an own length of 0 is a blocking FAIL, not the unknown-length WARN")
     ok("LocalToPartnerLength='0'" in found[0].detail, found[0].detail)
+
+    same = _recs(("FVTGENERIC-05", "14000"), ("FVTGENERIC-06", "14000"))
+    unknown = {r["instance"]: {"I": None, "Q": None} for r in same}
+    found = a(same, {r["instance"]: {"I": 2, "Q": 2} for r in same}, unknown, [])
+    eq(sorted({(f.type, f.severity) for f in found}), [("if_area_length_unknown", "WARN"), ("if_area_overlap", "FAIL")],
+       "refute round 2: two areas at one start collide whatever their (unknown) lengths")
+    eq(sum(f.type == "if_area_overlap" for f in found), 2, "the IN pair and the OUT pair")
+    ok("(I14000..? (length unknown))" in next(f.detail for f in found if f.type == "if_area_overlap"))
+
+    twins = _recs(("SORTER-01", "10000"), ("SORTER+DIAG-01", "20000"))
+    found = a(twins, {r["instance"]: {"I": 2, "Q": 2} for r in twins},
+              {r["instance"]: {"I": 128, "Q": 128} for r in twins}, [])
+    eq([(f.type, f.severity, f.location) for f in found], [("if_name_duplicate", "FAIL", "NET!O2")],
+       "refute round 2: SORTER-01 and SORTER+DIAG-01 are both SORTER-01")
 
 
 def test_io_address_side1_generic_syntax():

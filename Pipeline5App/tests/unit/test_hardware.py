@@ -587,6 +587,27 @@ def test_transfer_area_length_must_be_a_whole_number():
     eq([(f.type, f.severity) for f in findings], [("hw_ta_base_invalid", "FAIL")], "an area starts on a whole byte")
 
 
+def test_700_alone_writes_no_colliding_areas():
+    """C-031 refute round 2: phase 700 checks what it writes (a lone 700 button never passes 400) - two bit-less
+    interfaces of one coupler share its start (their IN and OUT areas overlap), an area over a card's address, two
+    interfaces of one name on a coupler: blocking FAILs; areas of different couplers far apart are quiet."""
+    from pipeline5.findings import gate
+    rows = _coupler_rows(("FVTGENERIC-05", "", None), ("FVTGENERIC-06", "", None), head={"coupler_start": "14000"})
+    _s, _m, findings = hardware.extract(rows, _ta_dtd())
+    eq([(f.type, f.severity) for f in findings], [("hw_ta_overlap", "FAIL")] * 2, "the IN pair and the OUT pair")
+    ok("FVTGENERIC-05_IN (I14000..14127) and FVTGENERIC-06_IN (I14000..14127) overlap" in findings[0].detail,
+       findings[0].detail)
+    ok(gate.has_blocking(findings))
+    _s, _m, findings = hardware.extract(_coupler_rows(("SORTER-01", "0", None)), _ta_dtd())
+    eq([(f.type, f.location) for f in findings], [("hw_ta_overlap", "[NS50] row 9")], "the area over the card's I0.0")
+    ok("overlaps 1 I/O-List address, the first I0.0" in findings[0].detail, findings[0].detail)
+    _s, modules, findings = hardware.extract(_coupler_rows(("SORTER-01", "10000", None), ("SORTER+DIAG-01", "20000", None)),
+                                             _ta_dtd())
+    eq([(f.type, f.severity) for f in findings], [("hw_ta_name_duplicate", "FAIL")])
+    eq([m["module_name"] for m in modules if m["model_id"].startswith("TransferArea")],
+       ["SORTER-01_IN", "SORTER-01_OUT"], "the second SORTER-01 is not written")
+
+
 def test_shipped_transfer_area_defaults():
     """C-031 (user 2026-10-08): the default area length, 128 bytes, lives in the shipped DeviceTypesDatabase."""
     from pipeline5.config.loaders import load_device_types_db
@@ -628,5 +649,6 @@ if __name__ == "__main__":
         ("ioc_rows_without_a_coupler_warn", test_ioc_rows_without_a_coupler_warn),
         ("unroutable_ioc_hardware_parameters_warn", test_unroutable_ioc_hardware_parameters_warn),
         ("transfer_area_length_must_be_a_whole_number", test_transfer_area_length_must_be_a_whole_number),
+        ("700_alone_writes_no_colliding_areas", test_700_alone_writes_no_colliding_areas),
         ("shipped_transfer_area_defaults", test_shipped_transfer_area_defaults),
     ]))

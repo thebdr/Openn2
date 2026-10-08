@@ -111,6 +111,26 @@ def test_node_address_ranges_positional():
     eq(rows[6]["I_startByte"], "", "the sheet boundary ends n2's span -> the S2 row is unowned")
 
 
+def test_node_address_ranges_skip_interface_rows():
+    """C-031 refute round 2: an IOC row is no I/O of its node (an address-spelled base `I20000.0` stretched the
+    coupler's range over the next node's card - node_of answered the coupler) and, copied from its coupler's head
+    with the Profinet name kept, opens no node."""
+    from pipeline5.truth import addresses
+    rows = [
+        {"source_sheet": "S", "profinet_name": "n6", "bit": ""},
+        {"source_sheet": "S", "bit": "I0.0"},
+        {"source_sheet": "S", "script_type": "IOC", "bit": "I20000.0"},
+        {"source_sheet": "S", "script_type": " ioc ", "profinet_name": "n6", "bit": ""},      # copied from the head
+        {"source_sheet": "S", "bit": "I1.0"},
+        {"source_sheet": "S", "profinet_name": "n7", "bit": ""},
+        {"source_sheet": "S", "bit": "I100.0"},
+    ]
+    staging._add_node_address_ranges(rows)
+    eq((rows[0]["I_startByte"], rows[0]["I_endByte"]), (0, 1), "n6 = its cards only, the IOC rows' still under it")
+    eq((rows[3]["I_startByte"], rows[2]["I_startByte"]), ("", ""), "no IOC row carries a range")
+    eq(addresses.node_of(rows, rows[6]), rows[5], "the next node's card is the next node's")
+
+
 def test_node_address_range_empty_when_no_addressed_rows():
     rows = [{"source_sheet": "S", "profinet_name": "n", "bit": ""}]
     staging._add_node_address_ranges(rows)
@@ -331,6 +351,7 @@ if __name__ == "__main__":
         ("read_view_keeps_struck_when_not_excluding", test_read_view_keeps_struck_when_not_excluding),
         ("is_sorter_area_number_to_name", test_is_sorter_area_number_to_name),
         ("node_address_ranges_positional", test_node_address_ranges_positional),
+        ("node_address_ranges_skip_interface_rows", test_node_address_ranges_skip_interface_rows),
         ("node_address_range_empty_when_no_addressed_rows", test_node_address_range_empty_when_no_addressed_rows),
         ("dup_signal_uid_findings", test_dup_signal_uid_findings),
         ("dup_type_index_findings", test_dup_type_index_findings),

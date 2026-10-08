@@ -320,7 +320,10 @@ def _add_node_address_ranges(rows) -> None:
     NOT keyed by FLD/location: a safety module's emergency stops carry their OWN device location (a push
     button's +ES..), so a location key misses them and leaves the module's range empty - which then drops
     those signals from every node-of lookup (the 02/06/08 builders, diagnosis FL, coverage). Writes
-    `I_/Q_startByte/endByte` on the node-head row (the one carrying `profinet_name`); '' on every other."""
+    `I_/Q_startByte/endByte` on the node-head row (the one carrying `profinet_name`); '' on every other.
+    An IOC row (an interface - [[C-031]]) is neither: its Bit is a transfer area's base, no I/O of its node (an
+    address-spelled `I20000.0` stretched the coupler's range over the next nodes' cards), and one copied from its
+    coupler's head keeps the Profinet name without opening a node (refute round 2)."""
     def _flush(node, ib, qb):
         if node is None:
             return
@@ -336,6 +339,8 @@ def _add_node_address_ranges(rows) -> None:
         rs = r.get("source_sheet")
         if rs != sheet:                                # a new sheet ends the current node's span
             _flush(cur, ib, qb); cur, ib, qb, sheet = None, [], [], rs
+        if str(r.get("script_type") or "").strip().upper() == identity.INTERFACE_TRIGGER_TYPE:
+            continue                                   # an interface: no node, no I/O ([[C-031]])
         if r.get("profinet_name"):                     # a node head opens a new span (and owns its own bit)
             _flush(cur, ib, qb); cur, ib, qb = r, [], []
         ab = _addr_byte(r.get("bit"))

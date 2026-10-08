@@ -64,8 +64,8 @@ from pipeline5.findings.finding import Finding, record
 from pipeline5.truth.table import Table
 from pipeline5.truth.signals import signals_table, is_generated, station_role
 from pipeline5.truth.identity import INTERFACE_TRIGGER_TYPE
-from pipeline5.phases.interfaces.builder import (TRANSFER_AREAS, area_params, base_byte, interface_name, ioc_base,
-                                                length_value)
+from pipeline5.phases.interfaces.builder import (TRANSFER_AREAS, area_lengths, area_params, base_byte,
+                                                interface_name, ioc_base, length_value, overlap_problems)
 
 _ADDR = re.compile(r"\s*([IQ])\s*(\d+)\.(\d+)", re.IGNORECASE)
 
@@ -241,7 +241,7 @@ def _ioc_without_coupler(row, where_text) -> Finding:
               where, str(row.get("uid", "")), doc=_io_doc() if "!" in where else "")
 
 
-def _transfer_areas(station, head, iocs, by_id, findings) -> list:
+def _transfer_areas(station, head, iocs, by_id, findings, spans) -> list:
     """A coupler's transfer-area module rows ([[C-031]]): per IOC row under its head, in document order,
     `<name>_IN` (TransferArea-IN, I Addr = the base) and `<name>_OUT` (TransferArea-OUT, Q Addr = the base),
     positions 1..n; the base = the IOC row's Bit, else the head's `coupler_start` (`ioc_base`). Lengths: the
@@ -249,8 +249,10 @@ def _transfer_areas(station, head, iocs, by_id, findings) -> list:
     `area_params`: any spelling, the last entry winning) is written, in the database's spelling, on its own area;
     another entry is a `hw_ta_param_unrouted` WARN. Blocking: a base that is no byte (`hw_ta_base_invalid`), a
     length that is no positive whole number (`hw_ta_length_invalid`), a model missing from the database
-    (`hw_device_not_in_dtd`)."""
-    out, position = [], 0
+    (`hw_device_not_in_dtd`). Two areas of one name on the coupler are a blocking `hw_ta_name_duplicate` (TIA
+    rejects the second); each area's span (its length: the row's own, else the database default) goes into `spans`
+    for the PLC-wide overlap check of `extract` - a lone 700 button writes no colliding areas (refute round 2)."""
+    out, position, names = [], 0, set()
     for ioc in iocs:
         name = interface_name(ioc.get("index"))
         if not name:                                    # 400 reports the IOC row without an Index
@@ -274,6 +276,13 @@ def _transfer_areas(station, head, iocs, by_id, findings) -> list:
                                + " in its Hardware Parameters is no positive whole number of bytes",
                                where, str(ioc.get("uid", "")), doc=doc))
             continue
+        if name.upper() in names:
+            findings.append(_f("hw_ta_name_duplicate", "FAIL",
+                               f"two interfaces named {name!r} on {station!r} - their transfer areas would share the "
+                               "names " + name + "_IN / " + name + "_OUT", where, str(ioc.get("uid", "")), doc=doc))
+            continue
+        names.add(name.upper())
+        sizes = area_lengths(ioc, {"by_id": by_id})
         if unrouted:
             findings.append(_f("hw_ta_param_unrouted", "WARN",
                                f"interface {name!r} on {station!r}: Hardware Parameters entr"
@@ -289,6 +298,8 @@ def _transfer_areas(station, head, iocs, by_id, findings) -> list:
                                    "DeviceTypesDatabase - skipped", where, str(ioc.get("uid", "")), doc=doc))
                 continue
             position += 1
+            spans.append((direction, base, base + sizes[direction] if sizes[direction] else None, name + suffix,
+                          where, str(ioc.get("uid", ""))))
             out.append({
                 "station_name": station, "slot": position, "module_name": name + suffix,
                 "model_id": rec["model_id"],
@@ -314,6 +325,7 @@ def extract(rows, dtd) -> tuple:
     seen_ips = {}          # ip -> the FIRST generated station's {name, where} - the dedup anchor
     any_head = False       # an IOC row before the first head has no station
     skipped = ""           # the last head SKIPPED (duplicate IP / not in the DTD) - its IOC rows get no area either
+    spans = []             # every transfer area written - checked for collisions once the walk is done ([[C-031]])
 
     def finalize():
         if cur is None:
@@ -410,7 +422,8 @@ def extract(rows, dtd) -> tuple:
                 "source_signal": "",
             })
 
-        modules.extend(_transfer_areas(str(row.get("profinet_name") or "").strip(), row, iocs, by_id, findings))
+        modules.extend(_transfer_areas(str(row.get("profinet_name") or "").strip(), row, iocs, by_id, findings,
+                                       spans))
 
     for row in rows or []:
         if is_generated(row):                    # a generated signal sits under no head in the document - a
@@ -465,6 +478,9 @@ def extract(rows, dtd) -> tuple:
             findings.append(_ioc_without_coupler(row, "before any station head" if not any_head
                                                  else f"under the skipped station {skipped!r}"))
     finalize()
+    for detail, location, uid in overlap_problems(spans, [r for r in rows or [] if not is_generated(r)], _where):
+        findings.append(_f("hw_ta_overlap", "FAIL", detail, location, uid,
+                           doc=_io_doc() if "!" in location else ""))
     return stations, modules, findings
 
 
