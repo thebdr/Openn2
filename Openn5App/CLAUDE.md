@@ -230,7 +230,9 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   compacted LAST, after the others moved away, so every drop lands on a free spot - `MovesInSafeOrder`), and
   after the user opens the view, zooms until the rows fit vertically and the first columns horizontally, and
   calibrates - in a step-by-step WIZARD (a coloured step strip, one card per step with a drawing of what to hover, a
-  pulsing "then press F9" pill, the derived numbers on the side; colourful on purpose - it underlines the two numbers,
+  pulsing "then press F9" pill - the drawing puts the pointer's tip on the exact point to hover -, a score strip of chips
+  under the header (what Openness tells us about a device, and what it does not: X, Y, Move()), the derived numbers
+  on the side; colourful on purpose - it underlines the two numbers,
   X and Y, that Openness will not give) - with the global hotkey F9: the first station, the second, the first cell of
   row 2, the four scrollbar
   ARROW buttons (< > ^ v); the robot then clicks > 8 times and v 6 times and the user re-hovers the first station
