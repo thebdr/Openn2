@@ -192,8 +192,9 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   column 9 `Connector` (`X1`/`X2`; the verbatim I/O-List cell "X1-P1 R" is fine -
   `HardwareConfigLoader.ExtractConnector`) picks the interface by item name or PositionNumber and the IO
   connector by ordinal (`PickIoConnector`: the PN/PN coupler's X2 = its second connector, logged
-  `<station>: Connector X2 -> IO connector 2 of 2`); without a designation single-connector devices use
-  `First()`, multi-connector ones keep the historical `Last()` plus a WARNING. Association is the documented
+  `<station>: Connector X2 -> IO connector 2 of 2`); without a designation the FIRST connector is used -
+  X1 on a coupler - and an unmarked multi-connector station logs a WARNING (user decision 2026-10-09: the historical
+  `Last()` came from the pre-AI single-connector version; PL5 emits the designation explicitly anyway). Association is the documented
   two-step (node `ConnectToSubnet`, then `ConnectToIoSystem`). A missing Ethernet interface skips the station /
   aborts the controller with file/line; the rack falls back to the first device item when the "Rack"/"Rail" name
   match fails (localized projects); "no free slot accepts the module" and a PlcCardCm with no slot pop the

@@ -109,3 +109,4 @@ you pick; nothing of it is applied.
 - **E not needed** (the first-run default from Pipeline5's last project); the Workspace root picker is enough.
 - Items F-H and the data of §5: skipped as recommended.
 - Next: the user inspects the imported data on TIA thoroughly and OP5 solidifies from there (first run: the FVT project with the coupler rows).
+- **Default IO connector = First (X1)** since 2026-10-09: the epitaxy line had kept the historical `Last()` for unmarked multi-connector devices (the user's pre-AI single-connector version); the user chose First as the default. Explicit `X1`/`X2` wins either way, and PL5 emits it for every station whose I/O-list row carries one.
