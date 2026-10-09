@@ -898,7 +898,8 @@ def test_graft_total_row_and_workbook_names():
     """A table whose total row is SHOWN keeps it - each column's function, label and custom formula (its table
     renamed): without them Excel repairs the whole I/O List (refute round 3, measured in Excel). A sheet whose
     formulas use a name defined in its OWN workbook is refused (the name would not resolve in the I/O List, or
-    resolve to the I/O List's own); an unused name, and Excel's own `_xl...` names, are no reason."""
+    resolve to the I/O List's own) - and so is one reaching ANOTHER workbook through its links; an unused
+    name or link, and Excel's own `_xl...` names, are no reason."""
     import warnings as _w
     from openpyxl.workbook.defined_name import DefinedName
     _w.simplefilter("ignore")
@@ -943,6 +944,19 @@ def test_graft_total_row_and_workbook_names():
                                                      "IF_UNUSED: inserted into the I/O List",
                                                      "IF_XLFN: inserted into the I/O List"],
            "a name only in a literal, an unused name, Excel's own _xlfn. name: inserted")
+
+        # a formula into ANOTHER workbook (`[1]Sheet1!A1` - the source's external link, not copied): refused
+        from pipeline5.documents import xlsx_sheet_graft as graft
+        lk0 = os.path.join(d, "lk0.xlsx"); _make_rich_if(lk0)
+        wb = load_workbook(lk0); wb.active["L5"] = "=[1]Sheet1!A1*2"; wb.save(lk0)
+        link = b'</sheets><externalReferences><externalReference r:id="rId9"/></externalReferences>'
+        linked = os.path.join(d, "IF_LINK.xlsx"); _variant(lk0, linked, b"</sheets>", link, part="xl/workbook.xml")
+        quiet = os.path.join(d, "IF_QUIET.xlsx"); _variant(xl0, quiet, b"</sheets>", link, part="xl/workbook.xml")
+        iol3 = os.path.join(d, "iol3.xlsx"); _modern_iolist(iol3)
+        res = graft.graft_sheets(iol3, [{"title": "IF_LINK", "source": linked}, {"title": "IF_QUIET", "source": quiet}])
+        eq([(r["title"], r["error"]) for r in res],
+           [("IF_LINK", "its formulas reference another workbook - the graft does not copy external links"),
+            ("IF_QUIET", None)], "a used external link refuses the sheet; a link no formula uses does not")
 
 
 def test_graft_carries_external_hyperlinks():

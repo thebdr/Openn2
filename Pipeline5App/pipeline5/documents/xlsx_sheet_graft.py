@@ -26,8 +26,8 @@ four bookkeeping parts; every other part is copied byte-for-byte:
     `count` attributes change.
 Pure stdlib, Excel-independent. A source the graft cannot read, or cannot carry faithfully (a sheet part other
 than tables / external hyperlinks, cell metadata - a dynamic array / rich value -, a prefixed spreadsheetml
-namespace, a dangling style or string index, a formula using a name its own workbook defines - it would not
-resolve in the target), is REFUSED for that sheet - never half-copied, nothing of it kept (not even a
+namespace, a dangling style or string index, a formula using a name its own workbook defines or another
+workbook through its links - neither would resolve in the target), is REFUSED for that sheet - never half-copied, nothing of it kept (not even a
 style); the others still graft.
 
 Callers: src://pipeline5/systems/plc_based/siemens_s7/interface_xlsx_writer.py (phase 400e - the IF_ sheets
@@ -244,9 +244,10 @@ class _Source:
             self.sheet = z.read(part).decode("utf-8")
             self.rels = _rels_of(z, part)
             self.tables = {rid: z.read(t) for rid, typ, t, _ in self.rels if typ == _T_TABLE}
+            wbxml = z.read("xl/workbook.xml").decode("utf-8")
             self.names = sorted({html.unescape(n) for n in re.findall(
-                r'<(?:\w+:)?definedName\b[^>]*\bname="([^"]*)"', z.read("xl/workbook.xml").decode("utf-8"))
-                if not n.lower().startswith("_xl")})
+                r'<(?:\w+:)?definedName\b[^>]*\bname="([^"]*)"', wbxml) if not n.lower().startswith("_xl")})
+            self.external = bool(re.search(r"<(?:\w+:)?externalReference\b", wbxml))   # links to other workbooks
             book = {typ: t for _, typ, t, _ in _rels_of(z, "xl/workbook.xml")}
             styles = book.get(_T_STYLES)
             self.styles = ET.fromstring(z.read(styles)) if styles else None
@@ -575,10 +576,13 @@ class _Book:
             else:
                 raise GraftError(f"the sheet carries a {(typ or '?').rsplit('/', 1)[-1]} part the graft does not copy")
         totals = [tf.text or "" for t in src.tables.values() for tf in ET.fromstring(t).iter(_MAIN + "totalsRowFormula")]
-        used = _names_used([f.group(3) for f in _FORMULA.finditer(src.sheet)] + totals, src.names)
+        formulas = [f.group(3) for f in _FORMULA.finditer(src.sheet)] + totals
+        used = _names_used(formulas, src.names)
         if used:                                          # 2. a name of the SOURCE workbook would not resolve
             raise GraftError(f"its formulas use {', '.join(map(repr, used))}, defined in its own workbook - the "
                              "graft does not copy workbook names")
+        if src.external and any(re.search(r"\[\d+\]", f) for f in formulas):    # `[1]Sheet!A1`: the SOURCE's link
+            raise GraftError("its formulas reference another workbook - the graft does not copy external links")
         rx = _table_renamer(renames)                      # 3. the parts, every table name known
         for rid, new, tid, tpart in tables:
             self.added[tpart] = _table_xml(src.tables[rid], tid, new, rx).encode("utf-8")
