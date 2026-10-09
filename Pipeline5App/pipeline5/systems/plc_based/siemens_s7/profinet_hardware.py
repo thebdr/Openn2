@@ -33,9 +33,10 @@ a literal `%Q%` the importer cannot convert) with a **`hw_addr_unresolved` WARN*
   Comment = the DTD comment. Custom Parameters = `PotentialGroup=1` on the first card + the DTD "Parameters
   by Signal Type" blocks (`Ch(#)` -> the signal's channel) then col-AG (override, last). Default cards
   (DTD ids `<PARENT>:SUFFIX`) add one row per station of PARENT.
-- **Transfer areas** ([[C-031]]): an IOC row (an interface) under a coupler's head is never a card - the coupler
-  gets `<name>_IN` (TransferArea-IN, I Addr = the IOC base) and `<name>_OUT` (TransferArea-OUT, Q Addr = the
-  base) per interface, positions 1..n, after the cards; the area length is the model's DTD default (applied by
+- **Transfer areas** ([[C-031]]): an IOC row (an interface: named in its Mnemonic, based on its Bit) under a
+  coupler's head is never a card - the coupler gets `<name>_IN` (TransferArea-IN, I Addr = the base) and
+  `<name>_OUT` (TransferArea-OUT, Q Addr = the base) per interface, positions 1..n, after the cards; a coupler
+  with no IOC row under it is just its station; the area length is the model's DTD default (applied by
   the importer) unless the IOC row's col AG sets that area's length key (written, routed to its area).
 
 DTD col-5 "Parameters" are applied by OP4 itself and are NEVER written here; only col-6 "Parameters by
@@ -65,7 +66,7 @@ from pipeline5.truth.table import Table
 from pipeline5.truth.signals import signals_table, is_generated, station_role
 from pipeline5.truth.identity import INTERFACE_TRIGGER_TYPE
 from pipeline5.phases.interfaces.builder import (TRANSFER_AREAS, area_lengths, area_params, base_byte,
-                                                interface_name, ioc_base, length_value, overlap_problems)
+                                                interface_name, length_value, overlap_problems)
 
 _ADDR = re.compile(r"\s*([IQ])\s*(\d+)\.(\d+)", re.IGNORECASE)
 
@@ -236,15 +237,15 @@ def _is_ioc(row) -> bool:
 def _ioc_without_coupler(row, where_text) -> Finding:
     where = _where(row)
     return _f("hw_ta_no_iodevice", "WARN",
-              f"interface {str(row.get('index') or '').strip()!r} {where_text}: no transfer area (an interface is an "
+              f"interface {str(row.get('mnemonic') or '').strip()!r} {where_text}: no transfer area (an interface is an "
               "area of the coupler whose head it sits under - an I-device is not modelled)",
               where, str(row.get("uid", "")), doc=_io_doc() if "!" in where else "")
 
 
-def _transfer_areas(station, head, iocs, by_id, findings, spans) -> list:
+def _transfer_areas(station, iocs, by_id, findings, spans) -> list:
     """A coupler's transfer-area module rows ([[C-031]]): per IOC row under its head, in document order,
     `<name>_IN` (TransferArea-IN, I Addr = the base) and `<name>_OUT` (TransferArea-OUT, Q Addr = the base),
-    positions 1..n; the base = the IOC row's Bit, else the head's `coupler_start` (`ioc_base`). Lengths: the
+    positions 1..n; the name = the IOC row's Mnemonic, the base = its Bit (user 2026-10-09). Lengths: the
     database model's default is applied by the importer - only the IOC row's own length key (Hardware Parameters,
     `area_params`: any spelling, the last entry winning) is written, in the database's spelling, on its own area;
     another entry is a `hw_ta_param_unrouted` WARN. Blocking: a base that is no byte (`hw_ta_base_invalid`), a
@@ -254,17 +255,17 @@ def _transfer_areas(station, head, iocs, by_id, findings, spans) -> list:
     for the PLC-wide overlap check of `extract` - a lone 700 button writes no colliding areas (refute round 2)."""
     out, position, names = [], 0, set()
     for ioc in iocs:
-        name = interface_name(ioc.get("index"))
-        if not name:                                    # 400 reports the IOC row without an Index
+        name = interface_name(ioc.get("mnemonic"))
+        if not name:                                    # 400 reports the IOC row without a Mnemonic
             continue
         where = _where(ioc)
         doc = _io_doc() if "!" in where else ""
-        cell = ioc_base(ioc, head)
+        cell = str(ioc.get("bit") or "").strip()
         base = base_byte(cell)
         if base is None:
             findings.append(_f("hw_ta_base_invalid", "FAIL",
-                               f"interface {name!r} on {station!r}: base {cell!r} is not a byte (the IOC row's Bit - "
-                               "`10000` or `I10000.0` - or its coupler's start) - its transfer areas cannot be placed",
+                               f"interface {name!r} on {station!r}: base {cell!r} is not a byte (the IOC row's Bit: "
+                               "`10000` or `I10000.0`) - its transfer areas cannot be placed",
                                where, str(ioc.get("uid", "")), doc=doc))
             continue
         lengths, unrouted = area_params(ioc.get("hardware_params"))
@@ -422,8 +423,7 @@ def extract(rows, dtd) -> tuple:
                 "source_signal": "",
             })
 
-        modules.extend(_transfer_areas(str(row.get("profinet_name") or "").strip(), row, iocs, by_id, findings,
-                                       spans))
+        modules.extend(_transfer_areas(str(row.get("profinet_name") or "").strip(), iocs, by_id, findings, spans))
 
     for row in rows or []:
         if is_generated(row):                    # a generated signal sits under no head in the document - a

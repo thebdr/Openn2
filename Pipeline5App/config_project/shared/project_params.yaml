@@ -1,13 +1,10 @@
 project_code: 8XXX
 
 # --- input documents -------------------------------------------------------- #
-iolist_path: 
-  C:\Source\Repos\_Openn2\Shared\DocumentsValidationData\Passing\8XXX_IOyyyy_R0.0_EmergencyIoListValidationTemplate.xlsx
+iolist_path: ../../../Shared/DocumentsValidationData/Passing/8XXX_IOyyyy_R0.0_EmergencyIoListValidationTemplate.xlsx
 iolist_previous_path: ''
 
-matrix_path: 
-  C:\Source\Repos\_Openn2\Shared\DocumentsValidationData\Passing\8XXX_Cause and 
-  Effect Matrix_R0.0_ValidationTemplate.xlsx
+matrix_path: ../../../Shared/DocumentsValidationData/Passing/8XXX_Cause and Effect Matrix_R0.0_ValidationTemplate.xlsx
 matrix_previous_path: ''
 # the *_previous_path point at the prior document revision - reserved for the future ph100 change-tracing.
 

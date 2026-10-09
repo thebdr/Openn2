@@ -71,16 +71,21 @@ def test_index_membership_normalizes():
 
 
 def test_find_interfaces_from_ioc_rows():
-    rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "10000", "id_node": "10",
+    """C-031 (user 2026-10-09): an interface is named in its IOC row's Mnemonic - the Index is not read; an IOC row
+    without a Mnemonic is an `if_ioc_no_mnemonic` WARN (pointing at its Index when the PL3 place holds the name)."""
+    rows = [{"script_type": "IOC", "mnemonic": "SORTER-01", "index": "0007", "bit": "10000", "id_node": "10",
              "device": "-K1", "profinet_ip": "1.2.3.4", "source_sheet": "S", "source_row": 5},
-            {"script_type": "IOC", "index": "", "source_sheet": "S", "source_row": 6},
-            {"script_type": "DI1/2", "index": "x"}]
+            {"script_type": "IOC", "mnemonic": "", "index": "SORTER-02", "source_sheet": "S", "source_row": 6},
+            {"script_type": "IOC", "source_sheet": "S", "source_row": 7},
+            {"script_type": "DI1/2", "mnemonic": "x"}]
     recs, findings = interfaces.find_interfaces(rows)
-    eq(len(recs), 1, "one IOC record (the blank-index IOC warned, the DI1/2 ignored)")
-    eq((recs[0]["machine_type"], recs[0]["index"], recs[0]["base"]), ("SORTER", "01", "10000"))
-    eq(len(findings), 1, "the blank-Index IOC is a finding")
-    eq((findings[0].phase, findings[0].type, findings[0].severity), (400, "if_ioc_no_index", "WARN"),
-       "the no-index report container")
+    eq(len(recs), 1, "one IOC record (the unnamed IOC rows warned, the DI1/2 ignored)")
+    eq((recs[0]["instance"], recs[0]["machine_type"], recs[0]["index"], recs[0]["base"]),
+       ("SORTER-01", "SORTER", "01", "10000"), "named by the Mnemonic, never by the Index '0007'")
+    eq([(f.phase, f.type, f.severity, f.location) for f in findings],
+       [(400, "if_ioc_no_mnemonic", "WARN", "S!6"), (400, "if_ioc_no_mnemonic", "WARN", "S!7")])
+    ok("its Index 'SORTER-02' is not read - write the name in Mnemonic" in findings[0].detail, findings[0].detail)
+    ok("Index" not in findings[1].detail, findings[1].detail)
 
 
 def test_allocate_bytes_bool_block_and_word():
@@ -181,39 +186,23 @@ def test_interface_name_and_base_byte():
        "a bare byte or an address's byte (the notation, bit 0 - an area starts on a whole byte); else None")
 
 
-def test_ioc_base_from_the_coupler_start():
-    """C-031 (user 2026-10-08): an IOC row with no Bit takes the start of the coupler it sits under - the head row's
-    `coupler_start` (FVT: column AB) - by the same positional rule as phase 700 (`station_role`); its own Bit wins;
-    a generated row in between belongs to no head; two bit-less interfaces of one coupler share its start, and the
-    overlap check stops them."""
-    rows = [{"script_type": "IOC", "index": "X-09", "source_cell": "S!O1"},                       # before any head
-            {"script_type": "PA", "type_hw": "PA", "coupler_start": "14000", "source_cell": "S!O2"},
-            {"script_type": "KB", "spawned_by": "qbad", "source_cell": "qbad:x"},                 # generated
-            {"script_type": "IOC", "index": "FVTGENERIC-05", "source_cell": "S!O3"},
-            {"script_type": "IOC", "index": "FVTGENERIC-06", "bit": "10000", "source_cell": "S!O4"},
-            {"script_type": "PA", "type_hw": "PA", "source_cell": "S!O5"},
-            {"script_type": "IOC", "index": "FVTGENERIC-07", "source_cell": "S!O6"},
-            {"script_type": "PA", "type_hw": "PA", "coupler_start": "16000", "source_cell": "S!O7"},
-            {"script_type": "IOC", "index": "SORTER-01", "source_cell": "S!O8"},
-            {"script_type": "IOC", "index": "SORTER-02", "source_cell": "S!O9"}]
+def test_ioc_base_is_its_own_bit():
+    """C-031 (user 2026-10-09: AB dropped): an interface's base is its IOC row's own Bit - no head column is read
+    (`coupler_start`, a Mnemonic on the head); a bit-less row has no base (the blocking FAIL); two interfaces at one
+    base overlap."""
+    rows = [{"script_type": "PA", "type_hw": "PA", "coupler_start": "14000", "mnemonic": "CABINETAL00834"},
+            {"script_type": "IOC", "mnemonic": "FVTGENERIC-05", "source_cell": "S!O3"},
+            {"script_type": "IOC", "mnemonic": "FVTGENERIC-06", "bit": "16000", "source_cell": "S!O4"},
+            {"script_type": "IOC", "mnemonic": "SORTER-01", "bit": "I16000.0", "source_cell": "S!O5"}]
     records, _f = interfaces.find_interfaces(rows)
     eq([(r["instance"], r["base"]) for r in records],
-       [("X-09", ""), ("FVTGENERIC-05", "14000"), ("FVTGENERIC-06", "10000"), ("FVTGENERIC-07", ""),
-        ("SORTER-01", "16000"), ("SORTER-02", "16000")])
+       [("FVTGENERIC-05", ""), ("FVTGENERIC-06", "16000"), ("SORTER-01", "I16000.0")])
     size = {r["instance"]: {"I": 2, "Q": 2} for r in records}
     length = {r["instance"]: {"I": 128, "Q": 128} for r in records}
     found = interfaces.area_findings(records, size, length, [])
     eq([(f.type, f.location) for f in found],
-       [("if_base_invalid", "S!O1"), ("if_base_invalid", "S!O6"), ("if_area_overlap", "S!O8"), ("if_area_overlap", "S!O8")],
-       "no base before a head / under a head without a start; the two areas sharing 16000 overlap (IN and OUT)")
-    copied = [{"script_type": "PA", "type_hw": "PA", "coupler_start": "5000"},
-              {"script_type": "IOC", "type_hw": "PA", "index": "FVTGENERIC-08"}]          # Type copied from the head
-    eq(list(interfaces.ioc_bases(copied).values()), ["5000"], "refute round 1: an IOC row typed PA is no head")
-    for head in ({"script_type": "PLC"}, {"script_type": "PlcCardCm"}):
-        under = [dict(head, coupler_start="5000"), {"script_type": "IOC", "index": "X-01"},
-                 {"script_type": "IOC", "index": "X-02", "bit": "9000"}]
-        eq(list(interfaces.ioc_bases(under).values()), ["", "9000"],
-           f"refute round 2: a {head['script_type']} head lends no start (FVT's AB holds a byte on every row)")
+       [("if_base_invalid", "S!O3"), ("if_area_overlap", "S!O4"), ("if_area_overlap", "S!O4")],
+       "no Bit = no base; the two areas at 16000 overlap (IN and OUT)")
 
 
 def test_area_lengths_default_and_override():
@@ -245,8 +234,8 @@ def test_mapping_by_name_number_and_diag_name():
 
 
 def test_unknown_interface_name_warns():
-    rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "10000", "source_cell": "NET!O7"},
-            {"script_type": "IOC", "index": "FVTGENERIC-03", "bit": "11000", "source_cell": "NET!O8"},
+    rows = [{"script_type": "IOC", "mnemonic": "SORTER-01", "bit": "10000", "source_cell": "NET!O7"},
+            {"script_type": "IOC", "mnemonic": "FVTGENERIC-03", "bit": "11000", "source_cell": "NET!O8"},
             {"script_type": "DI1/2", "interface_mapping": "SORTER-01|SORTR-01|03|04", "functional_unit": "=A",
              "location": "-B", "device": "-C", "source_cell": "NET!O20", "uid": "u1"},
             {"script_type": "DI1/2", "interface_mapping": "fvtgeneric-03", "source_cell": "NET!O21"}]
@@ -257,7 +246,7 @@ def test_unknown_interface_name_warns():
 
 
 def _recs(*iocs):
-    rows = [{"script_type": "IOC", "index": index, "bit": bit, "source_cell": f"NET!O{n}", "uid": f"i{n}"}
+    rows = [{"script_type": "IOC", "mnemonic": index, "bit": bit, "source_cell": f"NET!O{n}", "uid": f"i{n}"}
             for n, (index, bit) in enumerate(iocs, 1)]
     return interfaces.find_interfaces(rows)[0]
 
@@ -351,9 +340,9 @@ def test_build_interfaces_checks_the_real_layout():
     IOC row's own length key, routed), the `<GENERIC>` fallback warned for a machine type with no sheet; tables
     written either way (the handler's gate halts the projections)."""
     from pipeline5 import config
-    rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "10000", "source_cell": "NET!O7", "uid": "i1",
+    rows = [{"script_type": "IOC", "mnemonic": "SORTER-01", "bit": "10000", "source_cell": "NET!O7", "uid": "i1",
              "hardware_params": "LocalToPartnerLength=2"},
-            {"script_type": "IOC", "index": "FVT_GENERIC-03", "bit": "11000", "source_cell": "NET!O8", "uid": "i2"},
+            {"script_type": "IOC", "mnemonic": "FVT_GENERIC-03", "bit": "11000", "source_cell": "NET!O8", "uid": "i2"},
             {"script_type": "DI1/2", "interface_mapping": "SORTER-01", "plc_binding": '"07_DOOR"."D1"',
              "source_cell": "NET!O20", "uid": "d1"}]
     original_db = config.database_dir
@@ -373,15 +362,14 @@ def test_build_interfaces_checks_the_real_layout():
 
 
 def test_the_if_workbook_gets_the_resolved_base():
-    """C-031 refute round 1: an address-spelled base (`I20000.0`) or the coupler's start is stored RESOLVED in
+    """C-031 refute round 1: an address-spelled base (`I20000.0`) is stored RESOLVED in
     `base_address` - the IF_ workbook's Base Address (and so its cached addresses and the inserted IF_ sheet) is the
     byte the area and the tags use, never the template's 10000."""
     from openpyxl import Workbook
     from pipeline5 import config
     from pipeline5.systems.plc_based.siemens_s7 import interface_xlsx_writer as writer
-    rows = [{"script_type": "IOC", "index": "SORTER-01", "bit": "I20000.0", "source_cell": "NET!O7", "uid": "i1"},
-            {"script_type": "PA", "type_hw": "PA", "coupler_start": "14000", "source_cell": "NET!O8", "uid": "h2"},
-            {"script_type": "IOC", "index": "SORTER-02", "source_cell": "NET!O9", "uid": "i2"}]
+    rows = [{"script_type": "IOC", "mnemonic": "SORTER-01", "bit": "I20000.0", "source_cell": "NET!O7", "uid": "i1"},
+            {"script_type": "IOC", "mnemonic": "SORTER-02", "bit": "14000", "source_cell": "NET!O9", "uid": "i2"}]
     original_db = config.database_dir
     with tempfile.TemporaryDirectory() as d:
         tpl = os.path.join(d, "t.xlsx"); _native_template(tpl)
@@ -414,7 +402,7 @@ if __name__ == "__main__":
         ("collect_mirror_set_not_mirrored_finding", test_collect_mirror_set_not_mirrored_finding),
         ("template_native_elements", test_template_native_elements),
         ("interface_name_and_base_byte", test_interface_name_and_base_byte),
-        ("ioc_base_from_the_coupler_start", test_ioc_base_from_the_coupler_start),
+        ("ioc_base_is_its_own_bit", test_ioc_base_is_its_own_bit),
         ("area_lengths_default_and_override", test_area_lengths_default_and_override),
         ("mapping_by_name_number_and_diag_name", test_mapping_by_name_number_and_diag_name),
         ("unknown_interface_name_warns", test_unknown_interface_name_warns),

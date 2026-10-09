@@ -24,7 +24,7 @@ from pipeline5.truth.database import Database
 from pipeline5.findings.finding import Finding, record
 from pipeline5.truth.table import Table
 from pipeline5.truth import addresses, identity
-from pipeline5.truth.signals import signals_table, is_generated, station_role
+from pipeline5.truth.signals import signals_table
 
 from pipeline5.truth.identity import INTERFACE_TRIGGER_TYPE as TRIGGER_TYPE  # shared vocabulary
 
@@ -56,34 +56,10 @@ TRANSFER_AREAS = {"I": ("TransferArea-IN", "PartnerToLocalLength"),
                   "Q": ("TransferArea-OUT", "LocalToPartnerLength")}
 
 
-def interface_name(index_field) -> str:
-    """An interface's name - its IOC Index without the `+DIAG` marker (`SORTER+DIAG-02` -> `SORTER-02`): what the
-    `Interfaces` column names it by and what its transfer areas are called after ([[C-031]])."""
-    return _DIAG_RE.sub("", str(index_field or "")).strip()
-
-
-def ioc_base(ioc, head) -> str:
-    """An IOC row's base cell ([[C-031]]): its own Bit, else the start of the coupler it sits under - the head row's
-    `coupler_start` cell (a project maps that column; FVT: the address-builder byte, column AB - user 2026-10-08)."""
-    own = str(ioc.get("bit") or "").strip()
-    return own or (str((head or {}).get("coupler_start") or "").strip())
-
-
-def ioc_bases(rows) -> dict:
-    """{id(IOC row): its base cell} over the document rows in order - each IOC row under the last head before it
-    (`station_role`, the positional rule phase 700 walks; generated rows sit under no head). Only a coupler - an
-    IoDevice head - lends its start: under the PLC / a CM head an IOC row has its own Bit or no base (FVT's column AB
-    holds a byte on every row, the PLC's too - refute round 2)."""
-    out, head = {}, None
-    for r in rows or []:
-        if is_generated(r):
-            continue
-        role = station_role(r)
-        if role is not None:
-            head = r if role == "IoDevice" else None
-        elif str(r.get("script_type") or "").strip().upper() == TRIGGER_TYPE:
-            out[id(r)] = ioc_base(r, head)
-    return out
+def interface_name(mnemonic) -> str:
+    """An interface's name - its IOC row's Mnemonic without the `+DIAG` marker (`SORTER+DIAG-02` -> `SORTER-02`):
+    what the `Interfaces` column names it by and what its transfer areas are called after ([[C-031]])."""
+    return _DIAG_RE.sub("", str(mnemonic or "")).strip()
 
 
 def base_byte(value):
@@ -312,25 +288,29 @@ def _maps_to(index, names, mapping) -> bool:
 
 
 def find_interfaces(rows) -> tuple:
-    """One record per IOC row of the staged signals. Returns (records, findings); an IOC row with no
-    Index is a `if_ioc_no_index` WARN + skipped."""
+    """One record per IOC row of the staged signals, named by its Mnemonic (`SORTER-01`, `SORTER+DIAG-02` - user
+    2026-10-09: the interface is defined in column Mnemonic; the Index is not read) and based on its own Bit
+    ([[C-031]]). Returns (records, findings); an IOC row with no Mnemonic is no interface - an
+    `if_ioc_no_mnemonic` WARN (naming its Index when it has one: the PL3 place of the name) + skipped."""
     records, findings = [], []
-    bases = ioc_bases(rows)
     for r in rows or []:
         if str(r.get("script_type", "") or "").strip().upper() != TRIGGER_TYPE:
             continue
-        instance = str(r.get("index", "") or "").strip()
+        instance = str(r.get("mnemonic", "") or "").strip()
         loc = str(r.get("source_cell") or "").strip()             or f"{r.get('source_sheet', '')}!{r.get('source_row', '')}"
         if not instance:
-            findings.append(_f("if_ioc_no_index", "WARN", "IOC row has no Index - skipped", loc,
-                               str(r.get("uid", "")), doc=_io_doc()))
+            legacy = str(r.get("index", "") or "").strip()
+            findings.append(_f("if_ioc_no_mnemonic", "WARN",
+                               "IOC row has no Mnemonic (the interface name) - no interface"
+                               + (f"; its Index {legacy!r} is not read - write the name in Mnemonic" if legacy else ""),
+                               loc, str(r.get("uid", "")), doc=_io_doc()))
             continue
         machine_type, index = parse_instance(instance)
         records.append({
             "instance": instance, "machine_type": machine_type, "index": index,
             "name": interface_name(instance),
             "is_diag": _detect_diag(instance),
-            "base": bases.get(id(r), str(r.get("bit", "") or "").strip()),   # own Bit, else the coupler's start
+            "base": str(r.get("bit", "") or "").strip(),
             "base_node": str(r.get("id_node", "") or "").strip(),
             "device": str(r.get("device", "") or "").strip(),
             "ip": str(r.get("profinet_ip", "") or "").strip(), "source": loc,
@@ -690,9 +670,8 @@ def area_findings(records, extents, lengths, rows) -> list:
         base = base_byte(rec["base"])
         if base is None:
             out.append(_f("if_base_invalid", "FAIL",
-                          f"interface {rec['instance']!r}: base {rec['base']!r} is not a byte (the IOC row's Bit - "
-                          "`10000` or `I10000.0` - or its coupler's start) - its transfer areas and tags cannot be "
-                          "placed",
+                          f"interface {rec['instance']!r}: base {rec['base']!r} is not a byte (the IOC row's Bit: "
+                          "`10000` or `I10000.0`) - its transfer areas and tags cannot be placed",
                           rec["source"], str(row.get("uid", "")), doc=doc))
             continue
         overrides, _unrouted = area_params(row.get("hardware_params"))
@@ -733,7 +712,7 @@ def build_interfaces(database: Database | None = None, template_path: str | None
     """400b: per IOC instance, collect its mirror set + lay out the bytes -> the `interfaces` +
     `interface_elements` tables. Runs `annotate_interface_tagnames` first (the Signal Name Side 1 base
     needs name_in_db/name_in_tagtable). Records the findings to `validation_issues` + saves the Database.
-    Returns (database, findings) - the `if_ioc_no_index` / `if_signal_not_mirrored` / `if_mapping_unknown` /
+    Returns (database, findings) - the `if_ioc_no_mnemonic` / `if_signal_not_mirrored` / `if_mapping_unknown` /
     `if_sheet_fallback` WARNs and the transfer-area checks of `area_findings` ([[C-031]]; `dtd` = the
     DeviceTypesDatabase holding the default area lengths, loaded from the params when None)."""
     if database is None:

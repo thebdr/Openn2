@@ -463,8 +463,8 @@ def _coupler_rows(*iocs, head=None):
             dict({"script_type": "PA", "type_hw": "PA", "part_no": "COUPLER", "profinet_name": "n6",
                   "profinet_ip": "192.168.50.6", "functional_unit": "=S1", "slot": "-K6", "bit": "",
                   "source_sheet": "NS50", "source_row": 3}, **(head or {}))]
-    for n, (index, bit, extra) in enumerate(iocs):
-        rows.append(dict({"script_type": "IOC", "index": index, "bit": bit, "slot": "", "uid": f"ioc{n}",
+    for n, (name, bit, extra) in enumerate(iocs):
+        rows.append(dict({"script_type": "IOC", "mnemonic": name, "bit": bit, "slot": "", "uid": f"ioc{n}",
                           "source_sheet": "NS50", "source_row": 4 + n}, **(extra or {})))
     rows.append({"script_type": "A", "part_no": "DI16", "slot": "-C1", "bit": "I0.0", "source_sheet": "NS50",
                  "source_row": 9})
@@ -474,7 +474,7 @@ def _coupler_rows(*iocs, head=None):
 def test_coupler_interfaces_become_transfer_areas():
     """C-031: each IOC row under a coupler's head = `<name>_IN` (I Addr = base) + `<name>_OUT` (Q Addr = base) in
     document order, positions 1..n after the cards; the length written only where the IOC row's col AG sets it
-    (the database default is the importer's); a `+DIAG` Index names its areas without the marker; an
+    (the database default is the importer's); a `+DIAG` Mnemonic names its areas without the marker; an
     address-spelled base gives its byte; an IOC row with a Slot is still no card; a length key in any spelling is
     written in the database's (the importer matches attribute names exactly - refute round 1)."""
     rows = _coupler_rows(("SORTER-01", "10000", {"hardware_params": "partnertolocallength = 64"}),
@@ -511,21 +511,22 @@ def test_transfer_area_base_must_be_a_byte():
     ok("'TransferArea-IN'" in findings[0].detail and "'TransferArea-OUT'" in findings[1].detail)
 
 
-def test_transfer_area_base_from_the_coupler_start():
-    """C-031 (user 2026-10-08, FVT: "use offsets in column AB for the couplers' start address"): an IOC row with no
-    Bit of its own takes its coupler head's start (`coupler_start`); its own Bit wins; neither = the blocking FAIL."""
-    def bases(rows):
+def test_ioc_rows_are_named_in_mnemonic_and_based_on_their_bit():
+    """C-031 (user 2026-10-09: "drop AB and use the rows under the coupler ... the interface will be defined in
+    column Mnemonic"): an IOC row named only in its Index is no interface (400 warns - 700 writes no area, silently);
+    a coupler with no IOC row under it is just its station; the base is the IOC row's own Bit - no head column is
+    read (a bit-less row is the blocking FAIL whatever its head carries)."""
+    def areas(rows):
         _s, modules, findings = hardware.extract(rows, _ta_dtd())
-        return [(m["module_name"], m["i_addr"], m["q_addr"]) for m in modules
-                if m["model_id"].startswith("TransferArea")], [(f.type, f.severity) for f in findings]
-    eq(bases(_coupler_rows(("FVTGENERIC-05", "", None), head={"coupler_start": "14000"})),
-       ([("FVTGENERIC-05_IN", 14000, ""), ("FVTGENERIC-05_OUT", "", 14000)], []), "the coupler's start")
-    eq(bases(_coupler_rows(("FVTGENERIC-05", "10000", None), head={"coupler_start": "14000"}))[0],
-       [("FVTGENERIC-05_IN", 10000, ""), ("FVTGENERIC-05_OUT", "", 10000)], "the IOC row's own Bit wins")
-    areas, findings = bases(_coupler_rows(("FVTGENERIC-05", "", None)))
-    eq((areas, findings), ([], [("hw_ta_base_invalid", "FAIL")]), "no Bit, no coupler start")
-    _s, _m, found = hardware.extract(_coupler_rows(("FVTGENERIC-05", "", None)), _ta_dtd())
-    ok("base '' is not a byte" in found[0].detail and "coupler's start" in found[0].detail, found[0].detail)
+        return ([m["module_name"] for m in modules if m["model_id"].startswith("TransferArea")],
+                [(f.type, f.severity) for f in findings])
+    eq(areas(_coupler_rows(("", "10000", {"index": "SORTER-01"}))), ([], []), "named in Index only: no area")
+    rows = _coupler_rows()
+    stations, modules, findings = hardware.extract(rows, _ta_dtd())
+    eq(([s["station_name"] for s in stations], [m["module_name"] for m in modules if m["station_name"] == "n6"],
+        findings), (["n1", "n6"], ["-C1", "COUPLER:PS"], []), "no IOC row: the station (and its cards) only")
+    eq(areas(_coupler_rows(("FVTGENERIC-05", "", None), head={"coupler_start": "14000", "mnemonic": "CABINETAL00834"})),
+       ([], [("hw_ta_base_invalid", "FAIL")]), "no Bit: no base - the head's columns are not read")
 
 
 def test_ioc_rows_without_a_coupler_warn():
@@ -533,7 +534,7 @@ def test_ioc_rows_without_a_coupler_warn():
     (not in the database / a duplicate IP - refute round 1: 400 still builds the interface) or generated gets no
     area and a WARN; an IOC row whose Type was copied from its coupler (`PA`) is an interface, never a head."""
     plc = dict(_rows()[0])
-    ioc = {"script_type": "IOC", "index": "SORTER-01", "bit": "10000", "source_sheet": "NS50", "source_row": 3}
+    ioc = {"script_type": "IOC", "mnemonic": "SORTER-01", "bit": "10000", "source_sheet": "NS50", "source_row": 3}
     _s, modules, findings = hardware.extract([dict(ioc, source_row=1), plc, ioc], _ta_dtd())
     eq(modules, [], "no area")
     eq([(f.type, f.severity, f.location) for f in findings],
@@ -588,11 +589,11 @@ def test_transfer_area_length_must_be_a_whole_number():
 
 
 def test_700_alone_writes_no_colliding_areas():
-    """C-031 refute round 2: phase 700 checks what it writes (a lone 700 button never passes 400) - two bit-less
-    interfaces of one coupler share its start (their IN and OUT areas overlap), an area over a card's address, two
+    """C-031 refute round 2: phase 700 checks what it writes (a lone 700 button never passes 400) - two
+    interfaces of one coupler at one base (their IN and OUT areas overlap), an area over a card's address, two
     interfaces of one name on a coupler: blocking FAILs; areas of different couplers far apart are quiet."""
     from pipeline5.findings import gate
-    rows = _coupler_rows(("FVTGENERIC-05", "", None), ("FVTGENERIC-06", "", None), head={"coupler_start": "14000"})
+    rows = _coupler_rows(("FVTGENERIC-05", "14000", None), ("FVTGENERIC-06", "14000", None))
     _s, _m, findings = hardware.extract(rows, _ta_dtd())
     eq([(f.type, f.severity) for f in findings], [("hw_ta_overlap", "FAIL")] * 2, "the IN pair and the OUT pair")
     ok("FVTGENERIC-05_IN (I14000..14127) and FVTGENERIC-06_IN (I14000..14127) overlap" in findings[0].detail,
@@ -645,7 +646,8 @@ if __name__ == "__main__":
         ("lowercase_placeholder_without_rows_is_dropped", test_lowercase_placeholder_without_rows_is_dropped),
         ("coupler_interfaces_become_transfer_areas", test_coupler_interfaces_become_transfer_areas),
         ("transfer_area_base_must_be_a_byte", test_transfer_area_base_must_be_a_byte),
-        ("transfer_area_base_from_the_coupler_start", test_transfer_area_base_from_the_coupler_start),
+        ("ioc_rows_are_named_in_mnemonic_and_based_on_their_bit",
+         test_ioc_rows_are_named_in_mnemonic_and_based_on_their_bit),
         ("ioc_rows_without_a_coupler_warn", test_ioc_rows_without_a_coupler_warn),
         ("unroutable_ioc_hardware_parameters_warn", test_unroutable_ioc_hardware_parameters_warn),
         ("transfer_area_length_must_be_a_whole_number", test_transfer_area_length_must_be_a_whole_number),
