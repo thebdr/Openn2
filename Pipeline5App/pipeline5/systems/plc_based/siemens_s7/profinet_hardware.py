@@ -254,6 +254,9 @@ def connector_side(cell):
     return int(m.group(1)) if m else None
 
 
+DEFAULT_SIDE = 1          # no X1/X2 in the Connector: the importer's side (user 2026-10-09: "default to 1st")
+
+
 def area_names(side: int) -> dict:
     """{'I': ..., 'Q': ...} - each area named by its direction across the coupler (user 2026-10-09: "X1toX2,
     X2toX1"): the IN area carries partner -> local, the OUT area local -> partner, `local` = the PLC's side."""
@@ -267,8 +270,9 @@ def _transfer_areas(station, head, iocs, by_id, findings, spans) -> list:
     NAMED by their direction across the coupler (user 2026-10-09): on a coupler whose head's Connector says X1 the
     IN area is `X2toX1` and the OUT area `X1toX2` - X2 the other way round; a coupler carrying several interfaces
     appends the interface name (`X1toX2_SORTER-01`) - TIA wants unique names on a device. A Connector naming
-    neither X1 nor X2 is a blocking `hw_ta_connector_unknown` (the directions cannot be named) and no area of that
-    coupler is written. The interface = the IOC row's Mnemonic, the base = its Bit (user 2026-10-09). Lengths: the
+    neither X1 nor X2 is a `hw_ta_connector_unknown` WARN and the areas are named for X1 - the importer's side
+    when no Connector designates one (user 2026-10-09: "op5 will default to 1st, which in this case is X1").
+    The interface = the IOC row's Mnemonic, the base = its Bit (user 2026-10-09). Lengths: the
     database model's default is applied by the importer - only the IOC row's own length key (Hardware Parameters,
     `area_params`: any spelling, the last entry winning) is written, in the database's spelling, on its own area;
     another entry is a `hw_ta_param_unrouted` WARN. Blocking: a base that is no byte (`hw_ta_base_invalid`), a
@@ -283,12 +287,12 @@ def _transfer_areas(station, head, iocs, by_id, findings, spans) -> list:
     side = connector_side(head.get("connector"))
     if side is None:
         where = _where(head)
-        findings.append(_f("hw_ta_connector_unknown", "FAIL",
+        findings.append(_f("hw_ta_connector_unknown", "WARN",
                            f"coupler {station!r}: its Connector {str(head.get('connector') or '').strip()!r} names neither "
-                           "X1 nor X2 - the side this PLC's network plugs into names its transfer areas' directions "
-                           "(X1toX2 / X2toX1); none written", where, str(head.get("uid", "")),
-                           doc=_io_doc() if "!" in where else ""))
-        return out
+                           "X1 nor X2 - its transfer areas are named for X1 (X2toX1 / X1toX2), the side the importer "
+                           "picks without a designation; write X1 or X2 in the Connector cell to choose",
+                           where, str(head.get("uid", "")), doc=_io_doc() if "!" in where else ""))
+        side = DEFAULT_SIDE
     directions = area_names(side)
     several = len(named) > 1
     for ioc in iocs:

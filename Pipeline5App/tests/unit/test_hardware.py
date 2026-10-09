@@ -666,7 +666,8 @@ def test_transfer_areas_are_named_by_direction():
     """User 2026-10-09 ("i prefer X1toX2, X2toX1"): the coupler head's Connector names the PLC's side - on X1 the IN
     area (partner -> local) is X2toX1 and the OUT area X1toX2, on X2 the other way round; read from FVT's `X2` and
     the fixture's `X1-P1 R`, any case; a lone interface keeps the bare direction; a Connector naming neither side is
-    a blocking FAIL at the head with no area of that coupler written - and only on a coupler that HAS interfaces."""
+    a WARN at the head and the areas are named for X1 - the importer's side without a designation (user 2026-10-09:
+    "op5 will default to 1st") - never blocking, and only on a coupler that HAS interfaces."""
     from pipeline5.findings import gate
 
     def areas(connector, *iocs):
@@ -683,9 +684,10 @@ def test_transfer_areas_are_named_by_direction():
     for connector in ("", "X3", "P1", "X12", "BOX1"):
         found, findings = areas(connector, lone)
         eq((found, [(f.type, f.severity, f.location) for f in findings]),
-           ([], [("hw_ta_connector_unknown", "FAIL", "[NS50] row 3")]), repr(connector))
-        ok(gate.has_blocking(findings) and f"Connector {connector!r} names neither X1 nor X2" in findings[0].detail,
-           findings[0].detail)
+           ([("X2toX1", "TransferArea-IN", 14000, ""), ("X1toX2", "TransferArea-OUT", "", 14000)],
+            [("hw_ta_connector_unknown", "WARN", "[NS50] row 3")]), repr(connector))
+        ok(not gate.has_blocking(findings) and f"Connector {connector!r} names neither X1 nor X2" in findings[0].detail
+           and "named for X1" in findings[0].detail, findings[0].detail)
     eq(areas("", ("", "10000", {"index": "SORTER-01"}))[1], [], "no interface on the coupler: its Connector is not read")
 
 
