@@ -66,9 +66,14 @@ def test_attribute_orphan_only_for_signals():
 
 
 def test_attribute_interface_defines_and_mirror():
-    r = _sig(script_type="IOC", index="SORTER-01", plc_binding='"04_SPEED"."enc"', type={"type_id": "IOC"})
+    r = _sig(script_type="IOC", mnemonic="SORTER-01", index="0007", plc_binding='"04_SPEED"."enc"', type={"type_id": "IOC"})
     res = coverage.attribute([r], _outputs(iface_instances={"SORTER-01"}, iface_exprs={'"04_SPEED"."enc"'}))
     eq(res["records"][0]["interfaces"], "defines|mirror", "an IOC row defines its interface AND mirrors")
+    # C-031 (2026-10-09): the interface is named in the Mnemonic - an Index naming it defines nothing (FVT's IOC
+    # rows have no Index: they were reported ORPHAN while coverage still read it)
+    legacy = _sig(script_type="IOC", index="SORTER-01", type={"type_id": "IOC"})
+    res = coverage.attribute([legacy], _outputs(iface_instances={"SORTER-01"}))
+    eq(res["records"][0]["interfaces"], "", "named only in the Index: no interface")
 
 
 def test_attribute_hardware_station_and_module():

@@ -205,7 +205,7 @@ def attribute(rows, outputs) -> dict:
         if binding and binding in diagb:
             place["diagnosis"].add("yes")
         if str(r.get("script_type", "")).strip().upper() == identity.INTERFACE_TRIGGER_TYPE \
-                and str(r.get("index", "") or "").strip() in ifi:
+                and str(r.get("mnemonic", "") or "").strip() in ifi:     # the interface's name ([[C-031]])
             place["interfaces"].add("defines")
         if binding and binding in ifx:
             place["interfaces"].add("mirror")
