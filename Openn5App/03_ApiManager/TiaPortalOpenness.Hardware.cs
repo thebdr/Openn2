@@ -38,9 +38,10 @@ namespace Openn._03_ApiManager
 
         /// <summary>
         /// The stations the last generation run created, in creation order - their slots on the ONE row Openness puts
-        /// them on in the network view ("Re-arrange devices" drags them from there). Controllers only in create-new mode.
+        /// them on in the network view ("Re-arrange devices" drags them from there, one row per Stations.csv Group).
+        /// Controllers only in create-new mode.
         /// </summary>
-        public List<string> LastCreatedStations { get; } = new List<string>();
+        public List<NetworkViewLayout.Station> LastCreatedStations { get; } = new List<NetworkViewLayout.Station>();
 
         #endregion Hardware generation state
 
@@ -211,7 +212,7 @@ namespace Openn._03_ApiManager
                     var device = (plcGroup != null ? plcGroup.Devices : project.Devices)
                         .CreateWithItem(HwDb.Identifier[c.identifier].identifier, c.name, c.name);
                     ioControllers.Add(new Tuple<Device, DeviceItem>(device, null));
-                    LastCreatedStations.Add(device.Name);
+                    LastCreatedStations.Add(new NetworkViewLayout.Station { Name = device.Name, Group = c.group });
                     Log("IoController Creation Ok: device " + device.Name + " (" + HwDb.Identifier[c.identifier].comment + ") created");
 
                     netInterface = FindNetworkInterface(device.DeviceItems, c.connector, c.name);
@@ -492,7 +493,7 @@ namespace Openn._03_ApiManager
 
                 Log("IoDevice Creation Ok: IoDevice " + _device.Name + " (" + HwDb.Identifier[d.Item1.identifier].comment + ") created - " + stationParameters);
                 createdCount++;
-                LastCreatedStations.Add(_device.Name);
+                LastCreatedStations.Add(new NetworkViewLayout.Station { Name = _device.Name, Group = d.Item1.group });
             }
 
             Log("IoDevice generation finished: " + createdCount + " of " + _devicesList.Count + " IO device(s) created" + SkippedSuffix(skippedCount) +

@@ -583,12 +583,14 @@ namespace Openn
         /// </summary>
         private void btnArrangeDevices_Click(object sender, RoutedEventArgs e)
         {
-            IList<string> stations = tia.LastCreatedStations.ToList();
+            IList<NetworkViewLayout.Station> stations = tia.LastCreatedStations.ToList();
             string source = "the last hardware generation run";
             if (stations.Count == 0)
             {
                 var loaded = Openn._01_Constructor.HardwareIoDevices.DevicesList;
-                stations = loaded != null ? loaded.Select(d => d.Item1.name).ToList() : new List<string>();
+                stations = loaded != null
+                    ? loaded.Select(d => new NetworkViewLayout.Station { Name = d.Item1.name, Group = d.Item1.group }).ToList()
+                    : new List<NetworkViewLayout.Station>();
                 source = "the loaded configuration - no generation ran in this session, so stations that already existed are NOT on the default row";
             }
             var window = new ArrangeDevicesWindow(stations, source, () => tia.AttachedProcessId) { Owner = this };

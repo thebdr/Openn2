@@ -225,8 +225,10 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   and has no layout call; TIA's editors are invisible to UI Automation and keys do not move objects (verified
   2026-10-09) - only a mouse drag does. So the Files tab's "Re-arrange devices.." takes the last generation's
   stations in creation order (`TiaPortalOpenness.LastCreatedStations`; the loaded IO-device list stands in without
-  a generation, with a warning), plans rows by the station name's middle dash segments (a run of equal keys = one
-  row, columns = order; row 0 never moves), and after the user opens the view, zooms until everything fits and
+  a generation, with a warning), plans rows by the Stations.csv Group column (one row per group, at most 7 per row - the box in the
+  window - a longer group wraps onto the next free row; rows in order of first appearance; the first row is
+  compacted LAST, after the others moved away, so every drop lands on a free spot - `MovesInSafeOrder`), and
+  after the user opens the view, zooms until everything fits and
   calibrates three points with the global hotkey F9 (first station, last station, first cell of row 2), brings
   TIA to the front (`AttachedProcessId`) and drags each station with SendInput from its default slot to its cell.
   F12 or a foreground change stops it; the drags never run while another window is in front. Pitch = (last -
@@ -481,6 +483,7 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
    ports; generate again: `already connected`; a malformed cell fails the load with file/line; unticked with links
    present logs `Topology links in Stations.csv NOT wired`.
 18. **Re-arrange devices**: right after a generation, open the network view, zoom out so the row and the rows below fit,
-   press "Re-arrange devices..", F9 on the first station, F9 on the last, F9 one row below the first, Start: the
-   stations of every later group move to their own row (log `Re-arrange: <station> -> row r, column c`), row 1
-   stays; F12 stops mid-way; alt-tabbing away stops with `lost the foreground`; a plan off-screen is refused.
+   press "Re-arrange devices..", F9 on the first station, F9 on the last, F9 one row below the first, Start: every
+   Group gets its own row(s), at most 7 per row (the box in the window; a group of 9 fills row 1 with 7 and puts 2 on
+   the next free row), logged `Re-arrange: <station> -> row r, column c (<group>)`; the first group's row is compacted
+   last; F12 stops mid-way; alt-tabbing away stops with `lost the foreground`; a plan off-screen is refused.

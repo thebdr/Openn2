@@ -8,15 +8,22 @@ namespace Openn._01_Constructor
     /// The row/column plan behind "Re-arrange devices": Openness creates every station on ONE row of the
     /// network (and topology) view, in creation order, at a constant pitch, and the API offers no layout call
     /// (verified 2026-10-09: no position/layout member in Openness V15-V19, TIA's editors are invisible to UI
-    /// Automation, only a mouse drag moves an object). So the plan keys each station by the middle dash
-    /// segments of its name (n0006-tric-aec01-K25101 -> "tric-aec01"; fewer than three segments = the whole
-    /// name) and makes every RUN of consecutive equal keys one row, in creation order; the column is the
-    /// position within the run. Row 0 therefore never moves (its columns equal the default slots); the other
-    /// rows are empty space below the default row, so every drag lands on a free cell. Pure arithmetic, no TIA:
-    /// the window turns the cells into mouse drags from the calibrated default row.
+    /// Automation, only a mouse drag moves an object). The plan groups the stations by their Stations.csv
+    /// <c>Group</c> column (the device-group path; empty = "(no group)"): a group owns one row after another,
+    /// at most <see cref="MaxPerRow"/> stations per row (a longer group wraps onto the next free row); rows are
+    /// handed out in the order the groups first appear in the creation order, columns = the position within the
+    /// group's row. Pure arithmetic, no TIA: the window turns the cells into mouse drags from the calibrated
+    /// default row, in <see cref="MovesInSafeOrder"/> - every drop must land on a free spot.
     /// </summary>
     public sealed class NetworkViewLayout
     {
+        /// <summary>A station on the default row: its name and its Stations.csv Group.</summary>
+        public sealed class Station
+        {
+            public string Name;
+            public string Group;
+        }
+
         /// <summary>One station: its default slot (Index on row 0) and its target cell.</summary>
         public sealed class Cell
         {
@@ -25,51 +32,72 @@ namespace Openn._01_Constructor
             public int Index;
             public int Row;
             public int Column;
-            /// <summary>False for row 0: a station on the first run already sits where it belongs.</summary>
+            /// <summary>False when the target cell is the default slot (row 0, column = index).</summary>
             public bool NeedsMove => Row != 0 || Column != Index;
         }
 
+        public const int DefaultMaxPerRow = 7;
+        public const string NoGroup = "(no group)";
+
         public IList<Cell> Cells { get; }
         public int RowCount { get; }
+        public int MaxPerRow { get; }
         public int Moves => Cells.Count(c => c.NeedsMove);
 
-        public NetworkViewLayout(IEnumerable<string> stationsInCreationOrder)
+        public NetworkViewLayout(IEnumerable<Station> stationsInCreationOrder, int maxPerRow = DefaultMaxPerRow)
         {
+            MaxPerRow = Math.Max(1, maxPerRow);
             var cells = new List<Cell>();
-            int row = -1, column = 0;
-            string previousKey = null;
+            var groupRow = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);     //the row the group is filling
+            var groupColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);  //the next column on that row
+            int nextRow = 0;
             int index = 0;
-            foreach (string name in stationsInCreationOrder)
+            foreach (Station station in stationsInCreationOrder)
             {
-                string key = KeyOf(name);
-                if (row < 0 || !string.Equals(key, previousKey, StringComparison.OrdinalIgnoreCase))
+                string key = KeyOf(station.Group);
+                int column;
+                if (!groupColumn.TryGetValue(key, out column) || column >= MaxPerRow)
                 {
-                    row++;
+                    //the group's first station, or its row is full: the next free row is its
+                    groupRow[key] = nextRow++;
                     column = 0;
-                    previousKey = key;
                 }
-                cells.Add(new Cell { Name = name, Key = key, Index = index, Row = row, Column = column });
+                cells.Add(new Cell { Name = station.Name, Key = key, Index = index, Row = groupRow[key], Column = column });
+                groupColumn[key] = column + 1;
                 index++;
-                column++;
             }
             Cells = cells;
-            RowCount = row + 1;
+            RowCount = nextRow;
         }
 
-        /// <summary>The row key of a station name: the dash segments between the first and the last one.</summary>
-        public static string KeyOf(string name)
+        /// <summary>The row key of a station: its Group as written in Stations.csv, "(no group)" when empty.</summary>
+        public static string KeyOf(string group) =>
+            string.IsNullOrWhiteSpace(group) ? NoGroup : group.Trim();
+
+        /// <summary>
+        /// The moves in an order where every drop lands on a free spot: first every station bound for a row
+        /// below the default row (those rows are empty), then the stations that stay on row 0, compacted left to
+        /// right - by then the slots they move into have been vacated by stations that went down (or by row-0
+        /// stations already compacted further left).
+        /// </summary>
+        public IEnumerable<Cell> MovesInSafeOrder()
         {
-            string[] parts = (name ?? string.Empty).Split('-');
-            if (parts.Length < 3) return name ?? string.Empty;
-            return string.Join("-", parts, 1, parts.Length - 2);
+            foreach (Cell cell in Cells.Where(c => c.NeedsMove && c.Row > 0)) yield return cell;
+            foreach (Cell cell in Cells.Where(c => c.NeedsMove && c.Row == 0).OrderBy(c => c.Column)) yield return cell;
         }
 
-        /// <summary>One line per row: "row 2 (lb-ae01): n0023-lb-ae01-K30001, n0030-lb-ae02-K30001".</summary>
+        /// <summary>One line per row: "row 2 (=TRIC_IODevices, continued): n0013-..., n0014-..." with a note for the row that stays.</summary>
         public IEnumerable<string> Describe()
         {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var group in Cells.GroupBy(c => c.Row).OrderBy(g => g.Key))
-                yield return "row " + (group.Key + 1) + " (" + group.First().Key + "): " + string.Join(", ", group.Select(c => c.Name)) +
-                             (group.Key == 0 ? "  - stays on the default row" : string.Empty);
+            {
+                string key = group.First().Key;
+                bool continued = !seen.Add(key);
+                yield return "row " + (group.Key + 1) + " (" + key + (continued ? ", continued" : string.Empty) + "): " +
+                             string.Join(", ", group.OrderBy(c => c.Column).Select(c => c.Name)) +
+                             (group.Key == 0 ? (group.Any(c => c.NeedsMove) ? "  - the default row, compacted last" : "  - stays on the default row") : string.Empty);
+            }
         }
     }
 }
