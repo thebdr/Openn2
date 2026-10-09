@@ -229,7 +229,10 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   window - a longer group wraps onto the next free row; rows in order of first appearance; the first row is
   compacted LAST, after the others moved away, so every drop lands on a free spot - `MovesInSafeOrder`), and
   after the user opens the view, zooms until the rows fit vertically and the first columns horizontally, and
-  calibrates with the global hotkey F9: the first station, the second, the first cell of row 2, the four scrollbar
+  calibrates - in a step-by-step WIZARD (a coloured step strip, one card per step with a drawing of what to hover, a
+  pulsing "then press F9" pill, the derived numbers on the side; colourful on purpose - it underlines the two numbers,
+  X and Y, that Openness will not give) - with the global hotkey F9: the first station, the second, the first cell of
+  row 2, the four scrollbar
   ARROW buttons (< > ^ v); the robot then clicks > 8 times and v 6 times and the user re-hovers the first station
   after each, which measures the scroll step in px per click. From then on the robot scrolls by COUNTED clicks
   (the user's model, 2026-10-10: exact, no pixel reading), brings TIA to the front (`AttachedProcessId`) and drags
