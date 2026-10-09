@@ -242,11 +242,22 @@ def _zip(path, parts):
             z.writestr(name, content if isinstance(content, bytes) else content.encode("utf-8"))
 
 
+def _devmode() -> bytes:
+    """A minimal well-formed DEVMODEW (220 bytes: a device name, spec 0x0401, size 220, orientation + paper size
+    set - landscape A4). Excel parses the printer-settings part and REFUSES a workbook whose blob is not one
+    (checked 2026-10-09), so the fixture carries a real-shaped one."""
+    import struct
+    return ("Fixture Printer".encode("utf-16-le").ljust(64, b"\0") + struct.pack("<HHHHI", 0x0401, 0, 220, 0, 0x3)
+            + struct.pack("<8h", 2, 9, 0, 0, 100, 1, 0, 0) + struct.pack("<5h", 0, 0, 0, 0, 0) + b"\0" * 64
+            + struct.pack("<HIII", 0, 0, 0, 0) + struct.pack("<II", 0, 0) + b"\0" * 32)
+
+
 def _modern_iolist(path, defined_names=()):
     """An I/O List as a modern Excel writes it - with what openpyxl cannot carry: a DYNAMIC ARRAY (cm +
     xl/metadata.xml), a THREADED comment (threadedComments + persons + its legacy placeholder), an add-in
     binding (webextensions), a featurePropertyBag, printer settings, an EMPTY-TEXT cell, a calcChain, a
-    cached formula, a table (T_Types, id 1), no <numFmts> and a self-closing <dxfs/>."""
+    cached formula, a table (T_Types, id 1), no <numFmts> and a self-closing <dxfs/>. Excel 16 opens it
+    (checked 2026-10-09: the array spills 1 / 2 / 3, one threaded comment, landscape)."""
     dn = "".join(f'<definedName name="{n}">FamilyCheck!$A$1</definedName>' for n in defined_names)
     ms = "http://schemas.microsoft.com/office"
     _zip(path, {
@@ -386,7 +397,7 @@ def _modern_iolist(path, defined_names=()):
         "xl/featurePropertyBag/featurePropertyBag.xml": (
             _DECL + f'<FeaturePropertyBags xmlns="{ms}/spreadsheetml/2022/featurepropertybag">'
             '<bag type="Checkbox"/></FeaturePropertyBags>'),
-        "xl/printerSettings/printerSettings1.bin": b"\x00\x01PRINTER\xff\x00" * 8,
+        "xl/printerSettings/printerSettings1.bin": _devmode(),
         "xl/calcChain.xml": (
             _DECL + '<calcChain xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             '<c r="B2" i="1" a="1"/><c r="D2"/></calcChain>'),
