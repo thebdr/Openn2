@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V18" />
+  <SW.Blocks.InstanceDB ID="0">
+    <AttributeList>
+      <InstanceOfName>02_Safety_Door</InstanceOfName>
+      <InstanceOfType>FB</InstanceOfType>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input">
+    <Member Name="Bypass_For_Commissioning" Datatype="Bool" />
+    <Member Name="DIAG" Datatype="Bool" />
+    <Member Name="CH1" Datatype="Bool" />
+    <Member Name="CH2" Datatype="Bool" />
+    <Member Name="Sorter_Running_from MSC" Datatype="Bool" />
+    <Member Name="Sorter_Stop_from_Encoder" Datatype="Bool" />
+    <Member Name="Open_Request" Datatype="Bool" />
+    <Member Name="Alarm_Filter" Datatype="Bool" />
+    <Member Name="Sorter_Door" Datatype="Bool" />
+    <Member Name="ACK_NEC" Datatype="Bool" />
+    <Member Name="ACK" Datatype="Bool" />
+    <Member Name="ON_Lamp" Datatype="Bool" />
+  </Section>
+  <Section Name="Output">
+    <Member Name="Solenoid" Datatype="Bool" />
+    <Member Name="EM_Cut" Datatype="Bool" />
+    <Member Name="EM_Cut_Delay" Datatype="Bool" />
+    <Member Name="Diag_Open" Datatype="Bool" />
+    <Member Name="Diag_Alarm" Datatype="Bool" />
+    <Member Name="Reset_Lamp" Datatype="Bool" />
+  </Section>
+  <Section Name="InOut" />
+  <Section Name="Static">
+    <Member Name="E-STOP" Datatype="ESTOP1" Version="1.6" />
+    <Member Name="TON_Alarm" Datatype="TON" Version="1.4" />
+    <Member Name="TOF_DoorLamp" Datatype="TOF" Version="1.4" />
+  </Section>
+</Sections></Interface>
+      <Name>=S1+MA1-QQ1</Name>
+      <Namespace />
+      <Number>21</Number>
+      <ProgrammingLanguage>F_DB</ProgrammingLanguage>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <MultilingualText ID="3" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="4" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.InstanceDB>
+</Document>

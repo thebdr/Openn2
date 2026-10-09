@@ -1,0 +1,10 @@
+﻿DATA_BLOCK "!!instanceOf-BoolToUDInt_Inverted_Filtered_Tristate$$"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"BoolToUDInt_Inverted_Filtered_Tristate"
+
+BEGIN
+
+END_DATA_BLOCK
+

@@ -1,0 +1,14 @@
+﻿FUNCTION "00_Diagnostic PB" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+NETWORK
+TITLE = Diagnostic to MSC via Coupler
+
+//To be used only in case of diagnostic to MSC via COupler
+//From Safety Pilot, insert what you find in the file "00_Diagnostic PB.txt"
+
+
+END_FUNCTION
+

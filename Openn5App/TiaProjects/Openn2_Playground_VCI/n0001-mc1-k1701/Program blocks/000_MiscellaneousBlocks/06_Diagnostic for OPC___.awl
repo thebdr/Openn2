@@ -1,0 +1,43 @@
+﻿FUNCTION "06_Diagnostic for OPC___" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//To be used only in case of diagnostic to MSC via OPC UA
+//From Safety Pilot, insert what you find in the file "06_Diagnostic for OPC.txt"
+//ONE CABINET AT A TIME!
+//One network per cabinet
+//
+
+BEGIN
+NETWORK
+TITLE = Cabinet =S1+MC1
+
+// Cabinet =S1+MC1
+
+      CALL "CabState", "S1.CABINET000.STATE"
+      (  ALARM1                      := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.ALARM1" , 
+         ALARM2                      := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.ALARM2" , 
+         WARNING1                    := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.WARNING1" , 
+         WARNING2                    := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.WARNING2" , 
+         STATE                       := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.STATE"
+      );
+      CALL "BoolToUDInt_Inverted_Filtered", "S1.CABINET000.ALARM1"
+      (  TEST_MODE                   := "S1.CABINET000.ALARM1".TEST_MODE_ENABLED , 
+         "UDint"                     := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.ALARM1"
+      );
+
+      CALL "BoolToUDInt_Inverted_Filtered", "S1.CABINET000.ALARM2"
+      (  IN_30                       := "08_AL_FILTER"."n0003-mc1-k3201_SN10" , 
+         ML_30                       := TRUE , 
+         "UDint"                     := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.ALARM2"
+      );
+
+      CALL "BoolToUDInt_Inverted_Filtered", "S1.CABINET000.WARNING1"
+      (  "UDint"                     := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.WARNING1"
+      );
+
+      CALL "BoolToUDInt_Inverted_Filtered", "S1.CABINET000.WARNING2"
+      (  "UDint"                     := "DiagnosticTags"."S1.CABINET!!cabinetIndex$$.WARNING2"
+      );
+
+END_FUNCTION
+

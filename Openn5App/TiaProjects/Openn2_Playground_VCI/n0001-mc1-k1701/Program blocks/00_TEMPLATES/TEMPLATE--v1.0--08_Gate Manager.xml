@@ -1,0 +1,325 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V18" />
+  <SW.Blocks.FC ID="0">
+    <AttributeList>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input" />
+  <Section Name="Output" />
+  <Section Name="InOut" />
+  <Section Name="Temp">
+    <Member Name="temp_EXAMPLE_OPEN" Datatype="Bool" />
+  </Section>
+  <Section Name="Constant" />
+  <Section Name="Return">
+    <Member Name="Ret_Val" Datatype="Void" />
+  </Section>
+</Sections></Interface>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>TEMPLATE--v1.0--08_Gate Manager</Name>
+      <Namespace />
+      <Number>25</Number>
+      <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>v1.0 First Emission</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="SPEED_STATE_REC" />
+        <Component Name="RCV_DATA" />
+        <Component Name="!!SPEED_STATE_REC.SORTER_{index}_STOPPED$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="!!05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING$$" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="23" />
+    <Part Name="Coil" UId="24" />
+  </Parts>
+  <Wires>
+    <Wire UId="25">
+      <Powerrail />
+      <NameCon UId="23" Name="in" />
+    </Wire>
+    <Wire UId="26">
+      <IdentCon UId="21" />
+      <NameCon UId="23" Name="operand" />
+    </Wire>
+    <Wire UId="27">
+      <NameCon UId="23" Name="out" />
+      <NameCon UId="24" Name="in" />
+    </Wire>
+    <Wire UId="28">
+      <IdentCon UId="22" />
+      <NameCon UId="24" Name="operand" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Transfer Data from Speed Control</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="8" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="GlobalVariable" UId="21">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="!!00_Commissioning.{db_element}$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="!!tagName:DoorClosedDiagInput$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="!!tagName:DoorClosedCh1$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="24">
+      <Symbol>
+        <Component Name="!!tagName:DoorClosedCh2$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="25">
+      <Symbol>
+        <Component Name="!!tagName:SorterRunningIOC$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="26">
+      <Symbol>
+        <Component Name="05_EM_STATE" />
+        <Component Name="!!05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="27">
+      <Symbol>
+        <Component Name="!!tagName:DoorOpenRequest$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="28">
+      <Symbol>
+        <Component Name="!!choice:IsSorterDoor$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="29">
+      <Symbol>
+        <Component Name="!!choice:DoorResetNecessary$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="30">
+      <Symbol>
+        <Component Name="!!tagName:DoorClosedCh1$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="31">
+      <Symbol>
+        <Component Name="!!tagName:DoorSolenoidUnlock$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="32">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="!!07_DOOR.{db_element:DI1/2}$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="33">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="!!07_DOOR.{db_element:DI2/2}$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="34">
+      <Symbol>
+        <Component Name="07_DOOR" />
+        <Component Name="!!07_DOOR.{db_element:DD}$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="35">
+      <Symbol>
+        <Component Name="!!tagName:DoorResetLamp$$" />
+      </Symbol>
+    </Access>
+    <Call UId="36">
+      <CallInfo Name="02_Safety_Door" BlockType="FB">
+        <Instance Scope="GlobalVariable" UId="37">
+          <Component Name="!!instanceOf-02_Safety_Door$$" />
+        </Instance>
+        <Parameter Name="Bypass_For_Commissioning" Section="Input" Type="Bool" />
+        <Parameter Name="DIAG" Section="Input" Type="Bool" />
+        <Parameter Name="CH1" Section="Input" Type="Bool" />
+        <Parameter Name="CH2" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Running_from MSC" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Stop_from_Encoder" Section="Input" Type="Bool" />
+        <Parameter Name="Open_Request" Section="Input" Type="Bool" />
+        <Parameter Name="Alarm_Filter" Section="Input" Type="Bool" />
+        <Parameter Name="Sorter_Door" Section="Input" Type="Bool" />
+        <Parameter Name="ACK_NEC" Section="Input" Type="Bool" />
+        <Parameter Name="ACK" Section="Input" Type="Bool" />
+        <Parameter Name="ON_Lamp" Section="Input" Type="Bool" />
+        <Parameter Name="Solenoid" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut" Section="Output" Type="Bool" />
+        <Parameter Name="EM_Cut_Delay" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Open" Section="Output" Type="Bool" />
+        <Parameter Name="Diag_Alarm" Section="Output" Type="Bool" />
+        <Parameter Name="Reset_Lamp" Section="Output" Type="Bool" />
+      </CallInfo>
+    </Call>
+  </Parts>
+  <Wires>
+    <Wire UId="41">
+      <Powerrail />
+      <NameCon UId="36" Name="en" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="21" />
+      <NameCon UId="36" Name="Bypass_For_Commissioning" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="22" />
+      <NameCon UId="36" Name="DIAG" />
+    </Wire>
+    <Wire UId="44">
+      <IdentCon UId="23" />
+      <NameCon UId="36" Name="CH1" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="24" />
+      <NameCon UId="36" Name="CH2" />
+    </Wire>
+    <Wire UId="46">
+      <IdentCon UId="25" />
+      <NameCon UId="36" Name="Sorter_Running_from MSC" />
+    </Wire>
+    <Wire UId="47">
+      <IdentCon UId="26" />
+      <NameCon UId="36" Name="Sorter_Stop_from_Encoder" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="27" />
+      <NameCon UId="36" Name="Open_Request" />
+    </Wire>
+    <Wire UId="49">
+      <OpenCon UId="38" />
+      <NameCon UId="36" Name="Alarm_Filter" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="28" />
+      <NameCon UId="36" Name="Sorter_Door" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="29" />
+      <NameCon UId="36" Name="ACK_NEC" />
+    </Wire>
+    <Wire UId="52">
+      <IdentCon UId="30" />
+      <NameCon UId="36" Name="ACK" />
+    </Wire>
+    <Wire UId="53">
+      <OpenCon UId="39" />
+      <NameCon UId="36" Name="ON_Lamp" />
+    </Wire>
+    <Wire UId="54">
+      <NameCon UId="36" Name="Solenoid" />
+      <IdentCon UId="31" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="36" Name="EM_Cut" />
+      <IdentCon UId="32" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="36" Name="EM_Cut_Delay" />
+      <OpenCon UId="40" />
+    </Wire>
+    <Wire UId="57">
+      <NameCon UId="36" Name="Diag_Open" />
+      <IdentCon UId="33" />
+    </Wire>
+    <Wire UId="58">
+      <NameCon UId="36" Name="Diag_Alarm" />
+      <IdentCon UId="34" />
+    </Wire>
+    <Wire UId="59">
+      <NameCon UId="36" Name="Reset_Lamp" />
+      <IdentCon UId="35" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="9" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="A" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="B" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="C" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>!!NetworkComment$$</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="D" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="E" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>Manage Safety Doors</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.FC>
+</Document>

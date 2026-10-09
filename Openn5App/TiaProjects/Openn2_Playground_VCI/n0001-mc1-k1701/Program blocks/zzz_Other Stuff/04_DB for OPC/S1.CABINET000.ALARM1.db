@@ -1,0 +1,11 @@
+﻿DATA_BLOCK "S1.CABINET000.ALARM1"
+{ DB_Accessible_From_OPC_UA := 'FALSE' ;
+ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"BoolToUDInt_Inverted_Filtered"
+
+BEGIN
+
+END_DATA_BLOCK
+

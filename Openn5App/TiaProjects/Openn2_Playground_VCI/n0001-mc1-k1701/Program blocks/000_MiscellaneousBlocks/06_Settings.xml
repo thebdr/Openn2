@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V18" />
+  <SW.Blocks.GlobalDB ID="0">
+    <AttributeList>
+      <DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Static">
+    <Member Name="Tristate" Datatype="Bool" />
+    <Member Name="Reactivation_Delay" Datatype="Time">
+      <StartValue>T#10ms</StartValue>
+    </Member>
+    <Member Name="Blink_Cyle_Time" Datatype="Time">
+      <StartValue>T#1S_260MS</StartValue>
+    </Member>
+    <Member Name="ON_Time" Datatype="Time">
+      <StartValue>T#630MS</StartValue>
+    </Member>
+    <Member Name="N_TRIG_RESET" Datatype="Time" />
+  </Section>
+</Sections></Interface>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>06_Settings</Name>
+      <Namespace />
+      <Number>8</Number>
+      <ProgrammingLanguage>F_DB</ProgrammingLanguage>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <MultilingualText ID="3" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="4" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.GlobalDB>
+</Document>

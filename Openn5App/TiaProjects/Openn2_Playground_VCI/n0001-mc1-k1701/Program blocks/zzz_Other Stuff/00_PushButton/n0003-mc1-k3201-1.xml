@@ -1,0 +1,110 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V18" />
+  <SW.Blocks.InstanceDB ID="0">
+    <AttributeList>
+      <InstanceOfName>00_Push-Button_Input</InstanceOfName>
+      <InstanceOfType>FB</InstanceOfType>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input">
+    <Member Name="Bypass_ET200" Datatype="Bool" />
+    <Member Name="IN_1" Datatype="Bool" />
+    <Member Name="IN_2" Datatype="Bool" />
+    <Member Name="IN_3" Datatype="Bool" />
+    <Member Name="IN_4" Datatype="Bool" />
+    <Member Name="ON_Tristate" Datatype="Bool" />
+    <Member Name="NormOpenDiag" Datatype="Bool" />
+    <Member Name="ON_Lamp" Datatype="Bool" />
+    <Member Name="RESET" Datatype="Bool" />
+    <Member Name="REAC_DELAY" Datatype="Time">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="BLINK_CYCLE_TIME" Datatype="Time" />
+    <Member Name="ON_TIME" Datatype="Time" />
+  </Section>
+  <Section Name="Output">
+    <Member Name="OUT_1" Datatype="Bool" />
+    <Member Name="OUT_2" Datatype="Bool" />
+    <Member Name="OUT_3" Datatype="Bool" />
+    <Member Name="OUT_4" Datatype="Bool" />
+    <Member Name="Diag_1" Datatype="Bool" />
+    <Member Name="Diag_2" Datatype="Bool" />
+    <Member Name="Diag_3" Datatype="Bool" />
+    <Member Name="Diag_4" Datatype="Bool" />
+    <Member Name="Lamp_1" Datatype="Bool" />
+    <Member Name="Lamp_2" Datatype="Bool" />
+    <Member Name="Lamp_3" Datatype="Bool" />
+    <Member Name="Lamp_4" Datatype="Bool" />
+  </Section>
+  <Section Name="InOut" />
+  <Section Name="Static">
+    <Member Name="TON_1" Datatype="TON" Version="1.4">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="TON_2" Datatype="TON" Version="1.4">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="TON_3" Datatype="TON" Version="1.4">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="TON_4" Datatype="TON" Version="1.4">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="TOF_Lamp1" Datatype="TOF" Version="1.4" />
+    <Member Name="TOF_Lamp2" Datatype="TOF" Version="1.4" />
+    <Member Name="TOF_Lamp3" Datatype="TOF" Version="1.4" />
+    <Member Name="TOF_Lamp4" Datatype="TOF" Version="1.4" />
+    <Member Name="PRESSED_1" Datatype="Bool" />
+    <Member Name="PRESSED_2" Datatype="Bool" />
+    <Member Name="PRESSED_3" Datatype="Bool" />
+    <Member Name="PRESSED_4" Datatype="Bool" />
+    <Member Name="s_IN_1_P" Datatype="Bool" />
+    <Member Name="s_IN_2_P" Datatype="Bool" />
+    <Member Name="s_IN_3_P" Datatype="Bool" />
+    <Member Name="s_IN_4_P" Datatype="Bool" />
+    <Member Name="s_IN_1_N" Datatype="Bool" />
+    <Member Name="s_IN_2_N" Datatype="Bool" />
+    <Member Name="s_IN_3_N" Datatype="Bool" />
+    <Member Name="s_IN_4_N" Datatype="Bool" />
+    <Member Name="DUTY_CYCLE" Datatype="Time" />
+  </Section>
+</Sections></Interface>
+      <Name>n0003-mc1-k3201-1</Name>
+      <Namespace />
+      <Number>9</Number>
+      <ProgrammingLanguage>F_DB</ProgrammingLanguage>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <MultilingualText ID="3" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="4" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.InstanceDB>
+</Document>

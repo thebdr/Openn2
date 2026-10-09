@@ -1,0 +1,5146 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V18" />
+  <SW.Blocks.FB ID="0">
+    <AttributeList>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input">
+    <Member Name="IN_00" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_00" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_00" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_01" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_01" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_01" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_02" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_02" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_02" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_03" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_03" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_03" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_04" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_04" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_04" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_05" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_05" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_05" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_06" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_06" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_06" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_07" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_07" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_07" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_08" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_08" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_08" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_09" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_09" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_09" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_10" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_10" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_10" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_11" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_11" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_11" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_12" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_12" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_12" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_13" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_13" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_13" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_14" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_14" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_14" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_15" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_15" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_15" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_16" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_16" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_16" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_17" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_17" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_17" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_18" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_18" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_18" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_19" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_19" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_19" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_20" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_20" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_20" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_21" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_21" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_21" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_22" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_22" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_22" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_23" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_23" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_23" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_24" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_24" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_24" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_25" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_25" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_25" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_26" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_26" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_26" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_27" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_27" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_27" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_28" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_28" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_28" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_29" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_29" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_29" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_30" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_30" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_30" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="IN_31" Datatype="Bool">
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="ML_31" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Use Mirror Logic [OUTPUT := INPUT] | Default=TRUE</MultiLanguageText>
+      </Comment>
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="FL_31" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Filter [OUTPUT := FALSE when FL = TRUE]</MultiLanguageText>
+      </Comment>
+      <StartValue>false</StartValue>
+    </Member>
+    <Member Name="RESET_Necessary" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">If false, alarms will reset when the condition is false</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="RESET_Command" Datatype="Bool">
+      <Comment>
+        <MultiLanguageText Lang="en-US">RESET Tristate Memory (Alarm was ON)</MultiLanguageText>
+      </Comment>
+    </Member>
+  </Section>
+  <Section Name="Output">
+    <Member Name="Tristate_DW" Datatype="UDInt" />
+  </Section>
+  <Section Name="InOut">
+    <Member Name="Alarm_Warning_DW" Datatype="UDInt" />
+  </Section>
+  <Section Name="Static">
+    <Member Name="TEST_MODE_ENABLED" Datatype="Bool" />
+    <Member Name="NAME_00" Datatype="WString[128]" />
+    <Member Name="BITVALUE_00" Datatype="Bool" />
+    <Member Name="NAME_01" Datatype="WString[128]" />
+    <Member Name="BITVALUE_01" Datatype="Bool" />
+    <Member Name="NAME_02" Datatype="WString[128]" />
+    <Member Name="BITVALUE_02" Datatype="Bool" />
+    <Member Name="NAME_03" Datatype="WString[128]" />
+    <Member Name="BITVALUE_03" Datatype="Bool" />
+    <Member Name="NAME_04" Datatype="WString[128]" />
+    <Member Name="BITVALUE_04" Datatype="Bool" />
+    <Member Name="NAME_05" Datatype="WString[128]" />
+    <Member Name="BITVALUE_05" Datatype="Bool" />
+    <Member Name="NAME_06" Datatype="WString[128]" />
+    <Member Name="BITVALUE_06" Datatype="Bool" />
+    <Member Name="NAME_07" Datatype="WString[128]" />
+    <Member Name="BITVALUE_07" Datatype="Bool" />
+    <Member Name="NAME_08" Datatype="WString[128]" />
+    <Member Name="BITVALUE_08" Datatype="Bool" />
+    <Member Name="NAME_09" Datatype="WString[128]" />
+    <Member Name="BITVALUE_09" Datatype="Bool" />
+    <Member Name="NAME_10" Datatype="WString[128]" />
+    <Member Name="BITVALUE_10" Datatype="Bool" />
+    <Member Name="NAME_11" Datatype="WString[128]" />
+    <Member Name="BITVALUE_11" Datatype="Bool" />
+    <Member Name="NAME_12" Datatype="WString[128]" />
+    <Member Name="BITVALUE_12" Datatype="Bool" />
+    <Member Name="NAME_13" Datatype="WString[128]" />
+    <Member Name="BITVALUE_13" Datatype="Bool" />
+    <Member Name="NAME_14" Datatype="WString[128]" />
+    <Member Name="BITVALUE_14" Datatype="Bool" />
+    <Member Name="NAME_15" Datatype="WString[128]" />
+    <Member Name="BITVALUE_15" Datatype="Bool" />
+    <Member Name="NAME_16" Datatype="WString[128]" />
+    <Member Name="BITVALUE_16" Datatype="Bool" />
+    <Member Name="NAME_17" Datatype="WString[128]" />
+    <Member Name="BITVALUE_17" Datatype="Bool" />
+    <Member Name="NAME_18" Datatype="WString[128]" />
+    <Member Name="BITVALUE_18" Datatype="Bool" />
+    <Member Name="NAME_19" Datatype="WString[128]" />
+    <Member Name="BITVALUE_19" Datatype="Bool" />
+    <Member Name="NAME_20" Datatype="WString[128]" />
+    <Member Name="BITVALUE_20" Datatype="Bool" />
+    <Member Name="NAME_21" Datatype="WString[128]" />
+    <Member Name="BITVALUE_21" Datatype="Bool" />
+    <Member Name="NAME_22" Datatype="WString[128]" />
+    <Member Name="BITVALUE_22" Datatype="Bool" />
+    <Member Name="NAME_23" Datatype="WString[128]" />
+    <Member Name="BITVALUE_23" Datatype="Bool" />
+    <Member Name="NAME_24" Datatype="WString[128]" />
+    <Member Name="BITVALUE_24" Datatype="Bool" />
+    <Member Name="NAME_25" Datatype="WString[128]" />
+    <Member Name="BITVALUE_25" Datatype="Bool" />
+    <Member Name="NAME_26" Datatype="WString[128]" />
+    <Member Name="BITVALUE_26" Datatype="Bool" />
+    <Member Name="NAME_27" Datatype="WString[128]" />
+    <Member Name="BITVALUE_27" Datatype="Bool" />
+    <Member Name="NAME_28" Datatype="WString[128]" />
+    <Member Name="BITVALUE_28" Datatype="Bool" />
+    <Member Name="NAME_29" Datatype="WString[128]" />
+    <Member Name="BITVALUE_29" Datatype="Bool" />
+    <Member Name="NAME_30" Datatype="WString[128]" />
+    <Member Name="BITVALUE_30" Datatype="Bool" />
+    <Member Name="NAME_31" Datatype="WString[128]" />
+    <Member Name="BITVALUE_31" Datatype="Bool" />
+    <Member Name="AUX" Datatype="Struct">
+      <Member Name="READ_PARAM_NAME_DONE" Datatype="Bool">
+        <StartValue>FALSE</StartValue>
+      </Member>
+      <Member Name="TON_RESET_TEST_MODE" Datatype="TON_TIME" Version="1.0">
+        <Sections>
+          <Section Name="None">
+            <Member Name="PT" Datatype="Time">
+              <StartValue>T#10m</StartValue>
+            </Member>
+          </Section>
+        </Sections>
+      </Member>
+      <Member Name="MERKERS" Datatype="Array[0..7] of Bool">
+        <AttributeList>
+          <BooleanAttribute Name="SetPoint" SystemDefined="true">true</BooleanAttribute>
+        </AttributeList>
+      </Member>
+    </Member>
+    <Member Name="AlarmWasON" Datatype="Array[0..31] of Bool" />
+    <Member Name="OutputMemory" Datatype="UDInt" />
+  </Section>
+  <Section Name="Temp">
+    <Member Name="AlarmIdx" Datatype="USInt" />
+    <Member Name="AlarmFallingEdge" Datatype="Bool" />
+    <Member Name="AlarmIsOn" Datatype="Bool" />
+    <Member Name="InitialAlarmsState" Datatype="UDInt" />
+  </Section>
+  <Section Name="Constant" />
+</Sections></Interface>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <MemoryReserve>100</MemoryReserve>
+      <Name>BoolToUDInt_Inverted_Filtered_Tristate</Name>
+      <Namespace />
+      <Number>74</Number>
+      <ProgrammingLanguage>LAD</ProgrammingLanguage>
+      <SetENOAutomatically>false</SetENOAutomatically>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>IN_xx =  Boolean Input Value.
+ML_xx = Mirror Logic, sets the Corresponding Output Udint bit equal to IN if True, or equal to Not IN if False).
+FL_xx = Filter (mute) the input. Corresponding Output Udint bit is always false when FL is true.</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v3">
+  <Token Text="IF" UId="21" />
+  <Blank UId="22" />
+  <Token Text="NOT" UId="23" />
+  <Blank UId="24" />
+  <Access Scope="LocalVariable" UId="25">
+    <Symbol UId="26">
+      <Component Name="TEST_MODE_ENABLED" UId="27" />
+    </Symbol>
+  </Access>
+  <Blank UId="28" />
+  <Token Text="THEN" UId="29" />
+  <NewLine UId="30" />
+  <Blank Num="4" UId="31" />
+  <Access Scope="LocalVariable" UId="32">
+    <Symbol UId="33">
+      <Component Name="InitialAlarmsState" UId="34" />
+    </Symbol>
+  </Access>
+  <Blank UId="35" />
+  <Token Text=":=" UId="36" />
+  <Blank UId="37" />
+  <Access Scope="LocalVariable" UId="38">
+    <Symbol UId="39">
+      <Component Name="Alarm_Warning_DW" UId="40" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="41" />
+  <NewLine UId="42" />
+  <Blank Num="4" UId="43" />
+  <NewLine UId="44" />
+  <Blank Num="4" UId="45" />
+  <LineComment UId="46">
+    <Text UId="47">reset alarms by command</Text>
+  </LineComment>
+  <NewLine UId="48" />
+  <Blank Num="4" UId="49" />
+  <Token Text="IF" UId="50" />
+  <Blank UId="51" />
+  <Access Scope="LocalVariable" UId="52">
+    <Symbol UId="53">
+      <Component Name="RESET_Command" UId="54" />
+    </Symbol>
+  </Access>
+  <Blank UId="55" />
+  <Token Text="THEN" UId="56" />
+  <NewLine UId="57" />
+  <Blank Num="8" UId="58" />
+  <Access Scope="LocalVariable" UId="59">
+    <Symbol UId="60">
+      <Component Name="OutputMemory" UId="61" />
+    </Symbol>
+  </Access>
+  <Blank UId="62" />
+  <Token Text=":=" UId="63" />
+  <Blank UId="64" />
+  <Access Scope="LiteralConstant" UId="65">
+    <Constant UId="66">
+      <ConstantValue UId="68">0</ConstantValue>
+    </Constant>
+  </Access>
+  <Token Text=";" UId="69" />
+  <NewLine UId="70" />
+  <Blank Num="8" UId="71" />
+  <Access Scope="LocalVariable" UId="72">
+    <Symbol UId="73">
+      <Component Name="InitialAlarmsState" UId="74" />
+    </Symbol>
+  </Access>
+  <Blank UId="75" />
+  <Token Text=":=" UId="76" />
+  <Blank UId="77" />
+  <Access Scope="LiteralConstant" UId="78">
+    <Constant UId="79">
+      <ConstantValue UId="81">0</ConstantValue>
+    </Constant>
+  </Access>
+  <Token Text=";" UId="82" />
+  <NewLine UId="83" />
+  <Blank Num="4" UId="84" />
+  <Token Text="END_IF" UId="85" />
+  <Token Text=";" UId="86" />
+  <NewLine UId="87" />
+  <Blank Num="4" UId="88" />
+  <NewLine UId="89" />
+  <Blank Num="4" UId="90" />
+  <LineComment UId="91">
+    <Text UId="92">set idividual bits</Text>
+  </LineComment>
+  <NewLine UId="93" />
+  <Blank Num="4" UId="94" />
+  <Access Scope="LocalVariable" UId="95">
+    <Symbol UId="96">
+      <Component Name="Alarm_Warning_DW" UId="97" />
+      <Token Text="." UId="98" />
+      <Token Text="%X0" UId="99" />
+    </Symbol>
+  </Access>
+  <Blank UId="100" />
+  <Token Text=":=" UId="101" />
+  <Blank UId="102" />
+  <Token Text="(" UId="103" />
+  <Access Scope="LocalVariable" UId="104">
+    <Symbol UId="105">
+      <Component Name="IN_00" UId="106" />
+    </Symbol>
+  </Access>
+  <Blank UId="107" />
+  <Token Text="XOR" UId="108" />
+  <Blank UId="109" />
+  <Token Text="NOT" UId="110" />
+  <Blank UId="111" />
+  <Access Scope="LocalVariable" UId="112">
+    <Symbol UId="113">
+      <Component Name="ML_00" UId="114" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="115" />
+  <Blank UId="116" />
+  <Token Text="AND" UId="117" />
+  <Blank UId="118" />
+  <Token Text="NOT" UId="119" />
+  <Blank UId="120" />
+  <Access Scope="LocalVariable" UId="121">
+    <Symbol UId="122">
+      <Component Name="FL_00" UId="123" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="124" />
+  <NewLine UId="125" />
+  <Blank Num="4" UId="126" />
+  <Access Scope="LocalVariable" UId="127">
+    <Symbol UId="128">
+      <Component Name="Alarm_Warning_DW" UId="129" />
+      <Token Text="." UId="130" />
+      <Token Text="%X1" UId="131" />
+    </Symbol>
+  </Access>
+  <Blank UId="132" />
+  <Token Text=":=" UId="133" />
+  <Blank UId="134" />
+  <Token Text="(" UId="135" />
+  <Access Scope="LocalVariable" UId="136">
+    <Symbol UId="137">
+      <Component Name="IN_01" UId="138" />
+    </Symbol>
+  </Access>
+  <Blank UId="139" />
+  <Token Text="XOR" UId="140" />
+  <Blank UId="141" />
+  <Token Text="NOT" UId="142" />
+  <Blank UId="143" />
+  <Access Scope="LocalVariable" UId="144">
+    <Symbol UId="145">
+      <Component Name="ML_01" UId="146" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="147" />
+  <Blank UId="148" />
+  <Token Text="AND" UId="149" />
+  <Blank UId="150" />
+  <Token Text="NOT" UId="151" />
+  <Blank UId="152" />
+  <Access Scope="LocalVariable" UId="153">
+    <Symbol UId="154">
+      <Component Name="FL_01" UId="155" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="156" />
+  <NewLine UId="157" />
+  <Blank Num="4" UId="158" />
+  <Access Scope="LocalVariable" UId="159">
+    <Symbol UId="160">
+      <Component Name="Alarm_Warning_DW" UId="161" />
+      <Token Text="." UId="162" />
+      <Token Text="%X2" UId="163" />
+    </Symbol>
+  </Access>
+  <Blank UId="164" />
+  <Token Text=":=" UId="165" />
+  <Blank UId="166" />
+  <Token Text="(" UId="167" />
+  <Access Scope="LocalVariable" UId="168">
+    <Symbol UId="169">
+      <Component Name="IN_02" UId="170" />
+    </Symbol>
+  </Access>
+  <Blank UId="171" />
+  <Token Text="XOR" UId="172" />
+  <Blank UId="173" />
+  <Token Text="NOT" UId="174" />
+  <Blank UId="175" />
+  <Access Scope="LocalVariable" UId="176">
+    <Symbol UId="177">
+      <Component Name="ML_02" UId="178" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="179" />
+  <Blank UId="180" />
+  <Token Text="AND" UId="181" />
+  <Blank UId="182" />
+  <Token Text="NOT" UId="183" />
+  <Blank UId="184" />
+  <Access Scope="LocalVariable" UId="185">
+    <Symbol UId="186">
+      <Component Name="FL_02" UId="187" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="188" />
+  <NewLine UId="189" />
+  <Blank Num="4" UId="190" />
+  <Access Scope="LocalVariable" UId="191">
+    <Symbol UId="192">
+      <Component Name="Alarm_Warning_DW" UId="193" />
+      <Token Text="." UId="194" />
+      <Token Text="%X3" UId="195" />
+    </Symbol>
+  </Access>
+  <Blank UId="196" />
+  <Token Text=":=" UId="197" />
+  <Blank UId="198" />
+  <Token Text="(" UId="199" />
+  <Access Scope="LocalVariable" UId="200">
+    <Symbol UId="201">
+      <Component Name="IN_03" UId="202" />
+    </Symbol>
+  </Access>
+  <Blank UId="203" />
+  <Token Text="XOR" UId="204" />
+  <Blank UId="205" />
+  <Token Text="NOT" UId="206" />
+  <Blank UId="207" />
+  <Access Scope="LocalVariable" UId="208">
+    <Symbol UId="209">
+      <Component Name="ML_03" UId="210" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="211" />
+  <Blank UId="212" />
+  <Token Text="AND" UId="213" />
+  <Blank UId="214" />
+  <Token Text="NOT" UId="215" />
+  <Blank UId="216" />
+  <Access Scope="LocalVariable" UId="217">
+    <Symbol UId="218">
+      <Component Name="FL_03" UId="219" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="220" />
+  <NewLine UId="221" />
+  <Blank Num="4" UId="222" />
+  <Access Scope="LocalVariable" UId="223">
+    <Symbol UId="224">
+      <Component Name="Alarm_Warning_DW" UId="225" />
+      <Token Text="." UId="226" />
+      <Token Text="%X4" UId="227" />
+    </Symbol>
+  </Access>
+  <Blank UId="228" />
+  <Token Text=":=" UId="229" />
+  <Blank UId="230" />
+  <Token Text="(" UId="231" />
+  <Access Scope="LocalVariable" UId="232">
+    <Symbol UId="233">
+      <Component Name="IN_04" UId="234" />
+    </Symbol>
+  </Access>
+  <Blank UId="235" />
+  <Token Text="XOR" UId="236" />
+  <Blank UId="237" />
+  <Token Text="NOT" UId="238" />
+  <Blank UId="239" />
+  <Access Scope="LocalVariable" UId="240">
+    <Symbol UId="241">
+      <Component Name="ML_04" UId="242" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="243" />
+  <Blank UId="244" />
+  <Token Text="AND" UId="245" />
+  <Blank UId="246" />
+  <Token Text="NOT" UId="247" />
+  <Blank UId="248" />
+  <Access Scope="LocalVariable" UId="249">
+    <Symbol UId="250">
+      <Component Name="FL_04" UId="251" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="252" />
+  <NewLine UId="253" />
+  <Blank Num="4" UId="254" />
+  <Access Scope="LocalVariable" UId="255">
+    <Symbol UId="256">
+      <Component Name="Alarm_Warning_DW" UId="257" />
+      <Token Text="." UId="258" />
+      <Token Text="%X5" UId="259" />
+    </Symbol>
+  </Access>
+  <Blank UId="260" />
+  <Token Text=":=" UId="261" />
+  <Blank UId="262" />
+  <Token Text="(" UId="263" />
+  <Access Scope="LocalVariable" UId="264">
+    <Symbol UId="265">
+      <Component Name="IN_05" UId="266" />
+    </Symbol>
+  </Access>
+  <Blank UId="267" />
+  <Token Text="XOR" UId="268" />
+  <Blank UId="269" />
+  <Token Text="NOT" UId="270" />
+  <Blank UId="271" />
+  <Access Scope="LocalVariable" UId="272">
+    <Symbol UId="273">
+      <Component Name="ML_05" UId="274" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="275" />
+  <Blank UId="276" />
+  <Token Text="AND" UId="277" />
+  <Blank UId="278" />
+  <Token Text="NOT" UId="279" />
+  <Blank UId="280" />
+  <Access Scope="LocalVariable" UId="281">
+    <Symbol UId="282">
+      <Component Name="FL_05" UId="283" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="284" />
+  <NewLine UId="285" />
+  <Blank Num="4" UId="286" />
+  <Access Scope="LocalVariable" UId="287">
+    <Symbol UId="288">
+      <Component Name="Alarm_Warning_DW" UId="289" />
+      <Token Text="." UId="290" />
+      <Token Text="%X6" UId="291" />
+    </Symbol>
+  </Access>
+  <Blank UId="292" />
+  <Token Text=":=" UId="293" />
+  <Blank UId="294" />
+  <Token Text="(" UId="295" />
+  <Access Scope="LocalVariable" UId="296">
+    <Symbol UId="297">
+      <Component Name="IN_06" UId="298" />
+    </Symbol>
+  </Access>
+  <Blank UId="299" />
+  <Token Text="XOR" UId="300" />
+  <Blank UId="301" />
+  <Token Text="NOT" UId="302" />
+  <Blank UId="303" />
+  <Access Scope="LocalVariable" UId="304">
+    <Symbol UId="305">
+      <Component Name="ML_06" UId="306" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="307" />
+  <Blank UId="308" />
+  <Token Text="AND" UId="309" />
+  <Blank UId="310" />
+  <Token Text="NOT" UId="311" />
+  <Blank UId="312" />
+  <Access Scope="LocalVariable" UId="313">
+    <Symbol UId="314">
+      <Component Name="FL_06" UId="315" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="316" />
+  <NewLine UId="317" />
+  <Blank Num="4" UId="318" />
+  <Access Scope="LocalVariable" UId="319">
+    <Symbol UId="320">
+      <Component Name="Alarm_Warning_DW" UId="321" />
+      <Token Text="." UId="322" />
+      <Token Text="%X7" UId="323" />
+    </Symbol>
+  </Access>
+  <Blank UId="324" />
+  <Token Text=":=" UId="325" />
+  <Blank UId="326" />
+  <Token Text="(" UId="327" />
+  <Access Scope="LocalVariable" UId="328">
+    <Symbol UId="329">
+      <Component Name="IN_07" UId="330" />
+    </Symbol>
+  </Access>
+  <Blank UId="331" />
+  <Token Text="XOR" UId="332" />
+  <Blank UId="333" />
+  <Token Text="NOT" UId="334" />
+  <Blank UId="335" />
+  <Access Scope="LocalVariable" UId="336">
+    <Symbol UId="337">
+      <Component Name="ML_07" UId="338" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="339" />
+  <Blank UId="340" />
+  <Token Text="AND" UId="341" />
+  <Blank UId="342" />
+  <Token Text="NOT" UId="343" />
+  <Blank UId="344" />
+  <Access Scope="LocalVariable" UId="345">
+    <Symbol UId="346">
+      <Component Name="FL_07" UId="347" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="348" />
+  <NewLine UId="349" />
+  <Blank Num="4" UId="350" />
+  <Access Scope="LocalVariable" UId="351">
+    <Symbol UId="352">
+      <Component Name="Alarm_Warning_DW" UId="353" />
+      <Token Text="." UId="354" />
+      <Token Text="%X8" UId="355" />
+    </Symbol>
+  </Access>
+  <Blank UId="356" />
+  <Token Text=":=" UId="357" />
+  <Blank UId="358" />
+  <Token Text="(" UId="359" />
+  <Access Scope="LocalVariable" UId="360">
+    <Symbol UId="361">
+      <Component Name="IN_08" UId="362" />
+    </Symbol>
+  </Access>
+  <Blank UId="363" />
+  <Token Text="XOR" UId="364" />
+  <Blank UId="365" />
+  <Token Text="NOT" UId="366" />
+  <Blank UId="367" />
+  <Access Scope="LocalVariable" UId="368">
+    <Symbol UId="369">
+      <Component Name="ML_08" UId="370" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="371" />
+  <Blank UId="372" />
+  <Token Text="AND" UId="373" />
+  <Blank UId="374" />
+  <Token Text="NOT" UId="375" />
+  <Blank UId="376" />
+  <Access Scope="LocalVariable" UId="377">
+    <Symbol UId="378">
+      <Component Name="FL_08" UId="379" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="380" />
+  <NewLine UId="381" />
+  <Blank Num="4" UId="382" />
+  <Access Scope="LocalVariable" UId="383">
+    <Symbol UId="384">
+      <Component Name="Alarm_Warning_DW" UId="385" />
+      <Token Text="." UId="386" />
+      <Token Text="%X9" UId="387" />
+    </Symbol>
+  </Access>
+  <Blank UId="388" />
+  <Token Text=":=" UId="389" />
+  <Blank UId="390" />
+  <Token Text="(" UId="391" />
+  <Access Scope="LocalVariable" UId="392">
+    <Symbol UId="393">
+      <Component Name="IN_09" UId="394" />
+    </Symbol>
+  </Access>
+  <Blank UId="395" />
+  <Token Text="XOR" UId="396" />
+  <Blank UId="397" />
+  <Token Text="NOT" UId="398" />
+  <Blank UId="399" />
+  <Access Scope="LocalVariable" UId="400">
+    <Symbol UId="401">
+      <Component Name="ML_09" UId="402" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="403" />
+  <Blank UId="404" />
+  <Token Text="AND" UId="405" />
+  <Blank UId="406" />
+  <Token Text="NOT" UId="407" />
+  <Blank UId="408" />
+  <Access Scope="LocalVariable" UId="409">
+    <Symbol UId="410">
+      <Component Name="FL_09" UId="411" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="412" />
+  <NewLine UId="413" />
+  <Blank Num="4" UId="414" />
+  <Access Scope="LocalVariable" UId="415">
+    <Symbol UId="416">
+      <Component Name="Alarm_Warning_DW" UId="417" />
+      <Token Text="." UId="418" />
+      <Token Text="%X10" UId="419" />
+    </Symbol>
+  </Access>
+  <Blank UId="420" />
+  <Token Text=":=" UId="421" />
+  <Blank UId="422" />
+  <Token Text="(" UId="423" />
+  <Access Scope="LocalVariable" UId="424">
+    <Symbol UId="425">
+      <Component Name="IN_10" UId="426" />
+    </Symbol>
+  </Access>
+  <Blank UId="427" />
+  <Token Text="XOR" UId="428" />
+  <Blank UId="429" />
+  <Token Text="NOT" UId="430" />
+  <Blank UId="431" />
+  <Access Scope="LocalVariable" UId="432">
+    <Symbol UId="433">
+      <Component Name="ML_10" UId="434" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="435" />
+  <Blank UId="436" />
+  <Token Text="AND" UId="437" />
+  <Blank UId="438" />
+  <Token Text="NOT" UId="439" />
+  <Blank UId="440" />
+  <Access Scope="LocalVariable" UId="441">
+    <Symbol UId="442">
+      <Component Name="FL_10" UId="443" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="444" />
+  <NewLine UId="445" />
+  <Blank Num="4" UId="446" />
+  <Access Scope="LocalVariable" UId="447">
+    <Symbol UId="448">
+      <Component Name="Alarm_Warning_DW" UId="449" />
+      <Token Text="." UId="450" />
+      <Token Text="%X11" UId="451" />
+    </Symbol>
+  </Access>
+  <Blank UId="452" />
+  <Token Text=":=" UId="453" />
+  <Blank UId="454" />
+  <Token Text="(" UId="455" />
+  <Access Scope="LocalVariable" UId="456">
+    <Symbol UId="457">
+      <Component Name="IN_11" UId="458" />
+    </Symbol>
+  </Access>
+  <Blank UId="459" />
+  <Token Text="XOR" UId="460" />
+  <Blank UId="461" />
+  <Token Text="NOT" UId="462" />
+  <Blank UId="463" />
+  <Access Scope="LocalVariable" UId="464">
+    <Symbol UId="465">
+      <Component Name="ML_11" UId="466" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="467" />
+  <Blank UId="468" />
+  <Token Text="AND" UId="469" />
+  <Blank UId="470" />
+  <Token Text="NOT" UId="471" />
+  <Blank UId="472" />
+  <Access Scope="LocalVariable" UId="473">
+    <Symbol UId="474">
+      <Component Name="FL_11" UId="475" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="476" />
+  <NewLine UId="477" />
+  <Blank Num="4" UId="478" />
+  <Access Scope="LocalVariable" UId="479">
+    <Symbol UId="480">
+      <Component Name="Alarm_Warning_DW" UId="481" />
+      <Token Text="." UId="482" />
+      <Token Text="%X12" UId="483" />
+    </Symbol>
+  </Access>
+  <Blank UId="484" />
+  <Token Text=":=" UId="485" />
+  <Blank UId="486" />
+  <Token Text="(" UId="487" />
+  <Access Scope="LocalVariable" UId="488">
+    <Symbol UId="489">
+      <Component Name="IN_12" UId="490" />
+    </Symbol>
+  </Access>
+  <Blank UId="491" />
+  <Token Text="XOR" UId="492" />
+  <Blank UId="493" />
+  <Token Text="NOT" UId="494" />
+  <Blank UId="495" />
+  <Access Scope="LocalVariable" UId="496">
+    <Symbol UId="497">
+      <Component Name="ML_12" UId="498" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="499" />
+  <Blank UId="500" />
+  <Token Text="AND" UId="501" />
+  <Blank UId="502" />
+  <Token Text="NOT" UId="503" />
+  <Blank UId="504" />
+  <Access Scope="LocalVariable" UId="505">
+    <Symbol UId="506">
+      <Component Name="FL_12" UId="507" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="508" />
+  <NewLine UId="509" />
+  <Blank Num="4" UId="510" />
+  <Access Scope="LocalVariable" UId="511">
+    <Symbol UId="512">
+      <Component Name="Alarm_Warning_DW" UId="513" />
+      <Token Text="." UId="514" />
+      <Token Text="%X13" UId="515" />
+    </Symbol>
+  </Access>
+  <Blank UId="516" />
+  <Token Text=":=" UId="517" />
+  <Blank UId="518" />
+  <Token Text="(" UId="519" />
+  <Access Scope="LocalVariable" UId="520">
+    <Symbol UId="521">
+      <Component Name="IN_13" UId="522" />
+    </Symbol>
+  </Access>
+  <Blank UId="523" />
+  <Token Text="XOR" UId="524" />
+  <Blank UId="525" />
+  <Token Text="NOT" UId="526" />
+  <Blank UId="527" />
+  <Access Scope="LocalVariable" UId="528">
+    <Symbol UId="529">
+      <Component Name="ML_13" UId="530" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="531" />
+  <Blank UId="532" />
+  <Token Text="AND" UId="533" />
+  <Blank UId="534" />
+  <Token Text="NOT" UId="535" />
+  <Blank UId="536" />
+  <Access Scope="LocalVariable" UId="537">
+    <Symbol UId="538">
+      <Component Name="FL_13" UId="539" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="540" />
+  <NewLine UId="541" />
+  <Blank Num="4" UId="542" />
+  <Access Scope="LocalVariable" UId="543">
+    <Symbol UId="544">
+      <Component Name="Alarm_Warning_DW" UId="545" />
+      <Token Text="." UId="546" />
+      <Token Text="%X14" UId="547" />
+    </Symbol>
+  </Access>
+  <Blank UId="548" />
+  <Token Text=":=" UId="549" />
+  <Blank UId="550" />
+  <Token Text="(" UId="551" />
+  <Access Scope="LocalVariable" UId="552">
+    <Symbol UId="553">
+      <Component Name="IN_14" UId="554" />
+    </Symbol>
+  </Access>
+  <Blank UId="555" />
+  <Token Text="XOR" UId="556" />
+  <Blank UId="557" />
+  <Token Text="NOT" UId="558" />
+  <Blank UId="559" />
+  <Access Scope="LocalVariable" UId="560">
+    <Symbol UId="561">
+      <Component Name="ML_14" UId="562" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="563" />
+  <Blank UId="564" />
+  <Token Text="AND" UId="565" />
+  <Blank UId="566" />
+  <Token Text="NOT" UId="567" />
+  <Blank UId="568" />
+  <Access Scope="LocalVariable" UId="569">
+    <Symbol UId="570">
+      <Component Name="FL_14" UId="571" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="572" />
+  <NewLine UId="573" />
+  <Blank Num="4" UId="574" />
+  <Access Scope="LocalVariable" UId="575">
+    <Symbol UId="576">
+      <Component Name="Alarm_Warning_DW" UId="577" />
+      <Token Text="." UId="578" />
+      <Token Text="%X15" UId="579" />
+    </Symbol>
+  </Access>
+  <Blank UId="580" />
+  <Token Text=":=" UId="581" />
+  <Blank UId="582" />
+  <Token Text="(" UId="583" />
+  <Access Scope="LocalVariable" UId="584">
+    <Symbol UId="585">
+      <Component Name="IN_15" UId="586" />
+    </Symbol>
+  </Access>
+  <Blank UId="587" />
+  <Token Text="XOR" UId="588" />
+  <Blank UId="589" />
+  <Token Text="NOT" UId="590" />
+  <Blank UId="591" />
+  <Access Scope="LocalVariable" UId="592">
+    <Symbol UId="593">
+      <Component Name="ML_15" UId="594" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="595" />
+  <Blank UId="596" />
+  <Token Text="AND" UId="597" />
+  <Blank UId="598" />
+  <Token Text="NOT" UId="599" />
+  <Blank UId="600" />
+  <Access Scope="LocalVariable" UId="601">
+    <Symbol UId="602">
+      <Component Name="FL_15" UId="603" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="604" />
+  <NewLine UId="605" />
+  <Blank Num="4" UId="606" />
+  <Access Scope="LocalVariable" UId="607">
+    <Symbol UId="608">
+      <Component Name="Alarm_Warning_DW" UId="609" />
+      <Token Text="." UId="610" />
+      <Token Text="%X16" UId="611" />
+    </Symbol>
+  </Access>
+  <Blank UId="612" />
+  <Token Text=":=" UId="613" />
+  <Blank UId="614" />
+  <Token Text="(" UId="615" />
+  <Access Scope="LocalVariable" UId="616">
+    <Symbol UId="617">
+      <Component Name="IN_16" UId="618" />
+    </Symbol>
+  </Access>
+  <Blank UId="619" />
+  <Token Text="XOR" UId="620" />
+  <Blank UId="621" />
+  <Token Text="NOT" UId="622" />
+  <Blank UId="623" />
+  <Access Scope="LocalVariable" UId="624">
+    <Symbol UId="625">
+      <Component Name="ML_16" UId="626" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="627" />
+  <Blank UId="628" />
+  <Token Text="AND" UId="629" />
+  <Blank UId="630" />
+  <Token Text="NOT" UId="631" />
+  <Blank UId="632" />
+  <Access Scope="LocalVariable" UId="633">
+    <Symbol UId="634">
+      <Component Name="FL_16" UId="635" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="636" />
+  <NewLine UId="637" />
+  <Blank Num="4" UId="638" />
+  <Access Scope="LocalVariable" UId="639">
+    <Symbol UId="640">
+      <Component Name="Alarm_Warning_DW" UId="641" />
+      <Token Text="." UId="642" />
+      <Token Text="%X17" UId="643" />
+    </Symbol>
+  </Access>
+  <Blank UId="644" />
+  <Token Text=":=" UId="645" />
+  <Blank UId="646" />
+  <Token Text="(" UId="647" />
+  <Access Scope="LocalVariable" UId="648">
+    <Symbol UId="649">
+      <Component Name="IN_17" UId="650" />
+    </Symbol>
+  </Access>
+  <Blank UId="651" />
+  <Token Text="XOR" UId="652" />
+  <Blank UId="653" />
+  <Token Text="NOT" UId="654" />
+  <Blank UId="655" />
+  <Access Scope="LocalVariable" UId="656">
+    <Symbol UId="657">
+      <Component Name="ML_17" UId="658" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="659" />
+  <Blank UId="660" />
+  <Token Text="AND" UId="661" />
+  <Blank UId="662" />
+  <Token Text="NOT" UId="663" />
+  <Blank UId="664" />
+  <Access Scope="LocalVariable" UId="665">
+    <Symbol UId="666">
+      <Component Name="FL_17" UId="667" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="668" />
+  <NewLine UId="669" />
+  <Blank Num="4" UId="670" />
+  <Access Scope="LocalVariable" UId="671">
+    <Symbol UId="672">
+      <Component Name="Alarm_Warning_DW" UId="673" />
+      <Token Text="." UId="674" />
+      <Token Text="%X18" UId="675" />
+    </Symbol>
+  </Access>
+  <Blank UId="676" />
+  <Token Text=":=" UId="677" />
+  <Blank UId="678" />
+  <Token Text="(" UId="679" />
+  <Access Scope="LocalVariable" UId="680">
+    <Symbol UId="681">
+      <Component Name="IN_18" UId="682" />
+    </Symbol>
+  </Access>
+  <Blank UId="683" />
+  <Token Text="XOR" UId="684" />
+  <Blank UId="685" />
+  <Token Text="NOT" UId="686" />
+  <Blank UId="687" />
+  <Access Scope="LocalVariable" UId="688">
+    <Symbol UId="689">
+      <Component Name="ML_18" UId="690" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="691" />
+  <Blank UId="692" />
+  <Token Text="AND" UId="693" />
+  <Blank UId="694" />
+  <Token Text="NOT" UId="695" />
+  <Blank UId="696" />
+  <Access Scope="LocalVariable" UId="697">
+    <Symbol UId="698">
+      <Component Name="FL_18" UId="699" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="700" />
+  <NewLine UId="701" />
+  <Blank Num="4" UId="702" />
+  <Access Scope="LocalVariable" UId="703">
+    <Symbol UId="704">
+      <Component Name="Alarm_Warning_DW" UId="705" />
+      <Token Text="." UId="706" />
+      <Token Text="%X19" UId="707" />
+    </Symbol>
+  </Access>
+  <Blank UId="708" />
+  <Token Text=":=" UId="709" />
+  <Blank UId="710" />
+  <Token Text="(" UId="711" />
+  <Access Scope="LocalVariable" UId="712">
+    <Symbol UId="713">
+      <Component Name="IN_19" UId="714" />
+    </Symbol>
+  </Access>
+  <Blank UId="715" />
+  <Token Text="XOR" UId="716" />
+  <Blank UId="717" />
+  <Token Text="NOT" UId="718" />
+  <Blank UId="719" />
+  <Access Scope="LocalVariable" UId="720">
+    <Symbol UId="721">
+      <Component Name="ML_19" UId="722" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="723" />
+  <Blank UId="724" />
+  <Token Text="AND" UId="725" />
+  <Blank UId="726" />
+  <Token Text="NOT" UId="727" />
+  <Blank UId="728" />
+  <Access Scope="LocalVariable" UId="729">
+    <Symbol UId="730">
+      <Component Name="FL_19" UId="731" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="732" />
+  <NewLine UId="733" />
+  <Blank Num="4" UId="734" />
+  <Access Scope="LocalVariable" UId="735">
+    <Symbol UId="736">
+      <Component Name="Alarm_Warning_DW" UId="737" />
+      <Token Text="." UId="738" />
+      <Token Text="%X20" UId="739" />
+    </Symbol>
+  </Access>
+  <Blank UId="740" />
+  <Token Text=":=" UId="741" />
+  <Blank UId="742" />
+  <Token Text="(" UId="743" />
+  <Access Scope="LocalVariable" UId="744">
+    <Symbol UId="745">
+      <Component Name="IN_20" UId="746" />
+    </Symbol>
+  </Access>
+  <Blank UId="747" />
+  <Token Text="XOR" UId="748" />
+  <Blank UId="749" />
+  <Token Text="NOT" UId="750" />
+  <Blank UId="751" />
+  <Access Scope="LocalVariable" UId="752">
+    <Symbol UId="753">
+      <Component Name="ML_20" UId="754" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="755" />
+  <Blank UId="756" />
+  <Token Text="AND" UId="757" />
+  <Blank UId="758" />
+  <Token Text="NOT" UId="759" />
+  <Blank UId="760" />
+  <Access Scope="LocalVariable" UId="761">
+    <Symbol UId="762">
+      <Component Name="FL_20" UId="763" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="764" />
+  <NewLine UId="765" />
+  <Blank Num="4" UId="766" />
+  <Access Scope="LocalVariable" UId="767">
+    <Symbol UId="768">
+      <Component Name="Alarm_Warning_DW" UId="769" />
+      <Token Text="." UId="770" />
+      <Token Text="%X21" UId="771" />
+    </Symbol>
+  </Access>
+  <Blank UId="772" />
+  <Token Text=":=" UId="773" />
+  <Blank UId="774" />
+  <Token Text="(" UId="775" />
+  <Access Scope="LocalVariable" UId="776">
+    <Symbol UId="777">
+      <Component Name="IN_21" UId="778" />
+    </Symbol>
+  </Access>
+  <Blank UId="779" />
+  <Token Text="XOR" UId="780" />
+  <Blank UId="781" />
+  <Token Text="NOT" UId="782" />
+  <Blank UId="783" />
+  <Access Scope="LocalVariable" UId="784">
+    <Symbol UId="785">
+      <Component Name="ML_21" UId="786" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="787" />
+  <Blank UId="788" />
+  <Token Text="AND" UId="789" />
+  <Blank UId="790" />
+  <Token Text="NOT" UId="791" />
+  <Blank UId="792" />
+  <Access Scope="LocalVariable" UId="793">
+    <Symbol UId="794">
+      <Component Name="FL_21" UId="795" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="796" />
+  <NewLine UId="797" />
+  <Blank Num="4" UId="798" />
+  <Access Scope="LocalVariable" UId="799">
+    <Symbol UId="800">
+      <Component Name="Alarm_Warning_DW" UId="801" />
+      <Token Text="." UId="802" />
+      <Token Text="%X22" UId="803" />
+    </Symbol>
+  </Access>
+  <Blank UId="804" />
+  <Token Text=":=" UId="805" />
+  <Blank UId="806" />
+  <Token Text="(" UId="807" />
+  <Access Scope="LocalVariable" UId="808">
+    <Symbol UId="809">
+      <Component Name="IN_22" UId="810" />
+    </Symbol>
+  </Access>
+  <Blank UId="811" />
+  <Token Text="XOR" UId="812" />
+  <Blank UId="813" />
+  <Token Text="NOT" UId="814" />
+  <Blank UId="815" />
+  <Access Scope="LocalVariable" UId="816">
+    <Symbol UId="817">
+      <Component Name="ML_22" UId="818" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="819" />
+  <Blank UId="820" />
+  <Token Text="AND" UId="821" />
+  <Blank UId="822" />
+  <Token Text="NOT" UId="823" />
+  <Blank UId="824" />
+  <Access Scope="LocalVariable" UId="825">
+    <Symbol UId="826">
+      <Component Name="FL_22" UId="827" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="828" />
+  <NewLine UId="829" />
+  <Blank Num="4" UId="830" />
+  <Access Scope="LocalVariable" UId="831">
+    <Symbol UId="832">
+      <Component Name="Alarm_Warning_DW" UId="833" />
+      <Token Text="." UId="834" />
+      <Token Text="%X23" UId="835" />
+    </Symbol>
+  </Access>
+  <Blank UId="836" />
+  <Token Text=":=" UId="837" />
+  <Blank UId="838" />
+  <Token Text="(" UId="839" />
+  <Access Scope="LocalVariable" UId="840">
+    <Symbol UId="841">
+      <Component Name="IN_23" UId="842" />
+    </Symbol>
+  </Access>
+  <Blank UId="843" />
+  <Token Text="XOR" UId="844" />
+  <Blank UId="845" />
+  <Token Text="NOT" UId="846" />
+  <Blank UId="847" />
+  <Access Scope="LocalVariable" UId="848">
+    <Symbol UId="849">
+      <Component Name="ML_23" UId="850" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="851" />
+  <Blank UId="852" />
+  <Token Text="AND" UId="853" />
+  <Blank UId="854" />
+  <Token Text="NOT" UId="855" />
+  <Blank UId="856" />
+  <Access Scope="LocalVariable" UId="857">
+    <Symbol UId="858">
+      <Component Name="FL_23" UId="859" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="860" />
+  <NewLine UId="861" />
+  <Blank Num="4" UId="862" />
+  <Access Scope="LocalVariable" UId="863">
+    <Symbol UId="864">
+      <Component Name="Alarm_Warning_DW" UId="865" />
+      <Token Text="." UId="866" />
+      <Token Text="%X24" UId="867" />
+    </Symbol>
+  </Access>
+  <Blank UId="868" />
+  <Token Text=":=" UId="869" />
+  <Blank UId="870" />
+  <Token Text="(" UId="871" />
+  <Access Scope="LocalVariable" UId="872">
+    <Symbol UId="873">
+      <Component Name="IN_24" UId="874" />
+    </Symbol>
+  </Access>
+  <Blank UId="875" />
+  <Token Text="XOR" UId="876" />
+  <Blank UId="877" />
+  <Token Text="NOT" UId="878" />
+  <Blank UId="879" />
+  <Access Scope="LocalVariable" UId="880">
+    <Symbol UId="881">
+      <Component Name="ML_24" UId="882" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="883" />
+  <Blank UId="884" />
+  <Token Text="AND" UId="885" />
+  <Blank UId="886" />
+  <Token Text="NOT" UId="887" />
+  <Blank UId="888" />
+  <Access Scope="LocalVariable" UId="889">
+    <Symbol UId="890">
+      <Component Name="FL_24" UId="891" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="892" />
+  <NewLine UId="893" />
+  <Blank Num="4" UId="894" />
+  <Access Scope="LocalVariable" UId="895">
+    <Symbol UId="896">
+      <Component Name="Alarm_Warning_DW" UId="897" />
+      <Token Text="." UId="898" />
+      <Token Text="%X25" UId="899" />
+    </Symbol>
+  </Access>
+  <Blank UId="900" />
+  <Token Text=":=" UId="901" />
+  <Blank UId="902" />
+  <Token Text="(" UId="903" />
+  <Access Scope="LocalVariable" UId="904">
+    <Symbol UId="905">
+      <Component Name="IN_25" UId="906" />
+    </Symbol>
+  </Access>
+  <Blank UId="907" />
+  <Token Text="XOR" UId="908" />
+  <Blank UId="909" />
+  <Token Text="NOT" UId="910" />
+  <Blank UId="911" />
+  <Access Scope="LocalVariable" UId="912">
+    <Symbol UId="913">
+      <Component Name="ML_25" UId="914" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="915" />
+  <Blank UId="916" />
+  <Token Text="AND" UId="917" />
+  <Blank UId="918" />
+  <Token Text="NOT" UId="919" />
+  <Blank UId="920" />
+  <Access Scope="LocalVariable" UId="921">
+    <Symbol UId="922">
+      <Component Name="FL_25" UId="923" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="924" />
+  <NewLine UId="925" />
+  <Blank Num="4" UId="926" />
+  <Access Scope="LocalVariable" UId="927">
+    <Symbol UId="928">
+      <Component Name="Alarm_Warning_DW" UId="929" />
+      <Token Text="." UId="930" />
+      <Token Text="%X26" UId="931" />
+    </Symbol>
+  </Access>
+  <Blank UId="932" />
+  <Token Text=":=" UId="933" />
+  <Blank UId="934" />
+  <Token Text="(" UId="935" />
+  <Access Scope="LocalVariable" UId="936">
+    <Symbol UId="937">
+      <Component Name="IN_26" UId="938" />
+    </Symbol>
+  </Access>
+  <Blank UId="939" />
+  <Token Text="XOR" UId="940" />
+  <Blank UId="941" />
+  <Token Text="NOT" UId="942" />
+  <Blank UId="943" />
+  <Access Scope="LocalVariable" UId="944">
+    <Symbol UId="945">
+      <Component Name="ML_26" UId="946" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="947" />
+  <Blank UId="948" />
+  <Token Text="AND" UId="949" />
+  <Blank UId="950" />
+  <Token Text="NOT" UId="951" />
+  <Blank UId="952" />
+  <Access Scope="LocalVariable" UId="953">
+    <Symbol UId="954">
+      <Component Name="FL_26" UId="955" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="956" />
+  <NewLine UId="957" />
+  <Blank Num="4" UId="958" />
+  <Access Scope="LocalVariable" UId="959">
+    <Symbol UId="960">
+      <Component Name="Alarm_Warning_DW" UId="961" />
+      <Token Text="." UId="962" />
+      <Token Text="%X27" UId="963" />
+    </Symbol>
+  </Access>
+  <Blank UId="964" />
+  <Token Text=":=" UId="965" />
+  <Blank UId="966" />
+  <Token Text="(" UId="967" />
+  <Access Scope="LocalVariable" UId="968">
+    <Symbol UId="969">
+      <Component Name="IN_27" UId="970" />
+    </Symbol>
+  </Access>
+  <Blank UId="971" />
+  <Token Text="XOR" UId="972" />
+  <Blank UId="973" />
+  <Token Text="NOT" UId="974" />
+  <Blank UId="975" />
+  <Access Scope="LocalVariable" UId="976">
+    <Symbol UId="977">
+      <Component Name="ML_27" UId="978" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="979" />
+  <Blank UId="980" />
+  <Token Text="AND" UId="981" />
+  <Blank UId="982" />
+  <Token Text="NOT" UId="983" />
+  <Blank UId="984" />
+  <Access Scope="LocalVariable" UId="985">
+    <Symbol UId="986">
+      <Component Name="FL_27" UId="987" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="988" />
+  <NewLine UId="989" />
+  <Blank Num="4" UId="990" />
+  <Access Scope="LocalVariable" UId="991">
+    <Symbol UId="992">
+      <Component Name="Alarm_Warning_DW" UId="993" />
+      <Token Text="." UId="994" />
+      <Token Text="%X28" UId="995" />
+    </Symbol>
+  </Access>
+  <Blank UId="996" />
+  <Token Text=":=" UId="997" />
+  <Blank UId="998" />
+  <Token Text="(" UId="999" />
+  <Access Scope="LocalVariable" UId="1000">
+    <Symbol UId="1001">
+      <Component Name="IN_28" UId="1002" />
+    </Symbol>
+  </Access>
+  <Blank UId="1003" />
+  <Token Text="XOR" UId="1004" />
+  <Blank UId="1005" />
+  <Token Text="NOT" UId="1006" />
+  <Blank UId="1007" />
+  <Access Scope="LocalVariable" UId="1008">
+    <Symbol UId="1009">
+      <Component Name="ML_28" UId="1010" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="1011" />
+  <Blank UId="1012" />
+  <Token Text="AND" UId="1013" />
+  <Blank UId="1014" />
+  <Token Text="NOT" UId="1015" />
+  <Blank UId="1016" />
+  <Access Scope="LocalVariable" UId="1017">
+    <Symbol UId="1018">
+      <Component Name="FL_28" UId="1019" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="1020" />
+  <NewLine UId="1021" />
+  <Blank Num="4" UId="1022" />
+  <Access Scope="LocalVariable" UId="1023">
+    <Symbol UId="1024">
+      <Component Name="Alarm_Warning_DW" UId="1025" />
+      <Token Text="." UId="1026" />
+      <Token Text="%X29" UId="1027" />
+    </Symbol>
+  </Access>
+  <Blank UId="1028" />
+  <Token Text=":=" UId="1029" />
+  <Blank UId="1030" />
+  <Token Text="(" UId="1031" />
+  <Access Scope="LocalVariable" UId="1032">
+    <Symbol UId="1033">
+      <Component Name="IN_29" UId="1034" />
+    </Symbol>
+  </Access>
+  <Blank UId="1035" />
+  <Token Text="XOR" UId="1036" />
+  <Blank UId="1037" />
+  <Token Text="NOT" UId="1038" />
+  <Blank UId="1039" />
+  <Access Scope="LocalVariable" UId="1040">
+    <Symbol UId="1041">
+      <Component Name="ML_29" UId="1042" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="1043" />
+  <Blank UId="1044" />
+  <Token Text="AND" UId="1045" />
+  <Blank UId="1046" />
+  <Token Text="NOT" UId="1047" />
+  <Blank UId="1048" />
+  <Access Scope="LocalVariable" UId="1049">
+    <Symbol UId="1050">
+      <Component Name="FL_29" UId="1051" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="1052" />
+  <NewLine UId="1053" />
+  <Blank Num="4" UId="1054" />
+  <Access Scope="LocalVariable" UId="1055">
+    <Symbol UId="1056">
+      <Component Name="Alarm_Warning_DW" UId="1057" />
+      <Token Text="." UId="1058" />
+      <Token Text="%X30" UId="1059" />
+    </Symbol>
+  </Access>
+  <Blank UId="1060" />
+  <Token Text=":=" UId="1061" />
+  <Blank UId="1062" />
+  <Token Text="(" UId="1063" />
+  <Access Scope="LocalVariable" UId="1064">
+    <Symbol UId="1065">
+      <Component Name="IN_30" UId="1066" />
+    </Symbol>
+  </Access>
+  <Blank UId="1067" />
+  <Token Text="XOR" UId="1068" />
+  <Blank UId="1069" />
+  <Token Text="NOT" UId="1070" />
+  <Blank UId="1071" />
+  <Access Scope="LocalVariable" UId="1072">
+    <Symbol UId="1073">
+      <Component Name="ML_30" UId="1074" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="1075" />
+  <Blank UId="1076" />
+  <Token Text="AND" UId="1077" />
+  <Blank UId="1078" />
+  <Token Text="NOT" UId="1079" />
+  <Blank UId="1080" />
+  <Access Scope="LocalVariable" UId="1081">
+    <Symbol UId="1082">
+      <Component Name="FL_30" UId="1083" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="1084" />
+  <NewLine UId="1085" />
+  <Blank Num="4" UId="1086" />
+  <Access Scope="LocalVariable" UId="1087">
+    <Symbol UId="1088">
+      <Component Name="Alarm_Warning_DW" UId="1089" />
+      <Token Text="." UId="1090" />
+      <Token Text="%X31" UId="1091" />
+    </Symbol>
+  </Access>
+  <Blank UId="1092" />
+  <Token Text=":=" UId="1093" />
+  <Blank UId="1094" />
+  <Token Text="(" UId="1095" />
+  <Access Scope="LocalVariable" UId="1096">
+    <Symbol UId="1097">
+      <Component Name="IN_31" UId="1098" />
+    </Symbol>
+  </Access>
+  <Blank UId="1099" />
+  <Token Text="XOR" UId="1100" />
+  <Blank UId="1101" />
+  <Token Text="NOT" UId="1102" />
+  <Blank UId="1103" />
+  <Access Scope="LocalVariable" UId="1104">
+    <Symbol UId="1105">
+      <Component Name="ML_31" UId="1106" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="1107" />
+  <Blank UId="1108" />
+  <Token Text="AND" UId="1109" />
+  <Blank UId="1110" />
+  <Token Text="NOT" UId="1111" />
+  <Blank UId="1112" />
+  <Access Scope="LocalVariable" UId="1113">
+    <Symbol UId="1114">
+      <Component Name="FL_31" UId="1115" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="1116" />
+  <NewLine UId="1117" />
+  <Blank Num="4" UId="1118" />
+  <NewLine UId="1119" />
+  <Blank Num="4" UId="1120" />
+  <LineComment UId="1121">
+    <Text UId="1122">alarms will NOT auto reset when the condition is not present anymore</Text>
+  </LineComment>
+  <NewLine UId="1123" />
+  <Blank Num="4" UId="1124" />
+  <Token Text="IF" UId="1125" />
+  <Blank UId="1126" />
+  <Access Scope="LocalVariable" UId="1127">
+    <Symbol UId="1128">
+      <Component Name="RESET_Necessary" UId="1129" />
+    </Symbol>
+  </Access>
+  <Blank UId="1130" />
+  <Token Text="THEN" UId="1131" />
+  <NewLine UId="1132" />
+  <Blank Num="8" UId="1133" />
+  <LineComment UId="1134">
+    <Text UId="1135">keep alarms written from outside this block</Text>
+  </LineComment>
+  <NewLine UId="1136" />
+  <Blank Num="8" UId="1137" />
+  <Access Scope="LocalVariable" UId="1138">
+    <Symbol UId="1139">
+      <Component Name="Alarm_Warning_DW" UId="1140" />
+    </Symbol>
+  </Access>
+  <Blank UId="1141" />
+  <Token Text=":=" UId="1142" />
+  <Blank UId="1143" />
+  <Access Scope="LocalVariable" UId="1144">
+    <Symbol UId="1145">
+      <Component Name="Alarm_Warning_DW" UId="1146" />
+    </Symbol>
+  </Access>
+  <Blank UId="1147" />
+  <Token Text="OR" UId="1148" />
+  <Blank UId="1149" />
+  <Access Scope="LocalVariable" UId="1150">
+    <Symbol UId="1151">
+      <Component Name="InitialAlarmsState" UId="1152" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="1153" />
+  <NewLine UId="1154" />
+  <Blank Num="8" UId="1155" />
+  <NewLine UId="1156" />
+  <Blank Num="8" UId="1157" />
+  <LineComment UId="1158">
+    <Text UId="1159">keep alarms that were active at last cycle</Text>
+  </LineComment>
+  <NewLine UId="1160" />
+  <Blank Num="8" UId="1161" />
+  <Access Scope="LocalVariable" UId="1162">
+    <Symbol UId="1163">
+      <Component Name="Alarm_Warning_DW" UId="1164" />
+    </Symbol>
+  </Access>
+  <Blank UId="1165" />
+  <Token Text=":=" UId="1166" />
+  <Blank UId="1167" />
+  <Access Scope="LocalVariable" UId="1168">
+    <Symbol UId="1169">
+      <Component Name="Alarm_Warning_DW" UId="1170" />
+    </Symbol>
+  </Access>
+  <Blank UId="1171" />
+  <Token Text="OR" UId="1172" />
+  <Blank UId="1173" />
+  <Access Scope="LocalVariable" UId="1174">
+    <Symbol UId="1175">
+      <Component Name="OutputMemory" UId="1176" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="1177" />
+  <NewLine UId="1178" />
+  <Blank Num="8" UId="1179" />
+  <NewLine UId="1180" />
+  <Blank Num="8" UId="1181" />
+  <LineComment UId="1182">
+    <Text UId="1183">save output</Text>
+  </LineComment>
+  <NewLine UId="1184" />
+  <Blank Num="8" UId="1185" />
+  <Access Scope="LocalVariable" UId="1186">
+    <Symbol UId="1187">
+      <Component Name="OutputMemory" UId="1188" />
+    </Symbol>
+  </Access>
+  <Blank UId="1189" />
+  <Token Text=":=" UId="1190" />
+  <Blank UId="1191" />
+  <Access Scope="LocalVariable" UId="1192">
+    <Symbol UId="1193">
+      <Component Name="Alarm_Warning_DW" UId="1194" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="1195" />
+  <NewLine UId="1196" />
+  <Blank Num="4" UId="1197" />
+  <Token Text="END_IF" UId="1198" />
+  <Token Text=";" UId="1199" />
+  <NewLine UId="1200" />
+  <Blank Num="4" UId="1201" />
+  <NewLine UId="1202" />
+  <Token Text="END_IF" UId="1203" />
+  <Token Text=";" UId="1204" />
+  <NewLine UId="1205" />
+</StructuredText></NetworkSource>
+          <ProgrammingLanguage>SCL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>BOOL to UDINT conversion</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="8" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v3">
+  <Token Text="FOR" UId="21" />
+  <Blank UId="22" />
+  <Access Scope="LocalVariable" UId="23">
+    <Symbol UId="24">
+      <Component Name="AlarmIdx" UId="25" />
+    </Symbol>
+  </Access>
+  <Blank UId="26" />
+  <Token Text=":=" UId="27" />
+  <Blank UId="28" />
+  <Access Scope="LiteralConstant" UId="29">
+    <Constant UId="30">
+      <ConstantValue UId="32">0</ConstantValue>
+    </Constant>
+  </Access>
+  <Blank UId="33" />
+  <Token Text="TO" UId="34" />
+  <Blank UId="35" />
+  <Access Scope="LiteralConstant" UId="36">
+    <Constant UId="37">
+      <ConstantValue UId="39">31</ConstantValue>
+    </Constant>
+  </Access>
+  <Blank UId="40" />
+  <Token Text="DO" UId="41" />
+  <NewLine UId="42" />
+  <Blank Num="4" UId="43" />
+  <LineComment UId="44">
+    <Text UId="45">check value of bit in word</Text>
+  </LineComment>
+  <NewLine UId="46" />
+  <Blank Num="4" UId="47" />
+  <Access Scope="LocalVariable" UId="48">
+    <Symbol UId="49">
+      <Component Name="AlarmIsOn" UId="50" />
+    </Symbol>
+  </Access>
+  <Blank UId="51" />
+  <Token Text=":=" UId="52" />
+  <Blank UId="53" />
+  <Token Text="(" UId="54" />
+  <Access Scope="Call" UId="55">
+    <Instruction Name="SHR" UId="56">
+      <TemplateValue Name="value_type" Type="Type" UId="57">UDInt</TemplateValue>
+      <Token Text="(" UId="58" />
+      <Parameter Name="IN" UId="59">
+        <Blank UId="60" />
+        <Token Text=":=" UId="61" />
+        <Blank UId="62" />
+        <Access Scope="LocalVariable" UId="63">
+          <Symbol UId="64">
+            <Component Name="Alarm_Warning_DW" UId="65" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="66" />
+      <Blank UId="67" />
+      <Parameter Name="N" UId="68">
+        <Blank UId="69" />
+        <Token Text=":=" UId="70" />
+        <Blank UId="71" />
+        <Access Scope="LocalVariable" UId="72">
+          <Symbol UId="73">
+            <Component Name="AlarmIdx" UId="74" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="76" />
+    </Instruction>
+  </Access>
+  <Blank UId="77" />
+  <Token Text="AND" UId="78" />
+  <Blank UId="79" />
+  <Access Scope="TypedConstant" UId="80">
+    <Constant UId="81">
+      <ConstantValue UId="82">udint#1</ConstantValue>
+    </Constant>
+  </Access>
+  <Token Text=")" UId="83" />
+  <Blank UId="84" />
+  <Token Text="=" UId="85" />
+  <Blank UId="86" />
+  <Access Scope="TypedConstant" UId="87">
+    <Constant UId="88">
+      <ConstantValue UId="89">udint#1</ConstantValue>
+    </Constant>
+  </Access>
+  <Token Text=";" UId="90" />
+  <NewLine UId="91" />
+  <Blank Num="4" UId="92" />
+  <LineComment UId="93">
+    <Text UId="94">evaluate falling edge</Text>
+  </LineComment>
+  <NewLine UId="95" />
+  <Blank Num="4" UId="96" />
+  <Access Scope="LocalVariable" UId="97">
+    <Symbol UId="98">
+      <Component Name="AlarmFallingEdge" UId="99" />
+    </Symbol>
+  </Access>
+  <Blank UId="100" />
+  <Token Text=":=" UId="101" />
+  <Blank UId="102" />
+  <Token Text="(" UId="103" />
+  <Token Text="NOT" UId="104" />
+  <Blank UId="105" />
+  <Access Scope="LocalVariable" UId="106">
+    <Symbol UId="107">
+      <Component Name="AlarmIsOn" UId="108" />
+    </Symbol>
+  </Access>
+  <Token Text=")" UId="109" />
+  <Blank UId="110" />
+  <Token Text="AND" UId="111" />
+  <Blank UId="112" />
+  <Access Scope="LocalVariable" UId="113">
+    <Symbol UId="114">
+      <Component Name="AlarmWasON" UId="115">
+        <Token Text="[" UId="116" />
+        <Access Scope="LocalVariable" UId="117">
+          <Symbol UId="118">
+            <Component Name="AlarmIdx" UId="119" />
+          </Symbol>
+        </Access>
+        <Token Text="]" UId="120" />
+      </Component>
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="121" />
+  <NewLine UId="122" />
+  <Blank Num="4" UId="123" />
+  <LineComment UId="124">
+    <Text UId="125">update bit memory</Text>
+  </LineComment>
+  <NewLine UId="126" />
+  <Blank Num="4" UId="127" />
+  <Access Scope="LocalVariable" UId="128">
+    <Symbol UId="129">
+      <Component Name="AlarmWasON" UId="130">
+        <Token Text="[" UId="131" />
+        <Access Scope="LocalVariable" UId="132">
+          <Symbol UId="133">
+            <Component Name="AlarmIdx" UId="134" />
+          </Symbol>
+        </Access>
+        <Token Text="]" UId="135" />
+      </Component>
+    </Symbol>
+  </Access>
+  <Blank UId="136" />
+  <Token Text=":=" UId="137" />
+  <Blank UId="138" />
+  <Access Scope="LocalVariable" UId="139">
+    <Symbol UId="140">
+      <Component Name="AlarmIsOn" UId="141" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="142" />
+  <NewLine UId="143" />
+  <Blank Num="4" UId="144" />
+  <NewLine UId="145" />
+  <Blank Num="4" UId="146" />
+  <LineComment UId="147">
+    <Text UId="148">set bit in Tristate UDint</Text>
+  </LineComment>
+  <NewLine UId="149" />
+  <Blank Num="4" UId="150" />
+  <Token Text="IF" UId="151" />
+  <Blank UId="152" />
+  <Access Scope="LocalVariable" UId="153">
+    <Symbol UId="154">
+      <Component Name="AlarmFallingEdge" UId="155" />
+    </Symbol>
+  </Access>
+  <Blank UId="156" />
+  <Token Text="THEN" UId="157" />
+  <NewLine UId="158" />
+  <Blank Num="8" UId="159" />
+  <Access Scope="LocalVariable" UId="160">
+    <Symbol UId="161">
+      <Component Name="Tristate_DW" UId="162" />
+    </Symbol>
+  </Access>
+  <Blank UId="163" />
+  <Token Text=":=" UId="164" />
+  <Blank UId="165" />
+  <Access Scope="Call" UId="166">
+    <Instruction Name="DECO" UId="167">
+      <TemplateValue Name="return_type" Type="Type" UId="168">DWord</TemplateValue>
+      <Token Text="(" UId="169" />
+      <NamelessParameter UId="170">
+        <Access Scope="LocalVariable" UId="171">
+          <Symbol UId="172">
+            <Component Name="AlarmIdx" UId="173" />
+          </Symbol>
+        </Access>
+      </NamelessParameter>
+      <Token Text=")" UId="175" />
+    </Instruction>
+  </Access>
+  <Blank UId="176" />
+  <Token Text="OR" UId="177" />
+  <Blank UId="178" />
+  <Access Scope="LocalVariable" UId="179">
+    <Symbol UId="180">
+      <Component Name="Tristate_DW" UId="181" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="182" />
+  <NewLine UId="183" />
+  <Blank Num="4" UId="184" />
+  <Token Text="END_IF" UId="185" />
+  <Token Text=";" UId="186" />
+  <NewLine UId="187" />
+  <Token Text="END_FOR" UId="188" />
+  <Token Text=";" UId="189" />
+  <NewLine Num="2" UId="190" />
+  <LineComment UId="191">
+    <Text UId="192">clear tristate UDint</Text>
+  </LineComment>
+  <NewLine UId="193" />
+  <Token Text="IF" UId="194" />
+  <Blank UId="195" />
+  <Access Scope="LocalVariable" UId="196">
+    <Symbol UId="197">
+      <Component Name="RESET_Command" UId="198" />
+    </Symbol>
+  </Access>
+  <Blank UId="199" />
+  <Token Text="THEN" UId="200" />
+  <NewLine UId="201" />
+  <Blank Num="4" UId="202" />
+  <Access Scope="LocalVariable" UId="203">
+    <Symbol UId="204">
+      <Component Name="Tristate_DW" UId="205" />
+    </Symbol>
+  </Access>
+  <Blank UId="206" />
+  <Token Text=":=" UId="207" />
+  <Blank UId="208" />
+  <Access Scope="LiteralConstant" UId="209">
+    <Constant UId="210">
+      <ConstantValue UId="212">0</ConstantValue>
+    </Constant>
+  </Access>
+  <Token Text=";" UId="213" />
+  <NewLine UId="214" />
+  <Token Text="END_IF" UId="215" />
+  <Token Text=";" UId="216" />
+</StructuredText></NetworkSource>
+          <ProgrammingLanguage>SCL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="9" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="A" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="B" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="C" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Alarm Was ON (Tristate) Management</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="D" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v3">
+  <Token Text="IF" UId="21" />
+  <Blank UId="22" />
+  <Token Text="NOT" UId="23" />
+  <Blank UId="24" />
+  <Access Scope="LocalVariable" UId="25">
+    <Symbol UId="26">
+      <Component Name="AUX" UId="27" />
+      <Token Text="." UId="28" />
+      <Component Name="READ_PARAM_NAME_DONE" UId="29" />
+    </Symbol>
+  </Access>
+  <Blank UId="30" />
+  <Token Text="THEN" UId="31" />
+  <NewLine UId="32" />
+  <Blank Num="4" UId="33" />
+  <Access Scope="LocalVariable" UId="34">
+    <Symbol UId="35">
+      <Component Name="NAME_00" UId="36" />
+    </Symbol>
+  </Access>
+  <Blank UId="37" />
+  <Token Text=":=" UId="38" />
+  <Blank UId="39" />
+  <Access Scope="Call" UId="40">
+    <Instruction Name="GetSymbolName" UId="41">
+      <Token Text="(" UId="42" />
+      <Parameter Name="variable" UId="43">
+        <Blank UId="44" />
+        <Token Text=":=" UId="45" />
+        <Blank UId="46" />
+        <Access Scope="LocalVariable" UId="47">
+          <Symbol UId="48">
+            <Component Name="IN_00" UId="49" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="50" />
+      <Blank UId="51" />
+      <Parameter Name="size" UId="52">
+        <Blank UId="53" />
+        <Token Text=":=" UId="54" />
+        <Blank UId="55" />
+        <Access Scope="LiteralConstant" UId="56">
+          <Constant UId="57">
+            <ConstantValue UId="59">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="61" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="62" />
+  <NewLine UId="63" />
+  <Blank Num="4" UId="64" />
+  <Access Scope="LocalVariable" UId="65">
+    <Symbol UId="66">
+      <Component Name="NAME_01" UId="67" />
+    </Symbol>
+  </Access>
+  <Blank UId="68" />
+  <Token Text=":=" UId="69" />
+  <Blank UId="70" />
+  <Access Scope="Call" UId="71">
+    <Instruction Name="GetSymbolName" UId="72">
+      <Token Text="(" UId="73" />
+      <Parameter Name="variable" UId="74">
+        <Blank UId="75" />
+        <Token Text=":=" UId="76" />
+        <Blank UId="77" />
+        <Access Scope="LocalVariable" UId="78">
+          <Symbol UId="79">
+            <Component Name="IN_01" UId="80" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="81" />
+      <Blank UId="82" />
+      <Parameter Name="size" UId="83">
+        <Blank UId="84" />
+        <Token Text=":=" UId="85" />
+        <Blank UId="86" />
+        <Access Scope="LiteralConstant" UId="87">
+          <Constant UId="88">
+            <ConstantValue UId="90">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="92" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="93" />
+  <NewLine UId="94" />
+  <Blank Num="4" UId="95" />
+  <Access Scope="LocalVariable" UId="96">
+    <Symbol UId="97">
+      <Component Name="NAME_02" UId="98" />
+    </Symbol>
+  </Access>
+  <Blank UId="99" />
+  <Token Text=":=" UId="100" />
+  <Blank UId="101" />
+  <Access Scope="Call" UId="102">
+    <Instruction Name="GetSymbolName" UId="103">
+      <Token Text="(" UId="104" />
+      <Parameter Name="variable" UId="105">
+        <Blank UId="106" />
+        <Token Text=":=" UId="107" />
+        <Blank UId="108" />
+        <Access Scope="LocalVariable" UId="109">
+          <Symbol UId="110">
+            <Component Name="IN_02" UId="111" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="112" />
+      <Blank UId="113" />
+      <Parameter Name="size" UId="114">
+        <Blank UId="115" />
+        <Token Text=":=" UId="116" />
+        <Blank UId="117" />
+        <Access Scope="LiteralConstant" UId="118">
+          <Constant UId="119">
+            <ConstantValue UId="121">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="123" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="124" />
+  <NewLine UId="125" />
+  <Blank Num="4" UId="126" />
+  <Access Scope="LocalVariable" UId="127">
+    <Symbol UId="128">
+      <Component Name="NAME_03" UId="129" />
+    </Symbol>
+  </Access>
+  <Blank UId="130" />
+  <Token Text=":=" UId="131" />
+  <Blank UId="132" />
+  <Access Scope="Call" UId="133">
+    <Instruction Name="GetSymbolName" UId="134">
+      <Token Text="(" UId="135" />
+      <Parameter Name="variable" UId="136">
+        <Blank UId="137" />
+        <Token Text=":=" UId="138" />
+        <Blank UId="139" />
+        <Access Scope="LocalVariable" UId="140">
+          <Symbol UId="141">
+            <Component Name="IN_03" UId="142" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="143" />
+      <Blank UId="144" />
+      <Parameter Name="size" UId="145">
+        <Blank UId="146" />
+        <Token Text=":=" UId="147" />
+        <Blank UId="148" />
+        <Access Scope="LiteralConstant" UId="149">
+          <Constant UId="150">
+            <ConstantValue UId="152">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="154" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="155" />
+  <NewLine UId="156" />
+  <Blank Num="4" UId="157" />
+  <Access Scope="LocalVariable" UId="158">
+    <Symbol UId="159">
+      <Component Name="NAME_04" UId="160" />
+    </Symbol>
+  </Access>
+  <Blank UId="161" />
+  <Token Text=":=" UId="162" />
+  <Blank UId="163" />
+  <Access Scope="Call" UId="164">
+    <Instruction Name="GetSymbolName" UId="165">
+      <Token Text="(" UId="166" />
+      <Parameter Name="variable" UId="167">
+        <Blank UId="168" />
+        <Token Text=":=" UId="169" />
+        <Blank UId="170" />
+        <Access Scope="LocalVariable" UId="171">
+          <Symbol UId="172">
+            <Component Name="IN_04" UId="173" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="174" />
+      <Blank UId="175" />
+      <Parameter Name="size" UId="176">
+        <Blank UId="177" />
+        <Token Text=":=" UId="178" />
+        <Blank UId="179" />
+        <Access Scope="LiteralConstant" UId="180">
+          <Constant UId="181">
+            <ConstantValue UId="183">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="185" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="186" />
+  <NewLine UId="187" />
+  <Blank Num="4" UId="188" />
+  <Access Scope="LocalVariable" UId="189">
+    <Symbol UId="190">
+      <Component Name="NAME_05" UId="191" />
+    </Symbol>
+  </Access>
+  <Blank UId="192" />
+  <Token Text=":=" UId="193" />
+  <Blank UId="194" />
+  <Access Scope="Call" UId="195">
+    <Instruction Name="GetSymbolName" UId="196">
+      <Token Text="(" UId="197" />
+      <Parameter Name="variable" UId="198">
+        <Blank UId="199" />
+        <Token Text=":=" UId="200" />
+        <Blank UId="201" />
+        <Access Scope="LocalVariable" UId="202">
+          <Symbol UId="203">
+            <Component Name="IN_05" UId="204" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="205" />
+      <Blank UId="206" />
+      <Parameter Name="size" UId="207">
+        <Blank UId="208" />
+        <Token Text=":=" UId="209" />
+        <Blank UId="210" />
+        <Access Scope="LiteralConstant" UId="211">
+          <Constant UId="212">
+            <ConstantValue UId="214">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="216" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="217" />
+  <NewLine UId="218" />
+  <Blank Num="4" UId="219" />
+  <Access Scope="LocalVariable" UId="220">
+    <Symbol UId="221">
+      <Component Name="NAME_06" UId="222" />
+    </Symbol>
+  </Access>
+  <Blank UId="223" />
+  <Token Text=":=" UId="224" />
+  <Blank UId="225" />
+  <Access Scope="Call" UId="226">
+    <Instruction Name="GetSymbolName" UId="227">
+      <Token Text="(" UId="228" />
+      <Parameter Name="variable" UId="229">
+        <Blank UId="230" />
+        <Token Text=":=" UId="231" />
+        <Blank UId="232" />
+        <Access Scope="LocalVariable" UId="233">
+          <Symbol UId="234">
+            <Component Name="IN_06" UId="235" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="236" />
+      <Blank UId="237" />
+      <Parameter Name="size" UId="238">
+        <Blank UId="239" />
+        <Token Text=":=" UId="240" />
+        <Blank UId="241" />
+        <Access Scope="LiteralConstant" UId="242">
+          <Constant UId="243">
+            <ConstantValue UId="245">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="247" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="248" />
+  <NewLine UId="249" />
+  <Blank Num="4" UId="250" />
+  <Access Scope="LocalVariable" UId="251">
+    <Symbol UId="252">
+      <Component Name="NAME_07" UId="253" />
+    </Symbol>
+  </Access>
+  <Blank UId="254" />
+  <Token Text=":=" UId="255" />
+  <Blank UId="256" />
+  <Access Scope="Call" UId="257">
+    <Instruction Name="GetSymbolName" UId="258">
+      <Token Text="(" UId="259" />
+      <Parameter Name="variable" UId="260">
+        <Blank UId="261" />
+        <Token Text=":=" UId="262" />
+        <Blank UId="263" />
+        <Access Scope="LocalVariable" UId="264">
+          <Symbol UId="265">
+            <Component Name="IN_07" UId="266" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="267" />
+      <Blank UId="268" />
+      <Parameter Name="size" UId="269">
+        <Blank UId="270" />
+        <Token Text=":=" UId="271" />
+        <Blank UId="272" />
+        <Access Scope="LiteralConstant" UId="273">
+          <Constant UId="274">
+            <ConstantValue UId="276">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="278" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="279" />
+  <NewLine UId="280" />
+  <Blank Num="4" UId="281" />
+  <Access Scope="LocalVariable" UId="282">
+    <Symbol UId="283">
+      <Component Name="NAME_08" UId="284" />
+    </Symbol>
+  </Access>
+  <Blank UId="285" />
+  <Token Text=":=" UId="286" />
+  <Blank UId="287" />
+  <Access Scope="Call" UId="288">
+    <Instruction Name="GetSymbolName" UId="289">
+      <Token Text="(" UId="290" />
+      <Parameter Name="variable" UId="291">
+        <Blank UId="292" />
+        <Token Text=":=" UId="293" />
+        <Blank UId="294" />
+        <Access Scope="LocalVariable" UId="295">
+          <Symbol UId="296">
+            <Component Name="IN_08" UId="297" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="298" />
+      <Blank UId="299" />
+      <Parameter Name="size" UId="300">
+        <Blank UId="301" />
+        <Token Text=":=" UId="302" />
+        <Blank UId="303" />
+        <Access Scope="LiteralConstant" UId="304">
+          <Constant UId="305">
+            <ConstantValue UId="307">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="309" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="310" />
+  <NewLine UId="311" />
+  <Blank Num="4" UId="312" />
+  <Access Scope="LocalVariable" UId="313">
+    <Symbol UId="314">
+      <Component Name="NAME_09" UId="315" />
+    </Symbol>
+  </Access>
+  <Blank UId="316" />
+  <Token Text=":=" UId="317" />
+  <Blank UId="318" />
+  <Access Scope="Call" UId="319">
+    <Instruction Name="GetSymbolName" UId="320">
+      <Token Text="(" UId="321" />
+      <Parameter Name="variable" UId="322">
+        <Blank UId="323" />
+        <Token Text=":=" UId="324" />
+        <Blank UId="325" />
+        <Access Scope="LocalVariable" UId="326">
+          <Symbol UId="327">
+            <Component Name="IN_09" UId="328" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="329" />
+      <Blank UId="330" />
+      <Parameter Name="size" UId="331">
+        <Blank UId="332" />
+        <Token Text=":=" UId="333" />
+        <Blank UId="334" />
+        <Access Scope="LiteralConstant" UId="335">
+          <Constant UId="336">
+            <ConstantValue UId="338">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="340" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="341" />
+  <NewLine UId="342" />
+  <Blank Num="4" UId="343" />
+  <Access Scope="LocalVariable" UId="344">
+    <Symbol UId="345">
+      <Component Name="NAME_10" UId="346" />
+    </Symbol>
+  </Access>
+  <Blank UId="347" />
+  <Token Text=":=" UId="348" />
+  <Blank UId="349" />
+  <Access Scope="Call" UId="350">
+    <Instruction Name="GetSymbolName" UId="351">
+      <Token Text="(" UId="352" />
+      <Parameter Name="variable" UId="353">
+        <Blank UId="354" />
+        <Token Text=":=" UId="355" />
+        <Blank UId="356" />
+        <Access Scope="LocalVariable" UId="357">
+          <Symbol UId="358">
+            <Component Name="IN_10" UId="359" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="360" />
+      <Blank UId="361" />
+      <Parameter Name="size" UId="362">
+        <Blank UId="363" />
+        <Token Text=":=" UId="364" />
+        <Blank UId="365" />
+        <Access Scope="LiteralConstant" UId="366">
+          <Constant UId="367">
+            <ConstantValue UId="369">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="371" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="372" />
+  <NewLine UId="373" />
+  <Blank Num="4" UId="374" />
+  <Access Scope="LocalVariable" UId="375">
+    <Symbol UId="376">
+      <Component Name="NAME_11" UId="377" />
+    </Symbol>
+  </Access>
+  <Blank UId="378" />
+  <Token Text=":=" UId="379" />
+  <Blank UId="380" />
+  <Access Scope="Call" UId="381">
+    <Instruction Name="GetSymbolName" UId="382">
+      <Token Text="(" UId="383" />
+      <Parameter Name="variable" UId="384">
+        <Blank UId="385" />
+        <Token Text=":=" UId="386" />
+        <Blank UId="387" />
+        <Access Scope="LocalVariable" UId="388">
+          <Symbol UId="389">
+            <Component Name="IN_11" UId="390" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="391" />
+      <Blank UId="392" />
+      <Parameter Name="size" UId="393">
+        <Blank UId="394" />
+        <Token Text=":=" UId="395" />
+        <Blank UId="396" />
+        <Access Scope="LiteralConstant" UId="397">
+          <Constant UId="398">
+            <ConstantValue UId="400">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="402" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="403" />
+  <NewLine UId="404" />
+  <Blank Num="4" UId="405" />
+  <Access Scope="LocalVariable" UId="406">
+    <Symbol UId="407">
+      <Component Name="NAME_12" UId="408" />
+    </Symbol>
+  </Access>
+  <Blank UId="409" />
+  <Token Text=":=" UId="410" />
+  <Blank UId="411" />
+  <Access Scope="Call" UId="412">
+    <Instruction Name="GetSymbolName" UId="413">
+      <Token Text="(" UId="414" />
+      <Parameter Name="variable" UId="415">
+        <Blank UId="416" />
+        <Token Text=":=" UId="417" />
+        <Blank UId="418" />
+        <Access Scope="LocalVariable" UId="419">
+          <Symbol UId="420">
+            <Component Name="IN_12" UId="421" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="422" />
+      <Blank UId="423" />
+      <Parameter Name="size" UId="424">
+        <Blank UId="425" />
+        <Token Text=":=" UId="426" />
+        <Blank UId="427" />
+        <Access Scope="LiteralConstant" UId="428">
+          <Constant UId="429">
+            <ConstantValue UId="431">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="433" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="434" />
+  <NewLine UId="435" />
+  <Blank Num="4" UId="436" />
+  <Access Scope="LocalVariable" UId="437">
+    <Symbol UId="438">
+      <Component Name="NAME_13" UId="439" />
+    </Symbol>
+  </Access>
+  <Blank UId="440" />
+  <Token Text=":=" UId="441" />
+  <Blank UId="442" />
+  <Access Scope="Call" UId="443">
+    <Instruction Name="GetSymbolName" UId="444">
+      <Token Text="(" UId="445" />
+      <Parameter Name="variable" UId="446">
+        <Blank UId="447" />
+        <Token Text=":=" UId="448" />
+        <Blank UId="449" />
+        <Access Scope="LocalVariable" UId="450">
+          <Symbol UId="451">
+            <Component Name="IN_13" UId="452" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="453" />
+      <Blank UId="454" />
+      <Parameter Name="size" UId="455">
+        <Blank UId="456" />
+        <Token Text=":=" UId="457" />
+        <Blank UId="458" />
+        <Access Scope="LiteralConstant" UId="459">
+          <Constant UId="460">
+            <ConstantValue UId="462">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="464" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="465" />
+  <NewLine UId="466" />
+  <Blank Num="4" UId="467" />
+  <Access Scope="LocalVariable" UId="468">
+    <Symbol UId="469">
+      <Component Name="NAME_14" UId="470" />
+    </Symbol>
+  </Access>
+  <Blank UId="471" />
+  <Token Text=":=" UId="472" />
+  <Blank UId="473" />
+  <Access Scope="Call" UId="474">
+    <Instruction Name="GetSymbolName" UId="475">
+      <Token Text="(" UId="476" />
+      <Parameter Name="variable" UId="477">
+        <Blank UId="478" />
+        <Token Text=":=" UId="479" />
+        <Blank UId="480" />
+        <Access Scope="LocalVariable" UId="481">
+          <Symbol UId="482">
+            <Component Name="IN_14" UId="483" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="484" />
+      <Blank UId="485" />
+      <Parameter Name="size" UId="486">
+        <Blank UId="487" />
+        <Token Text=":=" UId="488" />
+        <Blank UId="489" />
+        <Access Scope="LiteralConstant" UId="490">
+          <Constant UId="491">
+            <ConstantValue UId="493">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="495" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="496" />
+  <NewLine UId="497" />
+  <Blank Num="4" UId="498" />
+  <Access Scope="LocalVariable" UId="499">
+    <Symbol UId="500">
+      <Component Name="NAME_15" UId="501" />
+    </Symbol>
+  </Access>
+  <Blank UId="502" />
+  <Token Text=":=" UId="503" />
+  <Blank UId="504" />
+  <Access Scope="Call" UId="505">
+    <Instruction Name="GetSymbolName" UId="506">
+      <Token Text="(" UId="507" />
+      <Parameter Name="variable" UId="508">
+        <Blank UId="509" />
+        <Token Text=":=" UId="510" />
+        <Blank UId="511" />
+        <Access Scope="LocalVariable" UId="512">
+          <Symbol UId="513">
+            <Component Name="IN_15" UId="514" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="515" />
+      <Blank UId="516" />
+      <Parameter Name="size" UId="517">
+        <Blank UId="518" />
+        <Token Text=":=" UId="519" />
+        <Blank UId="520" />
+        <Access Scope="LiteralConstant" UId="521">
+          <Constant UId="522">
+            <ConstantValue UId="524">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="526" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="527" />
+  <NewLine UId="528" />
+  <Blank Num="4" UId="529" />
+  <Access Scope="LocalVariable" UId="530">
+    <Symbol UId="531">
+      <Component Name="NAME_16" UId="532" />
+    </Symbol>
+  </Access>
+  <Blank UId="533" />
+  <Token Text=":=" UId="534" />
+  <Blank UId="535" />
+  <Access Scope="Call" UId="536">
+    <Instruction Name="GetSymbolName" UId="537">
+      <Token Text="(" UId="538" />
+      <Parameter Name="variable" UId="539">
+        <Blank UId="540" />
+        <Token Text=":=" UId="541" />
+        <Blank UId="542" />
+        <Access Scope="LocalVariable" UId="543">
+          <Symbol UId="544">
+            <Component Name="IN_16" UId="545" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="546" />
+      <Blank UId="547" />
+      <Parameter Name="size" UId="548">
+        <Blank UId="549" />
+        <Token Text=":=" UId="550" />
+        <Blank UId="551" />
+        <Access Scope="LiteralConstant" UId="552">
+          <Constant UId="553">
+            <ConstantValue UId="555">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="557" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="558" />
+  <NewLine UId="559" />
+  <Blank Num="4" UId="560" />
+  <Access Scope="LocalVariable" UId="561">
+    <Symbol UId="562">
+      <Component Name="NAME_17" UId="563" />
+    </Symbol>
+  </Access>
+  <Blank UId="564" />
+  <Token Text=":=" UId="565" />
+  <Blank UId="566" />
+  <Access Scope="Call" UId="567">
+    <Instruction Name="GetSymbolName" UId="568">
+      <Token Text="(" UId="569" />
+      <Parameter Name="variable" UId="570">
+        <Blank UId="571" />
+        <Token Text=":=" UId="572" />
+        <Blank UId="573" />
+        <Access Scope="LocalVariable" UId="574">
+          <Symbol UId="575">
+            <Component Name="IN_17" UId="576" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="577" />
+      <Blank UId="578" />
+      <Parameter Name="size" UId="579">
+        <Blank UId="580" />
+        <Token Text=":=" UId="581" />
+        <Blank UId="582" />
+        <Access Scope="LiteralConstant" UId="583">
+          <Constant UId="584">
+            <ConstantValue UId="586">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="588" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="589" />
+  <NewLine UId="590" />
+  <Blank Num="4" UId="591" />
+  <Access Scope="LocalVariable" UId="592">
+    <Symbol UId="593">
+      <Component Name="NAME_18" UId="594" />
+    </Symbol>
+  </Access>
+  <Blank UId="595" />
+  <Token Text=":=" UId="596" />
+  <Blank UId="597" />
+  <Access Scope="Call" UId="598">
+    <Instruction Name="GetSymbolName" UId="599">
+      <Token Text="(" UId="600" />
+      <Parameter Name="variable" UId="601">
+        <Blank UId="602" />
+        <Token Text=":=" UId="603" />
+        <Blank UId="604" />
+        <Access Scope="LocalVariable" UId="605">
+          <Symbol UId="606">
+            <Component Name="IN_18" UId="607" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="608" />
+      <Blank UId="609" />
+      <Parameter Name="size" UId="610">
+        <Blank UId="611" />
+        <Token Text=":=" UId="612" />
+        <Blank UId="613" />
+        <Access Scope="LiteralConstant" UId="614">
+          <Constant UId="615">
+            <ConstantValue UId="617">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="619" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="620" />
+  <NewLine UId="621" />
+  <Blank Num="4" UId="622" />
+  <Access Scope="LocalVariable" UId="623">
+    <Symbol UId="624">
+      <Component Name="NAME_19" UId="625" />
+    </Symbol>
+  </Access>
+  <Blank UId="626" />
+  <Token Text=":=" UId="627" />
+  <Blank UId="628" />
+  <Access Scope="Call" UId="629">
+    <Instruction Name="GetSymbolName" UId="630">
+      <Token Text="(" UId="631" />
+      <Parameter Name="variable" UId="632">
+        <Blank UId="633" />
+        <Token Text=":=" UId="634" />
+        <Blank UId="635" />
+        <Access Scope="LocalVariable" UId="636">
+          <Symbol UId="637">
+            <Component Name="IN_19" UId="638" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="639" />
+      <Blank UId="640" />
+      <Parameter Name="size" UId="641">
+        <Blank UId="642" />
+        <Token Text=":=" UId="643" />
+        <Blank UId="644" />
+        <Access Scope="LiteralConstant" UId="645">
+          <Constant UId="646">
+            <ConstantValue UId="648">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="650" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="651" />
+  <NewLine UId="652" />
+  <Blank Num="4" UId="653" />
+  <Access Scope="LocalVariable" UId="654">
+    <Symbol UId="655">
+      <Component Name="NAME_20" UId="656" />
+    </Symbol>
+  </Access>
+  <Blank UId="657" />
+  <Token Text=":=" UId="658" />
+  <Blank UId="659" />
+  <Access Scope="Call" UId="660">
+    <Instruction Name="GetSymbolName" UId="661">
+      <Token Text="(" UId="662" />
+      <Parameter Name="variable" UId="663">
+        <Blank UId="664" />
+        <Token Text=":=" UId="665" />
+        <Blank UId="666" />
+        <Access Scope="LocalVariable" UId="667">
+          <Symbol UId="668">
+            <Component Name="IN_20" UId="669" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="670" />
+      <Blank UId="671" />
+      <Parameter Name="size" UId="672">
+        <Blank UId="673" />
+        <Token Text=":=" UId="674" />
+        <Blank UId="675" />
+        <Access Scope="LiteralConstant" UId="676">
+          <Constant UId="677">
+            <ConstantValue UId="679">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="681" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="682" />
+  <NewLine UId="683" />
+  <Blank Num="4" UId="684" />
+  <Access Scope="LocalVariable" UId="685">
+    <Symbol UId="686">
+      <Component Name="NAME_21" UId="687" />
+    </Symbol>
+  </Access>
+  <Blank UId="688" />
+  <Token Text=":=" UId="689" />
+  <Blank UId="690" />
+  <Access Scope="Call" UId="691">
+    <Instruction Name="GetSymbolName" UId="692">
+      <Token Text="(" UId="693" />
+      <Parameter Name="variable" UId="694">
+        <Blank UId="695" />
+        <Token Text=":=" UId="696" />
+        <Blank UId="697" />
+        <Access Scope="LocalVariable" UId="698">
+          <Symbol UId="699">
+            <Component Name="IN_21" UId="700" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="701" />
+      <Blank UId="702" />
+      <Parameter Name="size" UId="703">
+        <Blank UId="704" />
+        <Token Text=":=" UId="705" />
+        <Blank UId="706" />
+        <Access Scope="LiteralConstant" UId="707">
+          <Constant UId="708">
+            <ConstantValue UId="710">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="712" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="713" />
+  <NewLine UId="714" />
+  <Blank Num="4" UId="715" />
+  <Access Scope="LocalVariable" UId="716">
+    <Symbol UId="717">
+      <Component Name="NAME_22" UId="718" />
+    </Symbol>
+  </Access>
+  <Blank UId="719" />
+  <Token Text=":=" UId="720" />
+  <Blank UId="721" />
+  <Access Scope="Call" UId="722">
+    <Instruction Name="GetSymbolName" UId="723">
+      <Token Text="(" UId="724" />
+      <Parameter Name="variable" UId="725">
+        <Blank UId="726" />
+        <Token Text=":=" UId="727" />
+        <Blank UId="728" />
+        <Access Scope="LocalVariable" UId="729">
+          <Symbol UId="730">
+            <Component Name="IN_22" UId="731" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="732" />
+      <Blank UId="733" />
+      <Parameter Name="size" UId="734">
+        <Blank UId="735" />
+        <Token Text=":=" UId="736" />
+        <Blank UId="737" />
+        <Access Scope="LiteralConstant" UId="738">
+          <Constant UId="739">
+            <ConstantValue UId="741">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="743" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="744" />
+  <NewLine UId="745" />
+  <Blank Num="4" UId="746" />
+  <Access Scope="LocalVariable" UId="747">
+    <Symbol UId="748">
+      <Component Name="NAME_23" UId="749" />
+    </Symbol>
+  </Access>
+  <Blank UId="750" />
+  <Token Text=":=" UId="751" />
+  <Blank UId="752" />
+  <Access Scope="Call" UId="753">
+    <Instruction Name="GetSymbolName" UId="754">
+      <Token Text="(" UId="755" />
+      <Parameter Name="variable" UId="756">
+        <Blank UId="757" />
+        <Token Text=":=" UId="758" />
+        <Blank UId="759" />
+        <Access Scope="LocalVariable" UId="760">
+          <Symbol UId="761">
+            <Component Name="IN_23" UId="762" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="763" />
+      <Blank UId="764" />
+      <Parameter Name="size" UId="765">
+        <Blank UId="766" />
+        <Token Text=":=" UId="767" />
+        <Blank UId="768" />
+        <Access Scope="LiteralConstant" UId="769">
+          <Constant UId="770">
+            <ConstantValue UId="772">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="774" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="775" />
+  <NewLine UId="776" />
+  <Blank Num="4" UId="777" />
+  <Access Scope="LocalVariable" UId="778">
+    <Symbol UId="779">
+      <Component Name="NAME_24" UId="780" />
+    </Symbol>
+  </Access>
+  <Blank UId="781" />
+  <Token Text=":=" UId="782" />
+  <Blank UId="783" />
+  <Access Scope="Call" UId="784">
+    <Instruction Name="GetSymbolName" UId="785">
+      <Token Text="(" UId="786" />
+      <Parameter Name="variable" UId="787">
+        <Blank UId="788" />
+        <Token Text=":=" UId="789" />
+        <Blank UId="790" />
+        <Access Scope="LocalVariable" UId="791">
+          <Symbol UId="792">
+            <Component Name="IN_24" UId="793" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="794" />
+      <Blank UId="795" />
+      <Parameter Name="size" UId="796">
+        <Blank UId="797" />
+        <Token Text=":=" UId="798" />
+        <Blank UId="799" />
+        <Access Scope="LiteralConstant" UId="800">
+          <Constant UId="801">
+            <ConstantValue UId="803">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="805" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="806" />
+  <NewLine UId="807" />
+  <Blank Num="4" UId="808" />
+  <Access Scope="LocalVariable" UId="809">
+    <Symbol UId="810">
+      <Component Name="NAME_25" UId="811" />
+    </Symbol>
+  </Access>
+  <Blank UId="812" />
+  <Token Text=":=" UId="813" />
+  <Blank UId="814" />
+  <Access Scope="Call" UId="815">
+    <Instruction Name="GetSymbolName" UId="816">
+      <Token Text="(" UId="817" />
+      <Parameter Name="variable" UId="818">
+        <Blank UId="819" />
+        <Token Text=":=" UId="820" />
+        <Blank UId="821" />
+        <Access Scope="LocalVariable" UId="822">
+          <Symbol UId="823">
+            <Component Name="IN_25" UId="824" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="825" />
+      <Blank UId="826" />
+      <Parameter Name="size" UId="827">
+        <Blank UId="828" />
+        <Token Text=":=" UId="829" />
+        <Blank UId="830" />
+        <Access Scope="LiteralConstant" UId="831">
+          <Constant UId="832">
+            <ConstantValue UId="834">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="836" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="837" />
+  <NewLine UId="838" />
+  <Blank Num="4" UId="839" />
+  <Access Scope="LocalVariable" UId="840">
+    <Symbol UId="841">
+      <Component Name="NAME_26" UId="842" />
+    </Symbol>
+  </Access>
+  <Blank UId="843" />
+  <Token Text=":=" UId="844" />
+  <Blank UId="845" />
+  <Access Scope="Call" UId="846">
+    <Instruction Name="GetSymbolName" UId="847">
+      <Token Text="(" UId="848" />
+      <Parameter Name="variable" UId="849">
+        <Blank UId="850" />
+        <Token Text=":=" UId="851" />
+        <Blank UId="852" />
+        <Access Scope="LocalVariable" UId="853">
+          <Symbol UId="854">
+            <Component Name="IN_26" UId="855" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="856" />
+      <Blank UId="857" />
+      <Parameter Name="size" UId="858">
+        <Blank UId="859" />
+        <Token Text=":=" UId="860" />
+        <Blank UId="861" />
+        <Access Scope="LiteralConstant" UId="862">
+          <Constant UId="863">
+            <ConstantValue UId="865">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="867" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="868" />
+  <NewLine UId="869" />
+  <Blank Num="4" UId="870" />
+  <Access Scope="LocalVariable" UId="871">
+    <Symbol UId="872">
+      <Component Name="NAME_27" UId="873" />
+    </Symbol>
+  </Access>
+  <Blank UId="874" />
+  <Token Text=":=" UId="875" />
+  <Blank UId="876" />
+  <Access Scope="Call" UId="877">
+    <Instruction Name="GetSymbolName" UId="878">
+      <Token Text="(" UId="879" />
+      <Parameter Name="variable" UId="880">
+        <Blank UId="881" />
+        <Token Text=":=" UId="882" />
+        <Blank UId="883" />
+        <Access Scope="LocalVariable" UId="884">
+          <Symbol UId="885">
+            <Component Name="IN_27" UId="886" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="887" />
+      <Blank UId="888" />
+      <Parameter Name="size" UId="889">
+        <Blank UId="890" />
+        <Token Text=":=" UId="891" />
+        <Blank UId="892" />
+        <Access Scope="LiteralConstant" UId="893">
+          <Constant UId="894">
+            <ConstantValue UId="896">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="898" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="899" />
+  <NewLine UId="900" />
+  <Blank Num="4" UId="901" />
+  <Access Scope="LocalVariable" UId="902">
+    <Symbol UId="903">
+      <Component Name="NAME_28" UId="904" />
+    </Symbol>
+  </Access>
+  <Blank UId="905" />
+  <Token Text=":=" UId="906" />
+  <Blank UId="907" />
+  <Access Scope="Call" UId="908">
+    <Instruction Name="GetSymbolName" UId="909">
+      <Token Text="(" UId="910" />
+      <Parameter Name="variable" UId="911">
+        <Blank UId="912" />
+        <Token Text=":=" UId="913" />
+        <Blank UId="914" />
+        <Access Scope="LocalVariable" UId="915">
+          <Symbol UId="916">
+            <Component Name="IN_28" UId="917" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="918" />
+      <Blank UId="919" />
+      <Parameter Name="size" UId="920">
+        <Blank UId="921" />
+        <Token Text=":=" UId="922" />
+        <Blank UId="923" />
+        <Access Scope="LiteralConstant" UId="924">
+          <Constant UId="925">
+            <ConstantValue UId="927">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="929" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="930" />
+  <NewLine UId="931" />
+  <Blank Num="4" UId="932" />
+  <Access Scope="LocalVariable" UId="933">
+    <Symbol UId="934">
+      <Component Name="NAME_29" UId="935" />
+    </Symbol>
+  </Access>
+  <Blank UId="936" />
+  <Token Text=":=" UId="937" />
+  <Blank UId="938" />
+  <Access Scope="Call" UId="939">
+    <Instruction Name="GetSymbolName" UId="940">
+      <Token Text="(" UId="941" />
+      <Parameter Name="variable" UId="942">
+        <Blank UId="943" />
+        <Token Text=":=" UId="944" />
+        <Blank UId="945" />
+        <Access Scope="LocalVariable" UId="946">
+          <Symbol UId="947">
+            <Component Name="IN_29" UId="948" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="949" />
+      <Blank UId="950" />
+      <Parameter Name="size" UId="951">
+        <Blank UId="952" />
+        <Token Text=":=" UId="953" />
+        <Blank UId="954" />
+        <Access Scope="LiteralConstant" UId="955">
+          <Constant UId="956">
+            <ConstantValue UId="958">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="960" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="961" />
+  <NewLine UId="962" />
+  <Blank Num="4" UId="963" />
+  <Access Scope="LocalVariable" UId="964">
+    <Symbol UId="965">
+      <Component Name="NAME_30" UId="966" />
+    </Symbol>
+  </Access>
+  <Blank UId="967" />
+  <Token Text=":=" UId="968" />
+  <Blank UId="969" />
+  <Access Scope="Call" UId="970">
+    <Instruction Name="GetSymbolName" UId="971">
+      <Token Text="(" UId="972" />
+      <Parameter Name="variable" UId="973">
+        <Blank UId="974" />
+        <Token Text=":=" UId="975" />
+        <Blank UId="976" />
+        <Access Scope="LocalVariable" UId="977">
+          <Symbol UId="978">
+            <Component Name="IN_30" UId="979" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="980" />
+      <Blank UId="981" />
+      <Parameter Name="size" UId="982">
+        <Blank UId="983" />
+        <Token Text=":=" UId="984" />
+        <Blank UId="985" />
+        <Access Scope="LiteralConstant" UId="986">
+          <Constant UId="987">
+            <ConstantValue UId="989">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="991" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="992" />
+  <NewLine UId="993" />
+  <Blank Num="4" UId="994" />
+  <Access Scope="LocalVariable" UId="995">
+    <Symbol UId="996">
+      <Component Name="NAME_31" UId="997" />
+    </Symbol>
+  </Access>
+  <Blank UId="998" />
+  <Token Text=":=" UId="999" />
+  <Blank UId="1000" />
+  <Access Scope="Call" UId="1001">
+    <Instruction Name="GetSymbolName" UId="1002">
+      <Token Text="(" UId="1003" />
+      <Parameter Name="variable" UId="1004">
+        <Blank UId="1005" />
+        <Token Text=":=" UId="1006" />
+        <Blank UId="1007" />
+        <Access Scope="LocalVariable" UId="1008">
+          <Symbol UId="1009">
+            <Component Name="IN_31" UId="1010" />
+          </Symbol>
+        </Access>
+      </Parameter>
+      <Token Text="," UId="1011" />
+      <Blank UId="1012" />
+      <Parameter Name="size" UId="1013">
+        <Blank UId="1014" />
+        <Token Text=":=" UId="1015" />
+        <Blank UId="1016" />
+        <Access Scope="LiteralConstant" UId="1017">
+          <Constant UId="1018">
+            <ConstantValue UId="1020">128</ConstantValue>
+          </Constant>
+        </Access>
+      </Parameter>
+      <Token Text=")" UId="1022" />
+    </Instruction>
+  </Access>
+  <Token Text=";" UId="1023" />
+  <NewLine UId="1024" />
+  <Blank Num="4" UId="1025" />
+  <Access Scope="LocalVariable" UId="1026">
+    <Symbol UId="1027">
+      <Component Name="AUX" UId="1028" />
+      <Token Text="." UId="1029" />
+      <Component Name="READ_PARAM_NAME_DONE" UId="1030" />
+    </Symbol>
+  </Access>
+  <Blank UId="1031" />
+  <Token Text=":=" UId="1032" />
+  <Blank UId="1033" />
+  <Access Scope="LiteralConstant" UId="1034">
+    <Constant UId="1035">
+      <ConstantValue UId="1037">TRUE</ConstantValue>
+    </Constant>
+  </Access>
+  <Token Text=";" UId="1038" />
+  <NewLine UId="1039" />
+  <Token Text="END_IF" UId="1040" />
+  <Token Text=";" UId="1041" />
+</StructuredText></NetworkSource>
+          <ProgrammingLanguage>SCL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="E" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="F" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="10" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="11" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Get input tag name as string</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="12" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="LiteralConstant" UId="21">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LocalVariable" UId="22">
+      <Symbol>
+        <Component Name="AUX" />
+        <Component Name="MERKERS" AccessModifier="Array">
+          <Access Scope="LiteralConstant">
+            <Constant>
+              <ConstantType>DInt</ConstantType>
+              <ConstantValue>0</ConstantValue>
+            </Constant>
+          </Access>
+        </Component>
+      </Symbol>
+    </Access>
+    <Access Scope="LocalVariable" UId="23">
+      <Symbol>
+        <Component Name="TEST_MODE_ENABLED" />
+      </Symbol>
+    </Access>
+    <Access Scope="LocalVariable" UId="24">
+      <Symbol>
+        <Component Name="TEST_MODE_ENABLED" />
+      </Symbol>
+    </Access>
+    <Access Scope="TypedConstant" UId="25">
+      <Constant>
+        <ConstantValue>t#15m</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LocalVariable" UId="26">
+      <Symbol>
+        <Component Name="AUX" />
+        <Component Name="TON_RESET_TEST_MODE" />
+        <Component Name="Q" />
+      </Symbol>
+    </Access>
+    <Access Scope="LocalVariable" UId="27">
+      <Symbol>
+        <Component Name="AUX" />
+        <Component Name="MERKERS" AccessModifier="Array">
+          <Access Scope="LiteralConstant">
+            <Constant>
+              <ConstantType>DInt</ConstantType>
+              <ConstantValue>1</ConstantValue>
+            </Constant>
+          </Access>
+        </Component>
+      </Symbol>
+    </Access>
+    <Access Scope="LiteralConstant" UId="28">
+      <Constant>
+        <ConstantType>Bool</ConstantType>
+        <ConstantValue>FALSE</ConstantValue>
+      </Constant>
+    </Access>
+    <Access Scope="LocalVariable" UId="29">
+      <Symbol>
+        <Component Name="AUX" />
+        <Component Name="MERKERS" AccessModifier="Array">
+          <Access Scope="LiteralConstant">
+            <Constant>
+              <ConstantType>DInt</ConstantType>
+              <ConstantValue>2</ConstantValue>
+            </Constant>
+          </Access>
+        </Component>
+      </Symbol>
+    </Access>
+    <Access Scope="LocalVariable" UId="30">
+      <Symbol>
+        <Component Name="TEST_MODE_ENABLED" />
+      </Symbol>
+    </Access>
+    <Part Name="PContact" UId="31" />
+    <Part Name="SCoil" UId="32" />
+    <Part Name="Contact" UId="33" />
+    <Part Name="TON" Version="1.0" UId="34">
+      <Instance Scope="LocalVariable" UId="35">
+        <Component Name="AUX" />
+        <Component Name="TON_RESET_TEST_MODE" />
+      </Instance>
+      <TemplateValue Name="time_type" Type="Type">Time</TemplateValue>
+    </Part>
+    <Part Name="PContact" UId="36" />
+    <Part Name="PContact" UId="37" />
+    <Part Name="O" UId="38">
+      <TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>
+    </Part>
+    <Part Name="RCoil" UId="39" />
+  </Parts>
+  <Wires>
+    <Wire UId="41">
+      <Powerrail />
+      <NameCon UId="31" Name="pre" />
+      <NameCon UId="33" Name="in" />
+      <NameCon UId="36" Name="pre" />
+      <NameCon UId="37" Name="pre" />
+    </Wire>
+    <Wire UId="42">
+      <IdentCon UId="22" />
+      <NameCon UId="31" Name="bit" />
+    </Wire>
+    <Wire UId="43">
+      <IdentCon UId="21" />
+      <NameCon UId="31" Name="operand" />
+    </Wire>
+    <Wire UId="44">
+      <NameCon UId="31" Name="out" />
+      <NameCon UId="32" Name="in" />
+    </Wire>
+    <Wire UId="45">
+      <IdentCon UId="23" />
+      <NameCon UId="32" Name="operand" />
+    </Wire>
+    <Wire UId="46">
+      <IdentCon UId="24" />
+      <NameCon UId="33" Name="operand" />
+    </Wire>
+    <Wire UId="47">
+      <NameCon UId="33" Name="out" />
+      <NameCon UId="34" Name="IN" />
+    </Wire>
+    <Wire UId="48">
+      <IdentCon UId="25" />
+      <NameCon UId="34" Name="PT" />
+    </Wire>
+    <Wire UId="49">
+      <NameCon UId="34" Name="ET" />
+      <OpenCon UId="40" />
+    </Wire>
+    <Wire UId="50">
+      <IdentCon UId="27" />
+      <NameCon UId="36" Name="bit" />
+    </Wire>
+    <Wire UId="51">
+      <IdentCon UId="26" />
+      <NameCon UId="36" Name="operand" />
+    </Wire>
+    <Wire UId="52">
+      <NameCon UId="36" Name="out" />
+      <NameCon UId="38" Name="in1" />
+    </Wire>
+    <Wire UId="53">
+      <IdentCon UId="29" />
+      <NameCon UId="37" Name="bit" />
+    </Wire>
+    <Wire UId="54">
+      <IdentCon UId="28" />
+      <NameCon UId="37" Name="operand" />
+    </Wire>
+    <Wire UId="55">
+      <NameCon UId="37" Name="out" />
+      <NameCon UId="38" Name="in2" />
+    </Wire>
+    <Wire UId="56">
+      <NameCon UId="38" Name="out" />
+      <NameCon UId="39" Name="in" />
+    </Wire>
+    <Wire UId="57">
+      <IdentCon UId="30" />
+      <NameCon UId="39" Name="operand" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="13" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="14" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="15" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="16" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>ENABLE TESTING MODE (automatically reset after 15 minutes)</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="17" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v3">
+  <LineComment UId="21">
+    <Text UId="22">if not in test mode BITVALUE is equal to the corresponding bit of the output UDINT</Text>
+  </LineComment>
+  <NewLine UId="23" />
+  <Token Text="IF" UId="24" />
+  <Blank UId="25" />
+  <Token Text="NOT" UId="26" />
+  <Blank UId="27" />
+  <Access Scope="LocalVariable" UId="28">
+    <Symbol UId="29">
+      <Component Name="TEST_MODE_ENABLED" UId="30" />
+    </Symbol>
+  </Access>
+  <Blank UId="31" />
+  <Token Text="THEN" UId="32" />
+  <Blank UId="33" />
+  <NewLine UId="34" />
+  <Blank Num="4" UId="35" />
+  <Access Scope="LocalVariable" UId="36">
+    <Symbol UId="37">
+      <Component Name="BITVALUE_00" UId="38" />
+    </Symbol>
+  </Access>
+  <Blank UId="39" />
+  <Token Text=":=" UId="40" />
+  <Blank UId="41" />
+  <Access Scope="LocalVariable" UId="42">
+    <Symbol UId="43">
+      <Component Name="Alarm_Warning_DW" UId="44" />
+      <Token Text="." UId="45" />
+      <Token Text="%X0" UId="46" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="47" />
+  <NewLine UId="48" />
+  <Blank Num="4" UId="49" />
+  <Access Scope="LocalVariable" UId="50">
+    <Symbol UId="51">
+      <Component Name="BITVALUE_01" UId="52" />
+    </Symbol>
+  </Access>
+  <Blank UId="53" />
+  <Token Text=":=" UId="54" />
+  <Blank UId="55" />
+  <Access Scope="LocalVariable" UId="56">
+    <Symbol UId="57">
+      <Component Name="Alarm_Warning_DW" UId="58" />
+      <Token Text="." UId="59" />
+      <Token Text="%X1" UId="60" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="61" />
+  <NewLine UId="62" />
+  <Blank Num="4" UId="63" />
+  <Access Scope="LocalVariable" UId="64">
+    <Symbol UId="65">
+      <Component Name="BITVALUE_02" UId="66" />
+    </Symbol>
+  </Access>
+  <Blank UId="67" />
+  <Token Text=":=" UId="68" />
+  <Blank UId="69" />
+  <Access Scope="LocalVariable" UId="70">
+    <Symbol UId="71">
+      <Component Name="Alarm_Warning_DW" UId="72" />
+      <Token Text="." UId="73" />
+      <Token Text="%X2" UId="74" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="75" />
+  <NewLine UId="76" />
+  <Blank Num="4" UId="77" />
+  <Access Scope="LocalVariable" UId="78">
+    <Symbol UId="79">
+      <Component Name="BITVALUE_03" UId="80" />
+    </Symbol>
+  </Access>
+  <Blank UId="81" />
+  <Token Text=":=" UId="82" />
+  <Blank UId="83" />
+  <Access Scope="LocalVariable" UId="84">
+    <Symbol UId="85">
+      <Component Name="Alarm_Warning_DW" UId="86" />
+      <Token Text="." UId="87" />
+      <Token Text="%X3" UId="88" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="89" />
+  <NewLine UId="90" />
+  <Blank Num="4" UId="91" />
+  <Access Scope="LocalVariable" UId="92">
+    <Symbol UId="93">
+      <Component Name="BITVALUE_04" UId="94" />
+    </Symbol>
+  </Access>
+  <Blank UId="95" />
+  <Token Text=":=" UId="96" />
+  <Blank UId="97" />
+  <Access Scope="LocalVariable" UId="98">
+    <Symbol UId="99">
+      <Component Name="Alarm_Warning_DW" UId="100" />
+      <Token Text="." UId="101" />
+      <Token Text="%X4" UId="102" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="103" />
+  <NewLine UId="104" />
+  <Blank Num="4" UId="105" />
+  <Access Scope="LocalVariable" UId="106">
+    <Symbol UId="107">
+      <Component Name="BITVALUE_05" UId="108" />
+    </Symbol>
+  </Access>
+  <Blank UId="109" />
+  <Token Text=":=" UId="110" />
+  <Blank UId="111" />
+  <Access Scope="LocalVariable" UId="112">
+    <Symbol UId="113">
+      <Component Name="Alarm_Warning_DW" UId="114" />
+      <Token Text="." UId="115" />
+      <Token Text="%X5" UId="116" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="117" />
+  <NewLine UId="118" />
+  <Blank Num="4" UId="119" />
+  <Access Scope="LocalVariable" UId="120">
+    <Symbol UId="121">
+      <Component Name="BITVALUE_06" UId="122" />
+    </Symbol>
+  </Access>
+  <Blank UId="123" />
+  <Token Text=":=" UId="124" />
+  <Blank UId="125" />
+  <Access Scope="LocalVariable" UId="126">
+    <Symbol UId="127">
+      <Component Name="Alarm_Warning_DW" UId="128" />
+      <Token Text="." UId="129" />
+      <Token Text="%X6" UId="130" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="131" />
+  <NewLine UId="132" />
+  <Blank Num="4" UId="133" />
+  <Access Scope="LocalVariable" UId="134">
+    <Symbol UId="135">
+      <Component Name="BITVALUE_07" UId="136" />
+    </Symbol>
+  </Access>
+  <Blank UId="137" />
+  <Token Text=":=" UId="138" />
+  <Blank UId="139" />
+  <Access Scope="LocalVariable" UId="140">
+    <Symbol UId="141">
+      <Component Name="Alarm_Warning_DW" UId="142" />
+      <Token Text="." UId="143" />
+      <Token Text="%X7" UId="144" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="145" />
+  <NewLine UId="146" />
+  <Blank Num="4" UId="147" />
+  <Access Scope="LocalVariable" UId="148">
+    <Symbol UId="149">
+      <Component Name="BITVALUE_08" UId="150" />
+    </Symbol>
+  </Access>
+  <Blank UId="151" />
+  <Token Text=":=" UId="152" />
+  <Blank UId="153" />
+  <Access Scope="LocalVariable" UId="154">
+    <Symbol UId="155">
+      <Component Name="Alarm_Warning_DW" UId="156" />
+      <Token Text="." UId="157" />
+      <Token Text="%X8" UId="158" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="159" />
+  <NewLine UId="160" />
+  <Blank Num="4" UId="161" />
+  <Access Scope="LocalVariable" UId="162">
+    <Symbol UId="163">
+      <Component Name="BITVALUE_09" UId="164" />
+    </Symbol>
+  </Access>
+  <Blank UId="165" />
+  <Token Text=":=" UId="166" />
+  <Blank UId="167" />
+  <Access Scope="LocalVariable" UId="168">
+    <Symbol UId="169">
+      <Component Name="Alarm_Warning_DW" UId="170" />
+      <Token Text="." UId="171" />
+      <Token Text="%X9" UId="172" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="173" />
+  <NewLine UId="174" />
+  <Blank Num="4" UId="175" />
+  <Access Scope="LocalVariable" UId="176">
+    <Symbol UId="177">
+      <Component Name="BITVALUE_10" UId="178" />
+    </Symbol>
+  </Access>
+  <Blank UId="179" />
+  <Token Text=":=" UId="180" />
+  <Blank UId="181" />
+  <Access Scope="LocalVariable" UId="182">
+    <Symbol UId="183">
+      <Component Name="Alarm_Warning_DW" UId="184" />
+      <Token Text="." UId="185" />
+      <Token Text="%X10" UId="186" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="187" />
+  <NewLine UId="188" />
+  <Blank Num="4" UId="189" />
+  <Access Scope="LocalVariable" UId="190">
+    <Symbol UId="191">
+      <Component Name="BITVALUE_11" UId="192" />
+    </Symbol>
+  </Access>
+  <Blank UId="193" />
+  <Token Text=":=" UId="194" />
+  <Blank UId="195" />
+  <Access Scope="LocalVariable" UId="196">
+    <Symbol UId="197">
+      <Component Name="Alarm_Warning_DW" UId="198" />
+      <Token Text="." UId="199" />
+      <Token Text="%X11" UId="200" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="201" />
+  <NewLine UId="202" />
+  <Blank Num="4" UId="203" />
+  <Access Scope="LocalVariable" UId="204">
+    <Symbol UId="205">
+      <Component Name="BITVALUE_12" UId="206" />
+    </Symbol>
+  </Access>
+  <Blank UId="207" />
+  <Token Text=":=" UId="208" />
+  <Blank UId="209" />
+  <Access Scope="LocalVariable" UId="210">
+    <Symbol UId="211">
+      <Component Name="Alarm_Warning_DW" UId="212" />
+      <Token Text="." UId="213" />
+      <Token Text="%X12" UId="214" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="215" />
+  <NewLine UId="216" />
+  <Blank Num="4" UId="217" />
+  <Access Scope="LocalVariable" UId="218">
+    <Symbol UId="219">
+      <Component Name="BITVALUE_13" UId="220" />
+    </Symbol>
+  </Access>
+  <Blank UId="221" />
+  <Token Text=":=" UId="222" />
+  <Blank UId="223" />
+  <Access Scope="LocalVariable" UId="224">
+    <Symbol UId="225">
+      <Component Name="Alarm_Warning_DW" UId="226" />
+      <Token Text="." UId="227" />
+      <Token Text="%X13" UId="228" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="229" />
+  <NewLine UId="230" />
+  <Blank Num="4" UId="231" />
+  <Access Scope="LocalVariable" UId="232">
+    <Symbol UId="233">
+      <Component Name="BITVALUE_14" UId="234" />
+    </Symbol>
+  </Access>
+  <Blank UId="235" />
+  <Token Text=":=" UId="236" />
+  <Blank UId="237" />
+  <Access Scope="LocalVariable" UId="238">
+    <Symbol UId="239">
+      <Component Name="Alarm_Warning_DW" UId="240" />
+      <Token Text="." UId="241" />
+      <Token Text="%X14" UId="242" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="243" />
+  <NewLine UId="244" />
+  <Blank Num="4" UId="245" />
+  <Access Scope="LocalVariable" UId="246">
+    <Symbol UId="247">
+      <Component Name="BITVALUE_15" UId="248" />
+    </Symbol>
+  </Access>
+  <Blank UId="249" />
+  <Token Text=":=" UId="250" />
+  <Blank UId="251" />
+  <Access Scope="LocalVariable" UId="252">
+    <Symbol UId="253">
+      <Component Name="Alarm_Warning_DW" UId="254" />
+      <Token Text="." UId="255" />
+      <Token Text="%X15" UId="256" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="257" />
+  <NewLine UId="258" />
+  <Blank Num="4" UId="259" />
+  <Access Scope="LocalVariable" UId="260">
+    <Symbol UId="261">
+      <Component Name="BITVALUE_16" UId="262" />
+    </Symbol>
+  </Access>
+  <Blank UId="263" />
+  <Token Text=":=" UId="264" />
+  <Blank UId="265" />
+  <Access Scope="LocalVariable" UId="266">
+    <Symbol UId="267">
+      <Component Name="Alarm_Warning_DW" UId="268" />
+      <Token Text="." UId="269" />
+      <Token Text="%X16" UId="270" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="271" />
+  <NewLine UId="272" />
+  <Blank Num="4" UId="273" />
+  <Access Scope="LocalVariable" UId="274">
+    <Symbol UId="275">
+      <Component Name="BITVALUE_17" UId="276" />
+    </Symbol>
+  </Access>
+  <Blank UId="277" />
+  <Token Text=":=" UId="278" />
+  <Blank UId="279" />
+  <Access Scope="LocalVariable" UId="280">
+    <Symbol UId="281">
+      <Component Name="Alarm_Warning_DW" UId="282" />
+      <Token Text="." UId="283" />
+      <Token Text="%X17" UId="284" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="285" />
+  <NewLine UId="286" />
+  <Blank Num="4" UId="287" />
+  <Access Scope="LocalVariable" UId="288">
+    <Symbol UId="289">
+      <Component Name="BITVALUE_18" UId="290" />
+    </Symbol>
+  </Access>
+  <Blank UId="291" />
+  <Token Text=":=" UId="292" />
+  <Blank UId="293" />
+  <Access Scope="LocalVariable" UId="294">
+    <Symbol UId="295">
+      <Component Name="Alarm_Warning_DW" UId="296" />
+      <Token Text="." UId="297" />
+      <Token Text="%X18" UId="298" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="299" />
+  <NewLine UId="300" />
+  <Blank Num="4" UId="301" />
+  <Access Scope="LocalVariable" UId="302">
+    <Symbol UId="303">
+      <Component Name="BITVALUE_19" UId="304" />
+    </Symbol>
+  </Access>
+  <Blank UId="305" />
+  <Token Text=":=" UId="306" />
+  <Blank UId="307" />
+  <Access Scope="LocalVariable" UId="308">
+    <Symbol UId="309">
+      <Component Name="Alarm_Warning_DW" UId="310" />
+      <Token Text="." UId="311" />
+      <Token Text="%X19" UId="312" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="313" />
+  <NewLine UId="314" />
+  <Blank Num="4" UId="315" />
+  <Access Scope="LocalVariable" UId="316">
+    <Symbol UId="317">
+      <Component Name="BITVALUE_20" UId="318" />
+    </Symbol>
+  </Access>
+  <Blank UId="319" />
+  <Token Text=":=" UId="320" />
+  <Blank UId="321" />
+  <Access Scope="LocalVariable" UId="322">
+    <Symbol UId="323">
+      <Component Name="Alarm_Warning_DW" UId="324" />
+      <Token Text="." UId="325" />
+      <Token Text="%X20" UId="326" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="327" />
+  <NewLine UId="328" />
+  <Blank Num="4" UId="329" />
+  <Access Scope="LocalVariable" UId="330">
+    <Symbol UId="331">
+      <Component Name="BITVALUE_21" UId="332" />
+    </Symbol>
+  </Access>
+  <Blank UId="333" />
+  <Token Text=":=" UId="334" />
+  <Blank UId="335" />
+  <Access Scope="LocalVariable" UId="336">
+    <Symbol UId="337">
+      <Component Name="Alarm_Warning_DW" UId="338" />
+      <Token Text="." UId="339" />
+      <Token Text="%X21" UId="340" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="341" />
+  <NewLine UId="342" />
+  <Blank Num="4" UId="343" />
+  <Access Scope="LocalVariable" UId="344">
+    <Symbol UId="345">
+      <Component Name="BITVALUE_22" UId="346" />
+    </Symbol>
+  </Access>
+  <Blank UId="347" />
+  <Token Text=":=" UId="348" />
+  <Blank UId="349" />
+  <Access Scope="LocalVariable" UId="350">
+    <Symbol UId="351">
+      <Component Name="Alarm_Warning_DW" UId="352" />
+      <Token Text="." UId="353" />
+      <Token Text="%X22" UId="354" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="355" />
+  <NewLine UId="356" />
+  <Blank Num="4" UId="357" />
+  <Access Scope="LocalVariable" UId="358">
+    <Symbol UId="359">
+      <Component Name="BITVALUE_23" UId="360" />
+    </Symbol>
+  </Access>
+  <Blank UId="361" />
+  <Token Text=":=" UId="362" />
+  <Blank UId="363" />
+  <Access Scope="LocalVariable" UId="364">
+    <Symbol UId="365">
+      <Component Name="Alarm_Warning_DW" UId="366" />
+      <Token Text="." UId="367" />
+      <Token Text="%X23" UId="368" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="369" />
+  <NewLine UId="370" />
+  <Blank Num="4" UId="371" />
+  <Access Scope="LocalVariable" UId="372">
+    <Symbol UId="373">
+      <Component Name="BITVALUE_24" UId="374" />
+    </Symbol>
+  </Access>
+  <Blank UId="375" />
+  <Token Text=":=" UId="376" />
+  <Blank UId="377" />
+  <Access Scope="LocalVariable" UId="378">
+    <Symbol UId="379">
+      <Component Name="Alarm_Warning_DW" UId="380" />
+      <Token Text="." UId="381" />
+      <Token Text="%X24" UId="382" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="383" />
+  <NewLine UId="384" />
+  <Blank Num="4" UId="385" />
+  <Access Scope="LocalVariable" UId="386">
+    <Symbol UId="387">
+      <Component Name="BITVALUE_25" UId="388" />
+    </Symbol>
+  </Access>
+  <Blank UId="389" />
+  <Token Text=":=" UId="390" />
+  <Blank UId="391" />
+  <Access Scope="LocalVariable" UId="392">
+    <Symbol UId="393">
+      <Component Name="Alarm_Warning_DW" UId="394" />
+      <Token Text="." UId="395" />
+      <Token Text="%X25" UId="396" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="397" />
+  <NewLine UId="398" />
+  <Blank Num="4" UId="399" />
+  <Access Scope="LocalVariable" UId="400">
+    <Symbol UId="401">
+      <Component Name="BITVALUE_26" UId="402" />
+    </Symbol>
+  </Access>
+  <Blank UId="403" />
+  <Token Text=":=" UId="404" />
+  <Blank UId="405" />
+  <Access Scope="LocalVariable" UId="406">
+    <Symbol UId="407">
+      <Component Name="Alarm_Warning_DW" UId="408" />
+      <Token Text="." UId="409" />
+      <Token Text="%X26" UId="410" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="411" />
+  <NewLine UId="412" />
+  <Blank Num="4" UId="413" />
+  <Access Scope="LocalVariable" UId="414">
+    <Symbol UId="415">
+      <Component Name="BITVALUE_27" UId="416" />
+    </Symbol>
+  </Access>
+  <Blank UId="417" />
+  <Token Text=":=" UId="418" />
+  <Blank UId="419" />
+  <Access Scope="LocalVariable" UId="420">
+    <Symbol UId="421">
+      <Component Name="Alarm_Warning_DW" UId="422" />
+      <Token Text="." UId="423" />
+      <Token Text="%X27" UId="424" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="425" />
+  <NewLine UId="426" />
+  <Blank Num="4" UId="427" />
+  <Access Scope="LocalVariable" UId="428">
+    <Symbol UId="429">
+      <Component Name="BITVALUE_28" UId="430" />
+    </Symbol>
+  </Access>
+  <Blank UId="431" />
+  <Token Text=":=" UId="432" />
+  <Blank UId="433" />
+  <Access Scope="LocalVariable" UId="434">
+    <Symbol UId="435">
+      <Component Name="Alarm_Warning_DW" UId="436" />
+      <Token Text="." UId="437" />
+      <Token Text="%X28" UId="438" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="439" />
+  <NewLine UId="440" />
+  <Blank Num="4" UId="441" />
+  <Access Scope="LocalVariable" UId="442">
+    <Symbol UId="443">
+      <Component Name="BITVALUE_29" UId="444" />
+    </Symbol>
+  </Access>
+  <Blank UId="445" />
+  <Token Text=":=" UId="446" />
+  <Blank UId="447" />
+  <Access Scope="LocalVariable" UId="448">
+    <Symbol UId="449">
+      <Component Name="Alarm_Warning_DW" UId="450" />
+      <Token Text="." UId="451" />
+      <Token Text="%X29" UId="452" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="453" />
+  <NewLine UId="454" />
+  <Blank Num="4" UId="455" />
+  <Access Scope="LocalVariable" UId="456">
+    <Symbol UId="457">
+      <Component Name="BITVALUE_30" UId="458" />
+    </Symbol>
+  </Access>
+  <Blank UId="459" />
+  <Token Text=":=" UId="460" />
+  <Blank UId="461" />
+  <Access Scope="LocalVariable" UId="462">
+    <Symbol UId="463">
+      <Component Name="Alarm_Warning_DW" UId="464" />
+      <Token Text="." UId="465" />
+      <Token Text="%X30" UId="466" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="467" />
+  <NewLine UId="468" />
+  <Blank Num="4" UId="469" />
+  <Access Scope="LocalVariable" UId="470">
+    <Symbol UId="471">
+      <Component Name="BITVALUE_31" UId="472" />
+    </Symbol>
+  </Access>
+  <Blank UId="473" />
+  <Token Text=":=" UId="474" />
+  <Blank UId="475" />
+  <Access Scope="LocalVariable" UId="476">
+    <Symbol UId="477">
+      <Component Name="Alarm_Warning_DW" UId="478" />
+      <Token Text="." UId="479" />
+      <Token Text="%X31" UId="480" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="481" />
+  <NewLine UId="482" />
+  <Blank Num="4" UId="483" />
+  <NewLine UId="484" />
+  <LineComment UId="485">
+    <Text UId="486">if in test mode the corresponding bit of the output UDINT is equal to BITVALUE (which can be toggled)    </Text>
+  </LineComment>
+  <NewLine UId="487" />
+  <Token Text="ELSIF" UId="488" />
+  <Blank UId="489" />
+  <Access Scope="LocalVariable" UId="490">
+    <Symbol UId="491">
+      <Component Name="TEST_MODE_ENABLED" UId="492" />
+    </Symbol>
+  </Access>
+  <Blank UId="493" />
+  <Token Text="THEN" UId="494" />
+  <Blank UId="495" />
+  <NewLine UId="496" />
+  <Blank Num="4" UId="497" />
+  <Access Scope="LocalVariable" UId="498">
+    <Symbol UId="499">
+      <Component Name="Alarm_Warning_DW" UId="500" />
+      <Token Text="." UId="501" />
+      <Token Text="%X0" UId="502" />
+    </Symbol>
+  </Access>
+  <Blank UId="503" />
+  <Token Text=":=" UId="504" />
+  <Blank UId="505" />
+  <Access Scope="LocalVariable" UId="506">
+    <Symbol UId="507">
+      <Component Name="BITVALUE_00" UId="508" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="509" />
+  <NewLine UId="510" />
+  <Blank Num="4" UId="511" />
+  <Access Scope="LocalVariable" UId="512">
+    <Symbol UId="513">
+      <Component Name="Alarm_Warning_DW" UId="514" />
+      <Token Text="." UId="515" />
+      <Token Text="%X1" UId="516" />
+    </Symbol>
+  </Access>
+  <Blank UId="517" />
+  <Token Text=":=" UId="518" />
+  <Blank UId="519" />
+  <Access Scope="LocalVariable" UId="520">
+    <Symbol UId="521">
+      <Component Name="BITVALUE_01" UId="522" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="523" />
+  <NewLine UId="524" />
+  <Blank Num="4" UId="525" />
+  <Access Scope="LocalVariable" UId="526">
+    <Symbol UId="527">
+      <Component Name="Alarm_Warning_DW" UId="528" />
+      <Token Text="." UId="529" />
+      <Token Text="%X2" UId="530" />
+    </Symbol>
+  </Access>
+  <Blank UId="531" />
+  <Token Text=":=" UId="532" />
+  <Blank UId="533" />
+  <Access Scope="LocalVariable" UId="534">
+    <Symbol UId="535">
+      <Component Name="BITVALUE_02" UId="536" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="537" />
+  <NewLine UId="538" />
+  <Blank Num="4" UId="539" />
+  <Access Scope="LocalVariable" UId="540">
+    <Symbol UId="541">
+      <Component Name="Alarm_Warning_DW" UId="542" />
+      <Token Text="." UId="543" />
+      <Token Text="%X3" UId="544" />
+    </Symbol>
+  </Access>
+  <Blank UId="545" />
+  <Token Text=":=" UId="546" />
+  <Blank UId="547" />
+  <Access Scope="LocalVariable" UId="548">
+    <Symbol UId="549">
+      <Component Name="BITVALUE_03" UId="550" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="551" />
+  <NewLine UId="552" />
+  <Blank Num="4" UId="553" />
+  <Access Scope="LocalVariable" UId="554">
+    <Symbol UId="555">
+      <Component Name="Alarm_Warning_DW" UId="556" />
+      <Token Text="." UId="557" />
+      <Token Text="%X4" UId="558" />
+    </Symbol>
+  </Access>
+  <Blank UId="559" />
+  <Token Text=":=" UId="560" />
+  <Blank UId="561" />
+  <Access Scope="LocalVariable" UId="562">
+    <Symbol UId="563">
+      <Component Name="BITVALUE_04" UId="564" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="565" />
+  <NewLine UId="566" />
+  <Blank Num="4" UId="567" />
+  <Access Scope="LocalVariable" UId="568">
+    <Symbol UId="569">
+      <Component Name="Alarm_Warning_DW" UId="570" />
+      <Token Text="." UId="571" />
+      <Token Text="%X5" UId="572" />
+    </Symbol>
+  </Access>
+  <Blank UId="573" />
+  <Token Text=":=" UId="574" />
+  <Blank UId="575" />
+  <Access Scope="LocalVariable" UId="576">
+    <Symbol UId="577">
+      <Component Name="BITVALUE_05" UId="578" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="579" />
+  <NewLine UId="580" />
+  <Blank Num="4" UId="581" />
+  <Access Scope="LocalVariable" UId="582">
+    <Symbol UId="583">
+      <Component Name="Alarm_Warning_DW" UId="584" />
+      <Token Text="." UId="585" />
+      <Token Text="%X6" UId="586" />
+    </Symbol>
+  </Access>
+  <Blank UId="587" />
+  <Token Text=":=" UId="588" />
+  <Blank UId="589" />
+  <Access Scope="LocalVariable" UId="590">
+    <Symbol UId="591">
+      <Component Name="BITVALUE_06" UId="592" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="593" />
+  <NewLine UId="594" />
+  <Blank Num="4" UId="595" />
+  <Access Scope="LocalVariable" UId="596">
+    <Symbol UId="597">
+      <Component Name="Alarm_Warning_DW" UId="598" />
+      <Token Text="." UId="599" />
+      <Token Text="%X7" UId="600" />
+    </Symbol>
+  </Access>
+  <Blank UId="601" />
+  <Token Text=":=" UId="602" />
+  <Blank UId="603" />
+  <Access Scope="LocalVariable" UId="604">
+    <Symbol UId="605">
+      <Component Name="BITVALUE_07" UId="606" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="607" />
+  <NewLine UId="608" />
+  <Blank Num="4" UId="609" />
+  <Access Scope="LocalVariable" UId="610">
+    <Symbol UId="611">
+      <Component Name="Alarm_Warning_DW" UId="612" />
+      <Token Text="." UId="613" />
+      <Token Text="%X8" UId="614" />
+    </Symbol>
+  </Access>
+  <Blank UId="615" />
+  <Token Text=":=" UId="616" />
+  <Blank UId="617" />
+  <Access Scope="LocalVariable" UId="618">
+    <Symbol UId="619">
+      <Component Name="BITVALUE_08" UId="620" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="621" />
+  <NewLine UId="622" />
+  <Blank Num="4" UId="623" />
+  <Access Scope="LocalVariable" UId="624">
+    <Symbol UId="625">
+      <Component Name="Alarm_Warning_DW" UId="626" />
+      <Token Text="." UId="627" />
+      <Token Text="%X9" UId="628" />
+    </Symbol>
+  </Access>
+  <Blank UId="629" />
+  <Token Text=":=" UId="630" />
+  <Blank UId="631" />
+  <Access Scope="LocalVariable" UId="632">
+    <Symbol UId="633">
+      <Component Name="BITVALUE_09" UId="634" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="635" />
+  <NewLine UId="636" />
+  <Blank Num="4" UId="637" />
+  <Access Scope="LocalVariable" UId="638">
+    <Symbol UId="639">
+      <Component Name="Alarm_Warning_DW" UId="640" />
+      <Token Text="." UId="641" />
+      <Token Text="%X10" UId="642" />
+    </Symbol>
+  </Access>
+  <Blank UId="643" />
+  <Token Text=":=" UId="644" />
+  <Blank UId="645" />
+  <Access Scope="LocalVariable" UId="646">
+    <Symbol UId="647">
+      <Component Name="BITVALUE_10" UId="648" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="649" />
+  <NewLine UId="650" />
+  <Blank Num="4" UId="651" />
+  <Access Scope="LocalVariable" UId="652">
+    <Symbol UId="653">
+      <Component Name="Alarm_Warning_DW" UId="654" />
+      <Token Text="." UId="655" />
+      <Token Text="%X11" UId="656" />
+    </Symbol>
+  </Access>
+  <Blank UId="657" />
+  <Token Text=":=" UId="658" />
+  <Blank UId="659" />
+  <Access Scope="LocalVariable" UId="660">
+    <Symbol UId="661">
+      <Component Name="BITVALUE_11" UId="662" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="663" />
+  <NewLine UId="664" />
+  <Blank Num="4" UId="665" />
+  <Access Scope="LocalVariable" UId="666">
+    <Symbol UId="667">
+      <Component Name="Alarm_Warning_DW" UId="668" />
+      <Token Text="." UId="669" />
+      <Token Text="%X12" UId="670" />
+    </Symbol>
+  </Access>
+  <Blank UId="671" />
+  <Token Text=":=" UId="672" />
+  <Blank UId="673" />
+  <Access Scope="LocalVariable" UId="674">
+    <Symbol UId="675">
+      <Component Name="BITVALUE_12" UId="676" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="677" />
+  <NewLine UId="678" />
+  <Blank Num="4" UId="679" />
+  <Access Scope="LocalVariable" UId="680">
+    <Symbol UId="681">
+      <Component Name="Alarm_Warning_DW" UId="682" />
+      <Token Text="." UId="683" />
+      <Token Text="%X13" UId="684" />
+    </Symbol>
+  </Access>
+  <Blank UId="685" />
+  <Token Text=":=" UId="686" />
+  <Blank UId="687" />
+  <Access Scope="LocalVariable" UId="688">
+    <Symbol UId="689">
+      <Component Name="BITVALUE_13" UId="690" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="691" />
+  <NewLine UId="692" />
+  <Blank Num="4" UId="693" />
+  <Access Scope="LocalVariable" UId="694">
+    <Symbol UId="695">
+      <Component Name="Alarm_Warning_DW" UId="696" />
+      <Token Text="." UId="697" />
+      <Token Text="%X14" UId="698" />
+    </Symbol>
+  </Access>
+  <Blank UId="699" />
+  <Token Text=":=" UId="700" />
+  <Blank UId="701" />
+  <Access Scope="LocalVariable" UId="702">
+    <Symbol UId="703">
+      <Component Name="BITVALUE_14" UId="704" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="705" />
+  <NewLine UId="706" />
+  <Blank Num="4" UId="707" />
+  <Access Scope="LocalVariable" UId="708">
+    <Symbol UId="709">
+      <Component Name="Alarm_Warning_DW" UId="710" />
+      <Token Text="." UId="711" />
+      <Token Text="%X15" UId="712" />
+    </Symbol>
+  </Access>
+  <Blank UId="713" />
+  <Token Text=":=" UId="714" />
+  <Blank UId="715" />
+  <Access Scope="LocalVariable" UId="716">
+    <Symbol UId="717">
+      <Component Name="BITVALUE_15" UId="718" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="719" />
+  <NewLine UId="720" />
+  <Blank Num="4" UId="721" />
+  <Access Scope="LocalVariable" UId="722">
+    <Symbol UId="723">
+      <Component Name="Alarm_Warning_DW" UId="724" />
+      <Token Text="." UId="725" />
+      <Token Text="%X16" UId="726" />
+    </Symbol>
+  </Access>
+  <Blank UId="727" />
+  <Token Text=":=" UId="728" />
+  <Blank UId="729" />
+  <Access Scope="LocalVariable" UId="730">
+    <Symbol UId="731">
+      <Component Name="BITVALUE_16" UId="732" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="733" />
+  <NewLine UId="734" />
+  <Blank Num="4" UId="735" />
+  <Access Scope="LocalVariable" UId="736">
+    <Symbol UId="737">
+      <Component Name="Alarm_Warning_DW" UId="738" />
+      <Token Text="." UId="739" />
+      <Token Text="%X17" UId="740" />
+    </Symbol>
+  </Access>
+  <Blank UId="741" />
+  <Token Text=":=" UId="742" />
+  <Blank UId="743" />
+  <Access Scope="LocalVariable" UId="744">
+    <Symbol UId="745">
+      <Component Name="BITVALUE_17" UId="746" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="747" />
+  <NewLine UId="748" />
+  <Blank Num="4" UId="749" />
+  <Access Scope="LocalVariable" UId="750">
+    <Symbol UId="751">
+      <Component Name="Alarm_Warning_DW" UId="752" />
+      <Token Text="." UId="753" />
+      <Token Text="%X18" UId="754" />
+    </Symbol>
+  </Access>
+  <Blank UId="755" />
+  <Token Text=":=" UId="756" />
+  <Blank UId="757" />
+  <Access Scope="LocalVariable" UId="758">
+    <Symbol UId="759">
+      <Component Name="BITVALUE_18" UId="760" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="761" />
+  <NewLine UId="762" />
+  <Blank Num="4" UId="763" />
+  <Access Scope="LocalVariable" UId="764">
+    <Symbol UId="765">
+      <Component Name="Alarm_Warning_DW" UId="766" />
+      <Token Text="." UId="767" />
+      <Token Text="%X19" UId="768" />
+    </Symbol>
+  </Access>
+  <Blank UId="769" />
+  <Token Text=":=" UId="770" />
+  <Blank UId="771" />
+  <Access Scope="LocalVariable" UId="772">
+    <Symbol UId="773">
+      <Component Name="BITVALUE_19" UId="774" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="775" />
+  <NewLine UId="776" />
+  <Blank Num="4" UId="777" />
+  <Access Scope="LocalVariable" UId="778">
+    <Symbol UId="779">
+      <Component Name="Alarm_Warning_DW" UId="780" />
+      <Token Text="." UId="781" />
+      <Token Text="%X20" UId="782" />
+    </Symbol>
+  </Access>
+  <Blank UId="783" />
+  <Token Text=":=" UId="784" />
+  <Blank UId="785" />
+  <Access Scope="LocalVariable" UId="786">
+    <Symbol UId="787">
+      <Component Name="BITVALUE_20" UId="788" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="789" />
+  <NewLine UId="790" />
+  <Blank Num="4" UId="791" />
+  <Access Scope="LocalVariable" UId="792">
+    <Symbol UId="793">
+      <Component Name="Alarm_Warning_DW" UId="794" />
+      <Token Text="." UId="795" />
+      <Token Text="%X21" UId="796" />
+    </Symbol>
+  </Access>
+  <Blank UId="797" />
+  <Token Text=":=" UId="798" />
+  <Blank UId="799" />
+  <Access Scope="LocalVariable" UId="800">
+    <Symbol UId="801">
+      <Component Name="BITVALUE_21" UId="802" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="803" />
+  <NewLine UId="804" />
+  <Blank Num="4" UId="805" />
+  <Access Scope="LocalVariable" UId="806">
+    <Symbol UId="807">
+      <Component Name="Alarm_Warning_DW" UId="808" />
+      <Token Text="." UId="809" />
+      <Token Text="%X22" UId="810" />
+    </Symbol>
+  </Access>
+  <Blank UId="811" />
+  <Token Text=":=" UId="812" />
+  <Blank UId="813" />
+  <Access Scope="LocalVariable" UId="814">
+    <Symbol UId="815">
+      <Component Name="BITVALUE_22" UId="816" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="817" />
+  <NewLine UId="818" />
+  <Blank Num="4" UId="819" />
+  <Access Scope="LocalVariable" UId="820">
+    <Symbol UId="821">
+      <Component Name="Alarm_Warning_DW" UId="822" />
+      <Token Text="." UId="823" />
+      <Token Text="%X23" UId="824" />
+    </Symbol>
+  </Access>
+  <Blank UId="825" />
+  <Token Text=":=" UId="826" />
+  <Blank UId="827" />
+  <Access Scope="LocalVariable" UId="828">
+    <Symbol UId="829">
+      <Component Name="BITVALUE_23" UId="830" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="831" />
+  <NewLine UId="832" />
+  <Blank Num="4" UId="833" />
+  <Access Scope="LocalVariable" UId="834">
+    <Symbol UId="835">
+      <Component Name="Alarm_Warning_DW" UId="836" />
+      <Token Text="." UId="837" />
+      <Token Text="%X24" UId="838" />
+    </Symbol>
+  </Access>
+  <Blank UId="839" />
+  <Token Text=":=" UId="840" />
+  <Blank UId="841" />
+  <Access Scope="LocalVariable" UId="842">
+    <Symbol UId="843">
+      <Component Name="BITVALUE_24" UId="844" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="845" />
+  <NewLine UId="846" />
+  <Blank Num="4" UId="847" />
+  <Access Scope="LocalVariable" UId="848">
+    <Symbol UId="849">
+      <Component Name="Alarm_Warning_DW" UId="850" />
+      <Token Text="." UId="851" />
+      <Token Text="%X25" UId="852" />
+    </Symbol>
+  </Access>
+  <Blank UId="853" />
+  <Token Text=":=" UId="854" />
+  <Blank UId="855" />
+  <Access Scope="LocalVariable" UId="856">
+    <Symbol UId="857">
+      <Component Name="BITVALUE_25" UId="858" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="859" />
+  <NewLine UId="860" />
+  <Blank Num="4" UId="861" />
+  <Access Scope="LocalVariable" UId="862">
+    <Symbol UId="863">
+      <Component Name="Alarm_Warning_DW" UId="864" />
+      <Token Text="." UId="865" />
+      <Token Text="%X26" UId="866" />
+    </Symbol>
+  </Access>
+  <Blank UId="867" />
+  <Token Text=":=" UId="868" />
+  <Blank UId="869" />
+  <Access Scope="LocalVariable" UId="870">
+    <Symbol UId="871">
+      <Component Name="BITVALUE_26" UId="872" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="873" />
+  <NewLine UId="874" />
+  <Blank Num="4" UId="875" />
+  <Access Scope="LocalVariable" UId="876">
+    <Symbol UId="877">
+      <Component Name="Alarm_Warning_DW" UId="878" />
+      <Token Text="." UId="879" />
+      <Token Text="%X27" UId="880" />
+    </Symbol>
+  </Access>
+  <Blank UId="881" />
+  <Token Text=":=" UId="882" />
+  <Blank UId="883" />
+  <Access Scope="LocalVariable" UId="884">
+    <Symbol UId="885">
+      <Component Name="BITVALUE_27" UId="886" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="887" />
+  <NewLine UId="888" />
+  <Blank Num="4" UId="889" />
+  <Access Scope="LocalVariable" UId="890">
+    <Symbol UId="891">
+      <Component Name="Alarm_Warning_DW" UId="892" />
+      <Token Text="." UId="893" />
+      <Token Text="%X28" UId="894" />
+    </Symbol>
+  </Access>
+  <Blank UId="895" />
+  <Token Text=":=" UId="896" />
+  <Blank UId="897" />
+  <Access Scope="LocalVariable" UId="898">
+    <Symbol UId="899">
+      <Component Name="BITVALUE_28" UId="900" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="901" />
+  <NewLine UId="902" />
+  <Blank Num="4" UId="903" />
+  <Access Scope="LocalVariable" UId="904">
+    <Symbol UId="905">
+      <Component Name="Alarm_Warning_DW" UId="906" />
+      <Token Text="." UId="907" />
+      <Token Text="%X29" UId="908" />
+    </Symbol>
+  </Access>
+  <Blank UId="909" />
+  <Token Text=":=" UId="910" />
+  <Blank UId="911" />
+  <Access Scope="LocalVariable" UId="912">
+    <Symbol UId="913">
+      <Component Name="BITVALUE_29" UId="914" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="915" />
+  <NewLine UId="916" />
+  <Blank Num="4" UId="917" />
+  <Access Scope="LocalVariable" UId="918">
+    <Symbol UId="919">
+      <Component Name="Alarm_Warning_DW" UId="920" />
+      <Token Text="." UId="921" />
+      <Token Text="%X30" UId="922" />
+    </Symbol>
+  </Access>
+  <Blank UId="923" />
+  <Token Text=":=" UId="924" />
+  <Blank UId="925" />
+  <Access Scope="LocalVariable" UId="926">
+    <Symbol UId="927">
+      <Component Name="BITVALUE_30" UId="928" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="929" />
+  <NewLine UId="930" />
+  <Blank Num="4" UId="931" />
+  <Access Scope="LocalVariable" UId="932">
+    <Symbol UId="933">
+      <Component Name="Alarm_Warning_DW" UId="934" />
+      <Token Text="." UId="935" />
+      <Token Text="%X31" UId="936" />
+    </Symbol>
+  </Access>
+  <Blank UId="937" />
+  <Token Text=":=" UId="938" />
+  <Blank UId="939" />
+  <Access Scope="LocalVariable" UId="940">
+    <Symbol UId="941">
+      <Component Name="BITVALUE_31" UId="942" />
+    </Symbol>
+  </Access>
+  <Token Text=";" UId="943" />
+  <NewLine UId="944" />
+  <Token Text="END_IF" UId="945" />
+  <Token Text=";" UId="946" />
+</StructuredText></NetworkSource>
+          <ProgrammingLanguage>SCL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="18" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="19" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="1A" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="1B" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>FOR TESTING PURPOSES</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="1C" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="1D" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>Convert 32 individual Booleans to an Udint Variable. Each bit can be inverted and filtered (muted). Memorize the falling edge of each bit in the 'Tristate' output </Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.FB>
+</Document>

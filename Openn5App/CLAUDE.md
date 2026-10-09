@@ -25,6 +25,13 @@ Everything below that is not marked OP5 is inherited from OP3 and still true. I/
   `bin\Debug\Openn5.exe`; old-style csproj - a new .cs needs its own `<Compile Include>` entry). The NuGet
   `packages\` folder is gitignored; copy it from `Openn3App\packages` or restore it when it is missing.
 - V21+ is deliberately unsupported (breaking Openness changes).
+- **`TiaProjects\` is a tracked asset - never gitignore it** (grafted from OP3's history on 2026-10-09):
+  `Openn2_Playground\Openn2_Playground.ap18` (TIA V18) is the playground project the block templates live
+  in (block group `00_TEMPLATES` - the `TEMPLATE--vX.Y--…` blocks whose exports are the files under
+  `Shared\Templates\Tia Portal Software Blocks`), and `Openn2_Playground_VCI\` is its TIA Version Control
+  Interface export - the reference for the VCI-shaped workspace (`<PLC>\Program blocks\<group>`, `PLC tags`,
+  `PLC data types`). Attach to the playground by path to edit or re-export a template. It keeps its
+  historical name (renaming a TIA project needs TIA itself).
 
 ## Architecture — key invariants
 
@@ -227,7 +234,8 @@ Everything below that is not marked OP5 is inherited from OP3 and still true. I/
   `DeviceTypesDatabase.csv` is a shared **input** under `Shared\HardwareConfigBuilderData` (not
   beside the generated Stations/Modules), so `HardwareDeviceTypesDatabase.ResolvePath` prefers a copy
   beside the config folder and otherwise falls back to the shared one. Openn5-internal working dirs
-  (the TIA project, `GeneratedBlocks`, `AttributeDumps`, `Logs`) stay next to the exe. `CsvTable`
+  (the default new-project folder `bin\Debug\TiaProjects`, `GeneratedBlocks`, `AttributeDumps`, `Logs`) stay
+  next to the exe - not to be confused with the tracked repo `TiaProjects\` playground (see Build). `CsvTable`
   opens config files `FileShare.ReadWrite` and closes them before parsing, so a load never locks the
   csv against Pipeline5 regenerating it (or Excel).
 - **Project round-trip** (`03_ApiManager/TiaPortalOpenness.Project.cs` + the "Project" tab): whole-project

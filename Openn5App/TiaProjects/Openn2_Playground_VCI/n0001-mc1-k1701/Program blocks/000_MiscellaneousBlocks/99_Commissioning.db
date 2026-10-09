@@ -1,0 +1,14 @@
+﻿DATA_BLOCK "99_Commissioning"
+{ DB_Accessible_From_OPC_UA := 'FALSE' ;
+ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      RESET_VIA_TIA : Bool;   // Used for emergency reset during commissioning
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+

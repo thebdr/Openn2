@@ -1,0 +1,64 @@
+﻿FUNCTION_BLOCK "CabStateDoor"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      EM_DOOR { ExternalWritable := 'False'} : Bool;
+      DOOR_OPEN { ExternalWritable := 'False'} : Bool;
+      DOOR_ALARM { ExternalWritable := 'False'} : Bool;
+      OPEN_REQ { ExternalWritable := 'False'} : Bool;
+   END_VAR
+
+   VAR_IN_OUT 
+      STATE { ExternalWritable := 'False'} : UDInt;
+   END_VAR
+
+   VAR 
+      TEST_MODE_ENABLED : Bool;
+      TEST_EM_DOOR : Bool;
+      TEST_OPEN : Bool;
+      TEST_ALARM : Bool;
+      TEST_OPEN_REQ : Bool;
+   END_VAR
+
+   VAR_TEMP 
+      t_state : Bool;
+   END_VAR
+
+
+BEGIN
+	IF #TEST_MODE_ENABLED THEN
+	    //door closed and locked
+	    #STATE.%X0 := NOT #TEST_EM_DOOR AND NOT #TEST_ALARM AND NOT #TEST_OPEN;
+	    //door open
+	    #STATE.%X1 := #TEST_OPEN AND NOT #TEST_ALARM;
+	    // door in emergency
+	    #STATE.%X7 := FALSE;
+	    //door in alarm
+	    #STATE.%X12 := #TEST_ALARM;
+	    //door in warning
+	    #STATE.%X13 := FALSE;
+	    //open request
+	    #t_state := #STATE.%X17;
+	    #STATE.%X17 := #TEST_OPEN_REQ OR (#t_state AND NOT #TEST_EM_DOOR);
+	    //door closed and unlocked
+	    #STATE.%X18 := #TEST_EM_DOOR AND NOT #TEST_OPEN;
+	    
+	ELSIF NOT #TEST_MODE_ENABLED THEN
+	    //door closed and locked
+	    #STATE.%X0 := NOT #EM_DOOR AND NOT #DOOR_ALARM AND NOT #DOOR_OPEN;
+	    //door open
+	    #STATE.%X1 := #DOOR_OPEN AND NOT #DOOR_ALARM;
+	    // door in emergency
+	    #STATE.%X7 := FALSE;
+	    //door in alarm
+	    #STATE.%X12 := #DOOR_ALARM;
+	    //door in warning
+	    #STATE.%X13 := FALSE;
+	    //open request
+	    #t_state := #STATE.%X17;
+	    #STATE.%X17 := #OPEN_REQ OR (#t_state AND NOT #EM_DOOR);
+	    //door closed and unlocked
+	    #STATE.%X18 := #EM_DOOR AND NOT #DOOR_OPEN;
+	END_IF;
+END_FUNCTION_BLOCK
+

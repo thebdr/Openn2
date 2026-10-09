@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V18" />
+  <SW.Blocks.GlobalDB ID="0">
+    <AttributeList>
+      <DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Static">
+    <Member Name="Always FALSE" Datatype="Bool" />
+    <Member Name="Always TRUE" Datatype="Bool">
+      <StartValue>TRUE</StartValue>
+    </Member>
+    <Member Name="RESET" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_area}_SORTER_POWER_CUT$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_area}_SAFETY_DOORS_COM$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_area}_SAFETY_BREAKERS_COM$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_area}_Q$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_area}_Q_DELAYED$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_areas.1}$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_areas.2}$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_areas.3}$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_areas.4}$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_areas.1}_RESET$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_areas.2}_RESET$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_areas.3}_RESET$$" Datatype="Bool" />
+    <Member Name="!!05_EM_STATE.{matrix_areas.4}_RESET$$" Datatype="Bool" />
+  </Section>
+</Sections></Interface>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>05_EM_STATE</Name>
+      <Namespace />
+      <Number>7</Number>
+      <ProgrammingLanguage>F_DB</ProgrammingLanguage>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <MultilingualText ID="3" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="4" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.GlobalDB>
+</Document>
