@@ -449,7 +449,7 @@ def _modern_iolist(path, defined_names=(), table="T_Types", crowded=False):
     _zip(path, parts)
 
 
-def _make_rich_if(path, font="Arial Narrow", hyperlink=False):
+def _make_rich_if(path, font="Arial Narrow", hyperlink=False, totals=False):
     """A generated IF_ sheet with what the graft must carry: a styled header (font / solid fill / border /
     alignment), a CUSTOM number format, a conditional format (a dxf), a validation, a merge, a column width,
     a text that starts with '=', a styled column (B) and row (6), the address headers the seeding reads (offset
@@ -494,8 +494,14 @@ def _make_rich_if(path, font="Arial Narrow", hyperlink=False):
     cols[5].dataDxfId = 99
     cols[5].calculatedColumnFormula = TableFormula(attr_text="DT[[#This Row],[I/O Offset Byte]]+$G$2")
     cols[0].dataCellStyle = "Source Style"
-    t = Table(displayName="DT", ref="A1:I4"); t.tableColumns = cols
+    t = Table(displayName="DT", ref="A1:I5" if totals else "A1:I4"); t.tableColumns = cols
     t.headerRowCellStyle, t.dataCellStyle = "Source Heading", "Source Style"
+    if totals:          # the total row SHOWN (Excel: Table Design > Total Row): a label, a count, a custom formula
+        from openpyxl.worksheet.filters import AutoFilter
+        t.totalsRowCount, t.autoFilter = 1, AutoFilter(ref="A1:I4")
+        cols[0].totalsRowLabel, cols[1].totalsRowFunction, cols[3].totalsRowFunction = "Total", "count", "custom"
+        cols[3].totalsRowFormula = TableFormula(attr_text="SUM(DT[I/O Offset Byte])")
+        ws["A5"], ws["B5"], ws["D5"] = "Total", "=SUBTOTAL(103,DT[Data Type])", "=SUM(DT[I/O Offset Byte])"
     t.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
     ws.add_table(t)
     wb.save(path)
@@ -888,6 +894,57 @@ def test_graft_table_names_unique_and_formula_rename():
         eq(wb["IF_A_1"]["F2"].value, "=DT_IF_A_1_2[[#This Row],[I/O Offset Byte]]+$G$2", "each follows its own")
 
 
+def test_graft_total_row_and_workbook_names():
+    """A table whose total row is SHOWN keeps it - each column's function, label and custom formula (its table
+    renamed): without them Excel repairs the whole I/O List (refute round 3, measured in Excel). A sheet whose
+    formulas use a name defined in its OWN workbook is refused (the name would not resolve in the I/O List, or
+    resolve to the I/O List's own); an unused name, and Excel's own `_xl...` names, are no reason."""
+    import warnings as _w
+    from openpyxl.workbook.defined_name import DefinedName
+    _w.simplefilter("ignore")
+    with tempfile.TemporaryDirectory() as d:
+        tot = os.path.join(d, "IF_TOT.xlsx"); _make_rich_if(tot, totals=True)
+        iol = os.path.join(d, "iol.xlsx"); _modern_iolist(iol)
+        eq(interface_xlsx.insert_sheets_into_iolist(iol, [("IF_TOT", tot)])[0], "IF_TOT: inserted into the I/O List",
+           "a total-row table is inserted")
+        tx = _parts(iol)["xl/tables/table2.xml"].decode("utf-8")
+        for piece in ('ref="A1:I5" headerRowCount="1" totalsRowCount="1"', '<autoFilter ref="A1:I4"/>',
+                      '<tableColumn id="1" name="Category" totalsRowLabel="Total"/>',
+                      '<tableColumn id="2" name="Data Type" totalsRowFunction="count"/>',
+                      '<tableColumn id="4" name="I/O Offset Byte" totalsRowFunction="custom"><totalsRowFormula>'
+                      'SUM(DT_IF_TOT[I/O Offset Byte])</totalsRowFormula></tableColumn>'):
+            ok(piece in tx, f"the total row kept: {piece}")
+        ws = load_workbook(iol)["IF_TOT"]
+        eq((ws.tables["DT_IF_TOT"].totalsRowCount, ws["A5"].value, ws["B5"].value),
+           (1, "Total", "=SUBTOTAL(103,DT_IF_TOT[Data Type])"), "the total row's cells follow the table")
+
+        def named(path, formula=None):
+            _make_rich_if(path)
+            wb = load_workbook(path)
+            wb.defined_names["SPARE_BYTES"] = DefinedName("SPARE_BYTES", attr_text="4")
+            if formula:
+                wb.active["L3"] = formula
+            wb.save(path)
+        used = os.path.join(d, "IF_USED.xlsx"); named(used, "=SPARE_BYTES*8")
+        lit = os.path.join(d, "IF_LIT.xlsx"); named(lit, '="SPARE_BYTES"&COUNTA(DT[Category])')
+        unused = os.path.join(d, "IF_UNUSED.xlsx"); named(unused)
+        xl0 = os.path.join(d, "xl0.xlsx"); _make_rich_if(xl0)
+        wb = load_workbook(xl0); wb.active["L4"] = "=_xlfn.SINGLE(A2)"; wb.save(xl0)
+        xlfn = os.path.join(d, "IF_XLFN.xlsx")
+        old = b"<definedNames />" if b"<definedNames />" in _parts(xl0)["xl/workbook.xml"] else b"<definedNames/>"
+        _variant(xl0, xlfn, old, b'<definedNames><definedName name="_xlfn.SINGLE" hidden="1">#NAME?</definedName>'
+                                 b'</definedNames>', part="xl/workbook.xml")
+        iol2 = os.path.join(d, "iol2.xlsx"); _modern_iolist(iol2)
+        acts = interface_xlsx.insert_sheets_into_iolist(iol2, [("IF_USED", used), ("IF_LIT", lit),
+                                                               ("IF_UNUSED", unused), ("IF_XLFN", xlfn)])
+        eq(acts[0], "[WARN] IF_USED: not inserted - its formulas use 'SPARE_BYTES', defined in its own workbook - "
+                    "the graft does not copy workbook names", "a used workbook name refuses the sheet")
+        eq([a for a in acts[1:] if "inserted" in a], ["IF_LIT: inserted into the I/O List",
+                                                     "IF_UNUSED: inserted into the I/O List",
+                                                     "IF_XLFN: inserted into the I/O List"],
+           "a name only in a literal, an unused name, Excel's own _xlfn. name: inserted")
+
+
 def test_graft_carries_external_hyperlinks():
     import re as _re
     import warnings as _w
@@ -971,6 +1028,7 @@ if __name__ == "__main__":
         ("graft_refuses_what_it_cannot_carry", test_graft_refuses_what_it_cannot_carry),
         ("graft_bookkeeping_edges", test_graft_bookkeeping_edges),
         ("graft_table_names_unique_and_formula_rename", test_graft_table_names_unique_and_formula_rename),
+        ("graft_total_row_and_workbook_names", test_graft_total_row_and_workbook_names),
         ("graft_carries_external_hyperlinks", test_graft_carries_external_hyperlinks),
         ("insert_is_one_atomic_write", test_insert_is_one_atomic_write),
         ("insert_interface_sheets_backs_up_first", test_insert_interface_sheets_backs_up_first),

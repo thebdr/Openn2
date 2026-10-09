@@ -13,9 +13,11 @@ four bookkeeping parts; every other part is copied byte-for-byte:
     name or a structured reference's [column] specifiers), `tabSelected` / `codeName` dropped,
     and optional cached values SEEDED into chosen formula cells;
   - its table parts, renamed `<name>_<title>` (unique in the workbook: tables + defined names, `_2`, `_3`...
-    on a clash) with a fresh id - ref, header / totals row counts, autoFilter, the column ids + names and the
-    table style kept; the per-column dxf / cell-style references and the calculated-column formulas dropped
-    (they point into the SOURCE workbook / at the old name - Excel drops a table that carries them);
+    on a clash) with a fresh id - ref, header / totals row counts, autoFilter, the column ids + names, the
+    total row (each column's function / label / custom formula, renamed - Excel REPAIRS a shown total row
+    without them) and the table style kept; the per-column dxf / cell-style references and the calculated-
+    column formulas dropped (they point into the SOURCE workbook / at the old name - Excel drops a table
+    that carries them);
   - xl/workbook.xml (+ a <sheet> at the end, so every localSheetId stays valid; calcPr fullCalcOnLoad so
     Excel computes the grafted formulas the source left uncached), xl/_rels/workbook.xml.rels (+ a
     Relationship), [Content_Types].xml (+ Overrides), xl/styles.xml - APPEND-only: the number formats,
@@ -24,8 +26,9 @@ four bookkeeping parts; every other part is copied byte-for-byte:
     `count` attributes change.
 Pure stdlib, Excel-independent. A source the graft cannot read, or cannot carry faithfully (a sheet part other
 than tables / external hyperlinks, cell metadata - a dynamic array / rich value -, a prefixed spreadsheetml
-namespace, a dangling style or string index), is REFUSED for that sheet - never half-copied, nothing of it
-kept (not even a style); the others still graft.
+namespace, a dangling style or string index, a formula using a name its own workbook defines - it would not
+resolve in the target), is REFUSED for that sheet - never half-copied, nothing of it kept (not even a
+style); the others still graft.
 
 Callers: src://pipeline5/systems/plc_based/siemens_s7/interface_xlsx_writer.py (phase 400e - the IF_ sheets
 into the I/O List). Sibling of src://pipeline5/documents/xlsx_surgical_writer.py (cell edits / app-built
@@ -227,7 +230,8 @@ def _rels_of(z, part: str) -> list:
 
 class _Source:
     """The FIRST worksheet of a source .xlsx + what grafting it needs: its rels, its tables' XML, its
-    styles (parsed) and its shared strings (the raw inner XML of each <si>, in order)."""
+    styles (parsed), its shared strings (the raw inner XML of each <si>, in order) and the names its
+    workbook defines (Excel's own `_xl...` names - future functions, LET parameters, print areas - aside)."""
 
     def __init__(self, path: str):
         with open(path, "rb") as fh:
@@ -240,6 +244,9 @@ class _Source:
             self.sheet = z.read(part).decode("utf-8")
             self.rels = _rels_of(z, part)
             self.tables = {rid: z.read(t) for rid, typ, t, _ in self.rels if typ == _T_TABLE}
+            self.names = sorted({html.unescape(n) for n in re.findall(
+                r'<(?:\w+:)?definedName\b[^>]*\bname="([^"]*)"', z.read("xl/workbook.xml").decode("utf-8"))
+                if not n.lower().startswith("_xl")})
             book = {typ: t for _, typ, t, _ in _rels_of(z, "xl/workbook.xml")}
             styles = book.get(_T_STYLES)
             self.styles = ET.fromstring(z.read(styles)) if styles else None
@@ -307,6 +314,17 @@ def _table_renamer(renames: dict):
     alt = "|".join(re.escape(k) for k in sorted(renames, key=len, reverse=True))
     return (re.compile(r"(?<![\w.\\])(" + alt + r")(?![\w.!])", re.IGNORECASE),
             {k.casefold(): v for k, v in renames.items()})
+
+
+def _names_used(texts, names) -> list:
+    """The `names` the formula `texts` use - a whole name, as `_rename_in_formula` sees one (never inside a
+    literal, a sheet name or a structured reference's specifiers)."""
+    if not names:
+        return []
+    marks = {n: f"\x00{i}\x00" for i, n in enumerate(names)}
+    rx = _table_renamer(marks)
+    out = "".join(_rename_in_formula(t, rx) for t in texts)
+    return [n for n, m in marks.items() if m in out]
 
 
 def _rename_in_formula(text: str, rx) -> str:
@@ -431,9 +449,24 @@ class _SheetRewrite:
         return xml[:end] + tail, seeded
 
 
-def _table_xml(src: bytes, tid: int, name: str) -> str:
-    """A grafted table part: the source table renamed + re-identified, its references into the SOURCE
-    workbook (dxfs, cell styles) and its calculated-column / totals formulas dropped."""
+def _table_column_xml(col, rx) -> str:
+    """One grafted <tableColumn>: its id + name and its TOTAL ROW (the function / label - Excel repairs a table
+    whose shown total row lost them - and a custom total formula, its table names renamed); its dxf / cell-
+    style references and calculated-column formula dropped (they point into the source workbook)."""
+    attrs = f' id="{_attr(col.get("id"))}" name="{_attr(col.get("name"))}"' + "".join(
+        f' {k}="{_attr(col.get(k))}"' for k in ("totalsRowFunction", "totalsRowLabel") if col.get(k) is not None)
+    tf = col.find(_MAIN + "totalsRowFormula")
+    if tf is None:
+        return f"<tableColumn{attrs}/>"
+    arr = ' array="1"' if tf.get("array") in ("1", "true") else ""
+    return (f"<tableColumn{attrs}><totalsRowFormula{arr}>{_text(_rename_in_formula(tf.text or '', rx))}"
+            "</totalsRowFormula></tableColumn>")
+
+
+def _table_xml(src: bytes, tid: int, name: str, rx) -> str:
+    """A grafted table part: the source table renamed + re-identified, its total row kept (`rx` renames the
+    grafted tables in a custom total formula), its references into the SOURCE workbook (dxfs, cell styles)
+    and its calculated-column formulas dropped."""
     root = ET.fromstring(src)
     if root.get("tableType") not in (None, "worksheet"):
         raise GraftError(f"table {root.get('displayName')}: a {root.get('tableType')} table (its query part "
@@ -446,8 +479,7 @@ def _table_xml(src: bytes, tid: int, name: str) -> str:
     cols = list(cols) if cols is not None else []
     tsi = root.find(_MAIN + "tableStyleInfo")
     body = ((_ser(af) if af is not None else "")
-            + f'<tableColumns count="{len(cols)}">'
-            + "".join(f'<tableColumn id="{_attr(c.get("id"))}" name="{_attr(c.get("name"))}"/>' for c in cols)
+            + f'<tableColumns count="{len(cols)}">' + "".join(_table_column_xml(c, rx) for c in cols)
             + "</tableColumns>" + (_ser(tsi) if tsi is not None else ""))
     return f'{_DECL}<table xmlns="{_MAIN_URI}"{attrs}>{body}</table>'
 
@@ -527,29 +559,36 @@ class _Book:
         if title.casefold() in self.sheet_names:
             raise GraftError("a sheet of that name is already in the workbook")
         src = _Source(source)
-        rels, renames = [], {}
+        rels, renames, tables = [], {}, []
         suffix = re.sub(r"[^A-Za-z0-9_]", "_", title)
-        for rid, typ, target, mode in src.rels:
+        for rid, typ, target, mode in src.rels:          # 1. every table's new name, id and part first
             if typ == _T_TABLE:
                 old = ET.fromstring(src.tables[rid])
                 old = old.get("displayName") or old.get("name")
-                new = self._unique(f"{old}_{suffix}")
-                renames[old] = new
+                renames[old] = self._unique(f"{old}_{suffix}")
                 self.table_ids.append(max(self.table_ids) + 1)
                 tpart = self._free("xl/tables/table{}.xml")
-                self.added[tpart] = _table_xml(src.tables[rid], self.table_ids[-1], new).encode("utf-8")
-                self._override(tpart, _CT_TABLE)
+                tables.append((rid, renames[old], self.table_ids[-1], tpart))
                 rels.append(f'<Relationship Id="{_attr(rid)}" Type="{_T_TABLE}" Target="../tables/{posixpath.basename(tpart)}"/>')
             elif typ == _T_HYPERLINK and mode == "External":
                 rels.append(f'<Relationship Id="{_attr(rid)}" Type="{_T_HYPERLINK}" Target="{_attr(target)}" TargetMode="External"/>')
             else:
                 raise GraftError(f"the sheet carries a {(typ or '?').rsplit('/', 1)[-1]} part the graft does not copy")
+        totals = [tf.text or "" for t in src.tables.values() for tf in ET.fromstring(t).iter(_MAIN + "totalsRowFormula")]
+        used = _names_used([f.group(3) for f in _FORMULA.finditer(src.sheet)] + totals, src.names)
+        if used:                                          # 2. a name of the SOURCE workbook would not resolve
+            raise GraftError(f"its formulas use {', '.join(map(repr, used))}, defined in its own workbook - the "
+                             "graft does not copy workbook names")
+        rx = _table_renamer(renames)                      # 3. the parts, every table name known
+        for rid, new, tid, tpart in tables:
+            self.added[tpart] = _table_xml(src.tables[rid], tid, new, rx).encode("utf-8")
+            self._override(tpart, _CT_TABLE)
         xml, seeded = _SheetRewrite(src, self.styles, renames).rewrite(seeds)
         part = self._free("xl/worksheets/sheet{}.xml")
         self.added[part] = xml.encode("utf-8")
         if rels:
             rpart = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
-            self.added[rpart] =(f'{_DECL}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
+            self.added[rpart] = (f'{_DECL}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
                                  f'relationships">{"".join(rels)}</Relationships>').encode("utf-8")
         self._override(part, xlsx_edit._WS_CT)
         self._register(title, part)
