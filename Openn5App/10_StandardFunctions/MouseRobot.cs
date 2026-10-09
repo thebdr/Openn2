@@ -131,6 +131,68 @@ namespace Openn._10_StandardFunctions
 
         public static void UnregisterHotkey(IntPtr hWnd, int id) => UnregisterHotKey(hWnd, id);
 
+        // ============================== screen pixels (the scrollbar reading) ==============================
+
+        /// <summary>The colour at a screen point (the average of the 3x3 pixels around it); black when the screen cannot be read.</summary>
+        public static System.Drawing.Color SampleColor(System.Windows.Point p)
+        {
+            try
+            {
+                using (var bitmap = new System.Drawing.Bitmap(3, 3))
+                {
+                    using (var g = System.Drawing.Graphics.FromImage(bitmap))
+                        g.CopyFromScreen((int)p.X - 1, (int)p.Y - 1, 0, 0, new System.Drawing.Size(3, 3));
+                    int r = 0, gr = 0, b = 0;
+                    for (int y = 0; y < 3; y++)
+                        for (int x = 0; x < 3; x++)
+                        {
+                            System.Drawing.Color c = bitmap.GetPixel(x, y);
+                            r += c.R; gr += c.G; b += c.B;
+                        }
+                    return System.Drawing.Color.FromArgb(r / 9, gr / 9, b / 9);
+                }
+            }
+            catch { return System.Drawing.Color.Black; }
+        }
+
+        /// <summary>One screen pixel; black when it cannot be read.</summary>
+        public static System.Drawing.Color PixelAt(int x, int y)
+        {
+            try
+            {
+                using (var bitmap = new System.Drawing.Bitmap(1, 1))
+                {
+                    using (var g = System.Drawing.Graphics.FromImage(bitmap))
+                        g.CopyFromScreen(x, y, 0, 0, new System.Drawing.Size(1, 1));
+                    return bitmap.GetPixel(0, 0);
+                }
+            }
+            catch { return System.Drawing.Color.Black; }
+        }
+
+        /// <summary>The pixels of one screen row from xFrom to xTo inclusive; null when the screen cannot be read.</summary>
+        public static System.Drawing.Color[] ReadRow(int y, int xFrom, int xTo)
+        {
+            int width = xTo - xFrom + 1;
+            if (width < 1) return null;
+            try
+            {
+                using (var bitmap = new System.Drawing.Bitmap(width, 1))
+                {
+                    using (var g = System.Drawing.Graphics.FromImage(bitmap))
+                        g.CopyFromScreen(xFrom, y, 0, 0, new System.Drawing.Size(width, 1));
+                    var row = new System.Drawing.Color[width];
+                    for (int x = 0; x < width; x++) row[x] = bitmap.GetPixel(x, 0);
+                    return row;
+                }
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Sum of the channel differences - below ~48 two colours read as the same thing.</summary>
+        public static int ColorDistance(System.Drawing.Color a, System.Drawing.Color b) =>
+            Math.Abs(a.R - b.R) + Math.Abs(a.G - b.G) + Math.Abs(a.B - b.B);
+
         public const uint VK_F9 = 0x78;
         public const uint VK_F12 = 0x7B;
     }
