@@ -109,6 +109,37 @@ def test_phase_of_sub():
     eq(i18n.tr(phases.sub_by_number(510).label_key), "Generate I/O Tags")
 
 
+def test_buttons_layout_workbook_matches_the_registry():
+    """assets/ButtonsLayout.xlsx - the operator's picture of the bar (written by scripts/gen_buttons_layout.py; user
+    2026-10-10: "update the buttons layout to match the current layout") - shows exactly what the bar draws: the
+    Run Pipeline master, a column per phase (number, name, the ▾ chevron), its sub-buttons in registry order as the
+    dropdown labels them (`<number>  <label>`), the disabled ones greyed, `↓` between two action steps and `—`
+    elsewhere, and the Run-all order. A registry change without a rerun of the script fails here."""
+    import os
+    import openpyxl
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "ButtonsLayout.xlsx")
+    ws = openpyxl.load_workbook(path).worksheets[0]
+    numbered = [p for p in phases if p.number]
+    eq(ws["B3"].value, i18n.tr([p for p in phases if not p.number][0].name_key, "en"), "the Run Pipeline master")
+    for i, phase in enumerate(numbered):
+        col = 4 + 2 * i
+        cell = lambda row: ws.cell(row=row, column=col)
+        eq((cell(1).value, cell(3).value.replace("\n", " "), cell(4).value),
+           (phase.number, i18n.tr(phase.name_key, "en"), "▾"), f"phase {phase.number}'s head")
+        subs = list(phase.subs)
+        eq([cell(5 + 2 * k).value for k in range(len(subs) + 1)],
+           [f"{s.number}  {i18n.tr(s.label_key, 'en')}" for s in subs] + [None], f"phase {phase.number}'s buttons")
+        eq([cell(6 + 2 * k).value for k in range(len(subs) - 1)],
+           ["↓" if a.kind == "action" and b.kind == "action" else "—" for a, b in zip(subs, subs[1:])],
+           f"phase {phase.number}'s links")
+        eq([str(cell(5 + 2 * k).fill.fgColor.rgb).endswith("B2BEC3") for k in range(len(subs))],
+           [not s.enabled for s in subs], f"phase {phase.number}'s greyed buttons")
+    eq(ws.cell(row=1, column=4 + 2 * len(numbered)).value, None, "no column beyond the last phase")
+    order = " → ".join(str(n) for n in phases.run_plan)
+    ok(any(f"order: {order}" in str(c.value) for row in ws.iter_rows() for c in row if c.value),
+       "the Run-all order is stated")
+
+
 def test_by_number():
     eq(phases.by_number(800).handler, "software")
     eq(phases.by_number(900).handler, "reporting")
@@ -129,4 +160,5 @@ if __name__ == "__main__":
         ("labels_resolve_in_both_languages", test_labels_resolve_in_both_languages),
         ("phase_of_sub", test_phase_of_sub),
         ("by_number", test_by_number),
+        ("buttons_layout_workbook_matches_the_registry", test_buttons_layout_workbook_matches_the_registry),
     ]))

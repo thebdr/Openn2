@@ -1,8 +1,9 @@
 """The siemens_s7_safety MAIN ROUTINE - this system's whole pipeline, in one file.
 
 Read it top to bottom and you have the system's operating manual: PHASES is the table of contents
-(every phase-bar button + chevron sub-button, transcribed from the operator oracle
-`Pipeline3App/assets/ButtonsLayout.xlsx`, with the explicit Run-all `run_plan`), and the `run_*`
+(every phase-bar button + chevron sub-button, first transcribed from PL3's operator oracle ButtonsLayout.xlsx -
+`assets/ButtonsLayout.xlsx` is now GENERATED from it by scripts/gen_buttons_layout.py - with the explicit Run-all
+`run_plan`), and the `run_*`
 handlers below it are the chapters - each one stages its prerequisites, runs its phase, and reports
 through the PhaseContext seams. No handler touches Tk: the host (workbench/app_main) supplies
 `ctx.emit/status/gate/render/halt`, which is why every phase button is also runnable HEADLESS
@@ -22,7 +23,8 @@ from pipeline5.language import i18n
 from pipeline5.systems.system_contract import Phase, PhaseSet, Sub
 
 # --------------------------------------------------------------------------------------------- #
-# The phase registry - bar order, Run-all first. Sub-buttons per the oracle ButtonsLayout.xlsx;
+# The phase registry - bar order, Run-all first. Change it, then rerun scripts/gen_buttons_layout.py (the
+# operator's picture, assets/ButtonsLayout.xlsx - test_gui_phase_model fails while they differ);
 # deferred/unported ones are kept VISIBLE but enabled=False (greyed). Phase 200 (Documents Fill
 # Out) IS built + wired; it is kept OUT of run_plan by design - it mutates the source document,
 # so filling is a deliberate operator action (the 200 button), never a side-effect of Run-all.

@@ -18,8 +18,8 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class Sub:
-    """One chevron-dropdown sub-button of a phase (transcribed per system from its operator oracle -
-    Siemens: `Pipeline3App/assets/ButtonsLayout.xlsx`). Three KINDS:
+    """One chevron-dropdown sub-button of a phase (authored per system - Siemens: first transcribed from PL3's
+    ButtonsLayout.xlsx, which `assets/ButtonsLayout.xlsx` now mirrors, generated from the registry). Three KINDS:
       * action  - run that sub-phase: the phase handler is invoked with `only=<number>`
       * open    - open a folder/file: `opens` names the target the GUI resolves to a path
                   (System.open_targets first, then System.output_layout, then the kernel targets)

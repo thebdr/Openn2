@@ -37,6 +37,20 @@ from pipeline5.project import project_manager as project
 from pipeline5.project import app_state as state
 
 APP_TITLE = "Pipeline5 - SSOT database build"
+ICON = os.path.join(config.APP_ROOT, "assets", "Pipeline5.png")
+
+
+def window_icon(root):
+    """Give every window of the app - the main one and each dialog - the Pipeline5 icon (title bar + taskbar):
+    `iconphoto(True, ...)` on the root, as PL3 did (the PL5 port lost it). Returns the PhotoImage, which the caller
+    keeps referenced (Tk drops an unreferenced image); None when the file is missing or unreadable - the icon is
+    cosmetic, Tk keeps its default."""
+    try:
+        image = tk.PhotoImage(file=ICON)
+        root.iconphoto(True, image)
+        return image
+    except tk.TclError:
+        return None
 
 
 class App:
@@ -56,6 +70,7 @@ class App:
         self._system = self._systems[0]       # the ACTIVE system (the selector switches it for multi)
         config.use_system(self._system)       # the resolver system tiers + Database/<sid> routing follow
         self._set_title()
+        self._icon = window_icon(root)          # kept referenced for the window's lifetime
         root.geometry(f"{app_ui['width']}x{app_ui['height']}")
         root.protocol("WM_DELETE_WINDOW", self._on_close)   # ask before an unsaved Files-tab edit is lost (C-026),
         #                                                     then persist window size + close the tee on exit
