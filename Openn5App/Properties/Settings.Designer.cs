@@ -89,5 +89,21 @@ namespace Openn.Properties
                 this["LogWindowTopmost"] = value;
             }
         }
+
+        /// <summary>Whether the hardware generation wires the PROFINET port links of the Topology column afterwards.</summary>
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool WireProfinetPorts
+        {
+            get
+            {
+                return ((bool)(this["WireProfinetPorts"]));
+            }
+            set
+            {
+                this["WireProfinetPorts"] = value;
+            }
+        }
     }
 }

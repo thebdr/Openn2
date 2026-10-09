@@ -18,6 +18,7 @@ namespace Openn._01_Constructor
             public string subnet;
             public string connector; //X1/X01... interface designation; empty = default pick
             public string group;     //device-group path "folder/sub/..."; empty = ungrouped root
+            public List<TopologyLink> topology; //Stations.csv column 10 port links (HardwareTopology.Parse); the loader fills it, the constructor starts it empty
             public string customParameters;
             public string srcFileName;
             public int srcRow;
@@ -31,6 +32,7 @@ namespace Openn._01_Constructor
                 connector = _connector;
                 group = _group;
                 customParameters = _customParameters;
+                topology = new List<TopologyLink>();
                 srcFileName = _srcFileName;
                 srcRow = _srcRow;
             }

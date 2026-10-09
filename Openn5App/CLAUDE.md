@@ -210,6 +210,27 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   `Window_Closing` and the version-switch restart run `Shutdown()` on the TiaWorker (bounded 10 s): a project WE
   opened is closed, an attached user instance is left running (`ownsPortal`); re-attaching releases the previous
   portal first. `StartFileLog` disposes its writer when the seeding throws (no orphaned handle).
+- **PROFINET port wiring** (`TiaPortalOpenness.Hardware.cs WirePorts`, 2026-10-10): Stations.csv column 10 `Topology`
+  (optional; `01_Constructor/HardwareTopology.cs` parses `X1-P2 > <partner station>:X1-P1`, `|` separated, at load
+  with file/line errors; the editor round-trips it) names the port links of the plant; with the "Wire PROFINET
+  ports" box ticked (one choice mirrored on both tabs, `WirePorts_Changed`, remembered in
+  `Properties.Settings.WireProfinetPorts`) the generation wires them after the stations exist through
+  `NetworkPort.ConnectToPort`: the interface item by `Xn` (name token / PositionNumber), the port item by "Port n" /
+  PositionNumber / order. A pair already connected is left alone, a port connected elsewhere is reported and never
+  disconnected, a missing station/interface/port is reported; skipped (existing) stations are wired too. Unticked
+  with links present = one log line saying so. The data source is OPEN: PL5 emits column 9 `Connector` from the
+  I/O list's column I verbatim and nothing about partners yet.
+- **Re-arrange devices** (`ArrangeDevicesWindow.cs`, `01_Constructor/NetworkViewLayout.cs`,
+  `10_StandardFunctions/MouseRobot.cs`, 2026-10-10): Openness creates every station on ONE row of the network view
+  and has no layout call; TIA's editors are invisible to UI Automation and keys do not move objects (verified
+  2026-10-09) - only a mouse drag does. So the Files tab's "Re-arrange devices.." takes the last generation's
+  stations in creation order (`TiaPortalOpenness.LastCreatedStations`; the loaded IO-device list stands in without
+  a generation, with a warning), plans rows by the station name's middle dash segments (a run of equal keys = one
+  row, columns = order; row 0 never moves), and after the user opens the view, zooms until everything fits and
+  calibrates three points with the global hotkey F9 (first station, last station, first cell of row 2), brings
+  TIA to the front (`AttachedProcessId`) and drags each station with SendInput from its default slot to its cell.
+  F12 or a foreground change stops it; the drags never run while another window is in front. Pitch = (last -
+  first) / (N - 1); the plan is refused when a slot or cell leaves the screen.
 - **Transfer areas** (PN/PN coupler 6ES7158-3AD10 V4.x, I-devices): NOT device items - they live in
   `NetworkInterface.TransferAreas` of the station's PROFINET interface, so a `DeviceItems` walk never
   sees them (the dump prints them as `::TransferArea(i)` with `.Addr(j)` local / `.PartnerAddr(j)`
@@ -455,3 +476,11 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
    DB <name> via F_DB xml import (instanceOf F_ESTOP1) - direct CreateInstanceDB is not allowed for
    auto-generated blocks`. Run the csv again: the same-FB DB is replaced (`already exists (same FB "…") -
    replaced with a fresh one`); a name taken by a different block still pops the dialog naming it.
+17. **Port wiring**: add `X1-P2 > <next station>:X1-P1` to a station's Topology cell (editor or csv), tick "Wire
+   PROFINET ports", generate: the log shows `Port link wired: …`, the topology view shows the line between the two
+   ports; generate again: `already connected`; a malformed cell fails the load with file/line; unticked with links
+   present logs `Topology links in Stations.csv NOT wired`.
+18. **Re-arrange devices**: right after a generation, open the network view, zoom out so the row and the rows below fit,
+   press "Re-arrange devices..", F9 on the first station, F9 on the last, F9 one row below the first, Start: the
+   stations of every later group move to their own row (log `Re-arrange: <station> -> row r, column c`), row 1
+   stays; F12 stops mid-way; alt-tabbing away stops with `lost the foreground`; a plan off-screen is refused.

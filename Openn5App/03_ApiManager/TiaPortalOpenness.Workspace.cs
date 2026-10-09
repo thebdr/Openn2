@@ -72,7 +72,7 @@ namespace Openn._03_ApiManager
         /// Imports the given catalog items in import order and returns one result per item (in that order).
         /// createNewIoControllers is the hardware generation's controller mode (false = use the existing controllers).
         /// </summary>
-        public IList<WorkspaceImportResult> ImportWorkspaceItems(WorkspaceCatalog catalog, IList<WorkspaceItem> items, bool createNewIoControllers)
+        public IList<WorkspaceImportResult> ImportWorkspaceItems(WorkspaceCatalog catalog, IList<WorkspaceItem> items, bool createNewIoControllers, bool wirePorts = false)
         {
             var results = new List<WorkspaceImportResult>();
             if (catalog == null || items == null || items.Count == 0)
@@ -111,7 +111,7 @@ namespace Openn._03_ApiManager
                 WorkspaceImportResult result;
                 try
                 {
-                    result = ImportWorkspaceItem(catalog, item, createNewIoControllers, plcCache, hardwareRuns, out abort);
+                    result = ImportWorkspaceItem(catalog, item, createNewIoControllers, wirePorts, plcCache, hardwareRuns, out abort);
                 }
                 catch (Exception e)
                 {
@@ -132,7 +132,7 @@ namespace Openn._03_ApiManager
             return results;
         }
 
-        private WorkspaceImportResult ImportWorkspaceItem(WorkspaceCatalog catalog, WorkspaceItem item, bool createNewIoControllers,
+        private WorkspaceImportResult ImportWorkspaceItem(WorkspaceCatalog catalog, WorkspaceItem item, bool createNewIoControllers, bool wirePorts,
             Dictionary<string, Tuple<PlcSoftware, string>> plcCache, Dictionary<string, WorkspaceImportResult> hardwareRuns, out bool abort)
         {
             abort = false;
@@ -153,7 +153,7 @@ namespace Openn._03_ApiManager
                     return new WorkspaceImportResult(item, WorkspaceImportOutcome.NothingToDo, "reference data - read by the hardware generation of its folder");
 
                 case ImportRoute.HardwareGeneration:
-                    return ImportWorkspaceHardware(catalog, item, createNewIoControllers, hardwareRuns, out abort);
+                    return ImportWorkspaceHardware(catalog, item, createNewIoControllers, wirePorts, hardwareRuns, out abort);
 
                 default:
                     return ImportWorkspaceSoftware(item, plcCache, out abort);
@@ -165,7 +165,7 @@ namespace Openn._03_ApiManager
         /// configuration, so the second file of the pair reports the outcome of the run the first one started.
         /// The loader reads the whole folder, so every hardware file in it must be importable.
         /// </summary>
-        private WorkspaceImportResult ImportWorkspaceHardware(WorkspaceCatalog catalog, WorkspaceItem item, bool createNewIoControllers,
+        private WorkspaceImportResult ImportWorkspaceHardware(WorkspaceCatalog catalog, WorkspaceItem item, bool createNewIoControllers, bool wirePorts,
             Dictionary<string, WorkspaceImportResult> hardwareRuns, out bool abort)
         {
             abort = false;
@@ -206,7 +206,7 @@ namespace Openn._03_ApiManager
                 {
                     if (!HardwareConfigLoader.LoadAll(folder))
                         result = new WorkspaceImportResult(item, WorkspaceImportOutcome.Failed, "hardware configuration did not load (see the log) - nothing generated");
-                    else if (CreateDevices(createNewIoControllers))
+                    else if (CreateDevices(createNewIoControllers, wirePorts))
                         result = new WorkspaceImportResult(item, WorkspaceImportOutcome.Imported, "hardware generation run completed (stations already in the project were skipped - see the log)");
                     else if (Cancelled())
                         result = new WorkspaceImportResult(item, WorkspaceImportOutcome.Cancelled, "hardware generation cancelled");

@@ -49,13 +49,15 @@ namespace Openn._01_Constructor
         public string Group = "";
         /// <summary>9th column written by Pipeline5 (PN/PN coupler connector); carried through the editor untouched.</summary>
         public string Connector = "";
+        /// <summary>PROFINET port links "X1-P2 > station:X1-P1 | ..." (Stations.csv column 10, optional) - wired when "Wire PROFINET ports" is on.</summary>
+        public string Topology = "";
         public List<ModuleModel> Modules = new List<ModuleModel>();
 
         public string DisplayText => "[" + Role + "] " + Name + (IpAddress.Length > 0 ? "  (" + IpAddress + ")" : "");
 
         /// <summary>Text the explorer's regex search runs against.</summary>
         public string SearchText =>
-            Role + " " + Name + " " + ModelId + " " + IpAddress + " " + PnNumber + " " + Subnet + " " + CustomParameters + " " + Group;
+            Role + " " + Name + " " + ModelId + " " + IpAddress + " " + PnNumber + " " + Subnet + " " + CustomParameters + " " + Group + " " + Topology;
 
         /// <summary>Deep copy including all modules.</summary>
         public StationModel Clone()
@@ -70,6 +72,7 @@ namespace Openn._01_Constructor
                 Subnet = Subnet,
                 CustomParameters = CustomParameters,
                 Group = Group,
+                Topology = Topology,
             };
             foreach (ModuleModel module in Modules)
                 copy.Modules.Add(module.Clone());
@@ -146,6 +149,7 @@ namespace Openn._01_Constructor
                     CustomParameters = row.Get(6),
                     Group = row.Get(7),
                     Connector = row.Get(8),
+                    Topology = row.Get(9),
                 });
             }
 
@@ -194,7 +198,7 @@ namespace Openn._01_Constructor
         {
             var stationsContent = new StringBuilder();
             stationsContent.Append(RenderHeader(StationsHeader, InputKind.HwStations));
-            stationsContent.AppendLine("# Role,Station Name,Model Id,IP Address,PN Number,Subnet,Custom Parameters,Group,Connector  (PN Number empty = last IP octet; parameters separated by |; Group = folder/subfolder/...)");
+            stationsContent.AppendLine("# Role,Station Name,Model Id,IP Address,PN Number,Subnet,Custom Parameters,Group,Connector,Topology  (PN Number empty = last IP octet; parameters separated by |; Group = folder/subfolder/...; Connector = X1/X2 on multi-connector devices; Topology = port links X1-P2 > station:X1-P1, | separated)");
 
             var modulesContent = new StringBuilder();
             modulesContent.Append(RenderHeader(ModulesHeader, InputKind.HwModules));
@@ -202,7 +206,7 @@ namespace Openn._01_Constructor
 
             foreach (StationModel station in Stations)
             {
-                stationsContent.AppendLine(JoinCsv(station.Role, station.Name, station.ModelId, station.IpAddress, station.PnNumber, station.Subnet, station.CustomParameters, station.Group, station.Connector));
+                stationsContent.AppendLine(JoinCsv(station.Role, station.Name, station.ModelId, station.IpAddress, station.PnNumber, station.Subnet, station.CustomParameters, station.Group, station.Connector, station.Topology));
                 foreach (ModuleModel module in station.Modules)
                     modulesContent.AppendLine(JoinCsv(station.Name, module.Slot, module.Name, module.ModelId, module.IAddress, module.QAddress, module.CustomParameters));
             }
