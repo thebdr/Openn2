@@ -18,28 +18,27 @@ src://pipeline5/phases/interfaces/builder.py builds the tables, then - gated by
 `iolist_params.insert_interface_sheets` - `insert_interface_sheets` (400e). Reads the `interfaces`
 + `interface_elements` SSOT tables; writes
 ProjectDocumentation/InformationDatabase/Interfaces/IF_<instance>.xlsx (`interfaces_dir` in
-src://pipeline5/config/paths.py) and, in 400e, edits the configured I/O List IN PLACE (timestamped
-.bak first). Phase 510 does NOT read these files - it projects the stored `io_address_side1`
+src://pipeline5/config/paths.py) and, in 400e, adds the IF_ sheets to the configured I/O List IN PLACE
+(timestamped .bak first) - grafted at the ZIP/XML level, every existing part of the workbook left
+byte-identical (src://pipeline5/documents/xlsx_sheet_graft.py, [[C-034]]). Phase 510 does NOT read these files - it projects the stored `io_address_side1`
 column, the same value 400e seeds into the inserted sheets (verified; see
 src://pipeline5/systems/plc_based/siemens_s7/plctags_xlsx_writer.py).
 """
 from __future__ import annotations
 
 import datetime
-import io
 import os
 import re
 import shutil
 import xml.etree.ElementTree as ET
 import zipfile
-from copy import copy, deepcopy
 
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableColumn
 
 from pipeline5 import config
 from pipeline5.phases.interfaces import builder as interfaces
+from pipeline5.documents import xlsx_sheet_graft
 from pipeline5.documents import xlsx_surgical_writer as xlsx_edit
 
 _INDEX_TOKEN = "<index>"
@@ -264,102 +263,15 @@ def project(database, template_path: str | None = None, out_dir: str | None = No
 
 
 # =================================================================================================== #
-# Phase 400e - insert each IF_<instance> sheet into the I/O List (formulas + their caches kept; NOT lossless
-# on a modern workbook - dynamic arrays frozen, threaded comments / add-ins / metadata dropped: [[P-019]])
+# Phase 400e - insert each IF_<instance> sheet into the I/O List, LOSSLESSLY ([[C-034]])
 # =================================================================================================== #
-# Clean-room port of PL3's interfaces.py insertion path. openpyxl writes the combined workbook (keeping
-# every existing formula), then the existing formula cells' CACHED VALUES - which openpyxl drops on
-# re-save - are patched back at the ZIP/XML level, so both the formulas and their values survive. The
-# inserted IF_ sheets' `I/O Address Side 1` LET cache (also dropped, and base-stale at the source) is
-# RE-SEEDED with the value computed in Python, so phase 510 reads correct addresses without Excel. Then
-# xlsx_edit.freeze_arrays (400d) freezes any dynamic array openpyxl flattened in the I/O List's other
-# sheets, avoiding the "overlapping array formula" corruption.
-
-def _copy_sheet(src, dst, title) -> None:
-    """Copy a generated interface sheet `src` into workbook `dst` as a new sheet `title`: values +
-    formulas (the per-sheet table names are made unique and rewritten in the formulas), cell styles,
-    column widths, merged cells, and the tables (re-created)."""
-    suffix = re.sub(r"[^A-Za-z0-9_]", "_", title)
-    renames = {nm: f"{nm}_{suffix}" for nm in list(src.tables)}     # unique table names in the iolist
-    new = dst.create_sheet(title)
-    for row in src.iter_rows():
-        for cell in row:
-            v = cell.value
-            if v is None and not cell.has_style:
-                continue
-            if isinstance(v, str) and v.startswith("="):
-                for old, newn in renames.items():
-                    v = v.replace(old, newn)
-            nc = new.cell(row=cell.row, column=cell.column, value=v)
-            if cell.data_type == "s" and isinstance(v, str) and v[:1] in ("=", "+", "-"):
-                nc.data_type = "s"
-            if cell.has_style:
-                nc.font = copy(cell.font)
-                nc.fill = copy(cell.fill)
-                nc.border = copy(cell.border)
-                nc.alignment = copy(cell.alignment)
-                nc.number_format = cell.number_format
-    for letter, dim in src.column_dimensions.items():
-        if dim.width:
-            new.column_dimensions[letter].width = dim.width
-    for mc in list(src.merged_cells.ranges):
-        new.merge_cells(str(mc))
-    for nm in list(src.tables):
-        st = src.tables[nm]
-        nt = Table(displayName=renames[nm], ref=st.ref)     # constructor sets name == displayName
-        nt.headerRowCount = st.headerRowCount
-        nt.totalsRowCount = st.totalsRowCount
-        # Fresh columns with id + name ONLY. The source columns carry dataDxfId (indices into the
-        # SOURCE workbook's differential-format records - out of range in the I/O List) and
-        # calculatedColumnFormula (referencing the OLD table name); either makes Excel drop the whole
-        # table. The cells keep their own copied/rewritten formulas, so addresses still compute.
-        nt.tableColumns = [TableColumn(id=i + 1, name=col.name) for i, col in enumerate(st.tableColumns)]
-        if st.tableStyleInfo is not None:
-            nt.tableStyleInfo = deepcopy(st.tableStyleInfo)
-        new.add_table(nt)
-
-
-def _capture_formula_caches(zbytes) -> dict:
-    """{sheet name -> {cell ref -> (t_attr, cached value text)}} for every formula cell carrying a
-    cached value. openpyxl drops these on re-save, so they are restored afterwards (else data_only
-    readers - staging/validation, e.g. Profinet IP/name - would see None)."""
-    caches = {}
-    with zipfile.ZipFile(io.BytesIO(zbytes)) as z:
-        present = set(z.namelist())
-        for nm, part in xlsx_edit._sheet_name_to_part(zbytes).items():
-            if part not in present:
-                continue
-            cc = {}
-            for c in ET.fromstring(z.read(part)).iter(_MAIN_NS + "c"):
-                f, v = c.find(_MAIN_NS + "f"), c.find(_MAIN_NS + "v")
-                if f is not None and v is not None and v.text is not None:
-                    cc[c.get("r")] = (c.get("t"), v.text)
-            if cc:
-                caches[nm] = cc
-    return caches
-
-
-def _patch_formula_cache(xml: str, ref: str, t, value: str) -> str:
-    """Set a single formula cell's cached value (+ its result-type t) in an openpyxl-written worksheet
-    XML string. openpyxl usually emits an empty <v/> for a formula cell, but a copied formula cell may
-    carry none at all - so REPLACE an existing <v>...</v>/<v/> when present, else APPEND one after the
-    <f> (used both to restore the I/O List's own caches and to seed the inserted IF_ address values)."""
-    esc = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    pat = re.compile(r'(<c r="' + re.escape(ref) + r'")([^>]*)(>)(.*?)(</c>)', re.DOTALL)
-
-    def repl(m):
-        attrs = re.sub(r'\s+t="[^"]*"', "", m.group(2))
-        if t:
-            attrs += f' t="{t}"'
-        body = m.group(4)
-        if re.search(r"<v\s*/>|<v>.*?</v>", body, re.DOTALL):
-            body = re.sub(r"<v\s*/>|<v>.*?</v>", f"<v>{esc}</v>", body, count=1)
-        else:
-            body += f"<v>{esc}</v>"
-        return m.group(1) + attrs + m.group(3) + body + m.group(5)
-
-    return pat.sub(repl, xml, count=1)
-
+# The sheets are GRAFTED at the ZIP/XML level (src://pipeline5/documents/xlsx_sheet_graft.py): every
+# existing part of the I/O List stays byte-identical - its formulas + caches, dynamic arrays, threaded
+# comments, add-in bindings, metadata, printer settings; only workbook.xml, its rels, [Content_Types].xml
+# (one entry per new part) and styles.xml (APPEND-only) change. The PL3 port this replaced re-saved the
+# whole workbook with openpyxl and patched the caches back - lossy on a modern workbook ([[P-019]]'s
+# measurement). The inserted sheets' `I/O Address Side 1` LET cache is SEEDED with the value computed in
+# Python (the source cache is base-stale), so phase 510 reads correct addresses without Excel.
 
 # --- Interface I/O Address Side 1: compute the LET's value in Python (Excel-independent) ----------------
 # Each inserted IF_ sheet carries an `_xlfn.LET` "I/O Address Side 1" formula whose Excel cache openpyxl
@@ -431,79 +343,34 @@ def _interface_address_caches(if_path) -> dict:
 
 
 def insert_sheets_into_iolist(iolist_path, sheets) -> list:
-    """Insert each (title, if_path) interface sheet into the I/O List ONLY if a sheet of that name is
-    not already present. openpyxl writes the combined workbook (keeping every existing
-    formula), then the existing formula cells' CACHED VALUES - which openpyxl drops on re-save - are
-    patched back from the original, so both the formulas and their values survive. ONE atomic save (the
-    caller backs the I/O List up first). Returns per-interface action strings."""
+    """Insert each (title, if_path) interface sheet into the I/O List ONLY if no sheet of that name (Excel's
+    case-insensitive rule) is already present - grafted as a new LAST sheet, every existing part of the
+    workbook left byte-identical ([[C-034]]), its `I/O Address Side 1` caches seeded. ONE atomic save (the
+    caller backs the I/O List up first); a sheet the graft refuses is reported and adds nothing. Returns
+    per-interface action strings."""
     with open(iolist_path, "rb") as fh:
-        caches = _capture_formula_caches(fh.read())
-
-    dst = load_workbook(iolist_path)               # data_only=False -> keep the existing formulas
-    actions, changed, inserted = [], False, []
+        present = {nm.casefold() for nm in xlsx_edit._sheet_name_to_part(fh.read())}
+    actions, grafts = [], []
     for title, if_path in sheets:
-        if title in dst.sheetnames:
+        if title.casefold() in present:
             actions.append(f"{title}: already present in the I/O List - skipped")
             continue
-        src_wb = load_workbook(if_path)
-        _copy_sheet(src_wb[src_wb.sheetnames[0]], dst, title)
-        src_wb.close()
-        inserted.append((title, if_path))
-        actions.append(f"{title}: inserted into the I/O List")
-        changed = True
-    if not changed:
-        dst.close()
+        present.add(title.casefold())
+        # the IF_ sheet's I/O Address Side 1: computed base+offset (the source cache is base-stale)
+        grafts.append({"title": title, "source": if_path, "seeds": _interface_address_caches(if_path)})
+    if not grafts:
         return actions
-
-    tmp = iolist_path + ".tmp_insert.xlsx"
     try:
-        dst.save(tmp)
-        dst.close()
-        with open(tmp, "rb") as fh:
-            data = fh.read()
-        tparts = xlsx_edit._sheet_name_to_part(data)
-        # restore the original I/O List's formula caches AND seed each inserted IF_ sheet's I/O Address
-        # Side 1 (computed base+offset; openpyxl dropped the LET cache and the source cache is base-stale)
-        to_patch = {nm: dict(cc) for nm, cc in caches.items()}
-        for title, if_path in inserted:
-            seeded = _interface_address_caches(if_path)
-            if seeded:
-                to_patch.setdefault(title, {}).update(seeded)
-                actions.append(f"{title}: seeded {len(seeded)} I/O Address Side 1 values (Excel-independent)")
-        repl = {}
-        for nm, cc in to_patch.items():
-            part = tparts.get(nm)
-            if not part:
-                continue
-            with zipfile.ZipFile(io.BytesIO(data)) as z:
-                xml = z.read(part).decode("utf-8")
-            for ref, (t, v) in cc.items():
-                xml = _patch_formula_cache(xml, ref, t, v)
-            repl[part] = xml.encode("utf-8")
-        out = io.BytesIO()
-        with zipfile.ZipFile(io.BytesIO(data)) as zin, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
-            for it in zin.infolist():
-                zout.writestr(it, repl.get(it.filename) or zin.read(it.filename))
-        with open(tmp, "wb") as fh:
-            fh.write(out.getvalue())
-        os.replace(tmp, iolist_path)
-        # openpyxl's save FLATTENS any dynamic array in the I/O List's other sheets into a master +
-        # literal slaves (an "overlapping array formula" Excel reports as corrupt). Post-process with the
-        # surgical writer (400d): freeze every such array to its cached values (+ drop a stale calcChain).
-        for sheet_name, master, rng in xlsx_edit.freeze_arrays(iolist_path):
-            actions.append(f"[WARN] froze legacy array {sheet_name}!{master} (spill {rng}) to its cached "
-                           "values to avoid corruption (the original formula is in the backup)")
-    except (OSError, ET.ParseError, zipfile.BadZipFile) as e:
-        try:
-            dst.close()
-        except Exception:  # noqa: BLE001
-            pass
-        if os.path.exists(tmp):
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
-        actions.append(f"save failed ({e}) - I/O List left unchanged (restore from the .bak if needed)")
+        results = xlsx_sheet_graft.graft_sheets(iolist_path, grafts)
+    except (OSError, ET.ParseError, zipfile.BadZipFile, UnicodeDecodeError, xlsx_sheet_graft.GraftError) as e:
+        return actions + [f"save failed ({e}) - I/O List left unchanged (restore from the .bak if needed)"]
+    for r in results:
+        if r["error"]:
+            actions.append(f"[WARN] {r['title']}: not inserted - {r['error']}")
+            continue
+        actions.append(f"{r['title']}: inserted into the I/O List")
+        if r["seeded"]:
+            actions.append(f"{r['title']}: seeded {len(r['seeded'])} I/O Address Side 1 values (Excel-independent)")
     return actions
 
 

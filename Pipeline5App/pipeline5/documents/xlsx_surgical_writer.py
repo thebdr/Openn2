@@ -13,8 +13,10 @@ behind.
 
 Because it never re-serialises the whole workbook, openpyxl's formula-cache drop never happens, so
 there is nothing to restore. `set_cells` is the pure per-sheet engine; `edit_workbook` is the zip-level
-orchestrator (atomic temp + os.replace); `freeze_arrays` is the post-process the openpyxl-based
-phase-400 interface-sheet insert (400e) still calls.
+orchestrator (atomic temp + os.replace); `freeze_arrays` is the post-process for an openpyxl-SAVED
+workbook (no pipeline caller left: the phase-400 interface-sheet insert (400e) that needed it became a
+ZIP/XML-level graft - src://pipeline5/documents/xlsx_sheet_graft.py, the sibling that copies a whole
+sheet from another workbook in, [[C-034]]).
 """
 from __future__ import annotations
 import io
@@ -329,8 +331,8 @@ def _register_sheet(existing_parts, wbxml, relsxml, ctxml, name):
 
 
 def freeze_arrays(path: str, *, dest: str | None = None) -> list:
-    """Post-process an openpyxl-saved .xlsx (the openpyxl-based writers - e.g. phase 400's interface-
-    sheet insert - that CAN'T avoid the flatten): FREEZE every array formula in place (remove the master
+    """Post-process an openpyxl-saved .xlsx (an openpyxl-based writer that CAN'T avoid the
+    flatten - phase 400's interface-sheet insert was one until [[C-034]]): FREEZE every array formula in place (remove the master
     <f>, keeping its + the spill cells' cached values), so an openpyxl-flattened dynamic array (a master
     + literal slaves) becomes static values with NO overlapping-array corruption; and DROP a stale
     xl/calcChain.xml. Atomic (temp + os.replace). Returns the (sheet, master_ref, range) frozen (WARN

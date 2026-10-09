@@ -11,7 +11,7 @@ matrix_previous_path: ''
 iolist_params:
   sheets: ^NET SAFETY \d{1,3}|^r\d+\.s\d+\.c\d+/gmi       # a single sheet name, a list of names or a regular expression
   header_row: 1
-  insert_interface_sheets: true                           # the interface sheets created as output are added to the workbook (re-saves it: dynamic arrays frozen, threaded comments / add-ins dropped - P-019)
+  insert_interface_sheets: true                           # the interface sheets created as output are added to the workbook as its last sheets (every existing part kept byte-identical - C-034; a timestamped .bak first)
   diag_bits_range: [0, 62]                                # valid diagnosis bit range (inclusive); ph200 §8 diag allocation reads this (node non-P up from min / P down from max)
 
 matrix_params:
