@@ -462,7 +462,7 @@ def _coupler_rows(*iocs, head=None):
     rows = [dict(_rows()[0]),
             dict({"script_type": "PA", "type_hw": "PA", "part_no": "COUPLER", "profinet_name": "n6",
                   "profinet_ip": "192.168.50.6", "functional_unit": "=S1", "slot": "-K6", "bit": "",
-                  "source_sheet": "NS50", "source_row": 3}, **(head or {}))]
+                  "connector": "X1", "source_sheet": "NS50", "source_row": 3}, **(head or {}))]
     for n, (name, bit, extra) in enumerate(iocs):
         rows.append(dict({"script_type": "IOC", "mnemonic": name, "bit": bit, "slot": "", "uid": f"ioc{n}",
                           "source_sheet": "NS50", "source_row": 4 + n}, **(extra or {})))
@@ -472,8 +472,9 @@ def _coupler_rows(*iocs, head=None):
 
 
 def test_coupler_interfaces_become_transfer_areas():
-    """C-031: each IOC row under a coupler's head = `<name>_IN` (I Addr = base) + `<name>_OUT` (Q Addr = base) in
-    document order, positions 1..n after the cards; the length written only where the IOC row's col AG sets it
+    """C-031: each IOC row under a coupler's head = an IN area (I Addr = base) + an OUT area (Q Addr = base) in
+    document order, positions 1..n after the cards, named by direction - two interfaces on the coupler append their
+    names (`X2toX1_SORTER-01`, user 2026-10-09); the length written only where the IOC row's col AG sets it
     (the database default is the importer's); a `+DIAG` Mnemonic names its areas without the marker; an
     address-spelled base gives its byte; an IOC row with a Slot is still no card; a length key in any spelling is
     written in the database's (the importer matches attribute names exactly - refute round 1)."""
@@ -486,10 +487,11 @@ def test_coupler_interfaces_become_transfer_areas():
     eq(coupler, [
         (1, "-C1", "DI16", 0, 0, "PotentialGroup=1 | Ch(0).Filter=1", "DI 16x24VDC", ""),
         (2, "COUPLER:PS", "COUPLER:PS", "", "", "", "Power Supply", ""),
-        (1, "SORTER-01_IN", "TransferArea-IN", 10000, "", "PartnerToLocalLength=64", "TransferArea-IN area", "ioc0"),
-        (2, "SORTER-01_OUT", "TransferArea-OUT", "", 10000, "", "TransferArea-OUT area", "ioc0"),
-        (3, "SORTER-02_IN", "TransferArea-IN", 20000, "", "", "TransferArea-IN area", "ioc1"),
-        (4, "SORTER-02_OUT", "TransferArea-OUT", "", 20000, "", "TransferArea-OUT area", "ioc1"),
+        (1, "X2toX1_SORTER-01", "TransferArea-IN", 10000, "", "PartnerToLocalLength=64", "TransferArea-IN area",
+         "ioc0"),
+        (2, "X1toX2_SORTER-01", "TransferArea-OUT", "", 10000, "", "TransferArea-OUT area", "ioc0"),
+        (3, "X2toX1_SORTER-02", "TransferArea-IN", 20000, "", "", "TransferArea-IN area", "ioc1"),
+        (4, "X1toX2_SORTER-02", "TransferArea-OUT", "", 20000, "", "TransferArea-OUT area", "ioc1"),
     ], "the card + the default card, then 2 areas per interface - never a card from an IOC row")
     rows = _coupler_rows(("SORTER-01", "I2.0", None))
     rows[-1]["bit"] = "I8.0"
@@ -558,7 +560,7 @@ def test_ioc_rows_without_a_coupler_warn():
         _coupler_rows(("SORTER-01", "10000", {"type_hw": "PA", "part_no": "COUPLER", "profinet_ip": "192.168.50.6"})),
         _ta_dtd())
     eq((len(stations), [m["module_name"] for m in modules if m["model_id"].startswith("TransferArea")], findings),
-       (2, ["SORTER-01_IN", "SORTER-01_OUT"], []), "an IOC row typed PA is still the coupler's interface")
+       (2, ["X2toX1", "X1toX2"], []), "an IOC row typed PA is still the coupler's interface")
 
 
 def test_unroutable_ioc_hardware_parameters_warn():
@@ -569,7 +571,7 @@ def test_unroutable_ioc_hardware_parameters_warn():
                                                                       "PartnerToLocalLength=64 | PartnerToLocalLength=16"}))
     _s, modules, findings = hardware.extract(rows, _ta_dtd())
     areas = {m["module_name"]: m["custom_parameters"] for m in modules if m["model_id"].startswith("TransferArea")}
-    eq(areas, {"SORTER-01_IN": "PartnerToLocalLength=16", "SORTER-01_OUT": "LocalToPartnerLength=32"})
+    eq(areas, {"X2toX1": "PartnerToLocalLength=16", "X1toX2": "LocalToPartnerLength=32"})
     eq([(f.type, f.severity) for f in findings], [("hw_ta_param_unrouted", "WARN")])
     ok("Foo=1" in findings[0].detail and "not written" in findings[0].detail, findings[0].detail)
 
@@ -596,7 +598,7 @@ def test_700_alone_writes_no_colliding_areas():
     rows = _coupler_rows(("FVTGENERIC-05", "14000", None), ("FVTGENERIC-06", "14000", None))
     _s, _m, findings = hardware.extract(rows, _ta_dtd())
     eq([(f.type, f.severity) for f in findings], [("hw_ta_overlap", "FAIL")] * 2, "the IN pair and the OUT pair")
-    ok("FVTGENERIC-05_IN (I14000..14127) and FVTGENERIC-06_IN (I14000..14127) overlap" in findings[0].detail,
+    ok("X2toX1_FVTGENERIC-05 (I14000..14127) and X2toX1_FVTGENERIC-06 (I14000..14127) overlap" in findings[0].detail,
        findings[0].detail)
     ok(gate.has_blocking(findings))
     _s, _m, findings = hardware.extract(_coupler_rows(("SORTER-01", "0", None)), _ta_dtd())
@@ -605,8 +607,36 @@ def test_700_alone_writes_no_colliding_areas():
     _s, modules, findings = hardware.extract(_coupler_rows(("SORTER-01", "10000", None), ("SORTER+DIAG-01", "20000", None)),
                                              _ta_dtd())
     eq([(f.type, f.severity) for f in findings], [("hw_ta_name_duplicate", "FAIL")])
+    ok("X2toX1_SORTER-01 / X1toX2_SORTER-01" in findings[0].detail, findings[0].detail)
     eq([m["module_name"] for m in modules if m["model_id"].startswith("TransferArea")],
-       ["SORTER-01_IN", "SORTER-01_OUT"], "the second SORTER-01 is not written")
+       ["X2toX1_SORTER-01", "X1toX2_SORTER-01"], "the second SORTER-01 is not written")
+
+
+def test_transfer_areas_are_named_by_direction():
+    """User 2026-10-09 ("i prefer X1toX2, X2toX1"): the coupler head's Connector names the PLC's side - on X1 the IN
+    area (partner -> local) is X2toX1 and the OUT area X1toX2, on X2 the other way round; read from FVT's `X2` and
+    the fixture's `X1-P1 R`, any case; a lone interface keeps the bare direction; a Connector naming neither side is
+    a blocking FAIL at the head with no area of that coupler written - and only on a coupler that HAS interfaces."""
+    from pipeline5.findings import gate
+
+    def areas(connector, *iocs):
+        _s, modules, findings = hardware.extract(_coupler_rows(*iocs, head={"connector": connector}), _ta_dtd())
+        return ([(m["module_name"], m["model_id"], m["i_addr"], m["q_addr"]) for m in modules
+                 if m["model_id"].startswith("TransferArea")], findings)
+    lone = ("FVTGENERIC-05", "14000", None)
+    eq(areas("X1", lone), ([("X2toX1", "TransferArea-IN", 14000, ""), ("X1toX2", "TransferArea-OUT", "", 14000)], []))
+    eq(areas("X2", lone), ([("X1toX2", "TransferArea-IN", 14000, ""), ("X2toX1", "TransferArea-OUT", "", 14000)], []),
+       "the PLC on X2: what it reads comes X1 -> X2")
+    eq(areas("x2-P1 R", lone)[0][0][0], "X1toX2", "any case, a port suffix")
+    eq(areas("X1-P1 R", lone)[0][0][0], "X2toX1", "the fixture's spelling")
+    eq(areas("-X2", lone)[0][0][0], "X1toX2", "a designation prefix - OP5 reads the token anywhere")
+    for connector in ("", "X3", "P1", "X12", "BOX1"):
+        found, findings = areas(connector, lone)
+        eq((found, [(f.type, f.severity, f.location) for f in findings]),
+           ([], [("hw_ta_connector_unknown", "FAIL", "[NS50] row 3")]), repr(connector))
+        ok(gate.has_blocking(findings) and f"Connector {connector!r} names neither X1 nor X2" in findings[0].detail,
+           findings[0].detail)
+    eq(areas("", ("", "10000", {"index": "SORTER-01"}))[1], [], "no interface on the coupler: its Connector is not read")
 
 
 def test_shipped_transfer_area_defaults():
@@ -653,4 +683,5 @@ if __name__ == "__main__":
         ("transfer_area_length_must_be_a_whole_number", test_transfer_area_length_must_be_a_whole_number),
         ("700_alone_writes_no_colliding_areas", test_700_alone_writes_no_colliding_areas),
         ("shipped_transfer_area_defaults", test_shipped_transfer_area_defaults),
+        ("transfer_areas_are_named_by_direction", test_transfer_areas_are_named_by_direction),
     ]))

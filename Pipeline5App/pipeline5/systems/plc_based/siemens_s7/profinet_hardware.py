@@ -242,10 +242,33 @@ def _ioc_without_coupler(row, where_text) -> Finding:
               where, str(row.get("uid", "")), doc=_io_doc() if "!" in where else "")
 
 
-def _transfer_areas(station, iocs, by_id, findings, spans) -> list:
-    """A coupler's transfer-area module rows ([[C-031]]): per IOC row under its head, in document order,
-    `<name>_IN` (TransferArea-IN, I Addr = the base) and `<name>_OUT` (TransferArea-OUT, Q Addr = the base),
-    positions 1..n; the name = the IOC row's Mnemonic, the base = its Bit (user 2026-10-09). Lengths: the
+# OP5's own reading of the cell (HardwareIoDevices ConnectorNumber: an `Xn` token anywhere, not inside a word,
+# not followed by a digit) - a PN/PN coupler has only the two sides
+_CONNECTOR_SIDE = re.compile(r"(?<![0-9A-Za-z])[Xx]([12])(?![0-9])")
+
+
+def connector_side(cell):
+    """1 / 2 - the coupler side this PLC's network plugs into: the head row's Connector cell (`X1`, `X2`, `X1-P1 R`,
+    `-X2`, any case - the token OP5 picks the port by); None when it names neither."""
+    m = _CONNECTOR_SIDE.search(str(cell or ""))
+    return int(m.group(1)) if m else None
+
+
+def area_names(side: int) -> dict:
+    """{'I': ..., 'Q': ...} - each area named by its direction across the coupler (user 2026-10-09: "X1toX2,
+    X2toX1"): the IN area carries partner -> local, the OUT area local -> partner, `local` = the PLC's side."""
+    local, partner = f"X{side}", f"X{3 - side}"
+    return {"I": f"{partner}to{local}", "Q": f"{local}to{partner}"}
+
+
+def _transfer_areas(station, head, iocs, by_id, findings, spans) -> list:
+    """A coupler's transfer-area module rows ([[C-031]]): per IOC row under its head, in document order, an IN
+    area (TransferArea-IN, I Addr = the base) and an OUT area (TransferArea-OUT, Q Addr = the base), positions 1..n,
+    NAMED by their direction across the coupler (user 2026-10-09): on a coupler whose head's Connector says X1 the
+    IN area is `X2toX1` and the OUT area `X1toX2` - X2 the other way round; a coupler carrying several interfaces
+    appends the interface name (`X1toX2_SORTER-01`) - TIA wants unique names on a device. A Connector naming
+    neither X1 nor X2 is a blocking `hw_ta_connector_unknown` (the directions cannot be named) and no area of that
+    coupler is written. The interface = the IOC row's Mnemonic, the base = its Bit (user 2026-10-09). Lengths: the
     database model's default is applied by the importer - only the IOC row's own length key (Hardware Parameters,
     `area_params`: any spelling, the last entry winning) is written, in the database's spelling, on its own area;
     another entry is a `hw_ta_param_unrouted` WARN. Blocking: a base that is no byte (`hw_ta_base_invalid`), a
@@ -254,6 +277,20 @@ def _transfer_areas(station, iocs, by_id, findings, spans) -> list:
     rejects the second); each area's span (its length: the row's own, else the database default) goes into `spans`
     for the PLC-wide overlap check of `extract` - a lone 700 button writes no colliding areas (refute round 2)."""
     out, position, names = [], 0, set()
+    named = [ioc for ioc in iocs if interface_name(ioc.get("mnemonic"))]
+    if not named:
+        return out
+    side = connector_side(head.get("connector"))
+    if side is None:
+        where = _where(head)
+        findings.append(_f("hw_ta_connector_unknown", "FAIL",
+                           f"coupler {station!r}: its Connector {str(head.get('connector') or '').strip()!r} names neither "
+                           "X1 nor X2 - the side this PLC's network plugs into names its transfer areas' directions "
+                           "(X1toX2 / X2toX1); none written", where, str(head.get("uid", "")),
+                           doc=_io_doc() if "!" in where else ""))
+        return out
+    directions = area_names(side)
+    several = len(named) > 1
     for ioc in iocs:
         name = interface_name(ioc.get("mnemonic"))
         if not name:                                    # 400 reports the IOC row without a Mnemonic
@@ -280,7 +317,8 @@ def _transfer_areas(station, iocs, by_id, findings, spans) -> list:
         if name.upper() in names:
             findings.append(_f("hw_ta_name_duplicate", "FAIL",
                                f"two interfaces named {name!r} on {station!r} - their transfer areas would share the "
-                               "names " + name + "_IN / " + name + "_OUT", where, str(ioc.get("uid", "")), doc=doc))
+                               f"names {directions['I']}_{name} / {directions['Q']}_{name}", where,
+                               str(ioc.get("uid", "")), doc=doc))
             continue
         names.add(name.upper())
         sizes = area_lengths(ioc, {"by_id": by_id})
@@ -290,7 +328,8 @@ def _transfer_areas(station, iocs, by_id, findings, spans) -> list:
                                + ("y " if len(unrouted) == 1 else "ies ") + " | ".join(unrouted)
                                + " name no transfer area (only " + " / ".join(k for _m, k in TRANSFER_AREAS.values())
                                + ") - not written", where, str(ioc.get("uid", "")), doc=doc))
-        for direction, suffix in (("I", "_IN"), ("Q", "_OUT")):
+        for direction in ("I", "Q"):
+            area = directions[direction] + (f"_{name}" if several else "")
             model = TRANSFER_AREAS[direction][0]
             rec = by_id.get(model.upper())
             if rec is None:
@@ -299,10 +338,10 @@ def _transfer_areas(station, iocs, by_id, findings, spans) -> list:
                                    "DeviceTypesDatabase - skipped", where, str(ioc.get("uid", "")), doc=doc))
                 continue
             position += 1
-            spans.append((direction, base, base + sizes[direction] if sizes[direction] else None, name + suffix,
+            spans.append((direction, base, base + sizes[direction] if sizes[direction] else None, area,
                           where, str(ioc.get("uid", ""))))
             out.append({
-                "station_name": station, "slot": position, "module_name": name + suffix,
+                "station_name": station, "slot": position, "module_name": area,
                 "model_id": rec["model_id"],
                 "i_addr": base if direction == "I" else "", "q_addr": base if direction == "Q" else "",
                 "custom_parameters": (f"{TRANSFER_AREAS[direction][1]}={length_value(lengths[direction])}"
@@ -423,7 +462,8 @@ def extract(rows, dtd) -> tuple:
                 "source_signal": "",
             })
 
-        modules.extend(_transfer_areas(str(row.get("profinet_name") or "").strip(), iocs, by_id, findings, spans))
+        modules.extend(_transfer_areas(str(row.get("profinet_name") or "").strip(), row, iocs, by_id, findings,
+                                       spans))
 
     for row in rows or []:
         if is_generated(row):                    # a generated signal sits under no head in the document - a

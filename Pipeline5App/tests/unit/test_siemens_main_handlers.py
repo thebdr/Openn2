@@ -1345,10 +1345,10 @@ def test_a_transfer_area_fail_halts_the_interface_outputs():
         rows = [r for r in csv.reader(line for line in text.splitlines() if line and not line.startswith("#"))]
         return [(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows if r[3].startswith("TransferArea")]
 
-    expected = [("n0006-mc1-cc1-k66201", "1", "SORTER-01_IN", "TransferArea-IN", "10000", ""),
-                ("n0006-mc1-cc1-k66201", "2", "SORTER-01_OUT", "TransferArea-OUT", "", "10000"),
-                ("n0006-mc1-cc1-k66201", "3", "SORTER-02_IN", "TransferArea-IN", "20000", ""),
-                ("n0006-mc1-cc1-k66201", "4", "SORTER-02_OUT", "TransferArea-OUT", "", "20000")]
+    expected = [("n0006-mc1-cc1-k66201", "1", "X2toX1_SORTER-01", "TransferArea-IN", "10000", ""),
+                ("n0006-mc1-cc1-k66201", "2", "X1toX2_SORTER-01", "TransferArea-OUT", "", "10000"),
+                ("n0006-mc1-cc1-k66201", "3", "X2toX1_SORTER-02", "TransferArea-IN", "20000", ""),
+                ("n0006-mc1-cc1-k66201", "4", "X1toX2_SORTER-02", "TransferArea-OUT", "", "20000")]
     host = _Host()
     SYSTEM.handlers["hardware"](host.ctx())
     eq(host.halted, False)
