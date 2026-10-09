@@ -16,6 +16,9 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
       * the VCI-shaped workspace (contract §4): PL5's `Devices & networks/`, `Templates/`, `<PLC>/Program
         blocks/`, `<PLC>/PLC tags/` compare against the reference's legacy folders (the §4.1 mapping);
         `.openn/workspace.openn.config` and the `.openn` sidecars are PL5-only by design
+      * the tag-table XML (`<PLC>/PLC tags/<Table>.xml`, contract §9.1 decided 2026-10-09): a sanctioned NEW
+        surface PL4 never had - not compared, but every file must carry the header and be a well-formed
+        `SW.Tags.PlcTagTable` document (counted in the summary line)
       * the coupler transfer areas (C-031, contract §2.1): the `TransferArea-*` rows of `hardware_modules.csv`
         and `Modules.csv` are PL5-only (PL4 never emitted them) - dropped from the PL5 side only, counted in the
         verdict; a reference row of that model would still be a difference
@@ -180,7 +183,7 @@ def _xlsx_cells(path: str):
 _WORKSPACE = "TiaPortalProjectInterface/BuilderData/"
 _TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
 _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
-SANCTIONED = {"transfer_area_rows": 0}
+SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0}
 
 
 def _drop_transfer_areas(rel: str, data: bytes) -> bytes:
@@ -192,6 +195,34 @@ def _drop_transfer_areas(rel: str, data: bytes) -> bytes:
     kept = [line for line in lines if not _TRANSFER_AREA_ROW.search(line.rstrip())]
     SANCTIONED["transfer_area_rows"] += len(lines) - len(kept)
     return "".join(kept).encode("utf-8")
+
+
+def _is_tag_table_xml(rel: str) -> bool:
+    """A PL5 `<PLC>/PLC tags/<Table>.xml` (contract §9.1, since 2026-10-09) - the sanctioned new surface."""
+    if not rel.startswith(_WORKSPACE) or not rel.lower().endswith(".xml"):
+        return False
+    parts = rel[len(_WORKSPACE):].split("/")
+    return len(parts) >= 3 and parts[1] == "PLC tags"
+
+
+def _check_tag_table_xml(rel: str, path: str, label: str) -> list:
+    """What the sanctioned surface must still satisfy: the contract-v1 header and a well-formed
+    `SW.Tags.PlcTagTable` document naming its table."""
+    import xml.etree.ElementTree as ET
+    try:
+        text = open(path, "rb").read().decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return [f"{label}: tag-table XML is not UTF-8: {rel}"]
+    _body, headered = _strip_header(text)
+    problems = [] if headered else [f"{label}: no #!openn header: {rel}"]
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError as error:
+        return problems + [f"{label}: tag-table XML is not well-formed: {rel} ({error})"]
+    table = root.find("SW.Tags.PlcTagTable")
+    if root.tag != "Document" or table is None or not (table.findtext("AttributeList/Name") or "").strip():
+        problems.append(f"{label}: not a SW.Tags.PlcTagTable document with a table name: {rel}")
+    return problems
 
 
 def _legacy_rel(rel: str):
@@ -223,6 +254,10 @@ def compare(a_root: str, b_root: str, label: str) -> list:
     diffs = []
     a, b = _tree(a_root), {}
     for rel, path in _tree(b_root).items():
+        if _is_tag_table_xml(rel):                     # the sanctioned new surface: checked, never compared
+            diffs += _check_tag_table_xml(rel, path, label)
+            SANCTIONED["tag_table_xml"] += 1
+            continue
         legacy = _legacy_rel(rel)
         if legacy is None:
             continue                                   # PL5-only by design
@@ -295,7 +330,8 @@ def main() -> int:
         print("running PL5 (against the frozen PL4 reference)...")
         run_pl5(p5db, p5out)
         diffs = compare(ref_db, p5db, "SSOT") + compare(ref_out, p5out, "OUTPUT")
-        print(f"\ncompared {len(_tree(ref_db))} SSOT files + {len(_tree(ref_out))} output files")
+        print(f"\ncompared {len(_tree(ref_db))} SSOT files + {len(_tree(ref_out))} output files"
+              f" (+ {SANCTIONED['tag_table_xml']} sanctioned tag-table XML: header + well-formedness checked)")
         if diffs:
             print(f"PARITY BROKEN - {len(diffs)} differences:")
             for d in diffs:

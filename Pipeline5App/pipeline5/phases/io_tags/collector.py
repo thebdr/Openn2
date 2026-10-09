@@ -29,6 +29,9 @@ TAG_TABLE_FILE = "PLCTags.xlsx"
 TAG_COLUMNS = ["Name", "Path", "Data Type", "Logical Address", "Comment",
                "Hmi Visible", "Hmi Accessible", "Hmi Writeable", "Typeobject ID", "Version ID"]
 PROP_COLUMNS = ["Path", "BelongsToUnit", "Accessibility"]
+# Hmi Visible / Hmi Accessible / Hmi Writeable of every PL5 tag (the PL3 convention: all three on) - the
+# workbook's three flag columns and the tag-table XML's External* attributes come from this one triple.
+HMI_DEFAULTS = (True, True, True)
 IF_PREFIX = "IF_"
 
 # the TIA data-type spelling: a known type -> its TIA casing; an unknown type capitalizes; blank -> Bool.

@@ -18,7 +18,10 @@ tables by design.
 
 Output -> `<PLC>/PLC tags/PLCTags.xlsx` (sheets "PLC Tags" + "TagTable Properties"; all values text) + its
 `PLCTags.xlsx.openn` sidecar - the contract-v1 `#!openn` header of a binary file (`doc/plc-tags-workbook`:
-OP5 lists the workbook, the TIA GUI imports it; the tag-table XML is contract §9.1).
+OP5 lists the workbook, the TIA GUI imports it) - AND, since 2026-10-09 (contract §9.1 decided, option 1),
+the importable twin: one `<Table>.xml` per tag table (`sw/tag-table`, written by
+src://pipeline5/systems/plc_based/siemens_s7/plctags_xml_emitter.py from the same collected tags, under the
+same duplicate-tag gate).
 
 Place in the flow: the 500 header / 510 "Generate I/O Tags" (run_data_blocks only=510 in
 src://pipeline5/systems/plc_based/siemens_s7/safety/main.py), after the 520 build + the interface
@@ -47,11 +50,13 @@ from pipeline5.findings.finding import Finding, record_standalone
 from pipeline5.truth import identity
 from pipeline5.truth.signals import signals_table
 from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+from pipeline5.systems.plc_based.siemens_s7 import plctags_xml_emitter as tag_xml
 from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
 
 PHASE = 510
 
 from pipeline5.phases.io_tags.collector import (
+    HMI_DEFAULTS,
     IF_PREFIX,
     PROP_COLUMNS,
     TAG_COLUMNS,
@@ -94,7 +99,7 @@ def write_plc_tags(tags, out_dir, plc=None) -> str:
     for table in sorted(tables):
         for t in tables[table]:
             _append_text_row(ws, [t["name"], table, t["data_type"], t["address"], t["comment"],
-                                  "True", "True", "True", "", ""])
+                                  *["True" if flag else "False" for flag in HMI_DEFAULTS], "", ""])
     props = wb.create_sheet("TagTable Properties")
     props.append(PROP_COLUMNS)
     for table in sorted(tables):
@@ -107,9 +112,10 @@ def write_plc_tags(tags, out_dir, plc=None) -> str:
 
 
 def project(database: Database | None = None, out_dir: str | None = None) -> dict:
-    """Project the two SSOT sources to `out_dir`/PLCTags.xlsx (+ its .openn sidecar; out_dir defaults to the
-    workspace's `<PLC>/PLC tags`).
-    Returns {'path', 'total', 'io_count', 'iface_count', 'tables', 'findings'} - `findings` = the
+    """Project the two SSOT sources to `out_dir`/PLCTags.xlsx (+ its .openn sidecar) AND one `<Table>.xml` per
+    tag table (the importable `sw/tag-table` twin, `plctags_xml_emitter`); out_dir defaults to the workspace's
+    `<PLC>/PLC tags`.
+    Returns {'path', 'xml_files', 'total', 'io_count', 'iface_count', 'tables', 'findings'} - `findings` = the
     `iotag_no_address` WARNs + the `iotag_duplicate` FAILs (the caller renders/gates them). On a duplicate
     tag the workbook is NOT written (`run.has_blocking` raw-FAIL guard - never hand OP4 a broken import
     surface; 'path' comes back '') and the FAILs alone are RECORDED to `validation_issues.csv`
@@ -126,8 +132,9 @@ def project(database: Database | None = None, out_dir: str | None = None) -> dic
     findings += duplicate_findings(tags)
     if run.has_blocking(findings):                    # duplicate tags -> record the FAILs, write NOTHING
         record_standalone([f for f in findings if f.type == "iotag_duplicate"])
-        path = ""
+        path, xml_files = "", []
     else:
         path = write_plc_tags(tags, out_dir, plc)
-    return {"path": path, "total": len(tags), "io_count": len(io), "iface_count": len(iface),
-            "tables": sorted({t["path"] for t in tags}), "findings": findings}
+        xml_files = tag_xml.write_tag_tables(tags, out_dir, plc)     # the importable twin (sw/tag-table)
+    return {"path": path, "xml_files": xml_files, "total": len(tags), "io_count": len(io),
+            "iface_count": len(iface), "tables": sorted({t["path"] for t in tags}), "findings": findings}

@@ -76,8 +76,8 @@ release) live as `P-xxx` deltas under **Pending Contract Deltas**. Legacy apps (
 ## C-010: Phase 510 — I/O Tags (PLCTags)
 - **Date:** 2026-07-16
 - **Source:** discovery
-- **Description:** A pure projection of `signals` + `interface_elements` to `PlcTags/PLCTags.xlsx` (the OP import surface): resolved I/O signals plus interface tags, sorted by tag table, two sheets. A duplicate (tag table, name) pair — TIA's case-insensitive uniqueness rule — emits a blocking `iotag_duplicate` FAIL with dual source links and no write; the same name across different tables stays legal.
-- **Verification:** automated → Pipeline4App/tests/unit/test_io_tags.py | two tag sources, dtype/address mapping, duplicate-tag FAIL + no-write, cross-table pass
+- **Description:** A pure projection of `signals` + `interface_elements` to the tag tables: `PLCTags.xlsx` (resolved I/O signals plus interface tags, sorted by tag table, two sheets - the manual TIA-GUI aid, `doc/plc-tags-workbook`) and, PL5 since 2026-10-09 (OP5 contract v1 §9.1, option 1), one `SW.Tags.PlcTagTable` XML per tag table under `<PLC>/PLC tags/` (`sw/tag-table` - the OP5 import surface: the workbook's tags row for row, the External* flags from its Hmi columns, the comment item only where a comment exists, hex ids, the `#!openn` header with the exact table name, the file name made file-safe by OP5's rule). A duplicate (tag table, name) pair — TIA's case-insensitive uniqueness rule — emits a blocking `iotag_duplicate` FAIL with dual source links and no write (neither workbook nor XML); the same name across different tables stays legal.
+- **Verification:** automated → Pipeline4App/tests/unit/test_io_tags.py, Pipeline5App/tests/unit/test_io_tags.py, Pipeline5App/tests/unit/test_plctags_xml.py | two tag sources, dtype/address mapping, duplicate-tag FAIL + no-write, cross-table pass; PL5: the per-table XML mirrors the workbook, its header, file names + collision, the duplicate gate covers it
 - **Status:** pending verification
 
 ## C-011: Phase 600 — Diagnosis

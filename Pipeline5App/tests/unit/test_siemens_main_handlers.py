@@ -1185,6 +1185,8 @@ def test_run_all_writes_a_ready_op5_workspace():
                    for dp, _d, fs in os.walk(root) for f in fs)
     ok("Devices & networks/Stations.csv" in files and "Devices & networks/Modules.csv" in files, files)
     ok(f"{plc}/PLC tags/PLCTags.xlsx" in files and f"{plc}/PLC tags/PLCTags.xlsx.openn" in files, files)
+    tag_tables = [f for f in files if f.startswith(f"{plc}/PLC tags/") and f.endswith(".xml")]
+    ok(len(tag_tables) >= 2, f"one sw/tag-table XML per tag table beside the workbook (contract 9.1): {tag_tables}")
     blocks = [f for f in files if f.startswith(f"{plc}/Program blocks/")]
     ok(any(f.endswith(".xml") for f in blocks) and any(f.endswith(".csv") for f in blocks)
        and any(f.endswith(".scl") for f in blocks) and f"{plc}/Program blocks/InstanceDBs.csv" in files, blocks)
@@ -1210,6 +1212,7 @@ def test_run_all_writes_a_ready_op5_workspace():
     eq(kinds["Devices & networks/Stations.csv"], "hw/stations")
     eq(kinds["Devices & networks/Modules.csv"], "hw/modules")
     eq(kinds[f"{plc}/Program blocks/InstanceDBs.csv"], "sw/instance-db")
+    eq({kinds[f] for f in tag_tables}, {"sw/tag-table"}, "every tag-table XML declares sw/tag-table")
     eq(kinds[f"{plc}/Program blocks/02_COM.xml"], "sw/data-block")
     eq(kinds[f"{plc}/Program blocks/03_Zone Cumulative.xml"], "sw/code-block")
     eq(kinds[f"{plc}/Program blocks/04_ESTOP.csv"], "sw/block-gen")

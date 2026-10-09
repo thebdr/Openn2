@@ -454,7 +454,8 @@ def run_data_blocks(ctx, only=None):
             return
         ctx.render(iface_findings + res["findings"], label="510 I/O tags")
         ctx.emit("RSLT", f"  510: {res['total']} I/O tags ({res['io_count']} signal + "
-                         f"{res['iface_count']} interface) across {len(res['tables'])} tables -> {dirs['io_tags']}")
+                         f"{res['iface_count']} interface) across {len(res['tables'])} tables "
+                         f"({len(res.get('xml_files', []))} tag-table XML + the workbook) -> {dirs['io_tags']}")
 
 
 def run_interfaces(ctx, only=None):

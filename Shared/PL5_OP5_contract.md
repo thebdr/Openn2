@@ -49,7 +49,7 @@ change — a trailing added column (the 9th `Connector`) does not bump it.
 | `hw/stations` | one row per station: `Plc` / `PlcCardCm` / `IoDevice`, IP, PN number, subnet, custom parameters, group, connector | `Stations.csv` | `Devices & networks` | hardware generation | 10 | 2 | PL5 phase 700 |
 | `hw/modules` | one row per plugged module of a station: slot order, model, I/Q address, custom parameters | `Modules.csv` | `Devices & networks` | hardware generation | 11 | 2 | PL5 phase 700 |
 | `sw/udt` | one PLC data type | `<Name>.xml` (`SW.Types.PlcStruct`) | `<PLC>/PLC data types/…` | `TypeGroup.Types.Import` | 20 | 1 | PL5 (not emitted yet) |
-| `sw/tag-table` | one PLC tag table | `<Table>.xml` (`SW.Tags.PlcTagTable`) | `<PLC>/PLC tags/…` | `TagTableGroup.TagTables.Import` | 30 | 1 | PL5 (today: xlsx only, see §9) |
+| `sw/tag-table` | one PLC tag table | `<Table>.xml` (`SW.Tags.PlcTagTable`) | `<PLC>/PLC tags/…` | `TagTableGroup.TagTables.Import` | 30 | 1 | PL5 phase 510 (since 2026-10-09) |
 | `sw/data-block` | one global DB (F-DBs included) | `<Name>.xml` (`SW.Blocks.GlobalDB`) | `<PLC>/Program blocks/<group>/…` | `Blocks.Import` | 40 | 1 | PL5 phase 520 |
 | `sw/instance-db` | list of single-instance DBs created through the API | `InstanceDBs.csv` (`%` key row `Name, InstanceOf, Number, Folder`) | `<PLC>/Program blocks/<group>/…` | `CreateInstanceDB` per row | 50 | 1 | PL5 phase 830 |
 | `sw/block-gen` | template-driven block generation list (`$ template=`, `%` keys, `@` rows) | `<Block>.csv` | `<PLC>/Program blocks/<group>/…` | `BlockXmlGenerator` → `Blocks.Import` | 60 | 1 | PL5 phase 820 |
@@ -284,6 +284,14 @@ unchanged, OP5's catalog classifies a project copy Ready); the `TestData/Passing
 `hw/modules` schema 2) — OP5 now refuses an unheadered database; the block templates still have none (not edited
 since the contract; they are never imported by themselves, so nothing refuses them yet).
 
+**PL5 status (2026-10-09):** tag tables (§9.1, option 1) — phase 510 writes one `<PLC>/PLC tags/<Table>.xml`
+(`sw/tag-table`, `SW.Tags.PlcTagTable` in the shape of a TIA V18 export, UTF-8 BOM + CRLF, hex ids, the External*
+flags from the workbook's Hmi columns, the comment item only when there is a comment) per tag table of the
+workbook, from the same collected tags and under the same duplicate-tag gate (`plctags_xml_emitter.py`); the file
+name is the table name made file-safe (OP5's export rule, invalid characters -> `_`), the header's `name` the exact
+table name. `PLCTags.xlsx` + its sidecar stay as the manual aid. The parity oracle checks these files (header +
+well-formedness) as a sanctioned new surface.
+
 ## 7. Consumer obligations (OP5)
 
 1. Classify before importing; log the catalog summary; import `Ready` items only — never `Legacy` / `NeedsHeader` /
@@ -318,9 +326,10 @@ since the contract; they are never imported by themselves, so nothing refuses th
 
 ## 9. Open questions (decide here)
 
-1. **Tag tables:** PL5 emits only `PLCTags.xlsx`; OP5 imports tag-table XML. Who converts? (OP3 on the unmerged
-   `epitaxy` branch converted the xlsx; PL5 could emit `SW.Tags.PlcTagTable` XML directly — preferred: one
-   format, no Excel dependency in OP.)
+1. **Tag tables — decided 2026-10-09 (option 1):** PL5 emits the `SW.Tags.PlcTagTable` XML directly (phase 510,
+   one file per tag table, see §6 status); OP5 imports it through its existing `sw/tag-table` route, no OP5 change.
+   The workbook `PLCTags.xlsx` stays a manual aid (`doc/plc-tags-workbook`, listed, never imported). The same
+   risk as every XML surface applies: TIA's acceptance of the header comment before `<Document>` (§8 step 1).
 2. **UDTs:** PL5 emits none today; the `sw/udt` kind is ready when it does.
 3. **`.db` sources vs `GlobalDB` XML:** both exist for the same blocks in the builtin tree (PL3 leftovers). With
    `run` stamping the leftovers become `Stale`; until then OP5 imports both — decide whether `sw/source` `.db`
@@ -332,16 +341,17 @@ since the contract; they are never imported by themselves, so nothing refuses th
 
 ## Appendix A — the builtin tree (OP5 scan)
 
-**After the PL5 implementation (2026-10-08** — `scripts/run_pipeline.py` over the builtin config, then the Appendix B
-scan**):**
+**After the PL5 implementation (2026-10-09, the tag-table XML included** — `scripts/run_pipeline.py` over the builtin
+config, then the Appendix B scan with the OP5 build of 2b9b5d8**):**
 
 ```
-Workspace scan: Z:\Source\Repos\_Openn5\Shared\OutputTree\TiaPortalProjectInterface\BuilderData
+Workspace scan: C:\Source\Repos\_Openn5\Shared\OutputTree\TiaPortalProjectInterface\BuilderData
   layout: VCI shape (<PLC>/Program blocks | PLC tags | PLC data types + Devices & networks)
-  workspace config: Ok, contract 1, project 8XXX, producer Pipeline5 5.0, run 20261008-120906-e378
-  35 file(s): 32 classified, 0 unclassified, 3 ignored
+  workspace config: Ok, contract 1, project 8XXX, producer Pipeline5 5.0, run 20261009-123822-c704
+  45 file(s): 42 classified, 0 unclassified, 3 ignored
   hw/stations              1 file(s)   ready 1, legacy 0, needs-header 0, invalid 0, stale 0
   hw/modules               1 file(s)   ready 1, legacy 0, needs-header 0, invalid 0, stale 0
+  sw/tag-table            10 file(s)   ready 10, legacy 0, needs-header 0, invalid 0, stale 0
   sw/data-block           11 file(s)   ready 11, legacy 0, needs-header 0, invalid 0, stale 0
   sw/instance-db           1 file(s)   ready 1, legacy 0, needs-header 0, invalid 0, stale 0
   sw/block-gen             7 file(s)   ready 7, legacy 0, needs-header 0, invalid 0, stale 0
