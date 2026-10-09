@@ -152,7 +152,7 @@ ZONE_GROUPS = [
     ("PB",              ("E1/2", "E")),  # always (every area has push buttons; E = the single-row form)
     ("FDB",             ("KQ",)),       # always (every area has contactor feedback)
     ("SAFETY_BREAKERS", ("B1/2",)),     # only when the area has a breaker
-    ("DOORS",           ("DI1/2",)),    # only when the area has a door safety input
+    ("DOORS",           ("DI1/2", "DI")),  # only when the area has a door safety input (DI = the one-row door)
 ]
 
 
@@ -260,7 +260,7 @@ def build_04_estop(db: Database) -> Table:
     for area in db.areas():
         inarea = db.by_area(area)
         is_sorter = area in sorter
-        has_doors = any(str(r.get("script_type", "")).upper() == "DI1/2" and r.get("name_in_db")
+        has_doors = any(str(r.get("script_type", "")).upper() in ("DI1/2", "DI") and r.get("name_in_db")
                         for r in inarea)
         has_breakers = any(str(r.get("script_type", "")).upper() == "B1/2" and r.get("name_in_db")
                            for r in inarea)
@@ -461,7 +461,9 @@ def build_08_gate_manager(db: Database) -> Table:
     network ALSO consumes the sorter interlock (template evolution, user spec 2026-07-07):
     tagName:SorterRunningIOC + the 05_EM_STATE SORTER_nn_NOT_RUNNING member, nn resolved via the DI's
     matrix_areas x the N1/2 encoders (`sorter_nn`); tagName:DoorReset = the DR tag (the one reset
-    button feeds both the open-request and the reset FB pins)."""
+    button feeds both the open-request and the reset FB pins). A ONE-row door (DI - both channels on one 1oo2
+    F-DI input, [[C-032]]) is its own CH1 and CH2, and its two 07_DOOR members (SAFE_STATE, DIAGNOSIS - the
+    config's element order) are the EM_Cut and Diag_Open outputs a DI1/2 + DI2/2 pair fills one each."""
     t = Table("08_Gate Manager")
 
     # TT01 - one @ row per sorter (distinct N1/2 index), no door instance / bypass
@@ -514,9 +516,12 @@ def build_08_gate_manager(db: Database) -> Table:
     for dq in db.by_type("DQ"):
         idx = str(dq.get("index", "")).strip()
         di1, di2, dd = first_of("DI1/2", idx), first_of("DI2/2", idx), first_of("DD", idx)
+        di = None if di1 else first_of("DI", idx)            # the one-row door: CH1 = CH2, both 07_DOOR outputs
+        door = di1 or di
         dr, dl = first_of("DR", idx), first_of("DL", idx)
-        anchor = di1 or dq
-        node = _node_of(db, di1 or dq)                       # bypass the DI's node (the safety input)
+        anchor = door or dq
+        node = _node_of(db, door or dq)                      # bypass the DI's node (the safety input)
+        door_members = db.members_of(di, "07_DOOR") if di else []
         bypass = f"{node['profinet_name']} {node['profinet_ip']}".strip() if node else ""
         inst = f"SFDOOR_{anchor.get('iol_FLD', '')}"
         nn = sorter_nn(anchor)                               # the door's sorter, via the DI's area
@@ -525,8 +530,8 @@ def build_08_gate_manager(db: Database) -> Table:
             **{"instanceOf-02_Safety_Door": inst},
             NetworkComment=inst,
             **{"00_Commissioning.{db_element}": bypass},
-            **{"tagName:DoorClosedCh1": tag(di1)},
-            **{"tagName:DoorClosedCh2": tag(di2)},
+            **{"tagName:DoorClosedCh1": tag(door)},
+            **{"tagName:DoorClosedCh2": tag(di) if di else tag(di2)},
             **{"tagName:DoorClosedDiagInput": tag(dd)},
             **{"tagName:DoorOpenRequest": tag(dr)},
             **{"tagName:DoorReset": tag(dr)},                # the one reset button feeds both FB pins
@@ -538,10 +543,10 @@ def build_08_gate_manager(db: Database) -> Table:
             # that actually exists in PLCTags (not 'SORTER RUNNING').
             **{"tagName:SorterRunningIOC": f"PNC_I_SORTER-{nn} SORTER- RUNNING" if nn else ""},
             **{"05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING": f"SORTER_{nn}_NOT_RUNNING" if nn else ""},
-            **{"07_DOOR.{db_element:DI1/2}": member(di1)},
-            **{"07_DOOR.{db_element:DI2/2}": member(di2)},
+            **{"07_DOOR.{db_element:DI1/2}": member(door)},
+            **{"07_DOOR.{db_element:DI2/2}": (door_members[1] if len(door_members) > 1 else "") if di else member(di2)},
             **{"07_DOOR.{db_element:DD}": member(dd)},
-            **{"choice:IsSorterDoor": "AlwaysTRUE" if (di1 and di1.get("IsSorterArea") == "yes") else "AlwaysFALSE"},
+            **{"choice:IsSorterDoor": "AlwaysTRUE" if (door and door.get("IsSorterArea") == "yes") else "AlwaysFALSE"},
             **{"choice:DoorResetNecessary": "AlwaysTRUE" if dr else "AlwaysFALSE"},
         )
     return t

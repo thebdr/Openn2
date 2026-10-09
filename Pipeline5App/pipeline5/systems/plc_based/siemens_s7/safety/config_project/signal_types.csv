@@ -13,6 +13,7 @@ N1/2,Safety Encoder Sensor 1,Safety,N,1,no,SAFETY_Encoders,Safety Encoder {$inde
 N2/2,Safety Encoder Sensor 2,Safety,N,2,no,SAFETY_Encoders,Safety Encoder {$index} Sensor 2 [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],warn
 DI1/2,Door Closed Safety Input 1,Safety,DI,1,no,SAFETY_Doors,Door Closed Safety Input 1 [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
 DI2/2,Door Closed Safety Input 2,Safety,DI,2,no,SAFETY_Doors,Door Closed Safety Input 2 [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+DI,Door Closed Safety Input (single row - both channels),Safety,,,no,SAFETY_Doors,Door Closed Safety Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],yes
 DD,Door Closed Diag Input,Diag,,,no,SAFETY_Doors,Door Closed Diagnosis Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
 DR,Door Reset Input,Std,,,no,SAFETY_Doors,Door Reset Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
 DL,Door Lamp Output,Std,,,no,SAFETY_Doors,Door Lamp Output [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no

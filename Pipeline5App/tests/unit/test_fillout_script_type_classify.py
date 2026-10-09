@@ -29,6 +29,11 @@ def test_in_ladder():
        "ONE row naming both channels -> the single-row type E (C-029)")
     eq(_t(bit="I0.1", desc_l1="FEEDBACK SAFETY RELAY"), "KI", "safety relay feedback")
     eq(_t(bit="I0.2", desc_l1="DOOR OPEN", desc_l1b="CH2"), "DI2/2", "door channel input")
+    eq(_t(bit="I645.1", desc_l1="SAFETY DOOR OPEN", desc_l1b="CH1\\CH2 =TRIB-CA01-B1"), "DI",
+       "ONE door row naming both channels -> the single-row type DI (C-032, FVT's spelling)")
+    eq(_t(bit="I0.2", desc_l1="SAFETY DOOR OPEN", desc_l1b="CH1 =X-B1"), "DI1/2", "one channel named stays DI1/2")
+    eq(_t(bit="I645.2", desc_l1="SAFETY DOOR OPEN", desc_l1b="DIAGNOSIS Input =TRIB-CA01-B1"), "DD",
+       "its diagnosis row stays DD")
     eq(_t(bit="I0.3", desc_l1="DOOR OPEN", desc_l1b="RESET"), "DR", "door reset")
     eq(_t(bit="I0.4", desc_l1="DOOR OPEN"), "DD", "door open plain")
     eq(_t(bit="I0.5", desc_l1="SAFETY ENCODER PHOTOCELL", desc_l1b="CELL 3"), "N3/2", "encoder photocell")

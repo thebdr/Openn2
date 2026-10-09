@@ -224,6 +224,61 @@ def test_shipped_e_matches_e12():
        "a lone E typed from the shipped config is complete")
 
 
+def test_shipped_di_matches_di12():
+    """C-032: the SHIPPED type DI (the one-row door, user 2026-10-09) gets what a DI1/2 gets - the door tag table,
+    the C&E mandate, diagnosis and the interface tag name - with NO channel (its tag reads `Door Closed Safety Input
+    [ <FLD> ]`, no channel number); a lone DI typed from the shipped config is the door's index anchor and its DD
+    (same FLD) inherits the index."""
+    from pipeline5.config import paths, loaders
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    from pipeline5.truth import identity
+    paths.use_system(SYSTEM)
+    types = loaders.load_signal_types()
+    di, pair = loaders.resolve_type(types, "DI"), loaders.resolve_type(types, "DI1/2")
+    ok(di is not None, "DI is a shipped type")
+    eq(di.get("channel"), "", "one row - no channel")
+    for k in ("category", "tagtable_name", "ce_mandatory", "io_comment"):
+        eq(di.get(k), pair.get(k), f"DI's {k} = DI1/2's")
+    eq(identity.tag_name({"iol_FLD": "=TRIB-CA01-B1", "combined_FLD": "=TRIB-CA01-B1", "script_type": "DI",
+                          "type": di}), "Door Closed Safety Input [ =TRIB-CA01-B1 ]")
+    diag = loaders.load_signal_diagnosis()
+    ok(diag.get("DI") and diag.get("DI") == diag.get("DI1/2"), "the same diagnosis")
+    names = loaders.load_interface_tagnames()
+    ok(names.get("DI") and names.get("DI") == names.get("DI1/2"), "the same interface tag name")
+    dd = loaders.resolve_type(types, "DD")
+    rows = [{"uid": "s", "script_type": "DI", "type": di, "functional_unit": "=TRIB", "location": "-CA01",
+             "device": "-B1", "source_row": 1, "index": ""},
+            {"uid": "d", "script_type": "DD", "type": dd, "functional_unit": "=TRIB", "location": "-CA01",
+             "device": "-B1", "source_row": 2, "index": ""}]
+    reasons = {}
+    got = ix.assign_indices(rows, fam.load_object_families(), from_scratch=True, reasons=reasons)
+    eq((got, reasons), ({"s": "0001", "d": "0001"}, {}), "the DI anchors the door, its DD inherits")
+
+
+def test_one_row_door_contradictions():
+    """C-032: on a one-row door's designation a DI2/2 is a type contradiction (kept index or not), a DI1/2 or a
+    second DI a second object - flagged like E's ([[C-029]]); never a silent inherit."""
+    shipped = fam.load_object_families()
+    reasons = {}
+    got = ix.assign_indices([_row("s", "DI", fld="=D-1", source_row=1),
+                             _row("c", "DI2/2", fld="=D-1", channel="2", source_row=2)],
+                            shipped, from_scratch=True, reasons=reasons)
+    eq((got["s"], got["c"], reasons), ("0001", INPUT_REQUIRED, {"c": "single_with_channel_2"}), "DI + DI2/2")
+    reasons = {}
+    got = ix.assign_indices([_row("s", "DI", fld="=D-2", source_row=1, index="0001"),
+                             _row("c", "DI2/2", fld="=D-2", channel="2", source_row=2, index="0001")],
+                            shipped, reasons=reasons)
+    eq((got["c"], reasons), ("0001", {"c": "single_with_channel_2"}), "reported even with an index (kept)")
+    reasons = {}
+    ix.assign_indices([_row("p", "DI1/2", fld="=D-3", channel="1", source_row=1),
+                       _row("s", "DI", fld="=D-3", source_row=2)], shipped, from_scratch=True, reasons=reasons)
+    eq(reasons, {"s": "single_with_anchor"}, "DI1/2 then DI")
+    reasons = {}
+    ix.assign_indices([_row("a", "DI", fld="=D-4", source_row=1),
+                       _row("b", "DI", fld="=D-4", source_row=2)], shipped, from_scratch=True, reasons=reasons)
+    eq(reasons, {"b": "single_with_anchor"}, "DI + DI")
+
+
 def test_single_with_channel_2_is_flagged():
     """C-029 refute round 2: an E2/2 on the designation of a ONE-row e-stop (E) is a contradiction - flagged
     (`<input required>`), never a silent inherit of the E's index; the E itself keeps its index."""
@@ -292,6 +347,8 @@ if __name__ == "__main__":
         ("family_for_longest_prefix", test_family_for_longest_prefix),
         ("shipped_el_joins_emergency_pb", test_shipped_el_joins_emergency_pb),
         ("shipped_e_matches_e12", test_shipped_e_matches_e12),
+        ("shipped_di_matches_di12", test_shipped_di_matches_di12),
+        ("one_row_door_contradictions", test_one_row_door_contradictions),
         ("single_with_channel_2_is_flagged", test_single_with_channel_2_is_flagged),
         ("contradiction_reported_even_with_an_index", test_contradiction_reported_even_with_an_index),
         ("two_objects_on_one_designation_are_flagged", test_two_objects_on_one_designation_are_flagged),

@@ -3,6 +3,7 @@ priority,gate,when,type,comment
 19,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /EMERGENCY PUSH.BUTTON PRES/ and clean($desc_l1b) ~ /CH1/ and clean($desc_l1b) ~ /CH2/",E,emergency push-button - ONE row for both channels (checked in hardware)
 20,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /EMERGENCY PUSH.BUTTON PRES/","E{extract(clean($desc_l1b),/CH./,-1:)}/2",emergency push-button pressed
 21,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /FEEDBACK.*SAFE.*(RELAY|CONTACTOR)/",KI,safety relay/contactor feedback input
+21,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /DOOR.*OPEN/ and clean($desc_l1b) ~ /CH1/ and clean($desc_l1b) ~ /CH2/",DI,safety door - ONE row for both channels (1oo2 checked in hardware); before the door channel rule 22
 22,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /DOOR.*OPEN/ and clean($desc_l1b) ~ /CH/","DI{extract(clean($desc_l1b),/CH./,-1:)}/2",door channel input
 23,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /DOOR.*OPEN/ and clean($desc_l1b) ~ /RESET/",DR,door reset
 24,In,"clean(join(' ', $desc_l1, $desc_l1b)) ~ /DOOR.*OPEN/",DD,door open (plain)

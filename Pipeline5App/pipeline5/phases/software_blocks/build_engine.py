@@ -69,7 +69,8 @@ def build(database: DB | None = None, system=None) -> tuple:
     if database is None:
         colmap = config.load_column_map("IoList")
         database = DB([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
-    db = Database(list(database["signals"]))
+    db = Database(list(database["signals"]),
+                  members=list(database["db_members"]) if "db_members" in database else [])
     templates = system.templates
     inventory = templates.template_keys()                    # {block name -> [keys]} from the shipped .xml
 

@@ -16,8 +16,11 @@ def _as_list(value) -> list:
 
 
 class Database:
-    def __init__(self, rows):
+    def __init__(self, rows, members=None):
         self.rows = list(rows or [])
+        # the 520 `db_members` rows (read-only): a builder reads a signal's members beyond its leftmost one
+        # (`name_in_db`) through `members_of` - in the config's element order, never re-rendered by name
+        self.members = list(members or [])
 
     def __iter__(self):
         return iter(self.rows)
@@ -48,6 +51,14 @@ class Database:
     def by_area(self, area: str) -> list:
         """Rows that belong to the C&E area `area` (the staged `matrix_areas` list cell)."""
         return [r for r in self.rows if area in _as_list(r.get("matrix_areas"))]
+
+    def members_of(self, row, db_name: str) -> list:
+        """The member names `row` produced in the data block `db_name` (the 520 `db_members` rows whose `source`
+        is the row's uid), in the datablock_members config's element order - e.g. a one-row door's (DI) two
+        07_DOOR members: SAFE_STATE then DIAGNOSIS ([[C-032]]). [] when the row produced none there."""
+        uid = str((row or {}).get("uid", ""))
+        return [str(m.get("member", "")) for m in self.members
+                if uid and str(m.get("source", "")) == uid and str(m.get("db_name", "")) == db_name]
 
     def areas(self) -> list:
         """The distinct C&E areas present, in first-seen order."""

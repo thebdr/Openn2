@@ -688,6 +688,78 @@ def test_single_row_e_joins_02_and_03():
     eq([r["02_COM.{db_element}"] for r in t3.rows], ["AREA 1 PB", "AREA 1 FDB"], "E makes the area's PB group")
 
 
+def test_one_row_door_in_08_03_04():
+    """C-032: a one-row door (DI - both channels on one 1oo2 F-DI input) is its own CH1 AND CH2 of the 08 Gate
+    Manager's 02_Safety_Door (the old program wired the same input; an open CH2 never read the door closed), its
+    two 07_DOOR members - read from the 520 db_members in config order - are the EM_Cut and Diag_Open outputs; it
+    makes its area's DOORS group in 03 and counts as a door in 04 (TT03 for a doors-only area)."""
+    node = _node("n1", "1.2.3.4", i0="0", i1="20", q0="0", q1="20")
+    rows = [node,
+            {"uid": "di", "script_type": "DI", "index": "3", "bit": "I1.0", "name_in_db": "Door SAFE [ D ]",
+             "iol_FLD": "DOORB", "name_in_tagtable": "TDI", "IsSorterArea": "", "matrix_areas": ["AREA 2"]},
+            {"uid": "dd", "script_type": "DD", "index": "3", "name_in_db": "Door ALARM [ D ]", "name_in_tagtable": "TDD"},
+            {"script_type": "DQ", "index": "3", "name_in_tagtable": "TDQ"}]
+    members = [{"db_name": "07_DOOR", "member": "Door SAFE [ D ]", "source": "di"},
+               {"db_name": "07_DOOR", "member": "Door DIAG [ D ]", "source": "di"},
+               {"db_name": "07_DOOR", "member": "Door ALARM [ D ]", "source": "dd"}]
+    d = builders.build_08_gate_manager(Database(rows, members=members)).rows[0]
+    eq((d["tagName:DoorClosedCh1"], d["tagName:DoorClosedCh2"]), ("TDI", "TDI"), "CH1 = CH2 = the one input")
+    eq((d["07_DOOR.{db_element:DI1/2}"], d["07_DOOR.{db_element:DI2/2}"], d["07_DOOR.{db_element:DD}"]),
+       ("Door SAFE [ D ]", "Door DIAG [ D ]", "Door ALARM [ D ]"), "EM_Cut / Diag_Open / Diag_Alarm")
+    eq((d["instanceOf-02_Safety_Door"], d["00_Commissioning.{db_element}"]), ("SFDOOR_DOORB", "n1 1.2.3.4"),
+       "the DI is the door's anchor (instance, bypass node)")
+    eq(Database(rows, members=[{"db_name": "07_DOOR", "member": "SEED", "source": ""}]).members_of({}, "07_DOOR"), [],
+       "a row without a uid owns no member (never the sourceless ones)")
+    rows3 = [{"script_type": "DI", "matrix_areas": ["AREA 2"], "areas_description": ["Carousel"],
+              "name_in_db": "Door SAFE [ D ]", "datablocks": ["07_DOOR"]},
+             {"script_type": "KQ", "matrix_areas": ["AREA 2"], "areas_description": ["Carousel"],
+              "name_in_db": "FDB_A", "datablocks": ["03_FDBACK"]}]
+    eq([r["02_COM.{db_element}"] for r in builders.build_03_zone_cumulative(Database(rows3)).rows],
+       ["AREA 2 FDB", "AREA 2 DOORS"], "DI makes the area's DOORS group")
+    eq(builders.build_04_estop(Database(rows3)).rows[0]["TemplateType"], "03", "a doors-only area")
+
+
+def test_engine_hands_the_builders_the_db_members():
+    """C-032: the real 800 build gives the builders the 520 `db_members` - the one-row door's Diag_Open is its
+    DIAGNOSIS member in the written 08 row (a builder seeing only `name_in_db` would leave the slot empty)."""
+    from pipeline5 import config
+    from pipeline5.truth.signals import signals_table
+    from pipeline5.truth.datablocks import db_members_table
+    sig = signals_table(["script_type", "index", "bit", "name_in_db", "iol_FLD", "name_in_tagtable"])
+    sig.add(script_type="DI", index="3", bit="I1.0", name_in_db="Door SAFE [ D ]", iol_FLD="DOORB",
+            name_in_tagtable="TDI", source_cell="S!O1")
+    sig.add(script_type="DQ", index="3", name_in_tagtable="TDQ", source_cell="S!O2")
+    members = db_members_table()
+    di_uid = sig.rows[0]["uid"]
+    members.add(db_name="07_DOOR", member="Door SAFE [ D ]", source=di_uid)
+    members.add(db_name="07_DOOR", member="Door DIAG [ D ]", source=di_uid)
+    original = config.database_dir
+    with tempfile.TemporaryDirectory() as d:
+        config.database_dir = lambda: d                     # build() saves its tables - never into the repo
+        try:
+            db, _f = engine.build(DB([sig, members]), system=SYSTEM)
+        finally:
+            config.database_dir = original
+    row = next(m["values"] for m in db["software_block_members"]
+               if m["block"] == "08_Gate Manager" and m["values"].get("TemplateType") == "02")
+    eq((row["07_DOOR.{db_element:DI1/2}"], row["07_DOOR.{db_element:DI2/2}"]), ("Door SAFE [ D ]", "Door DIAG [ D ]"))
+
+
+def test_shipped_door_members_take_di():
+    """C-032: the SHIPPED 07_DOOR / 02_COM member rules give a one-row door (DI) BOTH door members - SAFE_STATE
+    then DIAGNOSIS, the order the 08 Gate Manager reads - and its area's DOORS member."""
+    from pipeline5.config import paths, loaders
+    from pipeline5.phases.datablocks import generator as datablocks
+    paths.use_system(SYSTEM)
+    defs = [d for d in loaders.load_db_definitions() if d["db_name"] in ("07_DOOR", "02_COM")]
+    els = [e for e in loaders.load_db_elements() if e["db_name"] in ("07_DOOR", "02_COM")]
+    rows = [{"uid": "u1", "script_type": "DI", "combined_FLD": "=TRIB-CA01-B1", "matrix_areas": ["AREA 1_TRIB"]}]
+    g, _inst, _f = datablocks.generate(rows, defs, els, loaders.load_db_types())
+    eq([m["name"] for m in g["07_DOOR"]["members"] if "=TRIB-CA01-B1" in m["name"]],
+       ["Door Closed SAFE_STATE [ =TRIB-CA01-B1 ]", "Door Closed DIAGNOSIS [ =TRIB-CA01-B1 ]"])
+    ok("AREA 1_TRIB DOORS" in [m["name"] for m in g["02_COM"]["members"]], "the area's DOORS member")
+
+
 def test_shipped_pushbutton_members_take_e():
     """C-029: the SHIPPED 01_Pushbutton / 02_COM member rules give a single-row e-stop (E) its push-button
     member and its area's PB member, exactly as an E1/2."""
@@ -709,6 +781,9 @@ def test_shipped_pushbutton_members_take_e():
 if __name__ == "__main__":
     import sys
     sys.exit(run("blocks", [
+        ("one_row_door_in_08_03_04", test_one_row_door_in_08_03_04),
+        ("shipped_door_members_take_di", test_shipped_door_members_take_di),
+        ("engine_hands_the_builders_the_db_members", test_engine_hands_the_builders_the_db_members),
         ("table_add_tracks_columns_and_iterator", test_table_add_tracks_columns_and_iterator),
         ("database_list_cell_filters", test_database_list_cell_filters),
         ("serialization_wrap_order_and_iterator", test_serialization_wrap_order_and_iterator),

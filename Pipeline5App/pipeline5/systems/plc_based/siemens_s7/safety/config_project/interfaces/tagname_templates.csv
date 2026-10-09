@@ -11,6 +11,7 @@ B2/2,PNC_Q_{$interface_name}-{$interface_id}_Safety Breaker [ {$combined_FLD} ]
 N1/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
 N2/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
 DI1/2,PNC_Q_{$interface_name}-{$interface_id}_{$db_element}
+DI,PNC_Q_{$interface_name}-{$interface_id}_{$db_element}
 DI2/2,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}
 DD,PNC_Q_{$interface_name}-{$interface_id}_{$db_element}
 DR,PNC_Q_{$interface_name}-{$interface_id}_{$tag_name}

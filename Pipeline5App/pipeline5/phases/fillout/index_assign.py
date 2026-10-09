@@ -129,6 +129,9 @@ def role_of(res) -> str:
             return ANCHOR
         if st.startswith("DD") or (st.startswith("DI") and ch == "2"):
             return FLD_INHERIT
+        anchors = {a.strip().upper() for a in (fam.anchor or "").split("|") if a.strip()}
+        if st in anchors and ch == "":
+            return SINGLE                  # DI: the one-row door - its DD members inherit it by FLD (C-032)
         return MANUAL
     return STANDALONE
 
@@ -162,9 +165,10 @@ def _unresolved(res, reason: str, error: bool = False) -> None:
 # The TYPE contradictions of a channel family ([[C-029]] refute rounds 2-3): an index never settles them - they
 # are reported whether or not the row already carries one (a human index is kept), and the advice is the type.
 CONTRADICTIONS = {
-    "single_with_channel_2": "a channel-2 row on the designation of a ONE-row object (e.g. E - its description "
-                             "names both channels): correct the script type or the description, not the index",
-    "single_with_anchor": "a second object on one designation (a ONE-row object - e.g. E - beside another, or "
+    "single_with_channel_2": "a channel-2 row on the designation of a ONE-row object (e.g. E or DI - its "
+                             "description names both channels): correct the script type or the description, not "
+                             "the index",
+    "single_with_anchor": "a second object on one designation (a ONE-row object - e.g. E or DI - beside another, or "
                           "beside a channel-1 row): correct the script type or the description, not the index",
 }
 
@@ -229,6 +233,11 @@ def assign_indices(rows: list, families: list, *, from_scratch: bool = False, re
                 res.index = got
             else:
                 _unresolved(res, "channel_fld_mismatch", error=True)
+        elif (role == FLD_INHERIT and _td_channel(res.type_def) == "2"
+              and _anchor_lookup(single_anchor.get(res.family.key, {}), res.fld)):
+            # a door's channel-2 row (DI2/2) beside a ONE-row door (DI): typed as a single - the same contradiction
+            # as an E2/2 beside an E, never a silent inherit ([[C-032]])
+            _contradiction(res, "single_with_channel_2")
         elif role == FLD_INHERIT:
             got = _anchor_lookup(fld_anchor.get("D", {}), res.fld)
             if got:
