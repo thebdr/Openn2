@@ -35,9 +35,10 @@ INPUT_REQUIRED = classify.INPUT_REQUIRED
 _clean = _expr_runtime.clean              # the shared text cleaner (control chars -> space, ws collapse)
 _UNRESOLVED_SHEET = "_UnresolvedIndex"
 # the pipeline-owned output columns whose HEADER is written (only into a blank header cell - a customized
-# header is preserved) - mirrors PL3's HEADER_COLS.
+# header is preserved) - mirrors PL3's HEADER_COLS; + the `Interfaces` column the pipeline reads ([[C-031]]: the
+# user fills its cells - the fill writes only the header, never a value).
 _OUTPUT_COLS = ("skip_reason", "script_type", "suggested_type", "index",
-                "diag_cabinet", "diag_bit", "hardware_params")
+                "diag_cabinet", "diag_bit", "hardware_params", "interface_mapping")
 
 
 def _f(type_: str, severity: str, detail: str, location: str = "") -> Finding:

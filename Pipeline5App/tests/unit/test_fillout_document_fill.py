@@ -67,6 +67,8 @@ def test_fill_ab_ac_modes_and_unresolved():
         eq(ws["AB5"].value, "MANUAL", "Mode-2: a human AB value is preserved")
         eq(ws["AC5"].value, "DI2/2", "AC still shows what the rules computed (Mode-2)")
         eq(ws["AB1"].value, "Script Type", "a blank output header is written")
+        eq(ws["AH1"].value, "Interfaces", "the Interfaces column's blank header too (C-031)")
+        eq([ws[f"AH{r}"].value for r in range(2, 6)], [None] * 4, "…never one of its values (the user's)")
         ok("_UnresolvedIndex" in wb.sheetnames, "the _UnresolvedIndex sheet is added")
         eq((res["filled"], res["mismatch"], res["unresolved"]), (2, 1, 1), "counts: 2 filled, 1 kept, 1 unresolved")
         eq([f.type for f in res["findings"] if f.severity == "FAIL"], ["fill_unresolved"], "one blocking FAIL")
@@ -83,6 +85,20 @@ def test_fill_ab_ac_modes_and_unresolved():
             body = h.read()
         ok(fail.uid in body and "fill_unresolved" in body,
            "the [FAIL] log line's uid IS in the table - the Findings jump lands")
+
+
+def test_fill_keeps_a_customized_interfaces_header():
+    """C-031: a header the user already wrote in the Interfaces column is kept, like every output column's."""
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "io.xlsx")
+        _raw_iolist(p)
+        wb = load_workbook(p)
+        wb[_SHEET]["AH1"] = "Machine interfaces"
+        wb[_SHEET]["AH5"] = "SORTER-01"
+        wb.save(p)
+        _fill_210(_params(p))
+        ws = load_workbook(p)[_SHEET]
+        eq((ws["AH1"].value, ws["AH5"].value), ("Machine interfaces", "SORTER-01"), "header and value kept")
 
 
 def test_fill_is_idempotent_noop_drops_backup():
@@ -139,4 +155,5 @@ if __name__ == "__main__":
         ("fill_ab_ac_modes_and_unresolved", _sandboxed(test_fill_ab_ac_modes_and_unresolved)),
         ("fill_reports_a_type_contradiction_with_an_index", _sandboxed(test_fill_reports_a_type_contradiction_with_an_index)),
         ("fill_is_idempotent_noop_drops_backup", _sandboxed(test_fill_is_idempotent_noop_drops_backup)),
+        ("fill_keeps_a_customized_interfaces_header", _sandboxed(test_fill_keeps_a_customized_interfaces_header)),
     ]))
