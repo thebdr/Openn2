@@ -3,8 +3,9 @@
 `project(database)` writes one interface workbook per `interfaces` row: copy the MachineInterfaces
 template, keep only the chosen machine sheet, retitle it to `IF_<instance>`, plug the Base Address / Base
 Node / Index (Side rows, by header name) + replace `<index>` tokens, then lay the instance's
-`interface_elements` onto the data table as the custom mirror block. Clean-room port of PL3's
-`generate_one` / `_plug` / `_append_custom_rows`.
+`interface_elements` onto the data table as the custom mirror block (above a total row the table shows -
+it moves down, still the table's last row: [[C-035]]). Clean-room port of PL3's `generate_one` / `_plug` /
+`_append_custom_rows`.
 
 The elements are already mirrored + byte-laid-out (phase 400b); this projector only WRITES them - it adds
 the BOOL-block padding (a full 2-byte block per script_type group: the real signals on the low bits, then
@@ -130,11 +131,15 @@ def _plug(ws, base_address, node_side1, node_side2, index) -> None:
 
 # --- the custom mirror block (the interface_elements, with the BOOL-block padding) --------------- #
 def _append_custom_rows(ws, elements) -> None:
+    """Lay the mirror block below the data table's last DATA row and stretch the table over it. A total row
+    the table shows moves down below the block - Excel's own 'insert table rows above' ([[C-035]]): its
+    formulas name the whole column, so they cover the block; the filter stops above it, as Excel keeps it."""
     found = interfaces._find_data_table(ws)
     if not found:
         return
-    name, c1, r1, c2, r2, hdr = found
+    name, c1, r1, c2, r2, hdr = found                      # r2 = the last DATA row (a total row below it)
     table = ws.tables[name]
+    totals = int(table.totalsRowCount or 0)
     s1c, s2c = hdr.get("I/O Address Side 1"), hdr.get("I/O Address Side 2")
     f1 = f2 = None
     for r in range(r1 + 1, r2 + 1):                       # the address LET formula, copied per new row
@@ -153,7 +158,12 @@ def _append_custom_rows(ws, elements) -> None:
         else:
             ws.cell(r, col).value = value
 
-    def _write(r, *, category, dt, direction, offset, bit, name_, expr, desc, fu, loc, dev, dc, swp, db):
+    pending = []                                           # (row, fields) - written once a total row has moved
+
+    def _write(r, **fields):
+        pending.append((r, fields))
+
+    def _write_row(r, *, category, dt, direction, offset, bit, name_, expr, desc, fu, loc, dev, dc, swp, db):
         _put(r, "Category", category, text=True)
         _put(r, "Description", desc, text=True)
         _put(r, "Functional Unit", fu, text=True)
@@ -222,11 +232,15 @@ def _append_custom_rows(ws, elements) -> None:
                            name_="", expr="", desc="", fu="", loc="", dev="", dc="", swp="", db="")
             row += 1
 
+    if last > r2 and totals:                               # the total row(s) go below the block, as they are
+        ws.move_range(f"{get_column_letter(c1)}{r2 + 1}:{get_column_letter(c2)}{r2 + totals}", rows=last - r2)
+    for r, fields in pending:
+        _write_row(r, **fields)
     if last > r2:
-        newref = f"{get_column_letter(c1)}{r1}:{get_column_letter(c2)}{last}"
-        table.ref = newref
+        datref = f"{get_column_letter(c1)}{r1}:{get_column_letter(c2)}{last}"
+        table.ref = f"{get_column_letter(c1)}{r1}:{get_column_letter(c2)}{last + totals}"
         if table.autoFilter:
-            table.autoFilter.ref = newref
+            table.autoFilter.ref = datref                  # a table's filter never covers its total row
 
 
 def project(database, template_path: str | None = None, out_dir: str | None = None) -> dict:

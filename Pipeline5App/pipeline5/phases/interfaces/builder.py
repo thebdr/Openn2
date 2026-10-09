@@ -339,13 +339,15 @@ def choose_sheet(sheet_names, machine_type) -> str:
 
 def _find_data_table(ws):
     """The (name, c1, r1, c2, r2, {header: col}) of the sheet's data table (the one whose header row
-    carries 'Category'); None if absent. Robust to table renames."""
+    carries 'Category'); r2 is its last DATA row - a total row the table shows (Excel: Table Design > Total
+    Row) is below it and never read as data ([[C-035]]). None if absent. Robust to table renames."""
     for name in list(ws.tables):
-        c1, r1, c2, r2 = range_boundaries(ws.tables[name].ref)
+        table = ws.tables[name]
+        c1, r1, c2, r2 = range_boundaries(table.ref)
         hdr = {str(ws.cell(r1, c).value).strip(): c
                for c in range(c1, c2 + 1) if ws.cell(r1, c).value not in (None, "")}
         if "Category" in hdr:
-            return name, c1, r1, c2, r2, hdr
+            return name, c1, r1, c2, r2 - int(table.totalsRowCount or 0), hdr
     return None
 
 

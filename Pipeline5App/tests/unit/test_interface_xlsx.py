@@ -83,6 +83,160 @@ def test_append_custom_rows_word_row_and_separator():
     ok(ws.tables["T"].ref in ("A1:G3", "A1:G4"), "one word row (+ a trailing separator)")
 
 
+# --- [[C-035]]: a total row SHOWN on the template's data table (Excel: Table Design > Total Row) -------- #
+_TOT_ELEMS = [{"category": "X", "direction": "Q", "data_type": "BOOL", "offset_byte": 10, "bit": 0,
+               "signal_name": "PNC_a", "source": "mirror"},
+              {"category": "X", "direction": "Q", "data_type": "BOOL", "offset_byte": 10, "bit": 1,
+               "signal_name": "PNC_b", "source": "mirror"},
+              {"category": "SPD", "direction": "I", "data_type": "WORD", "offset_byte": 12, "bit": None,
+               "signal_name": "PNC_speed", "source": "mirror"}]
+_ADDR_F = "=SIG[[#This Row],[I/O Offset Byte]]*8"
+
+
+def _totals_template(totals=True, formulas=True):
+    """A template sheet (`SORTER`) whose data table `SIG` SHOWS its total row: header row 1, a template-native
+    row 2 (HEARTBEAT), a blank data row 3, the total row 4 - a bold label, the max of the offsets, a count of
+    the signal names and one of the addresses (each the SUBTOTAL Excel writes for it); a note BESIDE the table
+    in that row (I4). `formulas`: the data rows carry the address formula. totals=False: the same table
+    without its total row (the twin the projection must match row for row)."""
+    from openpyxl.styles import Font
+    from openpyxl.worksheet.filters import AutoFilter
+    wb = Workbook(); ws = wb.active; ws.title = "SORTER"
+    hdr = ["Category", "Data Type", "Direction </>", "I/O Offset Byte", "I/O Bit", "Signal Name Side 1",
+           "I/O Address Side 1"]
+    for c, h in enumerate(hdr, start=1):
+        ws.cell(1, c, h)
+    for c, v in enumerate(("LIFE", "BOOL", ">", 0, 0, "HEARTBEAT"), start=1):
+        ws.cell(2, c, v)
+    if formulas:
+        ws["G2"], ws["G3"] = _ADDR_F, _ADDR_F
+    ws["I4"] = "note"
+    cols = [TableColumn(id=i + 1, name=h) for i, h in enumerate(hdr)]
+    t = Table(displayName="SIG", ref="A1:G4" if totals else "A1:G3", autoFilter=AutoFilter(ref="A1:G3"))
+    t.tableColumns = cols
+    if totals:
+        t.totalsRowCount = 1
+        cols[0].totalsRowLabel = "Total"
+        cols[3].totalsRowFunction, cols[5].totalsRowFunction, cols[6].totalsRowFunction = "max", "count", "count"
+        ws["A4"] = "Total"; ws["A4"].font = Font(bold=True)
+        ws["D4"] = "=SUBTOTAL(104,SIG[I/O Offset Byte])"
+        ws["F4"] = "=SUBTOTAL(103,SIG[Signal Name Side 1])"
+        ws["G4"] = "=SUBTOTAL(103,SIG[I/O Address Side 1])"
+    t.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
+    ws.add_table(t)
+    return wb, ws
+
+
+def _values(ws, rows, cols=9):
+    return [[ws.cell(r, c).value for c in range(1, cols + 1)] for r in rows]
+
+
+def test_append_custom_rows_moves_a_shown_total_row():
+    """The mirror block goes ABOVE a shown total row - Excel's own 'insert table rows above': the block on the
+    rows right below the last DATA row (exactly where the twin without a total row gets it), the total row
+    moved below the block whole (label, style, its SUBTOTALs naming the whole column - so they cover the
+    block), the table ref ending on it, the autoFilter one row short (Excel never filters the total row),
+    totalsRowCount kept; a cell beside the table stays where it is."""
+    twin_wb, twin = _totals_template(totals=False)
+    interface_xlsx._append_custom_rows(twin, _TOT_ELEMS)
+    wb, ws = _totals_template()
+    eq(interfaces._find_data_table(ws)[4], 3, "the data table's last DATA row is 3 - the total row is no data")
+    interface_xlsx._append_custom_rows(ws, _TOT_ELEMS)
+    # the twin: the BOOL block 4-19 (bytes 10 / 11) + separator 20, the WORD 21 + separator 22
+    eq(_values(ws, range(1, 22)), _values(twin, range(1, 22)), "rows 1-21 are the twin's, cell for cell")
+    eq(_values(ws, [4, 5, 21]),
+       [["X", "BOOL", ">", 10, 0, "PNC_a", _ADDR_F, None, "note"],
+        ["X", "BOOL", ">", 10, 1, "PNC_b", _ADDR_F, None, None],
+        ["SPD", "WORD", "<", 12, None, "PNC_speed", _ADDR_F, None, None]],
+       "the block starts on the total row's old row 4 and ends on 21; the note beside the table stays on 4")
+    eq(_values(ws, [22]), [["Total", None, None, "=SUBTOTAL(104,SIG[I/O Offset Byte])", None,
+                            "=SUBTOTAL(103,SIG[Signal Name Side 1])", "=SUBTOTAL(103,SIG[I/O Address Side 1])",
+                            None, None]], "the total row, moved whole below the block")
+    eq((ws["A22"].font.b, ws["A4"].font.b), (True, False), "its style moved with it - row 4 keeps none")
+    eq(_values(twin, [22]), [[None] * 9], "(the twin's row 22 is the blank separator)")
+    t = ws.tables["SIG"]
+    eq((t.ref, t.autoFilter.ref, t.totalsRowCount), ("A1:G22", "A1:G21", 1),
+       "the table ends on the total row; the filter stops above it")
+    eq((twin.tables["SIG"].ref, twin.tables["SIG"].autoFilter.ref), ("A1:G21", "A1:G21"), "the twin as before")
+    eq([(c.name, c.totalsRowLabel, c.totalsRowFunction) for c in t.tableColumns if c.totalsRowLabel or
+        c.totalsRowFunction], [("Category", "Total", None), ("I/O Offset Byte", None, "max"),
+                               ("Signal Name Side 1", None, "count"), ("I/O Address Side 1", None, "count")],
+       "each column's total kept")
+
+    # nothing to append (none, or only template-native elements): the sheet is the template's
+    for elems in ([], [dict(_TOT_ELEMS[0], source="template")]):
+        wb, ws = _totals_template()
+        interface_xlsx._append_custom_rows(ws, elems)
+        t = ws.tables["SIG"]
+        eq((t.ref, t.autoFilter.ref, ws["A4"].value, ws["A5"].value), ("A1:G4", "A1:G3", "Total", None),
+           f"no mirror rows ({len(elems)} element(s)): the total row stays on row 4")
+
+    # the data rows carry no address formula: the total row's SUBTOTAL is never copied into the block
+    wb, ws = _totals_template(formulas=False)
+    interface_xlsx._append_custom_rows(ws, _TOT_ELEMS)
+    eq([ws.cell(r, 7).value for r in (4, 5, 21, 22)], [None, None, None, "=SUBTOTAL(103,SIG[I/O Address Side 1])"],
+       "the block's addresses stay empty; only the moved total row has the SUBTOTAL")
+
+
+def test_template_readers_skip_a_shown_total_row():
+    """400b's template readers read the data rows only: a total row the table shows - here labelled on the
+    signal-name and direction columns - is never a template-native signal, nor a byte the template uses."""
+    wb, ws = _totals_template()
+    t = ws.tables["SIG"]
+    t.tableColumns[5].totalsRowFunction, t.tableColumns[5].totalsRowLabel = None, "Signals"
+    t.tableColumns[2].totalsRowLabel = "<"
+    ws["F4"], ws["C4"] = "Signals", "<"
+    ws["D4"] = 40                                            # a total cell's cached value, as Excel leaves it
+    with tempfile.TemporaryDirectory() as d:
+        tpl = os.path.join(d, "tpl.xlsx"); wb.save(tpl)
+        native = interfaces.template_native_elements(tpl, "SORTER", 1, 10000, "I<base+offset>/.<bit>")
+        eq([(e.signal_name, e.direction, e.offset_byte) for e in native], [("HEARTBEAT", "Q", 0)],
+           "only the data row's HEARTBEAT - not the total row's label")
+        eq(interfaces.template_extent(tpl, "SORTER"), {"I": 0, "Q": 1}, "the total row adds no input byte 40")
+        eq(interfaces.template_last_used_byte(tpl, "SORTER"), {"I": -1, "Q": 0}, "nor a last used input byte")
+
+
+def test_project_and_insert_a_template_showing_its_total_row():
+    """Through the real 400c `project` (template file -> IF_ workbook on disk) and the real 400e insert: the
+    written table part ends on the moved total row with its totals, the filter above it; grafted into an I/O
+    List the same, the totals' table name renamed with the table ([[C-034]])."""
+    import re as _re
+    import warnings as _w
+    _w.simplefilter("ignore")
+    with tempfile.TemporaryDirectory() as d:
+        wb, _ws = _totals_template(); tpl = os.path.join(d, "tpl.xlsx"); wb.save(tpl)
+        db = {"interfaces": [{"instance": "SORTER-01", "template_sheet": "SORTER", "base_address": 10000,
+                              "base_node": 10, "interface_id": 1}],
+              "interface_elements": [dict(e, interface="SORTER-01") for e in _TOT_ELEMS]}
+        out = os.path.join(d, "out")
+        eq(interface_xlsx.project(db, template_path=tpl, out_dir=out),
+           {"created": [os.path.join(out, "IF_SORTER-01.xlsx")]}, "one IF_ workbook")
+        ifp = os.path.join(out, "IF_SORTER-01.xlsx")
+        tx = _parts(ifp)["xl/tables/table1.xml"].decode("utf-8")
+        eq(_re.search(r'<table\b[^>]*\bref="([^"]+)"[^>]*\btotalsRowCount="(\d)"', tx).groups(), ("A1:G22", "1"),
+           "the written table ends on the total row")
+        eq(_re.findall(r'<autoFilter ref="([^"]+)"', tx), ["A1:G21"], "its filter stops above it")
+        ws = load_workbook(ifp)["SORTER-01"]
+        eq(_values(ws, [3, 4, 21, 22]),
+           [[None, None, None, None, None, None, _ADDR_F, None, None],
+            ["X", "BOOL", ">", 10, 0, "PNC_a", _ADDR_F, None, "note"],
+            ["SPD", "WORD", "<", 12, None, "PNC_speed", _ADDR_F, None, None],
+            ["Total", None, None, "=SUBTOTAL(104,SIG[I/O Offset Byte])", None,
+             "=SUBTOTAL(103,SIG[Signal Name Side 1])", "=SUBTOTAL(103,SIG[I/O Address Side 1])", None, None]],
+           "read back: the block from row 4, the total row on 22")
+
+        iol = os.path.join(d, "iol.xlsx"); _modern_iolist(iol)
+        eq(interface_xlsx.insert_sheets_into_iolist(iol, [("IF_SORTER-01", ifp)])[0],
+           "IF_SORTER-01: inserted into the I/O List", "inserted")
+        gx = _parts(iol)["xl/tables/table2.xml"].decode("utf-8")
+        eq((_re.search(r'<table\b[^>]*\bref="([^"]+)"[^>]*\btotalsRowCount="(\d)"', gx).groups(),
+            _re.findall(r'<autoFilter ref="([^"]+)"', gx)), (("A1:G22", "1"), ["A1:G21"]), "grafted the same")
+        g = load_workbook(iol)["IF_SORTER-01"]
+        eq((g["A22"].value, g["D22"].value, g["F22"].value),
+           ("Total", "=SUBTOTAL(104,SIG_IF_SORTER_01[I/O Offset Byte])",
+            "=SUBTOTAL(103,SIG_IF_SORTER_01[Signal Name Side 1])"), "the totals follow the renamed table")
+
+
 # =================================================================================================== #
 # Phase 400e - the lossless IF_ sheet insertion + the Excel-independent address-cache seeding
 # =================================================================================================== #
@@ -1061,6 +1215,10 @@ if __name__ == "__main__":
         ("append_custom_rows_bool_block_and_padding", test_append_custom_rows_bool_block_and_padding),
         ("append_custom_rows_skips_template_source", test_append_custom_rows_skips_template_source),
         ("append_custom_rows_word_row_and_separator", test_append_custom_rows_word_row_and_separator),
+        ("append_custom_rows_moves_a_shown_total_row", test_append_custom_rows_moves_a_shown_total_row),
+        ("template_readers_skip_a_shown_total_row", test_template_readers_skip_a_shown_total_row),
+        ("project_and_insert_a_template_showing_its_total_row",
+         test_project_and_insert_a_template_showing_its_total_row),
         ("io_address_mirror", test_io_address_mirror),
         ("resolve_num_chain", test_resolve_num_chain),
         ("interface_address_caches", test_interface_address_caches),
