@@ -229,15 +229,15 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   window - a longer group wraps onto the next free row; rows in order of first appearance; the first row is
   compacted LAST, after the others moved away, so every drop lands on a free spot - `MovesInSafeOrder`), and
   after the user opens the view, zooms until the rows fit vertically and the first columns horizontally, and
-  calibrates SIX points with the global hotkey F9 (first station, second station, first cell of row 2, the
-  horizontal scrollbar's thumb, an empty part of its track, then - scrolled fully right - the last station), brings
-  TIA to the front (`AttachedProcessId`) and drags with SendInput. The default row is wider than any zoom (65
-  stations on the FVT), so the robot SCROLLS: it reads the scrollbar from screen pixels (`MouseRobot.ReadRow`;
-  thumb length / trough = viewport / canvas, thumb position = offset; colours sampled at the calibration), scrolls
-  by dragging the thumb (closed loop, re-read), moves a far station in hops of one viewport (dropped on a parking
-  strip below the planned rows) until a direct drag reaches its cell, and keeps a model of every station's canvas
-  position. F12 or a foreground change stops it; the drags never run while another window is in front. Pitch =
-  second - first; the plan is refused when the columns or the rows do not fit the viewport.
+  calibrates with the global hotkey F9: the first station, the second, the first cell of row 2, the four scrollbar
+  ARROW buttons (< > ^ v); the robot then clicks > 8 times and v 6 times and the user re-hovers the first station
+  after each, which measures the scroll step in px per click. From then on the robot scrolls by COUNTED clicks
+  (the user's model, 2026-10-10: exact, no pixel reading), brings TIA to the front (`AttachedProcessId`) and drags
+  with SendInput, keeping every station's canvas position. A far station travels down in hops of one viewport at a
+  free column (columns beyond "max per row" are free on every row - the lane is its target row, row 2 for the
+  first row), then left in hops along that lane, then one drag into its cell. Requirements: at least "max per row
+  + 1" columns and 2 rows visible (the zoom); the plan is refused otherwise. F12 or a foreground change stops it;
+  the drags never run while another window is in front.
 - **Transfer areas** (PN/PN coupler 6ES7158-3AD10 V4.x, I-devices): NOT device items - they live in
   `NetworkInterface.TransferAreas` of the station's PROFINET interface, so a `DeviceItems` walk never
   sees them (the dump prints them as `::TransferArea(i)` with `.Addr(j)` local / `.PartnerAddr(j)`
@@ -487,10 +487,11 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
    PROFINET ports", generate: the log shows `Port link wired: …`, the topology view shows the line between the two
    ports; generate again: `already connected`; a malformed cell fails the load with file/line; unticked with links
    present logs `Topology links in Stations.csv NOT wired`.
-18. **Re-arrange devices**: right after a generation, open the network view scrolled fully left, zoom out so the rows fit vertically, press
-   "Re-arrange devices..", F9 on the first station, the second, one row below the first, the scrollbar thumb, the
-   track, then scroll fully right and F9 on the last station, Start: the view scrolls by itself (thumb drags), far
-   stations hop left on a strip below the rows (`after N hop(s)` in the log), then every
+18. **Re-arrange devices**: right after a generation, open the network view at its origin (fully left and up), zoom so that 8 columns fit, press
+   "Re-arrange devices..", F9 on the first station, the second, one row below the first, the four arrow buttons,
+   then F9 on the first station after the robot clicked > 8 times and again after it clicked v 6 times (the status
+   shows the measured step and the viewport in columns x rows), Start: the view scrolls by arrow clicks, far stations
+   hop down and left along their row's free columns (`after N hop(s)` in the log), then every
    Group gets its own row(s), at most 7 per row (the box in the window; a group of 9 fills row 1 with 7 and puts 2 on
    the next free row), logged `Re-arrange: <station> -> row r, column c (<group>)`; the first group's row is compacted
    last; F12 stops mid-way; alt-tabbing away stops with `lost the foreground`; a plan off-screen is refused.
