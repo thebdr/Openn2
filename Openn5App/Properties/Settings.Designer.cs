@@ -58,5 +58,36 @@ namespace Openn.Properties
                 this["ProjectPanelExpanded"] = value;
             }
         }
+        /// <summary>The pop-out log window placement "left,top,width,height" (WPF units, invariant culture); "" = default size, centered on the main window screen.</summary>
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LogWindowPlacement
+        {
+            get
+            {
+                return ((string)(this["LogWindowPlacement"]));
+            }
+            set
+            {
+                this["LogWindowPlacement"] = value;
+            }
+        }
+
+        /// <summary>Whether the pop-out log window is kept above every other window.</summary>
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool LogWindowTopmost
+        {
+            get
+            {
+                return ((bool)(this["LogWindowTopmost"]));
+            }
+            set
+            {
+                this["LogWindowTopmost"] = value;
+            }
+        }
     }
 }

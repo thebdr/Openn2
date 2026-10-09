@@ -354,7 +354,17 @@ namespace Openn._03_ApiManager
         /// <summary>Creates an external source (.db/.scl/.awl) and generates its blocks (keeping partial results on error).</summary>
         private void GenerateFromExternalSource(PlcSoftware sw, string path)
         {
-            PlcExternalSource source = sw.ExternalSourceGroup.ExternalSources.CreateFromFile(Path.GetFileName(path), path);
+            //a leftover source object of the same name (a previous run) makes CreateFromFile fail ("The name is not
+            //unique"): the regeneration semantics replace it. The source OBJECT is only the import vehicle - deleting
+            //it never touches the blocks generated earlier.
+            string name = Path.GetFileName(path);
+            PlcExternalSource stale = sw.ExternalSourceGroup.ExternalSources.Find(name);
+            if (stale != null)
+            {
+                Log("External source " + name + " already exists (left over from a previous run) - replaced with the fresh file");
+                stale.Delete();
+            }
+            PlcExternalSource source = sw.ExternalSourceGroup.ExternalSources.CreateFromFile(name, path);
             source.GenerateBlocksFromSource(GenerateBlockOption.KeepOnError);
         }
 

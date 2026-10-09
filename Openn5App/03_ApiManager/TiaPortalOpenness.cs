@@ -40,6 +40,13 @@ namespace Openn._03_ApiManager
         /// <summary>The project all block and hardware operations work on; null = not attached.</summary>
         private Project project = null;
 
+        /// <summary>
+        /// True when this app CREATED the portal (new TiaPortal) and therefore owns its
+        /// lifetime; false when we merely attached to a user's already-running instance.
+        /// Governs teardown: an owned project is closed, an attached one is left running.
+        /// </summary>
+        private bool ownsPortal = false;
+
         #endregion Connection state
 
         #region Attach / detach
@@ -53,6 +60,10 @@ namespace Openn._03_ApiManager
         /// </summary>
         public string AttachToProject(string _Path = "")
         {
+            //Release any portal/project left from a previous attach first, so re-attaching neither
+            //orphans the old portal nor keeps its imported/exported XMLs locked in the Openness host.
+            if (portal != null || project != null) Shutdown();
+
             bool bCreateNewProject = string.IsNullOrEmpty(_Path); //if no path is specified, create a new project
             string defaultProjectsFolder = appBaseDir + "\\TiaProjects\\";
             string projectName = "openness_project";
@@ -89,6 +100,7 @@ namespace Openn._03_ApiManager
 
                     portal = new TiaPortal(TiaPortalMode.WithUserInterface);
                     project = portal.Projects.Create(new DirectoryInfo(defaultProjectsFolder), projectName);
+                    ownsPortal = true; //we created this portal - we own its teardown
 
                     Log("Attached to New Tia Project: " + project.Name);
                 }
@@ -104,6 +116,7 @@ namespace Openn._03_ApiManager
 
                     portal = new TiaPortal(TiaPortalMode.WithUserInterface);
                     project = portal.Projects.Open(projectFile);
+                    ownsPortal = true; //we opened this project in a portal we created
                     Log("Opened Tia Project: " + projectFile.Name);
                 }
 
@@ -136,6 +149,7 @@ namespace Openn._03_ApiManager
                     if (!tiaPortalProcess.ProjectPath.ToString().Contains(projectPath)) continue;
 
                     portal = TiaPortal.GetProcess(tiaPortalProcess.Id).Attach(); //keep the attached instance referenced
+                    ownsPortal = false; //attached to the user's running TIA - never close it on teardown
                     foreach (Project openProject in portal.Projects)
                     {
                         Log("Attached to Existing Tia Project: " + openProject.Name);
@@ -190,6 +204,41 @@ namespace Openn._03_ApiManager
                 project = null;
             }
             return "";
+        }
+
+        /// <summary>
+        /// Releases the Openness connection and every file handle the runtime still holds on
+        /// imported/exported block, tag and UDT XMLs - those stay open in the Openness/TIA host
+        /// until the owning Project and TiaPortal are disposed, which is why files linger locked
+        /// after an operation. A project WE opened is closed; a user's attached project is left
+        /// running (only our client attachment drops).
+        ///
+        /// Must run on the TiaWorker thread (Openness is not thread-safe). Idempotent, so it is
+        /// safe to call from both the window Closing handler and the version-switch restart path.
+        /// </summary>
+        public void Shutdown()
+        {
+            try
+            {
+                if (project != null)
+                {
+                    if (ownsPortal)
+                        try { project.Close(); } catch { /* project already gone */ }
+                    project = null;
+                }
+
+                if (portal != null)
+                {
+                    try { portal.Dispose(); } catch { /* portal already gone */ }
+                    portal = null;
+                }
+
+                ownsPortal = false;
+            }
+            catch (Exception e)
+            {
+                Log("TIA teardown error \n" + e.Message);
+            }
         }
 
         private void SaveProject()

@@ -199,6 +199,11 @@ BuilderData/                                   ← the workspace (name kept; PL5
   to TIA as a VCI workspace *and* imported by OP5.
 - Groups are folders. A file at the category root lands in the root group (today's flat `ImportReady/`).
 - Reserved root folders: `.openn`, `.vci`, `Devices & networks`, `Templates`. Every other root folder is a PLC.
+- `.openn/import.openn5.config` (optional, **OP5-owned**, since 2026-10-09): the files whose Import box the user unticked in
+  OP5's Workspace tab - `#` comments, then one `disabled: <relative path>` line per file (`/` separated, as the catalog
+  shows it). OP5 writes it on every tick change and removes it when nothing is unticked; the catalog lists it Ignored.
+  It survives a regeneration because PL5 writes only `workspace.openn.config` in `.openn/` and never deletes other
+  files there (PL5 must keep it that way).
 - OP5 **exports** into the same shape (`ExportedData/<PLC>/…`, hardware as `Devices & networks/<project>.aml`).
 - Multi-system PL5 projects produce one workspace per system (`Output/<system>/TiaPortalProjectInterface/BuilderData`).
   OP5 lets the user pick the workspace root; the default stays `Shared/OutputTree/TiaPortalProjectInterface/BuilderData`.

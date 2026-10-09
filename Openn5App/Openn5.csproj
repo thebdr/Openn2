@@ -73,6 +73,8 @@
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationIcon>Roberto-64x64.ico</ApplicationIcon>
+    <!-- debug builds carry a "D"-badged icon so the two exes are distinguishable at a glance -->
+    <ApplicationIcon Condition=" '$(Configuration)' == 'Debug' ">Roberto-64x64-Debug.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="FontAwesome.WPF, Version=4.7.0.37774, Culture=neutral, PublicKeyToken=0758b07a11a4f466, processorArchitecture=MSIL">
@@ -112,6 +114,7 @@
     <Compile Include="00_Contract\InputKind.cs" />
     <Compile Include="00_Contract\OpennHeader.cs" />
     <Compile Include="00_Contract\WorkspaceCatalog.cs" />
+    <Compile Include="00_Contract\WorkspaceImportSettings.cs" />
     <Compile Include="01_Constructor\CustomParameterParser.cs" />
     <Compile Include="01_Constructor\HardwareConfigDocument.cs" />
     <Compile Include="01_Constructor\HardwareConfigLoader.cs" />
@@ -127,6 +130,7 @@
     <Compile Include="03_ApiManager\TiaPortalOpenness.Workspace.cs" />
     <Compile Include="BlockSearchWindow.cs" />
     <Compile Include="HardwareConfigEditorWindow.cs" />
+    <Compile Include="LogWindow.cs" />
     <Compile Include="03_ApiManager\OpennessVersionDialog.cs" />
     <Compile Include="03_ApiManager\TiaPortalOpenness.cs" />
     <Compile Include="03_ApiManager\TiaWorker.cs" />

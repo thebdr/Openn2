@@ -150,6 +150,8 @@ namespace Openn._02_Converter
                 }
                 int stringsIndex = csv.IteratorStringsStart;
                 int stringsConsumed = 0, stringsNonEmpty = 0;
+                int emptyComponents = 0;
+                var emptySlots = new List<string>(); //which key/slot produced each empty component
                 foreach (string sectionLine in section)
                 {
                     //literal ID="hex" attributes in the section (raw exports / auto
@@ -164,18 +166,44 @@ namespace Openn._02_Converter
                     {
                         if (csv.Keys[i].Length == 0 || csv.Keys[i].StartsWith("#", StringComparison.Ordinal)) continue;
                         string value = i < row.Cells.Count ? row.Cells[i] : string.Empty;
+                        if (value.Length == 0)
+                        {
+                            int hits = Regex.Matches(line, Regex.Escape("<Component Name=\"" + csv.Keys[i] + "\"")).Count;
+                            for (int hit = 0; hit < hits; hit++) emptySlots.Add("column " + csv.Keys[i] + " (empty cell)");
+                        }
                         line = line.Replace(csv.Keys[i], XmlEscape(value));
                     }
                     line = ReplaceEachOccurrence(line, IteratorKey, () => (idCounter++).ToString("X"));
-                    line = ReplaceEachOccurrence(line, IteratorStringsKey, () =>
+                    string lineBeforeIterators = line;
+                    line = IteratorStringsPattern.Replace(line, m =>
                     {
                         string value = stringsIndex < row.Cells.Count ? row.Cells[stringsIndex] : string.Empty;
                         stringsIndex++;
                         stringsConsumed++;
                         if (value.Length > 0) stringsNonEmpty++;
+                        else if (IsComponentName(lineBeforeIterators, m.Index))
+                            emptySlots.Add(IteratorStringsKey + " slot " + stringsConsumed +
+                                (stringsIndex > row.Cells.Count
+                                    ? " (the row ends at value " + Math.Max(0, row.Cells.Count - csv.IteratorStringsStart) + ")"
+                                    : " (empty cell)"));
                         return XmlEscape(value);
                     });
+                    emptyComponents += EmptyComponentName.Matches(line).Count;
                     output.Add(line);
+                }
+
+                //an empty symbol component never imports - fail HERE naming the row AND the
+                //key/slot that produced each empty, instead of TIA's import-time
+                //"No name defined in 'Component'" with only a UID
+                if (emptyComponents > 0)
+                {
+                    string detail = emptySlots.Count > 0
+                        ? "\n  empty: " + string.Join("; ", emptySlots.Take(8)) + (emptySlots.Count > 8 ? "; +" + (emptySlots.Count - 8) + " more" : "")
+                        : "";
+                    if (emptySlots.Count < emptyComponents)
+                        detail += "\n  (" + (emptyComponents - emptySlots.Count) + " not attributable to a key - a literal empty <Component Name> in the template section?)";
+                    errors.Add(Where(csvPath, row.LineNumber) + "TemplateType " + row.TypeNumber.ToString("00") + " produced " +
+                        emptyComponents + " EMPTY <Component Name=\"\"> symbol slot(s)" + detail);
                 }
 
                 if (stringsConsumed > 0 && stringsNonEmpty == 0)
@@ -485,6 +513,16 @@ namespace Openn._02_Converter
                 if (File.Exists(candidate)) return candidate;
             return candidates[0];
         }
+
+        /// <summary>An emitted symbol/instance component with an EMPTY name - always invalid TIA-XML
+        /// (TIA rejects it at import as "No name defined in 'Component'" with only a UID).</summary>
+        private static readonly Regex EmptyComponentName = new Regex("<Component Name=\"\"\\s*/?>");
+
+        private static readonly Regex IteratorStringsPattern = new Regex(Regex.Escape(IteratorStringsKey));
+
+        /// <summary>True when the placeholder at <paramref name="index"/> sits inside &lt;Component Name="..."&gt;.</summary>
+        private static bool IsComponentName(string line, int index) =>
+            index >= 17 && string.CompareOrdinal(line, index - 17, "<Component Name=\"", 0, 17) == 0;
 
         private static Template ParseTemplate(string templatePath, List<string> errors)
         {

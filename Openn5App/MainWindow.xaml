@@ -17,6 +17,7 @@
         ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         Activated="Window_Activated"
+        Closing="Window_Closing"
         Background="#F4F4F6"
         >
     <Window.Resources>
@@ -68,20 +69,60 @@
             <Setter Property="Foreground" Value="#666"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
-        <!-- Workspace tab: group headers of the catalog grid (level 0 = PLC / workspace, 1 = TIA folder, 2 = block group) -->
+        <!-- Workspace tab: the catalog grid's group headers drawn as a tree. Level 0 = PLC / workspace (blue band),
+             1 = TIA folder (grey band with a blue left bar, indented), 2 = block group (plain, further indented; the
+             "(root)" group draws no header at all). A flat toggle with a triangle glyph - right = collapsed,
+             down = expanded - replaces the default Expander chrome, so the state reads at a glance. -->
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <Style x:Key="GroupToggle" TargetType="ToggleButton">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Padding" Value="6,2,6,2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" CornerRadius="2" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#FF1F4E79"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="GroupGlyph" TargetType="TextBlock">
+            <Setter Property="Text" Value="&#x25BE;"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#FF1F4E79"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="False">
+                    <Setter Property="Text" Value="&#x25B8;"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="WorkspaceGroupLevel0" TargetType="{x:Type GroupItem}">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type GroupItem}">
-                        <Expander IsExpanded="True" BorderThickness="0" Margin="0,3,0,0">
-                            <Expander.Header>
+                        <StackPanel>
+                            <ToggleButton x:Name="toggle" IsChecked="True" Style="{StaticResource GroupToggle}" Margin="0,6,0,1"
+                                          Background="#FFDCE8F5" BorderBrush="#FF9FB8D8" BorderThickness="1">
                                 <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GroupGlyph}"/>
                                     <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Foreground="#FF1F4E79"/>
-                                    <TextBlock Text="{Binding ItemCount, StringFormat='({0})'}" FontSize="11" Foreground="#FF808080" Margin="5,0,0,0"/>
+                                    <TextBlock Text="{Binding ItemCount, StringFormat='({0})'}" FontSize="11" Foreground="#FF5A6B7E" Margin="5,0,0,0"/>
                                 </StackPanel>
-                            </Expander.Header>
-                            <ItemsPresenter/>
-                        </Expander>
+                            </ToggleButton>
+                            <ItemsPresenter Visibility="{Binding IsChecked, ElementName=toggle, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -90,15 +131,17 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type GroupItem}">
-                        <Expander IsExpanded="True" BorderThickness="0" Margin="0,1,0,0">
-                            <Expander.Header>
-                                <StackPanel Orientation="Horizontal" Margin="14,0,0,0">
+                        <StackPanel>
+                            <ToggleButton x:Name="toggle" IsChecked="True" Style="{StaticResource GroupToggle}" Margin="18,2,0,1"
+                                          Background="#FFF1F3F6" BorderBrush="#FF9FB8D8" BorderThickness="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GroupGlyph}"/>
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="#FF333333"/>
                                     <TextBlock Text="{Binding ItemCount, StringFormat='({0})'}" FontSize="11" Foreground="#FF808080" Margin="5,0,0,0"/>
                                 </StackPanel>
-                            </Expander.Header>
-                            <ItemsPresenter/>
-                        </Expander>
+                            </ToggleButton>
+                            <ItemsPresenter Visibility="{Binding IsChecked, ElementName=toggle, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -107,15 +150,23 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type GroupItem}">
-                        <Expander IsExpanded="True" BorderThickness="0">
-                            <Expander.Header>
-                                <StackPanel Orientation="Horizontal" Margin="28,0,0,0">
+                        <StackPanel>
+                            <ToggleButton x:Name="toggle" IsChecked="True" Style="{StaticResource GroupToggle}" Margin="36,1,0,0"
+                                          Background="Transparent" BorderBrush="#FFC8CDD5" BorderThickness="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GroupGlyph}" Foreground="#FF808080"/>
                                     <TextBlock Text="{Binding Name}" FontStyle="Italic" FontSize="11" Foreground="#FF555555"/>
                                     <TextBlock Text="{Binding ItemCount, StringFormat='({0})'}" FontSize="11" Foreground="#FF808080" Margin="5,0,0,0"/>
                                 </StackPanel>
-                            </Expander.Header>
-                            <ItemsPresenter/>
-                        </Expander>
+                            </ToggleButton>
+                            <ItemsPresenter Visibility="{Binding IsChecked, ElementName=toggle, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <!-- files directly in the TIA folder: no third band, they sit right under the folder -->
+                            <DataTrigger Binding="{Binding Name}" Value="(root)">
+                                <Setter TargetName="toggle" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -125,9 +176,10 @@
     <Grid Margin="6">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="5*" MinHeight="260"/>
+            <RowDefinition x:Name="rowTabs" Height="*" MinHeight="260"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="4*" MinHeight="140"/>
+            <!-- the log starts six lines tall (SetDefaultLogHeight measures the real line height at Loaded); the splitter resizes it -->
+            <RowDefinition x:Name="rowLog" Height="150" MinHeight="70"/>
         </Grid.RowDefinitions>
 
         <!-- ==================== TIA project connection: collapsed by default (rarely used) ====================
@@ -181,6 +233,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -200,12 +253,23 @@
                     </DockPanel>
 
                     <!-- summary strip -->
-                    <Border Grid.Row="1" Background="White" BorderBrush="#FFB8B8C0" BorderThickness="1" Padding="6,3" Margin="2,0,2,4">
+                    <Border Grid.Row="1" Background="White" BorderBrush="#FFB8B8C0" BorderThickness="1" Padding="6,3" Margin="2,0,2,4"
+                            ToolTip="Click a chip to show only the rows it counts; click it again to show all">
                         <WrapPanel x:Name="wpWorkspaceSummary"/>
                     </Border>
 
+                    <!-- live text filter (combined with the chip filter) -->
+                    <DockPanel Grid.Row="2" Margin="2,0,2,4">
+                        <Label DockPanel.Dock="Left" Content="Filter:" VerticalAlignment="Center"/>
+                        <Button x:Name="btnWsClearFilter" Click="btnWsClearFilter_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Clear" Visibility="Collapsed"
+                                ToolTip="Show all rows again (clears the text filter and the chip filter)"/>
+                        <TextBlock x:Name="tbWsFilterInfo" DockPanel.Dock="Right" Margin="8,0,8,0" VerticalAlignment="Center" FontSize="10" Foreground="#666"/>
+                        <TextBox x:Name="tbWsFilter" TextChanged="tbWsFilter_TextChanged" KeyDown="tbWsFilter_KeyDown"
+                                 ToolTip="Narrows the grid as you type - matches file name, path, kind, status, action, producer, run and notes (regex, case-insensitive; a pattern that is not a valid regex matches as plain text). Esc clears. Combines with a clicked chip."/>
+                    </DockPanel>
+
                     <!-- the catalog: PLC > TIA folder > group > file -->
-                    <ListView x:Name="lvWorkspace" Grid.Row="2" Margin="2,0,2,0" FontSize="11" SelectionMode="Extended"
+                    <ListView x:Name="lvWorkspace" Grid.Row="3" Margin="2,0,2,0" FontSize="11" SelectionMode="Extended"
                               SelectionChanged="lvWorkspace_SelectionChanged" BorderBrush="#FFB8B8C0"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListView.GroupStyle>
@@ -225,6 +289,17 @@
                         </ListView.ItemContainerStyle>
                         <ListView.View>
                             <GridView AllowsColumnReorder="True">
+                                <GridViewColumn Width="54">
+                                    <GridViewColumn.Header>
+                                        <TextBlock Text="Import" ToolTip="Tick = the file takes part in Import Selection / Import Workspace. Untick to keep a file out: remembered per workspace (.openn\import.openn5.config), so it survives rescans, restarts and PL5 regenerations. Right-click selected rows to tick / untick many at once."/>
+                                    </GridViewColumn.Header>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding ImportEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      Visibility="{Binding CanToggleImport, Converter={StaticResource BoolToVis}}" ToolTip="{Binding ImportToggleTip}"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
                                 <GridViewColumn Header="Status" Width="88">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
@@ -257,7 +332,10 @@
                         </ListView.View>
                         <ListView.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Import selected" Click="btnWsImportSelected_Click"/>
+                                <MenuItem Header="Import Selection" Click="btnWsImportSelected_Click"/>
+                                <Separator/>
+                                <MenuItem Header="Tick Import for selected" Click="miWsEnableImport_Click" ToolTip="The selected importable rows take part in the import again"/>
+                                <MenuItem Header="Untick Import for selected" Click="miWsDisableImport_Click" ToolTip="The selected importable rows are kept out of the import (remembered per workspace)"/>
                                 <Separator/>
                                 <MenuItem Header="Show details in log" Click="miWsLogDetails_Click"/>
                                 <MenuItem Header="Open containing folder" Click="miWsOpenFolder_Click"/>
@@ -267,15 +345,15 @@
                     </ListView>
 
                     <!-- detail pane: header, placement, notes of the selected file -->
-                    <TextBox x:Name="tbWorkspaceDetail" Grid.Row="3" Height="96" Margin="2,4,2,4" IsReadOnly="True" TextWrapping="Wrap"
+                    <TextBox x:Name="tbWorkspaceDetail" Grid.Row="4" Height="96" Margin="2,4,2,4" IsReadOnly="True" TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11" Background="#FAFAFC" VerticalContentAlignment="Top"/>
 
                     <!-- import actions -->
-                    <DockPanel Grid.Row="4" Margin="2,0,2,0">
-                        <Button x:Name="btnWsImportAll" Click="btnWsImportAll_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" FontWeight="SemiBold" Content="Import all importable"
-                                ToolTip="Every Ready file, in import order (hardware, UDTs, tag tables, data blocks, instance DBs, block generation, code blocks, sources), per PLC. Files without a valid #!openn header, misplaced, stale or unclassified files are skipped with their reason. Nothing is saved."/>
-                        <Button x:Name="btnWsImportSelected" Click="btnWsImportSelected_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Import selected"
-                                ToolTip="The selected rows (Ctrl / Shift + click), sorted into import order. Non-importable rows are skipped with their reason."/>
+                    <DockPanel Grid.Row="5" Margin="2,0,2,0">
+                        <Button x:Name="btnWsImportAll" Click="btnWsImportAll_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" FontWeight="SemiBold" Content="Import Workspace"
+                                ToolTip="The whole workspace: every Ready, ticked file, in import order (hardware, UDTs, tag tables, data blocks, instance DBs, block generation, code blocks, sources), per PLC. Files without a valid #!openn header, misplaced, stale or unclassified files are skipped with their reason, and so are rows whose Import box is unticked. Nothing is saved."/>
+                        <Button x:Name="btnWsImportSelected" Click="btnWsImportSelected_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Import Selection"
+                                ToolTip="The selected rows (Ctrl / Shift + click), sorted into import order. Non-importable rows and rows whose Import box is unticked are skipped with their reason."/>
                         <Button x:Name="btnWsLogCatalog" Click="btnWsLogCatalog_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" MinWidth="110" Content="Log catalog"
                                 ToolTip="Write the catalog summary (counts per kind, files needing attention) to the log"/>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -288,7 +366,7 @@
                     </DockPanel>
 
                     <!-- export: the attached project into the workspace's sibling ExportedData, same shape, stamped -->
-                    <Expander x:Name="expExport" Grid.Row="5" Margin="2,6,2,0" IsExpanded="False" Background="#FAFAFC" BorderBrush="#FFB8B8C0" BorderThickness="1" Padding="6,2,6,4">
+                    <Expander x:Name="expExport" Grid.Row="6" Margin="2,6,2,0" IsExpanded="False" Background="#FAFAFC" BorderBrush="#FFB8B8C0" BorderThickness="1" Padding="6,2,6,4">
                         <Expander.Header>
                             <TextBlock FontSize="12">
                                 <Run Text="Export the attached TIA project" FontWeight="SemiBold"/>
@@ -413,8 +491,10 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <DockPanel Grid.Row="0" Margin="6,2,6,2">
+            <DockPanel x:Name="dpLogToolbar" Grid.Row="0" Margin="6,2,6,2">
                 <Label DockPanel.Dock="Left" Content="Log" FontWeight="SemiBold"/>
+                <Button x:Name="btnLogPopout" Click="btnLogPopout_Click" DockPanel.Dock="Left" Margin="6,0,0,0" MinWidth="0" Padding="8,0" Content="Pop out &#x2197;"
+                        ToolTip="Open the log in its own window (this one keeps running too)"/>
                 <Button x:Name="btnClearLogs" Click="btnClearLogs_Click" DockPanel.Dock="Right" MinWidth="80" Background="#FFADFFF9" Content="Clear Logs"/>
                 <Button x:Name="btnCancelOperation" Click="btnCancelOperation_Click" DockPanel.Dock="Right" Margin="0,0,8,0" MinWidth="120" FontWeight="SemiBold" Background="#FFFFD2D2" Visibility="Hidden" Content="Cancel Operation"/>
                 <CheckBox x:Name="cbLogToFile" DockPanel.Dock="Right" Margin="0,0,12,0" VerticalAlignment="Center" FontWeight="Normal" Content="Log to file" Checked="cbLogToFile_Checked" Unchecked="cbLogToFile_Unchecked"/>

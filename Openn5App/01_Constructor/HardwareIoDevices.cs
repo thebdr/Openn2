@@ -16,16 +16,20 @@ namespace Openn._01_Constructor
             public string IP;
             public string pnNumber; //explicit PROFINET device number; empty = derive from last IP octet
             public string subnet;
+            public string connector; //X1/X01... interface designation; empty = default pick
+            public string group;     //device-group path "folder/sub/..."; empty = ungrouped root
             public string customParameters;
             public string srcFileName;
             public int srcRow;
-            public _Device(string _name, string _identifier, string _IP, string _pnNumber, string _subnet, string _customParameters, string _srcFileName, int _srcRow)
+            public _Device(string _name, string _identifier, string _IP, string _pnNumber, string _subnet, string _connector, string _group, string _customParameters, string _srcFileName, int _srcRow)
             {
                 name = _name;
                 identifier = _identifier;
                 IP = _IP;
                 pnNumber = _pnNumber;
                 subnet = _subnet;
+                connector = _connector;
+                group = _group;
                 customParameters = _customParameters;
                 srcFileName = _srcFileName;
                 srcRow = _srcRow;

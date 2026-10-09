@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Openn._10_StandardFunctions;
 using static Openn._10_StandardFunctions.LogsManager;
 
@@ -9,7 +10,7 @@ namespace Openn._01_Constructor
 {
     /// <summary>
     /// Loads a hardware configuration folder (format 2):
-    ///   DeviceTypesDatabase.csv - model database
+    ///   DeviceTypesDatabase.xlsx/.csv - model database (shared input; the xlsx is preferred)
     ///   Stations.csv            - one row per station (Role: Plc / PlcCardCm / IoDevice)
     ///   Modules.csv             - one row per plugged module, referencing its station
     ///                             (a row whose model is of type TransferArea is a PN/PN
@@ -107,6 +108,11 @@ namespace Openn._01_Constructor
 
         /// <summary>
         /// Stations.csv columns: Role,Station Name,Model Id,IP Address,PN Number,Subnet,Custom Parameters
+        /// (+ optional: 8 = Group, a device-group path "folder/sub/..." the generation
+        /// find-or-creates in the project tree (empty = ungrouped); 9 = Connector, picking the interface /
+        /// IO connector on devices that expose more than one - ignored elsewhere. PL emits the
+        /// I/O-List cell VERBATIM there, e.g. "X1-P1 R" = port + direction; the loader extracts
+        /// the bare X&lt;n&gt; designation per the coordination brief.)
         /// </summary>
         private static void ParseStations(CsvTable stations, List<string> errors,
             List<HardwareIoControllers._Controller> controllers, List<HardwareIoDevices._Device> devices)
@@ -125,7 +131,8 @@ namespace Openn._01_Constructor
                 }
 
                 string role = row.Get(0), name = row.Get(1), modelId = row.Get(2),
-                       ip = row.Get(3), pnNumber = row.Get(4), subnet = row.Get(5), customParameters = row.Get(6);
+                       ip = row.Get(3), pnNumber = row.Get(4), subnet = row.Get(5), customParameters = row.Get(6),
+                       group = row.Get(7), connectorCell = row.Get(8), connector = ExtractConnector(connectorCell);
 
                 if (name.Length == 0)
                     errors.Add(where + "Station Name is empty");
@@ -147,6 +154,9 @@ namespace Openn._01_Constructor
                 if (subnet.Length == 0)
                     errors.Add(where + "Subnet is empty");
 
+                if (connectorCell.Length > 0 && connector.Length == 0)
+                    errors.Add(where + "Connector must carry an interface designation like X1 / X01 (the verbatim I/O-List cell, e.g. \"X1-P1 R\", is fine), found \"" + connectorCell + "\"");
+
                 int pnValue;
                 if (pnNumber.Length > 0 && (!int.TryParse(pnNumber, out pnValue) || pnValue < 1))
                     errors.Add(where + "PN Number must be a positive integer or empty, found \"" + pnNumber + "\"");
@@ -158,11 +168,11 @@ namespace Openn._01_Constructor
                 {
                     if (pnNumber.Length > 0)
                         errors.Add(where + "PN Number applies to IoDevice stations only");
-                    controllers.Add(new HardwareIoControllers._Controller(name, modelId, ip, subnet, customParameters, stations.FilePath, row.LineNumber));
+                    controllers.Add(new HardwareIoControllers._Controller(name, modelId, ip, subnet, connector, group, customParameters, stations.FilePath, row.LineNumber));
                 }
                 else if (role.Equals("IoDevice", StringComparison.OrdinalIgnoreCase))
                 {
-                    devices.Add(new HardwareIoDevices._Device(name, modelId, ip, pnNumber, subnet, customParameters, stations.FilePath, row.LineNumber));
+                    devices.Add(new HardwareIoDevices._Device(name, modelId, ip, pnNumber, subnet, connector, group, customParameters, stations.FilePath, row.LineNumber));
                 }
                 else
                 {
@@ -189,6 +199,46 @@ namespace Openn._01_Constructor
                 if (device.subnet.Length > 0 && !controllerSubnets.Contains(device.subnet))
                     errors.Add("File: " + device.srcFileName + " Line: " + device.srcRow + " - Subnet \"" + device.subnet + "\" of station " + device.name + " is not provided by any controller");
             }
+
+            //PROFINET device numbers must be unique per subnet (explicit PN Number, else the
+            //default = the last IP octet). TIA rejects the duplicate only at generation time,
+            //so catch the collision here with file/line context instead.
+            var pnNumbersBySubnet = new Dictionary<string, Dictionary<int, string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (HardwareIoDevices._Device device in devices)
+            {
+                if (device.subnet.Length == 0 || Uri.CheckHostName(device.IP) != UriHostNameType.IPv4) continue; //already reported
+                int pnValue;
+                if (device.pnNumber.Length > 0)
+                {
+                    if (!int.TryParse(device.pnNumber, out pnValue)) continue; //already reported
+                }
+                else
+                {
+                    pnValue = int.Parse(device.IP.Split('.')[3]);
+                }
+
+                Dictionary<int, string> usedNumbers;
+                if (!pnNumbersBySubnet.TryGetValue(device.subnet, out usedNumbers))
+                    pnNumbersBySubnet.Add(device.subnet, usedNumbers = new Dictionary<int, string>());
+                string otherStation;
+                if (usedNumbers.TryGetValue(pnValue, out otherStation))
+                    errors.Add("File: " + device.srcFileName + " Line: " + device.srcRow + " - PROFINET device number " + pnValue +
+                               " on subnet \"" + device.subnet + "\" is already taken by station " + otherStation +
+                               " (PN Number defaults to the last IP octet - set an explicit, unique PN Number)");
+                else
+                    usedNumbers.Add(pnValue, device.name);
+            }
+        }
+
+        /// <summary>
+        /// The bare X-designation inside a Stations.csv Connector cell. PL emits the I/O-List
+        /// cell VERBATIM (e.g. "X1-P1 R" = port + direction; see PL4_OP4_coordination.md) - the
+        /// OP side extracts the X&lt;n&gt; token; "" when the cell is empty or carries none.
+        /// </summary>
+        internal static string ExtractConnector(string raw)
+        {
+            Match match = Regex.Match(raw ?? "", "(?<![0-9A-Za-z])[Xx][0-9]{1,2}(?![0-9])");
+            return match.Success ? match.Value : "";
         }
 
         private static int ControllerOrder(HardwareIoControllers._Controller controller)
