@@ -21,11 +21,13 @@ def _element(**kw):
     return row
 
 
-def _db(elements):
-    etab = interface_elements_table()
+def _db(elements, interfaces=()):
+    itab, etab = interfaces_table(), interface_elements_table()
+    for i in interfaces:
+        itab.add(**i)
     for e in elements:
         etab.add(**e)
-    return Database([interfaces_table(), etab])
+    return Database([itab, etab])
 
 
 def test_direction_templates_and_quoting():
@@ -106,6 +108,47 @@ def test_project_file_shape():
         ok(not os.path.exists(legacy), "the legacy MachineInterfaces.scl is swept (no double import)")
 
 
+def test_the_description_opens_its_region():
+    """C-033: the interface's description is its REGION's first line, a comment (the shipped
+    `scl_region_comment`); an interface without one gets none; the comment opens no byte group and is no
+    assignment - even when it ends in ';'."""
+    eq(interface_scl._scl_params()["region_comment"], "    // {$description}", "the shipped template")
+    with tempfile.TemporaryDirectory() as d:
+        res = interface_scl.project(_db([
+            _element(interface="SORTER-01", signal_name="A", expression="E1", io_address_side1="I10010.0"),
+            _element(interface="SORTER-01", signal_name="B", expression="E2", io_address_side1="I10011.0"),
+            _element(interface="SORTER-02", signal_name="C", expression="E3", io_address_side1="I11010.0"),
+            _element(interface="SORTER-03", signal_name="D", expression="E4", io_address_side1="I12010.0"),
+        ], interfaces=[{"instance": "SORTER-01", "description": "IO COUPLER - INTERFACE SAFETY (=TRIC) / COY LOWER"},
+                       {"instance": "SORTER-02", "description": ""},
+                       {"instance": "SORTER-03", "description": "ENDS IN;"}]), out_dir=d)
+        text = open(res["path"], encoding="utf-8-sig").read().replace("\r\n", "\n")
+    body = text.split("BEGIN\n", 1)[1].split("END_FUNCTION", 1)[0].splitlines()
+    eq(body, ["REGION SORTER-01", "    // IO COUPLER - INTERFACE SAFETY (=TRIC) / COY LOWER",
+              '    "A" := "E1";', "", '    "B" := "E2";', "END_REGION", "",
+              "REGION SORTER-02", '    "C" := "E3";', "END_REGION", "",
+              "REGION SORTER-03", "    // ENDS IN;", '    "D" := "E4";', "END_REGION"])
+    eq((res["assignments"], res["interfaces"]), (4, 3), "the comments are no assignments")
+
+
+def test_the_region_comment_is_config():
+    """C-033: the comment line is the project's template ($description, $interface); a blank render or a blank
+    description writes no line; a project config without the key is a located error."""
+    from pipeline5 import config
+    rows = [{"instance": "SORTER-01", "description": "LOWER"}, {"instance": "SORTER-02", "description": "  "}]
+    eq(interface_scl.region_comments(rows, "    // {$interface}: {$description}"), {"SORTER-01": "    // SORTER-01: LOWER"})
+    eq(interface_scl.region_comments(rows, "{}"), {}, "a template rendering blank writes nothing")
+    original = config.load_generation_params
+    config.load_generation_params = lambda: {"interfaces": {"scl_file": "x.scl", "scl_line_templates": {}}}
+    try:
+        interface_scl._scl_params()
+        ok(False, "a missing key must raise")
+    except RuntimeError as error:
+        ok("interfaces.scl_region_comment" in str(error), str(error))
+    finally:
+        config.load_generation_params = original
+
+
 def test_project_no_elements_writes_nothing():
     with tempfile.TemporaryDirectory() as d:
         res = interface_scl.project(_db([]), out_dir=d)
@@ -122,4 +165,6 @@ if __name__ == "__main__":
         ("byte_groups_get_blank_lines", test_byte_groups_get_blank_lines),
         ("project_file_shape", test_project_file_shape),
         ("project_no_elements_writes_nothing", test_project_no_elements_writes_nothing),
+        ("the_description_opens_its_region", test_the_description_opens_its_region),
+        ("the_region_comment_is_config", test_the_region_comment_is_config),
     ]))

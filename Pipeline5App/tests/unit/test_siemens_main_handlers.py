@@ -1382,6 +1382,27 @@ def test_a_transfer_area_fail_halts_the_interface_outputs():
         config.load_params = original
 
 
+def test_the_interface_description_reaches_the_scl():
+    """C-033 through the REAL 400 handler on the fixture: each IOC row's Description L1 (`IO COUPLER - SORTER
+    INTERFACE`, no second part) is its interface's `description` in the interfaces table and the comment opening
+    its REGION in the written `10_Machine Interfaces.scl`."""
+    import glob
+    from pipeline5.phases.interfaces.builder import interface_elements_table, interfaces_table
+    from pipeline5.truth.database import Database
+    host = _Host()
+    SYSTEM.handlers["interfaces"](host.ctx())
+    eq(host.halted, False)
+    db = Database([interfaces_table(), interface_elements_table()]).load(p5paths._BUILTIN_DATABASE)
+    eq([(i["instance"], i["description"]) for i in db["interfaces"]],
+       [("SORTER-01", "IO COUPLER - SORTER INTERFACE"), ("SORTER+DIAG-02", "IO COUPLER - SORTER INTERFACE")])
+    path = glob.glob(os.path.join(p5paths._BUILTIN_OUTPUT, "**", "10_Machine Interfaces.scl"), recursive=True)
+    eq(len(path), 1, path)
+    lines = open(path[0], encoding="utf-8-sig").read().splitlines()
+    eq([(line, lines[n + 1]) for n, line in enumerate(lines) if line.startswith("REGION ")],
+       [("REGION SORTER-01", "    // IO COUPLER - SORTER INTERFACE"),
+        ("REGION SORTER+DIAG-02", "    // IO COUPLER - SORTER INTERFACE")])
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("siemens_main_handlers", [
@@ -1421,4 +1442,5 @@ if __name__ == "__main__":
         ("run_all_writes_a_ready_op5_workspace", _sandboxed(test_run_all_writes_a_ready_op5_workspace)),
         ("a_transfer_area_fail_halts_the_interface_outputs",
          _sandboxed(test_a_transfer_area_fail_halts_the_interface_outputs)),
+        ("the_interface_description_reaches_the_scl", _sandboxed(test_the_interface_description_reaches_the_scl)),
     ]))

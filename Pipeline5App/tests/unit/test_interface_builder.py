@@ -386,6 +386,65 @@ def test_the_if_workbook_gets_the_resolved_base():
     eq(ws.cell(2, 4).value, 20000, "the IF_ workbook's Side-1 Base Address")
 
 
+def _build(rows, **kw):
+    """build_interfaces on `rows` with the native template + the test DTD, saving into a temp dir."""
+    from pipeline5 import config
+    original_db = config.database_dir
+    with tempfile.TemporaryDirectory() as d:
+        tpl = os.path.join(d, "t.xlsx"); _native_template(tpl)
+        config.database_dir = lambda: d                        # build_interfaces saves - never into the repo
+        try:
+            return interfaces.build_interfaces(_signals_db(rows), template_path=tpl, dtd=_ta_dtd(), **kw)
+        finally:
+            config.database_dir = original_db
+
+
+_FVT_IOC = {"script_type": "IOC", "mnemonic": "SORTER-01", "bit": "I10000.0", "source_cell": "NET!O6", "uid": "i1",
+            "desc_l1": "IO COUPLER - INTERFACE",
+            "desc_l1b": "SAFETY (=TRIC) /\n  COY LOWER SORTER   (=TRIB-AEC01)"}
+
+
+def test_interface_description_from_the_ioc_row():
+    """C-033: each interface's `description` is its IOC row's, through the SHIPPED template - Description L1 + its
+    second part, cleaned to one line (a line break would end the SCL comment); an IOC row with neither = blank."""
+    eq(interfaces.description_template(), "{clean(join(' ', $desc_l1, $desc_l1b))}", "the shipped template")
+    rows = [dict(_FVT_IOC),
+            {"script_type": "IOC", "mnemonic": "SORTER-02", "bit": "11000", "source_cell": "NET!O8", "uid": "i2",
+             "desc_l1": "", "desc_l1b": ""}]
+    db, found = _build(rows)
+    eq([(i["instance"], i["description"]) for i in db["interfaces"]],
+       [("SORTER-01", "IO COUPLER - INTERFACE SAFETY (=TRIC) / COY LOWER SORTER (=TRIB-AEC01)"), ("SORTER-02", "")])
+    eq([f.type for f in found if f.type == "if_description_invalid"], [], "a renderable template: no finding")
+    eq(interfaces.interfaces_table().columns[:3], ["uid", "instance", "description"], "the SSOT column")
+
+
+def test_interface_description_template_is_config():
+    """C-033: the template is the project's choice - another column set is honored, its result still made ONE line
+    (the comment's line break) even when the template does not clean; a template the row cannot
+    render (a field it does not carry, a malformed hole) is ONE WARN at the first IOC row, every description blank,
+    the tables still built (never a crash); a project config without the key is a located error."""
+    from pipeline5 import config
+    rows = [dict(_FVT_IOC), dict(_FVT_IOC, mnemonic="SORTER-02", bit="11000", source_cell="NET!O8", uid="i2",
+                                  desc_l1b="UPPER")]
+    db, found = _build(rows, describe_with="{$mnemonic}: {$desc_l1b}")     # no clean() - the builder's own
+    eq([i["description"] for i in db["interfaces"]],
+       ["SORTER-01: SAFETY (=TRIC) / COY LOWER SORTER (=TRIB-AEC01)", "SORTER-02: UPPER"])
+    for bad in ("{$no_such_column}", "{clean($desc_l1}"):
+        db, found = _build(rows, describe_with=bad)
+        warned = [(f.type, f.severity, f.location) for f in found if f.type == "if_description_invalid"]
+        eq(warned, [("if_description_invalid", "WARN", "NET!O6")], f"one WARN for {bad!r}")
+        eq([i["description"] for i in db["interfaces"]], ["", ""], "blank descriptions")
+    original = config.load_generation_params
+    config.load_generation_params = lambda: {"interfaces": {"scl_file": "x.scl"}}
+    try:
+        interfaces.description_template()
+        ok(False, "a missing key must raise")
+    except RuntimeError as error:
+        ok("interfaces.description_template" in str(error), str(error))
+    finally:
+        config.load_generation_params = original
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("interfaces", [
@@ -411,4 +470,6 @@ if __name__ == "__main__":
         ("layout_extent_words", test_layout_extent_words),
         ("build_interfaces_checks_the_real_layout", test_build_interfaces_checks_the_real_layout),
         ("the_if_workbook_gets_the_resolved_base", test_the_if_workbook_gets_the_resolved_base),
+        ("interface_description_from_the_ioc_row", test_interface_description_from_the_ioc_row),
+        ("interface_description_template_is_config", test_interface_description_template_is_config),
     ]))

@@ -183,7 +183,10 @@ def _xlsx_cells(path: str):
 _WORKSPACE = "TiaPortalProjectInterface/BuilderData/"
 _TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
 _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
-SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0}
+SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0}
+_INTERFACE_SCL = "10_Machine Interfaces.scl"
+_REGION_LINE = re.compile(r"^REGION\s")
+_COMMENT_LINE = re.compile(r"^\s*//")
 
 
 def _drop_transfer_areas(rel: str, data: bytes) -> bytes:
@@ -195,6 +198,38 @@ def _drop_transfer_areas(rel: str, data: bytes) -> bytes:
     kept = [line for line in lines if not _TRANSFER_AREA_ROW.search(line.rstrip())]
     SANCTIONED["transfer_area_rows"] += len(lines) - len(kept)
     return "".join(kept).encode("utf-8")
+
+
+def _drop_interface_descriptions(rel: str, data: bytes) -> bytes:
+    """The PL5-only interface description (C-033) out of a PL5 file: the `interfaces` table's `description`
+    column, and the `//` comment line right after each `REGION` of the interfaces SCL - every other byte kept."""
+    name = os.path.basename(rel)
+    if name == "interfaces.csv":
+        import csv
+        import io
+        text = data.decode("utf-8")
+        bom = "\ufeff" if text.startswith("\ufeff") else ""
+        rows = list(csv.reader(io.StringIO(text[len(bom):], newline="")))
+        if not rows or "description" not in rows[0]:
+            return data
+        at = rows[0].index("description")
+        out = io.StringIO(newline="")
+        writer = csv.writer(out)                           # the Table writer's dialect (CRLF, minimal quoting)
+        for row in rows:
+            if len(row) > at and row is not rows[0] and row[at]:
+                SANCTIONED["interface_descriptions"] += 1
+            writer.writerow(row[:at] + row[at + 1:])
+        return (bom + out.getvalue()).encode("utf-8")
+    if name == _INTERFACE_SCL:
+        lines = data.decode("utf-8").splitlines(keepends=True)
+        kept = []
+        for line in lines:
+            if kept and _REGION_LINE.match(kept[-1]) and _COMMENT_LINE.match(line):
+                SANCTIONED["region_comments"] += 1
+                continue
+            kept.append(line)
+        return "".join(kept).encode("utf-8")
+    return data
 
 
 def _is_tag_table_xml(rel: str) -> bool:
@@ -287,7 +322,7 @@ def compare(a_root: str, b_root: str, label: str) -> list:
             if not headered:
                 diffs.append(f"{label}: no #!openn header: {rel}")
         da = _norm_text(open(a[rel], "rb").read())
-        db = _norm_text(_drop_transfer_areas(rel, raw_b))
+        db = _norm_text(_drop_interface_descriptions(rel, _drop_transfer_areas(rel, raw_b)))
         if da != db:
             diffs.append(f"{label}: bytes differ: {rel}")
     return diffs
@@ -338,7 +373,9 @@ def main() -> int:
                 print("  ", d)
             return 1
         print("PARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations; "
-              f"{SANCTIONED['transfer_area_rows']} PL5-only transfer-area rows)")
+              f"{SANCTIONED['transfer_area_rows']} PL5-only transfer-area rows, "
+              f"{SANCTIONED['interface_descriptions']} interface descriptions + "
+              f"{SANCTIONED['region_comments']} SCL region comments)")
         return 0
 
 

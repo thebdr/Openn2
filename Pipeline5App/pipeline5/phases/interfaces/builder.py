@@ -20,6 +20,7 @@ from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries
 
 from pipeline5 import config
+from pipeline5.language import expr
 from pipeline5.truth.database import Database
 from pipeline5.findings.finding import Finding, record
 from pipeline5.truth.table import Table
@@ -148,10 +149,11 @@ def build_tagnames(database: Database | None = None) -> Database:
 
 # --- 400b: the interface instances + the mirrored elements (the SSOT tables) --------------------- #
 def interfaces_table() -> Table:
-    """One row per IOC interface instance (its identity + plug values + chosen template sheet)."""
+    """One row per IOC interface instance (its identity + plug values + chosen template sheet; `description`
+    = the IOC row's own description through `interfaces.description_template` - [[C-033]])."""
     return Table(
         "interfaces",
-        columns=["uid", "instance", "machine_type", "interface_id", "is_diag", "base_address",
+        columns=["uid", "instance", "description", "machine_type", "interface_id", "is_diag", "base_address",
                  "base_node", "device", "ip", "template_sheet", "source"],
         json_columns=["is_diag"],
         key_columns=["instance"],
@@ -708,13 +710,36 @@ def area_findings(records, extents, lengths, rows) -> list:
     return out
 
 
-def build_interfaces(database: Database | None = None, template_path: str | None = None, dtd: dict | None = None) -> tuple:
+def description_template() -> str:
+    """The interface description's template - `interfaces.description_template` in generation_params.yaml,
+    rendered against the IOC row ([[C-033]]). STRICT: a missing key is a located error, never an in-code
+    default (the config-completeness rule)."""
+    section = (config.load_generation_params() or {}).get("interfaces") or {}
+    try:
+        return str(section["description_template"])
+    except (KeyError, TypeError):
+        raise RuntimeError("generation_params.yaml: interfaces.description_template is missing") from None
+
+
+def describe(row, template: str) -> str:
+    """The interface's description: `template` rendered (strict) against its IOC row, cleaned to ONE line -
+    it becomes a `//` comment in the SCL, which a line break would end. Raises `expr.ExprError` on a field
+    the row does not carry / a malformed template."""
+    from pipeline5.language.expr.runtime import clean
+    return clean(expr.render(template, dict(row), mode="strict"))
+
+
+def build_interfaces(database: Database | None = None, template_path: str | None = None, dtd: dict | None = None,
+                     describe_with: str | None = None) -> tuple:
     """400b: per IOC instance, collect its mirror set + lay out the bytes -> the `interfaces` +
     `interface_elements` tables. Runs `annotate_interface_tagnames` first (the Signal Name Side 1 base
     needs name_in_db/name_in_tagtable). Records the findings to `validation_issues` + saves the Database.
     Returns (database, findings) - the `if_ioc_no_mnemonic` / `if_signal_not_mirrored` / `if_mapping_unknown` /
     `if_sheet_fallback` WARNs and the transfer-area checks of `area_findings` ([[C-031]]; `dtd` = the
-    DeviceTypesDatabase holding the default area lengths, loaded from the params when None)."""
+    DeviceTypesDatabase holding the default area lengths, loaded from the params when None). Each interface's
+    `description` comes from its IOC row through `describe_with` (default: the configured
+    `description_template`); a template the row cannot render is one `if_description_invalid` WARN and blank
+    descriptions ([[C-033]])."""
     if database is None:
         colmap = config.load_column_map("IoList")
         database = Database([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
@@ -727,6 +752,9 @@ def build_interfaces(database: Database | None = None, template_path: str | None
     sheet_names = template_sheet_names(template_path)
     if records and dtd is None:
         dtd = config.load_device_types_db(config.load_params())
+    if records and describe_with is None:
+        describe_with = description_template()
+    template_error = None
 
     isynt_by_sheet: dict = {}
     extent_by_sheet: dict = {}
@@ -755,7 +783,17 @@ def build_interfaces(database: Database | None = None, template_path: str | None
                                                      [e for e in native + elems if e.direction == d])
                                     for d in ("I", "Q")}
         lengths[rec["instance"]] = area_lengths(rec["row"], dtd)
-        itab.add(instance=rec["instance"], machine_type=rec["machine_type"], interface_id=rec["index"],
+        description = ""
+        if template_error is None:
+            try:
+                description = describe(rec["row"], describe_with)
+            except expr.ExprError as error:                 # one WARN, never a crash
+                template_error = error
+                findings.append(_f("if_description_invalid", "WARN",
+                                   f"interfaces.description_template {describe_with!r} does not render against "
+                                   f"the IOC row ({error}) - every interface description left blank",
+                                   rec["source"], str(rec["row"].get("uid", "")), doc=_io_doc()))
+        itab.add(instance=rec["instance"], description=description, machine_type=rec["machine_type"], interface_id=rec["index"],
                  is_diag=rec["is_diag"], base_address=str(base) if base is not None else rec["base"],
                  base_node=rec["base_node"],
                  device=rec["device"], ip=rec["ip"], template_sheet=sheet, source=rec["source"])

@@ -264,7 +264,8 @@ def project(database, template_path: str | None = None, out_dir: str | None = No
 
 
 # =================================================================================================== #
-# Phase 400e - insert each IF_<instance> sheet into the I/O List, LOSSLESSLY
+# Phase 400e - insert each IF_<instance> sheet into the I/O List (formulas + their caches kept; NOT lossless
+# on a modern workbook - dynamic arrays frozen, threaded comments / add-ins / metadata dropped: [[P-019]])
 # =================================================================================================== #
 # Clean-room port of PL3's interfaces.py insertion path. openpyxl writes the combined workbook (keeping
 # every existing formula), then the existing formula cells' CACHED VALUES - which openpyxl drops on
@@ -431,7 +432,7 @@ def _interface_address_caches(if_path) -> dict:
 
 def insert_sheets_into_iolist(iolist_path, sheets) -> list:
     """Insert each (title, if_path) interface sheet into the I/O List ONLY if a sheet of that name is
-    not already present, LOSSLESSLY. openpyxl writes the combined workbook (keeping every existing
+    not already present. openpyxl writes the combined workbook (keeping every existing
     formula), then the existing formula cells' CACHED VALUES - which openpyxl drops on re-save - are
     patched back from the original, so both the formulas and their values survive. ONE atomic save (the
     caller backs the I/O List up first). Returns per-interface action strings."""

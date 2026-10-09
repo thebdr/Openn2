@@ -20,6 +20,12 @@ interfaces:
   scl_line_templates:
     ">": "    {$signal_name_q} := {$expression_q};"
     "<": "    {$expression_q} := {$signal_name_q};"
+  # The interface's description (the interfaces table's `description`), rendered against its IOC row - any
+  # I/O-List column ($desc_l1 = Description L1, $desc_l1b = its second part, $mnemonic, ...) - and cleaned
+  # to one line. It opens the interface's REGION as the comment below ($description; $interface = the
+  # name); an interface whose description renders blank gets no comment line.
+  description_template: "{clean(join(' ', $desc_l1, $desc_l1b))}"
+  scl_region_comment: "    // {$description}"
 
 diagnosis:
   # The packed SCL DWord slot names - the BoolToUDInt instance per cabinet DWord (phase 620). Bit 0-31

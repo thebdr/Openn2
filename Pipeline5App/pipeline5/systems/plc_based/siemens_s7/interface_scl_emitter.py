@@ -8,7 +8,10 @@ the partner; the SSOT stores I/Q):
     <:  <expression side 1> := <signal name side 1>;
 
 Within a region, a BLANK LINE opens each new I/O BYTE (the `io_address_side1` up to the `.bit`) -
-the assignments read grouped by byte, like the IF_ sheet lays them out (user spec 2026-07-07).
+the assignments read grouped by byte, like the IF_ sheet lays them out (user spec 2026-07-07). The
+region's FIRST line is the interface's description as a comment (`interfaces.scl_region_comment`
+rendered with $description = the `interfaces` row's, taken from its IOC row - [[C-033]]); an interface
+without a description gets no comment line.
 
 The line templates live in generation_params.yaml (`interfaces.scl_line_templates`), rendered
 through the ONE expression engine against each element row. The ctx carries the raw SSOT columns
@@ -60,10 +63,11 @@ def _scl_params() -> dict:
     try:
         templates = section["scl_line_templates"]
         return {"file": str(section["scl_file"]),
-                "templates": {str(k): str(v) for k, v in dict(templates).items()}}
+                "templates": {str(k): str(v) for k, v in dict(templates).items()},
+                "region_comment": str(section["scl_region_comment"])}
     except (KeyError, TypeError):
-        raise RuntimeError("generation_params.yaml: interfaces.scl_file / interfaces.scl_line_templates"
-                           " is missing/malformed") from None
+        raise RuntimeError("generation_params.yaml: interfaces.scl_file / interfaces.scl_line_templates /"
+                           " interfaces.scl_region_comment is missing/malformed") from None
 
 
 def _quoted(text: str) -> str:
@@ -75,18 +79,34 @@ def _quoted(text: str) -> str:
     return f'"{text}"'
 
 
-def render_lines(elements, templates: dict) -> tuple:
-    """`(lines, findings)` - the SCL body: a REGION per interface (first-seen order), one rendered
-    assignment per element, a BLANK line before each NEW I/O byte (the address up to `.bit` - the
-    byte grouping the IF_ sheet also shows; skipped elements don't break a byte group). An element
-    with a blank signal/expression or an unmapped direction is SKIPPED with a WARN (the rest of the
-    file still ships)."""
+def region_comments(interfaces, template: str) -> dict:
+    """{instance -> the REGION's comment line}: `template` rendered (strict) per `interfaces` row with
+    $description / $interface; a row without a description gets none ([[C-033]])."""
+    out = {}
+    for row in interfaces or []:
+        description = str(row.get("description") or "").strip()
+        if description:
+            instance = str(row.get("instance") or "")
+            line = expr.render(template, {"description": description, "interface": instance}, mode="strict")
+            if line.strip():
+                out[instance] = line
+    return out
+
+
+def render_lines(elements, templates: dict, comments: dict | None = None) -> tuple:
+    """`(lines, findings)` - the SCL body: a REGION per interface (first-seen order), its `comments`
+    line first (when the interface has one), one rendered assignment per element, a BLANK line before
+    each NEW I/O byte (the address up to `.bit` - the byte grouping the IF_ sheet also shows; skipped
+    elements don't break a byte group). An element with a blank signal/expression or an unmapped
+    direction is SKIPPED with a WARN (the rest of the file still ships)."""
     lines, findings = [], []
     by_interface: dict = {}
     for e in elements:
         by_interface.setdefault(str(e.get("interface") or ""), []).append(e)
     for instance, rows in by_interface.items():
         lines.append(f"REGION {instance}")
+        if (comments or {}).get(instance):
+            lines.append(comments[instance])
         last_byte = None
         for e in rows:
             signal = str(e.get("signal_name") or "").strip()
@@ -129,9 +149,11 @@ def project(database: Database | None = None, out_dir: str | None = None) -> dic
     params = _scl_params()
     if not elements:
         return {"path": "", "assignments": 0, "interfaces": 0, "findings": []}
-    body, findings = render_lines(elements, params["templates"])
+    interfaces = list(database["interfaces"]) if "interfaces" in database else []
+    body, findings = render_lines(elements, params["templates"],
+                                  region_comments(interfaces, params["region_comment"]))
     n_regions = sum(1 for line in body if line.startswith("REGION "))
-    n_assign = sum(1 for line in body if line.strip().endswith(";"))
+    n_assign = sum(1 for line in body if line.strip().endswith(";") and not line.lstrip().startswith("//"))
     function_name = os.path.splitext(os.path.basename(params["file"]))[0]
     text_lines = [f'FUNCTION "{function_name}" : Void',
                   "{ S7_Optimized_Access := 'TRUE' }",
