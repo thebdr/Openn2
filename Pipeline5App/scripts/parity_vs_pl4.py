@@ -183,7 +183,10 @@ def _xlsx_cells(path: str):
 _WORKSPACE = "TiaPortalProjectInterface/BuilderData/"
 _TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
 _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
-SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0}
+SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
+              "device_types_copy": 0}
+_DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
+_SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
 _INTERFACE_SCL = "10_Machine Interfaces.scl"
 _REGION_LINE = re.compile(r"^REGION\s")
 _COMMENT_LINE = re.compile(r"^\s*//")
@@ -260,6 +263,20 @@ def _check_tag_table_xml(rel: str, path: str, label: str) -> list:
     return problems
 
 
+def _check_device_types_copy(path: str, label: str) -> list:
+    """The shipped DeviceTypesDatabase (C-036, since 2026-10-09) - a PL5-only file: a `hw/device-types` header
+    citing the shared original, and below it the original byte for byte (the oracle's run reads the shared one)."""
+    text = open(path, "rb").read().decode("utf-8")
+    body, headered = _strip_header(text)
+    problems = [] if headered else [f"{label}: no #!openn header on the shipped DeviceTypesDatabase"]
+    if "#! kind: hw/device-types" not in text or "#! source: Shared/HardwareConfigBuilderData/DeviceTypesDatabase.csv" not in text:
+        problems.append(f"{label}: the shipped DeviceTypesDatabase is no hw/device-types copy citing the shared one")
+    original, _h = _strip_header(open(_SHARED_DEVICE_TYPES, "rb").read().decode("utf-8"))
+    if body != original:
+        problems.append(f"{label}: the shipped DeviceTypesDatabase differs from the shared original below its header")
+    return problems
+
+
 def _legacy_rel(rel: str):
     """A PL5 output path -> the frozen reference's path: the VCI-shaped workspace (contract §4) onto the
     legacy BuilderData folders (§4.1, inverted). None = a PL5-only file by design (the workspace config,
@@ -292,6 +309,10 @@ def compare(a_root: str, b_root: str, label: str) -> list:
         if _is_tag_table_xml(rel):                     # the sanctioned new surface: checked, never compared
             diffs += _check_tag_table_xml(rel, path, label)
             SANCTIONED["tag_table_xml"] += 1
+            continue
+        if rel == _DEVICE_TYPES_COPY:                  # the shipped database: checked against its original
+            diffs += _check_device_types_copy(path, label)
+            SANCTIONED["device_types_copy"] += 1
             continue
         legacy = _legacy_rel(rel)
         if legacy is None:
@@ -375,7 +396,8 @@ def main() -> int:
         print("PARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations; "
               f"{SANCTIONED['transfer_area_rows']} PL5-only transfer-area rows, "
               f"{SANCTIONED['interface_descriptions']} interface descriptions + "
-              f"{SANCTIONED['region_comments']} SCL region comments)")
+              f"{SANCTIONED['region_comments']} SCL region comments, {SANCTIONED['device_types_copy']} shipped "
+              "DeviceTypesDatabase checked against its original)")
         return 0
 
 

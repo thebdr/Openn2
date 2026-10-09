@@ -566,8 +566,9 @@ def run_hardware(ctx, only=None):
     res = hardware_csv.project(database)
     if res["findings"]:
         ctx.render(res["findings"], label="700 BuilderData")
-    own = f" (+ the project's {os.path.basename(res['device_types_db'])})" if res.get("device_types_db") else ""
-    ctx.emit("RSLT", f"  700: {res['stations']} stations + {res['modules']} modules{own} -> {dirs['hardware']}")
+    dtd = (f" + {os.path.basename(res['device_types_db'])} (from {res.get('device_types_source') or 'its params'})"
+           if res.get("device_types_db") else "")
+    ctx.emit("RSLT", f"  700: {res['stations']} stations + {res['modules']} modules{dtd} -> {dirs['hardware']}")
 
 
 def run_software(ctx, only=None):

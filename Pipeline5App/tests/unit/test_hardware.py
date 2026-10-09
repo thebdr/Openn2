@@ -8,6 +8,7 @@ from _harness import run, eq, ok
 from pipeline5.truth.database import Database
 from pipeline5.systems.plc_based.siemens_s7 import profinet_hardware as hardware
 from pipeline5.systems.plc_based.siemens_s7 import hardware_csv_export as hardware_csv
+from pipeline5.systems.plc_based.siemens_s7 import openn_header
 
 
 def _dtd_rec(model, dev_type="IoDeviceCard", comment="", params_by_type=None, io_addr="", parent=None):
@@ -374,10 +375,11 @@ def test_resolve_addr_template_ignores_case():
 
 
 def test_project_device_types_db_is_what_700_reads_and_places():
-    """C-028 refute round 3: a project whose params name its own DeviceTypesDatabase (`device_types_db`) gets ITS
-    values - phase 700 reads it, and 700b places a copy beside Stations.csv for the importer (which reads a local
-    one first); with no param nothing is placed, and a stray local copy is reported (it would override the
-    shared one for the importer), never deleted."""
+    """C-028 refute round 3 + C-036: a project whose params name its own DeviceTypesDatabase (`device_types_db`)
+    gets ITS values - phase 700 reads it - and 700b ships THE database it read beside Stations.csv on every run
+    (the importer reads a local one first): the original byte for byte below a fresh `hw/device-types` header
+    (the run, `source` = the original - the file name for one outside Shared/ and the project, a comment saying
+    edits belong there); with no param the SHARED database ships, cited `Shared/...`, over whatever stood there."""
     from pipeline5 import config
     from pipeline5.config.loaders import load_device_types_db
     from pipeline5.config.paths import DEVICE_TYPES_DB_DEFAULT
@@ -403,17 +405,65 @@ def test_project_device_types_db_is_what_700_reads_and_places():
             ok("Ch(0).Failsafe_SensorEvaluation=0" in text and "SensorSupply" not in text,
                f"700 read the project's database: {text}")
             res = hardware_csv.project(db, out_dir=out)
-            eq(open(res["device_types_db"], encoding="utf-8").read(), open(own, encoding="utf-8").read(),
-               "700b placed the project's database beside Stations.csv")
+            eq(res["device_types_db"], os.path.join(out, "DeviceTypesDatabase.csv"), "beside Stations.csv")
+            copy = open(res["device_types_db"], encoding="utf-8").read()
+            eq(openn_header.strip_header(copy), openn_header.strip_header(open(own, encoding="utf-8").read()),
+               "700b shipped the project's database, byte for byte below the header")
+            stamp = openn_header.read_header(res["device_types_db"])
+            eq((stamp.get("kind"), stamp.get("schema"), stamp.get("producer"), stamp.get("target"), stamp.get("source"),
+                stamp.get("comment")),
+               ("hw/device-types", "1", openn_header.producer(700), "Devices & networks", "MyDeviceTypes.csv",
+                "the database phase 700 read - rewritten by every phase 700 run: edit the source"),
+               "a fresh header: an original outside Shared/ and the project is cited by its file name")
+            eq(stamp.get("run"), openn_header.current_run(), "this generation's run - never Stale beside Stations.csv")
+            eq(copy.count("#!openn"), 1, "the original's own header replaced, not stacked")
+            eq(res["findings"], [])
             config.load_params = lambda path=None: {}
             res = hardware_csv.project(db, out_dir=out)
-            eq(res["device_types_db"], "", "no param: nothing placed")
-            eq([(f.type, f.severity) for f in res["findings"]], [("hw_local_dtd", "WARN")], "the stray copy reported")
-            ok(os.path.isfile(os.path.join(out, "DeviceTypesDatabase.csv")), "never deleted")
+            copy = open(res["device_types_db"], encoding="utf-8").read()
+            eq(openn_header.strip_header(copy), openn_header.strip_header(shared),
+               "no param: the SHARED database ships, over the project copy that stood there")
+            eq(openn_header.read_header(res["device_types_db"]).get("source"),
+               "Shared/HardwareConfigBuilderData/DeviceTypesDatabase.csv", "cited from the monorepo's Shared/")
+            eq(res["findings"], [], "nothing to report")
+            eq(load_device_types_db({"device_types_db": res["device_types_db"]})["by_id"].keys(),
+               load_device_types_db({})["by_id"].keys(), "the shipped copy reads as the shared one")
         finally:
             config.load_params, config.database_dir = original, original_db
     eq(load_device_types_db({"device_types_db": ""})["by_id"]["103040357"]["dev_type"], "IoDevice",
        "a blank param reads the shared database")
+
+
+def test_device_types_source_is_never_a_host_path():
+    """C-036: the shipped copy cites its original relative to `Shared/` or to the PROJECT folder (named by the
+    folder) - contract v1 §1.5, no host path in the handoff; the file name alone outside both; a project copy
+    sharing a semicolon delimiter keeps it (the header refuses a value ending with the delimiter)."""
+    from pipeline5 import config
+    from pipeline5.config.paths import DEVICE_TYPES_DB_DEFAULT
+    eq(hardware_csv.device_types_source(DEVICE_TYPES_DB_DEFAULT),
+       "Shared/HardwareConfigBuilderData/DeviceTypesDatabase.csv")
+    original = config.active_project
+    with tempfile.TemporaryDirectory() as d:
+        project = os.path.join(d, "FVT_PL5_Safety")
+        own = os.path.join(project, "config_project", "hw", "MyDeviceTypes.csv")
+        try:
+            config.active_project = lambda: project
+            eq(hardware_csv.device_types_source(own), "FVT_PL5_Safety/config_project/hw/MyDeviceTypes.csv")
+            eq(hardware_csv.device_types_source(os.path.join(d, "elsewhere", "DTD.csv")), "DTD.csv")
+        finally:
+            config.active_project = original
+        semi = os.path.join(d, "Semi.csv")
+        with open(semi, "w", encoding="utf-8-sig", newline="") as f:
+            f.write("# Identifier;Type;Order;Comment\r\nA1;IoDevice;OrderNumber:A1/V1.0;box\r\n")
+        original_params = config.load_params
+        try:
+            config.load_params = lambda path=None: {"device_types_db": semi}
+            path, _f = hardware_csv._place_device_types_db(os.path.join(d, "out"))
+        finally:
+            config.load_params = original_params
+        raw = open(path, "rb").read()
+        ok(raw.startswith(b"\xef\xbb\xbf#!openn\r\n"), "the BOM stays first, the header right after it")
+        ok(raw.endswith(b"A1;IoDevice;OrderNumber:A1/V1.0;box\r\n"), "the semicolon rows untouched")
 
 
 def test_col_ag_keys_matched_the_importers_way():
@@ -683,5 +733,6 @@ if __name__ == "__main__":
         ("transfer_area_length_must_be_a_whole_number", test_transfer_area_length_must_be_a_whole_number),
         ("700_alone_writes_no_colliding_areas", test_700_alone_writes_no_colliding_areas),
         ("shipped_transfer_area_defaults", test_shipped_transfer_area_defaults),
+        ("device_types_source_is_never_a_host_path", test_device_types_source_is_never_a_host_path),
         ("transfer_areas_are_named_by_direction", test_transfer_areas_are_named_by_direction),
     ]))

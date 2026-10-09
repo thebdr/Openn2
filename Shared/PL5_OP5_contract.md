@@ -45,7 +45,7 @@ change — a trailing added column (the 9th `Connector`) does not bump it.
 
 | kind | what | file | lives in (TIA folder) | OP5 route | order | schema | producer |
 |---|---|---|---|---|---|---|---|
-| `hw/device-types` | model database (order no → type identifier, device type, default custom parameters) | `DeviceTypesDatabase.csv` | `Devices & networks` (or `Shared/HardwareConfigBuilderData`) | reference data for hardware generation | 0 | 1 | hand-maintained |
+| `hw/device-types` | model database (order no → type identifier, device type, default custom parameters) | `DeviceTypesDatabase.csv` | `Devices & networks` (or `Shared/HardwareConfigBuilderData`) | reference data for hardware generation | 0 | 1 | hand-maintained (the original); PL5 phase 700 (the workspace copy) |
 | `hw/stations` | one row per station: `Plc` / `PlcCardCm` / `IoDevice`, IP, PN number, subnet, custom parameters, group, connector | `Stations.csv` | `Devices & networks` | hardware generation | 10 | 2 | PL5 phase 700 |
 | `hw/modules` | one row per plugged module of a station: slot order, model, I/Q address, custom parameters | `Modules.csv` | `Devices & networks` | hardware generation | 11 | 2 | PL5 phase 700 |
 | `sw/udt` | one PLC data type | `<Name>.xml` (`SW.Types.PlcStruct`) | `<PLC>/PLC data types/…` | `TypeGroup.Types.Import` | 20 | 1 | PL5 (not emitted yet) |
@@ -215,8 +215,10 @@ BuilderData/                                   ← the workspace (name kept; PL5
 - `Templates/` holds PL5's copies of the hand-maintained templates, each stamped `sw/block-template` with the
   generation's `run` (a copy an older generation left behind is Stale) and `source` = the original's folder; the
   block-gen csvs keep `$ template=Templates/<file>.xml`, which OP5 resolves by walking up to the workspace root (§7.3).
-  A `DeviceTypesDatabase.csv` copy (a project's own database, placed beside Stations.csv) stays byte-exact: it carries
-  a header once the hand-maintained original does (§6.7).
+  `DeviceTypesDatabase.csv` beside Stations.csv (since 2026-10-09): every phase 700 run ships the database it read -
+  the project's own (`device_types_db`) or the shared one - the original byte for byte below a fresh header
+  (`hw/device-types`, the run, `source` = the original relative to `Shared/` or to the project folder, never a host
+  path; a comment says the copy is rewritten every run and edits belong in the source).
 
 ### 4.1 Legacy layout → workspace mapping (recognized for the diagnosis only — never imported since 2026-10-09)
 
@@ -283,8 +285,9 @@ without a header is a difference; the PL5-only transfer-area rows of `Modules.cs
 allowance); `scripts/run_pipeline.py` generates a workspace headless. Transfer areas (§2.1) are emitted since
 2026-10-08 (`.zen/contract.md` C-031). 6: the `#!openn` row
 in the Files-tab grid is accepted as cosmetic. 7: `DeviceTypesDatabase.csv` carries its header since 2026-10-09
-(`hw/device-types`, schema 1, producer `hand-maintained`, no `run` - no generation produces it; PL5 and OP5 read it
-unchanged, OP5's catalog classifies a project copy Ready); the `TestData/Passing` database copy and the
+(`hw/device-types`, schema 1, producer `hand-maintained`, no `run`; PL5 and OP5 read it unchanged, OP5's catalog
+classifies a project copy Ready; since 2026-10-09 phase 700 ships the database it read into `Devices & networks/` on
+every run, stamped with the run and its `source` - §4); the `TestData/Passing` database copy and the
 `TestData/Passing` Stations/Modules fixtures were stamped by the OP session the same day (`hw/stations` /
 `hw/modules` schema 2) — OP5 now refuses an unheadered database; the block templates still have none (not edited
 since the contract; they are never imported by themselves, so nothing refuses them yet).
