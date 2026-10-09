@@ -1,3 +1,9 @@
+#!openn
+#! kind: hw/device-types
+#! schema: 1
+#! producer: hand-maintained (Shared/HardwareConfigBuilderData)
+#! generated: 2026-10-09T10:47:07Z
+#!end
 # Identifier,Type (Plc| PlcCard| PlcCardCm| IoDevice| IoDeviceCard| Hmi| TransferArea = PN/PN coupler transfer area: Order Number column holds the TIA TransferAreaType IN| OUT| IN_OUT...),Order Number/FW Version,Comment,Parameters (sep= | ),Parameters by Signal Type <ST>P1=0 | P2=0<ST>,I/O Addresses Parameter (Default is Device.Address, managed by Openn2)
 6ES7518-4FP00-0AB0,Plc,OrderNumber:6ES7518-4FP00-0AB0/V3.0,CPU 1518F-4PN/DP,,,
 6ES7517-3FP00-0AB0,Plc,OrderNumber:6ES7 517-3FP00-0AB0/V2.9,CPU 1517F-3 PN/DP,,,

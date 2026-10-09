@@ -267,7 +267,7 @@ workspace (the VCI dirs, the PLC folder, `begin_generation`); every writer stamp
 without a header is a difference; the PL5-only transfer-area rows of `Modules.csv` are its one sanctioned row
 allowance); `scripts/run_pipeline.py` generates a workspace headless. Transfer areas (§2.1) are emitted since
 2026-10-08 (`.zen/contract.md` C-031). 6: the `#!openn` row
-in the Files-tab grid is accepted as cosmetic. 7: not started (the hand-maintained files are unchanged).
+in the Files-tab grid is accepted as cosmetic. 7: `DeviceTypesDatabase.csv` carries its header since 2026-10-09 (`hw/device-types`, schema 1, producer `hand-maintained`, no `run` - no generation produces it; PL5 and OP5 read it unchanged, OP5's catalog classifies a project copy Ready); the block templates still have none (not edited since the contract).
 
 ## 7. Consumer obligations (OP5)
 
