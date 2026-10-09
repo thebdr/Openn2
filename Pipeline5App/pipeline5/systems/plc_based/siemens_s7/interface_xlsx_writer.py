@@ -37,6 +37,8 @@ import zipfile
 
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.cell_range import CellRange
+from openpyxl.worksheet.formula import ArrayFormula
 
 from pipeline5 import config
 from pipeline5.phases.interfaces import builder as interfaces
@@ -133,7 +135,8 @@ def _plug(ws, base_address, node_side1, node_side2, index) -> None:
 def _append_custom_rows(ws, elements) -> None:
     """Lay the mirror block below the data table's last DATA row and stretch the table over it. A total row
     the table shows moves down below the block - Excel's own 'insert table rows above' ([[C-035]]): its
-    formulas name the whole column, so they cover the block; the filter stops above it, as Excel keeps it."""
+    formulas name the whole column, so they cover the block (an array formula's range moves with its cell,
+    a hyperlink with its cell); the filter stops above it, as Excel keeps it."""
     found = interfaces._find_data_table(ws)
     if not found:
         return
@@ -234,6 +237,14 @@ def _append_custom_rows(ws, elements) -> None:
 
     if last > r2 and totals:                               # the total row(s) go below the block, as they are
         ws.move_range(f"{get_column_letter(c1)}{r2 + 1}:{get_column_letter(c2)}{r2 + totals}", rows=last - r2)
+        for row in ws.iter_rows(min_row=last + 1, max_row=last + totals, min_col=c1, max_col=c2):
+            for cell in row:                               # move_range leaves these two on the old row
+                if isinstance(cell.value, ArrayFormula):   # (an array range off its own cell: Excel repairs)
+                    span = CellRange(cell.value.ref)
+                    span.shift(row_shift=last - r2)
+                    cell.value.ref = span.coord
+                if cell.hyperlink is not None:
+                    cell.hyperlink.ref = cell.coordinate
     for r, fields in pending:
         _write_row(r, **fields)
     if last > r2:

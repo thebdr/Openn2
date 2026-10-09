@@ -93,14 +93,17 @@ _TOT_ELEMS = [{"category": "X", "direction": "Q", "data_type": "BOOL", "offset_b
 _ADDR_F = "=SIG[[#This Row],[I/O Offset Byte]]*8"
 
 
-def _totals_template(totals=True, formulas=True):
+def _totals_template(totals=True, formulas=True, extras=False):
     """A template sheet (`SORTER`) whose data table `SIG` SHOWS its total row: header row 1, a template-native
     row 2 (HEARTBEAT), a blank data row 3, the total row 4 - a bold label, the max of the offsets, a count of
     the signal names and one of the addresses (each the SUBTOTAL Excel writes for it); a note BESIDE the table
     in that row (I4). `formulas`: the data rows carry the address formula. totals=False: the same table
-    without its total row (the twin the projection must match row for row)."""
+    without its total row (the twin the projection must match row for row). `extras` (refute round 1): a
+    custom ARRAY total on I/O Bit (E4 - Excel saves a total typed as one, or entered Ctrl+Shift+Enter, as
+    `<f t="array" ref="E4">` + `totalsRowFormula array="1"`) and a labelled total cell with a hyperlink (C4)."""
     from openpyxl.styles import Font
     from openpyxl.worksheet.filters import AutoFilter
+    from openpyxl.worksheet.formula import ArrayFormula
     wb = Workbook(); ws = wb.active; ws.title = "SORTER"
     hdr = ["Category", "Data Type", "Direction </>", "I/O Offset Byte", "I/O Bit", "Signal Name Side 1",
            "I/O Address Side 1"]
@@ -122,13 +125,24 @@ def _totals_template(totals=True, formulas=True):
         ws["D4"] = "=SUBTOTAL(104,SIG[I/O Offset Byte])"
         ws["F4"] = "=SUBTOTAL(103,SIG[Signal Name Side 1])"
         ws["G4"] = "=SUBTOTAL(103,SIG[I/O Address Side 1])"
+    if extras:
+        cols[2].totalsRowLabel, cols[4].totalsRowFunction = "Docs", "custom"
+        cols[4].totalsRowFormula = TableFormula(array=True, attr_text='SUM(--(SIG[Data Type]="BOOL"))')
+        ws["C4"] = "Docs"; ws["C4"].hyperlink = "https://example.com/interfaces"
+        ws["E4"] = ArrayFormula("E4", '=SUM(--(SIG[Data Type]="BOOL"))')
     t.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
     ws.add_table(t)
     return wb, ws
 
 
 def _values(ws, rows, cols=9):
-    return [[ws.cell(r, c).value for c in range(1, cols + 1)] for r in rows]
+    """The cells' values, an array formula as ('array', its range, its text)."""
+    from openpyxl.worksheet.formula import ArrayFormula
+
+    def v(cell):
+        x = cell.value
+        return ("array", x.ref, x.text) if isinstance(x, ArrayFormula) else x
+    return [[v(ws.cell(r, c)) for c in range(1, cols + 1)] for r in rows]
 
 
 def test_append_custom_rows_moves_a_shown_total_row():
@@ -171,6 +185,16 @@ def test_append_custom_rows_moves_a_shown_total_row():
         eq((t.ref, t.autoFilter.ref, ws["A4"].value, ws["A5"].value), ("A1:G4", "A1:G3", "Total", None),
            f"no mirror rows ({len(elems)} element(s)): the total row stays on row 4")
 
+    # refute round 1: an ARRAY total keeps its range on its own (moved) cell - left on row 4, Excel refuses the
+    # file; a hyperlink on a total cell moves with it (it stayed on row 4, on the block's first row)
+    wb, ws = _totals_template(extras=True)
+    interface_xlsx._append_custom_rows(ws, _TOT_ELEMS)
+    eq(_values(ws, [22])[0][2:5], ["Docs", "=SUBTOTAL(104,SIG[I/O Offset Byte])",
+                                   ("array", "E22", '=SUM(--(SIG[Data Type]="BOOL"))')],
+       "the array total's range is its new cell E22")
+    eq((ws["C22"].hyperlink.ref, ws["C22"].hyperlink.target, ws["C4"].hyperlink, ws["E4"].value),
+       ("C22", "https://example.com/interfaces", None, 0), "the hyperlink moved with C22; row 4 is the block's")
+
     # the data rows carry no address formula: the total row's SUBTOTAL is never copied into the block
     wb, ws = _totals_template(formulas=False)
     interface_xlsx._append_custom_rows(ws, _TOT_ELEMS)
@@ -198,13 +222,14 @@ def test_template_readers_skip_a_shown_total_row():
 
 def test_project_and_insert_a_template_showing_its_total_row():
     """Through the real 400c `project` (template file -> IF_ workbook on disk) and the real 400e insert: the
-    written table part ends on the moved total row with its totals, the filter above it; grafted into an I/O
-    List the same, the totals' table name renamed with the table ([[C-034]])."""
+    written table part ends on the moved total row with its totals, the filter above it, the array total's
+    range and the hyperlink on their new cells; grafted into an I/O List the same, the totals' table name
+    renamed with the table ([[C-034]])."""
     import re as _re
     import warnings as _w
     _w.simplefilter("ignore")
     with tempfile.TemporaryDirectory() as d:
-        wb, _ws = _totals_template(); tpl = os.path.join(d, "tpl.xlsx"); wb.save(tpl)
+        wb, _ws = _totals_template(extras=True); tpl = os.path.join(d, "tpl.xlsx"); wb.save(tpl)
         db = {"interfaces": [{"instance": "SORTER-01", "template_sheet": "SORTER", "base_address": 10000,
                               "base_node": 10, "interface_id": 1}],
               "interface_elements": [dict(e, interface="SORTER-01") for e in _TOT_ELEMS]}
@@ -216,12 +241,17 @@ def test_project_and_insert_a_template_showing_its_total_row():
         eq(_re.search(r'<table\b[^>]*\bref="([^"]+)"[^>]*\btotalsRowCount="(\d)"', tx).groups(), ("A1:G22", "1"),
            "the written table ends on the total row")
         eq(_re.findall(r'<autoFilter ref="([^"]+)"', tx), ["A1:G21"], "its filter stops above it")
+        sx = _parts(ifp)["xl/worksheets/sheet1.xml"].decode("utf-8")
+        eq((_re.findall(r'<c r="(E\d+)"[^>]*><f t="array" ref="([^"]+)"', sx),
+            _re.findall(r'<hyperlink\b[^>]*\bref="([^"]+)"', sx)),
+           ([("E22", "E22")], ["C22"]), "written: the array total's range and the hyperlink on row 22")
         ws = load_workbook(ifp)["SORTER-01"]
         eq(_values(ws, [3, 4, 21, 22]),
            [[None, None, None, None, None, None, _ADDR_F, None, None],
             ["X", "BOOL", ">", 10, 0, "PNC_a", _ADDR_F, None, "note"],
             ["SPD", "WORD", "<", 12, None, "PNC_speed", _ADDR_F, None, None],
-            ["Total", None, None, "=SUBTOTAL(104,SIG[I/O Offset Byte])", None,
+            ["Total", None, "Docs", "=SUBTOTAL(104,SIG[I/O Offset Byte])",
+             ("array", "E22", '=SUM(--(SIG[Data Type]="BOOL"))'),
              "=SUBTOTAL(103,SIG[Signal Name Side 1])", "=SUBTOTAL(103,SIG[I/O Address Side 1])", None, None]],
            "read back: the block from row 4, the total row on 22")
 
@@ -232,9 +262,11 @@ def test_project_and_insert_a_template_showing_its_total_row():
         eq((_re.search(r'<table\b[^>]*\bref="([^"]+)"[^>]*\btotalsRowCount="(\d)"', gx).groups(),
             _re.findall(r'<autoFilter ref="([^"]+)"', gx)), (("A1:G22", "1"), ["A1:G21"]), "grafted the same")
         g = load_workbook(iol)["IF_SORTER-01"]
-        eq((g["A22"].value, g["D22"].value, g["F22"].value),
+        eq((g["A22"].value, g["D22"].value, g["F22"].value, _values(g, [22])[0][4], g["C22"].hyperlink.target),
            ("Total", "=SUBTOTAL(104,SIG_IF_SORTER_01[I/O Offset Byte])",
-            "=SUBTOTAL(103,SIG_IF_SORTER_01[Signal Name Side 1])"), "the totals follow the renamed table")
+            "=SUBTOTAL(103,SIG_IF_SORTER_01[Signal Name Side 1])",
+            ("array", "E22", '=SUM(--(SIG_IF_SORTER_01[Data Type]="BOOL"))'), "https://example.com/interfaces"),
+           "the totals follow the renamed table; the array total and the hyperlink on row 22")
 
 
 # =================================================================================================== #
