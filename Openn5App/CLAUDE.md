@@ -7,10 +7,13 @@ files, imports/exports PLC blocks.
 **OP5** is the Pipeline5 (PL5) counterpart, created 2026-10-07 as a copy of `Openn3App/` (OP3 - the stable,
 shipped pair with PL3/PL4; **never edit OP3 for OP5 work**, it is the fallback and the reference). What OP5
 changes: the **input contract** with PL5 - a VCI-shaped handoff workspace, a `#!openn` header on every file and
-a kind taxonomy (`00_Contract/`, spec in `Shared\PL5_OP5_contract.md`) - and the **Workspace tab** built on that
-catalog (the first tab; the per-path Software / Hardware / Project tabs stay as the manual, single-file tools).
-Everything below that is not marked OP5 is inherited from OP3 and still true. I/O controllers stay as they are
-(no existence tolerance; "Use existing IO controllers" mode).
+a kind taxonomy (`00_Contract/`, spec in `Shared\PL5_OP5_contract.md`) - and the UI around it: the **Workspace
+tab** (the first tab: scan, import and export of a whole handoff workspace), one **Files tab** for the single-file
+tools, and a **collapsible TIA project row** (rarely used, collapsed by default). Since 2026-10-09 **legacy
+acceptance is retired**: only files with a valid `#!openn` header in the VCI shape are imported; the legacy
+BuilderData folders, the bare `#!format=2` tag and unheadered files are recognized only to say why they are
+refused. Everything below that is not marked OP5 is inherited from OP3 and still true. I/O controllers stay as
+they are (no existence tolerance; "Use existing I/O controllers" mode).
 
 ## Build
 
@@ -76,41 +79,66 @@ Everything below that is not marked OP5 is inherited from OP3 and still true. I/
   a bare `#!format=N` = `Legacy`); `WorkspaceCatalog.Scan(root)` = classifies every file of a workspace
   (header first, legacy markers second), places it from the VCI-shaped path (`<PLC>/Program blocks/<group>`,
   `Devices & networks`, `Templates`; the legacy BuilderData folders are mapped too), checks header vs location
-  consistency and `run` staleness. Statuses: Ready / Legacy / NeedsHeader (importable) vs Invalid / Stale /
-  Unclassified (never imported) / Ignored. "Scan BuilderData" (Project tab) logs the catalog; `CsvTable.Header`
-  + `HardwareConfigLoader.CheckHeader` consume it (wrong kind or newer schema = load error; legacy / missing
-  header = warning until PL5 stamps its output); `BlockXmlGenerator` resolves a relative `template=` via the
+  consistency and `run` staleness. Statuses: **Ready is the only importable one** (valid header, consistent
+  placement, current run); Legacy / NeedsHeader (recognized by legacy markers or extension, header missing),
+  Invalid, Stale, Unclassified are never imported (since 2026-10-09 - the notes say why and how to fix);
+  Ignored = config, sidecars, templates, documentation. "Log catalog" (Workspace tab) logs the summary;
+  `CsvTable.Header` + `HardwareConfigLoader.CheckHeader` + `HardwareDeviceTypesDatabase.CheckHeader` consume
+  the header (wrong kind, newer schema, bare `#!format=N` tag or no header = load error - the device-type csv
+  must carry `kind: hw/device-types` too); `BlockXmlGenerator` resolves a relative `template=` via the
   csv folder, then `Templates\` at each level up to the workspace root, then `Shared\Templates\Tia Portal
   Software Blocks`. The spec (`Shared\PL5_OP5_contract.md`) and these three files change together. Test without
   TIA: `[Reflection.Assembly]::LoadFrom(".\bin\Debug\Openn5.exe")`, then
   `$asm.GetType("Openn._00_Contract.WorkspaceCatalog").GetMethod("Scan").Invoke($null, [object[]]@([string]$root))`
   and print `.Summary()` (no Siemens type is touched).
-- **Workspace tab (OP5)** (`MainWindow.Workspace.cs` = the UI partial, `03_ApiManager/TiaPortalOpenness.Workspace.cs`
-  = the import engine): the catalog as the primary way to import. Root picker (default `AppPaths.BuilderDataDir`;
-  Browse to a PL5 project's `Output[\<system>]\TiaPortalProjectInterface\BuilderData`; remembered in the user
-  setting `Properties.Settings.WorkspaceRoot`, stored as "" for the default so it keeps following the exe) +
-  Rescan; a `ListView`/`GridView` grouped PLC → TIA folder → group (three `GroupStyle` levels, Expanders), one row
-  per file with kind, status (Ready green, Legacy/NeedsHeader amber, Invalid/Stale/Unclassified red + red row tint,
-  Ignored grey), route, producer/generated/run from the header, notes, last import result; hover tooltip and a
-  detail pane repeat the full header/placement/notes; summary chips carry `WorkspaceCatalog.Summary()`'s counts.
-  After a scan the Hardware tab's csv folder follows the workspace's single hardware folder until edited.
-  "Import selected" / "Import all importable" queue ONE worker operation, `tia.ImportWorkspaceItems(catalog,
-  items, createNew)`: items sorted by `WorkspaceCatalog.OrderForImport` (kind rank, PLC, path) and dispatched per
-  `InputKindInfo.Route` - `HardwareGeneration` = `HardwareConfigLoader.LoadAll(<item folder>)` + `CreateDevices`
-  once per folder (Stations+Modules are one run; the folder's hardware files must all be importable), `Reference`
-  = nothing by itself, `ImportTypeXml` / `ImportTagTableXml` / `ImportBlockXml` into the find-or-created
-  type/tag/block group of the item's `GroupPath`, `CreateInstanceDbs` = `CreateInstanceDbsCore(path, GroupPath,
-  plc)`, `GenerateThenImport`, `GenerateFromSource` (root - TIA limitation, logged). The PLC comes from the item's
-  PLC folder (`FindPlcSoftware`, device or CPU name, groups included; a missing PLC fails its items - no fallback),
-  null = `GetPlcSoftware` (the single PLC). Invalid / Stale / Unclassified / Ignored items are never imported
-  (logged with their notes); routes without internal handling get `AskFileDecision(..., "Workspace import")`
-  (Retry/Abort/Ignore), instance DBs and hardware keep their own prompts; cancellation between items; nothing is
-  saved. `CreateDevices` now returns false when it stops early so the row result is honest. No new TIA behaviour.
+- **UI (OP5)** - `MainWindow.xaml`: a collapsible **TIA project row** (`Expander`, collapsed by default, state
+  remembered in `Properties.Settings.ProjectPanelExpanded`; its header keeps the Attach/Detach toggle and a status
+  text - Attach takes the selected open instance, expanding shows the instance dropdown, the path box and "TIA
+  Version.."), the **Workspace tab** (first, the focus) and the **Files tab**, then the log. One I/O-controller
+  mode: the radio pairs on both tabs mirror each other (`ControllerMode_Checked`).
+  **Workspace tab** (`MainWindow.Workspace.cs` = the UI partial, `03_ApiManager/TiaPortalOpenness.Workspace.cs`
+  = the import engine): root picker (default `AppPaths.BuilderDataDir`; Browse to a PL5 project's
+  `Output[\<system>]\TiaPortalProjectInterface\BuilderData`; remembered in `Properties.Settings.WorkspaceRoot`,
+  stored as "" for the default so it keeps following the exe) + Rescan; a `ListView`/`GridView` grouped PLC → TIA
+  folder → group (three `GroupStyle` levels, Expanders), one row per file with kind, status (Ready green;
+  everything else red-tinted - Legacy/NeedsHeader amber text, Invalid/Stale/Unclassified red, Ignored grey), route,
+  producer/generated/run from the header, notes, last import result; hover tooltip and a detail pane repeat the
+  full header/placement/notes; summary chips carry `WorkspaceCatalog.Summary()`'s counts (a legacy layout or
+  unheadered files show red "not importable" chips). After a scan the Files tab's hardware csv folder follows the
+  workspace's single `Devices & networks` folder until edited, and the export header shows
+  `AppPaths.ExportRootFor(root)` (the workspace's sibling `ExportedData`). "Import selected" / "Import all
+  importable" queue ONE worker operation, `tia.ImportWorkspaceItems(catalog, items, createNew)`: items sorted by
+  `WorkspaceCatalog.OrderForImport` (kind rank, PLC, path) and dispatched per `InputKindInfo.Route` -
+  `HardwareGeneration` = `HardwareConfigLoader.LoadAll(<item folder>)` + `CreateDevices` once per folder
+  (Stations+Modules are one run; the folder's hardware files must all be Ready), `Reference` = nothing by itself,
+  `ImportTypeXml` / `ImportTagTableXml` / `ImportBlockXml` into the find-or-created type/tag/block group of the
+  item's `GroupPath`, `CreateInstanceDbs` = `CreateInstanceDbsCore(path, GroupPath, plc)`, `GenerateThenImport`,
+  `GenerateFromSource` (root - TIA limitation, logged). The PLC comes from the item's PLC folder
+  (`FindPlcSoftware`, device or CPU name, groups included; a missing PLC fails its items - no fallback), null =
+  `GetPlcSoftware` (the single PLC). Non-Ready items are never imported (logged with their notes); routes without
+  internal handling get `AskFileDecision(..., "Workspace import")` (Retry/Abort/Ignore), instance DBs and hardware
+  keep their own prompts; cancellation between items; nothing is saved. `CreateDevices` returns false when it stops
+  early so the row result is honest.
+  The tab's **Export** expander (`03_ApiManager/TiaPortalOpenness.Project.cs`) writes the attached project into the
+  export root in the same VCI shape, every file stamped: `<PLC>\Program blocks\<group>\<Block>.xml` (code AND data
+  blocks share the folder, kind by `block is DataBlock`), `<PLC>\PLC data types\…`, `<PLC>\PLC tags\…` (TIA XML +
+  the header as the first comment after the declaration, BOM kept; keys kind/schema/producer/generated/run/
+  project/plc/target/name/source), the hardware as CAx `Devices & networks\<project>.aml` + `.cax.log` +
+  `.aml.openn` sidecar (doc/other), and `.openn\workspace.openn.config` with a fresh run id per export
+  (`ExportRun`). The PLC folder = the CPU device item's name (`FirstPlc`, every device incl. groups). "Export full
+  project" sweeps the PLC's three folders first; a single export only overwrites same-named files (the run id
+  marks the rest as leftovers). Nothing in TIA changes.
+  **Files tab**: the single-file tools - Search / Export Blocks (`BlockSearchWindow` → `AppPaths.ExportedBlocksDir`),
+  Import Block (one XML), Generate Blocks (one block-gen csv → `GeneratedBlocksDir`, the XML path lands in the
+  import box), Create Instance DBs (one csv), the hardware csv folder (Reload / Edit / Generate Hardware with the
+  controller mode) and Dump Device Attributes. File dialogs start at the box's own path, else at the workspace
+  root. The old Software / Hardware / Project tabs, the folder-based "Import Full Project" route and the import
+  queue (`RunImportQueue`) are gone - the Workspace tab is the batch way in.
 - **Hardware config** (`01_Constructor/`): csv "format 2" — `Stations.csv` +
   `Modules.csv` + `DeviceTypesDatabase.csv`; `,` delimited (`CsvTable` default; fields
   with a comma or `"` are `"`-quoted, and custom parameters use `|` internally so they
-  never need quoting), `#` comments, the `#!openn` header (OP5 contract v1; the legacy
-  `#!format=2` tag, Excel-padded `#!format=2,,,,` or not, is still accepted with a warning), parsed by `CsvTable`.
+  never need quoting), `#` comments, the `#!openn` header (OP5 contract v1, **required**: a bare
+  `#!format=2` tag - Excel-padded or not - or no header is a load error since 2026-10-09), parsed by `CsvTable`.
   `HardwareConfigLoader` validates the whole folder before
   publishing anything (all-or-nothing, every error with file/line). **No legacy
   support by design**: pre-format-2 folders (`IoControllersList.csv` + wide
@@ -144,8 +172,10 @@ Everything below that is not marked OP5 is inherited from OP3 and still true. I/
   `01_Constructor/HardwareConfigDocument.cs`): tree explorer with regex search,
   add/duplicate/delete/edit of stations and modules (Ctrl+Click multi-select,
   right-click context menu, Del key), unsaved objects highlighted bold blue,
-  read-only view of the model's default parameters, saves back to format-2 csv and
-  re-runs the validating loader. The document layer deliberately tolerates invalid
+  read-only view of the model's default parameters, saves back to csv - each file opening with its
+  `#!openn` header (the loaded header's keys such as `run` / `project` / `plc` carried forward, producer
+  and generated the editor's) and the 9th `Connector` column preserved - and re-runs the validating
+  loader. The document layer deliberately tolerates invalid
   rows (so broken configs can be fixed in the editor) — keep validation in the
   loader, not in the editor. Stations.csv has an optional 8th column `Group`
   (`folder/subfolder/...`) — organizational only for now, generation ignores it.
@@ -214,23 +244,14 @@ Everything below that is not marked OP5 is inherited from OP3 and still true. I/
   is free. Folders are find-or-created (`Groups.Find ?? Groups.Create`); name conflicts
   pop Retry/Abort/Ignore; cancellable between DBs; nothing saved. Preferred over the
   XML-template route for plain name+FB+number instance DBs.
-- **Import queue** (`TiaPortalOpenness.Blocks.cs RunImportQueue`): one-shot batch over
-  an intake folder (default `ImportQueue\` next to the exe). Files processed in
-  relative-path order (prefix `01_`,`02_`,… to sequence FBs before their instance DBs —
-  no dependency graph by design). Route auto-detected per file (`DetectQueueRoute`):
-  `.csv` with a `template=` directive → `BlockXmlGenerator.Generate` then import; `.csv`
-  with `%` key columns `Name`+`InstanceOf`/`FB` → `CreateInstanceDbs`; `.xml` → direct
-  import. Subfolders mirror into TIA block groups (`GetOrCreateBlockGroup`); an
-  instance-DB file's effective group is `join(subfolder, Folder column)`. Per-file
-  Retry/Abort/Ignore (`AskFileDecision`) for routes without internal handling;
-  instance-DB files keep their own per-DB prompt (no double-prompt); cancellable
-  between files; nothing saved.
 - **Input/output paths** (`10_StandardFunctions/AppPaths.cs`): defaults are resolved from the exe
   location, never hardcoded. `AppPaths` walks up from the exe to the monorepo `Shared` folder (the
-  one with `HardwareConfigBuilderData`/`OutputTree`) and hands back the Pipeline5↔Openn5 surface:
-  hardware config `…\BuilderData\HardwareConfiguration` (Stations+Modules), block-gen / instance-DB
-  csv `…\BuilderData\SoftwareBlocks\CreationInfo`, import-ready blocks + the import-queue intake
-  `…\BuilderData\SoftwareBlocks\ImportReady`, the block-export sink `…\ExportedData\SoftwareBlocks`.
+  one with `HardwareConfigBuilderData`/`OutputTree`) and hands back: `BuilderDataDir` = the default
+  workspace (`…\TiaPortalProjectInterface\BuilderData`, VCI shape), `ExportedDataDir` = the default export
+  root, `ExportRootFor(workspaceRoot)` = the sibling `ExportedData` of any workspace, `ExportedBlocksDir` =
+  the single-block export sink (`…\ExportedData\SingleBlocks`), `GeneratedBlocksDir` (exe-local) and
+  `DeviceTypesDatabasePath`. The legacy folders (`HardwareConfiguration`, `SoftwareBlocks\CreationInfo|
+  ImportReady`, `PlcTags`, `UserDataTypes`) have no AppPaths entry any more.
   `DeviceTypesDatabase.csv` is a shared **input** under `Shared\HardwareConfigBuilderData` (not
   beside the generated Stations/Modules), so `HardwareDeviceTypesDatabase.ResolvePath` prefers a copy
   beside the config folder and otherwise falls back to the shared one. Openn5-internal working dirs
@@ -238,20 +259,14 @@ Everything below that is not marked OP5 is inherited from OP3 and still true. I/
   next to the exe - not to be confused with the tracked repo `TiaProjects\` playground (see Build). `CsvTable`
   opens config files `FileShare.ReadWrite` and closes them before parsing, so a load never locks the
   csv against Pipeline5 regenerating it (or Excel).
-- **Project round-trip** (`03_ApiManager/TiaPortalOpenness.Project.cs` + the "Project" tab): whole-project
-  import/export against the Shared tree, the consumer/producer for Pipeline5's (deferred) phase **920** TIA
-  project coverage. **Import** (BuilderData → TIA), fixed order with a button each + "Import Full Project":
-  hardware (loads `HardwareConfigDir` then the existing `CreateDevices`) → UDTs → IO tags → data blocks →
-  instance DBs → software blocks. UDTs/IO-tags are **one XML per object** imported via
-  `TypeGroup.Types.Import` / `TagTableGroup.TagTables.Import` (Pipeline5 emits the XML; the `PLCTags.xlsx`
-  stays only for manual TIA tag import — **no Excel library is used**). Data vs software blocks are split by the
-  first `<SW.Blocks.*>` element of each ImportReady xml (`GlobalDB` ⇒ data block), `.db`/`.scl` go through
-  `ExternalSourceGroup.ExternalSources.CreateFromFile` + `GenerateBlocksFromSource`. **Export** (TIA →
-  `ExportedData/{SoftwareBlocks,DataBlocks,UserDataTypes,TagTables}`) is XML via each object's `Export`,
-  mirroring the TIA group tree; **hardware exports via CAx** (`project.GetService<CaxProvider>().Export` → one
-  `HardwareConfiguration/<project>.aml`). Every phase is cancellable (`TiaWorker.CurrentCancellation`) and the
-  new folder-imports are continue-on-error (per-file logged); instance-DB/hardware keep their own
-  Retry/Abort/Ignore. Nothing is saved.
+- **Export** (`03_ApiManager/TiaPortalOpenness.Project.cs`, the Workspace tab's Export expander - details in the
+  UI bullet): the attached project into the workspace's sibling `ExportedData`, VCI shape, every file stamped
+  (contract v1 §5.4) - the producer side for Pipeline5's (deferred) phase **920** TIA project coverage. XML via
+  each object's `Export` mirroring the TIA group tree, hardware via CAx (`project.GetService<CaxProvider>().Export`
+  → `Devices & networks\<project>.aml`). Cancellable between objects; nothing is saved. UDTs and tag tables are
+  **one XML per object** (`TypeGroup.Types.Import` / `TagTableGroup.TagTables.Import` on the way in; the
+  `PLCTags.xlsx` stays a manual TIA aid - **no Excel library is used**). The folder-based whole-project IMPORT
+  that used to live here is gone with the legacy layout; importing is the Workspace tab's job.
 
 ## Runtime requirements
 
@@ -275,8 +290,11 @@ Everything below that is not marked OP5 is inherited from OP3 and still true. I/
    the selection; picking a different version prompts and restarts the app.
    With exactly one instance + one open project, the project is auto-attached
    (button shows "Detach Project", steelblue).
-3. **Config load:** log shows
-   `Hardware configuration loaded: 14 device types, 2 controller(s), 87 IO device(s), 336 module(s)`.
+3. **Config load:** at startup the Files tab's hardware folder is the workspace's `Devices & networks`; the log
+   shows `Hardware configuration loaded: N device types, M controller(s), K IO device(s), L module(s)`
+   (the builtin PL5 workspace: 19 device types, 2 controllers, 7 IO devices, 18 modules). A folder whose csvs
+   carry only `#!format=2` (or no header) is refused: `Hardware configuration NOT loaded - ... requires a #!openn
+   header`. `Shared\HardwareConfigBuilderData\TestData\Passing` (stamped 2026-10-09, own database copy) loads.
 4. **Project handling:** attach to a running TIA instance (dropdown) and by path.
    Open "Search / Export Blocks" — the list must include blocks inside block-group
    subfolders and UDTs (shown as `[Type | Language] Folder/Name`, e.g. `[FB | SCL] …`,
@@ -308,24 +326,38 @@ Everything below that is not marked OP5 is inherited from OP3 and still true. I/
    filter writes a file under `AttributeDumps\` (log shows path + device/node/attribute
    counts); a name filter limits the dumped devices; an invalid regex logs an error;
    "Cancel Operation" stops between devices and marks the file `# CANCELLED`.
-9. **Scan Workspace** (OP5, no TIA needed; Project tab button or "Log catalog" on the Workspace tab): on today's
-   PL5 tree the log shows `layout: legacy BuilderData folders`, `workspace config: missing`, `29 file(s): 27
-   classified, 0 unclassified, 2 ignored` and every kind Legacy / NeedsHeader. On a headered tree the files show
-   Ready; a header whose `target` contradicts the folder shows `[Invalid]`; a file whose `run` differs from the
-   workspace config shows `[Stale]`; a file directly under a PLC folder or in a non-TIA folder shows `[Invalid]`.
-10. **Workspace tab** (OP5): at startup the tab is selected and lists the remembered root (default = the builtin
-   BuilderData); on today's legacy tree the summary chips read `layout: legacy BuilderData folders`, `config:
-   missing`, `29 file(s): 27 classified, 0 unclassified, 2 ignored; 27 importable`, the grid shows `<workspace> /
-   Devices & networks` (2 amber Legacy rows) and `<default PLC> / Program blocks` (24 rows: 11 data blocks, 1
-   instance-DB csv, 7 block-gen csvs, 1 code block, 5 sources - amber) plus `PLC tags` (PLCTags.xlsx grey Ignored)
-   and the xlsm grey. Browse to another root, Rescan, restart: the root is remembered. Hover / select a row: the
-   notes and header appear. On a synthetic headered workspace (CLAUDE.md "Contract layer" test pattern: `.openn\
-   workspace.openn.config` with `run`, a file with another `run`, a file whose `target` contradicts its folder, a
-   file directly under the PLC folder) the Stale / Invalid rows are red and `needs attention: N` is shown.
-   With a project attached, "Import all importable" runs exactly the imports of the Project tab's "Import Full
-   Project" in kind order (hardware → UDTs → tag tables → data blocks → instance DBs → block-gen → code blocks →
-   sources), logging `=== Workspace import: N item(s) ...` and one line per item, and fills the "Last result"
-   column (Imported green / Skipped amber / Failed red / NothingToDo, Cancelled grey); red rows are skipped with
-   `SKIPPED <path> - not importable [Invalid] ...`; "Cancel Operation" stops between items; a plug / import error
-   pops the Retry/Abort/Ignore dialog; nothing is saved. "Import selected" with only red rows selected logs that
-   none is importable and touches nothing.
+9. **Workspace tab** (OP5, no TIA needed for the scan): at startup the tab is selected and lists the remembered
+   root (default = the builtin BuilderData, PL5's VCI-shaped output). The chips read `layout: VCI shape`,
+   `config: ok, contract 1, project 8XXX, run …`, `35 file(s): 32 classified, 0 unclassified, 3 ignored; 32
+   importable`; every classified row is green Ready under `n0001-mc1-cc1-k65501 / Program blocks` (block-gen csvs,
+   DB and FC XML, InstanceDBs.csv, .scl sources), `<workspace> / Devices & networks` and `Templates`; `PLC tags`
+   holds PLCTags.xlsx grey Ignored with its sidecar. Browse to another root, Rescan, restart: the root is
+   remembered. Hover / select a row: the notes and header appear; "Log catalog" writes the summary to the log.
+   Point the root at a pre-contract tree (legacy `HardwareConfiguration` / `SoftwareBlocks` / `PlcTags` folders)
+   or at a folder with unheadered files: the rows are red-tinted (Legacy / NeedsHeader amber text, Invalid red),
+   the chips say `layout: legacy BuilderData folders - not importable` / `without #!openn header: N - not
+   imported`, and "Import all importable" logs that nothing is importable. On the synthetic headered workspace
+   (the "Contract layer" test pattern: `.openn\workspace.openn.config` with `run`, a file with another `run`, a
+   file whose `target` contradicts its folder, a file directly under the PLC folder) the Stale / Invalid rows are
+   red and `needs attention: N` is shown.
+10. **Workspace import** (project attached): "Import all importable" runs every Ready item in kind order
+   (hardware → UDTs → tag tables → data blocks → instance DBs → block-gen → code blocks → sources), logging
+   `=== Workspace import: N item(s) ...` and one line per item, and fills the "Last result" column (Imported
+   green / Skipped amber / Failed red / NothingToDo, Cancelled grey); non-Ready rows are skipped with
+   `SKIPPED <path> - not importable [...]`; "Cancel Operation" stops between items; a plug / import error pops the
+   Retry/Abort/Ignore dialog; nothing is saved. "Import selected" with only red rows selected logs that none is
+   importable and touches nothing.
+11. **Export** (project attached): expand "Export the attached TIA project → <sibling ExportedData>" and run
+   "Export full project": the log shows the run id and the PLC folder; `ExportedData\<PLC>\Program blocks\…`,
+   `PLC data types\…`, `PLC tags\…` hold TIA XML files whose second line opens the `#!openn` comment (kind
+   sw/code-block or sw/data-block, run, plc, target, name), `Devices & networks\<project>.aml` + `.cax.log` +
+   `.aml.openn` exist, and `.openn\workspace.openn.config` names contract 1, the run and the PLC. Point the
+   Workspace root at that ExportedData folder and Rescan: every XML is Ready, the AML Ignored (doc/other).
+12. **TIA project row**: starts collapsed (unless left open last time - `ProjectPanelExpanded`); the header reads
+   `TIA project: not attached - Attach takes the selected open instance (N found) ...`; Attach works from the
+   header without expanding when an instance is listed; expanding shows the dropdown, the path box and "TIA
+   Version..". After attaching the header reads `TIA project: <name>` and the button turns steelblue "Detach".
+13. **Files tab**: the hardware folder box follows the workspace (`Files tab: the hardware csv folder follows the
+   workspace -> …` in the log); Reload / Edit / Generate Hardware work as before; the controller radios mirror the
+   Workspace tab's; "Edit Hardware Config.." → Save + Reload writes both csvs with their `#!openn` header and the
+   Connector column, and the loader accepts them. Browse buttons start at the workspace root.

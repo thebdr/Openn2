@@ -298,163 +298,10 @@ namespace Openn._03_ApiManager
                     System.Windows.Forms.MessageBoxIcon.Warning));
         }
 
-        #region Import queue (batch)
-
-        private enum QueueRoute { GenerateImport, InstanceDb, ImportXml, Unknown }
-
         /// <summary>
-        /// Batch-processes every .csv/.xml file under the queue folder in relative-path
-        /// order (the user prefixes 01_,02_,... to sequence FBs before the instance DBs
-        /// that reference them). Each file's route is auto-detected; its subfolder under
-        /// the queue mirrors into a TIA block group (find-or-create). A failed file pops
-        /// Retry/Abort/Ignore. Cancellable between files; nothing is saved.
+        /// Per-file failure decision (UI thread; worker waits): Retry / Abort / Ignore. Used by the workspace import; the context names the operation in the dialog.
         /// </summary>
-        public void RunImportQueue(string queueFolder)
-        {
-            if (project == null)
-            {
-                Log("Can't run import queue: No Tia Project Attached");
-                return;
-            }
-            PlcSoftware plcSoftware = GetPlcSoftware(project);
-            if (plcSoftware == null)
-            {
-                Log("Can't run import queue: no Plc Software found in the project");
-                return;
-            }
-            if (!Directory.Exists(queueFolder))
-            {
-                Log("Import queue folder not found: " + queueFolder);
-                return;
-            }
-
-            string root = Path.GetFullPath(queueFolder).TrimEnd('\\', '/');
-            List<string> files = Directory.GetFiles(root, "*.*", SearchOption.AllDirectories)
-                .Where(f => { string e = Path.GetExtension(f).ToLowerInvariant(); return e == ".csv" || e == ".xml"; })
-                .OrderBy(f => f.Substring(root.Length).TrimStart('\\', '/'), StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (files.Count == 0)
-            {
-                Log("Import queue: no .csv or .xml files in " + root);
-                return;
-            }
-
-            Log("Import queue: " + files.Count + " file(s) in " + root);
-            int processed = 0;
-            foreach (string file in files)
-            {
-                if (TiaWorker.CurrentCancellation.IsCancellationRequested)
-                {
-                    Log("Import queue CANCELLED - " + processed + " of " + files.Count + " processed (project not saved)");
-                    return;
-                }
-
-                string rel = file.Substring(root.Length).TrimStart('\\', '/');
-                string relFolder = (Path.GetDirectoryName(rel) ?? "").Replace('\\', '/');
-                PlcBlockGroup group = GetOrCreateBlockGroup(plcSoftware.BlockGroup, relFolder);
-
-                while (true) //repeated while the user chooses Retry
-                {
-                    string error;
-                    BatchOutcome outcome = DispatchQueueFile(file, group, relFolder, out error);
-
-                    if (outcome == BatchOutcome.Completed) { processed++; break; }
-                    if (outcome == BatchOutcome.Aborted)
-                    {
-                        Log("Import queue ABORTED - " + processed + " of " + files.Count + " processed (project not saved)");
-                        return;
-                    }
-
-                    //Failed: let the user decide
-                    var decision = AskFileDecision(rel, error);
-                    if (decision == System.Windows.Forms.DialogResult.Retry) { Log("Retrying " + rel); continue; }
-                    if (decision == System.Windows.Forms.DialogResult.Ignore) { Log("SKIPPED " + rel + (error != null ? " - " + error : "")); break; }
-                    Log("Import queue ABORTED by the user at " + rel + " - " + processed + " of " + files.Count + " processed");
-                    return;
-                }
-            }
-
-            Log("Import queue done: " + processed + " of " + files.Count + " file(s) processed (project not saved)");
-        }
-
-        /// <summary>Runs one queue file through its detected route, importing into the mirrored group.</summary>
-        private BatchOutcome DispatchQueueFile(string file, PlcBlockGroup group, string relFolder, out string error)
-        {
-            error = null;
-            string label = Path.GetFileName(file) + (relFolder.Length > 0 ? " -> " + relFolder : "");
-
-            switch (DetectQueueRoute(file))
-            {
-                case QueueRoute.GenerateImport:
-                    string versionTag = "V" + OpennessSetup.SelectedInstallation.PortalVersion.Major;
-                    string outputFolder = Path.Combine(appBaseDir, "GeneratedBlocks");
-                    string xml = Openn._02_Converter.BlockXmlGenerator.Generate(file, versionTag, outputFolder, null);
-                    if (xml == null) { error = "block generation failed (see log)"; return BatchOutcome.Failed; }
-                    try { ImportXmlInto(group, xml); }
-                    catch (Exception e) { error = e.Message; return BatchOutcome.Failed; }
-                    Log("Import queue: generated + imported " + label);
-                    return BatchOutcome.Completed;
-
-                case QueueRoute.InstanceDb:
-                    BatchOutcome outcome = CreateInstanceDbsCore(file, relFolder);
-                    if (outcome == BatchOutcome.Failed) error = "instance DB csv has errors (see log)";
-                    return outcome;
-
-                case QueueRoute.ImportXml:
-                    try { ImportXmlInto(group, file); }
-                    catch (Exception e) { error = e.Message; return BatchOutcome.Failed; }
-                    Log("Import queue: imported " + label);
-                    return BatchOutcome.Completed;
-
-                default:
-                    error = "unrecognized csv (no template= directive and no Name/InstanceOf key columns)";
-                    return BatchOutcome.Failed;
-            }
-        }
-
-        /// <summary>
-        /// Detects the route from extension/content without a full parse: .xml = direct
-        /// import; .csv with a template= directive = generate-then-import; .csv whose %
-        /// key row has Name + InstanceOf/FB = instance DB; otherwise unknown.
-        /// </summary>
-        private static QueueRoute DetectQueueRoute(string path)
-        {
-            string ext = Path.GetExtension(path).ToLowerInvariant();
-            if (ext == ".xml") return QueueRoute.ImportXml;
-            if (ext != ".csv") return QueueRoute.Unknown;
-
-            string[] lines;
-            try { lines = File.ReadAllLines(path); }
-            catch { return QueueRoute.Unknown; }
-
-            //a generate template can have its key row too, so the template directive wins
-            foreach (string raw in lines)
-            {
-                string line = raw.Trim();
-                if (line.StartsWith("$", StringComparison.Ordinal) && line.IndexOf("template=", StringComparison.OrdinalIgnoreCase) >= 0)
-                    return QueueRoute.GenerateImport;
-            }
-            foreach (string raw in lines)
-            {
-                string line = raw.Trim();
-                if (!line.StartsWith("%", StringComparison.Ordinal)) continue;
-                var cells = line.Split(',', ';', '\t').Select(c => c.Trim()).ToList();
-                bool hasName = cells.Any(c => c.Equals("Name", StringComparison.OrdinalIgnoreCase));
-                bool hasFb = cells.Any(c => c.Equals("InstanceOf", StringComparison.OrdinalIgnoreCase) ||
-                                            c.Equals("InstanceOfFB", StringComparison.OrdinalIgnoreCase) ||
-                                            c.Equals("FB", StringComparison.OrdinalIgnoreCase));
-                if (hasName && hasFb) return QueueRoute.InstanceDb;
-                break; //first key row decides
-            }
-            return QueueRoute.Unknown;
-        }
-
-        /// <summary>
-        /// Per-file failure decision (UI thread; worker waits): Retry / Abort / Ignore. Shared by the import
-        /// queue (the default context) and the workspace import.
-        /// </summary>
-        private static System.Windows.Forms.DialogResult AskFileDecision(string fileLabel, string error, string context = "Import queue")
+        private static System.Windows.Forms.DialogResult AskFileDecision(string fileLabel, string error, string context = "Import")
         {
             var application = System.Windows.Application.Current;
             if (application == null) return System.Windows.Forms.DialogResult.Abort; //no UI: fail safe
@@ -469,8 +316,6 @@ namespace Openn._03_ApiManager
                     System.Windows.Forms.MessageBoxButtons.AbortRetryIgnore,
                     System.Windows.Forms.MessageBoxIcon.Warning));
         }
-
-        #endregion Import queue (batch)
 
         /// <summary>
         /// Imports an xml block file into the root block group of the Plc program,

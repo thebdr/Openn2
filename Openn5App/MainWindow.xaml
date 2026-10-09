@@ -62,6 +62,12 @@
             <Setter Property="Width" Value="75"/>
             <Setter Property="Margin" Value="4,0,0,0"/>
         </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Foreground" Value="#666"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
         <!-- Workspace tab: group headers of the catalog grid (level 0 = PLC / workspace, 1 = TIA folder, 2 = block group) -->
         <Style x:Key="WorkspaceGroupLevel0" TargetType="{x:Type GroupItem}">
             <Setter Property="Template">
@@ -124,11 +130,21 @@
             <RowDefinition Height="4*" MinHeight="140"/>
         </Grid.RowDefinitions>
 
-        <!-- ==================== TIA Project (common to all tabs) ==================== -->
-        <GroupBox Grid.Row="0" Header="TIA Project">
-            <Grid>
+        <!-- ==================== TIA project connection: collapsed by default (rarely used) ====================
+             The header keeps the Attach/Detach toggle and the attached-project status visible; the body holds the
+             instance dropdown, the project path and the TIA version switch. -->
+        <Expander x:Name="expProject" Grid.Row="0" Margin="4,0,4,4" IsExpanded="False"
+                  Expanded="expProject_Toggled" Collapsed="expProject_Toggled"
+                  Background="White" BorderBrush="#FFB8B8C0" BorderThickness="1" Padding="6,3,6,3">
+            <Expander.Header>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="btnAttachProject" Click="btnAttachProject_Click" MinWidth="130" FontWeight="SemiBold" Content="Attach Project" Margin="0,0,12,0"
+                            ToolTip="Attach = the selected open TIA instance (or the project path, expand to choose); Detach releases the project"/>
+                    <TextBlock x:Name="tbProjectStatus" VerticalAlignment="Center" FontWeight="Normal" FontSize="12" Text="TIA project: not attached"/>
+                </StackPanel>
+            </Expander.Header>
+            <Grid Margin="0,6,0,2" TextElement.FontWeight="Normal">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="2*"/>
                     <ColumnDefinition Width="2*"/>
                     <ColumnDefinition Width="2*"/>
@@ -139,11 +155,11 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- toggle: Attach Project / Detach Project (steelblue when attached) -->
-                <Button x:Name="btnAttachProject" Click="btnAttachProject_Click" Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Margin="2,2,8,2" MinWidth="130" FontWeight="SemiBold" Content="Attach Project"/>
+                <Label Grid.Row="0" Grid.Column="0" Content="Attached project:" Margin="2,0,2,4"/>
+                <TextBox x:Name="tbAttachedProject" Grid.Row="1" Grid.Column="0" Margin="2,0,8,2" IsReadOnly="True" Background="#E9E9EC"/>
 
-                <Label Grid.Row="0" Grid.Column="1" Content="Attached project:" Margin="2,0,2,4"/>
-                <TextBox x:Name="tbAttachedProject" Grid.Row="1" Grid.Column="1" Margin="2,0,8,2" IsReadOnly="True" Background="#E9E9EC"/>
+                <RadioButton x:Name="rbUseInstance" GroupName="rbgProjectSource" Grid.Row="0" Grid.Column="1" Margin="2,2,8,4">Attach to open instance</RadioButton>
+                <ComboBox x:Name="cbOpenTiaInstances" Grid.Row="1" Grid.Column="1" Margin="2,0,8,2" Background="White"/>
 
                 <RadioButton x:Name="rbUsePath" GroupName="rbgProjectSource" Grid.Row="0" Grid.Column="2" Margin="2,2,8,4">Attach by path</RadioButton>
                 <DockPanel Grid.Row="1" Grid.Column="2" Margin="2,0,8,2">
@@ -151,24 +167,22 @@
                     <TextBox x:Name="tbProjectPath"/>
                 </DockPanel>
 
-                <RadioButton x:Name="rbUseInstance" GroupName="rbgProjectSource" Grid.Row="0" Grid.Column="3" Margin="2,2,8,4">Attach to open instance</RadioButton>
-                <ComboBox x:Name="cbOpenTiaInstances" Grid.Row="1" Grid.Column="3" Margin="2,0,8,2" Background="White"/>
-
                 <!-- reopen the startup version selection (different version = app restart) -->
-                <Button x:Name="btnTiaVersion" Click="btnTiaVersion_Click" Grid.Row="0" Grid.Column="4" VerticalAlignment="Top" Margin="2,0,2,4" Content="TIA Version.." FontSize="10" MinHeight="20" Padding="6,1"/>
+                <Button x:Name="btnTiaVersion" Click="btnTiaVersion_Click" Grid.Row="1" Grid.Column="3" Margin="2,0,2,2" Content="TIA Version.." FontSize="10" MinHeight="20" Padding="6,1" VerticalAlignment="Center"/>
             </Grid>
-        </GroupBox>
+        </Expander>
 
-        <!-- ==================== Workspace / Software / Hardware / Project tabs ==================== -->
+        <!-- ==================== Workspace (the focus) | Files (single-file tools) ==================== -->
         <TabControl x:Name="tabMain" Grid.Row="1" Margin="4,2,4,2" SelectedIndex="0" Background="Transparent" BorderThickness="1" BorderBrush="#FFB8B8C0">
 
-            <!-- Workspace (default): the PL5 handoff workspace as a catalog, imports driven by it -->
+            <!-- Workspace: the PL5 handoff workspace as a catalog; import and export driven by it -->
             <TabItem Header="Workspace">
                 <Grid Margin="4,6,4,4" TextElement.FontWeight="Normal" TextElement.FontSize="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -182,7 +196,7 @@
                                 ToolTip="Back to the builtin Shared\OutputTree\TiaPortalProjectInterface\BuilderData (resolved from the exe location)"/>
                         <Button x:Name="btnWsBrowse" Click="btnWsBrowse_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
                         <TextBox x:Name="tbWorkspaceRoot" KeyDown="tbWorkspaceRoot_KeyDown"
-                                 ToolTip="The handoff workspace Pipeline5 wrote: a project's Output[\&lt;system&gt;]\TiaPortalProjectInterface\BuilderData (VCI shape: &lt;PLC&gt;\Program blocks | PLC tags | PLC data types + Devices &amp; networks + Templates) or the legacy BuilderData folders. Remembered between sessions. Enter = rescan."/>
+                                 ToolTip="The handoff workspace Pipeline5 wrote: a project's Output[\&lt;system&gt;]\TiaPortalProjectInterface\BuilderData in the VCI shape (&lt;PLC&gt;\Program blocks | PLC tags | PLC data types + Devices &amp; networks + Templates + .openn\workspace.openn.config). Remembered between sessions. Enter = rescan."/>
                     </DockPanel>
 
                     <!-- summary strip -->
@@ -256,158 +270,135 @@
                     <TextBox x:Name="tbWorkspaceDetail" Grid.Row="3" Height="96" Margin="2,4,2,4" IsReadOnly="True" TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11" Background="#FAFAFC" VerticalContentAlignment="Top"/>
 
-                    <!-- actions -->
+                    <!-- import actions -->
                     <DockPanel Grid.Row="4" Margin="2,0,2,0">
                         <Button x:Name="btnWsImportAll" Click="btnWsImportAll_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" FontWeight="SemiBold" Content="Import all importable"
-                                ToolTip="Every Ready / Legacy / NeedsHeader file, in import order (hardware, UDTs, tag tables, data blocks, instance DBs, block generation, code blocks, sources), per PLC. Invalid / Stale / Unclassified files are skipped with their reason. Nothing is saved."/>
+                                ToolTip="Every Ready file, in import order (hardware, UDTs, tag tables, data blocks, instance DBs, block generation, code blocks, sources), per PLC. Files without a valid #!openn header, misplaced, stale or unclassified files are skipped with their reason. Nothing is saved."/>
                         <Button x:Name="btnWsImportSelected" Click="btnWsImportSelected_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Import selected"
                                 ToolTip="The selected rows (Ctrl / Shift + click), sorted into import order. Non-importable rows are skipped with their reason."/>
                         <Button x:Name="btnWsLogCatalog" Click="btnWsLogCatalog_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" MinWidth="110" Content="Log catalog"
                                 ToolTip="Write the catalog summary (counts per kind, files needing attention) to the log"/>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <RadioButton x:Name="rbWsUseExistingControllers" GroupName="rbgWsControllers" Margin="2,0,16,0" Content="Use existing I/O controllers"
+                            <RadioButton x:Name="rbWsUseExistingControllers" GroupName="rbgWsControllers" Margin="2,0,16,0" Content="Use existing I/O controllers" Checked="ControllerMode_Checked"
                                          ToolTip="Hardware generation attaches to the controllers already in the project (the normal mode)"/>
-                            <RadioButton x:Name="rbWsCreateNewControllers" GroupName="rbgWsControllers" Content="Create new I/O controllers"
+                            <RadioButton x:Name="rbWsCreateNewControllers" GroupName="rbgWsControllers" Content="Create new I/O controllers" Checked="ControllerMode_Checked"
                                          ToolTip="Hardware generation creates the PLC and its communication modules (fails when they already exist)"/>
                             <TextBlock x:Name="tbWsSelection" Margin="24,0,0,0" Foreground="#666" FontSize="10" VerticalAlignment="Center"/>
                         </StackPanel>
                     </DockPanel>
-                </Grid>
-            </TabItem>
 
-            <!-- Software: the manual, single-file tools -->
-            <TabItem Header="Software">
-                <GroupBox Header="PLC Program Blocks  (manual, single-file tools)" Margin="4,8,4,4" VerticalAlignment="Top">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Search / export -->
-                        <DockPanel Grid.Row="0" Margin="2,2,2,8">
-                            <Button x:Name="btnExportSource" Click="btnExportSource_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Search / Export Blocks.."/>
-                            <Label Content="Browse / export blocks &#8212; regex search over the whole block tree, subfolders included" FontSize="10" Foreground="#666" VerticalAlignment="Center"/>
-                        </DockPanel>
-
-                        <!-- Import a single block xml -->
-                        <DockPanel Grid.Row="1" Margin="2,0,2,6">
-                            <Button x:Name="btnImportSource" Click="btnImportSource_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Import Block"/>
-                            <Button x:Name="btnBrowseBlocks" Click="btnBrowseBlocks_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
-                            <TextBox x:Name="tbSourceBlockPath" ToolTip="Source file (.xml) to import"/>
-                        </DockPanel>
-
-                        <!-- Generate blocks from a template csv -->
-                        <DockPanel Grid.Row="2" Margin="2,0,2,6">
-                            <Button x:Name="btnGenerateBlocks" Click="btnGenerateBlocks_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Generate Blocks"/>
-                            <Button x:Name="btnBrowseBlockGenCsv" Click="btnBrowseBlockGenCsv_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
-                            <TextBox x:Name="tbBlockGenName" DockPanel.Dock="Right" Width="160" Margin="6,0,0,0"
-                                     ToolTip="Generated block name. Empty = the template's block name with the TEMPLATE--vX.Y-- prefix stripped."/>
-                            <Label DockPanel.Dock="Right" Content="as:" VerticalAlignment="Center"/>
-                            <TextBox x:Name="tbBlockGenCsvPath" ToolTip="Generation csv. Row markers in the first cell: $ directive ($,template=&lt;path&gt; / $,separator=;), # comment, % key row, @ data row (@ ; TemplateType ; values...), &amp;END stop. &amp;END as a cell ends the row's columns; # key header = ignored column. Output goes to GeneratedBlocks\ next to the exe."/>
-                        </DockPanel>
-
-                        <!-- Create instance DBs directly -->
-                        <DockPanel Grid.Row="3" Margin="2,0,2,6">
-                            <Button x:Name="btnCreateInstanceDbs" Click="btnCreateInstanceDbs_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Create Instance DBs"/>
-                            <Button x:Name="btnBrowseInstanceDbCsv" Click="btnBrowseInstanceDbCsv_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
-                            <TextBox x:Name="tbInstanceDbCsvPath" ToolTip="Instance DB list csv. % key row names columns: Name, InstanceOf (FB), Number (empty = auto), Folder. @ rows = one instance DB each. Created directly via CreateInstanceDB (no template/XML). Conflicts pop Retry/Abort/Ignore."/>
-                        </DockPanel>
-
-                        <!-- Batch import queue -->
-                        <DockPanel Grid.Row="4" Margin="2,8,2,2">
-                            <Button x:Name="btnRunImportQueue" Click="btnRunImportQueue_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" FontWeight="SemiBold" Content="Run Import Queue"/>
-                            <Button x:Name="btnBrowseImportQueue" Click="btnBrowseImportQueue_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
-                            <TextBox x:Name="tbImportQueuePath" ToolTip="Folder of csv/xml files processed in filename order. Route auto-detected per file (template= csv -> generate+import; Name/InstanceOf csv -> instance DBs; .xml -> import). Subfolders map to TIA block groups. Failures pop Retry/Abort/Ignore."/>
-                        </DockPanel>
-                    </Grid>
-                </GroupBox>
-            </TabItem>
-
-            <!-- Hardware: the manual csv-folder tools -->
-            <TabItem Header="Hardware">
-                <StackPanel>
-                    <GroupBox Header="Hardware Configuration (csv)  (manual tool - the Workspace tab generates from the catalog)" Margin="4,8,4,4">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <DockPanel Grid.Row="0" Grid.Column="0" Margin="2,2,4,6">
-                                <Label DockPanel.Dock="Left" Content="Csv folder:" VerticalAlignment="Center"/>
-                                <Button x:Name="btnBrowseHwConfigCsv" Click="btnBrowseHwConfigCsv_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
-                                <TextBox x:Name="tbHardwareCsvPath" ToolTip="Stations.csv + Modules.csv folder. Follows the scanned workspace's hardware folder until you edit it."/>
-                            </DockPanel>
-                            <Button x:Name="btnImportHardwareCsv" Click="btnImportHardwareCsv_Click" Grid.Row="0" Grid.Column="1" Style="{StaticResource ActionButton}" Margin="4,2,0,6" Content="Reload Csv Config"/>
-                            <Button x:Name="btnEditHardwareConfig" Click="btnEditHardwareConfig_Click" Grid.Row="0" Grid.Column="2" Style="{StaticResource ActionButton}" Margin="4,2,0,6" Content="Edit Hardware Config.."/>
-
-                            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Margin="2,0,4,2" VerticalAlignment="Center">
-                                <RadioButton x:Name="rbUseExistingIoControllers" GroupName="rbgIoControllerSource" Margin="0,0,16,0" FontFamily="Consolas">Use Existing I/O Controllers</RadioButton>
-                                <RadioButton x:Name="rbCreateNewIoControllers" GroupName="rbgIoControllerSource" FontFamily="Consolas">Create New I/O Controllers</RadioButton>
-                            </StackPanel>
-                            <Button x:Name="btnGenerateHardware" Click="btnGenerateHardware_Click" Grid.Row="1" Grid.Column="2" Style="{StaticResource ActionButton}" Margin="4,0,0,2" FontWeight="SemiBold" Content="Generate Hardware"/>
-                        </Grid>
-                    </GroupBox>
-
-                    <GroupBox Header="Attribute Discovery" Margin="4,4,4,4">
-                        <DockPanel Margin="2,2,2,2">
-                            <Button x:Name="btnDumpAttributes" Click="btnDumpAttributes_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Dump Device Attributes"/>
-                            <Label DockPanel.Dock="Left" Content="Device filter:" VerticalAlignment="Center"/>
-                            <TextBox x:Name="tbDumpDeviceFilter" ToolTip="Dumps device attribute trees + GSD PrmData to AttributeDumps\ (paths in csv syntax). Device name filter: regex, case-insensitive, empty = all devices."/>
-                        </DockPanel>
-                    </GroupBox>
-                </StackPanel>
-            </TabItem>
-
-            <!-- Project: whole-project round-trip against the builtin Shared tree (fixed legacy folders) -->
-            <TabItem Header="Project">
-                <StackPanel>
-                    <GroupBox Header="Import from Shared  (legacy folder route - the Workspace tab is the catalog-driven way)" Margin="4,8,4,4">
-                        <StackPanel>
-                            <DockPanel Margin="2,2,2,6">
-                                <Button x:Name="btnImportFullProject" Click="btnImportFullProject_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" FontWeight="SemiBold" Content="Import Full Project"/>
-                                <Button x:Name="btnScanWorkspace" Click="btnScanWorkspace_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Margin="0,0,8,0" Content="Scan Workspace"
-                                        ToolTip="Rescan the Workspace tab's root and write the catalog summary to the log (contract v1 headers, legacy markers as fallback) - no TIA needed"/>
-                                <CheckBox x:Name="cbImportCreateNewControllers" IsChecked="True" VerticalAlignment="Center" FontWeight="Normal" Margin="2,0,0,0" Content="Create new I/O controllers (else attach to existing)"/>
-                            </DockPanel>
-                            <WrapPanel Margin="2,0,2,2">
-                                <Button x:Name="btnImportHardware"      Click="btnImportHardware_Click"      Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="1  Hardware"/>
-                                <Button x:Name="btnImportUdts"          Click="btnImportUdts_Click"          Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="2  UDTs"/>
-                                <Button x:Name="btnImportIoTags"        Click="btnImportIoTags_Click"        Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="3  IO Tags"/>
-                                <Button x:Name="btnImportDataBlocks"    Click="btnImportDataBlocks_Click"    Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="4  Data Blocks"/>
-                                <Button x:Name="btnImportInstanceDbsProj" Click="btnImportInstanceDbsProj_Click" Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="5  Instance DBs"/>
-                                <Button x:Name="btnImportSoftwareBlocks" Click="btnImportSoftwareBlocks_Click" Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="6  Software Blocks"/>
-                            </WrapPanel>
-                        </StackPanel>
-                    </GroupBox>
-
-                    <GroupBox Header="Export to Shared  (dump the attached project for Pipeline5 validation)" Margin="4,4,4,4">
-                        <StackPanel>
-                            <DockPanel Margin="2,2,2,6">
-                                <Button x:Name="btnExportFullProject" Click="btnExportFullProject_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" FontWeight="SemiBold" Content="Export Full Project"/>
-                                <Label Content="Everything as XML; hardware as CAx / AML." FontSize="10" Foreground="#666" VerticalAlignment="Center"/>
-                            </DockPanel>
-                            <WrapPanel Margin="2,0,2,2">
-                                <Button x:Name="btnExportSoftwareBlocks" Click="btnExportSoftwareBlocks_Click" Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="Software Blocks"/>
-                                <Button x:Name="btnExportDataBlocks"     Click="btnExportDataBlocks_Click"     Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="Data Blocks"/>
+                    <!-- export: the attached project into the workspace's sibling ExportedData, same shape, stamped -->
+                    <Expander x:Name="expExport" Grid.Row="5" Margin="2,6,2,0" IsExpanded="False" Background="#FAFAFC" BorderBrush="#FFB8B8C0" BorderThickness="1" Padding="6,2,6,4">
+                        <Expander.Header>
+                            <TextBlock FontSize="12">
+                                <Run Text="Export the attached TIA project" FontWeight="SemiBold"/>
+                                <Run Text="  &#8594;  "/>
+                                <Run x:Name="runExportRoot" Text="(scan a workspace first)" Foreground="#555"/>
+                            </TextBlock>
+                        </Expander.Header>
+                        <StackPanel Margin="0,4,0,0">
+                            <TextBlock Style="{StaticResource HintText}" Margin="2,0,2,6"
+                                       Text="The same VCI shape as the workspace, beside it: &lt;PLC&gt;\Program blocks | PLC data types | PLC tags as TIA XML with the #!openn header, the hardware as CAx/AML under Devices &amp; networks, and .openn\workspace.openn.config with a fresh run id. The full export sweeps the PLC's folders first; a single export only overwrites same-named files. Nothing in TIA is changed."/>
+                            <WrapPanel>
+                                <Button x:Name="btnExportFullProject" Click="btnExportFullProject_Click" Style="{StaticResource ActionButton}" Margin="2,2,4,2" FontWeight="SemiBold" Content="Export full project"/>
+                                <Button x:Name="btnExportSoftwareBlocks" Click="btnExportSoftwareBlocks_Click" Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="Code blocks"/>
+                                <Button x:Name="btnExportDataBlocks"     Click="btnExportDataBlocks_Click"     Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="Data blocks"/>
                                 <Button x:Name="btnExportUdts"           Click="btnExportUdts_Click"           Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="UDTs"/>
-                                <Button x:Name="btnExportTagTables"      Click="btnExportTagTables_Click"      Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="Tag Tables"/>
+                                <Button x:Name="btnExportTagTables"      Click="btnExportTagTables_Click"      Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="Tag tables"/>
                                 <Button x:Name="btnExportHardwareCax"    Click="btnExportHardwareCax_Click"    Style="{StaticResource ActionButton}" Margin="4,2,4,2" Content="Hardware (CAx)"/>
                             </WrapPanel>
                         </StackPanel>
-                    </GroupBox>
+                    </Expander>
+                </Grid>
+            </TabItem>
 
-                    <Label x:Name="lblSharedRoot" Margin="6,2,6,2" FontSize="10" FontWeight="Normal" Foreground="#888"/>
-                </StackPanel>
+            <!-- Files: the single-file tools (one block, one csv, one hardware folder, attribute dump) -->
+            <TabItem Header="Files">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="4,6,4,4">
+                        <TextBlock Style="{StaticResource HintText}" Margin="6,0,6,6"
+                                   Text="Single-file tools. The Workspace tab is the normal way in - it imports whole handoff workspaces by their headers. Use these when you need one block, one csv or one hardware folder by hand."/>
+
+                        <GroupBox Header="Program blocks - one file at a time">
+                            <Grid TextElement.FontWeight="Normal">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Search / export -->
+                                <DockPanel Grid.Row="0" Margin="2,2,2,8">
+                                    <Button x:Name="btnExportSource" Click="btnExportSource_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Search / Export Blocks.."/>
+                                    <TextBlock Style="{StaticResource HintText}" VerticalAlignment="Center" Text="Browse the attached project's block tree (regex search, subfolders and UDTs included) and export single blocks as XML or source."/>
+                                </DockPanel>
+
+                                <!-- Import a single block file -->
+                                <DockPanel Grid.Row="1" Margin="2,0,2,6">
+                                    <Button x:Name="btnImportSource" Click="btnImportSource_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Import Block"/>
+                                    <Button x:Name="btnBrowseBlocks" Click="btnBrowseBlocks_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
+                                    <TextBox x:Name="tbSourceBlockPath" ToolTip="One block XML (TIA Openness export) to import into the attached project's Program blocks root"/>
+                                </DockPanel>
+
+                                <!-- Generate blocks from a template csv -->
+                                <DockPanel Grid.Row="2" Margin="2,0,2,6">
+                                    <Button x:Name="btnGenerateBlocks" Click="btnGenerateBlocks_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Generate Blocks"/>
+                                    <Button x:Name="btnBrowseBlockGenCsv" Click="btnBrowseBlockGenCsv_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
+                                    <TextBox x:Name="tbBlockGenName" DockPanel.Dock="Right" Width="160" Margin="6,0,0,0"
+                                             ToolTip="Generated block name. Empty = the template's block name with the TEMPLATE--vX.Y-- prefix stripped."/>
+                                    <Label DockPanel.Dock="Right" Content="as:" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="tbBlockGenCsvPath" ToolTip="One block-generation csv (sw/block-gen). Row markers in the first cell: $ directive ($,template=&lt;path&gt; / $,separator=;), # comment, % key row, @ data row, &amp;END stop. The XML goes to GeneratedBlocks\ next to the exe and its path lands in the import box above."/>
+                                </DockPanel>
+
+                                <!-- Create instance DBs directly -->
+                                <DockPanel Grid.Row="3" Margin="2,0,2,2">
+                                    <Button x:Name="btnCreateInstanceDbs" Click="btnCreateInstanceDbs_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Create Instance DBs"/>
+                                    <Button x:Name="btnBrowseInstanceDbCsv" Click="btnBrowseInstanceDbCsv_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
+                                    <TextBox x:Name="tbInstanceDbCsvPath" ToolTip="One instance-DB list csv (sw/instance-db). % key row names the columns: Name, InstanceOf (FB), Number (empty = auto), Folder; @ rows = one instance DB each. Created directly via CreateInstanceDB; conflicts pop Retry/Abort/Ignore."/>
+                                </DockPanel>
+                            </Grid>
+                        </GroupBox>
+
+                        <GroupBox Header="Hardware configuration - one csv folder">
+                            <Grid TextElement.FontWeight="Normal">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Grid.Column="0" Margin="2,2,4,6">
+                                    <Label DockPanel.Dock="Left" Content="Csv folder:" VerticalAlignment="Center"/>
+                                    <Button x:Name="btnBrowseHwConfigCsv" Click="btnBrowseHwConfigCsv_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
+                                    <TextBox x:Name="tbHardwareCsvPath" ToolTip="Folder with Stations.csv + Modules.csv (hw/stations, hw/modules; the #!openn header is required). Follows the scanned workspace's Devices &amp; networks folder until you edit it."/>
+                                </DockPanel>
+                                <Button x:Name="btnImportHardwareCsv" Click="btnImportHardwareCsv_Click" Grid.Row="0" Grid.Column="1" Style="{StaticResource ActionButton}" Margin="4,2,0,6" Content="Reload Csv Config"/>
+                                <Button x:Name="btnEditHardwareConfig" Click="btnEditHardwareConfig_Click" Grid.Row="0" Grid.Column="2" Style="{StaticResource ActionButton}" Margin="4,2,0,6" Content="Edit Hardware Config.."/>
+
+                                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Margin="2,0,4,2" VerticalAlignment="Center">
+                                    <RadioButton x:Name="rbUseExistingIoControllers" GroupName="rbgIoControllerSource" Margin="0,0,16,0" Content="Use existing I/O controllers" Checked="ControllerMode_Checked"
+                                                 ToolTip="The same choice as on the Workspace tab (kept in sync)"/>
+                                    <RadioButton x:Name="rbCreateNewIoControllers" GroupName="rbgIoControllerSource" Content="Create new I/O controllers" Checked="ControllerMode_Checked"
+                                                 ToolTip="The same choice as on the Workspace tab (kept in sync)"/>
+                                </StackPanel>
+                                <Button x:Name="btnGenerateHardware" Click="btnGenerateHardware_Click" Grid.Row="1" Grid.Column="2" Style="{StaticResource ActionButton}" Margin="4,0,0,2" FontWeight="SemiBold" Content="Generate Hardware"/>
+                            </Grid>
+                        </GroupBox>
+
+                        <GroupBox Header="Discovery">
+                            <DockPanel Margin="2,2,2,2" TextElement.FontWeight="Normal">
+                                <Button x:Name="btnDumpAttributes" Click="btnDumpAttributes_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Dump Device Attributes"/>
+                                <Label DockPanel.Dock="Left" Content="Device filter:" VerticalAlignment="Center"/>
+                                <TextBox x:Name="tbDumpDeviceFilter" ToolTip="Dumps device attribute trees + GSD PrmData to AttributeDumps\ (paths in csv syntax). Device name filter: regex, case-insensitive, empty = all devices."/>
+                            </DockPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
 

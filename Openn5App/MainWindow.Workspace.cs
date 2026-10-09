@@ -93,7 +93,7 @@ namespace Openn
             }
 
             StatusBrush = WorkspaceColors.ForStatus(item.Status);
-            bool rejected = item.Status == ItemStatus.Invalid || item.Status == ItemStatus.Stale || item.Status == ItemStatus.Unclassified;
+            bool rejected = item.Status != ItemStatus.Ready && item.Status != ItemStatus.Ignored; //everything that is not imported is tinted
             RowBackground = rejected ? WorkspaceColors.RedTint : Brushes.Transparent;
             RowForeground = item.Status == ItemStatus.Ignored ? WorkspaceColors.Grey : WorkspaceColors.Text;
             ToolTipText = WorkspaceLabels.Describe(item, null);
@@ -222,8 +222,8 @@ namespace Openn
             switch (status)
             {
                 case ItemStatus.Ready: return "valid #!openn header, placement consistent - importable";
-                case ItemStatus.Legacy: return "recognized by legacy markers (format tag, csv markers, XML root) - importable; the producer should write the #!openn header";
-                case ItemStatus.NeedsHeader: return "classified by extension / location only - importable with care; header missing";
+                case ItemStatus.Legacy: return "recognized by legacy markers only (format tag, csv markers, XML root) - NOT imported: the #!openn header is required (legacy acceptance retired 2026-10-09)";
+                case ItemStatus.NeedsHeader: return "classified by extension / location only, no header - NOT imported: the #!openn header is required";
                 case ItemStatus.Invalid: return "header invalid, or contradicting the file's location - NOT imported";
                 case ItemStatus.Stale: return "its run differs from the workspace run - leftover of an older generation - NOT imported";
                 case ItemStatus.Unclassified: return "nothing recognizable in header, name, extension or content - NOT imported";
@@ -343,6 +343,7 @@ namespace Openn
                 tbWorkspaceRoot.Text = root;
             }
             RememberWorkspaceRoot(root);
+            runExportRoot.Text = AppPaths.ExportRootFor(root);
 
             WorkspaceCatalog catalog = null;
             await RunBackend(() => TiaWorker.Run(() => { catalog = WorkspaceCatalog.Scan(root); }), quietWhenBusy);
@@ -390,12 +391,12 @@ namespace Openn
                 return;
             }
 
-            AddSummaryChip("layout: " + (catalog.LegacyLayout ? "legacy BuilderData folders" : "VCI shape"),
+            AddSummaryChip("layout: " + (catalog.LegacyLayout ? "legacy BuilderData folders - not importable" : "VCI shape"),
                 catalog.LegacyLayout
-                    ? "HardwareConfiguration, SoftwareBlocks\\CreationInfo|ImportReady, PlcTags, UserDataTypes, DataBlocks - mapped onto the TIA tree with no PLC folder (the project's single PLC). Contract v1 expects the VCI shape."
+                    ? "HardwareConfiguration, SoftwareBlocks\\CreationInfo|ImportReady, PlcTags, UserDataTypes, DataBlocks: the pre-contract layout. Openn5 reads only the VCI shape (<PLC>/Program blocks | PLC tags | PLC data types + Devices & networks + Templates) - regenerate the workspace with Pipeline5 5.0+."
                     : "<PLC>/Program blocks | PLC tags | PLC data types + Devices & networks + Templates at the root",
-                catalog.LegacyLayout ? WorkspaceColors.Amber : WorkspaceColors.Green,
-                catalog.LegacyLayout ? WorkspaceColors.AmberTint : WorkspaceColors.GreenTint);
+                catalog.LegacyLayout ? WorkspaceColors.Red : WorkspaceColors.Green,
+                catalog.LegacyLayout ? WorkspaceColors.RedTint : WorkspaceColors.GreenTint);
 
             OpennHeader cfg = catalog.Config;
             if (cfg == null)
@@ -414,7 +415,7 @@ namespace Openn
             }
 
             AddSummaryChip(Totals(catalog).Split(';')[0] + "; " + catalog.InImportOrder().Count() + " importable",
-                "classified = a kind was recognized (header or legacy markers); importable = Ready / Legacy / NeedsHeader with an import route",
+                "classified = a kind was recognized (header or legacy markers); importable = Ready (valid #!openn header, consistent placement, current run) with an import route",
                 WorkspaceColors.Blue, WorkspaceColors.BlueTint, true);
 
             var classified = catalog.Items.Where(i => i.Status != ItemStatus.Ignored && i.Kind != InputKind.Unknown).ToList();
@@ -436,8 +437,9 @@ namespace Openn
                     WorkspaceColors.Red, WorkspaceColors.RedTint, true);
             int unheadered = catalog.Items.Count(i => i.Status == ItemStatus.Legacy || i.Status == ItemStatus.NeedsHeader);
             if (unheadered > 0)
-                AddSummaryChip("without #!openn header: " + unheadered, "Importable through legacy classification (contract v1 tolerance); the producer should stamp them",
-                    WorkspaceColors.Amber, WorkspaceColors.AmberTint);
+                AddSummaryChip("without #!openn header: " + unheadered + " - not imported",
+                    "Recognized by legacy markers or extension only. Contract v1 requires the #!openn header (legacy acceptance retired 2026-10-09): regenerate with Pipeline5 5.0+, or add the header by hand",
+                    WorkspaceColors.Red, WorkspaceColors.RedTint);
         }
 
         private void AddSummaryChip(string text, string tooltip, Brush color, Brush tint, bool bold = false)
@@ -457,7 +459,7 @@ namespace Openn
             wpWorkspaceSummary.Children.Add(border);
         }
 
-        /// <summary>Points the Hardware tab at the workspace's hardware folder when there is exactly one (until the user edits that box).</summary>
+        /// <summary>Points the Files tab's hardware csv folder at the workspace's hardware folder when there is exactly one (until the user edits that box).</summary>
         private void FollowWorkspaceHardwareFolder(WorkspaceCatalog catalog)
         {
             if (!hardwarePathFollowsWorkspace || !catalog.Exists) return;
@@ -471,7 +473,7 @@ namespace Openn
             settingHardwarePath = true;
             try { tbHardwareCsvPath.Text = folders[0]; }
             finally { settingHardwarePath = false; }
-            Log("Hardware tab: csv folder follows the workspace -> " + folders[0]);
+            Log("Files tab: the hardware csv folder follows the workspace -> " + folders[0]);
         }
 
         /// <summary>Remembers the root in the user settings; the default root is stored as "" so it keeps following the exe location.</summary>
@@ -530,7 +532,7 @@ namespace Openn
             int importable = items.Count(i => i.Importable);
             if (importable == 0)
             {
-                Log("Workspace import: none of the " + items.Count + " item(s) (" + what + ") is importable - Invalid / Stale / Unclassified / Ignored rows are never imported, see their notes");
+                Log("Workspace import: none of the " + items.Count + " item(s) (" + what + ") is importable - only Ready rows (valid #!openn header, consistent placement, current run) are imported, see the notes");
                 return;
             }
 

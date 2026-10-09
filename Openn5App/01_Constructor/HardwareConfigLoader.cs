@@ -77,10 +77,10 @@ namespace Openn._01_Constructor
         }
 
         /// <summary>
-        /// Contract v1: the csv opens with a "#!openn" header declaring its kind. A valid header
-        /// of another kind, or with a newer schema, is an error (all-or-nothing like every other
-        /// loader check); the legacy "#!format=2" tag and a missing header are still accepted
-        /// with a warning until Pipeline5 stamps its output.
+        /// Contract v1: the csv opens with a "#!openn" header declaring its kind. A valid header of
+        /// another kind, a newer schema, the bare legacy "#!format=2" tag or no header at all are
+        /// errors (all-or-nothing like every other loader check). Legacy acceptance was retired on
+        /// 2026-10-09: Pipeline5 stamps every file it writes, the hardware editor stamps what it saves.
         /// </summary>
         private static void CheckHeader(CsvTable table, string fileName, Openn._00_Contract.InputKind expectedKind, IList<string> errors)
         {
@@ -96,10 +96,11 @@ namespace Openn._01_Constructor
                     foreach (string problem in header.Problems) errors.Add(fileName + " header: " + problem);
                     break;
                 case Openn._00_Contract.HeaderStatus.Legacy:
-                    Log("WARNING: " + fileName + " carries only the legacy #!format=" + header.LegacyFormat + " tag - contract v1 expects a #!openn header (kind: " + expected.Id + ")");
+                    errors.Add(fileName + " carries only the legacy #!format=" + header.LegacyFormat + " tag - contract v1 requires a #!openn header (kind: " + expected.Id +
+                               "); regenerate it with Pipeline5 5.0+ or add the header (the hardware editor writes it on save)");
                     break;
                 default:
-                    Log("WARNING: " + fileName + " has no #!openn header - contract v1 expects one (kind: " + expected.Id + ")");
+                    errors.Add(fileName + " has no #!openn header - contract v1 requires one (kind: " + expected.Id + "); regenerate it with Pipeline5 5.0+ or add the header");
                     break;
             }
         }

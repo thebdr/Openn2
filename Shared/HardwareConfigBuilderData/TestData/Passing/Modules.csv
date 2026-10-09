@@ -1,4 +1,9 @@
-#!format=2,,,,,,,
+#!openn
+#! kind: hw/modules
+#! schema: 2
+#! producer: hand-maintained (Openn5 test data)
+#! generated: 2026-10-09T11:23:23Z
+#!end
 # Station Name,Slot (plug order),Module Name,Model Id,I Addr,Q Addr,Custom Parameters (separator= | )  syntax: [Item(i).][Ch(i).]Name=Value,Comment
 n0005-ms1-cc1-k65001,1,-K65010,6ES7131-6BH01-0BA0,0,0,PotentialGroup=1,DI 16x24VDC ST
 n0005-ms1-cc1-k65001,2,-K65012,6ES7131-6BH01-0BA0,4,4,,DI 16x24VDC ST

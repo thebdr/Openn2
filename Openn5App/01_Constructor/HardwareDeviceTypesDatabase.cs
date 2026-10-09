@@ -70,6 +70,7 @@ namespace Openn._01_Constructor
             CsvTable table = CsvTable.Read(filename);
             foreach (string tableError in table.Errors)
                 errors.Add(tableError);
+            CheckHeader(table, filename, errors);
 
             foreach (CsvRow row in table.Rows)
             {
@@ -99,6 +100,32 @@ namespace Openn._01_Constructor
                 }
 
                 Identifier.Add(modelId, new DeviceInfo(deviceType, row.Get(2), row.Get(3), row.Get(4), filename, row.LineNumber));
+            }
+        }
+
+        /// <summary>
+        /// Contract v1: the database opens with a "#!openn" header of kind hw/device-types - the file is
+        /// hand-maintained, so it says itself what it is. No header, the wrong kind or a broken header
+        /// is a load error (legacy acceptance retired 2026-10-09).
+        /// </summary>
+        private static void CheckHeader(CsvTable table, string filename, IList<string> errors)
+        {
+            Openn._00_Contract.OpennHeader header = table.Header;
+            Openn._00_Contract.InputKindInfo expected = Openn._00_Contract.InputKindInfo.For(Openn._00_Contract.InputKind.HwDeviceTypes);
+            switch (header.Status)
+            {
+                case Openn._00_Contract.HeaderStatus.Ok:
+                    if (header.KindInfo.Kind != Openn._00_Contract.InputKind.HwDeviceTypes)
+                        errors.Add(filename + ": header declares kind " + header.KindId + " - expected " + expected.Id);
+                    break;
+                case Openn._00_Contract.HeaderStatus.Invalid:
+                    foreach (string problem in header.Problems) errors.Add(filename + ": header: " + problem);
+                    break;
+                default:
+                    errors.Add(filename + ": no #!openn header - contract v1 requires one. Add these lines at the top of the file: " +
+                               "#!openn | #! kind: " + expected.Id + " | #! schema: " + expected.SupportedSchema +
+                               " | #! producer: <who maintains it> | #! generated: <ISO date-time> | #!end");
+                    break;
             }
         }
 

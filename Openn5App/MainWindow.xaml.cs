@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 
+using Openn._00_Contract;
 using Openn._03_ApiManager;
 using Openn._01_Constructor;
 using Openn._10_StandardFunctions;
@@ -15,6 +16,12 @@ using static Openn._03_ApiManager.TiaPortalOpenness;
 
 namespace Openn
 {
+    /// <summary>
+    /// Main window: a collapsible "TIA project" connection row (rarely used, so collapsed by default; its header
+    /// keeps the Attach/Detach toggle and the attached-project status visible), the Workspace tab (the primary
+    /// surface - the handoff workspace as a catalog, import and export driven by it; MainWindow.Workspace.cs),
+    /// the Files tab (single-file tools: one block, one csv, one hardware folder, the attribute dump) and the log.
+    /// </summary>
     public partial class MainWindow : Window
     {
         public IList<TiaProcessInfo> processInfoList = new List<TiaProcessInfo>();
@@ -26,6 +33,9 @@ namespace Openn
         //updates controls after awaiting, so the window never freezes.
         private bool backendBusy;
         private int runningOperations;
+
+        //the I/O controller mode has one radio pair per tab (Workspace, Files); they mirror each other
+        private bool syncingControllerMode;
 
         public MainWindow()
         {
@@ -42,23 +52,24 @@ namespace Openn
 
         private void InitializeGraphicComponents()
         {
-            //defaults point at the Shared handoff tree this app exchanges with Pipeline5
-            //(see AppPaths). The TIA project is Openn5-internal so it stays under the exe.
-            tbHardwareCsvPath.Text = AppPaths.HardwareConfigDir;          // Stations.csv + Modules.csv
+            //the Files tab starts at the default workspace; after the first scan its hardware folder follows the
+            //scanned workspace (MainWindow.Workspace.cs). The TIA project default is Openn5-internal (under the exe).
+            tbHardwareCsvPath.Text = Path.Combine(AppPaths.BuilderDataDir, WorkspaceLayout.HardwareFolder);
             tbProjectPath.Text = AppPaths.AppBaseDir + "\\TiaProjects\\openness_project";
-            tbSourceBlockPath.Text = AppPaths.ImportReadyBlocksDir;       // single block import (browse start)
-            tbBlockGenCsvPath.Text = AppPaths.BlocksCreationDir;          // block-generation csv
-            tbInstanceDbCsvPath.Text = AppPaths.BlocksCreationDir;        // InstanceDBs.csv
-            tbImportQueuePath.Text = AppPaths.ImportReadyBlocksDir;       // batch import intake
             rbUseInstance.IsChecked = true;
-            rbUseExistingIoControllers.IsChecked = true;
-            lblSharedRoot.Content = "Shared handoff tree: " + AppPaths.SharedRoot;
+            rbUseExistingIoControllers.IsChecked = true; //mirrored onto the Workspace tab's pair (ControllerMode_Checked)
+
+            bool expanded = false;
+            try { expanded = Properties.Settings.Default.ProjectPanelExpanded; }
+            catch (Exception e) { Log("Could not read the user settings \n" + e.Message); }
+            expProject.IsExpanded = expanded;
+            UpdateAttachButton();
         }
 
         /// <summary>
         /// Startup: the Workspace tab is the primary surface, so its catalog is listed first (no TIA needed; it
-        /// also points the Hardware tab at the workspace's hardware folder), then the Hardware tab's csv config
-        /// is loaded, the running instances are listed and the one-shot auto-attach runs - as before.
+        /// also points the Files tab at the workspace's hardware folder), then that hardware config is loaded,
+        /// the running instances are listed and the one-shot auto-attach runs.
         /// </summary>
         private async void RunStartupSequence()
         {
@@ -105,7 +116,7 @@ namespace Openn
             }
         }
 
-        #region Buttons & Controls
+        #region TIA project row
 
         /// <summary>Toggle: attaches when detached, detaches when attached.</summary>
         private async void btnAttachProject_Click(object sender, RoutedEventArgs e)
@@ -129,7 +140,8 @@ namespace Openn
             {
                 if (cbOpenTiaInstances.SelectedIndex < 0)
                 {
-                    Log("Can't attach: no open Tia Portal instance selected");
+                    Log("Can't attach: no open Tia Portal instance selected (expand the TIA project row to pick one, or attach by path)");
+                    expProject.IsExpanded = true;
                     return;
                 }
                 path = processInfoList[cbOpenTiaInstances.SelectedIndex].ProjectPath;
@@ -144,6 +156,7 @@ namespace Openn
 
         private bool IsProjectAttached => !string.IsNullOrEmpty(tbAttachedProject.Text);
 
+        /// <summary>The Attach/Detach toggle and the status text in the (collapsed) row's header.</summary>
         private void UpdateAttachButton()
         {
             if (IsProjectAttached)
@@ -151,12 +164,32 @@ namespace Openn
                 btnAttachProject.Content = "Detach Project";
                 btnAttachProject.Background = System.Windows.Media.Brushes.SteelBlue;
                 btnAttachProject.Foreground = System.Windows.Media.Brushes.White;
+                tbProjectStatus.Text = "TIA project: " + tbAttachedProject.Text;
             }
             else
             {
                 btnAttachProject.Content = "Attach Project";
                 btnAttachProject.ClearValue(System.Windows.Controls.Control.BackgroundProperty);
                 btnAttachProject.ClearValue(System.Windows.Controls.Control.ForegroundProperty);
+                tbProjectStatus.Text = cbOpenTiaInstances.Items.Count > 0
+                    ? "TIA project: not attached  -  Attach takes the selected open instance (" + cbOpenTiaInstances.Items.Count + " found); expand to choose or to attach by path"
+                    : "TIA project: not attached  -  no open TIA instance found; expand to attach by path";
+            }
+        }
+
+        /// <summary>The row remembers whether the user keeps it open.</summary>
+        private void expProject_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (!IsLoaded) return;
+            try
+            {
+                if (Properties.Settings.Default.ProjectPanelExpanded == expProject.IsExpanded) return;
+                Properties.Settings.Default.ProjectPanelExpanded = expProject.IsExpanded;
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception ex)
+            {
+                Log("Could not save the user settings \n" + ex.Message);
             }
         }
 
@@ -216,6 +249,111 @@ namespace Openn
             Application.Current.Shutdown();
         }
 
+        private async void Window_Activated(object sender, System.EventArgs e)
+        {
+            await RefreshOpenInstancesDropdown(quietWhenBusy: true);
+        }
+
+        private async Task RefreshOpenInstancesDropdown(bool quietWhenBusy)
+        {
+            await RunBackend(async () =>
+            {
+                try
+                {
+                    processInfoList = await TiaWorker.Run(() => tia.GetOpenTiaInstances());
+                }
+                catch (Exception ex)
+                {
+                    // typically: Siemens.Engineering.dll of the selected version could not be
+                    // loaded, or the user is not a member of the "Siemens TIA Openness" group
+                    Log("ERROR querying open Tia Portal instances \n" + ex.Message);
+                    return;
+                }
+
+                cbOpenTiaInstances.Items.Clear();
+                foreach (var processInfo in processInfoList)
+                {
+                    cbOpenTiaInstances.Items.Add("[" + processInfo.ProcessID + "] " + processInfo.ProjectName);
+                }
+                cbOpenTiaInstances.SelectedIndex = 0;
+                UpdateAttachButton();
+            }, quietWhenBusy);
+        }
+
+        #endregion TIA project row
+
+        #region I/O controller mode (one choice, two tabs)
+
+        /// <summary>Keeps the Workspace tab's and the Files tab's radio pairs equal; the hardware generation reads either.</summary>
+        private void ControllerMode_Checked(object sender, RoutedEventArgs e)
+        {
+            if (syncingControllerMode) return;
+            if (rbWsCreateNewControllers == null || rbCreateNewIoControllers == null) return; //still constructing
+            syncingControllerMode = true;
+            try
+            {
+                bool createNew = ReferenceEquals(sender, rbWsCreateNewControllers) || ReferenceEquals(sender, rbCreateNewIoControllers);
+                rbWsCreateNewControllers.IsChecked = createNew;
+                rbWsUseExistingControllers.IsChecked = !createNew;
+                rbCreateNewIoControllers.IsChecked = createNew;
+                rbUseExistingIoControllers.IsChecked = !createNew;
+            }
+            finally
+            {
+                syncingControllerMode = false;
+            }
+        }
+
+        /// <summary>True = "Create new I/O controllers" (either pair, they are kept equal).</summary>
+        private bool CreateNewControllersSelected => rbWsCreateNewControllers.IsChecked == true;
+
+        #endregion I/O controller mode
+
+        #region Workspace tab: export
+
+        /// <summary>The export root of the current workspace: its sibling ExportedData folder.</summary>
+        private string CurrentExportRoot() => AppPaths.ExportRootFor(tbWorkspaceRoot.Text);
+
+        private async void btnExportFullProject_Click(object sender, RoutedEventArgs e)
+        {
+            string root = CurrentExportRoot();
+            await RunBackend(() => TiaWorker.Run(() => tia.ExportFullProject(root)));
+        }
+
+        private async void btnExportSoftwareBlocks_Click(object sender, RoutedEventArgs e)
+        {
+            string root = CurrentExportRoot();
+            await RunBackend(() => TiaWorker.Run(() => tia.ExportSoftwareBlocks(root)));
+        }
+
+        private async void btnExportDataBlocks_Click(object sender, RoutedEventArgs e)
+        {
+            string root = CurrentExportRoot();
+            await RunBackend(() => TiaWorker.Run(() => tia.ExportDataBlocks(root)));
+        }
+
+        private async void btnExportUdts_Click(object sender, RoutedEventArgs e)
+        {
+            string root = CurrentExportRoot();
+            await RunBackend(() => TiaWorker.Run(() => tia.ExportUserDataTypes(root)));
+        }
+
+        private async void btnExportTagTables_Click(object sender, RoutedEventArgs e)
+        {
+            string root = CurrentExportRoot();
+            await RunBackend(() => TiaWorker.Run(() => tia.ExportTagTables(root)));
+        }
+
+        private async void btnExportHardwareCax_Click(object sender, RoutedEventArgs e)
+        {
+            string root = CurrentExportRoot();
+            await RunBackend(() => TiaWorker.Run(() => tia.ExportHardwareCax(root)));
+        }
+
+        #endregion Workspace tab: export
+
+        #region Files tab: program blocks
+
         private void btnExportSource_Click(object sender, RoutedEventArgs e)
         {
             if (backendBusy)
@@ -237,26 +375,31 @@ namespace Openn
         private async void btnImportSource_Click(object sender, RoutedEventArgs e)
         {
             string fileName = tbSourceBlockPath.Text;
+            if (string.IsNullOrWhiteSpace(fileName)) { Log("Pick a block XML to import first (Browse..)"); return; }
             await RunBackend(() => TiaWorker.Run(() => tia.ImportPlcBlock(fileName)));
         }
 
+        /// <summary>File dialogs of the Files tab start at the box's own path, else at the workspace root.</summary>
+        private string StartPathFor(string boxText) =>
+            string.IsNullOrWhiteSpace(boxText) ? tbWorkspaceRoot.Text : boxText;
+
         private void btnBrowseBlocks_Click(object sender, RoutedEventArgs e)
         {
-            var _path = GetFileDialog(startPath: tbSourceBlockPath.Text, filter: "File (.xml)|*.xml");
+            var _path = GetFileDialog(startPath: StartPathFor(tbSourceBlockPath.Text), filter: "Block XML (.xml)|*.xml");
             if (!(_path == null))
                 tbSourceBlockPath.Text = _path.FullName;
         }
 
         private void btnBrowseBlockGenCsv_Click(object sender, RoutedEventArgs e)
         {
-            var _path = GetFileDialog(startPath: tbBlockGenCsvPath.Text, filter: "File (.csv)|*.csv");
+            var _path = GetFileDialog(startPath: StartPathFor(tbBlockGenCsvPath.Text), filter: "Block generation csv (.csv)|*.csv");
             if (!(_path == null))
                 tbBlockGenCsvPath.Text = _path.FullName;
         }
 
         private void btnBrowseInstanceDbCsv_Click(object sender, RoutedEventArgs e)
         {
-            var _path = GetFileDialog(startPath: tbInstanceDbCsvPath.Text, filter: "File (.csv)|*.csv");
+            var _path = GetFileDialog(startPath: StartPathFor(tbInstanceDbCsvPath.Text), filter: "Instance DB csv (.csv)|*.csv");
             if (!(_path == null))
                 tbInstanceDbCsvPath.Text = _path.FullName;
         }
@@ -264,109 +407,18 @@ namespace Openn
         private async void btnCreateInstanceDbs_Click(object sender, RoutedEventArgs e)
         {
             string csvPath = tbInstanceDbCsvPath.Text;
+            if (string.IsNullOrWhiteSpace(csvPath)) { Log("Pick an instance-DB csv first (Browse..)"); return; }
             await RunBackend(() => TiaWorker.Run(() => tia.CreateInstanceDbs(csvPath)));
-        }
-
-        private void btnBrowseImportQueue_Click(object sender, RoutedEventArgs e)
-        {
-            var _path = GetFolderDialog(tbImportQueuePath.Text);
-            if (!(_path == null))
-                tbImportQueuePath.Text = _path.FullName;
-        }
-
-        private async void btnRunImportQueue_Click(object sender, RoutedEventArgs e)
-        {
-            string queueFolder = tbImportQueuePath.Text;
-            await RunBackend(() => TiaWorker.Run(() => tia.RunImportQueue(queueFolder)));
-        }
-
-        // ----- Project tab: whole-project import / export (the Pipeline5 round-trip) -----
-
-        /// <summary>
-        /// Rescans the Workspace tab's root (contract v1 "#!openn" headers, legacy markers as fallback) and
-        /// logs the catalog summary: kinds, statuses, files needing attention. No TIA needed.
-        /// </summary>
-        private async void btnScanWorkspace_Click(object sender, RoutedEventArgs e)
-        {
-            await RescanWorkspaceAsync();
-            LogWorkspaceCatalog();
-        }
-
-        private async void btnImportFullProject_Click(object sender, RoutedEventArgs e)
-        {
-            bool createNew = cbImportCreateNewControllers.IsChecked == true;
-            await RunBackend(() => TiaWorker.Run(() => tia.ImportFullProject(createNew)));
-        }
-
-        private async void btnImportHardware_Click(object sender, RoutedEventArgs e)
-        {
-            bool createNew = cbImportCreateNewControllers.IsChecked == true;
-            await RunBackend(() => TiaWorker.Run(() => tia.ImportHardware(createNew)));
-        }
-
-        private async void btnImportUdts_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ImportUserDataTypes()));
-        }
-
-        private async void btnImportIoTags_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ImportIoTags()));
-        }
-
-        private async void btnImportDataBlocks_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ImportDataBlocks()));
-        }
-
-        private async void btnImportInstanceDbsProj_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ImportInstanceDbs()));
-        }
-
-        private async void btnImportSoftwareBlocks_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ImportSoftwareBlocks()));
-        }
-
-        private async void btnExportFullProject_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ExportFullProject()));
-        }
-
-        private async void btnExportSoftwareBlocks_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ExportSoftwareBlocks()));
-        }
-
-        private async void btnExportDataBlocks_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ExportDataBlocks()));
-        }
-
-        private async void btnExportUdts_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ExportUserDataTypes()));
-        }
-
-        private async void btnExportTagTables_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ExportTagTables()));
-        }
-
-        private async void btnExportHardwareCax_Click(object sender, RoutedEventArgs e)
-        {
-            await RunBackend(() => TiaWorker.Run(() => tia.ExportHardwareCax()));
         }
 
         private async void btnGenerateBlocks_Click(object sender, RoutedEventArgs e)
         {
             string csvPath = tbBlockGenCsvPath.Text;
+            if (string.IsNullOrWhiteSpace(csvPath)) { Log("Pick a block-generation csv first (Browse..)"); return; }
             string blockName = tbBlockGenName.Text; //empty = template name without TEMPLATE--vX.Y-- prefix
             //the generated document is stamped with the RUNNING Openness version
             string versionTag = "V" + OpennessSetup.SelectedInstallation.PortalVersion.Major;
-            string outputFolder = Path.Combine(
-                Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName), "GeneratedBlocks");
+            string outputFolder = AppPaths.GeneratedBlocksDir;
 
             string outputPath = null;
             await RunBackend(() => TiaWorker.Run(() =>
@@ -379,11 +431,9 @@ namespace Openn
                 tbSourceBlockPath.Text = outputPath;
         }
 
-        private async void btnDumpAttributes_Click(object sender, RoutedEventArgs e)
-        {
-            string deviceNameFilter = tbDumpDeviceFilter.Text;
-            await RunBackend(() => TiaWorker.Run(() => tia.DumpDeviceAttributes(deviceNameFilter)));
-        }
+        #endregion Files tab: program blocks
+
+        #region Files tab: hardware + discovery
 
         private async void btnImportHardwareCsv_Click(object sender, RoutedEventArgs e)
         {
@@ -412,9 +462,19 @@ namespace Openn
                 return;
             }
 
-            bool? createNewIoControllers = rbCreateNewIoControllers.IsChecked;
+            bool? createNewIoControllers = CreateNewControllersSelected;
             await RunBackend(() => TiaWorker.Run(() => tia.CreateDevices(createNewIoControllers)));
         }
+
+        private async void btnDumpAttributes_Click(object sender, RoutedEventArgs e)
+        {
+            string deviceNameFilter = tbDumpDeviceFilter.Text;
+            await RunBackend(() => TiaWorker.Run(() => tia.DumpDeviceAttributes(deviceNameFilter)));
+        }
+
+        #endregion Files tab: hardware + discovery
+
+        #region Log toolbar
 
         private async void btnClearLogs_Click(object sender, RoutedEventArgs e)
         {
@@ -428,8 +488,6 @@ namespace Openn
             TiaWorker.CancelCurrentOperation();
             Log("Cancel requested - the operation stops after the current TIA call completes");
         }
-
-        #region Log copy
 
         private void lbLogView_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
@@ -464,10 +522,6 @@ namespace Openn
             }
         }
 
-        #endregion Log copy
-
-        #region Log filter & file log
-
         private void tbLogFilter_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
             string pattern = tbLogFilter.Text;
@@ -494,7 +548,7 @@ namespace Openn
 
         private void cbLogToFile_Checked(object sender, RoutedEventArgs e)
         {
-            string folder = Path.Combine(Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName), "Logs");
+            string folder = Path.Combine(AppPaths.AppBaseDir, "Logs");
             try
             {
                 Log("Logging to file: " + StartFileLog(folder));
@@ -513,40 +567,6 @@ namespace Openn
             Log("File logging stopped" + (path == null ? "" : " (" + path + ")"));
         }
 
-        #endregion Log filter & file log
-
-        private async void Window_Activated(object sender, System.EventArgs e)
-        {
-            await RefreshOpenInstancesDropdown(quietWhenBusy: true);
-        }
-
-        #endregion Buttons & Controls
-
-        private async Task RefreshOpenInstancesDropdown(bool quietWhenBusy)
-        {
-            await RunBackend(async () =>
-            {
-                try
-                {
-                    processInfoList = await TiaWorker.Run(() => tia.GetOpenTiaInstances());
-                }
-                catch (Exception ex)
-                {
-                    // typically: Siemens.Engineering.dll of the selected version could not be
-                    // loaded, or the user is not a member of the "Siemens TIA Openness" group
-                    Log("ERROR querying open Tia Portal instances \n" + ex.Message);
-                    return;
-                }
-
-                cbOpenTiaInstances.Items.Clear();
-                foreach (var processInfo in processInfoList)
-                {
-                    cbOpenTiaInstances.Items.Add("[" + processInfo.ProcessID + "] " + processInfo.ProjectName);
-                }
-                cbOpenTiaInstances.SelectedIndex = 0;
-            }, quietWhenBusy);
-        }
-
         private void ShowRunningIcon(string Start_Stop)
         {
             if (Start_Stop.Contains("start"))
@@ -559,6 +579,6 @@ namespace Openn
             btnCancelOperation.Visibility = visibility;
         }
 
+        #endregion Log toolbar
     }
-
 }

@@ -19,8 +19,8 @@ namespace Openn._00_Contract
     ///     &lt;PLC name&gt;\PLC tags\                    sw/tag-table (+ the manual PLCTags.xlsx)
     ///
     /// The legacy BuilderData layout (HardwareConfiguration, SoftwareBlocks\CreationInfo,
-    /// SoftwareBlocks\ImportReady, PlcTags, UserDataTypes, DataBlocks) is still recognized and
-    /// mapped onto the same categories, with no PLC (= the project's single PLC).
+    /// SoftwareBlocks\ImportReady, PlcTags, UserDataTypes, DataBlocks) is recognized only to name it:
+    /// its files are mapped for display but never imported (legacy acceptance retired 2026-10-09).
     /// </summary>
     public static class WorkspaceLayout
     {
@@ -59,9 +59,9 @@ namespace Openn._00_Contract
     {
         /// <summary>Valid header, known kind, placement consistent - importable.</summary>
         Ready,
-        /// <summary>Recognized by legacy markers (format tag, $ template directive, % key row, XML root) - importable, header missing.</summary>
+        /// <summary>Recognized by legacy markers only (format tag, $ template directive, % key row, XML root), header missing - NOT imported (legacy acceptance retired 2026-10-09).</summary>
         Legacy,
-        /// <summary>Classified by extension / location only - importable with care, header missing.</summary>
+        /// <summary>Classified by extension / location only, header missing - NOT imported.</summary>
         NeedsHeader,
         /// <summary>Header present but invalid, or contradicting the file's location - not imported.</summary>
         Invalid,
@@ -95,8 +95,8 @@ namespace Openn._00_Contract
         public ItemStatus Status { get; set; } = ItemStatus.Unclassified;
         public IList<string> Notes { get; } = new List<string>();
 
-        /// <summary>True for the statuses the importer accepts.</summary>
-        public bool Importable => (Status == ItemStatus.Ready || Status == ItemStatus.Legacy || Status == ItemStatus.NeedsHeader)
+        /// <summary>True for the one status the importer accepts: a valid header, consistent placement, current run.</summary>
+        public bool Importable => Status == ItemStatus.Ready
                                   && KindInfo != null && KindInfo.Route != ImportRoute.None && KindInfo.Route != ImportRoute.Template;
 
         /// <summary>"PLC / Category/Group" for display.</summary>
@@ -207,7 +207,7 @@ namespace Openn._00_Contract
         {
             yield return "Workspace scan: " + Root;
             if (!Exists) { yield return "  folder not found"; yield break; }
-            yield return "  layout: " + (LegacyLayout ? "legacy BuilderData folders (HardwareConfiguration, SoftwareBlocks, PlcTags, ...) - contract v1 expects the VCI shape"
+            yield return "  layout: " + (LegacyLayout ? "legacy BuilderData folders (HardwareConfiguration, SoftwareBlocks, PlcTags, ...) - NOT importable: regenerate with Pipeline5 5.0+ (VCI shape)"
                                                         : "VCI shape (<PLC>/Program blocks | PLC tags | PLC data types + Devices & networks)");
             yield return "  workspace config: " + (Config == null ? "missing (" + WorkspaceLayout.ConfigFolder + "\\" + WorkspaceLayout.ConfigFile + ")"
                 : Config.Status + (Config.Contract != null ? ", contract " + Config.Contract : string.Empty) +
@@ -240,8 +240,8 @@ namespace Openn._00_Contract
             }
             var unheadered = Items.Where(i => i.Status == ItemStatus.Legacy || i.Status == ItemStatus.NeedsHeader).ToList();
             if (unheadered.Count > 0)
-                yield return "  " + unheadered.Count + " importable file(s) without a #!openn header (legacy / extension classification) - " +
-                             "the producer should stamp them (contract v1).";
+                yield return "  " + unheadered.Count + " file(s) without a #!openn header (legacy / extension classification) - NOT imported: " +
+                             "contract v1 requires the header (legacy acceptance retired 2026-10-09).";
         }
 
         #region Classification
@@ -277,6 +277,8 @@ namespace Openn._00_Contract
             if (WorkspaceLayout.IsLegacyRoot(first))
             {
                 item.LegacyPlacement = true;
+                item.Misplaced = true;
+                item.Notes.Add("legacy BuilderData folder '" + first + "' - Openn5 reads only the VCI shape (<PLC>/Program blocks | PLC tags | PLC data types, Devices & networks, Templates): regenerate the workspace with Pipeline5 5.0+");
                 if (first.Equals(WorkspaceLayout.LegacyHardware, StringComparison.OrdinalIgnoreCase)) item.Category = WorkspaceLayout.HardwareFolder;
                 else if (first.Equals(WorkspaceLayout.LegacyPlcTags, StringComparison.OrdinalIgnoreCase)) item.Category = WorkspaceLayout.PlcTags;
                 else if (first.Equals(WorkspaceLayout.LegacyUserDataTypes, StringComparison.OrdinalIgnoreCase)) item.Category = WorkspaceLayout.PlcDataTypes;
@@ -345,9 +347,10 @@ namespace Openn._00_Contract
             }
 
             item.Status = (byMarker || h.Status == HeaderStatus.Legacy) ? ItemStatus.Legacy : ItemStatus.NeedsHeader;
-            item.Notes.Add(h.Status == HeaderStatus.Legacy
-                ? "legacy #!format=" + h.LegacyFormat + " tag - the producer should write the #!openn header"
-                : "no #!openn header - classified by " + (byMarker ? "content" : "extension / location"));
+            item.Notes.Add((h.Status == HeaderStatus.Legacy
+                ? "legacy #!format=" + h.LegacyFormat + " tag only"
+                : "no #!openn header (classified by " + (byMarker ? "content" : "extension / location") + " for display)") +
+                " - NOT imported: contract v1 requires the #!openn header; regenerate with Pipeline5 5.0+ or add the header");
         }
 
         /// <summary>Legacy classification: file name, csv markers, XML root object, extension.</summary>

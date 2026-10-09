@@ -42,5 +42,21 @@ namespace Openn.Properties
                 this["WorkspaceRoot"] = value;
             }
         }
+
+        /// <summary>Whether the TIA project row is kept open (collapsed by default - it is rarely used).</summary>
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ProjectPanelExpanded
+        {
+            get
+            {
+                return ((bool)(this["ProjectPanelExpanded"]));
+            }
+            set
+            {
+                this["ProjectPanelExpanded"] = value;
+            }
+        }
     }
 }

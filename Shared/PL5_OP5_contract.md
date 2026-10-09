@@ -1,12 +1,15 @@
 # PL5 ⇄ OP5 — the input contract (v1, draft)
 
 **Audience:** the PL session (`Pipeline5App/`, PL5) and the OP session (`Openn5App/`, OP5).
-**Status:** contract **1, draft**. OP5 side implemented (classification, header parsing, legacy acceptance,
-scan command); PL5 side implemented 2026-10-08 (migration steps 2 + 3: the header on every surface, the run
-id + workspace config, the VCI shape — the legacy layout and the `#!format=2` tag are no longer written).
-Open: step 1 (TIA's acceptance of the XML header comment before `<Document>`) is still unverified on a real import.
+**Status:** contract **1, draft**. OP5 side implemented (classification, header parsing, the Workspace tab's
+catalog-driven import, stamped VCI-shaped exports); PL5 side implemented 2026-10-08 (migration steps 2 + 3: the
+header on every surface, the run id + workspace config, the VCI shape — the legacy layout and the `#!format=2` tag
+are no longer written). **Legacy acceptance retired 2026-10-09** (step 5): OP5 imports only files with a valid
+header in the VCI shape; the legacy folders, the bare tag and unheadered files are recognized only to say why
+they are refused. Open: step 1 (TIA's acceptance of the XML header comment before `<Document>`) is still
+unverified on a real import.
 **Supersedes** the "format-preserving" regime of `PL4_OP4_coordination.md` for the v5 pair only: PL3/PL4 + OP3
-stay untouched and shippable; OP5 reads today's PL5 output **with warnings**; PL5 adopts v1 one surface at a time.
+stay untouched and shippable; the v5 pair speaks contract v1 only.
 
 The change protocol is unchanged: propose here → review against the TIA Openness API → agree → implement on
 both sides in the same cycle → verify end-to-end (OP5 import + TIA smoke). Until verified, the previous
@@ -23,8 +26,10 @@ format stays the gate.
    (`plc`, `target`) and then **must agree** — a mismatch is an error, not a hint.
 3. **Nothing silent.** Unknown, invalid, misplaced or stale files are listed and **skipped**, never imported.
    Every skip is logged with the reason and the fix.
-4. **Legacy is accepted for one version, with a warning.** OP5 v1 still imports the legacy BuilderData layout and
-   the `#!format=2` tag (status `Legacy`). OP5 v2 will require the header.
+4. **Legacy is recognized, never imported** (since 2026-10-09; before that OP5 accepted it with a warning). The
+   legacy BuilderData folders, the bare `#!format=2` tag and unheadered files are classified for display (status
+   `Legacy` / `NeedsHeader`, or `Invalid` for the legacy folders) and refused with the fix in the note:
+   regenerate with Pipeline5 5.0+, or add the header by hand.
 5. **No host paths in the handoff.** Template references are relative (`Templates/…`); the workspace is
    relocatable (a project's `Output/`, `Output/<system>/`, or the builtin `Shared/OutputTree/…`).
 6. **Hardware stations are never completed or compared.** A station already in TIA is skipped with its modules
@@ -201,14 +206,14 @@ BuilderData/                                   ← the workspace (name kept; PL5
   the scan's layout verdict "legacy"). The PLC folder = the `Plc` station's name, taken from the `hardware_stations`
   table or, before phase 700 ran, from the I/O List's PLC head row (the same rule phase 700 applies); no PLC head = a
   pointed error, no workspace. PL5 never sweeps: an existing legacy tree (`HardwareConfiguration/`, `SoftwareBlocks/`,
-  `PlcTags/`) must be deleted once by hand — OP5 v1 still reads it, with warnings, until then.
+  `PlcTags/`) must be deleted once by hand — OP5 refuses it (since 2026-10-09) and names the folders to delete.
 - `Templates/` holds PL5's copies of the hand-maintained templates, each stamped `sw/block-template` with the
   generation's `run` (a copy an older generation left behind is Stale) and `source` = the original's folder; the
   block-gen csvs keep `$ template=Templates/<file>.xml`, which OP5 resolves by walking up to the workspace root (§7.3).
   A `DeviceTypesDatabase.csv` copy (a project's own database, placed beside Stations.csv) stays byte-exact: it carries
   a header once the hand-maintained original does (§6.7).
 
-### 4.1 Legacy layout → workspace mapping (OP5 v1 reads both)
+### 4.1 Legacy layout → workspace mapping (recognized for the diagnosis only — never imported since 2026-10-09)
 
 | legacy folder | mapped to | PLC |
 |---|---|---|
@@ -225,19 +230,24 @@ BuilderData/                                   ← the workspace (name kept; PL5
 ## 5. What OP5 does with the catalog
 
 1. **Scan** the workspace → every file gets a kind and a status:
-   `Ready` (valid header) · `Legacy` (recognized by legacy markers: format tag, `$ template=`, `%` key row,
-   XML root object) · `NeedsHeader` (extension / location only) · `Invalid` (bad header, header ≠ location,
-   kind in the wrong TIA folder, no usable location) · `Stale` (run ≠ workspace run) · `Unclassified` ·
+   `Ready` (valid header, consistent placement, current run) · `Legacy` (recognized by legacy markers only:
+   format tag, `$ template=`, `%` key row, XML root object — header missing) · `NeedsHeader` (extension /
+   location only — header missing) · `Invalid` (bad header, header ≠ location, kind in the wrong TIA folder, no
+   usable location, a legacy BuilderData folder) · `Stale` (run ≠ workspace run) · `Unclassified` ·
    `Ignored` (config, sidecars, documentation, templates by themselves).
-2. **Import** only `Ready`, `Legacy` and `NeedsHeader` items, in kind order (§2 column *order*), then PLC, then
-   path (the `00_`, `01_` prefixes keep working inside a kind). `Invalid`, `Stale`, `Unclassified` are logged and
-   skipped — never imported.
+2. **Import** only `Ready` items (since 2026-10-09), in kind order (§2 column *order*), then PLC, then path
+   (the `00_`, `01_` prefixes keep working inside a kind). Everything else is logged with its reason and
+   skipped — never imported; `Legacy` / `NeedsHeader` rows say "regenerate with Pipeline5 5.0+ or add the header".
 3. **Existence policy per kind** (unchanged from OP3): stations already in TIA are skipped with their modules
    (warning); block / UDT / tag-table XML imports `Override`; instance DB name clashes prompt
    Retry/Abort/Ignore; a plug error prompts Retry/Abort/Ignore. Nothing is ever saved by OP5.
-4. **Export stamping** (planned, OP5 v1.x): OP5 inserts the header comment into every XML it exports and writes
-   `.openn/workspace.openn.config` for `ExportedData`, so PL5's coverage report (phase 920) can classify exports
-   the same way.
+4. **Export stamping** (done 2026-10-09): OP5 exports the attached project into the workspace's sibling
+   `ExportedData` in the VCI shape — `<PLC>/Program blocks/<group>/<Block>.xml` (code and data blocks, kind by
+   block type), `<PLC>/PLC data types/…`, `<PLC>/PLC tags/…` — each TIA XML with the header as the first comment
+   after the declaration (`run`, `project`, `plc`, `target`, `name`, `source: TIA export`), the hardware as CAx
+   `Devices & networks/<project>.aml` with an `.aml.openn` sidecar (`doc/other`), and `.openn/workspace.openn.config`
+   with a fresh run id per export, so PL5's coverage report (phase 920) can classify exports exactly like inputs.
+   A full export sweeps the PLC's three folders first; a single-kind export only overwrites same-named files.
 
 ---
 
@@ -267,12 +277,21 @@ workspace (the VCI dirs, the PLC folder, `begin_generation`); every writer stamp
 without a header is a difference; the PL5-only transfer-area rows of `Modules.csv` are its one sanctioned row
 allowance); `scripts/run_pipeline.py` generates a workspace headless. Transfer areas (§2.1) are emitted since
 2026-10-08 (`.zen/contract.md` C-031). 6: the `#!openn` row
-in the Files-tab grid is accepted as cosmetic. 7: `DeviceTypesDatabase.csv` carries its header since 2026-10-09 (`hw/device-types`, schema 1, producer `hand-maintained`, no `run` - no generation produces it; PL5 and OP5 read it unchanged, OP5's catalog classifies a project copy Ready); the block templates still have none (not edited since the contract).
+in the Files-tab grid is accepted as cosmetic. 7: `DeviceTypesDatabase.csv` carries its header since 2026-10-09
+(`hw/device-types`, schema 1, producer `hand-maintained`, no `run` - no generation produces it; PL5 and OP5 read it
+unchanged, OP5's catalog classifies a project copy Ready); the `TestData/Passing` database copy and the
+`TestData/Passing` Stations/Modules fixtures were stamped by the OP session the same day (`hw/stations` /
+`hw/modules` schema 2) — OP5 now refuses an unheadered database; the block templates still have none (not edited
+since the contract; they are never imported by themselves, so nothing refuses them yet).
 
 ## 7. Consumer obligations (OP5)
 
-1. Classify before importing; log the catalog summary; never import `Invalid` / `Stale` / `Unclassified`.
-2. Accept the legacy layout and `#!format=2` with warnings in v1; require the header in v2 (announced here).
+1. Classify before importing; log the catalog summary; import `Ready` items only — never `Legacy` / `NeedsHeader` /
+   `Invalid` / `Stale` / `Unclassified`.
+2. Require the header everywhere (since 2026-10-09): the hardware loader refuses a bare `#!format=2` or an
+   unheadered csv, the device-type database must carry `kind: hw/device-types`, the hardware editor writes the
+   header on save (the loaded header's keys carried forward). The legacy layout is recognized only to name the
+   folders to delete.
 3. Resolve a relative `template=` against: the csv folder → a `Templates/` folder at each level up to the
    workspace root → `Shared/Templates/Tia Portal Software Blocks`.
 4. Keep the hardware existence policy (skip existing stations with modules); keep I/O controllers as they are.
@@ -292,8 +311,8 @@ in the Files-tab grid is accepted as cosmetic. 7: `DeviceTypesDatabase.csv` carr
 | 1 | **TIA** | **verify that `Blocks.Import` / `Types.Import` / `TagTables.Import` accept an XML comment before `<Document>`** (and that a VCI workspace does) | import one headered DB XML into the playground project. If TIA refuses: XML headers move to the sidecar form (§3.3 last row), the rest of the contract is unchanged |
 | 2 | PL5 | **done 2026-10-08** — headers on every surface + workspace config + run id (the legacy layout is NOT kept beside the new shape: user decision) | OP5 scan: `Ready` everywhere (Appendix A); parity oracle green with the header + shape as allowed differences |
 | 3 | PL5 | **done 2026-10-08** — VCI shape (PLC folder = the Plc station, `Devices & networks`, `Templates/`, `<PLC>/PLC tags` + sidecar) | OP5 scan: layout "VCI shape" (Appendix A); OP5 full import ≡ OP3 import of the legacy tree (TIA smoke) — still to run |
-| 4 | OP5 | workspace-driven import (catalog → routes) replaces the per-folder buttons; workspace root selectable; export stamping | import of a PL5 workspace from a project `Output/` folder |
-| 5 | both | retire legacy acceptance (OP5 v2) | OP5 refuses an unheadered file with a pointed message |
+| 4 | OP5 | **done** — workspace-driven import (catalog → routes, Workspace tab, c7f0982), workspace root selectable; export stamping into the VCI shape (2026-10-09) | import of a PL5 workspace from a project `Output/` folder — still to run against TIA |
+| 5 | both | **done 2026-10-09** — legacy acceptance retired: OP5 imports `Ready` files only; the UI was reshaped around the workspace (one Files tab for single-file tools, collapsible TIA project row); the hand-maintained csv inputs were stamped | OP5 refuses an unheadered file with a pointed message (loader: `... has no #!openn header - contract v1 requires one (kind: hw/stations); regenerate it with Pipeline5 5.0+ or add the header`; catalog: red "not imported" rows and chips) — verified with the TIA-free harness |
 
 ---
 
@@ -333,7 +352,9 @@ Workspace scan: Z:\Source\Repos\_Openn5\Shared\OutputTree\TiaPortalProjectInterf
 
 The 3 ignored files are the workspace config, `PLCTags.xlsx` (`doc/plc-tags-workbook`, its header read from the
 sidecar - listed, never imported) and the sidecar itself. The PL3-era `.db` leftovers are gone with the legacy tree
-(a fresh workspace; an old project tree keeps them as Legacy until it is cleaned once, §4).
+(a fresh workspace; in an old project tree they show as `Legacy` / `NeedsHeader` - red, never imported - until the
+tree is cleaned once, §4). The same scan on 2026-10-09 (local clone, after the retirement): 35 files, 32 Ready, 3
+ignored, 32 importable - unchanged, since PL5's output was already fully headered.
 
 **Before (2026-10-07, the legacy tree):** 29 files, 27 classified, 0 unclassified, 2 ignored — every kind `Legacy`
 (the `#!format=2` tag / the csv and XML markers) or `NeedsHeader` (the five `sw/source` files: the PL3-era `.db`

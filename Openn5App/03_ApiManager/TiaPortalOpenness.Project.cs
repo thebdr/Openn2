@@ -1,148 +1,315 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Xml;
+using System.Text;
 using Siemens.Engineering;
 using Siemens.Engineering.Cax;
+using Siemens.Engineering.HW;
+using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.ExternalSources;
 using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.Types;
-using Openn._10_StandardFunctions;
+using Openn._00_Contract;
 using static Openn._10_StandardFunctions.LogsManager;
 
 namespace Openn._03_ApiManager
 {
     /// <summary>
-    /// Whole-project import / export for the Pipeline5 round-trip (the "Project" tab).
+    /// Project export for the Pipeline5 round-trip (Workspace tab, "Export"): the attached TIA project into an
+    /// export root shaped like the handoff workspace (contract v1, VCI shape), every file stamped with the header:
     ///
-    ///   Import: Shared\...\BuilderData\*   ->  builds the attached TIA project
-    ///   Export: the attached TIA project   ->  Shared\...\ExportedData\*  (XML; hardware as CAx/AML)
+    ///   &lt;exportRoot&gt;\.openn\workspace.openn.config               contract, producer, generated, run, project, plcs
+    ///   &lt;exportRoot&gt;\&lt;PLC&gt;\Program blocks\&lt;group&gt;\&lt;Block&gt;.xml   sw/code-block, sw/data-block (TIA XML + header comment)
+    ///   &lt;exportRoot&gt;\&lt;PLC&gt;\PLC data types\&lt;group&gt;\&lt;UDT&gt;.xml     sw/udt
+    ///   &lt;exportRoot&gt;\&lt;PLC&gt;\PLC tags\&lt;group&gt;\&lt;Table&gt;.xml        sw/tag-table
+    ///   &lt;exportRoot&gt;\Devices &amp; networks\&lt;project&gt;.aml           CAx / AutomationML (+ .cax.log, + .aml.openn sidecar: doc/other)
     ///
-    /// Reuses the per-feature primitives in the other partials (GetPlcSoftware, ImportXmlInto,
-    /// CreateDevices, CreateInstanceDbs, DetectQueueRoute, BlockXmlGenerator) and the shared
-    /// cancellation (TiaWorker.CurrentCancellation) - so these orchestrators stay thin. All paths
-    /// come from AppPaths; nothing is ever saved (a run is rolled back by closing TIA unsaved).
+    /// The export root is the caller's (the workspace's sibling ExportedData - AppPaths.ExportRootFor). The PLC folder
+    /// is the CPU device item's name, the name Pipeline5 uses for its PLC folder too. A full export sweeps the PLC's
+    /// three folders first; a single-kind export only overwrites same-named files - the run stamp tells a consumer
+    /// which files are leftovers. Every step is cancellable between objects (TiaWorker.CurrentCancellation);
+    /// nothing is ever saved. (The legacy whole-project IMPORT of this file is gone: the Workspace tab imports by
+    /// catalog - TiaPortalOpenness.Workspace.cs.)
     /// </summary>
     public partial class TiaPortalOpenness
     {
-        // ============================== EXPORT (TIA -> ExportedData) ==============================
-
-        /// <summary>Software blocks (FB/FC/OB/...) as XML, mirroring the TIA group tree.</summary>
-        public void ExportSoftwareBlocks() =>
-            RunBlockExport(b => !(b is DataBlock), AppPaths.ExportedBlocksDir, "software block");
-
-        /// <summary>Data blocks as XML, mirroring the TIA group tree.</summary>
-        public void ExportDataBlocks() =>
-            RunBlockExport(b => b is DataBlock, AppPaths.ExportedDataBlocksDir, "data block");
-
-        private void RunBlockExport(Func<PlcBlock, bool> match, string targetRoot, string label)
+        /// <summary>One export run: root, run id, project name, producer, and the stamping of every written file.</summary>
+        private sealed class ExportRun
         {
-            PlcSoftware sw = RequireSoftware("export " + label + "s");
-            if (sw == null) return;
-            SweepDir(targetRoot, "*.xml");
-            bool cancelled = false;
-            int n = ExportBlockTree(sw.BlockGroup, "", match, targetRoot, ref cancelled);
-            Log((cancelled ? "Export CANCELLED - " : "Exported ") + n + " " + label + "(s) -> " + targetRoot);
+            public string Root { get; }
+            public string RunId { get; }
+            public string ProjectName { get; }
+            public string Producer { get; }
+            public DateTime GeneratedUtc { get; }
+            public HashSet<string> Plcs { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public int Written { get; private set; }
+
+            public ExportRun(string root, string projectName)
+            {
+                Root = root;
+                ProjectName = projectName;
+                GeneratedUtc = DateTime.UtcNow;
+                RunId = GeneratedUtc.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N").Substring(0, 6);
+                Producer = "Openn5 " + typeof(ExportRun).Assembly.GetName().Version.ToString(3) + " (export)";
+            }
+
+            /// <summary>Inserts the header comment right after the XML declaration of a file TIA just exported (its UTF-8 BOM is kept).</summary>
+            public void StampXml(FileInfo file, InputKindInfo kind, string plc, string target, string name)
+            {
+                OpennHeader h = Header(kind);
+                h.Set("plc", plc);
+                h.Set("target", target);
+                h.Set("name", name);
+                h.Set("source", "TIA export");
+
+                bool bom = HasBom(file.FullName);
+                string text = File.ReadAllText(file.FullName, Encoding.UTF8);
+                string block = h.Render(HeaderSyntax.Xml);
+                int declarationEnd = text.StartsWith("<?xml", StringComparison.Ordinal) ? text.IndexOf("?>", StringComparison.Ordinal) + 2 : 0;
+                string stamped = declarationEnd > 0
+                    ? text.Substring(0, declarationEnd) + "\r\n" + block + text.Substring(declarationEnd).TrimStart('\r', '\n')
+                    : block + text;
+                File.WriteAllText(file.FullName, stamped, new UTF8Encoding(bom));
+                Written++;
+            }
+
+            /// <summary>The "&lt;file&gt;.openn" sidecar of a non-XML export (the CAx AML).</summary>
+            public void WriteSidecar(string path, InputKindInfo kind, string name)
+            {
+                OpennHeader h = Header(kind);
+                h.Set("name", name);
+                h.Set("source", "TIA CAx export");
+                File.WriteAllText(path + OpennHeader.SidecarExtension, h.Render(HeaderSyntax.Csv), new UTF8Encoding(false));
+                Written++;
+            }
+
+            /// <summary>.openn\workspace.openn.config of the export root: contract, producer, generated, run, project, plcs.</summary>
+            public void WriteWorkspaceConfig()
+            {
+                var h = new OpennHeader();
+                h.Set("contract", OpennHeader.CurrentContract.ToString(CultureInfo.InvariantCulture));
+                h.Set("producer", Producer);
+                h.Set("generated", Iso(GeneratedUtc));
+                h.Set("run", RunId);
+                h.Set("project", ProjectName);
+                h.Set("plcs", string.Join(", ", Plcs.OrderBy(p => p, StringComparer.OrdinalIgnoreCase)));
+                string dir = Path.Combine(Root, WorkspaceLayout.ConfigFolder);
+                Directory.CreateDirectory(dir);
+                File.WriteAllText(Path.Combine(dir, WorkspaceLayout.ConfigFile), h.Render(HeaderSyntax.Csv), new UTF8Encoding(false));
+            }
+
+            private OpennHeader Header(InputKindInfo kind)
+            {
+                OpennHeader h = OpennHeader.Create(kind, Producer, GeneratedUtc);
+                h.Set("run", RunId);
+                h.Set("project", ProjectName);
+                return h;
+            }
+
+            private static string Iso(DateTime utc) => utc.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+
+            private static bool HasBom(string path)
+            {
+                using (FileStream s = File.OpenRead(path))
+                    return s.Length >= 3 && s.ReadByte() == 0xEF && s.ReadByte() == 0xBB && s.ReadByte() == 0xBF;
+            }
         }
 
-        private int ExportBlockTree(PlcBlockGroup group, string groupPath, Func<PlcBlock, bool> match, string targetRoot, ref bool cancelled)
+        // ============================== EXPORT (TIA -> the workspace's sibling ExportedData) ==============================
+
+        /// <summary>Everything: blocks, UDTs, tag tables, hardware (CAx). Sweeps the PLC's three folders first.</summary>
+        public void ExportFullProject(string exportRoot)
+        {
+            if (project == null) { Log("Can't export: No Tia Project Attached"); return; }
+            string plcName;
+            PlcSoftware sw = FirstPlc(out plcName);
+            if (sw == null) { Log("Can't export: no Plc Software found in the project"); return; }
+
+            var run = new ExportRun(exportRoot, project.Name);
+            run.Plcs.Add(plcName);
+            Log("=== Export project '" + project.Name + "' -> " + exportRoot + " (run " + run.RunId + ", PLC folder '" + plcName + "') ===");
+            foreach (string folder in new[] { WorkspaceLayout.ProgramBlocks, WorkspaceLayout.PlcDataTypes, WorkspaceLayout.PlcTags })
+                SweepDir(Path.Combine(exportRoot, plcName, folder), "*.xml");
+
+            bool completed = ExportBlocks(run, sw, plcName, b => true, "block")
+                             && ExportTypes(run, sw, plcName)
+                             && ExportTags(run, sw, plcName);
+            if (completed) ExportCax(run);
+            Finish(run, !completed);
+        }
+
+        /// <summary>Code blocks (OB/FB/FC) as stamped XML into &lt;PLC&gt;\Program blocks\&lt;group&gt;.</summary>
+        public void ExportSoftwareBlocks(string exportRoot) =>
+            ExportOne(exportRoot, (run, sw, plc) => ExportBlocks(run, sw, plc, b => !(b is DataBlock), "code block"));
+
+        /// <summary>Data blocks (global, instance, array) as stamped XML into &lt;PLC&gt;\Program blocks\&lt;group&gt;.</summary>
+        public void ExportDataBlocks(string exportRoot) =>
+            ExportOne(exportRoot, (run, sw, plc) => ExportBlocks(run, sw, plc, b => b is DataBlock, "data block"));
+
+        /// <summary>User data types as stamped XML into &lt;PLC&gt;\PLC data types\&lt;group&gt;.</summary>
+        public void ExportUserDataTypes(string exportRoot) => ExportOne(exportRoot, ExportTypes);
+
+        /// <summary>PLC tag tables as stamped XML into &lt;PLC&gt;\PLC tags\&lt;group&gt;.</summary>
+        public void ExportTagTables(string exportRoot) => ExportOne(exportRoot, ExportTags);
+
+        /// <summary>Hardware via TIA's CAx export: one project-wide AutomationML file under Devices &amp; networks (+ sidecar).</summary>
+        public void ExportHardwareCax(string exportRoot)
+        {
+            if (project == null) { Log("Can't export hardware: No Tia Project Attached"); return; }
+            var run = new ExportRun(exportRoot, project.Name);
+            string plcName;
+            if (FirstPlc(out plcName) != null) run.Plcs.Add(plcName);
+            ExportCax(run);
+            Finish(run, false);
+        }
+
+        private void ExportOne(string exportRoot, Func<ExportRun, PlcSoftware, string, bool> step)
+        {
+            if (project == null) { Log("Can't export: No Tia Project Attached"); return; }
+            string plcName;
+            PlcSoftware sw = FirstPlc(out plcName);
+            if (sw == null) { Log("Can't export: no Plc Software found in the project"); return; }
+
+            var run = new ExportRun(exportRoot, project.Name);
+            run.Plcs.Add(plcName);
+            Log("=== Export -> " + exportRoot + " (run " + run.RunId + ", PLC folder '" + plcName + "') ===");
+            bool completed = step(run, sw, plcName);
+            Finish(run, !completed);
+        }
+
+        /// <summary>Writes the workspace config of the run (so files not rewritten in it read as stale) and logs the outcome.</summary>
+        private static void Finish(ExportRun run, bool cancelled)
+        {
+            try { run.WriteWorkspaceConfig(); }
+            catch (Exception e) { Log("ERROR writing the export workspace config \n" + e.Message); }
+            Log((cancelled ? "=== Export CANCELLED - " : "=== Export done - ") + run.Written + " file(s) written and stamped (run " + run.RunId + ") -> " + run.Root + " ===");
+        }
+
+        /// <summary>Blocks matching the filter into &lt;PLC&gt;\Program blocks\&lt;group&gt; (code and data blocks share the folder, as in TIA). False = cancelled.</summary>
+        private bool ExportBlocks(ExportRun run, PlcSoftware sw, string plcName, Func<PlcBlock, bool> match, string label)
+        {
+            string targetRoot = Path.Combine(run.Root, plcName, WorkspaceLayout.ProgramBlocks);
+            bool cancelled = false;
+            int n = ExportBlockTree(run, sw.BlockGroup, string.Empty, match, plcName, targetRoot, ref cancelled);
+            Log((cancelled ? "Export CANCELLED - " : "Exported ") + n + " " + label + "(s) -> " + targetRoot);
+            return !cancelled;
+        }
+
+        private int ExportBlockTree(ExportRun run, PlcBlockGroup group, string groupPath, Func<PlcBlock, bool> match, string plcName, string targetRoot, ref bool cancelled)
         {
             int count = 0;
             foreach (PlcBlock block in group.Blocks)
             {
                 if (Cancelled()) { cancelled = true; return count; }
                 if (!match(block)) continue;
-                try { ExportToXml(file => block.Export(file, ExportOptions.WithDefaults), targetRoot, groupPath, block.Name); count++; }
+                InputKindInfo kind = InputKindInfo.For(block is DataBlock ? InputKind.SwDataBlock : InputKind.SwCodeBlock);
+                try
+                {
+                    FileInfo file = ExportToXml(f => block.Export(f, ExportOptions.WithDefaults), targetRoot, groupPath, block.Name);
+                    run.StampXml(file, kind, plcName, TargetOf(WorkspaceLayout.ProgramBlocks, groupPath), block.Name);
+                    count++;
+                }
                 catch (Exception e) { Log("ERROR exporting block " + block.Name + " \n" + e.Message); }
             }
             foreach (PlcBlockUserGroup sub in group.Groups)
             {
-                count += ExportBlockTree(sub, Join(groupPath, sub.Name), match, targetRoot, ref cancelled);
+                count += ExportBlockTree(run, sub, Join(groupPath, sub.Name), match, plcName, targetRoot, ref cancelled);
                 if (cancelled) return count;
             }
             return count;
         }
 
-        /// <summary>User data types (UDTs) as XML, mirroring the TIA type-group tree.</summary>
-        public void ExportUserDataTypes()
+        /// <summary>User data types into &lt;PLC&gt;\PLC data types\&lt;group&gt;. False = cancelled.</summary>
+        private bool ExportTypes(ExportRun run, PlcSoftware sw, string plcName)
         {
-            PlcSoftware sw = RequireSoftware("export UDTs");
-            if (sw == null) return;
-            SweepDir(AppPaths.ExportedUserDataTypesDir, "*.xml");
+            string targetRoot = Path.Combine(run.Root, plcName, WorkspaceLayout.PlcDataTypes);
             bool cancelled = false;
-            int n = ExportTypeTree(sw.TypeGroup.Types, sw.TypeGroup.Groups, "", ref cancelled);
-            Log((cancelled ? "Export CANCELLED - " : "Exported ") + n + " UDT(s) -> " + AppPaths.ExportedUserDataTypesDir);
+            int n = ExportTypeTree(run, sw.TypeGroup.Types, sw.TypeGroup.Groups, string.Empty, plcName, targetRoot, ref cancelled);
+            Log((cancelled ? "Export CANCELLED - " : "Exported ") + n + " UDT(s) -> " + targetRoot);
+            return !cancelled;
         }
 
-        private int ExportTypeTree(PlcTypeComposition types, PlcTypeUserGroupComposition groups, string groupPath, ref bool cancelled)
+        private int ExportTypeTree(ExportRun run, PlcTypeComposition types, PlcTypeUserGroupComposition groups, string groupPath, string plcName, string targetRoot, ref bool cancelled)
         {
             int count = 0;
+            InputKindInfo kind = InputKindInfo.For(InputKind.SwUdt);
             foreach (PlcType type in types)
             {
                 if (Cancelled()) { cancelled = true; return count; }
-                try { ExportToXml(file => type.Export(file, ExportOptions.WithDefaults), AppPaths.ExportedUserDataTypesDir, groupPath, type.Name); count++; }
+                try
+                {
+                    FileInfo file = ExportToXml(f => type.Export(f, ExportOptions.WithDefaults), targetRoot, groupPath, type.Name);
+                    run.StampXml(file, kind, plcName, TargetOf(WorkspaceLayout.PlcDataTypes, groupPath), type.Name);
+                    count++;
+                }
                 catch (Exception e) { Log("ERROR exporting UDT " + type.Name + " \n" + e.Message); }
             }
             foreach (PlcTypeUserGroup sub in groups)
             {
-                count += ExportTypeTree(sub.Types, sub.Groups, Join(groupPath, sub.Name), ref cancelled);
+                count += ExportTypeTree(run, sub.Types, sub.Groups, Join(groupPath, sub.Name), plcName, targetRoot, ref cancelled);
                 if (cancelled) return count;
             }
             return count;
         }
 
-        /// <summary>PLC tag tables, one XML per table, mirroring the TIA tag-group tree.</summary>
-        public void ExportTagTables()
+        /// <summary>Tag tables into &lt;PLC&gt;\PLC tags\&lt;group&gt;. False = cancelled.</summary>
+        private bool ExportTags(ExportRun run, PlcSoftware sw, string plcName)
         {
-            PlcSoftware sw = RequireSoftware("export tag tables");
-            if (sw == null) return;
-            SweepDir(AppPaths.ExportedTagTablesDir, "*.xml");
+            string targetRoot = Path.Combine(run.Root, plcName, WorkspaceLayout.PlcTags);
             bool cancelled = false;
-            int n = ExportTagTree(sw.TagTableGroup.TagTables, sw.TagTableGroup.Groups, "", ref cancelled);
-            Log((cancelled ? "Export CANCELLED - " : "Exported ") + n + " tag table(s) -> " + AppPaths.ExportedTagTablesDir);
+            int n = ExportTagTree(run, sw.TagTableGroup.TagTables, sw.TagTableGroup.Groups, string.Empty, plcName, targetRoot, ref cancelled);
+            Log((cancelled ? "Export CANCELLED - " : "Exported ") + n + " tag table(s) -> " + targetRoot);
+            return !cancelled;
         }
 
-        private int ExportTagTree(PlcTagTableComposition tables, PlcTagTableUserGroupComposition groups, string groupPath, ref bool cancelled)
+        private int ExportTagTree(ExportRun run, PlcTagTableComposition tables, PlcTagTableUserGroupComposition groups, string groupPath, string plcName, string targetRoot, ref bool cancelled)
         {
             int count = 0;
+            InputKindInfo kind = InputKindInfo.For(InputKind.SwTagTable);
             foreach (PlcTagTable table in tables)
             {
                 if (Cancelled()) { cancelled = true; return count; }
-                try { ExportToXml(file => table.Export(file, ExportOptions.WithDefaults), AppPaths.ExportedTagTablesDir, groupPath, table.Name); count++; }
+                try
+                {
+                    FileInfo file = ExportToXml(f => table.Export(f, ExportOptions.WithDefaults), targetRoot, groupPath, table.Name);
+                    run.StampXml(file, kind, plcName, TargetOf(WorkspaceLayout.PlcTags, groupPath), table.Name);
+                    count++;
+                }
                 catch (Exception e) { Log("ERROR exporting tag table " + table.Name + " \n" + e.Message); }
             }
             foreach (PlcTagTableUserGroup sub in groups)
             {
-                count += ExportTagTree(sub.TagTables, sub.Groups, Join(groupPath, sub.Name), ref cancelled);
+                count += ExportTagTree(run, sub.TagTables, sub.Groups, Join(groupPath, sub.Name), plcName, targetRoot, ref cancelled);
                 if (cancelled) return count;
             }
             return count;
         }
 
         /// <summary>
-        /// Hardware configuration via TIA's CAx export: one project-wide AutomationML (.aml) file.
-        /// CAx is the supported "structured hardware as XML" surface; a CaxProvider service is
-        /// fetched from the attached project.
+        /// Hardware via TIA's CAx export: one project-wide AutomationML (.aml) under Devices &amp; networks, with TIA's
+        /// .cax.log beside it and an .openn sidecar (doc/other - the AML is not an OpennN input).
         /// </summary>
-        public void ExportHardwareCax()
+        private void ExportCax(ExportRun run)
         {
-            if (project == null) { Log("Can't export hardware: No Tia Project Attached"); return; }
             try
             {
                 CaxProvider cax = project.GetService<CaxProvider>();
                 if (cax == null) { Log("Can't export hardware: CAx service unavailable for this project"); return; }
 
-                Directory.CreateDirectory(AppPaths.ExportedHardwareDir);
+                string dir = Path.Combine(run.Root, WorkspaceLayout.HardwareFolder);
+                Directory.CreateDirectory(dir);
                 string stem = SafeName(project.Name);
-                var aml = new FileInfo(Path.Combine(AppPaths.ExportedHardwareDir, stem + ".aml"));
-                var log = new FileInfo(Path.Combine(AppPaths.ExportedHardwareDir, stem + ".cax.log"));
+                var aml = new FileInfo(Path.Combine(dir, stem + ".aml"));
+                var log = new FileInfo(Path.Combine(dir, stem + ".cax.log"));
                 if (aml.Exists) aml.Delete();
                 if (log.Exists) log.Delete();
 
                 bool ok = cax.Export(project, aml, log);
+                if (aml.Exists) run.WriteSidecar(aml.FullName, InputKindInfo.For(InputKind.DocOther), project.Name);
                 Log((ok ? "Exported hardware (CAx/AML): " : "Hardware CAx export reported issues (see .cax.log): ") + aml.FullName);
             }
             catch (Exception e)
@@ -151,174 +318,37 @@ namespace Openn._03_ApiManager
             }
         }
 
-        /// <summary>Exports the whole attached project to ExportedData (blocks, DBs, UDTs, tags, hardware).</summary>
-        public void ExportFullProject()
-        {
-            if (project == null) { Log("Can't export: No Tia Project Attached"); return; }
-            Log("=== Export Full Project: start ===");
-            ExportSoftwareBlocks(); if (Cancelled()) { Log("=== Export Full Project: CANCELLED ==="); return; }
-            ExportDataBlocks();     if (Cancelled()) { Log("=== Export Full Project: CANCELLED ==="); return; }
-            ExportUserDataTypes();  if (Cancelled()) { Log("=== Export Full Project: CANCELLED ==="); return; }
-            ExportTagTables();      if (Cancelled()) { Log("=== Export Full Project: CANCELLED ==="); return; }
-            ExportHardwareCax();
-            Log("=== Export Full Project: done -> " + AppPaths.ExportedDataDir + " ===");
-        }
-
-        // ============================== IMPORT (BuilderData -> TIA) ==============================
-
-        /// <summary>1. Hardware: load the BuilderData csv config, then build it (the existing, tested generator).</summary>
-        public void ImportHardware(bool createNewIoControllers)
-        {
-            if (project == null) { Log("Can't import hardware: No Tia Project Attached"); return; }
-            if (!Openn._01_Constructor.HardwareConfigLoader.LoadAll(AppPaths.HardwareConfigDir))
-            {
-                Log("Import hardware ABORTED - hardware configuration did not load from " + AppPaths.HardwareConfigDir);
-                return;
-            }
-            CreateDevices(createNewIoControllers);
-        }
-
-        /// <summary>2. User data types: import one XML per UDT (no-op until Pipeline5 emits them).</summary>
-        public void ImportUserDataTypes() =>
-            ImportXmlFolder("UDT", AppPaths.UserDataTypesImportDir, (sw, file) => sw.TypeGroup.Types.Import(file, ImportOptions.Override));
-
-        /// <summary>3. IO tags: import one XML per tag table (the PLCTags.xlsx beside them is ignored - manual TIA import only).</summary>
-        public void ImportIoTags() =>
-            ImportXmlFolder("tag table", AppPaths.PlcTagsDir, (sw, file) => sw.TagTableGroup.TagTables.Import(file, ImportOptions.Override));
-
-        /// <summary>4. Data blocks: F_DB/global-DB XML (Blocks.Import) + .db external sources (generate blocks).</summary>
-        public void ImportDataBlocks()
-        {
-            PlcSoftware sw = RequireSoftware("import data blocks");
-            if (sw == null) return;
-            string folder = AppPaths.ImportReadyBlocksDir;
-            if (!Directory.Exists(folder)) { Log("Import data blocks: folder not found (" + folder + ") - skipped"); return; }
-
-            List<string> dbXml = OrderedFiles(folder, "*.xml").Where(IsGlobalDbXml).ToList();
-            List<string> dbSrc = OrderedFiles(folder, "*.db").ToList();
-            int done = 0, total = dbXml.Count + dbSrc.Count;
-            if (total == 0) { Log("Import data blocks: nothing in " + folder + " - skipped"); return; }
-
-            foreach (string f in dbXml)
-            {
-                if (Cancelled()) { Log("Import data blocks CANCELLED - " + done + " of " + total); return; }
-                try { ImportXmlInto(sw.BlockGroup, f); done++; Log("Imported data block (xml): " + Path.GetFileName(f)); }
-                catch (Exception e) { Log("ERROR importing " + Path.GetFileName(f) + " \n" + e.Message); }
-            }
-            foreach (string f in dbSrc)
-            {
-                if (Cancelled()) { Log("Import data blocks CANCELLED - " + done + " of " + total); return; }
-                try { GenerateFromExternalSource(sw, f); done++; Log("Imported data block (.db source): " + Path.GetFileName(f)); }
-                catch (Exception e) { Log("ERROR importing " + Path.GetFileName(f) + " \n" + e.Message); }
-            }
-            Log("Import data blocks done: " + done + " of " + total);
-        }
-
-        /// <summary>5. Instance DBs: the existing CreationInfo\InstanceDBs.csv route (Retry/Abort/Ignore).</summary>
-        public void ImportInstanceDbs()
-        {
-            string csv = Path.Combine(AppPaths.BlocksCreationDir, "InstanceDBs.csv");
-            if (!File.Exists(csv)) { Log("Import instance DBs: " + csv + " not found - skipped"); return; }
-            CreateInstanceDbs(csv);
-        }
-
-        /// <summary>
-        /// 6. Software blocks: generate from the CreationInfo block-gen csvs (template route only,
-        /// skipping InstanceDBs.csv), then import the code-block XMLs (non-DB) and .scl/.awl sources.
-        /// </summary>
-        public void ImportSoftwareBlocks()
-        {
-            PlcSoftware sw = RequireSoftware("import software blocks");
-            if (sw == null) return;
-
-            string versionTag = "V" + OpennessSetup.SelectedInstallation.PortalVersion.Major;
-            string genOut = Path.Combine(AppPaths.AppBaseDir, "GeneratedBlocks");
-            int done = 0;
-
-            if (Directory.Exists(AppPaths.BlocksCreationDir))
-                foreach (string csv in OrderedFiles(AppPaths.BlocksCreationDir, "*.csv"))
-                {
-                    if (Cancelled()) { Log("Import software blocks CANCELLED - " + done + " imported"); return; }
-                    if (DetectQueueRoute(csv) != QueueRoute.GenerateImport) continue; //InstanceDBs.csv etc. handled elsewhere
-                    try
-                    {
-                        string xml = Openn._02_Converter.BlockXmlGenerator.Generate(csv, versionTag, genOut, null);
-                        if (xml == null) { Log("Block generation failed (see log): " + Path.GetFileName(csv)); continue; }
-                        ImportXmlInto(sw.BlockGroup, xml);
-                        done++; Log("Generated + imported: " + Path.GetFileName(csv));
-                    }
-                    catch (Exception e) { Log("ERROR generating/importing " + Path.GetFileName(csv) + " \n" + e.Message); }
-                }
-
-            if (Directory.Exists(AppPaths.ImportReadyBlocksDir))
-            {
-                foreach (string f in OrderedFiles(AppPaths.ImportReadyBlocksDir, "*.xml").Where(p => !IsGlobalDbXml(p)))
-                {
-                    if (Cancelled()) { Log("Import software blocks CANCELLED - " + done + " imported"); return; }
-                    try { ImportXmlInto(sw.BlockGroup, f); done++; Log("Imported block (xml): " + Path.GetFileName(f)); }
-                    catch (Exception e) { Log("ERROR importing " + Path.GetFileName(f) + " \n" + e.Message); }
-                }
-                foreach (string f in OrderedFiles(AppPaths.ImportReadyBlocksDir, "*.*").Where(IsTextSource))
-                {
-                    if (Cancelled()) { Log("Import software blocks CANCELLED - " + done + " imported"); return; }
-                    try { GenerateFromExternalSource(sw, f); done++; Log("Imported source: " + Path.GetFileName(f)); }
-                    catch (Exception e) { Log("ERROR importing " + Path.GetFileName(f) + " \n" + e.Message); }
-                }
-            }
-            Log("Import software blocks done: " + done + " block source(s)");
-        }
-
-        /// <summary>Builds the whole project from BuilderData in the fixed order; cancellable between phases.</summary>
-        public void ImportFullProject(bool createNewIoControllers)
-        {
-            if (project == null) { Log("Can't import: No Tia Project Attached"); return; }
-            Log("=== Import Full Project: start ===");
-            Log("--- 1/6 Hardware ---");        ImportHardware(createNewIoControllers); if (StopFull()) return;
-            Log("--- 2/6 User Data Types ---"); ImportUserDataTypes();                  if (StopFull()) return;
-            Log("--- 3/6 IO Tags ---");         ImportIoTags();                         if (StopFull()) return;
-            Log("--- 4/6 Data Blocks ---");     ImportDataBlocks();                     if (StopFull()) return;
-            Log("--- 5/6 Instance DBs ---");    ImportInstanceDbs();                    if (StopFull()) return;
-            Log("--- 6/6 Software Blocks ---"); ImportSoftwareBlocks();                 if (StopFull()) return;
-            Log("=== Import Full Project: done (project not saved) ===");
-        }
-
-        private static bool StopFull()
-        {
-            if (!Cancelled()) return false;
-            Log("=== Import Full Project: CANCELLED ===");
-            return true;
-        }
-
         // ============================== helpers ==============================
 
         private static bool Cancelled() => TiaWorker.CurrentCancellation.IsCancellationRequested;
 
-        private PlcSoftware RequireSoftware(string action)
+        /// <summary>
+        /// The project's first PLC software and the name of the CPU device item that owns it (the PLC folder name of
+        /// the workspace, the same name Pipeline5 writes). Walks every device of the project, groups included.
+        /// </summary>
+        private PlcSoftware FirstPlc(out string plcName)
         {
-            if (project == null) { Log("Can't " + action + ": No Tia Project Attached"); return null; }
-            PlcSoftware sw = GetPlcSoftware(project);
-            if (sw == null) Log("Can't " + action + ": no Plc Software found in the project");
-            return sw;
+            foreach (Device device in CollectAllDevices())
+            {
+                PlcSoftware sw = FirstPlc(device.DeviceItems, out plcName);
+                if (sw != null) return sw;
+            }
+            plcName = null;
+            return null;
         }
 
-        /// <summary>Imports every *.xml of a folder through one Openness Import call; no-op when empty/absent.</summary>
-        private void ImportXmlFolder(string label, string folder, Action<PlcSoftware, FileInfo> import)
+        private static PlcSoftware FirstPlc(DeviceItemComposition items, out string plcName)
         {
-            PlcSoftware sw = RequireSoftware("import " + label + "s");
-            if (sw == null) return;
-            if (!Directory.Exists(folder)) { Log("Import " + label + "s: folder not found (" + folder + ") - skipped"); return; }
-
-            List<string> files = OrderedFiles(folder, "*.xml").ToList();
-            if (files.Count == 0) { Log("Import " + label + "s: no .xml in " + folder + " - skipped"); return; }
-
-            int done = 0;
-            foreach (string f in files)
+            foreach (DeviceItem item in items)
             {
-                if (Cancelled()) { Log("Import " + label + "s CANCELLED - " + done + " of " + files.Count); return; }
-                try { import(sw, new FileInfo(f)); done++; Log("Imported " + label + ": " + Path.GetFileName(f)); }
-                catch (Exception e) { Log("ERROR importing " + Path.GetFileName(f) + " \n" + e.Message); }
+                SoftwareContainer container = item.GetService<SoftwareContainer>();
+                var sw = container != null ? container.Software as PlcSoftware : null;
+                if (sw != null) { plcName = item.Name; return sw; }
+                PlcSoftware nested = FirstPlc(item.DeviceItems, out plcName);
+                if (nested != null) return nested;
             }
-            Log("Import " + label + "s done: " + done + " of " + files.Count);
+            plcName = null;
+            return null;
         }
 
         /// <summary>Creates an external source (.db/.scl/.awl) and generates its blocks (keeping partial results on error).</summary>
@@ -328,43 +358,21 @@ namespace Openn._03_ApiManager
             source.GenerateBlocksFromSource(GenerateBlockOption.KeepOnError);
         }
 
-        /// <summary>Exports one object to &lt;targetRoot&gt;\&lt;groupPath&gt;\&lt;name&gt;.xml (the export deletes a stale same-named file first).</summary>
-        private static void ExportToXml(Action<FileInfo> export, string targetRoot, string groupPath, string name)
+        /// <summary>Exports one object to &lt;targetRoot&gt;\&lt;groupPath&gt;\&lt;name&gt;.xml (a stale same-named file is deleted first) and returns the file.</summary>
+        private static FileInfo ExportToXml(Action<FileInfo> export, string targetRoot, string groupPath, string name)
         {
             string dir = groupPath.Length == 0 ? targetRoot : Path.Combine(targetRoot, groupPath.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(dir);
             var file = new FileInfo(Path.Combine(dir, SafeName(name) + ".xml"));
             if (file.Exists) file.Delete();
             export(file);
+            file.Refresh();
+            return file;
         }
 
-        /// <summary>Files of one pattern in name order (so 00_,01_,... sequence FBs before their instance DBs).</summary>
-        private static IEnumerable<string> OrderedFiles(string folder, string pattern) =>
-            Directory.GetFiles(folder, pattern).OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase);
-
-        private static bool IsTextSource(string path)
-        {
-            string e = Path.GetExtension(path).ToLowerInvariant();
-            return e == ".scl" || e == ".awl";
-        }
-
-        /// <summary>True when the export XML's first SW object is a global data block (the F_DB / safe-DB form).</summary>
-        private static bool IsGlobalDbXml(string path) => FirstSwObjectElement(path) == "SW.Blocks.GlobalDB";
-
-        /// <summary>The first &lt;SW.Blocks.*&gt; / &lt;SW.Types.*&gt; element name in a TIA export xml (e.g. SW.Blocks.FB), or "".</summary>
-        private static string FirstSwObjectElement(string path)
-        {
-            try
-            {
-                using (var reader = XmlReader.Create(path, new XmlReaderSettings { IgnoreComments = true, IgnoreWhitespace = true, DtdProcessing = DtdProcessing.Ignore }))
-                    while (reader.Read())
-                        if (reader.NodeType == XmlNodeType.Element &&
-                            (reader.Name.StartsWith("SW.Blocks.", StringComparison.Ordinal) || reader.Name.StartsWith("SW.Types.", StringComparison.Ordinal)))
-                            return reader.Name;
-            }
-            catch { }
-            return "";
-        }
+        /// <summary>The header "target" of an exported object: its TIA folder plus group path ("Program blocks/00_Safety").</summary>
+        private static string TargetOf(string category, string groupPath) =>
+            groupPath.Length == 0 ? category : category + "/" + groupPath;
 
         private static void SweepDir(string dir, string pattern)
         {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Openn._00_Contract;
 using Openn._10_StandardFunctions;
 
 namespace Openn._01_Constructor
@@ -46,6 +47,8 @@ namespace Openn._01_Constructor
         public string CustomParameters = "";
         /// <summary>Organizational path "folder/subfolder/..."; informational for now (generation ignores it).</summary>
         public string Group = "";
+        /// <summary>9th column written by Pipeline5 (PN/PN coupler connector); carried through the editor untouched.</summary>
+        public string Connector = "";
         public List<ModuleModel> Modules = new List<ModuleModel>();
 
         public string DisplayText => "[" + Role + "] " + Name + (IpAddress.Length > 0 ? "  (" + IpAddress + ")" : "");
@@ -97,6 +100,10 @@ namespace Openn._01_Constructor
         public List<StationModel> Stations { get; } = new List<StationModel>();
         public List<string> LoadWarnings { get; } = new List<string>();
 
+        /// <summary>The #!openn headers read with the two csvs - Save carries their keys (run, project, plc, target, ...) forward.</summary>
+        public OpennHeader StationsHeader { get; private set; }
+        public OpennHeader ModulesHeader { get; private set; }
+
         /// <summary>Model database (read locally; does not disturb the loaded app state).</summary>
         public Dictionary<string, ModelInfo> Models { get; } = new Dictionary<string, ModelInfo>(StringComparer.OrdinalIgnoreCase);
 
@@ -124,6 +131,7 @@ namespace Openn._01_Constructor
             }
 
             CsvTable stations = CsvTable.Read(Path.Combine(folder, HardwareConfigLoader.StationsFileName));
+            document.StationsHeader = stations.Header;
             foreach (string error in stations.Errors) document.LoadWarnings.Add(error);
             foreach (CsvRow row in stations.Rows)
             {
@@ -137,10 +145,12 @@ namespace Openn._01_Constructor
                     Subnet = row.Get(5),
                     CustomParameters = row.Get(6),
                     Group = row.Get(7),
+                    Connector = row.Get(8),
                 });
             }
 
             CsvTable modules = CsvTable.Read(Path.Combine(folder, HardwareConfigLoader.ModulesFileName));
+            document.ModulesHeader = modules.Header;
             foreach (string error in modules.Errors) document.LoadWarnings.Add(error);
             foreach (CsvRow row in modules.Rows)
             {
@@ -175,22 +185,24 @@ namespace Openn._01_Constructor
         }
 
         /// <summary>
-        /// Writes Stations.csv + Modules.csv (format 2) back to the folder.
+        /// Writes Stations.csv + Modules.csv back to the folder, each opening with its #!openn header
+        /// (contract v1: kind hw/stations / hw/modules, schema 2). The keys of the header read at load -
+        /// run, project, plc, target, ... - are carried forward; producer and generated are the editor's.
         /// Stations keep their list order; module rows are grouped per station.
         /// </summary>
         public void Save()
         {
             var stationsContent = new StringBuilder();
-            stationsContent.AppendLine("#!format=" + HardwareConfigLoader.CurrentFormatVersion);
-            stationsContent.AppendLine("# Role,Station Name,Model Id,IP Address,PN Number,Subnet,Custom Parameters,Group  (PN Number empty = last IP octet; parameters separated by |; Group = folder/subfolder/...)");
+            stationsContent.Append(RenderHeader(StationsHeader, InputKind.HwStations));
+            stationsContent.AppendLine("# Role,Station Name,Model Id,IP Address,PN Number,Subnet,Custom Parameters,Group,Connector  (PN Number empty = last IP octet; parameters separated by |; Group = folder/subfolder/...)");
 
             var modulesContent = new StringBuilder();
-            modulesContent.AppendLine("#!format=" + HardwareConfigLoader.CurrentFormatVersion);
+            modulesContent.Append(RenderHeader(ModulesHeader, InputKind.HwModules));
             modulesContent.AppendLine("# Station Name,Slot,Module Name,Model Id,I Addr,Q Addr,Custom Parameters  (Slot = plug order; parameters separated by |)");
 
             foreach (StationModel station in Stations)
             {
-                stationsContent.AppendLine(JoinCsv(station.Role, station.Name, station.ModelId, station.IpAddress, station.PnNumber, station.Subnet, station.CustomParameters, station.Group));
+                stationsContent.AppendLine(JoinCsv(station.Role, station.Name, station.ModelId, station.IpAddress, station.PnNumber, station.Subnet, station.CustomParameters, station.Group, station.Connector));
                 foreach (ModuleModel module in station.Modules)
                     modulesContent.AppendLine(JoinCsv(station.Name, module.Slot, module.Name, module.ModelId, module.IAddress, module.QAddress, module.CustomParameters));
             }
@@ -198,6 +210,17 @@ namespace Openn._01_Constructor
             var encoding = new UTF8Encoding(true);
             File.WriteAllText(Path.Combine(Folder, HardwareConfigLoader.StationsFileName), stationsContent.ToString(), encoding);
             File.WriteAllText(Path.Combine(Folder, HardwareConfigLoader.ModulesFileName), modulesContent.ToString(), encoding);
+        }
+
+        /// <summary>The csv header the editor writes: the loaded header's keys carried forward, producer and generated the editor's.</summary>
+        private static string RenderHeader(OpennHeader loaded, InputKind kind)
+        {
+            string version = typeof(HardwareConfigDocument).Assembly.GetName().Version.ToString(3);
+            OpennHeader header = OpennHeader.Create(InputKindInfo.For(kind), "Openn5 " + version + " (hardware editor)", DateTime.UtcNow);
+            if (loaded != null && loaded.Status == HeaderStatus.Ok)
+                foreach (string key in loaded.Keys)
+                    if (!OpennHeader.RequiredKeys.Contains(key)) header.Set(key, loaded.Get(key));
+            return header.Render(HeaderSyntax.Csv);
         }
 
         /// <summary>"name" if free, otherwise "name_2", "name_3", ...</summary>
