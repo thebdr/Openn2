@@ -429,7 +429,7 @@ def _modern_iolist(path, defined_names=(), table="T_Types", crowded=False):
     if crowded:   # FVT's shape: custom number formats 164 / 165 (one in use), more fills / borders, two dxfs
         parts["xl/styles.xml"] = parts["xl/styles.xml"].replace(
             '<fonts count="2"',
-            '<numFmts count="2"><numFmt numFmtId="164" formatCode="[$-410]d\-mmm\-yyyy;@"/>'
+            '<numFmts count="2"><numFmt numFmtId="164" formatCode="[$-410]d\\-mmm\\-yyyy;@"/>'
             '<numFmt numFmtId="165" formatCode="0.0%"/></numFmts><fonts count="2"').replace(
             '<fills count="2">', '<fills count="4">').replace(
             '<fill><patternFill patternType="gray125"/></fill></fills>',

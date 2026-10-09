@@ -1,0 +1,20 @@
+{
+  "clause": "C-034",
+  "command": "C:/Source/Repos/_Openn2/.venv/Scripts/python.exe Pipeline5App/tests/unit/test_interface_xlsx.py",
+  "commandArgv": [
+    "C:/Source/Repos/_Openn2/.venv/Scripts/python.exe",
+    "Pipeline5App/tests/unit/test_interface_xlsx.py"
+  ],
+  "exitCode": 0,
+  "outputSha": "fc70f8f4623efa9042e968ffde7ec7604c96fb4200173ab6ad26160699da3f76",
+  "outputTail": "  PASS  resolve_num_chain\r\n  PASS  interface_address_caches\r\n  PASS  insert_seeds_interface_address_cache\r\n  PASS  insert_lossless_idempotent_and_table_clean\r\n  PASS  insert_into_a_modern_workbook_keeps_every_part\r\n  PASS  graft_remaps_into_a_crowded_styles_part\r\n  PASS  graft_shared_strings_become_inline\r\n  PASS  graft_refuses_what_it_cannot_carry\r\n  PASS  graft_bookkeeping_edges\r\n  PASS  graft_table_names_unique_and_formula_rename\r\n  PASS  graft_total_row_and_workbook_names\r\n  PASS  graft_carries_external_hyperlinks\r\n  PASS  insert_is_one_atomic_write\r\n  PASS  insert_interface_sheets_backs_up_first\r\n  -> 19/19 passed",
+  "ranAt": "2026-10-09T16:40:40.592Z",
+  "headCommit": "9f0357fa59d5aebc6b0ce259b40e9b4423e62c1c",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_interface_xlsx.py",
+      "file": "Pipeline5App/tests/unit/test_interface_xlsx.py",
+      "fileSha": "5fa7a2702519fd90560cb249f6a034171956c451198d8ba335efe781ef257a81"
+    }
+  ]
+}
