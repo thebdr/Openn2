@@ -439,7 +439,7 @@ namespace Openn._03_ApiManager
                 }
                 if (d.Item1.connector.Length == 0 && (network.Nodes.Count > 1 || network.IoConnectors.Count > 1))
                     Log("WARNING: " + d.Item1.name + " exposes " + network.Nodes.Count + " node(s) / " +
-                        network.IoConnectors.Count + " IO connector(s) and no Connector is configured - using the default pick" + "\n" +
+                        network.IoConnectors.Count + " IO connector(s) and no Connector is configured - using the first one (X1)" + "\n" +
                         "Add e.g. X1 / X2 to the station's Connector column to choose explicitly");
 
                 //the Openness-manual device example networks the interface FIRST, then assigns the
@@ -935,8 +935,9 @@ namespace Openn._03_ApiManager
         /// <summary>
         /// The IO connector to associate: the Connector designation picks the n-th one on a
         /// multi-connector interface (PN/PN coupler: X1 = first, X2 = second). Without a
-        /// designation, single-connector devices use the documented First() and multi-connector
-        /// ones keep the historical Last() (what the running plants are wired for).
+        /// designation the FIRST connector is used - X1 on a coupler (user decision 2026-10-09: the
+        /// historical Last() dated from the pre-AI single-connector version); CreateIoDevices logs a
+        /// WARNING for an unmarked multi-connector station, so the fallback is never silent.
         /// </summary>
         private IoConnector PickIoConnector(NetworkInterface network, string connectorSpec, string stationName)
         {
@@ -949,9 +950,9 @@ namespace Openn._03_ApiManager
                     Log(stationName + ": Connector " + connectorSpec + " -> IO connector " + n + " of " + count);
                     return network.IoConnectors.ElementAt(n - 1);
                 }
-                Log("WARNING: " + stationName + ": Connector \"" + connectorSpec + "\" is out of range (the interface has " + count + ") - using the default pick");
+                Log("WARNING: " + stationName + ": Connector \"" + connectorSpec + "\" is out of range (the interface has " + count + ") - using the first one");
             }
-            return count > 1 ? network.IoConnectors.Last() : network.IoConnectors.First();
+            return network.IoConnectors.First();
         }
 
         /// <summary>Reads an attribute as string, or "" when the item does not expose it.</summary>
