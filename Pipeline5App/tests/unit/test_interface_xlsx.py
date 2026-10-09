@@ -222,6 +222,9 @@ def test_insert_lossless_idempotent_and_table_clean():
            "the presence check is Excel's - case-insensitive (two such names would need a repair)")
         eq(os.path.getsize(iol), size, "a skip writes nothing")
         eq(load_workbook(iol).sheetnames.count("IF_SORTER-01"), 1, "no duplicate sheet")
+        eq(interface_xlsx.insert_sheets_into_iolist(iol, [("IF_NEW", ifp), ("IF_SORTER-01", ifp)]),
+           ["IF_NEW: inserted into the I/O List", "IF_SORTER-01: already present in the I/O List - skipped"],
+           "the actions follow the order the sheets were given")
 
 
 # =================================================================================================== #
@@ -252,15 +255,17 @@ def _devmode() -> bytes:
             + struct.pack("<HIII", 0, 0, 0, 0) + struct.pack("<II", 0, 0) + b"\0" * 32)
 
 
-def _modern_iolist(path, defined_names=(), table="T_Types"):
+def _modern_iolist(path, defined_names=(), table="T_Types", crowded=False):
     """An I/O List as a modern Excel writes it - with what openpyxl cannot carry: a DYNAMIC ARRAY (cm +
     xl/metadata.xml), a THREADED comment (threadedComments + persons + its legacy placeholder), an add-in
     binding (webextensions), a featurePropertyBag, printer settings, an EMPTY-TEXT cell, a calcChain, a
     cached formula, a table (T_Types, id 1), no <numFmts> and a self-closing <dxfs/>. Excel 16 opens it
-    (checked 2026-10-09: the array spills 1 / 2 / 3, one threaded comment, landscape)."""
+    (checked 2026-10-09: the array spills 1 / 2 / 3, one threaded comment, landscape). `crowded`: the
+    styles shaped like FVT's - its own custom number formats (a date cell E2 on 164), more fills /
+    borders, two dxfs - so a source index lands on a DIFFERENT target index."""
     dn = "".join(f'<definedName name="{n}">FamilyCheck!$A$1</definedName>' for n in defined_names)
     ms = "http://schemas.microsoft.com/office"
-    _zip(path, {
+    parts = {
         "[Content_Types].xml": (
             _DECL + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
             f'<Default Extension="bin" ContentType="{_CT_MAIN}printerSettings"/>'
@@ -420,14 +425,36 @@ def _modern_iolist(path, defined_names=(), table="T_Types"):
         "docProps/app.xml": (
             _DECL + '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">'
             '<Application>Microsoft Excel</Application></Properties>'),
-    })
+    }
+    if crowded:   # FVT's shape: custom number formats 164 / 165 (one in use), more fills / borders, two dxfs
+        parts["xl/styles.xml"] = parts["xl/styles.xml"].replace(
+            '<fonts count="2"',
+            '<numFmts count="2"><numFmt numFmtId="164" formatCode="[$-410]d\-mmm\-yyyy;@"/>'
+            '<numFmt numFmtId="165" formatCode="0.0%"/></numFmts><fonts count="2"').replace(
+            '<fills count="2">', '<fills count="4">').replace(
+            '<fill><patternFill patternType="gray125"/></fill></fills>',
+            '<fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor '
+            'rgb="FF00FF00"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid">'
+            '<fgColor rgb="FFFF0000"/><bgColor indexed="64"/></patternFill></fill></fills>').replace(
+            '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>',
+            '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/>'
+            '<top/><bottom style="double"><color rgb="FFFF0000"/></bottom><diagonal/></border></borders>').replace(
+            '<cellXfs count="2">', '<cellXfs count="3">').replace(
+            '</cellXfs>', '<xf numFmtId="164" fontId="0" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" '
+            'applyFill="1" applyBorder="1"/></cellXfs>').replace(
+            '<dxfs count="0"/>', '<dxfs count="2"><dxf><font><b/></font></dxf><dxf><fill><patternFill><bgColor '
+            'rgb="FF00B0F0"/></patternFill></fill></dxf></dxfs>')
+        parts["xl/worksheets/sheet1.xml"] = parts["xl/worksheets/sheet1.xml"].replace(
+            '<c r="D2"><f>A2*2</f><v>20</v></c>', '<c r="D2"><f>A2*2</f><v>20</v></c><c r="E2" s="2"><v>45000</v></c>')
+    _zip(path, parts)
 
 
 def _make_rich_if(path, font="Arial Narrow", hyperlink=False):
     """A generated IF_ sheet with what the graft must carry: a styled header (font / solid fill / border /
     alignment), a CUSTOM number format, a conditional format (a dxf), a validation, a merge, a column width,
-    a text that starts with '=', the address headers the seeding reads (offset D / bit E / address F / base G
-    / format H), a formula naming the table beside a string literal (K3), optionally an EXTERNAL hyperlink
+    a text that starts with '=', a styled column (B) and row (6), the address headers the seeding reads (offset
+    D / bit E / address F / base G / format H), a formula naming the table beside a string literal (K3),
+    optionally an EXTERNAL hyperlink
     (I2), and a table carrying a source dxf, a calculated-column formula and cell-style names (all three
     point into the source workbook). The sheet is tabSelected (the FVTGENERIC template is) - the graft must
     not keep that."""
@@ -457,6 +484,8 @@ def _make_rich_if(path, font="Arial Narrow", hyperlink=False):
     if hyperlink:
         ws["I2"].hyperlink = "https://example.com/interfaces"
     ws.column_dimensions["A"].width = 20.5
+    ws.column_dimensions["B"].font = Font(name="Consolas", italic=True)        # a styled column  (<col style>)
+    ws.row_dimensions[6].fill = PatternFill("solid", fgColor="FFFFFF00")       # a styled row     (<row s>)
     ws.sheet_view.tabSelected = True                          # as FVT's FVTGENERIC sheets carry it
     ws.conditional_formatting.add("A2:A4", CellIsRule(operator="equal", formula=['"SPD"'],
                                                       fill=PatternFill("solid", bgColor="FFFFC7CE")))
@@ -555,8 +584,8 @@ def test_insert_into_a_modern_workbook_keeps_every_part():
         eq([(n.get("numFmtId"), n.get("formatCode")) for n in sn.find(M + "numFmts")], [("164", "#,##0.000")],
            "the custom number format, at the first custom id")
         eq(len(sn.find(M + "dxfs")), 1, "the conditional format's dxf appended (the table's dxfs dropped)")
-        eq(len(sn.find(M + "cellXfs")), 2 + 2, "the header's + the number format's cell formats appended (the "
-           "source's default one maps to the I/O List's default)")
+        eq(len(sn.find(M + "cellXfs")), 2 + 4, "the header's, the number format's, the column's and the row's cell "
+           "formats appended (the source's default one maps to the I/O List's default)")
 
         # one more graft of the SAME template: every style already there -> styles.xml unchanged
         ifp2 = os.path.join(d, "IF_B.xlsx"); _make_rich_if(ifp2)
@@ -581,6 +610,9 @@ def test_insert_into_a_modern_workbook_keeps_every_part():
         eq((ws["A2"].font.name, ws["A2"].style_id), ("Arial", 0), "an unstyled cell takes the I/O List's default")
         eq([str(r) for r in ws.merged_cells.ranges], ["K1:L1"], "the merge")
         eq(ws.column_dimensions["A"].width, 20.5, "the column width")
+        eq((ws.column_dimensions["B"].font.name, ws.column_dimensions["B"].font.i), ("Consolas", True),
+           "the column's style (remapped)")
+        eq(ws.row_dimensions[6].fill.fgColor.rgb, "FFFFFF00", "the row's style (remapped)")
         eq([(str(v.sqref), v.formula1) for v in ws.data_validations.dataValidation], [("C2:C4", '"<,>"')],
            "the validation")
         cf = [(str(rng.sqref), r.formula, r.dxf.fill.bgColor.rgb)
@@ -592,7 +624,46 @@ def test_insert_into_a_modern_workbook_keeps_every_part():
         wd = load_workbook(iol, data_only=True)
         eq([wd["IF_SORTER-02"][r].value for r in ("F2", "F3", "F4")], ["Q10000.0", "I10001.2", "Q10004"],
            "the seeded I/O Address Side 1 values (data_only, no Excel)")
+        eq(wd["IF_SORTER-02"]["F2"].data_type, "s", "seeded as a STRING result")
+        import re as _re
+        f2 = _re.search(r'<c r="F2"[^>]*>', after["xl/worksheets/sheet4.xml"].decode("utf-8")).group(0)
+        ok(' t="str"' in f2, f"the seeded cell is a formula with a string result: {f2}")
         eq((wd["NET SAFETY 50"]["D2"].value, wd["NET SAFETY 50"]["B3"].value), (20, 2), "the I/O List's caches")
+
+
+def test_graft_remaps_into_a_crowded_styles_part():
+    """On a target whose styles are shaped like FVT's (its own custom number formats 164 / 165, more fills,
+    borders and dxfs than the source has), every source index lands on a DIFFERENT target index: the inserted
+    sheet still shows its own formats, the I/O List's own cells keep theirs (a reused id would restyle them)."""
+    import warnings as _w
+    import xml.etree.ElementTree as ET
+    _w.simplefilter("ignore")
+    M = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    with tempfile.TemporaryDirectory() as d:
+        ifp = os.path.join(d, "IF.xlsx"); _make_rich_if(ifp)
+        iol = os.path.join(d, "iol.xlsx"); _modern_iolist(iol, crowded=True)
+        before = _parts(iol)
+        eq(interface_xlsx.insert_sheets_into_iolist(iol, [("IF_SORTER-01", ifp)])[0],
+           "IF_SORTER-01: inserted into the I/O List", "inserted")
+        after = _parts(iol)
+        ok(_only_inserts(before["xl/styles.xml"], after["xl/styles.xml"], collections=True), "styles: insertions only")
+        sn = ET.fromstring(after["xl/styles.xml"])
+        eq([(n.get("numFmtId"), n.get("formatCode")) for n in sn.find(M + "numFmts")],
+           [("164", "[$-410]d\\-mmm\\-yyyy;@"), ("165", "0.0%"), ("166", "#,##0.000")],
+           "the new number format takes the id AFTER the I/O List's own")
+        wb = load_workbook(iol)
+        e2 = wb["NET SAFETY 50"]["E2"]
+        eq((e2.number_format, e2.fill.fgColor.rgb, e2.border.bottom.style),
+           ("[$-410]d\\-mmm\\-yyyy;@", "FF00FF00", "double"), "the I/O List's own date cell keeps its format")
+        ws = wb["IF_SORTER-01"]
+        h = ws["A1"]
+        eq((h.font.name, h.fill.fgColor.rgb, h.border.bottom.style), ("Arial Narrow", "FF7030A0", "thick"),
+           "the header's font / fill / border, remapped past the I/O List's own")
+        eq(ws["G2"].number_format, "#,##0.000", "the custom number format, remapped to 166")
+        cf = [(str(rng.sqref), r.dxf.fill.bgColor.rgb, r.dxf.font) for rng in ws.conditional_formatting for r in rng.rules]
+        eq(cf, [("A2:A4", "FFFFC7CE", None)], "the conditional format's own dxf (not the I/O List's bold one)")
+        eq((ws.column_dimensions["B"].font.name, ws.row_dimensions[6].fill.fgColor.rgb), ("Consolas", "FFFFFF00"),
+           "the column's and the row's styles")
 
 
 def _sst_source(path):
@@ -658,6 +729,29 @@ def _variant(src, dst, old: bytes, new: bytes, part="xl/worksheets/sheet1.xml"):
     _zip(dst, p)
 
 
+def _deflate_damaged(src, dst, part="xl/worksheets/sheet1.xml"):
+    """`src` with ONE byte of `part`'s compressed stream flipped - the first flip that makes inflating it fail
+    (zlib.error: a damaged deflate stream, the case a CRC check never reaches)."""
+    import struct
+    import zlib
+    with open(src, "rb") as fh:
+        data = bytearray(fh.read())
+    with zipfile.ZipFile(src) as z:
+        info = z.getinfo(part)
+    n, m = struct.unpack("<HH", bytes(data[info.header_offset + 26:info.header_offset + 30]))
+    start = info.header_offset + 30 + n + m
+    for k in range(info.compress_size):
+        bad = bytearray(data)
+        bad[start + k] ^= 0xFF
+        try:
+            zlib.decompress(bytes(bad[start:start + info.compress_size]), -15)
+        except zlib.error:
+            with open(dst, "wb") as fh:
+                fh.write(bad)
+            return
+    raise AssertionError("fixture: no single flipped byte broke the deflate stream")
+
+
 def test_graft_refuses_what_it_cannot_carry():
     """A sheet the graft cannot read or carry faithfully is refused - a WARN, nothing of it left behind (not
     a style it appended before the refusal, not a part name, not an id) - while the other sheets still
@@ -677,38 +771,81 @@ def test_graft_refuses_what_it_cannot_carry():
         s0 = os.path.join(d, "s0.xlsx"); _sst_source(s0)
         sst = os.path.join(d, "IF_SST.xlsx"); _variant(s0, sst, b'<c r="C1" t="s"><v>2</v>', b'<c r="C1" t="s"><v>99</v>')
         empty = os.path.join(d, "IF_EMPTY.xlsx"); open(empty, "wb").close()
+        typ = os.path.join(d, "IF_TYP.xlsx")                   # a malformed attribute (openpyxl: TypeError)
+        _variant(rich, typ, b'fontId="1"', b'fontId="one"', part="xl/styles.xml")
+        flip = os.path.join(d, "IF_FLIP.xlsx"); _deflate_damaged(rich, flip)   # zlib.error, not BadZipFile
 
         # the graft's own guards, exactly (cm / vm / a dangling style come AFTER the header's Comic Sans styles
         # were appended - the snapshot must take them back)
         iol = os.path.join(d, "iol.xlsx"); _modern_iolist(iol)
         before = _parts(iol)
         res = graft.graft_sheets(iol, [{"title": t, "source": p} for t, p in
-                                       (("IF_CM", cm), ("IF_VM", vm), ("IF_STY", sty), ("IF_SST", sst))])
-        eq([(r["title"], r["error"]) for r in res], [
+                                       (("IF_CM", cm), ("IF_VM", vm), ("IF_STY", sty), ("IF_SST", sst),
+                                        ("IF_TYP", typ), ("IF_FLIP", flip))])
+        eq([(r["title"], r["error"]) for r in res[:4]], [
             ("IF_CM", "cell A2 carries cell metadata (a dynamic array / rich value) the graft does not copy"),
             ("IF_VM", "cell A3 carries cell metadata (a dynamic array / rich value) the graft does not copy"),
-            ("IF_STY", "a cell names style 99, the source has 3"),
+            ("IF_STY", "a cell names style 99, the source has 5"),
             ("IF_SST", "cell C1 names shared string 99, the source has 3")], "each refusal and its reason")
+        eq(res[4]["error"], "ValueError: invalid literal for int() with base 10: 'one'", "a malformed index")
+        ok(res[5]["error"].startswith("error: Error -3 while decompressing data"), f"a damaged part: {res[5]}")
         eq(_parts(iol), before, "nothing grafted -> the I/O List is not written")
 
         # through the 400e entry: every refusal is a WARN (whichever layer catches it), the I/O List untouched
-        named = [("IF_BAD", bad), ("IF_CM", cm), ("IF_VM", vm), ("IF_STY", sty), ("IF_SST", sst), ("IF_EMPTY", empty)]
+        named = [("IF_BAD", bad), ("IF_CM", cm), ("IF_VM", vm), ("IF_STY", sty), ("IF_SST", sst),
+                 ("IF_EMPTY", empty), ("IF_TYP", typ), ("IF_FLIP", flip)]
         acts = interface_xlsx.insert_sheets_into_iolist(iol, named)
         eq([a.split(":", 1)[0] for a in acts], [f"[WARN] {t}" for t, _ in named], "one WARN per refused sheet")
         ok(all(": not inserted - " in a for a in acts), f"each says so: {acts}")
         ok(acts[0].endswith(" part the graft does not copy"), f"a comment's part is refused: {acts[0]}")
         eq(acts[5], "[WARN] IF_EMPTY: not inserted - its workbook cannot be read (BadZipFile: File is not a zip "
                     "file)", "an unreadable IF_ workbook refuses itself - it never aborts the insert")
+        ok(acts[6].startswith("[WARN] IF_TYP: not inserted - its workbook cannot be read (TypeError: "), acts[6])
+        ok(acts[7].startswith("[WARN] IF_FLIP: not inserted - its workbook cannot be read ("), acts[7])
         eq(_parts(iol), before, "nothing grafted -> the I/O List is not written")
 
-        # mixed: the refused ones leave NOTHING - the result is byte for byte the good sheet grafted alone
+        # mixed, the good sheet LAST and FIRST: the refused ones leave NOTHING - byte for byte the good one alone
         ref = os.path.join(d, "ref.xlsx"); _modern_iolist(ref)
         interface_xlsx.insert_sheets_into_iolist(ref, [("IF_GOOD", good)])
         acts = interface_xlsx.insert_sheets_into_iolist(iol, named + [("IF_GOOD", good)])
-        eq(acts[6:], ["IF_GOOD: inserted into the I/O List",
+        eq(acts[8:], ["IF_GOOD: inserted into the I/O List",
                       "IF_GOOD: seeded 3 I/O Address Side 1 values (Excel-independent)"], "the good one grafted")
         eq(_parts(iol), _parts(ref), "the refused sheets left nothing behind (styles, part names, ids)")
         ok(b"Comic Sans MS" not in _parts(iol)["xl/styles.xml"], "no refused style")
+        iol2 = os.path.join(d, "iol2.xlsx"); _modern_iolist(iol2)
+        acts = interface_xlsx.insert_sheets_into_iolist(iol2, [("IF_GOOD", good)] + named)
+        eq(acts[:2], ["IF_GOOD: inserted into the I/O List",
+                      "IF_GOOD: seeded 3 I/O Address Side 1 values (Excel-independent)"], "good first: grafted")
+        eq(_parts(iol2), _parts(ref), "a refusal AFTER a graft rolls back only itself")
+        iol3 = os.path.join(d, "iol3.xlsx"); _modern_iolist(iol3)
+        interface_xlsx.insert_sheets_into_iolist(iol3, [("IF_X-1", cm), ("IF_X_1", good)])
+        eq(list(load_workbook(iol3)["IF_X_1"].tables), ["DT_IF_X_1"], "a refused sheet's table name is not taken")
+
+
+def test_graft_bookkeeping_edges():
+    """No calcPr -> one is added (fullCalcOnLoad) after the defined names; one title twice in a run -> the
+    second skipped like an already-present sheet (Excel's case-insensitive rule); a title Excel would refuse
+    -> that sheet refused, the workbook untouched."""
+    import warnings as _w
+    from pipeline5.documents import xlsx_sheet_graft as graft
+    _w.simplefilter("ignore")
+    with tempfile.TemporaryDirectory() as d:
+        ifp = os.path.join(d, "IF.xlsx"); _make_rich_if(ifp)
+        base = os.path.join(d, "base.xlsx"); _modern_iolist(base)
+        iol = os.path.join(d, "iol.xlsx")
+        _variant(base, iol, b'<calcPr calcId="191029"/>', b"", part="xl/workbook.xml")
+        eq(interface_xlsx.insert_sheets_into_iolist(iol, [("IF_A", ifp), ("if_a", ifp)]),
+           ["IF_A: inserted into the I/O List", "IF_A: seeded 3 I/O Address Side 1 values (Excel-independent)",
+            "if_a: already present in the I/O List - skipped"], "the second spelling of one title is skipped")
+        ok('</definedNames><calcPr fullCalcOnLoad="1"/></workbook>' in _parts(iol)["xl/workbook.xml"].decode(),
+           "no calcPr -> one added in its schema place")
+        before = _parts(iol)
+        res = graft.graft_sheets(iol, [{"title": t, "source": ifp} for t in ("bad/name", "x" * 32, "'quoted'", "",
+                                                                             "if_A")])
+        eq([r["error"] for r in res], ["'bad/name' is no valid sheet name", f"'{'x' * 32}' is no valid sheet name",
+                                       "\"'quoted'\" is no valid sheet name", "'' is no valid sheet name",
+                                       "a sheet of that name is already in the workbook"], "each title refused")
+        eq(_parts(iol), before, "nothing grafted -> nothing written")
 
 
 def test_graft_table_names_unique_and_formula_rename():
@@ -725,7 +862,8 @@ def test_graft_table_names_unique_and_formula_rename():
             ("'Data'!A1+Data[x]", "'Data'!A1+Data_X[x]"),
             ("Data[[#Headers],[a'[b']]]&Data", "Data_X[[#Headers],[a'[b']]]&Data_X"),
             ('"say ""DT"" "&DT[A]', '"say ""DT"" "&DT_X[A]'),
-            ("X.DT+DT.Y+[1]Sheet!DT", "X.DT+DT.Y+[1]Sheet!DT_X")):
+            ("X.DT+DT.Y+[1]Sheet!DT", "X.DT+DT.Y+[1]Sheet!DT_X"),
+            ("Data!A1+SUM(Data!A1:A3)+Data[x]", "Data!A1+SUM(Data!A1:A3)+Data_X[x]")):
         eq(graft._rename_in_formula(formula, rx), want, formula)
     eq(graft._table_renamer({}), None, "nothing to rename -> no pattern")
     _w.simplefilter("ignore")
@@ -786,8 +924,8 @@ def test_insert_is_one_atomic_write():
             acts = interface_xlsx.insert_sheets_into_iolist(iol, [("IF_SORTER-01", ifp)])
         finally:
             graft.os.replace = real
-        eq(acts, ["save failed (the I/O List is open in Excel) - I/O List left unchanged (restore from the .bak "
-                  "if needed)"], "the failure is reported")
+        eq(acts, ["[WARN] save failed (the I/O List is open in Excel) - I/O List left unchanged (restore from the "
+                  ".bak if needed)"], "the failure is reported as a WARN")
         with open(iol, "rb") as fh:
             eq(fh.read(), original, "the I/O List is byte-identical")
         eq(sorted(os.listdir(d)), ["IF.xlsx", "iol.xlsx"], "no temp file left behind")
@@ -828,8 +966,10 @@ if __name__ == "__main__":
         ("insert_seeds_interface_address_cache", test_insert_seeds_interface_address_cache),
         ("insert_lossless_idempotent_and_table_clean", test_insert_lossless_idempotent_and_table_clean),
         ("insert_into_a_modern_workbook_keeps_every_part", test_insert_into_a_modern_workbook_keeps_every_part),
+        ("graft_remaps_into_a_crowded_styles_part", test_graft_remaps_into_a_crowded_styles_part),
         ("graft_shared_strings_become_inline", test_graft_shared_strings_become_inline),
         ("graft_refuses_what_it_cannot_carry", test_graft_refuses_what_it_cannot_carry),
+        ("graft_bookkeeping_edges", test_graft_bookkeeping_edges),
         ("graft_table_names_unique_and_formula_rename", test_graft_table_names_unique_and_formula_rename),
         ("graft_carries_external_hyperlinks", test_graft_carries_external_hyperlinks),
         ("insert_is_one_atomic_write", test_insert_is_one_atomic_write),

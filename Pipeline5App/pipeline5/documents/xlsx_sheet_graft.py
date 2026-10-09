@@ -300,11 +300,12 @@ def _skip_brackets(text: str, i: int) -> int:
 
 def _table_renamer(renames: dict):
     """(pattern, {old casefolded: new}) for `_rename_in_formula` - a whole NAME, case-insensitively (Excel's
-    rule), never part of a longer one (`DT` is not in `DT2` / `X.DT`); None when nothing is renamed."""
+    rule), never part of a longer one (`DT` is not in `DT2` / `X.DT`) nor a sheet name (`DT!A1`); None when
+    nothing is renamed."""
     if not renames:
         return None
     alt = "|".join(re.escape(k) for k in sorted(renames, key=len, reverse=True))
-    return (re.compile(r"(?<![\w.\\])(" + alt + r")(?![\w.])", re.IGNORECASE),
+    return (re.compile(r"(?<![\w.\\])(" + alt + r")(?![\w.!])", re.IGNORECASE),
             {k.casefold(): v for k, v in renames.items()})
 
 
@@ -618,8 +619,8 @@ def graft_sheets(path: str, grafts: list, *, dest: str | None = None) -> list:
             try:
                 seeded = book.graft(g["title"], g["source"], g.get("seeds") or {})
                 results.append({"title": g["title"], "error": None, "seeded": seeded})
-            except (GraftError, ET.ParseError, zipfile.BadZipFile, KeyError, IndexError, ValueError,
-                    UnicodeDecodeError, OSError) as e:          # whatever one source does, it refuses ITSELF
+            except Exception as e:  # noqa: BLE001 - whatever ONE source does (a damaged deflate stream, a
+                # malformed attribute, an index out of range ...), it refuses itself, never the whole run
                 book.restore(snap)
                 results.append({"title": g["title"], "error": f"{type(e).__name__}: {e}"
                                 if not isinstance(e, GraftError) else str(e), "seeded": []})

@@ -364,7 +364,7 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
         # workbook that cannot be read refuses itself, never the whole insert (the .bak is already taken)
         try:
             seeds = _interface_address_caches(if_path)
-        except (OSError, ET.ParseError, zipfile.BadZipFile, KeyError, IndexError, ValueError) as e:
+        except Exception as e:  # noqa: BLE001 - a damaged / malformed IF_ file: whatever openpyxl raises
             slot.append(f"[WARN] {title}: not inserted - its workbook cannot be read ({type(e).__name__}: {e})")
             continue
         present.add(title.casefold())
@@ -377,7 +377,7 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
     try:
         results = xlsx_sheet_graft.graft_sheets(iolist_path, [g for g, _ in grafts])
     except (OSError, ET.ParseError, zipfile.BadZipFile, UnicodeDecodeError, xlsx_sheet_graft.GraftError) as e:
-        return flat() + [f"save failed ({e}) - I/O List left unchanged (restore from the .bak if needed)"]
+        return flat() + [f"[WARN] save failed ({e}) - I/O List left unchanged (restore from the .bak if needed)"]
     for (_, slot), r in zip(grafts, results):
         if r["error"]:
             slot.append(f"[WARN] {r['title']}: not inserted - {r['error']}")
