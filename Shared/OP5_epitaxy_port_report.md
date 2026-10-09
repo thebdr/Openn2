@@ -100,3 +100,12 @@ you pick; nothing of it is applied.
 2. The database master: stay with the csv (PL5 reads it) or move both apps to the xlsx (a contract change, then
    bring in the epitaxy workbook)?
 3. The PL4-era csv columns (`signals_count`, `pairs_mapping`, `<DR>`/`<DD>` blocks): for the PL5 session to rule on.
+
+## 8. Decisions taken (2026-10-09, with the user)
+
+- **D ported** (the content-routed single-file import on the Files tab) - the only phase-2 piece the official version needs.
+- **C not needed**: Pipeline5 creates one XML per tag table itself (contract §9.1), so the workbook converter stays on the branch.
+- **A and B dropped for now** (the xlsx database and the GSDML importer): "I may get back to it in the future". The csv with its header stays the master; the branch keeps the code and the 505 KB workbook.
+- **E not needed** (the first-run default from Pipeline5's last project); the Workspace root picker is enough.
+- Items F-H and the data of §5: skipped as recommended.
+- Next: the user inspects the imported data on TIA thoroughly and OP5 solidifies from there (first run: the FVT project with the coupler rows).

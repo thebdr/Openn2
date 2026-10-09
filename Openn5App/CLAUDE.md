@@ -156,7 +156,7 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   (`ExportRun`). The PLC folder = the CPU device item's name (`FirstPlc`, every device incl. groups). "Export full
   project" sweeps the PLC's three folders first; a single export only overwrites same-named files (the run id
   marks the rest as leftovers). Nothing in TIA changes.
-  **Files tab**: the single-file tools - Search / Export Blocks (`BlockSearchWindow` → `AppPaths.ExportedBlocksDir`),
+  **Files tab**: the single-file tools - Search / Export Blocks (`BlockSearchWindow` → `AppPaths.ExportedBlocksDir`), "Import Block" routed by content (`ImportPlcBlock` + `DetectSingleFileRoute`, ported from the epitaxy line 2026-10-09: block XML, generation csv = generate + import, instance-DB csv, `.db/.scl/.awl` source = `GenerateFromExternalSource`; unrecognized files are refused with the list),
   Import Block (one XML), Generate Blocks (one block-gen csv → `GeneratedBlocksDir`, the XML path lands in the
   import box), Create Instance DBs (one csv), the hardware csv folder (Reload / Edit / Generate Hardware with the
   controller mode) and Dump Device Attributes. File dialogs start at the box's own path, else at the workspace

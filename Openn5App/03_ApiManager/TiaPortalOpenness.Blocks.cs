@@ -440,17 +440,105 @@ namespace Openn._03_ApiManager
                     System.Windows.Forms.MessageBoxIcon.Warning));
         }
 
+        /// <summary>The routes of the Files tab's single-file import, detected from extension / content.</summary>
+        private enum SingleFileRoute { GenerateImport, InstanceDb, ImportXml, Unknown }
+
         /// <summary>
-        /// Imports an xml block file into the root block group of the Plc program,
-        /// overriding an existing block with the same name.
+        /// Detects the route from extension/content without a full parse: .xml = direct
+        /// import; .csv with a template= directive = generate-then-import; .csv whose %
+        /// key row has Name + InstanceOf/FB = instance DB; otherwise unknown.
+        /// </summary>
+        private static SingleFileRoute DetectSingleFileRoute(string path)
+        {
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            if (ext == ".xml") return SingleFileRoute.ImportXml;
+            if (ext != ".csv") return SingleFileRoute.Unknown;
+
+            string[] lines;
+            try { lines = File.ReadAllLines(path); }
+            catch { return SingleFileRoute.Unknown; }
+
+            //a generate template can have its key row too, so the template directive wins
+            foreach (string raw in lines)
+            {
+                string line = raw.Trim();
+                if (line.StartsWith("$", StringComparison.Ordinal) && line.IndexOf("template=", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return SingleFileRoute.GenerateImport;
+            }
+            foreach (string raw in lines)
+            {
+                string line = raw.Trim();
+                if (!line.StartsWith("%", StringComparison.Ordinal)) continue;
+                var cells = line.Split(',', ';', '\t').Select(c => c.Trim()).ToList();
+                bool hasName = cells.Any(c => c.Equals("Name", StringComparison.OrdinalIgnoreCase));
+                bool hasFb = cells.Any(c => c.Equals("InstanceOf", StringComparison.OrdinalIgnoreCase) ||
+                                            c.Equals("InstanceOfFB", StringComparison.OrdinalIgnoreCase) ||
+                                            c.Equals("FB", StringComparison.OrdinalIgnoreCase));
+                if (hasName && hasFb) return SingleFileRoute.InstanceDb;
+                break; //first key row decides
+            }
+            return SingleFileRoute.Unknown;
+        }
+
+        /// <summary>
+        /// Imports ONE file into the root of the Plc program, routed by content (ported from the epitaxy
+        /// OP3 line 2026-10-09): a block .xml (overrides a same-named block), a generation csv (template=
+        /// directive -> generate + import), an instance-DB csv (Name/InstanceOf key columns), or a
+        /// .db/.scl/.awl external source (create + generate blocks; a stale source object is replaced).
+        /// The Workspace tab routes by header kind instead - this is the by-hand tool of the Files tab.
         /// </summary>
         public void ImportPlcBlock(string fileName)
         {
             try
             {
+                if (project == null)
+                {
+                    Log("Can't import: No Tia Project Attached");
+                    return;
+                }
                 PlcSoftware plcSoftware = GetPlcSoftware(project);
-                ImportXmlInto(plcSoftware.BlockGroup, fileName);
-                Log("Plc Source Block : " + fileName + " imported successfully");
+                if (plcSoftware == null)
+                {
+                    Log("Can't import: no Plc Software found in the project");
+                    return;
+                }
+
+                string extension = Path.GetExtension(fileName).ToLowerInvariant();
+                if (extension == ".db" || extension == ".scl" || extension == ".awl")
+                {
+                    GenerateFromExternalSource(plcSoftware, fileName);
+                    Log("Source " + Path.GetFileName(fileName) + " imported - blocks generated");
+                    return;
+                }
+
+                switch (DetectSingleFileRoute(fileName))
+                {
+                    case SingleFileRoute.GenerateImport:
+                        string versionTag = "V" + OpennessSetup.SelectedInstallation.PortalVersion.Major;
+                        string xml = Openn._02_Converter.BlockXmlGenerator.Generate(fileName, versionTag, Openn._10_StandardFunctions.AppPaths.GeneratedBlocksDir, null);
+                        if (xml == null)
+                        {
+                            Log("Import stopped - block generation failed (see log): " + Path.GetFileName(fileName));
+                            return;
+                        }
+                        ImportXmlInto(plcSoftware.BlockGroup, xml);
+                        Log("Generated + imported: " + Path.GetFileName(fileName));
+                        return;
+
+                    case SingleFileRoute.InstanceDb:
+                        CreateInstanceDbs(fileName); //logs its own summary
+                        return;
+
+                    case SingleFileRoute.ImportXml:
+                        ImportXmlInto(plcSoftware.BlockGroup, fileName);
+                        Log("Plc Source Block : " + fileName + " imported successfully");
+                        return;
+
+                    default:
+                        Log("Can't import " + Path.GetFileName(fileName) +
+                            ": unrecognized file (expected a block .xml, a generation/instance-DB .csv, or a .db/.scl/.awl source)");
+                        return;
+                }
             }
             catch (Exception e)
             {

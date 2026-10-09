@@ -454,7 +454,7 @@ namespace Openn
 
         private void btnBrowseBlocks_Click(object sender, RoutedEventArgs e)
         {
-            var _path = GetFileDialog(startPath: StartPathFor(tbSourceBlockPath.Text), filter: "Block XML (.xml)|*.xml");
+            var _path = GetFileDialog(startPath: StartPathFor(tbSourceBlockPath.Text), filter: "Importable (*.xml;*.csv;*.db;*.scl;*.awl)|*.xml;*.csv;*.db;*.scl;*.awl|All files (*.*)|*.*");
             if (!(_path == null))
                 tbSourceBlockPath.Text = _path.FullName;
         }

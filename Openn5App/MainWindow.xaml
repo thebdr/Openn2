@@ -416,7 +416,7 @@
                                 <DockPanel Grid.Row="1" Margin="2,0,2,6">
                                     <Button x:Name="btnImportSource" Click="btnImportSource_Click" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Import Block"/>
                                     <Button x:Name="btnBrowseBlocks" Click="btnBrowseBlocks_Click" DockPanel.Dock="Right" Style="{StaticResource BrowseButton}" Content="Browse.."/>
-                                    <TextBox x:Name="tbSourceBlockPath" ToolTip="One block XML (TIA Openness export) to import into the attached project's Program blocks root"/>
+                                    <TextBox x:Name="tbSourceBlockPath" ToolTip="One file to import into the attached project's Program blocks root, routed by content: a block XML (overrides a same-named block), a generation csv (template= directive -> generate + import), an instance-DB csv (Name/InstanceOf columns), or a .db/.scl/.awl source (blocks generated; a stale source object is replaced)"/>
                                 </DockPanel>
 
                                 <!-- Generate blocks from a template csv -->
