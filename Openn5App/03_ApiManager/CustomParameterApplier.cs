@@ -31,9 +31,9 @@ namespace Openn._03_ApiManager
     internal static class CustomParameterApplier
     {
         /// <summary>Applies the parameters of one plugged module (paths relative to the module).</summary>
-        public static void Apply(DeviceItem module, string globalParameters, string specificParameters, string ipAddress, string context)
+        public static string Apply(DeviceItem module, string globalParameters, string specificParameters, string ipAddress, string context)
         {
-            ApplyAll(module, globalParameters, specificParameters, ipAddress, context, "module");
+            return ApplyAll(module, globalParameters, specificParameters, ipAddress, context, "module");
         }
 
         /// <summary>
@@ -42,16 +42,11 @@ namespace Openn._03_ApiManager
         /// and PrmData records). Call AFTER the modules are plugged so the item
         /// indices match an attribute dump of a complete station.
         /// </summary>
-        public static void Apply(Device station, string globalParameters, string specificParameters, string ipAddress, string context)
+        public static string Apply(Device station, string globalParameters, string specificParameters, string ipAddress, string context)
         {
-            ApplyAll(station, globalParameters, specificParameters, ipAddress, context, "station");
+            return ApplyAll(station, globalParameters, specificParameters, ipAddress, context, "station");
         }
 
-        /// <summary>
-        /// Parses, merges and applies all parameters of one root object. Problems are
-        /// logged per parameter (with the given station/module context); one bad
-        /// parameter does not stop the others.
-        /// </summary>
         /// <summary>
         /// Applies the parameters of a TransferArea module row (PN/PN coupler /
         /// I-device transfer area). Name=Value targets the area's own attributes
@@ -61,47 +56,65 @@ namespace Openn._03_ApiManager
         /// Item(i)/Ch(i)/PrmData do not apply - an area is not a
         /// device item - and are reported as unresolvable paths.
         /// </summary>
-        public static void Apply(TransferArea area, string globalParameters, string specificParameters, string ipAddress, string context)
+        public static string Apply(TransferArea area, string globalParameters, string specificParameters, string ipAddress, string context)
         {
-            ApplyAll(area, globalParameters, specificParameters, ipAddress, context, "transfer area");
+            return ApplyAll(area, globalParameters, specificParameters, ipAddress, context, "transfer area");
         }
 
-        private static void ApplyAll(IEngineeringObject root, string globalParameters, string specificParameters, string ipAddress, string context, string rootKind)
+        /// <summary>
+        /// Parses, merges and applies all parameters of one root object. Problems are logged per parameter (with
+        /// the given station/module context); one bad parameter does not stop the others. Returns the one-line
+        /// summary the created-object log line carries: the parameters written (model defaults merged with the
+        /// row, as path.Name=Value) and how many failed.
+        /// </summary>
+        private static string ApplyAll(IEngineeringObject root, string globalParameters, string specificParameters, string ipAddress, string context, string rootKind)
         {
             var parseErrors = new List<string>();
             IList<CustomParameter> parameters = CustomParameterParser.Parse(globalParameters, specificParameters, ipAddress, parseErrors);
             foreach (string parseError in parseErrors)
                 Log("Custom parameter error (" + context + "): " + parseError);
 
-            if (parameters.Count == 0)
-                return;
+            if (parameters.Count == 0 && parseErrors.Count == 0)
+                return "no custom parameters";
 
+            var applied = new List<string>();
+            int failed = parseErrors.Count;
             if (root == null)
             {
-                Log("Custom parameter error (" + context + "): " + rootKind + " not found, " + parameters.Count + " parameter(s) skipped");
-                return;
+                if (parameters.Count > 0)
+                    Log("Custom parameter error (" + context + "): " + rootKind + " not found, " + parameters.Count + " parameter(s) skipped");
+                failed += parameters.Count;
+            }
+            else
+            {
+                foreach (CustomParameter parameter in parameters)
+                {
+                    bool written;
+                    try
+                    {
+                        written = ApplyParameter(root, parameter, context);
+                    }
+                    catch (Exception e)
+                    {
+                        Log("Custom parameter error (" + context + "): " + parameter + "\n" + e.Message);
+                        written = false;
+                    }
+                    if (written) applied.Add(parameter.ToString());
+                    else failed++;
+                }
             }
 
-            foreach (CustomParameter parameter in parameters)
-            {
-                try
-                {
-                    ApplyParameter(root, parameter, context);
-                }
-                catch (Exception e)
-                {
-                    Log("Custom parameter error (" + context + "): " + parameter + "\n" + e.Message);
-                }
-            }
+            string summary = "custom parameters: " + (applied.Count > 0 ? string.Join(", ", applied) : "none applied");
+            if (failed > 0) summary += " - " + failed + " FAILED (see the errors above)";
+            return summary;
         }
 
         /// <summary>Resolves the target object for one parameter and writes the value.</summary>
-        private static void ApplyParameter(IEngineeringObject root, CustomParameter parameter, string context)
+        private static bool ApplyParameter(IEngineeringObject root, CustomParameter parameter, string context)
         {
             if (parameter.IsPrmData)
             {
-                ApplyPrmData(root, parameter, context);
-                return;
+                return ApplyPrmData(root, parameter, context);
             }
 
             IEngineeringObject target;
@@ -112,7 +125,7 @@ namespace Openn._03_ApiManager
                 {
                     Log("Custom parameter error (" + context + "): no object of " + Describe(root) +
                         " has a writable attribute \"" + parameter.Name + "\"");
-                    return;
+                    return false;
                 }
             }
             else if (parameter.Path[0].Kind == CustomParameterStepKind.Channel)
@@ -123,7 +136,7 @@ namespace Openn._03_ApiManager
                 {
                     Log("Custom parameter error (" + context + "): no channel " + parameter.Path[0].Index +
                         " with a writable attribute \"" + parameter.Name + "\" found on " + Describe(root));
-                    return;
+                    return false;
                 }
             }
             else
@@ -132,24 +145,25 @@ namespace Openn._03_ApiManager
                 if (target == null)
                 {
                     Log("Custom parameter error (" + context + "): path of " + parameter + " does not exist on " + Describe(root));
-                    return;
+                    return false;
                 }
             }
 
             target.SetAttribute(parameter.Name, ConvertToAttributeType(target, parameter.Name, parameter.Value));
+            return true;
         }
 
         /// <summary>
         /// Writes a raw GSD parameter record (byte-exact) onto the GsdDeviceItem
         /// service of the path target. The hex value comes normalized from the parser.
         /// </summary>
-        private static void ApplyPrmData(IEngineeringObject root, CustomParameter parameter, string context)
+        private static bool ApplyPrmData(IEngineeringObject root, CustomParameter parameter, string context)
         {
             IEngineeringObject target = parameter.Path.Count == 0 ? root : ResolvePath(root, parameter.Path);
             if (target == null)
             {
                 Log("Custom parameter error (" + context + "): path of " + parameter + " does not exist on " + Describe(root));
-                return;
+                return false;
             }
 
             DeviceItem item = target as DeviceItem;
@@ -157,17 +171,18 @@ namespace Openn._03_ApiManager
             {
                 Log("Custom parameter error (" + context + "): " + parameter.Name + " needs an Item(..) path to a GSD module (target of " +
                     parameter + " is not a device item)");
-                return;
+                return false;
             }
 
             GsdDeviceItem gsd = item.GetService<GsdDeviceItem>();
             if (gsd == null)
             {
                 Log("Custom parameter error (" + context + "): " + Describe(item) + " is not a GSD device item - " + parameter.Name + " skipped");
-                return;
+                return false;
             }
 
             gsd.SetPrmData(parameter.PrmDataRecord, 0, HexToBytes(parameter.Value));
+            return true;
         }
 
         /// <summary>Walks an explicit Item(i)/Ch(i)/Addr(i) path down from the root.</summary>

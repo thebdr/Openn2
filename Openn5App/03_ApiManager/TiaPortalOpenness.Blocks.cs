@@ -160,9 +160,10 @@ namespace Openn._03_ApiManager
         /// CreateInstanceDB API (no template/XML, so none of the XML import pitfalls -
         /// IDs, namespaces, version, culture - apply). Reads the instance-DB list csv
         /// (InstanceDbListParser), resolves/creates the target folders, and creates
-        /// each DB. Cancellable between DBs; a name conflict pops Retry/Abort/Ignore
-        /// like the hardware generator. Numbers are auto-assigned when the csv leaves
-        /// Number empty. Nothing is saved.
+        /// each DB. Cancellable between DBs. A name conflict with an instance DB of the
+        /// SAME FB is the regeneration case and is replaced automatically (logged); any
+        /// other conflict pops Retry/Abort/Ignore like the hardware generator. Numbers
+        /// are auto-assigned when the csv leaves Number empty. Nothing is saved.
         /// </summary>
         public void CreateInstanceDbs(string csvPath)
         {
@@ -220,9 +221,33 @@ namespace Openn._03_ApiManager
                 {
                     try
                     {
-                        if (group.Blocks.Find(spec.Name) != null)
-                            throw new Exception("a block named \"" + spec.Name + "\" already exists" +
-                                (folder.Length > 0 ? " in folder " + folder : " at the root"));
+                        //block names are unique program-wide: check the target group first (for a
+                        //precise message), then the whole block tree
+                        PlcBlock existing = group.Blocks.Find(spec.Name);
+                        string existingWhere = existing != null
+                            ? (folder.Length > 0 ? " in folder " + folder : " at the root")
+                            : null;
+                        if (existing == null)
+                        {
+                            existing = FindBlock(plcSoftware.BlockGroup, spec.Name);
+                            if (existing != null) existingWhere = " in another folder (block names are unique program-wide)";
+                        }
+                        if (existing != null)
+                        {
+                            //an instance DB of the SAME FB = the regeneration case: replace it
+                            //automatically instead of bothering the user (start values are lost by design)
+                            if (existing is InstanceDB existingDb &&
+                                string.Equals(existingDb.InstanceOfName, spec.InstanceOf, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Log("Instance DB " + spec.Name + " already exists (same FB \"" + spec.InstanceOf + "\") - replaced with a fresh one");
+                                existing.Delete();
+                            }
+                            else
+                            {
+                                throw new Exception("a block named \"" + spec.Name + "\" already exists" + existingWhere +
+                                    " and it is NOT an instance DB of \"" + spec.InstanceOf + "\" (found: " + DescribeExistingBlock(existing) + ")");
+                            }
+                        }
 
                         group.Blocks.CreateInstanceDB(spec.Name, spec.Number == null, spec.Number ?? 1, spec.InstanceOf);
                         created++;
@@ -230,7 +255,22 @@ namespace Openn._03_ApiManager
                     }
                     catch (Exception e)
                     {
-                        var decision = AskCreateDecision(spec.Name, spec.InstanceOf, e.Message);
+                        string msg = e.Message;
+                        // Fail-safe / auto-generated FBs (e.g. F_ESTOP1) refuse CreateInstanceDB. Fall back to
+                        // the legacy method: import a minimal SW.Blocks.InstanceDB xml carrying F_DB - TIA allows
+                        // IMPORTING an F-instance DB where it forbids creating one directly.
+                        if (IsFailsafeCreateRejection(e))
+                        {
+                            if (TryImportFailsafeInstanceDb(group, spec, out string why))
+                            {
+                                created++;
+                                Log("Created fail-safe instance DB " + spec.Name + " via F_DB xml import (instanceOf " +
+                                    spec.InstanceOf + ") - direct CreateInstanceDB is not allowed for auto-generated blocks");
+                                break;
+                            }
+                            msg += "\n(fail-safe F_DB xml-import fallback also failed: " + why + ")";
+                        }
+                        var decision = AskCreateDecision(spec.Name, spec.InstanceOf, msg);
                         if (decision == System.Windows.Forms.DialogResult.Retry)
                         {
                             Log("Retrying instance DB " + spec.Name + " (line " + spec.LineNumber + ")");
@@ -238,11 +278,11 @@ namespace Openn._03_ApiManager
                         }
                         if (decision == System.Windows.Forms.DialogResult.Ignore)
                         {
-                            Log("SKIPPED instance DB " + spec.Name + " (line " + spec.LineNumber + ") \n" + e.Message);
+                            Log("SKIPPED instance DB " + spec.Name + " (line " + spec.LineNumber + ") \n" + msg);
                             break;
                         }
                         Log("Instance DB creation ABORTED by the user at " + spec.Name + " (line " + spec.LineNumber + ") - " +
-                            created + " of " + specs.Count + " created \n" + e.Message);
+                            created + " of " + specs.Count + " created \n" + msg);
                         return BatchOutcome.Aborted;
                     }
                 }
@@ -251,6 +291,89 @@ namespace Openn._03_ApiManager
             Log("Instance DB creation Ok: " + created + " of " + specs.Count + " instance DB(s) created (project not saved)");
             return BatchOutcome.Completed;
         }
+
+        /// <summary>What actually occupies a conflicting block name, for the conflict dialog.</summary>
+        private static string DescribeExistingBlock(PlcBlock block) =>
+            block is InstanceDB instanceDb
+                ? "an instance DB of \"" + instanceDb.InstanceOfName + "\""
+                : block.GetType().Name + ", " + block.ProgrammingLanguage;
+
+        /// <summary>
+        /// True when CreateInstanceDB was refused because the target FB is a fail-safe / auto-generated
+        /// block (e.g. F_ESTOP1). TIA does not allow creating instance DBs for those directly - they must
+        /// be imported as an F_DB xml instead (see TryImportFailsafeInstanceDb).
+        /// </summary>
+        private static bool IsFailsafeCreateRejection(Exception e)
+        {
+            if (e == null) return false;
+            if (e.GetType().Name == "DataBlockCreationNotAllowedException") return true;   // match by name (no hard type dep)
+            string m = e.Message ?? "";
+            return m.IndexOf("automatically generated", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>
+        /// The legacy fall-back for a fail-safe instance DB: TIA forbids CreateInstanceDB for an
+        /// auto-generated (F-) block but DOES allow importing an instance-DB xml that carries
+        /// ProgrammingLanguage=F_DB. Builds a minimal SW.Blocks.InstanceDB xml (the shape TIA exports)
+        /// and imports it into the spec's group. The instanceOf name must resolve to an existing FB
+        /// (the same name CreateInstanceDB was called with). Returns false + a reason on any error.
+        /// </summary>
+        private bool TryImportFailsafeInstanceDb(PlcBlockGroup group, Openn._02_Converter.InstanceDbSpec spec, out string error)
+        {
+            error = null;
+            string tmp = null;
+            try
+            {
+                string version = "V" + OpennessSetup.SelectedInstallation.PortalVersion.Major;
+                tmp = Path.Combine(Path.GetTempPath(), SafeName(spec.Name) + "_F_DB.xml");
+                File.WriteAllText(tmp, BuildFailsafeInstanceDbXml(spec, version), new System.Text.UTF8Encoding(true)); // BOM, like a real export
+                ImportXmlInto(group, tmp);
+                return true;
+            }
+            catch (Exception ex) { error = ex.Message; return false; }
+            finally { if (tmp != null) { try { File.Delete(tmp); } catch { } } }
+        }
+
+        /// <summary>Minimal fail-safe instance-DB xml (AttributeList + empty Comment/Title; TIA fills the interface from the FB).</summary>
+        private static string BuildFailsafeInstanceDbXml(Openn._02_Converter.InstanceDbSpec spec, string engineeringVersion)
+        {
+            bool auto = spec.Number == null;
+            var sb = new System.Text.StringBuilder();
+            sb.Append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n");
+            sb.Append("<Document>\r\n");
+            sb.Append("  <Engineering version=\"").Append(engineeringVersion).Append("\" />\r\n");
+            sb.Append("  <SW.Blocks.InstanceDB ID=\"0\">\r\n");
+            sb.Append("    <AttributeList>\r\n");
+            sb.Append("      <AutoNumber>").Append(auto ? "true" : "false").Append("</AutoNumber>\r\n");
+            sb.Append("      <InstanceOfName>").Append(XmlEscape(spec.InstanceOf)).Append("</InstanceOfName>\r\n");
+            sb.Append("      <InstanceOfType>FB</InstanceOfType>\r\n");
+            sb.Append("      <Name>").Append(XmlEscape(spec.Name)).Append("</Name>\r\n");
+            sb.Append("      <Namespace />\r\n");                                    // V18+ requires Namespace in every block AttributeList
+            if (!auto) sb.Append("      <Number>").Append(spec.Number.Value).Append("</Number>\r\n");
+            sb.Append("      <ProgrammingLanguage>F_DB</ProgrammingLanguage>\r\n");
+            sb.Append("    </AttributeList>\r\n");
+            sb.Append("    <ObjectList>\r\n");
+            sb.Append(EmptyMultilingual(1, 2, "Comment"));
+            sb.Append(EmptyMultilingual(3, 4, "Title"));
+            sb.Append("    </ObjectList>\r\n");
+            sb.Append("  </SW.Blocks.InstanceDB>\r\n");
+            sb.Append("</Document>\r\n");
+            return sb.ToString();
+        }
+
+        private static string EmptyMultilingual(int textId, int itemId, string composition) =>
+            "      <MultilingualText ID=\"" + textId.ToString("X") + "\" CompositionName=\"" + composition + "\">\r\n" +
+            "        <ObjectList>\r\n" +
+            "          <MultilingualTextItem ID=\"" + itemId.ToString("X") + "\" CompositionName=\"Items\">\r\n" +
+            "            <AttributeList>\r\n" +
+            "              <Culture>en-US</Culture>\r\n" +
+            "              <Text />\r\n" +
+            "            </AttributeList>\r\n" +
+            "          </MultilingualTextItem>\r\n" +
+            "        </ObjectList>\r\n" +
+            "      </MultilingualText>\r\n";
+
+        private static string XmlEscape(string s) => System.Security.SecurityElement.Escape(s ?? "");
 
         /// <summary>Outcome of one batch step: drives the import-queue's continue/stop/prompt decision.</summary>
         private enum BatchOutcome { Completed, Failed, Aborted }

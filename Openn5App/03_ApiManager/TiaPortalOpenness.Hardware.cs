@@ -32,6 +32,9 @@ namespace Openn._03_ApiManager
         /// <summary>Subnet + IO system per subnet name; I/O devices connect through this map.</summary>
         private Dictionary<string, Tuple<Subnet, IoSystem>> ioSystems;
 
+        /// <summary>Find-or-created device groups of the current run, by Group path.</summary>
+        private Dictionary<string, DeviceUserGroup> deviceGroupCache;
+
         #endregion Hardware generation state
 
         /// <summary>
@@ -64,11 +67,24 @@ namespace Openn._03_ApiManager
                 return false;
             }
 
-            project.ShowHwEditor(Siemens.Engineering.HW.View.Network); //show the network editor
+            deviceGroupCache = new Dictionary<string, DeviceUserGroup>(StringComparer.OrdinalIgnoreCase);
+
+            //generating while a TIA editor is open re-creates the stale per-device
+            //"IO device not connected to an IO system" compile messages - CONFIRMED 2026-07:
+            //with the editors closed they are gone for good. Openness has no close-editor API,
+            //so the user confirms the tabs are closed; this code never opens the network view -
+            //open it manually after the run to inspect the result.
+            if (!ConfirmEditorsClosed())
+            {
+                Log("Hardware generation CANCELLED at the checkpoint - close every TIA Portal editor tab, then generate again (nothing was changed)");
+                TiaWorker.CancelCurrentOperation(); //a workspace import reports its hardware run as cancelled and stops
+                return false;
+            }
 
             if (CreateNewIoControllers == true)
             {
-                CreateIoControllers(project);
+                if (CreateIoControllers(project) == false)
+                    return false;
             }
             else
             {
@@ -114,11 +130,11 @@ namespace Openn._03_ApiManager
                 //search for PLCs
                 if (HwDb.Identifier[ioC.identifier].deviceType.Equals("Plc", StringComparison.OrdinalIgnoreCase))
                 {
-                    Device device = FindDevice(ioC.name, project.Devices);
+                    Device device = FindDevice(ioC.name, project.Devices) ?? FindDeviceInGroups(ioC.name, project.DeviceGroups);
                     if (device != null)
                     {
                         ioControllers.Add(new Tuple<Device, DeviceItem>(device, null));
-                        netInterface = FindNetworkInterface(device.DeviceItems);
+                        netInterface = FindNetworkInterface(device.DeviceItems, ioC.connector, ioC.name);
                     }
                     else
                     {
@@ -134,7 +150,7 @@ namespace Openn._03_ApiManager
                     if (device != null)
                     {
                         ioControllers.Add(new Tuple<Device, DeviceItem>(null, device));
-                        netInterface = FindNetworkInterface(device.DeviceItems);
+                        netInterface = FindNetworkInterface(device.DeviceItems, ioC.connector, ioC.name);
                     }
                     else
                     {
@@ -144,7 +160,14 @@ namespace Openn._03_ApiManager
                     }
                 }
 
-                AdoptIoSystem(project, netInterface, ioC);
+                if (netInterface == null)
+                {
+                    Log("ERROR attaching IoController " + ioC.name + ": no Ethernet network interface found on it" + "\n" +
+                        "Line: " + ioC.srcRow.ToString() + " File: " + ioC.srcFileName);
+                    return false;
+                }
+                if (AdoptIoSystem(project, netInterface, ioC) == false)
+                    return false;
             }
             return true;
         }
@@ -152,9 +175,10 @@ namespace Openn._03_ApiManager
         /// <summary>
         /// "Create new controllers" mode: creates the Plc, plugs the communication
         /// modules into its rack, then creates subnet + IO system per controller and
-        /// assigns the configured IP address.
+        /// assigns the configured IP address. Returns false when the generation must
+        /// abort (nothing is saved - close the project in TIA without saving to roll back).
         /// </summary>
-        private void CreateIoControllers(Project project)
+        private bool CreateIoControllers(Project project)
         {
             ioControllers = new List<Tuple<Device, DeviceItem>>();
             ioSystems = new Dictionary<string, Tuple<Subnet, IoSystem>>();
@@ -165,45 +189,68 @@ namespace Openn._03_ApiManager
                 if (TiaWorker.CurrentCancellation.IsCancellationRequested)
                 {
                     Log("Hardware generation CANCELLED while creating IO controllers (project not saved - close it in TIA without saving to roll back)");
-                    return;
+                    return false;
                 }
 
                 if (HwDb.Identifier[c.identifier].deviceType == "Plc") //create Plc
                 {
-                    var device = project.Devices.CreateWithItem(HwDb.Identifier[c.identifier].identifier, c.name, c.name);
+                    DeviceUserGroup plcGroup = ResolveDeviceGroup(project, c.group);
+                    var device = (plcGroup != null ? plcGroup.Devices : project.Devices)
+                        .CreateWithItem(HwDb.Identifier[c.identifier].identifier, c.name, c.name);
                     ioControllers.Add(new Tuple<Device, DeviceItem>(device, null));
-                    Log("IoController Creation Ok: device " + device.Name + " (" + HwDb.Identifier[c.identifier].comment + " has been created");
+                    Log("IoController Creation Ok: device " + device.Name + " (" + HwDb.Identifier[c.identifier].comment + ") created");
 
-                    netInterface = FindNetworkInterface(device.DeviceItems);
+                    netInterface = FindNetworkInterface(device.DeviceItems, c.connector, c.name);
 
                     SetAttribute(device.DeviceItems, "Author", "bdragoi");
                     SetAttribute(device.DeviceItems, "Comment", "Tia Portal Openness");
                 }
                 else if (HwDb.Identifier[c.identifier].deviceType == "PlcCardCm") //create PlcCard
                 {
-                    if (ioControllers[0] == null)
+                    if (ioControllers.Count == 0 || ioControllers[0].Item1 == null)
                     {
                         Log("ERROR Creating PlcCard: no Plc exists \n The top row device in the .Csv file must be of type \"Plc\"");
-                        return;
+                        return false;
                     }
 
                     DeviceItem rail = FindRail(ioControllers[0].Item1.DeviceItems); //get PLC rack identifier
+                    if (rail == null)
+                    {
+                        Log("ERROR Creating PlcCard " + c.name + ": no rack/rail item found on " + ioControllers[0].Item1.Name +
+                            " (a TIA project created in another language names the rack differently) - generation ABORTED" + "\n" +
+                            "Line: " + c.srcRow.ToString() + " File: " + c.srcFileName);
+                        return false;
+                    }
 
+                    DeviceItem card = null;
                     for (int i = 1; i <= 20; i++) //plug PlcCard into the first free slot
                     {
                         if (!rail.CanPlugNew(HwDb.Identifier[c.identifier].identifier, c.name, i)) continue;
-                        var device = rail.PlugNew(HwDb.Identifier[c.identifier].identifier, c.name, i);
-                        ioControllers.Add(new Tuple<Device, DeviceItem>(null, device));
-                        Log("IoController Creation Ok: device " + device.Name + " (" + HwDb.Identifier[c.identifier].comment + "  has been created");
-
-                        netInterface = FindNetworkInterface(device.DeviceItems);
+                        card = rail.PlugNew(HwDb.Identifier[c.identifier].identifier, c.name, i);
                         break;
                     }
+                    if (card == null)
+                    {
+                        Log("ERROR Creating PlcCard " + c.name + " (" + HwDb.Identifier[c.identifier].comment + "): no rack slot 1-20 accepts it - generation ABORTED" + "\n" +
+                            "Line: " + c.srcRow.ToString() + " File: " + c.srcFileName);
+                        return false;
+                    }
+                    ioControllers.Add(new Tuple<Device, DeviceItem>(null, card));
+                    Log("IoController Creation Ok: device " + card.Name + " (" + HwDb.Identifier[c.identifier].comment + ") created");
+
+                    netInterface = FindNetworkInterface(card.DeviceItems, c.connector, c.name);
                 }
                 else //no Io Controller
                 {
                     Log("No IoController created because no valid type was found in Csv file \n Valid types: Plc, PlcCardCm");
-                    return;
+                    return false;
+                }
+
+                if (netInterface == null)
+                {
+                    Log("ERROR Creating IoController " + c.name + ": no Ethernet network interface found on it - generation ABORTED" + "\n" +
+                        "Line: " + c.srcRow.ToString() + " File: " + c.srcFileName);
+                    return false;
                 }
 
                 //create subnet
@@ -211,7 +258,7 @@ namespace Openn._03_ApiManager
                 if (subnet == null)
                     subnet = project.Subnets.Create("System:Subnet.Ethernet", c.subnetName);
 
-                netInterface.Nodes.First().ConnectToSubnet(project.Subnets.Find(c.subnetName));
+                netInterface.Nodes.First().ConnectToSubnet(subnet);
 
                 if (Uri.CheckHostName(c.IP) != UriHostNameType.IPv4)
                 {
@@ -233,35 +280,63 @@ namespace Openn._03_ApiManager
                 }
                 catch (Exception e)
                 {
-                    Log("ERROR Creating IoSystem1 \n" + e.Message);
-                    return;
+                    Log("ERROR Creating IoSystem for " + c.name + " - generation ABORTED \n" + e.Message);
+                    return false;
                 }
 
                 ioSystems.Add(c.subnetName, new Tuple<Subnet, IoSystem>(subnet, ioSystem));
             }
+            return true;
         }
 
         /// <summary>
         /// Used when attaching to existing controllers: reuses (and renames to the
-        /// configured name) the controller's subnet and IO system, creating them
-        /// only when missing, then registers them in the ioSystems map.
+        /// configured name) the controller's subnet and IO system, creating them only
+        /// when missing, then registers them in the ioSystems map. The controller node
+        /// is guaranteed to end up connected to exactly the registered subnet, so
+        /// devices can never join a subnet whose IO system lives elsewhere. Returns
+        /// false when the project state contradicts the configuration.
         /// </summary>
-        private void AdoptIoSystem(Project project, NetworkInterface netInterface, HwIoC._Controller c)
+        private bool AdoptIoSystem(Project project, NetworkInterface netInterface, HwIoC._Controller c)
         {
-            //associate or create subnet
+            Node node = netInterface.Nodes.First();
+
+            //resolve the subnet: an existing subnet already carrying the configured name wins,
+            //else the node's current subnet is adopted and renamed, else a fresh one is created
             Subnet subnet = project.Subnets.Find(c.subnetName);
+            if (subnet == null && node.ConnectedSubnet != null)
+            {
+                subnet = node.ConnectedSubnet;
+                foreach (var registered in ioSystems.Values)
+                {
+                    if (registered.Item1.Equals(subnet))
+                    {
+                        Log("ERROR attaching IoController " + c.name + ": it shares subnet \"" + subnet.Name + "\" with another configured controller" + "\n" +
+                            "Each controller needs its own subnet - separate them in TIA first" + "\n" +
+                            "Line: " + c.srcRow.ToString() + " File: " + c.srcFileName);
+                        return false;
+                    }
+                }
+                subnet.Name = c.subnetName;
+            }
             if (subnet == null)
             {
-                if (netInterface.Nodes.First().ConnectedSubnet == null)
-                {
-                    subnet = project.Subnets.Create("System:Subnet.Ethernet", c.subnetName);
-                    netInterface.Nodes.First().ConnectToSubnet(subnet);
-                }
-                else
-                {
-                    subnet = netInterface.Nodes.First().ConnectedSubnet;
-                    subnet.Name = c.subnetName;
-                }
+                subnet = project.Subnets.Create("System:Subnet.Ethernet", c.subnetName);
+            }
+
+            //the node must sit on exactly that subnet (a found-by-name subnet the node is not
+            //on would otherwise pair the devices' subnet with an IO system living elsewhere)
+            if (node.ConnectedSubnet == null)
+            {
+                node.ConnectToSubnet(subnet);
+            }
+            else if (!node.ConnectedSubnet.Equals(subnet))
+            {
+                Log("ERROR attaching IoController " + c.name + ": its interface is on subnet \"" + node.ConnectedSubnet.Name +
+                    "\" while a different subnet already carries the configured name \"" + c.subnetName + "\"" + "\n" +
+                    "Move the controller to \"" + c.subnetName + "\" (or delete the stray subnet) in TIA, then retry" + "\n" +
+                    "Line: " + c.srcRow.ToString() + " File: " + c.srcFileName);
+                return false;
             }
 
             //set or overwrite IpAddress
@@ -273,10 +348,11 @@ namespace Openn._03_ApiManager
             }
             else
             {
-                netInterface.Nodes.First().SetAttribute("Address", c.IP);
+                node.SetAttribute("Address", c.IP);
             }
 
-            //associate or create IoSystem
+            //associate or create IoSystem (the controller's own IO system is on our subnet by
+            //construction - the node connection above is enforced first)
             var controller = netInterface.IoControllers.First();
             IoSystem ioSystem = controller.IoSystem;
 
@@ -288,8 +364,8 @@ namespace Openn._03_ApiManager
                 }
                 catch (Exception e)
                 {
-                    Log("ERROR Creating IoSystem1 \n" + e.Message);
-                    return;
+                    Log("ERROR Creating IoSystem for " + c.name + " - generation ABORTED \n" + e.Message);
+                    return false;
                 }
             }
             else if (!ioSystem.Name.Equals(c.subnetName))
@@ -298,6 +374,7 @@ namespace Openn._03_ApiManager
             }
 
             ioSystems.Add(c.subnetName, new Tuple<Subnet, IoSystem>(subnet, ioSystem));
+            return true;
         }
 
         #endregion I/O controllers
@@ -346,15 +423,32 @@ namespace Openn._03_ApiManager
                     continue;
                 }
 
-                var _device = project.UngroupedDevicesGroup.Devices.CreateWithItem(HwDb.Identifier[d.Item1.identifier].identifier, d.Item1.name, d.Item1.name);
+                DeviceUserGroup deviceGroup = ResolveDeviceGroup(project, d.Item1.group);
+                var _device = (deviceGroup != null ? deviceGroup.Devices : project.UngroupedDevicesGroup.Devices)
+                    .CreateWithItem(HwDb.Identifier[d.Item1.identifier].identifier, d.Item1.name, d.Item1.name);
 
                 SetAttribute(_device.DeviceItems, "Author", "bdragoi");
                 SetAttribute(_device.DeviceItems, "Comment", "Tia Portal Openness");
 
-                var network = FindNetworkInterface(_device.DeviceItems);
+                var network = FindNetworkInterface(_device.DeviceItems, d.Item1.connector, d.Item1.name);
+                if (network == null)
+                {
+                    Log("ERROR on IoDevice Creation: " + d.Item1.name + " has no Ethernet network interface - device skipped, check it in TIA" + "\n" +
+                        "Line: " + d.Item1.srcRow.ToString() + " File: " + d.Item1.srcFileName);
+                    continue;
+                }
+                if (d.Item1.connector.Length == 0 && (network.Nodes.Count > 1 || network.IoConnectors.Count > 1))
+                    Log("WARNING: " + d.Item1.name + " exposes " + network.Nodes.Count + " node(s) / " +
+                        network.IoConnectors.Count + " IO connector(s) and no Connector is configured - using the default pick" + "\n" +
+                        "Add e.g. X1 / X2 to the station's Connector column to choose explicitly");
 
-                network.Nodes.Last().ConnectToSubnet(ioSystems[d.Item1.subnet].Item1);
-                network.IoConnectors.Last().ConnectToIoSystem(ioSystems[d.Item1.subnet].Item2);
+                //the Openness-manual device example networks the interface FIRST, then assigns the
+                //IO system. The single-call variant (ConnectToIoSystem alone) was tried 2026-07 and
+                //V18/V19 REFUSES it: "The io connector is not connected to same subnet (as io system)".
+                network.Nodes.First().ConnectToSubnet(ioSystems[d.Item1.subnet].Item1);
+
+                IoConnector connector = PickIoConnector(network, d.Item1.connector, d.Item1.name);
+                connector.ConnectToIoSystem(ioSystems[d.Item1.subnet].Item2);
 
                 if (Uri.CheckHostName(d.Item1.IP) != UriHostNameType.IPv4)
                 {
@@ -369,8 +463,8 @@ namespace Openn._03_ApiManager
                     if (!int.TryParse(d.Item1.pnNumber, out pnNumber))
                         pnNumber = Int32.Parse(d.Item1.IP.Split('.')[3]);
 
-                    network.IoConnectors.Last().SetAttribute("PnDeviceNumber", pnNumber);
-                    network.Nodes.Last().SetAttribute("Address", d.Item1.IP);
+                    connector.SetAttribute("PnDeviceNumber", pnNumber);
+                    network.Nodes.First().SetAttribute("Address", d.Item1.IP);
                 }
 
                 PlugSubmodules(_device, d.Item1, d.Item2);
@@ -379,10 +473,10 @@ namespace Openn._03_ApiManager
                 //sub-objects auto-created with the station (deep addresses, PrmData, ...).
                 //Applied after plugging so the tree matches an attribute dump of a
                 //complete station (item indices cannot shift afterwards).
-                CustomParameterApplier.Apply(_device, HwDb.Identifier[d.Item1.identifier].customParameters, d.Item1.customParameters,
+                string stationParameters = CustomParameterApplier.Apply(_device, HwDb.Identifier[d.Item1.identifier].customParameters, d.Item1.customParameters,
                     d.Item1.IP, d.Item1.name);
 
-                Log("IoDevice Creation Ok: IoDevice " + _device.Name + " (" + HwDb.Identifier[d.Item1.identifier].comment + " has been created");
+                Log("IoDevice Creation Ok: IoDevice " + _device.Name + " (" + HwDb.Identifier[d.Item1.identifier].comment + ") created - " + stationParameters);
                 createdCount++;
             }
 
@@ -393,17 +487,37 @@ namespace Openn._03_ApiManager
         private static string SkippedSuffix(int skippedCount) =>
             skippedCount > 0 ? ", " + skippedCount + " SKIPPED (already in project)" : string.Empty;
 
+        /// <summary>", I 100, Q 200" of a module row for its created line; "" without configured addresses.</summary>
+        private static string AddressSuffix(HwIoD._Submodule s) =>
+            (s.I_address.Length > 0 ? ", I " + s.I_address : string.Empty) + (s.Q_address.Length > 0 ? ", Q " + s.Q_address : string.Empty);
+
         /// <summary>
         /// Plugs each configured module into the first free slot of the device rack
         /// (the configured Slot only defines the order), then writes its custom
-        /// parameters and I/O start addresses. A plug error pops a Retry / Abort /
-        /// Ignore decision to the user (the worker waits); Ignore skips the module.
+        /// parameters and I/O start addresses. A plug error - including "no free slot
+        /// accepts the module", which used to skip the module silently - pops a
+        /// Retry / Abort / Ignore decision to the user (the worker waits); Ignore
+        /// skips the module, Abort cancels the whole generation.
         /// Rows whose model is of type TransferArea are not plugged: they become
         /// transfer areas on the station's PROFINET interface (CreateTransferArea).
         /// </summary>
         private void PlugSubmodules(Device _device, HwIoD._Device _mainDeviceData, IList<HwIoD._Submodule> _Submodules)
         {
             DeviceItem rail = FindRail(_device.DeviceItems);
+            if (rail == null && _device.DeviceItems.Count > 0)
+            {
+                //a TIA project created in another language names the rack differently, so the
+                //"Rack"/"Rail" name match can fail: fall back to the first device item, which
+                //is the rack on every station shape this generator plugs into
+                rail = _device.DeviceItems.First();
+                Log("WARNING: no rack/rail found by name on " + _device.Name + " - using its first item \"" + rail.Name + "\" as the rack");
+            }
+            if (rail == null)
+            {
+                Log("ERROR: no rack found on " + _device.Name + " - hardware generation ABORTED (project not saved)");
+                TiaWorker.CancelCurrentOperation();
+                return;
+            }
 
             int lastInsertedSlot = 0;
             foreach (var s in _Submodules)
@@ -422,57 +536,55 @@ namespace Openn._03_ApiManager
                     continue;
                 }
 
-                for (int i = lastInsertedSlot; i <= _device.DeviceItems.Count + _Submodules.Count; i++)
+                bool plugged = false;
+                bool skipSubmodule = false;
+                while (!plugged && !skipSubmodule) //repeated while the user chooses Retry
                 {
-                    bool tryNextSlot = false;
-                    bool skipSubmodule = false;
-
-                    while (true) //repeated while the user chooses Retry
+                    try
                     {
-                        try
+                        for (int i = lastInsertedSlot; i <= _device.DeviceItems.Count + _Submodules.Count; i++)
                         {
-                            if (!rail.CanPlugNew(HwDb.Identifier[s.identifier].identifier, s.name, i))
-                            {
-                                tryNextSlot = true;
-                                break;
-                            }
-                            lastInsertedSlot = i;
+                            if (!rail.CanPlugNew(HwDb.Identifier[s.identifier].identifier, s.name, i)) continue;
                             rail.PlugNew(HwDb.Identifier[s.identifier].identifier, s.name, i);
+                            lastInsertedSlot = i;
+                            plugged = true;
                             break;
                         }
-                        catch (Exception e)
-                        {
-                            var decision = AskPlugDecision(s.name, _device.Name, e.Message);
-                            if (decision == System.Windows.Forms.DialogResult.Retry)
-                            {
-                                Log("Retrying to plug submodule " + s.name + " to device " + _device.Name + " (slot " + i + ")");
-                                continue;
-                            }
-                            if (decision == System.Windows.Forms.DialogResult.Ignore)
-                            {
-                                Log("SKIPPED submodule " + s.name + " of device " + _device.Name + " after plug error - check I/O addresses and parameters! \n" + e.Message);
-                                skipSubmodule = true;
-                                break;
-                            }
-
-                            Log("Hardware generation ABORTED by the user after plug error at " + _device.Name + " / " + s.name + " \n" + e.Message);
-                            TiaWorker.CancelCurrentOperation(); //stops the outer loops at their next check
-                            return;
-                        }
+                        if (!plugged)
+                            throw new InvalidOperationException("No free slot accepts the module (slots " + lastInsertedSlot +
+                                                                " to " + (_device.DeviceItems.Count + _Submodules.Count) + " scanned)");
                     }
+                    catch (Exception e)
+                    {
+                        var decision = AskPlugDecision(s.name, _device.Name, e.Message);
+                        if (decision == System.Windows.Forms.DialogResult.Retry)
+                        {
+                            Log("Retrying to plug submodule " + s.name + " to device " + _device.Name);
+                            continue;
+                        }
+                        if (decision == System.Windows.Forms.DialogResult.Ignore)
+                        {
+                            Log("SKIPPED submodule " + s.name + " of device " + _device.Name + " after plug error - check I/O addresses and parameters! \n" + e.Message);
+                            skipSubmodule = true;
+                            continue;
+                        }
 
-                    if (tryNextSlot) continue;
-                    if (skipSubmodule) break;
-
-                    //write custom parameters & I/O addresses
-                    DeviceItem T_submodule = FindDeviceItem(s.name, _device.DeviceItems);
-
-                    CustomParameterApplier.Apply(T_submodule, HwDb.Identifier[s.identifier].customParameters, s.customParameters, _mainDeviceData.IP,
-                        _mainDeviceData.name + " / " + s.name);
-
-                    WriteIoStartAddresses(T_submodule, s, _mainDeviceData.name);
-                    break;
+                        Log("Hardware generation ABORTED by the user after plug error at " + _device.Name + " / " + s.name + " \n" + e.Message);
+                        TiaWorker.CancelCurrentOperation(); //stops the outer loops at their next check
+                        return;
+                    }
                 }
+                if (skipSubmodule) continue;
+
+                //write custom parameters & I/O addresses
+                DeviceItem T_submodule = FindDeviceItem(s.name, _device.DeviceItems);
+
+                string moduleParameters = CustomParameterApplier.Apply(T_submodule, HwDb.Identifier[s.identifier].customParameters, s.customParameters, _mainDeviceData.IP,
+                    _mainDeviceData.name + " / " + s.name);
+
+                WriteIoStartAddresses(T_submodule, s, _mainDeviceData.name);
+                Log("Module " + s.name + " (" + HwDb.Identifier[s.identifier].comment + ") plugged in slot " + lastInsertedSlot + " of IoDevice " + _device.Name +
+                    AddressSuffix(s) + " - " + moduleParameters);
             }
         }
 
@@ -537,9 +649,9 @@ namespace Openn._03_ApiManager
                 }
             }
 
-            CustomParameterApplier.Apply(area, HwDb.Identifier[s.identifier].customParameters, s.customParameters, _mainDeviceData.IP, context);
+            string areaParameters = CustomParameterApplier.Apply(area, HwDb.Identifier[s.identifier].customParameters, s.customParameters, _mainDeviceData.IP, context);
             WriteTransferAreaStartAddresses(area, s, _device.Name);
-            Log("Transfer area " + s.name + " (" + areaType + ", position " + position + ") created on IoDevice " + _device.Name);
+            Log("Transfer area " + s.name + " (" + areaType + ", position " + position + ") created on IoDevice " + _device.Name + AddressSuffix(s) + " - " + areaParameters);
             return true;
         }
 
@@ -581,6 +693,31 @@ namespace Openn._03_ApiManager
             if (s.Q_address != "" && !outputFound)
                 Log("WARNING: Q Addr " + s.Q_address + " of transfer area " + deviceName + " / " + area.Name + " NOT written - a " +
                     area.Type + " area has no writable partner Output address (Q Addr applies to OUT / IN_OUT areas)");
+        }
+
+        /// <summary>
+        /// Pre-generation checkpoint (Openness cannot close TIA editor tabs itself): the user
+        /// confirms all editors - especially the network view - are closed, because generating
+        /// under an open editor makes TIA post a per-device warning that persists through every compile.
+        /// Without a UI the generation just proceeds (nothing to confirm against).
+        /// </summary>
+        private static bool ConfirmEditorsClosed()
+        {
+            var application = System.Windows.Application.Current;
+            if (application == null) return true;
+
+            return application.Dispatcher.Invoke(() =>
+                System.Windows.Forms.MessageBox.Show(
+                    "Close ALL TIA Portal editor tabs now - especially the network view.\n\n" +
+                    "Generating while an editor is open makes TIA post a warning per device\n" +
+                    "(\"device not assigned to an IO controller\" / \"IO device not connected to an IO system\")\n" +
+                    "that persists through every compile.\n\n" +
+                    "OK     -  the tabs are closed, generate\n" +
+                    "Cancel -  stop (nothing is changed)",
+                    "Openn5 - Hardware Generation",
+                    System.Windows.Forms.MessageBoxButtons.OKCancel,
+                    System.Windows.Forms.MessageBoxIcon.Information)
+                == System.Windows.Forms.DialogResult.OK);
         }
 
         /// <summary>
@@ -652,13 +789,22 @@ namespace Openn._03_ApiManager
 
         #region Hardware tree helpers
 
-        /// <summary>The rack/rail item modules are plugged into (searches by item name).</summary>
+        /// <summary>
+        /// The rack/rail item modules are plugged into: the first item anywhere in the tree
+        /// whose name contains "Rack" or "Rail" (all siblings are searched at each level
+        /// before descending). Localized TIA projects may name the rack differently -
+        /// callers fall back to the first device item / abort with a clear message.
+        /// </summary>
         private DeviceItem FindRail(DeviceItemComposition devices)
         {
             foreach (var item in devices)
             {
                 if (item.Name.IndexOf("Rack") >= 0 || item.Name.IndexOf("Rail") >= 0) return item;
-                return FindRail(item.DeviceItems);
+            }
+            foreach (var item in devices)
+            {
+                DeviceItem rail = FindRail(item.DeviceItems);
+                if (rail != null) return rail;
             }
             return null;
         }
@@ -677,6 +823,40 @@ namespace Openn._03_ApiManager
             foreach (var item in devices)
             {
                 if (item.Name.ToString().Equals(Identifier)) return item;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// The device group of a station's Group path ("folder/sub/..."), find-or-created level
+        /// by level under project.DeviceGroups and cached per run; null = ungrouped root.
+        /// </summary>
+        private DeviceUserGroup ResolveDeviceGroup(Project project, string groupPath)
+        {
+            if (string.IsNullOrWhiteSpace(groupPath)) return null;
+            if (deviceGroupCache.TryGetValue(groupPath, out DeviceUserGroup cached)) return cached;
+
+            DeviceUserGroup group = null;
+            foreach (string segment in groupPath.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string name = segment.Trim();
+                if (name.Length == 0) continue;
+                DeviceUserGroupComposition children = group == null ? project.DeviceGroups : group.Groups;
+                group = children.Find(name) ?? children.Create(name);
+            }
+            deviceGroupCache[groupPath] = group;
+            return group;
+        }
+
+        /// <summary>Recursive device search through the user device groups (grouped stations do not appear in project.Devices).</summary>
+        private Device FindDeviceInGroups(String identifier, DeviceUserGroupComposition groups)
+        {
+            foreach (DeviceUserGroup group in groups)
+            {
+                Device device = FindDevice(identifier, group.Devices);
+                if (device != null) return device;
+                device = FindDeviceInGroups(identifier, group.Groups);
+                if (device != null) return device;
             }
             return null;
         }
@@ -702,6 +882,76 @@ namespace Openn._03_ApiManager
             }
 
             return networkInterface;
+        }
+
+        /// <summary>
+        /// The 1-based number of a Stations.csv Connector designation; 0 = none. Tolerates the
+        /// verbatim I/O-List cell form ("X1-P1 R") the loader also accepts, not just bare "X1".
+        /// </summary>
+        private static int ConnectorNumber(string connectorSpec)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(connectorSpec ?? "", "(?<![0-9A-Za-z])[Xx]([0-9]{1,2})(?![0-9])");
+            return match.Success ? int.Parse(match.Groups[1].Value) : 0;
+        }
+
+        /// <summary>
+        /// The Ethernet interface selected by the station's Connector designation: the interface
+        /// item carrying the Xn token in its name (GSD items are literally named "X1") or whose
+        /// PositionNumber equals n (Siemens CPUs: the X1/X2/... interfaces). Falls back to the
+        /// first interface with a WARNING when nothing matches; no designation = first interface.
+        /// </summary>
+        private NetworkInterface FindNetworkInterface(DeviceItemComposition devices, string connectorSpec, string stationName)
+        {
+            int n = ConnectorNumber(connectorSpec);
+            if (n == 0) return FindNetworkInterface(devices);
+            NetworkInterface match = FindNetworkInterfaceBySpec(devices, n);
+            if (match != null) return match;
+            Log("WARNING: " + stationName + ": no Ethernet interface matches Connector \"" + connectorSpec + "\" - using the first one");
+            return FindNetworkInterface(devices);
+        }
+
+        private NetworkInterface FindNetworkInterfaceBySpec(DeviceItemComposition devices, int n)
+        {
+            foreach (var device in devices)
+            {
+                NetworkInterface networkInterface = device.GetService<NetworkInterface>();
+                if (networkInterface != null && GetAttribute(device, "InterfaceType") == "Ethernet"
+                    && networkInterface.Nodes != null && networkInterface.Nodes.Count > 0
+                    && ItemMatchesConnector(device, n))
+                    return networkInterface;
+                NetworkInterface nested = FindNetworkInterfaceBySpec(device.DeviceItems, n);
+                if (nested != null) return nested;
+            }
+            return null;
+        }
+
+        /// <summary>The item name carries the Xn token, or its PositionNumber equals n.</summary>
+        private bool ItemMatchesConnector(DeviceItem item, int n)
+        {
+            if (System.Text.RegularExpressions.Regex.IsMatch(item.Name, "(^|[^0-9A-Za-z])[Xx]0*" + n + "([^0-9]|$)")) return true;
+            return GetAttribute(item, "PositionNumber") == n.ToString();
+        }
+
+        /// <summary>
+        /// The IO connector to associate: the Connector designation picks the n-th one on a
+        /// multi-connector interface (PN/PN coupler: X1 = first, X2 = second). Without a
+        /// designation, single-connector devices use the documented First() and multi-connector
+        /// ones keep the historical Last() (what the running plants are wired for).
+        /// </summary>
+        private IoConnector PickIoConnector(NetworkInterface network, string connectorSpec, string stationName)
+        {
+            int count = network.IoConnectors.Count;
+            int n = ConnectorNumber(connectorSpec);
+            if (n > 0 && count > 1)
+            {
+                if (n <= count)
+                {
+                    Log(stationName + ": Connector " + connectorSpec + " -> IO connector " + n + " of " + count);
+                    return network.IoConnectors.ElementAt(n - 1);
+                }
+                Log("WARNING: " + stationName + ": Connector \"" + connectorSpec + "\" is out of range (the interface has " + count + ") - using the default pick");
+            }
+            return count > 1 ? network.IoConnectors.Last() : network.IoConnectors.First();
         }
 
         /// <summary>Reads an attribute as string, or "" when the item does not expose it.</summary>

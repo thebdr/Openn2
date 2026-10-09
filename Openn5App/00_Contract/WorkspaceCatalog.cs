@@ -12,6 +12,7 @@ namespace Openn._00_Contract
     ///
     ///   BuilderData\
     ///     .openn\workspace.openn.config            workspace header (contract, project, producer, generated)
+    ///     .openn\import.openn5.config              Openn5's Import ticks (WorkspaceImportSettings; optional, written by Openn5)
     ///     Devices &amp; networks\                      hw/* csv (project level - VCI has no hardware)
     ///     Templates\                               sw/block-template (referenced by block-gen csvs; not a TIA folder)
     ///     &lt;PLC name&gt;\Program blocks\&lt;group&gt;\...   sw/code-block, sw/data-block, sw/block-gen, sw/instance-db, sw/source
@@ -26,6 +27,8 @@ namespace Openn._00_Contract
     {
         public const string ConfigFolder = ".openn";
         public const string ConfigFile = "workspace.openn.config";
+        /// <summary>Openn5's own file in the config folder: the files whose Import box the user unticked (WorkspaceImportSettings).</summary>
+        public const string ImportSettingsFile = "import.openn5.config";
         public const string VciConfigFolder = ".vci";
 
         public const string HardwareFolder = "Devices & networks";
@@ -248,7 +251,7 @@ namespace Openn._00_Contract
 
         private static bool IsIgnored(string[] segments, string name, string ext, WorkspaceItem item)
         {
-            if (segments[0].Equals(WorkspaceLayout.ConfigFolder, StringComparison.OrdinalIgnoreCase)) { item.Notes.Add("workspace config"); return true; }
+            if (segments[0].Equals(WorkspaceLayout.ConfigFolder, StringComparison.OrdinalIgnoreCase)) { item.Notes.Add(name.Equals(WorkspaceLayout.ImportSettingsFile, StringComparison.OrdinalIgnoreCase) ? "Openn5 import settings - the files whose Import box is unticked (written by Openn5)" : "workspace config"); return true; }
             if (segments[0].Equals(WorkspaceLayout.VciConfigFolder, StringComparison.OrdinalIgnoreCase)) { item.Notes.Add("TIA VCI workspace config"); return true; }
             if (ext == OpennHeader.SidecarExtension) { item.Notes.Add("header sidecar of " + name.Substring(0, name.Length - ext.Length)); return true; }
             if (name.StartsWith("~$", StringComparison.Ordinal) || TempNames.Contains(name.ToLowerInvariant())) { item.Notes.Add("temporary file"); return true; }

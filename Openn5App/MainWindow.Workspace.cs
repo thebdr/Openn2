@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -42,15 +43,56 @@ namespace Openn
         public string RelativePath => Item.RelativePath;
         public string KindId { get; }
         public string StatusText => Item.Status.ToString();
-        public string Action { get; }
         public string Producer { get; }
         public string Generated { get; }
         public string Run { get; }
         public string NotesText { get; }
-        public string ToolTipText { get; }
         public Brush StatusBrush { get; }
         public Brush RowBackground { get; }
-        public Brush RowForeground { get; }
+
+        private readonly string baseAction;
+        private readonly string baseToolTip;
+        private readonly string baseSearchText;
+        private bool importEnabled = true;
+
+        /// <summary>The Import box: only importable rows have one (the others are never imported anyway).</summary>
+        public bool CanToggleImport => Item.Importable;
+
+        /// <summary>
+        /// The user's Import tick (default on). Unticked = listed, never imported, until ticked again; remembered per
+        /// workspace (WorkspaceImportSettings). The grid's two-way binding sets it; the window persists the change.
+        /// </summary>
+        public bool ImportEnabled
+        {
+            get { return importEnabled; }
+            set
+            {
+                if (importEnabled == value) return;
+                importEnabled = value;
+                Notify("ImportEnabled");
+                Notify("ImportDisabled");
+                Notify("Action");
+                Notify("RowForeground");
+                Notify("ToolTipText");
+            }
+        }
+
+        /// <summary>True for an importable row the user unticked.</summary>
+        public bool ImportDisabled => CanToggleImport && !importEnabled;
+
+        public string Action => ImportDisabled ? "import disabled (" + baseAction + ")" : baseAction;
+        public string ToolTipText => ImportDisabled ? baseToolTip + ImportDisabledLine : baseToolTip;
+        /// <summary>Everything the text filter matches against: name, path, kind, status, action, producer, generated, run, notes (+ "disabled" when unticked).</summary>
+        public string SearchText => ImportDisabled ? baseSearchText + " disabled" : baseSearchText;
+        public Brush RowForeground => Item.Status == ItemStatus.Ignored || ImportDisabled ? WorkspaceColors.Grey : WorkspaceColors.Text;
+        public string ImportToggleTip =>
+            (Item.Kind == InputKind.HwStations || Item.Kind == InputKind.HwModules
+                ? "Import this folder's hardware configuration. Stations.csv and Modules.csv are one generation run: the tick covers both."
+                : "Import this file.") +
+            " Unticked = listed, never imported - remembered in " + WorkspaceLayout.ConfigFolder + "\\" + WorkspaceImportSettings.FileName + " of the workspace.";
+
+        /// <summary>The detail-pane / tooltip line of an unticked row.</summary>
+        public const string ImportDisabledLine = "\nImport:     DISABLED by you (Import box unticked) - skipped by Import Selection / Import Workspace";
 
         private string result = string.Empty;
         public string Result { get { return result; } private set { result = value; Notify("Result"); } }
@@ -63,7 +105,7 @@ namespace Openn
             Item = item;
             Name = Path.GetFileName(item.Path);
             KindId = item.KindInfo != null ? item.KindInfo.Id : (item.Status == ItemStatus.Ignored ? "-" : "?");
-            Action = WorkspaceLabels.ActionOf(item);
+            baseAction = WorkspaceLabels.ActionOf(item);
 
             OpennHeader h = item.Header;
             bool headered = h != null && (h.Status == HeaderStatus.Ok || h.Status == HeaderStatus.Invalid);
@@ -85,7 +127,7 @@ namespace Openn
             {
                 bool workspaceLevel = item.Plc == null &&
                     (item.Category == WorkspaceLayout.HardwareFolder || item.Category == WorkspaceLayout.TemplatesFolder || item.Category.Length == 0);
-                Owner = item.Plc ?? (workspaceLevel ? "<workspace>" : "<default PLC>");
+                Owner = item.Plc != null ? "PLC  " + item.Plc : (workspaceLevel ? "<workspace>" : "<default PLC>");
                 OwnerRank = workspaceLevel ? 0 : 1;
                 Folder = item.Category.Length > 0 ? item.Category : "(misplaced)";
                 FolderRank = WorkspaceLabels.FolderRank(item.Category);
@@ -95,8 +137,8 @@ namespace Openn
             StatusBrush = WorkspaceColors.ForStatus(item.Status);
             bool rejected = item.Status != ItemStatus.Ready && item.Status != ItemStatus.Ignored; //everything that is not imported is tinted
             RowBackground = rejected ? WorkspaceColors.RedTint : Brushes.Transparent;
-            RowForeground = item.Status == ItemStatus.Ignored ? WorkspaceColors.Grey : WorkspaceColors.Text;
-            ToolTipText = WorkspaceLabels.Describe(item, null);
+            baseToolTip = WorkspaceLabels.Describe(item, null);
+            baseSearchText = string.Join(" ", Name, RelativePath, KindId, StatusText, baseAction, Producer, Generated, Run, NotesText);
         }
 
         public void SetResult(WorkspaceImportResult r)
@@ -297,6 +339,20 @@ namespace Openn
         private bool hardwarePathFollowsWorkspace = true;
         private bool settingHardwarePath;
 
+        /// <summary>The grouped view over workspaceRows; its Filter combines the chip filter and the text filter.</summary>
+        private ListCollectionView workspaceView;
+        private Func<WorkspaceRow, bool> chipFilter;
+        private string chipFilterKey;
+        private Border activeChip;
+        private Regex textFilterRegex;
+        private string textFilterPlain = string.Empty;
+
+        /// <summary>The per-workspace Import ticks (.openn\import.openn5.config), reloaded by every scan; rows by item for the import gate.</summary>
+        private WorkspaceImportSettings importSettings;
+        private bool importSettingsUnsaved;
+        private Dictionary<WorkspaceItem, WorkspaceRow> rowsByItem = new Dictionary<WorkspaceItem, WorkspaceRow>();
+        private bool applyingImportTicks;
+
         private void InitializeWorkspaceTab()
         {
             string remembered = null;
@@ -329,6 +385,8 @@ namespace Openn
             view.SortDescriptions.Add(new SortDescription("Group", ListSortDirection.Ascending));
             view.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
             lvWorkspace.ItemsSource = view;
+            workspaceView = view;
+            ApplyWorkspaceFilter(); //a scan keeps the active chip / text filter
         }
 
         #region Scan
@@ -346,10 +404,19 @@ namespace Openn
             runExportRoot.Text = AppPaths.ExportRootFor(root);
 
             WorkspaceCatalog catalog = null;
-            await RunBackend(() => TiaWorker.Run(() => { catalog = WorkspaceCatalog.Scan(root); }), quietWhenBusy);
+            WorkspaceImportSettings ticks = null;
+            WorkspaceImportSettings keep = importSettingsUnsaved ? importSettings : null; //ticks a failed write left in memory
+            await RunBackend(() => TiaWorker.Run(() =>
+            {
+                catalog = WorkspaceCatalog.Scan(root);
+                ticks = keep != null && string.Equals(keep.Root, catalog.Root, StringComparison.OrdinalIgnoreCase) ? keep : WorkspaceImportSettings.Load(catalog.Root);
+            }), quietWhenBusy);
             if (catalog == null) return; //busy, or failed (logged by RunBackend)
 
             workspaceCatalog = catalog;
+            importSettings = ticks;
+            importSettingsUnsaved = ticks == keep;
+            foreach (string problem in ticks.Problems) Log("Import settings " + ticks.Path + ": " + problem);
             PopulateWorkspaceRows(catalog);
             UpdateWorkspaceSummary(catalog);
             UpdateWorkspaceSelectionInfo();
@@ -361,11 +428,33 @@ namespace Openn
                 return;
             }
             Log("Workspace scanned: " + catalog.Root + " - " + Totals(catalog));
+            int unticked = workspaceRows.Count(r => r.ImportDisabled);
+            if (unticked > 0)
+                Log("Import disabled by you for " + unticked + " file(s) (" + ticks.Path + ") - tick the Import box to import them again");
         }
 
         private void PopulateWorkspaceRows(WorkspaceCatalog catalog)
         {
-            ShowWorkspaceRows(catalog.Items.Select(item => new WorkspaceRow(item)).ToList());
+            WorkspaceImportSettings ticks = importSettings;
+            var rows = new List<WorkspaceRow>();
+            rowsByItem = new Dictionary<WorkspaceItem, WorkspaceRow>();
+            foreach (WorkspaceItem item in catalog.Items)
+            {
+                var row = new WorkspaceRow(item);
+                if (ticks != null && row.CanToggleImport && ticks.IsDisabled(item.RelativePath)) row.ImportEnabled = false;
+                row.PropertyChanged += WorkspaceRow_PropertyChanged;
+                rows.Add(row);
+                rowsByItem[item] = row;
+            }
+            applyingImportTicks = true;
+            try
+            {
+                //Stations.csv and Modules.csv of a folder are one generation run: an unticked one unticks its sibling
+                foreach (WorkspaceRow row in rows.Where(r => r.ImportDisabled).ToList())
+                    foreach (WorkspaceRow sibling in HardwareSiblings(row, rows)) sibling.ImportEnabled = false;
+            }
+            finally { applyingImportTicks = false; }
+            ShowWorkspaceRows(rows);
             tbWorkspaceDetail.Text = !catalog.Exists ? "Folder not found: " + catalog.Root
                 : catalog.Items.Count == 0 ? "The workspace is empty."
                 : "Select a row to see its header, placement and notes. Hover a row for the same text.";
@@ -385,6 +474,8 @@ namespace Openn
         private void UpdateWorkspaceSummary(WorkspaceCatalog catalog)
         {
             wpWorkspaceSummary.Children.Clear();
+            string wantedChip = chipFilterKey; //re-armed by AddSummaryChip when its chip comes back after the scan
+            activeChip = null;
             if (!catalog.Exists)
             {
                 AddSummaryChip("folder not found", "The workspace root does not exist: " + catalog.Root, WorkspaceColors.Red, WorkspaceColors.RedTint, true);
@@ -414,9 +505,16 @@ namespace Openn
                 AddSummaryChip(text, tip, ok ? WorkspaceColors.Green : WorkspaceColors.Red, ok ? WorkspaceColors.GreenTint : WorkspaceColors.RedTint);
             }
 
-            AddSummaryChip(Totals(catalog).Split(';')[0] + "; " + catalog.InImportOrder().Count() + " importable",
-                "classified = a kind was recognized (header or legacy markers); importable = Ready (valid #!openn header, consistent placement, current run) with an import route",
-                WorkspaceColors.Blue, WorkspaceColors.BlueTint, true);
+            int disabledByUser = workspaceRows.Count(r => r.ImportDisabled);
+            AddSummaryChip(Totals(catalog).Split(';')[0] + "; " + catalog.InImportOrder().Count() + " importable" + (disabledByUser > 0 ? " (" + disabledByUser + " unticked)" : string.Empty),
+                "classified = a kind was recognized (header or legacy markers); importable = Ready (valid #!openn header, consistent placement, current run) with an import route; unticked = importable but kept out by you (Import box)",
+                WorkspaceColors.Blue, WorkspaceColors.BlueTint, true,
+                "importable", r => r.Item.Importable);
+            if (disabledByUser > 0)
+                AddSummaryChip("import disabled: " + disabledByUser,
+                    "Importable files whose Import box you unticked - listed, never imported until ticked again; remembered in " + WorkspaceLayout.ConfigFolder + "\\" + WorkspaceImportSettings.FileName,
+                    WorkspaceColors.Grey, WorkspaceColors.GreyTint, false,
+                    "disabled", r => r.ImportDisabled);
 
             var classified = catalog.Items.Where(i => i.Status != ItemStatus.Ignored && i.Kind != InputKind.Unknown).ToList();
             foreach (var group in classified.GroupBy(i => i.KindInfo).OrderBy(g => g.Key.ImportOrder))
@@ -426,38 +524,173 @@ namespace Openn
                     stale = group.Count(i => i.Status == ItemStatus.Stale);
                 ItemStatus worst = invalid + stale > 0 ? ItemStatus.Invalid : legacy + needs > 0 ? ItemStatus.Legacy : ItemStatus.Ready;
                 string breakdown = "ready " + ready + ", legacy " + legacy + ", needs-header " + needs + ", invalid " + invalid + ", stale " + stale;
+                InputKind kind = group.Key.Kind;
                 AddSummaryChip(group.Key.Id + "  " + group.Count(), group.Key.Title + " - " + group.Count() + " file(s): " + breakdown +
                     "\n" + WorkspaceLabels.RouteLabel(group.Key.Route) + " (import order " + group.Key.ImportOrder + ")",
-                    WorkspaceColors.ForStatus(worst), WorkspaceColors.TintForStatus(worst));
+                    WorkspaceColors.ForStatus(worst), WorkspaceColors.TintForStatus(worst), false,
+                    group.Key.Id, r => r.Item.Kind == kind);
             }
 
             int attention = catalog.Items.Count(i => i.Status == ItemStatus.Invalid || i.Status == ItemStatus.Stale || i.Status == ItemStatus.Unclassified);
             if (attention > 0)
                 AddSummaryChip("needs attention: " + attention, "Invalid / Stale / Unclassified files - listed red below, never imported; the notes say why",
-                    WorkspaceColors.Red, WorkspaceColors.RedTint, true);
+                    WorkspaceColors.Red, WorkspaceColors.RedTint, true,
+                    "attention", r => r.Item.Status == ItemStatus.Invalid || r.Item.Status == ItemStatus.Stale || r.Item.Status == ItemStatus.Unclassified);
             int unheadered = catalog.Items.Count(i => i.Status == ItemStatus.Legacy || i.Status == ItemStatus.NeedsHeader);
             if (unheadered > 0)
                 AddSummaryChip("without #!openn header: " + unheadered + " - not imported",
                     "Recognized by legacy markers or extension only. Contract v1 requires the #!openn header (legacy acceptance retired 2026-10-09): regenerate with Pipeline5 5.0+, or add the header by hand",
-                    WorkspaceColors.Red, WorkspaceColors.RedTint);
+                    WorkspaceColors.Red, WorkspaceColors.RedTint, false,
+                    "unheadered", r => r.Item.Status == ItemStatus.Legacy || r.Item.Status == ItemStatus.NeedsHeader);
+
+            if (wantedChip != null && activeChip == null)
+            {
+                //the chip that was filtering no longer exists after this scan (its kind / status is gone): drop its filter
+                chipFilter = null;
+                chipFilterKey = null;
+            }
+            ApplyWorkspaceFilter();
         }
 
-        private void AddSummaryChip(string text, string tooltip, Brush color, Brush tint, bool bold = false)
+        /// <summary>
+        /// One chip of the summary strip. With a filter it is clickable: click = show only the rows it counts,
+        /// click again = show everything; the active chip is drawn filled. A chip whose key is the active filter
+        /// key (after a rescan) re-arms itself.
+        /// </summary>
+        private void AddSummaryChip(string text, string tooltip, Brush color, Brush tint, bool bold = false,
+            string filterKey = null, Func<WorkspaceRow, bool> filter = null)
         {
+            bool clickable = filter != null && filterKey != null;
             var border = new Border
             {
-                BorderBrush = color,
-                Background = tint,
-                BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(3),
                 Padding = new Thickness(6, 1, 6, 1),
                 Margin = new Thickness(0, 1, 6, 1),
-                ToolTip = tooltip,
-                Child = new TextBlock { Text = text, Foreground = color, FontSize = 11, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal },
+                ToolTip = tooltip + (clickable ? "\n\nClick: show only these rows. Click again: show all rows." : string.Empty),
+                Cursor = clickable ? Cursors.Hand : null,
+                Tag = new ChipStyle { Key = filterKey, Color = color, Tint = tint, Bold = bold },
+                Child = new TextBlock { Text = text, FontSize = 11 },
             };
             ToolTipService.SetShowDuration(border, 60000);
+
+            bool active = clickable && filterKey == chipFilterKey;
+            PaintChip(border, active);
+            if (clickable)
+            {
+                border.MouseLeftButtonUp += (s, e) => { ToggleChipFilter(border, filterKey, filter); e.Handled = true; };
+                if (active)
+                {
+                    activeChip = border;
+                    chipFilter = filter;
+                }
+            }
             wpWorkspaceSummary.Children.Add(border);
         }
+
+        #region Filters (chips + text)
+
+        /// <summary>The look of a chip, kept on its Tag so it can be repainted active / inactive.</summary>
+        private sealed class ChipStyle
+        {
+            public string Key;
+            public Brush Color;
+            public Brush Tint;
+            public bool Bold;
+        }
+
+        private static void PaintChip(Border chip, bool active)
+        {
+            var style = chip.Tag as ChipStyle;
+            if (style == null) return;
+            chip.BorderBrush = style.Color;
+            chip.Background = active ? style.Color : style.Tint;
+            chip.BorderThickness = new Thickness(active ? 2 : 1);
+            var text = chip.Child as TextBlock;
+            if (text == null) return;
+            text.Foreground = active ? Brushes.White : style.Color;
+            text.FontWeight = active || style.Bold ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+
+        /// <summary>One chip filter at a time: clicking the active chip clears it, clicking another one replaces it.</summary>
+        private void ToggleChipFilter(Border chip, string key, Func<WorkspaceRow, bool> filter)
+        {
+            bool deactivate = chipFilterKey == key;
+            if (activeChip != null) PaintChip(activeChip, false);
+            activeChip = null;
+            chipFilter = null;
+            chipFilterKey = null;
+            if (!deactivate)
+            {
+                activeChip = chip;
+                chipFilter = filter;
+                chipFilterKey = key;
+                PaintChip(chip, true);
+            }
+            ApplyWorkspaceFilter();
+        }
+
+        /// <summary>Applies the chip filter AND the text filter to the grid's view and updates the "showing" info.</summary>
+        private void ApplyWorkspaceFilter()
+        {
+            ListCollectionView view = workspaceView;
+            if (view == null) return;
+            bool textActive = textFilterRegex != null || textFilterPlain.Length > 0;
+            bool filtering = chipFilter != null || textActive;
+            view.Filter = filtering ? (Predicate<object>)(o => RowPassesFilters(o as WorkspaceRow)) : null;
+
+            tbWsFilterInfo.Text = filtering ? "showing " + view.Count + " of " + workspaceRows.Count + " rows" : string.Empty;
+            btnWsClearFilter.Visibility = filtering ? Visibility.Visible : Visibility.Collapsed;
+            UpdateWorkspaceSelectionInfo();
+        }
+
+        private bool RowPassesFilters(WorkspaceRow row)
+        {
+            if (row == null) return false;
+            if (chipFilter != null && !chipFilter(row)) return false;
+            if (textFilterRegex != null) return textFilterRegex.IsMatch(row.SearchText);
+            if (textFilterPlain.Length > 0) return row.SearchText.IndexOf(textFilterPlain, StringComparison.OrdinalIgnoreCase) >= 0;
+            return true;
+        }
+
+        /// <summary>Live text filter: a valid regex (case-insensitive), otherwise a plain substring match.</summary>
+        private void tbWsFilter_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            string pattern = tbWsFilter.Text.Trim();
+            textFilterRegex = null;
+            textFilterPlain = pattern;
+            if (pattern.Length > 0)
+            {
+                try
+                {
+                    textFilterRegex = new Regex(pattern, RegexOptions.IgnoreCase);
+                    textFilterPlain = string.Empty;
+                }
+                catch (ArgumentException)
+                {
+                    //not a regex (yet) - plain substring match
+                }
+            }
+            ApplyWorkspaceFilter();
+        }
+
+        private void tbWsFilter_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape) return;
+            tbWsFilter.Text = string.Empty; //TextChanged re-applies
+            e.Handled = true;
+        }
+
+        private void btnWsClearFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (activeChip != null) PaintChip(activeChip, false);
+            activeChip = null;
+            chipFilter = null;
+            chipFilterKey = null;
+            tbWsFilter.Text = string.Empty; //TextChanged re-applies; when it was already empty, apply explicitly
+            ApplyWorkspaceFilter();
+        }
+
+        #endregion Filters (chips + text)
 
         /// <summary>Points the Files tab's hardware csv folder at the workspace's hardware folder when there is exactly one (until the user edits that box).</summary>
         private void FollowWorkspaceHardwareFolder(WorkspaceCatalog catalog)
@@ -529,6 +762,27 @@ namespace Openn
                 Log("Can't import: attach a TIA project first");
                 return;
             }
+
+            //the Import ticks: unticked rows go to the report as skipped and are never passed to the engine
+            var unticked = new HashSet<WorkspaceItem>(items.Where(i => i.Importable && !ImportTicked(i)));
+            if (unticked.Count > 0)
+            {
+                items = items.Where(i => !unticked.Contains(i)).ToList();
+                Log("Workspace import: " + unticked.Count + " item(s) skipped - import disabled by you (Import box unticked): " +
+                    string.Join(", ", unticked.Select(i => i.RelativePath)));
+                foreach (WorkspaceItem item in unticked)
+                {
+                    WorkspaceRow row;
+                    if (rowsByItem.TryGetValue(item, out row))
+                        row.SetResult(new WorkspaceImportResult(item, WorkspaceImportOutcome.Skipped, "import disabled by you (Import box unticked)"));
+                }
+                if (items.Count == 0)
+                {
+                    Log("Workspace import: nothing left to import (" + what + ") - every item is unticked");
+                    RefreshWorkspaceDetail();
+                    return;
+                }
+            }
             int importable = items.Count(i => i.Importable);
             if (importable == 0)
             {
@@ -549,10 +803,110 @@ namespace Openn
                 if (byItem.TryGetValue(row.Item, out r)) row.SetResult(r);
             }
             WorkspaceRow selected = LastSelectedRow();
-            if (selected != null) tbWorkspaceDetail.Text = WorkspaceLabels.Describe(selected.Item, selected.Result);
+            if (selected != null) tbWorkspaceDetail.Text = DescribeRow(selected);
         }
 
         #endregion Import
+
+        #region Import ticks
+
+        /// <summary>A tick changed through the grid's checkbox: persist it (a hardware pair moves together).</summary>
+        private void WorkspaceRow_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (applyingImportTicks || e.PropertyName != "ImportEnabled") return;
+            var row = sender as WorkspaceRow;
+            if (row != null) SetImportEnabled(new[] { row }, row.ImportEnabled);
+        }
+
+        /// <summary>
+        /// Ticks or unticks the rows (Stations.csv and Modules.csv of one folder are one generation run, so they
+        /// always move together), writes the workspace's import settings once, then refreshes the chips, the
+        /// selection info and the detail pane - after the checkbox's own click handling, since the view refresh
+        /// regenerates the row containers.
+        /// </summary>
+        private void SetImportEnabled(IEnumerable<WorkspaceRow> rows, bool enabled)
+        {
+            WorkspaceImportSettings ticks = importSettings;
+            if (ticks == null) return;
+
+            var affected = new HashSet<WorkspaceRow>();
+            foreach (WorkspaceRow row in rows.Where(r => r.CanToggleImport))
+            {
+                affected.Add(row);
+                foreach (WorkspaceRow sibling in HardwareSiblings(row, workspaceRows)) affected.Add(sibling);
+            }
+            if (affected.Count == 0) return;
+
+            bool changed = false;
+            applyingImportTicks = true;
+            try
+            {
+                foreach (WorkspaceRow row in affected)
+                {
+                    row.ImportEnabled = enabled;
+                    changed |= ticks.SetDisabled(row.RelativePath, !enabled);
+                }
+            }
+            finally { applyingImportTicks = false; }
+            if (changed) SaveImportSettings(ticks);
+
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(() =>
+            {
+                if (workspaceCatalog != null) UpdateWorkspaceSummary(workspaceCatalog);
+                UpdateWorkspaceSelectionInfo();
+                RefreshWorkspaceDetail();
+            }));
+        }
+
+        /// <summary>The other hardware csv(s) of the row's folder: Stations.csv and Modules.csv are one generation run.</summary>
+        private static IEnumerable<WorkspaceRow> HardwareSiblings(WorkspaceRow row, IEnumerable<WorkspaceRow> among)
+        {
+            if (row.Item.Kind != InputKind.HwStations && row.Item.Kind != InputKind.HwModules) return Enumerable.Empty<WorkspaceRow>();
+            string folder = Path.GetDirectoryName(row.Item.Path) ?? string.Empty;
+            return among.Where(r => r != row && r.CanToggleImport
+                                 && (r.Item.Kind == InputKind.HwStations || r.Item.Kind == InputKind.HwModules)
+                                 && string.Equals(Path.GetDirectoryName(r.Item.Path) ?? string.Empty, folder, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        /// <summary>Writes the ticks beside the workspace config; a failed write keeps them for the session (and the next rescan of the same root).</summary>
+        private void SaveImportSettings(WorkspaceImportSettings ticks)
+        {
+            try
+            {
+                ticks.Save();
+                importSettingsUnsaved = false;
+            }
+            catch (Exception ex)
+            {
+                importSettingsUnsaved = true;
+                Log("Could not write the import settings " + ticks.Path + " \n" + ex.Message + "\n  the ticks hold for this session only");
+            }
+        }
+
+        /// <summary>True when an import run takes the item: importable and ticked (an item without a row counts as ticked).</summary>
+        private bool ImportTicked(WorkspaceItem item)
+        {
+            WorkspaceRow row;
+            return !rowsByItem.TryGetValue(item, out row) || row.ImportEnabled;
+        }
+
+        private void miWsEnableImport_Click(object sender, RoutedEventArgs e) =>
+            SetImportEnabled(lvWorkspace.SelectedItems.OfType<WorkspaceRow>().ToList(), true);
+
+        private void miWsDisableImport_Click(object sender, RoutedEventArgs e) =>
+            SetImportEnabled(lvWorkspace.SelectedItems.OfType<WorkspaceRow>().ToList(), false);
+
+        /// <summary>The detail pane text of a row: the item description, the last result and the Import tick when unticked.</summary>
+        private static string DescribeRow(WorkspaceRow row) =>
+            WorkspaceLabels.Describe(row.Item, row.Result) + (row.ImportDisabled ? WorkspaceRow.ImportDisabledLine : string.Empty);
+
+        private void RefreshWorkspaceDetail()
+        {
+            WorkspaceRow row = LastSelectedRow();
+            if (row != null) tbWorkspaceDetail.Text = DescribeRow(row);
+        }
+
+        #endregion Import ticks
 
         #region Buttons & controls
 
@@ -583,20 +937,20 @@ namespace Openn
         private void btnWsLogCatalog_Click(object sender, RoutedEventArgs e) => LogWorkspaceCatalog();
 
         private async void btnWsImportSelected_Click(object sender, RoutedEventArgs e) =>
-            await ImportWorkspaceAsync(SelectedWorkspaceItems(), "selected rows");
+            await ImportWorkspaceAsync(SelectedWorkspaceItems(), "Import Selection");
 
         private async void btnWsImportAll_Click(object sender, RoutedEventArgs e)
         {
             WorkspaceCatalog catalog = workspaceCatalog;
             IList<WorkspaceItem> all = catalog != null ? catalog.InImportOrder().ToList() : new List<WorkspaceItem>();
-            await ImportWorkspaceAsync(all, "all importable");
+            await ImportWorkspaceAsync(all, "Import Workspace");
         }
 
         private void lvWorkspace_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateWorkspaceSelectionInfo();
             WorkspaceRow row = LastSelectedRow();
-            if (row != null) tbWorkspaceDetail.Text = WorkspaceLabels.Describe(row.Item, row.Result);
+            if (row != null) tbWorkspaceDetail.Text = DescribeRow(row);
         }
 
         private void lvWorkspace_RowDoubleClick(object sender, MouseButtonEventArgs e)
@@ -632,15 +986,17 @@ namespace Openn
 
         private static void LogRowDetails(WorkspaceRow row)
         {
-            foreach (string line in WorkspaceLabels.Describe(row.Item, row.Result).Split('\n'))
+            foreach (string line in DescribeRow(row).Split('\n'))
                 Log("  " + line.TrimEnd('\r'));
         }
 
         private void UpdateWorkspaceSelectionInfo()
         {
-            int selected = lvWorkspace.SelectedItems.Count;
-            int importable = lvWorkspace.SelectedItems.OfType<WorkspaceRow>().Count(r => r.Item.Importable);
-            tbWsSelection.Text = selected == 0 ? "no row selected" : selected + " selected, " + importable + " importable";
+            var rows = lvWorkspace.SelectedItems.OfType<WorkspaceRow>().ToList();
+            int importable = rows.Count(r => r.Item.Importable);
+            int unticked = rows.Count(r => r.ImportDisabled);
+            tbWsSelection.Text = rows.Count == 0 ? "no row selected"
+                : rows.Count + " selected, " + importable + " importable" + (unticked > 0 ? " (" + unticked + " unticked)" : string.Empty);
         }
 
         #endregion Buttons & controls

@@ -15,15 +15,19 @@ namespace Openn._01_Constructor
             public string identifier;
             public string IP;
             public string subnetName;
+            public string connector; //X1/X01... interface designation; empty = default pick
+            public string group;     //device-group path "folder/sub/..."; empty = ungrouped root
             public string customParameters;
             public string srcFileName;
             public int srcRow;
-            public _Controller(string _name, string _identifier, string _IP, string _subnetName, string _customParameters, string _srcFileName, int _srcRow)
+            public _Controller(string _name, string _identifier, string _IP, string _subnetName, string _connector, string _group, string _customParameters, string _srcFileName, int _srcRow)
             {
                 name = _name;
                 identifier = _identifier;
                 IP = _IP;
                 subnetName = _subnetName;
+                connector = _connector;
+                group = _group;
                 customParameters = _customParameters;
                 srcFileName = _srcFileName;
                 srcRow = _srcRow;

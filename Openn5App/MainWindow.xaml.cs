@@ -47,7 +47,51 @@ namespace Openn
 
             InitializeGraphicComponents();
             InitializeWorkspaceTab();
+            Loaded += (s, e) => SetDefaultLogHeight(6);
+            Closed += (s, e) => logWindow?.Close(); //the pop-out log lives and dies with the main window
             RunStartupSequence();
+        }
+
+        /// <summary>
+        /// Starts the log area at <paramref name="rows"/> lines of text: the real height of a rendered log line
+        /// (the first item's container once it exists, else the font metrics) times the rows, plus the toolbar,
+        /// the list chrome and the horizontal scrollbar when it is showing. Set once at Loaded; the splitter
+        /// owns the height afterwards.
+        /// </summary>
+        private void SetDefaultLogHeight(int rows)
+        {
+            double line = 0;
+            if (lbLogView.Items.Count > 0)
+            {
+                var first = lbLogView.ItemContainerGenerator.ContainerFromIndex(0) as FrameworkElement;
+                if (first != null && first.ActualHeight > 0) line = first.ActualHeight;
+            }
+            if (line <= 0)
+                line = Math.Ceiling(lbLogView.FontSize * lbLogView.FontFamily.LineSpacing) + 4; //item padding + border of the default template
+
+            double scrollbar = 0;
+            var scroller = FindDescendant<System.Windows.Controls.ScrollViewer>(lbLogView);
+            if (scroller != null && scroller.ComputedHorizontalScrollBarVisibility == Visibility.Visible)
+                scrollbar = SystemParameters.HorizontalScrollBarHeight;
+
+            double toolbar = dpLogToolbar.ActualHeight + dpLogToolbar.Margin.Top + dpLogToolbar.Margin.Bottom;
+            double chrome = lbLogView.BorderThickness.Top + lbLogView.BorderThickness.Bottom + lbLogView.Margin.Top + lbLogView.Margin.Bottom + 2;
+            rowLog.Height = new GridLength(Math.Max(rowLog.MinHeight, toolbar + chrome + scrollbar + rows * line));
+        }
+
+        private static T FindDescendant<T>(DependencyObject root) where T : DependencyObject
+        {
+            if (root == null) return null;
+            int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < count; i++)
+            {
+                DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+                var typed = child as T;
+                if (typed != null) return typed;
+                T nested = FindDescendant<T>(child);
+                if (nested != null) return nested;
+            }
+            return null;
         }
 
         private void InitializeGraphicComponents()
@@ -246,7 +290,32 @@ namespace Openn
             if (answer != MessageBoxResult.Yes) return;
 
             Process.Start(Process.GetCurrentProcess().MainModule.FileName, "--tiaversion=" + selection.PortalVersion.Major);
+            TeardownTia(); //Application.Shutdown does not raise Window.Closing: release the attachment here
             Application.Current.Shutdown();
+        }
+
+        /// <summary>Exit: stop the file log, close the pop-out log, release the TIA attachment (TiaPortalOpenness.Shutdown) so no XML stays locked.</summary>
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            StopFileLog();
+            logWindow?.Close();
+            TeardownTia();
+        }
+
+        /// <summary>
+        /// Releases the TIA Openness connection on exit so the runtime frees every block/tag/UDT XML it still holds
+        /// open (see TiaPortalOpenness.Shutdown). Runs on the TiaWorker thread - the only thread allowed to touch
+        /// Siemens objects - with a bounded wait, so a stuck Openness call cannot hang the close (the worker is a
+        /// background thread and dies with the process anyway).
+        /// </summary>
+        private void TeardownTia()
+        {
+            try
+            {
+                TiaWorker.CancelCurrentOperation();
+                TiaWorker.Run(() => tia.Shutdown()).Wait(TimeSpan.FromSeconds(10));
+            }
+            catch { /* never block the exit on the teardown */ }
         }
 
         private async void Window_Activated(object sender, System.EventArgs e)
@@ -476,9 +545,26 @@ namespace Openn
 
         #region Log toolbar
 
+        private LogWindow logWindow; //the pop-out log (LogWindow.cs): one at a time, null while closed
+
+        /// <summary>Opens the log in its own window, or brings the open one to the front.</summary>
+        private void btnLogPopout_Click(object sender, RoutedEventArgs e)
+        {
+            if (logWindow == null)
+            {
+                logWindow = new LogWindow(this);
+                logWindow.Closed += (s, args) => logWindow = null;
+                logWindow.Show();
+                return;
+            }
+            if (logWindow.WindowState == WindowState.Minimized)
+                logWindow.WindowState = WindowState.Normal;
+            logWindow.Activate();
+        }
+
         private async void btnClearLogs_Click(object sender, RoutedEventArgs e)
         {
-            lbLogView.Items.Clear();
+            ClearLog();
             await RefreshOpenInstancesDropdown(quietWhenBusy: true);
         }
 
@@ -502,48 +588,17 @@ namespace Openn
 
         private void miCopyLogAll_Click(object sender, RoutedEventArgs e) => CopyLogLines(selectedOnly: false);
 
-        private void CopyLogLines(bool selectedOnly)
-        {
-            System.Collections.IEnumerable source =
-                selectedOnly && lbLogView.SelectedItems.Count > 0 ? lbLogView.SelectedItems : (System.Collections.IEnumerable)lbLogView.Items;
-
-            var text = new System.Text.StringBuilder();
-            foreach (object item in source)
-                text.AppendLine(TextOf(item));
-
-            if (text.Length == 0) return;
-            try
-            {
-                Clipboard.SetText(text.ToString());
-            }
-            catch (Exception ex)
-            {
-                Log("Could not copy to clipboard \n" + ex.Message); //clipboard can be locked by another process
-            }
-        }
+        private void CopyLogLines(bool selectedOnly) => CopyLines(lbLogView, selectedOnly);
 
         private void tbLogFilter_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
-            string pattern = tbLogFilter.Text;
-            if (string.IsNullOrWhiteSpace(pattern))
-            {
-                tbLogFilter.ClearValue(System.Windows.Controls.Control.BackgroundProperty);
-                SetFilter(null);
-                return;
-            }
-
-            try
-            {
-                var regex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                tbLogFilter.ClearValue(System.Windows.Controls.Control.BackgroundProperty);
-                SetFilter(line => regex.IsMatch(line));
-            }
-            catch (ArgumentException)
-            {
-                //invalid regex: mark the box, show everything
+            //regex, case-insensitive; an invalid pattern marks the box and shows everything (LogsManager.FilterFor)
+            bool invalidPattern;
+            SetFilter(lbLogView, FilterFor(tbLogFilter.Text, out invalidPattern));
+            if (invalidPattern)
                 tbLogFilter.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xDC, 0xDC));
-                SetFilter(null);
-            }
+            else
+                tbLogFilter.ClearValue(System.Windows.Controls.Control.BackgroundProperty);
         }
 
         private void cbLogToFile_Checked(object sender, RoutedEventArgs e)
