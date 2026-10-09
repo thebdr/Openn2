@@ -445,6 +445,42 @@ def test_interface_description_template_is_config():
         config.load_generation_params = original
 
 
+def test_a_mapped_di_sends_its_diagnosis_member():
+    """C-032 (user 2026-10-09: a mapped door must send "Door Closed DIAGNOSIS", not a second Door Alarm): through the
+    SHIPPED rules a one-row door (DI) named in the Interfaces column sends what a mapped DI1/2 + DI2/2 pair sends -
+    its SAFE_STATE (its own binding), the Door Alarm and the open request (its followers) AND the 07_DOOR DIAGNOSIS
+    member the DI owns (the `Door Diagnosis` follower, grouped as DI2/2) - the very member the shipped 07_DOOR rule
+    gives it. A two-row door gets no such follower (its DI2/2 sends the member itself)."""
+    from pipeline5 import config
+    from pipeline5.config import loaders
+    from pipeline5.phases.datablocks import generator as datablocks
+    door = {"uid": "d1", "script_type": "DI", "combined_FLD": "=TRIH-MA01-B1", "functional_unit": "=TRIH",
+            "location": "-MA01", "device": "-B1", "matrix_areas": ["AREA 1_TRIH"], "interface_mapping": "SORTER-02",
+            "plc_binding": '"07_DOOR"."Door Closed SAFE_STATE [ =TRIH-MA01-B1 ]"', "source_cell": "NET!O549"}
+    rules = dict(diag_rules=config.load_diagnosis_logic_rules(), if_rules=config.load_interface_elements())
+    els, found = interfaces.collect_mirror_set([door], index="02", is_diag=False, names=("SORTER-02",), **rules)
+    eq(found, [])
+    fill = {"interface_name": "SORTER", "interface_id": "02"}
+    eq([(e.direction, e.script_type, identity.interp_keep(e.signal_name, fill), e.mirror_name, e.source) for e in els], [
+        ("Q", "DI", "", '"07_DOOR"."Door Closed SAFE_STATE [ =TRIH-MA01-B1 ]"', "mirror"),
+        ("Q", "Safety Door Alarm - Not Properly Closed", "PNC_Q_Door Alarm [ =TRIH-MA01-B1 ]",
+         '"07_DOOR"."Door Alarm [ =TRIH-MA01-B1 ]"', "follow"),
+        ("I", "IF_DOOR_CMD", "PNC_I_Open Door Request [ =TRIH-MA01-B1 ]", "Open Door Request [ =TRIH-MA01-B1 ]",
+         "if_rule"),
+        ("Q", "DI2/2", "PNC_Q_SORTER-02_Door Closed DIAGNOSIS [ =TRIH-MA01-B1 ]",
+         '"07_DOOR"."Door Closed DIAGNOSIS [ =TRIH-MA01-B1 ]"', "if_rule")])
+    defs = [d for d in loaders.load_db_definitions() if d["db_name"] == "07_DOOR"]
+    members = [e for e in loaders.load_db_elements() if e["db_name"] == "07_DOOR"]
+    g, _inst, _f = datablocks.generate([door], defs, members, loaders.load_db_types())
+    eq(['"07_DOOR"."' + m["name"] + '"' for m in g["07_DOOR"]["members"] if "=TRIH-MA01-B1" in m["name"]],
+       [els[0].mirror_name, els[3].mirror_name], "the DI's two 07_DOOR members are exactly what it sends")
+    pair = [dict(door, uid="p1", script_type="DI1/2"),
+            dict(door, uid="p2", script_type="DI2/2", plc_binding='"07_DOOR"."Door Closed DIAGNOSIS [ =TRIH-MA01-B1 ]"')]
+    els, _found = interfaces.collect_mirror_set(pair, index="02", is_diag=False, names=("SORTER-02",), **rules)
+    eq([(e.script_type, e.source) for e in els if "DIAGNOSIS" in e.mirror_name], [("DI2/2", "mirror")],
+       "a two-row door: the DI2/2 sends the member itself, no follower")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("interfaces", [
@@ -472,4 +508,5 @@ if __name__ == "__main__":
         ("the_if_workbook_gets_the_resolved_base", test_the_if_workbook_gets_the_resolved_base),
         ("interface_description_from_the_ioc_row", test_interface_description_from_the_ioc_row),
         ("interface_description_template_is_config", test_interface_description_template_is_config),
+        ("a_mapped_di_sends_its_diagnosis_member", test_a_mapped_di_sends_its_diagnosis_member),
     ]))

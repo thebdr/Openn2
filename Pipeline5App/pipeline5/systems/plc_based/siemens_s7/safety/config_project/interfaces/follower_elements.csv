@@ -1,3 +1,4 @@
 name,required_types,dev_type,direction,data_type,script_type,member,interface_tagname
 Door Open Request,DI1/2|DI2/2|DI,DO,I,BOOL,IF_DOOR_CMD,Open Door Request [ {$functional_unit}{$location}{$device} ],PNC_{$direction}_{$member}
+Door Diagnosis,DI,DO,Q,BOOL,DI2/2,"""07_DOOR"".""Door Closed DIAGNOSIS [ {$combined_FLD} ]""",PNC_Q_{$interface_name}-{$interface_id}_Door Closed DIAGNOSIS [ {$combined_FLD} ]
 ,,,,,,,
