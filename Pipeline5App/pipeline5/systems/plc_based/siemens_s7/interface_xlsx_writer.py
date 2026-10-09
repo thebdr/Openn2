@@ -27,6 +27,7 @@ src://pipeline5/systems/plc_based/siemens_s7/plctags_xlsx_writer.py).
 from __future__ import annotations
 
 import datetime
+import io
 import os
 import re
 import shutil
@@ -269,8 +270,8 @@ def project(database, template_path: str | None = None, out_dir: str | None = No
 # existing part of the I/O List stays byte-identical - its formulas + caches, dynamic arrays, threaded
 # comments, add-in bindings, metadata, printer settings; only workbook.xml, its rels, [Content_Types].xml
 # (one entry per new part) and styles.xml (APPEND-only) change. The PL3 port this replaced re-saved the
-# whole workbook with openpyxl and patched the caches back - lossy on a modern workbook ([[P-019]]'s
-# measurement). The inserted sheets' `I/O Address Side 1` LET cache is SEEDED with the value computed in
+# whole workbook with openpyxl and patched the caches back - lossy on a modern workbook (P-019's
+# measurement, [[C-034]]). The inserted sheets' `I/O Address Side 1` LET cache is SEEDED with the value computed in
 # Python (the source cache is base-stale), so phase 510 reads correct addresses without Excel.
 
 # --- Interface I/O Address Side 1: compute the LET's value in Python (Excel-independent) ----------------
@@ -313,8 +314,10 @@ def _interface_address_caches(if_path) -> dict:
     """{cell ref -> ('str', address)} for an inserted IF_ sheet's `I/O Address Side 1` LET cells, each
     computed from the row's offset/bit/direction + the Side-1 base & format (the LET's $AH$2 / $AI$2) -
     so the sheet carries a CORRECT cached address WITHOUT Excel. {} when the table headers can't be
-    resolved (phase 510 then degrades to its unresolved-address WARN). Blank separator rows yield ''."""
-    wb = load_workbook(if_path)
+    resolved (phase 510 then degrades to its unresolved-address WARN). Blank separator rows yield ''. Read
+    from the file's bytes: a workbook openpyxl fails on part-way is never left open (locked on Windows)."""
+    with open(if_path, "rb") as fh:
+        wb = load_workbook(io.BytesIO(fh.read()))
     try:
         ws = wb[wb.sheetnames[0]]
         hdr = {str(ws.cell(1, c).value or "").strip(): c for c in range(1, ws.max_column + 1)}
@@ -346,32 +349,43 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
     """Insert each (title, if_path) interface sheet into the I/O List ONLY if no sheet of that name (Excel's
     case-insensitive rule) is already present - grafted as a new LAST sheet, every existing part of the
     workbook left byte-identical ([[C-034]]), its `I/O Address Side 1` caches seeded. ONE atomic save (the
-    caller backs the I/O List up first); a sheet the graft refuses is reported and adds nothing. Returns
-    per-interface action strings."""
+    caller backs the I/O List up first); a sheet that cannot be read or grafted is a WARN and adds nothing,
+    the others still insert. Returns the action strings, per sheet in the order given."""
     with open(iolist_path, "rb") as fh:
         present = {nm.casefold() for nm in xlsx_edit._sheet_name_to_part(fh.read())}
-    actions, grafts = [], []
+    slots, grafts = [], []                         # one list of actions per requested sheet, in order
     for title, if_path in sheets:
+        slot = []
+        slots.append(slot)
         if title.casefold() in present:
-            actions.append(f"{title}: already present in the I/O List - skipped")
+            slot.append(f"{title}: already present in the I/O List - skipped")
+            continue
+        # the IF_ sheet's I/O Address Side 1: computed base+offset (the source cache is base-stale); an IF_
+        # workbook that cannot be read refuses itself, never the whole insert (the .bak is already taken)
+        try:
+            seeds = _interface_address_caches(if_path)
+        except (OSError, ET.ParseError, zipfile.BadZipFile, KeyError, IndexError, ValueError) as e:
+            slot.append(f"[WARN] {title}: not inserted - its workbook cannot be read ({type(e).__name__}: {e})")
             continue
         present.add(title.casefold())
-        # the IF_ sheet's I/O Address Side 1: computed base+offset (the source cache is base-stale)
-        grafts.append({"title": title, "source": if_path, "seeds": _interface_address_caches(if_path)})
+        grafts.append(({"title": title, "source": if_path, "seeds": seeds}, slot))
+
+    def flat():
+        return [a for slot in slots for a in slot]
     if not grafts:
-        return actions
+        return flat()
     try:
-        results = xlsx_sheet_graft.graft_sheets(iolist_path, grafts)
+        results = xlsx_sheet_graft.graft_sheets(iolist_path, [g for g, _ in grafts])
     except (OSError, ET.ParseError, zipfile.BadZipFile, UnicodeDecodeError, xlsx_sheet_graft.GraftError) as e:
-        return actions + [f"save failed ({e}) - I/O List left unchanged (restore from the .bak if needed)"]
-    for r in results:
+        return flat() + [f"save failed ({e}) - I/O List left unchanged (restore from the .bak if needed)"]
+    for (_, slot), r in zip(grafts, results):
         if r["error"]:
-            actions.append(f"[WARN] {r['title']}: not inserted - {r['error']}")
+            slot.append(f"[WARN] {r['title']}: not inserted - {r['error']}")
             continue
-        actions.append(f"{r['title']}: inserted into the I/O List")
+        slot.append(f"{r['title']}: inserted into the I/O List")
         if r["seeded"]:
-            actions.append(f"{r['title']}: seeded {len(r['seeded'])} I/O Address Side 1 values (Excel-independent)")
-    return actions
+            slot.append(f"{r['title']}: seeded {len(r['seeded'])} I/O Address Side 1 values (Excel-independent)")
+    return flat()
 
 
 def insert_interface_sheets(database, *, iolist_path: str | None = None, out_dir: str | None = None) -> list:

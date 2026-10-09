@@ -9,7 +9,8 @@ four bookkeeping parts; every other part is copied byte-for-byte:
   - the worksheet XML, copied from the source with its cells re-pointed at the target: each style index
     remapped into the target's styles (a cell in the source's default format takes the target's default),
     each shared string written as an inline string (so xl/sharedStrings.xml is never rewritten), the grafted
-    tables' names rewritten in its formulas (outside string literals), `tabSelected` / `codeName` dropped,
+    tables' names rewritten in its formulas (a name only - never inside a string literal, a quoted sheet
+    name or a structured reference's [column] specifiers), `tabSelected` / `codeName` dropped,
     and optional cached values SEEDED into chosen formula cells;
   - its table parts, renamed `<name>_<title>` (unique in the workbook: tables + defined names, `_2`, `_3`...
     on a clash) with a fresh id - ref, header / totals row counts, autoFilter, the column ids + names and the
@@ -21,9 +22,10 @@ four bookkeeping parts; every other part is copied byte-for-byte:
     fonts, fills, borders, cell formats and conditional-format dxfs the sheet uses are appended (an
     identical entry already there - or appended by an earlier graft - is reused) and only the collections'
     `count` attributes change.
-Pure stdlib, Excel-independent. A source the graft cannot carry faithfully (a sheet part other than tables /
-external hyperlinks, cell metadata - a dynamic array / rich value -, a prefixed spreadsheetml namespace, a
-dangling style or string index) is REFUSED for that sheet - never half-copied; the others still graft.
+Pure stdlib, Excel-independent. A source the graft cannot read, or cannot carry faithfully (a sheet part other
+than tables / external hyperlinks, cell metadata - a dynamic array / rich value -, a prefixed spreadsheetml
+namespace, a dangling style or string index), is REFUSED for that sheet - never half-copied, nothing of it
+kept (not even a style); the others still graft.
 
 Callers: src://pipeline5/systems/plc_based/siemens_s7/interface_xlsx_writer.py (phase 400e - the IF_ sheets
 into the I/O List). Sibling of src://pipeline5/documents/xlsx_surgical_writer.py (cell edits / app-built
@@ -263,13 +265,67 @@ _FORMULA = re.compile(r"(<((?:\w+:)?(?:f|formula|formula1|formula2))(?:\s[^>]*)?
 _V = re.compile(r"<v\s*/>|<v(?:\s[^>]*)?(?<!/)>.*?</v>", re.DOTALL)
 
 
+def _skip_quoted(text: str, i: int, q: str) -> int:
+    """The index just past the quoted run that opens at text[i] (a doubled quote is an escaped one)."""
+    j = i + 1
+    while j < len(text):
+        if text[j] == q:
+            if text[j + 1:j + 2] == q:
+                j += 2
+                continue
+            return j + 1
+        j += 1
+    return j
+
+
+def _skip_brackets(text: str, i: int) -> int:
+    """The index just past the bracketed run that opens at text[i] - a structured reference's specifiers
+    (`[@[Data Type]]`, `[[#This Row],[Col]]`, nested) or an external-workbook index; `'` escapes the next
+    character inside it (`[a'[b']]`)."""
+    depth, j = 0, i
+    while j < len(text):
+        c = text[j]
+        if c == "'":
+            j += 2
+            continue
+        if c == "[":
+            depth += 1
+        elif c == "]":
+            depth -= 1
+            if depth == 0:
+                return j + 1
+        j += 1
+    return j
+
+
+def _table_renamer(renames: dict):
+    """(pattern, {old casefolded: new}) for `_rename_in_formula` - a whole NAME, case-insensitively (Excel's
+    rule), never part of a longer one (`DT` is not in `DT2` / `X.DT`); None when nothing is renamed."""
+    if not renames:
+        return None
+    alt = "|".join(re.escape(k) for k in sorted(renames, key=len, reverse=True))
+    return (re.compile(r"(?<![\w.\\])(" + alt + r")(?![\w.])", re.IGNORECASE),
+            {k.casefold(): v for k, v in renames.items()})
+
+
 def _rename_in_formula(text: str, rx) -> str:
-    """Rename table references in one formula's text, leaving "string literals" alone."""
+    """Rename the grafted tables' references in one formula's text. Only a NAME is renamed - never inside a
+    "string literal", a 'quoted sheet name' or the [bracketed] column specifiers of a structured reference
+    (a column may share a table's spelling: `Data[@[Data Type]]` keeps its column)."""
     if rx is None:
         return text
-    parts = re.split(r'("(?:[^"]|"")*")', text)
-    return "".join(p if i % 2 else rx[0].sub(lambda m: rx[1][m.group(1).casefold()], p)
-                   for i, p in enumerate(parts))
+    out, start, i = [], 0, 0
+    while i < len(text):
+        c = text[i]
+        if c in "\"'[":
+            out.append(rx[0].sub(lambda m: rx[1][m.group(1).casefold()], text[start:i]))
+            j = _skip_brackets(text, i) if c == "[" else _skip_quoted(text, i, c)
+            out.append(text[i:j])
+            start = i = j
+        else:
+            i += 1
+    out.append(rx[0].sub(lambda m: rx[1][m.group(1).casefold()], text[start:]))
+    return "".join(out)
 
 
 class _SheetRewrite:
@@ -278,11 +334,7 @@ class _SheetRewrite:
         self.xfs = src.style_list("cellXfs")
         self.default = _ser(self.xfs[0]) if self.xfs else None
         self.xf_cache: dict = {}
-        self.rx = None
-        if renames:
-            alt = "|".join(re.escape(k) for k in sorted(renames, key=len, reverse=True))
-            self.rx = (re.compile(r"(?<![\w.\\])(" + alt + r")(?![\w.])", re.IGNORECASE),
-                       {k.casefold(): v for k, v in renames.items()})
+        self.rx = _table_renamer(renames)
 
     def xf(self, i: int):
         """The target cellXfs index for source xf `i`; None = the source's default format (the cell then
@@ -566,7 +618,8 @@ def graft_sheets(path: str, grafts: list, *, dest: str | None = None) -> list:
             try:
                 seeded = book.graft(g["title"], g["source"], g.get("seeds") or {})
                 results.append({"title": g["title"], "error": None, "seeded": seeded})
-            except (GraftError, ET.ParseError, zipfile.BadZipFile, KeyError, UnicodeDecodeError, OSError) as e:
+            except (GraftError, ET.ParseError, zipfile.BadZipFile, KeyError, IndexError, ValueError,
+                    UnicodeDecodeError, OSError) as e:          # whatever one source does, it refuses ITSELF
                 book.restore(snap)
                 results.append({"title": g["title"], "error": f"{type(e).__name__}: {e}"
                                 if not isinstance(e, GraftError) else str(e), "seeded": []})

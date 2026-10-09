@@ -252,7 +252,7 @@ def _devmode() -> bytes:
             + struct.pack("<HIII", 0, 0, 0, 0) + struct.pack("<II", 0, 0) + b"\0" * 32)
 
 
-def _modern_iolist(path, defined_names=()):
+def _modern_iolist(path, defined_names=(), table="T_Types"):
     """An I/O List as a modern Excel writes it - with what openpyxl cannot carry: a DYNAMIC ARRAY (cm +
     xl/metadata.xml), a THREADED comment (threadedComments + persons + its legacy placeholder), an add-in
     binding (webextensions), a featurePropertyBag, printer settings, an EMPTY-TEXT cell, a calcChain, a
@@ -344,7 +344,7 @@ def _modern_iolist(path, defined_names=()):
             f'<Relationship Id="rId1" Type="{_R}/table" Target="../tables/table1.xml"/></Relationships>'),
         "xl/tables/table1.xml": (
             _DECL + '<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" '
-            'name="T_Types" displayName="T_Types" ref="A1:A2" totalsRowShown="0"><autoFilter ref="A1:A2"/>'
+            f'name="{table}" displayName="{table}" ref="A1:A2" totalsRowShown="0"><autoFilter ref="A1:A2"/>'
             '<tableColumns count="1"><tableColumn id="1" name="type_id"/></tableColumns>'
             '<tableStyleInfo name="TableStyleMedium2" showFirstColumn="0" showLastColumn="0" '
             'showRowStripes="1" showColumnStripes="0"/></table>'),
@@ -423,12 +423,14 @@ def _modern_iolist(path, defined_names=()):
     })
 
 
-def _make_rich_if(path, font="Arial Narrow"):
+def _make_rich_if(path, font="Arial Narrow", hyperlink=False):
     """A generated IF_ sheet with what the graft must carry: a styled header (font / solid fill / border /
     alignment), a CUSTOM number format, a conditional format (a dxf), a validation, a merge, a column width,
     a text that starts with '=', the address headers the seeding reads (offset D / bit E / address F / base G
-    / format H), and a table carrying a source dxf + a calculated-column formula. openpyxl marks the sheet
-    tabSelected (the FVTGENERIC template does) - the graft must not."""
+    / format H), a formula naming the table beside a string literal (K3), optionally an EXTERNAL hyperlink
+    (I2), and a table carrying a source dxf, a calculated-column formula and cell-style names (all three
+    point into the source workbook). The sheet is tabSelected (the FVTGENERIC template is) - the graft must
+    not keep that."""
     from openpyxl.formatting.rule import CellIsRule
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.worksheet.datavalidation import DataValidation
@@ -451,6 +453,9 @@ def _make_rich_if(path, font="Arial Narrow"):
     ws["G2"] = 10000; ws["G2"].number_format = "#,##0.000"
     ws["H2"] = "I<base+offset>/.<bit>"
     ws["K1"] = "NOTE"; ws.merge_cells("K1:L1")
+    ws["K3"] = '=COUNTA(DT[Category])&" DT"'
+    if hyperlink:
+        ws["I2"].hyperlink = "https://example.com/interfaces"
     ws.column_dimensions["A"].width = 20.5
     ws.sheet_view.tabSelected = True                          # as FVT's FVTGENERIC sheets carry it
     ws.conditional_formatting.add("A2:A4", CellIsRule(operator="equal", formula=['"SPD"'],
@@ -459,7 +464,9 @@ def _make_rich_if(path, font="Arial Narrow"):
     cols = [TableColumn(id=i + 1, name=h) for i, h in enumerate(hdr)]
     cols[5].dataDxfId = 99
     cols[5].calculatedColumnFormula = TableFormula(attr_text="DT[[#This Row],[I/O Offset Byte]]+$G$2")
+    cols[0].dataCellStyle = "Source Style"
     t = Table(displayName="DT", ref="A1:I4"); t.tableColumns = cols
+    t.headerRowCellStyle, t.dataCellStyle = "Source Heading", "Source Style"
     t.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
     ws.add_table(t)
     wb.save(path)
@@ -470,9 +477,17 @@ def _parts(path):
         return {n: z.read(n) for n in z.namelist()}
 
 
-def _only_inserts(a: bytes, b: bytes) -> bool:
+def _only_inserts(a: bytes, b: bytes, collections: bool = False) -> bool:
+    """`b` is `a` with text INSERTED only - nothing removed or rewritten. `collections`: a styles part, whose
+    collections' `count` attributes change and whose empty collection (`<dxfs count="0"/>`) opens up when
+    appended to - both normalised away first (every self-closing tag written open on both sides)."""
     import difflib
-    ops = difflib.SequenceMatcher(None, a.decode("utf-8"), b.decode("utf-8"), autojunk=False).get_opcodes()
+    import re as _re
+    a, b = a.decode("utf-8"), b.decode("utf-8")
+    if collections:
+        a, b = ([_re.sub(r"<([\w:.-]+)([^<>]*?)\s*/>", r"<\1\2></\1>",
+                         _re.sub(r'(?<![\w:])count="\d+"', 'count="#"', x)) for x in (a, b)])
+    ops = difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes()
     return all(op[0] in ("equal", "insert") for op in ops)
 
 
@@ -511,6 +526,13 @@ def test_insert_into_a_modern_workbook_keeps_every_part():
         # the four bookkeeping parts: appended to, never rewritten
         for name in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels", "[Content_Types].xml"):
             ok(_only_inserts(before[name], after[name]), f"{name}: insertions only")
+        ok(_only_inserts(before["xl/styles.xml"], after["xl/styles.xml"], collections=True),
+           "xl/styles.xml: insertions only, as TEXT (its root, namespaces, mc:Ignorable untouched) - counts aside")
+        ok(not _only_inserts(b'<dxfs count="0"/><x/>', b'<dxfs count="1"><dxf/></dxfs>', collections=True),
+           "(the styles check does see a removal)")
+        for tp in ("xl/tables/table2.xml", "xl/tables/table3.xml"):
+            for gone in (b"DxfId", b"CellStyle", b"calculatedColumnFormula"):
+                ok(gone not in after[tp], f"{tp}: no {gone.decode()} (it points into the source workbook)")
         wbx = after["xl/workbook.xml"].decode("utf-8")
         ok('<sheet name="IF_SORTER-01" sheetId="8" r:id="rId13"/><sheet name="IF_SORTER-02" sheetId="9" '
            'r:id="rId14"/></sheets>' in wbx, "the sheets appended LAST (localSheetId stays valid), fresh ids")
@@ -550,6 +572,7 @@ def test_insert_into_a_modern_workbook_keeps_every_part():
         eq((ws["A2"].value, ws["D3"].value, ws["E3"].value, ws["G2"].value), ("SAFE", 1, 2, 10000), "values")
         eq((ws["I3"].value, ws["I3"].data_type), ("=TRIB-CA01", "s"), "a leading '=' stays text")
         eq(ws["F2"].value, "=DT_IF_SORTER_01[[#This Row],[I/O Offset Byte]]+$G$2", "the formula follows its table")
+        eq(ws["K3"].value, '=COUNTA(DT_IF_SORTER_01[Category])&" DT"', "the table renamed, the literal kept")
         h = ws["A1"]
         eq((h.font.name, h.font.b, h.font.color.rgb, h.fill.fgColor.rgb, h.border.bottom.style,
             h.alignment.horizontal, h.alignment.wrap_text),
@@ -627,52 +650,84 @@ def test_graft_shared_strings_become_inline():
         eq(str(ws["B1"].value), "bold rest", "the rich text reads back whole")
 
 
+def _variant(src, dst, old: bytes, new: bytes, part="xl/worksheets/sheet1.xml"):
+    """`src` with ONE byte-level edit in one part, written to `dst`."""
+    p = _parts(src)
+    ok(old in p[part], f"fixture: {old!r} in {part}")
+    p[part] = p[part].replace(old, new, 1)
+    _zip(dst, p)
+
+
 def test_graft_refuses_what_it_cannot_carry():
-    """A sheet the graft cannot carry faithfully is refused - a WARN, nothing of it added (not even its
-    styles) - while the other sheets still graft; when none grafts, the I/O List is not written at all."""
+    """A sheet the graft cannot read or carry faithfully is refused - a WARN, nothing of it left behind (not
+    a style it appended before the refusal, not a part name, not an id) - while the other sheets still
+    graft; when none grafts, the I/O List is not written at all."""
     import warnings as _w
     from openpyxl.comments import Comment
+    from pipeline5.documents import xlsx_sheet_graft as graft
     _w.simplefilter("ignore")
     with tempfile.TemporaryDirectory() as d:
+        good = os.path.join(d, "IF_GOOD.xlsx"); _make_rich_if(good)
+        rich = os.path.join(d, "rich.xlsx"); _make_rich_if(rich, font="Comic Sans MS")
         bad = os.path.join(d, "IF_BAD.xlsx"); _make_rich_if(bad, font="Comic Sans MS")
         wb = load_workbook(bad); wb.active["A2"].comment = Comment("a note", "eng"); wb.save(bad)
-        cm = os.path.join(d, "IF_CM.xlsx"); _make_rich_if(cm, font="Comic Sans MS")
-        p = _parts(cm)
-        p["xl/worksheets/sheet1.xml"] = p["xl/worksheets/sheet1.xml"].replace(b'<c r="A2"', b'<c r="A2" cm="1"', 1)
-        _zip(cm, p)
-        good = os.path.join(d, "IF_GOOD.xlsx"); _make_rich_if(good)
+        cm = os.path.join(d, "IF_CM.xlsx"); _variant(rich, cm, b'<c r="A2"', b'<c r="A2" cm="1"')
+        vm = os.path.join(d, "IF_VM.xlsx"); _variant(rich, vm, b'<c r="A3"', b'<c r="A3" vm="1"')
+        sty = os.path.join(d, "IF_STY.xlsx"); _variant(rich, sty, b'<c r="A4"', b'<c r="A4" s="99"')
+        s0 = os.path.join(d, "s0.xlsx"); _sst_source(s0)
+        sst = os.path.join(d, "IF_SST.xlsx"); _variant(s0, sst, b'<c r="C1" t="s"><v>2</v>', b'<c r="C1" t="s"><v>99</v>')
+        empty = os.path.join(d, "IF_EMPTY.xlsx"); open(empty, "wb").close()
+
+        # the graft's own guards, exactly (cm / vm / a dangling style come AFTER the header's Comic Sans styles
+        # were appended - the snapshot must take them back)
         iol = os.path.join(d, "iol.xlsx"); _modern_iolist(iol)
         before = _parts(iol)
-
-        acts = interface_xlsx.insert_sheets_into_iolist(iol, [("IF_BAD", bad), ("IF_CM", cm)])
-        eq(len(acts), 2, "one action per sheet")
-        ok(acts[0].startswith("[WARN] IF_BAD: not inserted - the sheet carries a ")
-           and acts[0].endswith(" part the graft does not copy"), f"a comment is refused: {acts[0]}")
-        eq(acts[1], "[WARN] IF_CM: not inserted - cell A2 carries cell metadata (a dynamic array / rich value) "
-                    "the graft does not copy", "cell metadata is refused")
+        res = graft.graft_sheets(iol, [{"title": t, "source": p} for t, p in
+                                       (("IF_CM", cm), ("IF_VM", vm), ("IF_STY", sty), ("IF_SST", sst))])
+        eq([(r["title"], r["error"]) for r in res], [
+            ("IF_CM", "cell A2 carries cell metadata (a dynamic array / rich value) the graft does not copy"),
+            ("IF_VM", "cell A3 carries cell metadata (a dynamic array / rich value) the graft does not copy"),
+            ("IF_STY", "a cell names style 99, the source has 3"),
+            ("IF_SST", "cell C1 names shared string 99, the source has 3")], "each refusal and its reason")
         eq(_parts(iol), before, "nothing grafted -> the I/O List is not written")
 
-        acts = interface_xlsx.insert_sheets_into_iolist(iol, [("IF_BAD", bad), ("IF_GOOD", good)])
-        ok(acts[0].startswith("[WARN] IF_BAD: not inserted"), "the bad one refused")
-        eq(acts[1:], ["IF_GOOD: inserted into the I/O List",
+        # through the 400e entry: every refusal is a WARN (whichever layer catches it), the I/O List untouched
+        named = [("IF_BAD", bad), ("IF_CM", cm), ("IF_VM", vm), ("IF_STY", sty), ("IF_SST", sst), ("IF_EMPTY", empty)]
+        acts = interface_xlsx.insert_sheets_into_iolist(iol, named)
+        eq([a.split(":", 1)[0] for a in acts], [f"[WARN] {t}" for t, _ in named], "one WARN per refused sheet")
+        ok(all(": not inserted - " in a for a in acts), f"each says so: {acts}")
+        ok(acts[0].endswith(" part the graft does not copy"), f"a comment's part is refused: {acts[0]}")
+        eq(acts[5], "[WARN] IF_EMPTY: not inserted - its workbook cannot be read (BadZipFile: File is not a zip "
+                    "file)", "an unreadable IF_ workbook refuses itself - it never aborts the insert")
+        eq(_parts(iol), before, "nothing grafted -> the I/O List is not written")
+
+        # mixed: the refused ones leave NOTHING - the result is byte for byte the good sheet grafted alone
+        ref = os.path.join(d, "ref.xlsx"); _modern_iolist(ref)
+        interface_xlsx.insert_sheets_into_iolist(ref, [("IF_GOOD", good)])
+        acts = interface_xlsx.insert_sheets_into_iolist(iol, named + [("IF_GOOD", good)])
+        eq(acts[6:], ["IF_GOOD: inserted into the I/O List",
                       "IF_GOOD: seeded 3 I/O Address Side 1 values (Excel-independent)"], "the good one grafted")
-        after = _parts(iol)
-        ok(b"Comic Sans MS" not in after["xl/styles.xml"], "the refused sheet appended no style")
-        eq(sorted(set(after) - set(before)), ["xl/tables/table2.xml", "xl/worksheets/_rels/sheet3.xml.rels",
-                                              "xl/worksheets/sheet3.xml"], "only the good sheet's parts")
-        eq(load_workbook(iol).sheetnames, ["NET SAFETY 50", "FamilyCheck", "IF_GOOD"], "only the good sheet")
+        eq(_parts(iol), _parts(ref), "the refused sheets left nothing behind (styles, part names, ids)")
+        ok(b"Comic Sans MS" not in _parts(iol)["xl/styles.xml"], "no refused style")
 
 
-def test_graft_table_name_clash_and_formula_rename():
-    """The grafted table takes `<name>_<title>`, made unique against the workbook's tables AND defined names
-    (`_2` on a clash), and the formulas follow it - outside string literals, a longer name untouched."""
-    import re as _re
+def test_graft_table_names_unique_and_formula_rename():
+    """The grafted table takes `<name>_<title>`, unique against the workbook's tables, its defined names and
+    the tables grafted before it in the same run (`_2` on a clash); the formulas follow - a whole NAME only:
+    never in a string literal, a quoted sheet name or a structured reference's [column] specifiers."""
     import warnings as _w
     from pipeline5.documents import xlsx_sheet_graft as graft
-    rx = (_re.compile(r"(?<![\w.\\])(DT)(?![\w.])", _re.IGNORECASE), {"dt": "DT_X"})
-    eq(graft._rename_in_formula('DT[[#This Row],[A]]&"DT"&dt[B]&DT2[C]&SUM(DT)', rx),
-       'DT_X[[#This Row],[A]]&"DT"&DT_X[B]&DT2[C]&SUM(DT_X)',
-       "renamed outside literals, case-insensitively, whole names only")
+    rx = graft._table_renamer({"DT": "DT_X", "Data": "Data_X", "Side": "Side_X"})
+    for formula, want in (
+            ('DT[[#This Row],[A]]&"DT"&dt[B]&DT2[C]&SUM(DT)', 'DT_X[[#This Row],[A]]&"DT"&DT_X[B]&DT2[C]&SUM(DT_X)'),
+            ("Data[@[Data Type]]", "Data_X[@[Data Type]]"),
+            ("Side[[#This Row],[I/O Address Side 1]]", "Side_X[[#This Row],[I/O Address Side 1]]"),
+            ("'Data'!A1+Data[x]", "'Data'!A1+Data_X[x]"),
+            ("Data[[#Headers],[a'[b']]]&Data", "Data_X[[#Headers],[a'[b']]]&Data_X"),
+            ('"say ""DT"" "&DT[A]', '"say ""DT"" "&DT_X[A]'),
+            ("X.DT+DT.Y+[1]Sheet!DT", "X.DT+DT.Y+[1]Sheet!DT_X")):
+        eq(graft._rename_in_formula(formula, rx), want, formula)
+    eq(graft._table_renamer({}), None, "nothing to rename -> no pattern")
     _w.simplefilter("ignore")
     with tempfile.TemporaryDirectory() as d:
         ifp = os.path.join(d, "IF.xlsx"); _make_rich_if(ifp)
@@ -681,6 +736,61 @@ def test_graft_table_name_clash_and_formula_rename():
         ws = load_workbook(iol)["IF_SORTER-01"]
         eq(list(ws.tables), ["DT_IF_SORTER_01_2"], "a defined name of that spelling -> _2")
         eq(ws["F3"].value, "=DT_IF_SORTER_01_2[[#This Row],[I/O Offset Byte]]+$G$2", "the formula follows")
+
+        iol2 = os.path.join(d, "iol2.xlsx"); _modern_iolist(iol2, table="DT_IF_SORTER_01")
+        interface_xlsx.insert_sheets_into_iolist(iol2, [("IF_SORTER-01", ifp)])
+        eq(list(load_workbook(iol2)["IF_SORTER-01"].tables), ["DT_IF_SORTER_01_2"],
+           "an existing TABLE of that spelling (a renamed IF_ sheet keeps its tables) -> _2")
+
+        iol3 = os.path.join(d, "iol3.xlsx"); _modern_iolist(iol3)
+        interface_xlsx.insert_sheets_into_iolist(iol3, [("IF_A-1", ifp), ("IF_A_1", ifp)])
+        wb = load_workbook(iol3)
+        eq((list(wb["IF_A-1"].tables), list(wb["IF_A_1"].tables)), (["DT_IF_A_1"], ["DT_IF_A_1_2"]),
+           "two titles that clean up alike in one run -> the second _2")
+        eq(wb["IF_A_1"]["F2"].value, "=DT_IF_A_1_2[[#This Row],[I/O Offset Byte]]+$G$2", "each follows its own")
+
+
+def test_graft_carries_external_hyperlinks():
+    import re as _re
+    import warnings as _w
+    _w.simplefilter("ignore")
+    with tempfile.TemporaryDirectory() as d:
+        ifp = os.path.join(d, "IF.xlsx"); _make_rich_if(ifp, hyperlink=True)
+        iol = os.path.join(d, "iol.xlsx"); _modern_iolist(iol)
+        eq(interface_xlsx.insert_sheets_into_iolist(iol, [("IF_SORTER-01", ifp)])[0],
+           "IF_SORTER-01: inserted into the I/O List", "a sheet with an external hyperlink is inserted")
+        p = _parts(iol)
+        rid = _re.search(r'<hyperlink\b[^>]*\br:id="([^"]+)"', p["xl/worksheets/sheet3.xml"].decode("utf-8")).group(1)
+        rel = _re.search(r'<Relationship Id="' + rid + r'"[^>]*/>', p["xl/worksheets/_rels/sheet3.xml.rels"].decode())
+        ok(rel and 'TargetMode="External"' in rel.group(0) and 'Target="https://example.com/interfaces"' in rel.group(0),
+           f"the hyperlink's relationship comes along under its own id ({rel and rel.group(0)})")
+        eq(load_workbook(iol)["IF_SORTER-01"]["I2"].hyperlink.target, "https://example.com/interfaces", "read back")
+
+
+def test_insert_is_one_atomic_write():
+    """The grafted workbook is written to a temp file and swapped in: a swap that fails (the I/O List open in
+    Excel) leaves the I/O List byte-identical and no temp file behind."""
+    import warnings as _w
+    from pipeline5.documents import xlsx_sheet_graft as graft
+    _w.simplefilter("ignore")
+    with tempfile.TemporaryDirectory() as d:
+        ifp = os.path.join(d, "IF.xlsx"); _make_rich_if(ifp)
+        iol = os.path.join(d, "iol.xlsx"); _modern_iolist(iol)
+        with open(iol, "rb") as fh:
+            original = fh.read()
+
+        def locked(src, dst):
+            raise PermissionError("the I/O List is open in Excel")
+        real, graft.os.replace = graft.os.replace, locked
+        try:
+            acts = interface_xlsx.insert_sheets_into_iolist(iol, [("IF_SORTER-01", ifp)])
+        finally:
+            graft.os.replace = real
+        eq(acts, ["save failed (the I/O List is open in Excel) - I/O List left unchanged (restore from the .bak "
+                  "if needed)"], "the failure is reported")
+        with open(iol, "rb") as fh:
+            eq(fh.read(), original, "the I/O List is byte-identical")
+        eq(sorted(os.listdir(d)), ["IF.xlsx", "iol.xlsx"], "no temp file left behind")
 
 
 def test_insert_interface_sheets_backs_up_first():
@@ -720,6 +830,8 @@ if __name__ == "__main__":
         ("insert_into_a_modern_workbook_keeps_every_part", test_insert_into_a_modern_workbook_keeps_every_part),
         ("graft_shared_strings_become_inline", test_graft_shared_strings_become_inline),
         ("graft_refuses_what_it_cannot_carry", test_graft_refuses_what_it_cannot_carry),
-        ("graft_table_name_clash_and_formula_rename", test_graft_table_name_clash_and_formula_rename),
+        ("graft_table_names_unique_and_formula_rename", test_graft_table_names_unique_and_formula_rename),
+        ("graft_carries_external_hyperlinks", test_graft_carries_external_hyperlinks),
+        ("insert_is_one_atomic_write", test_insert_is_one_atomic_write),
         ("insert_interface_sheets_backs_up_first", test_insert_interface_sheets_backs_up_first),
     ]))
