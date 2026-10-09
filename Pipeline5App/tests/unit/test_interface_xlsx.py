@@ -853,6 +853,36 @@ def test_graft_bookkeeping_edges():
                                        "a sheet of that name is already in the workbook"], "each title refused")
         eq(_parts(iol), before, "nothing grafted -> nothing written")
 
+        # a source saved with a SECOND Excel window open: its views of window 1 - Excel repairs them in a
+        # one-window I/O List (refute round 4, measured in Excel); kept where the I/O List has that window too
+        import re as _re
+        two = os.path.join(d, "IF_TWO.xlsx"); _variant(ifp, two, b"</sheetViews>",
+                                                       b'<sheetView workbookViewId="1"/></sheetViews>')
+        only1 = os.path.join(d, "IF_ONLY1.xlsx")
+        _variant(ifp, only1, b'workbookViewId="0"', b'workbookViewId="1"')
+        one_win = os.path.join(d, "one.xlsx"); _modern_iolist(one_win)
+        interface_xlsx.insert_sheets_into_iolist(one_win, [("IF_TWO", two), ("IF_ONLY1", only1)])
+        p = _parts(one_win)
+        views = [_re.findall(r'workbookViewId="(\d+)"', p[s].decode()) for s in ("xl/worksheets/sheet3.xml",
+                                                                                  "xl/worksheets/sheet4.xml")]
+        eq(views, [["0"], ["0"]], "one-window I/O List: window 1's view dropped; a lone one re-pointed at 0")
+        two_win = os.path.join(d, "twowin.xlsx")
+        _variant(base, two_win, b'<workbookView activeTab="0"/>', b'<workbookView activeTab="0"/><workbookView/>',
+                 part="xl/workbook.xml")
+        interface_xlsx.insert_sheets_into_iolist(two_win, [("IF_TWO", two)])
+        eq(_re.findall(r'workbookViewId="(\d+)"', _parts(two_win)["xl/worksheets/sheet3.xml"].decode()), ["0", "1"],
+           "two-window I/O List: both views kept")
+
+        # an I/O List set to MANUAL calculation: Excel defers even fullCalcOnLoad to F9 - said, never changed
+        manual = os.path.join(d, "manual.xlsx")
+        _variant(base, manual, b'<calcPr calcId="191029"/>', b'<calcPr calcId="191029" calcMode="manual"/>',
+                 part="xl/workbook.xml")
+        acts = interface_xlsx.insert_sheets_into_iolist(manual, [("IF_A", ifp)])
+        eq(acts[-1], "the I/O List calculates manually: Excel computes the inserted sheets' other formulas on the "
+                     "next recalculation (F9) - their I/O Address Side 1 values are seeded", "the manual mode is said")
+        ok('<calcPr calcId="191029" calcMode="manual" fullCalcOnLoad="1"/>' in _parts(manual)["xl/workbook.xml"].decode(),
+           "the calculation mode is left as the engineer set it")
+
 
 def test_graft_table_names_unique_and_formula_rename():
     """The grafted table takes `<name>_<title>`, unique against the workbook's tables, its defined names and

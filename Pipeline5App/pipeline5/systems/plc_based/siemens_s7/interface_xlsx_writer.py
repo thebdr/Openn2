@@ -352,7 +352,8 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
     caller backs the I/O List up first); a sheet that cannot be read or grafted is a WARN and adds nothing,
     the others still insert. Returns the action strings, per sheet in the order given."""
     with open(iolist_path, "rb") as fh:
-        present = {nm.casefold() for nm in xlsx_edit._sheet_name_to_part(fh.read())}
+        data = fh.read()
+    present = {nm.casefold() for nm in xlsx_edit._sheet_name_to_part(data)}
     slots, grafts = [], []                         # one list of actions per requested sheet, in order
     for title, if_path in sheets:
         slot = []
@@ -385,7 +386,18 @@ def insert_sheets_into_iolist(iolist_path, sheets) -> list:
         slot.append(f"{r['title']}: inserted into the I/O List")
         if r["seeded"]:
             slot.append(f"{r['title']}: seeded {len(r['seeded'])} I/O Address Side 1 values (Excel-independent)")
+    if _calculates_manually(data) and any(not r["error"] for r in results):
+        slots.append(["the I/O List calculates manually: Excel computes the inserted sheets' other formulas on the "
+                      "next recalculation (F9) - their I/O Address Side 1 values are seeded"])
     return flat()
+
+
+def _calculates_manually(xlsx_bytes) -> bool:
+    """True when the workbook is set to MANUAL calculation (calcPr calcMode) - Excel then defers even the
+    fullCalcOnLoad the insert asks for until the next recalculation; the insert never changes the mode."""
+    with zipfile.ZipFile(io.BytesIO(xlsx_bytes)) as z:
+        wb = z.read("xl/workbook.xml").decode("utf-8", "replace")
+    return re.search(r'<(?:\w+:)?calcPr\b[^>]*\bcalcMode="manual"', wb) is not None
 
 
 def insert_interface_sheets(database, *, iolist_path: str | None = None, out_dir: str | None = None) -> list:

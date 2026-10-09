@@ -10,7 +10,8 @@ four bookkeeping parts; every other part is copied byte-for-byte:
     remapped into the target's styles (a cell in the source's default format takes the target's default),
     each shared string written as an inline string (so xl/sharedStrings.xml is never rewritten), the grafted
     tables' names rewritten in its formulas (a name only - never inside a string literal, a quoted sheet
-    name or a structured reference's [column] specifiers), `tabSelected` / `codeName` dropped,
+    name or a structured reference's [column] specifiers), `tabSelected` / `codeName` and the views of a
+    window the target does not have dropped,
     and optional cached values SEEDED into chosen formula cells;
   - its table parts, renamed `<name>_<title>` (unique in the workbook: tables + defined names, `_2`, `_3`...
     on a clash) with a fresh id - ref, header / totals row counts, autoFilter, the column ids + names, the
@@ -348,9 +349,23 @@ def _rename_in_formula(text: str, rx) -> str:
     return "".join(out)
 
 
+def _keep_views(xml: str, views: int) -> str:
+    """Keep only the <sheetView>s of a workbook window the TARGET has (`workbookViewId` below its `views`):
+    a source saved with a second Excel window open carries `workbookViewId="1"`, which Excel repairs in a
+    one-window workbook. A sheet left with none keeps its first view, re-pointed at window 0."""
+    block = re.search(r"<sheetViews\b[^>]*>(.*?)</sheetViews>", xml, re.DOTALL)
+    if not block:
+        return xml
+    found = re.findall(r"<sheetView(?=[\s/>])[^>]*?(?:/>|>.*?</sheetView>)", block.group(1), re.DOTALL)
+    kept = [v for v in found if int(_attr_of(v[:v.index(">") + 1], "workbookViewId") or 0) < views]
+    if not kept and found:
+        kept = [re.sub(r'(?<![\w:])workbookViewId="\d+"', 'workbookViewId="0"', found[0], count=1)]
+    return xml[:block.start(1)] + "".join(kept) + xml[block.end(1):]
+
+
 class _SheetRewrite:
-    def __init__(self, src: _Source, styles: _Styles, renames: dict):
-        self.src, self.styles = src, styles
+    def __init__(self, src: _Source, styles: _Styles, renames: dict, views: int = 1):
+        self.src, self.styles, self.views = src, styles, views
         self.xfs = src.style_list("cellXfs")
         self.default = _ser(self.xfs[0]) if self.xfs else None
         self.xf_cache: dict = {}
@@ -420,6 +435,7 @@ class _SheetRewrite:
         prefix, _ = _root_prefix(xml, "worksheet")
         if prefix != "":
             raise GraftError("the source worksheet is not plain spreadsheetml (a prefixed namespace)")
+        xml = _keep_views(xml, self.views)
         xml = re.sub(r"(<sheetView\b[^>]*?)\s+tabSelected=\"(?:1|true)\"", r"\1", xml)
         xml = re.sub(r"(<sheetPr\b[^>]*?)\s+codeName=\"[^\"]*\"", r"\1", xml)
         xml = re.sub(r"<col\b([^>]*?)(/?)>", lambda m: f"<col{self.restyle(m.group(1), 'style')}{m.group(2)}>", xml)
@@ -587,7 +603,8 @@ class _Book:
         for rid, new, tid, tpart in tables:
             self.added[tpart] = _table_xml(src.tables[rid], tid, new, rx).encode("utf-8")
             self._override(tpart, _CT_TABLE)
-        xml, seeded = _SheetRewrite(src, self.styles, renames).rewrite(seeds)
+        views = max(1, len(re.findall(r"<(?:\w+:)?workbookView(?=[\s/>])", self.wb)))   # the target's windows
+        xml, seeded = _SheetRewrite(src, self.styles, renames, views).rewrite(seeds)
         part = self._free("xl/worksheets/sheet{}.xml")
         self.added[part] = xml.encode("utf-8")
         if rels:
