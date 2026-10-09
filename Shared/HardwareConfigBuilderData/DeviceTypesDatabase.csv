@@ -2,14 +2,14 @@
 #! kind: hw/device-types
 #! schema: 1
 #! producer: hand-maintained (Shared/HardwareConfigBuilderData)
-#! generated: 2026-10-09T10:47:07Z
+#! generated: 2026-10-09T22:16:53Z
 #!end
 # Identifier,Type (Plc| PlcCard| PlcCardCm| IoDevice| IoDeviceCard| Hmi| TransferArea = PN/PN coupler transfer area: Order Number column holds the TIA TransferAreaType IN| OUT| IN_OUT...),Order Number/FW Version,Comment,Parameters (sep= | ),Parameters by Signal Type <ST>P1=0 | P2=0<ST>,I/O Addresses Parameter (Default is Device.Address, managed by Openn2)
 6ES7518-4FP00-0AB0,Plc,OrderNumber:6ES7518-4FP00-0AB0/V3.0,CPU 1518F-4PN/DP,,,
 6ES7517-3FP00-0AB0,Plc,OrderNumber:6ES7 517-3FP00-0AB0/V2.9,CPU 1517F-3 PN/DP,,,
 6ES7516-3FN02-0AB0,Plc,OrderNumber:6ES7 516-3FN02-0AB0/V2.8,CPU 1516F-3 PN/DP,,,
 6GK7542-1AX00-0XE0,PlcCardCm,OrderNumber:6GK7 542-1AX00-0XE0/V3.0,CM 1542-1,,,
-6ES7158-3AD10-0XA0,IoDevice,OrderNumber:6ES7 158-3AD10-0XA0/V4.2,PN/PN Coupler,,,
+6ES7158-3AD10-0XA0,IoDevice,OrderNumber:6ES7 158-3AD10-0XA0/V4.2,PN/PN Coupler,ActivateDataStatus=False | Item(1).DiagnosticsDataValidityActive=True,,
 TransferArea-IN,TransferArea,IN,PN/PN coupler transfer area IN (data INTO this side's PLC; Modules.csv: Slot=position I Addr=PLC input start; length PartnerToLocalLength: default in Parameters - a different size in the row's custom parameters; a Modules.csv row may also set the other coupler side via Addr(0).StartAddress - PL5 writes only the length),PartnerToLocalLength=128,,
 TransferArea-OUT,TransferArea,OUT,PN/PN coupler transfer area OUT (data OUT OF this side's PLC; Modules.csv: Slot=position Q Addr=PLC output start; length LocalToPartnerLength: default in Parameters - a different size in the row's custom parameters; a Modules.csv row may also set the other coupler side via Addr(0).StartAddress - PL5 writes only the length),LocalToPartnerLength=128,,
 TransferArea-IN_OUT,TransferArea,IN_OUT,PN/PN coupler transfer area IN/OUT (both directions; Modules.csv: I Addr + Q Addr=PLC starts; lengths PartnerToLocalLength (in) + LocalToPartnerLength (out): defaults in Parameters - a different size in the row's custom parameters),PartnerToLocalLength=128 | LocalToPartnerLength=128,,
