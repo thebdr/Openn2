@@ -47,6 +47,9 @@ namespace Openn._03_ApiManager
         /// </summary>
         private bool ownsPortal = false;
 
+        /// <summary>The TIA Portal process this instance is attached to (its main window is where the "Re-arrange devices" robot drags); null when unknown.</summary>
+        public int? AttachedProcessId { get; private set; }
+
         #endregion Connection state
 
         #region Attach / detach
@@ -100,6 +103,7 @@ namespace Openn._03_ApiManager
 
                     portal = new TiaPortal(TiaPortalMode.WithUserInterface);
                     project = portal.Projects.Create(new DirectoryInfo(defaultProjectsFolder), projectName);
+                    AttachedProcessId = CurrentPortalProcessId();
                     ownsPortal = true; //we created this portal - we own its teardown
 
                     Log("Attached to New Tia Project: " + project.Name);
@@ -116,6 +120,7 @@ namespace Openn._03_ApiManager
 
                     portal = new TiaPortal(TiaPortalMode.WithUserInterface);
                     project = portal.Projects.Open(projectFile);
+                    AttachedProcessId = CurrentPortalProcessId();
                     ownsPortal = true; //we opened this project in a portal we created
                     Log("Opened Tia Project: " + projectFile.Name);
                 }
@@ -149,6 +154,7 @@ namespace Openn._03_ApiManager
                     if (!tiaPortalProcess.ProjectPath.ToString().Contains(projectPath)) continue;
 
                     portal = TiaPortal.GetProcess(tiaPortalProcess.Id).Attach(); //keep the attached instance referenced
+                    AttachedProcessId = tiaPortalProcess.Id;
                     ownsPortal = false; //attached to the user's running TIA - never close it on teardown
                     foreach (Project openProject in portal.Projects)
                     {
@@ -216,6 +222,12 @@ namespace Openn._03_ApiManager
         /// Must run on the TiaWorker thread (Openness is not thread-safe). Idempotent, so it is
         /// safe to call from both the window Closing handler and the version-switch restart path.
         /// </summary>
+        private int? CurrentPortalProcessId()
+        {
+            try { return portal?.GetCurrentProcess()?.Id; }
+            catch { return null; }
+        }
+
         public void Shutdown()
         {
             try
@@ -233,6 +245,7 @@ namespace Openn._03_ApiManager
                     portal = null;
                 }
 
+                AttachedProcessId = null;
                 ownsPortal = false;
             }
             catch (Exception e)

@@ -102,6 +102,10 @@ namespace Openn
             tbProjectPath.Text = AppPaths.AppBaseDir + "\\TiaProjects\\openness_project";
             rbUseInstance.IsChecked = true;
             rbUseExistingIoControllers.IsChecked = true; //mirrored onto the Workspace tab's pair (ControllerMode_Checked)
+            bool wirePorts = false;
+            try { wirePorts = Properties.Settings.Default.WireProfinetPorts; }
+            catch (Exception e) { Log("Could not read the user settings \n" + e.Message); }
+            cbWirePorts.IsChecked = wirePorts; //mirrored onto the Workspace tab's box (WirePorts_Changed)
 
             bool expanded = false;
             try { expanded = Properties.Settings.Default.ProjectPanelExpanded; }
@@ -376,6 +380,36 @@ namespace Openn
         /// <summary>True = "Create new I/O controllers" (either pair, they are kept equal).</summary>
         private bool CreateNewControllersSelected => rbWsCreateNewControllers.IsChecked == true;
 
+        /// <summary>"Wire PROFINET ports": one choice, a box on each tab (mirrored), remembered in Properties.Settings.WireProfinetPorts.</summary>
+        private bool WirePortsSelected => cbWsWirePorts.IsChecked == true;
+
+        private bool syncingWirePorts;
+
+        private void WirePorts_Changed(object sender, RoutedEventArgs e)
+        {
+            if (syncingWirePorts) return;
+            if (cbWsWirePorts == null || cbWirePorts == null) return; //still constructing
+            syncingWirePorts = true;
+            try
+            {
+                bool on = (sender as System.Windows.Controls.CheckBox)?.IsChecked == true;
+                cbWsWirePorts.IsChecked = on;
+                cbWirePorts.IsChecked = on;
+                if (!IsLoaded) return;
+                if (Properties.Settings.Default.WireProfinetPorts == on) return;
+                Properties.Settings.Default.WireProfinetPorts = on;
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception ex)
+            {
+                Log("Could not save the user settings \n" + ex.Message);
+            }
+            finally
+            {
+                syncingWirePorts = false;
+            }
+        }
+
         #endregion I/O controller mode
 
         #region Workspace tab: export
@@ -532,13 +566,33 @@ namespace Openn
             }
 
             bool? createNewIoControllers = CreateNewControllersSelected;
-            await RunBackend(() => TiaWorker.Run(() => tia.CreateDevices(createNewIoControllers)));
+            bool wirePorts = WirePortsSelected;
+            await RunBackend(() => TiaWorker.Run(() => tia.CreateDevices(createNewIoControllers, wirePorts)));
         }
 
         private async void btnDumpAttributes_Click(object sender, RoutedEventArgs e)
         {
             string deviceNameFilter = tbDumpDeviceFilter.Text;
             await RunBackend(() => TiaWorker.Run(() => tia.DumpDeviceAttributes(deviceNameFilter)));
+        }
+
+        /// <summary>
+        /// "Re-arrange devices..": the mouse-drag layout of the last generation's stations (ArrangeDevicesWindow). Without
+        /// a generation in this session the loaded configuration's IO devices stand in - with a warning, since stations
+        /// already in the project were never on the default row.
+        /// </summary>
+        private void btnArrangeDevices_Click(object sender, RoutedEventArgs e)
+        {
+            IList<string> stations = tia.LastCreatedStations.ToList();
+            string source = "the last hardware generation run";
+            if (stations.Count == 0)
+            {
+                var loaded = Openn._01_Constructor.HardwareIoDevices.DevicesList;
+                stations = loaded != null ? loaded.Select(d => d.Item1.name).ToList() : new List<string>();
+                source = "the loaded configuration - no generation ran in this session, so stations that already existed are NOT on the default row";
+            }
+            var window = new ArrangeDevicesWindow(stations, source, () => tia.AttachedProcessId) { Owner = this };
+            window.Show();
         }
 
         #endregion Files tab: hardware + discovery

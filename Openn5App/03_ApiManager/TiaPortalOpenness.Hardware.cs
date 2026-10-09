@@ -4,6 +4,7 @@ using System.Linq;
 using Siemens.Engineering;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
+using Openn._01_Constructor;
 using static Openn._10_StandardFunctions.LogsManager;
 
 using HwDb = Openn._01_Constructor.HardwareDeviceTypesDatabase;
@@ -35,6 +36,12 @@ namespace Openn._03_ApiManager
         /// <summary>Find-or-created device groups of the current run, by Group path.</summary>
         private Dictionary<string, DeviceUserGroup> deviceGroupCache;
 
+        /// <summary>
+        /// The stations the last generation run created, in creation order - their slots on the ONE row Openness puts
+        /// them on in the network view ("Re-arrange devices" drags them from there). Controllers only in create-new mode.
+        /// </summary>
+        public List<string> LastCreatedStations { get; } = new List<string>();
+
         #endregion Hardware generation state
 
         /// <summary>
@@ -44,7 +51,7 @@ namespace Openn._03_ApiManager
         /// Returns true when the run went through to the end, false when it stopped
         /// early (precondition failed, controller missing, cancelled) - every reason is logged.
         /// </summary>
-        public bool CreateDevices(bool? CreateNewIoControllers = true)
+        public bool CreateDevices(bool? CreateNewIoControllers = true, bool wirePorts = false)
         {
             if (project == null)
             {
@@ -68,6 +75,7 @@ namespace Openn._03_ApiManager
             }
 
             deviceGroupCache = new Dictionary<string, DeviceUserGroup>(StringComparer.OrdinalIgnoreCase);
+            LastCreatedStations.Clear();
 
             //generating while a TIA editor is open re-creates the stale per-device
             //"IO device not connected to an IO system" compile messages - CONFIRMED 2026-07:
@@ -96,6 +104,11 @@ namespace Openn._03_ApiManager
 
             if (TiaWorker.CurrentCancellation.IsCancellationRequested)
                 return false; //the loop that observed the cancel has already logged it
+
+            if (wirePorts)
+                WirePorts();
+            else if (HwIoC.DevicesList.Any(c => c.topology.Count > 0) || HwIoD.DevicesList.Any(d => d.Item1.topology.Count > 0))
+                Log("Topology links in Stations.csv NOT wired - tick \"Wire PROFINET ports\" to apply them");
 
             foreach (var a in project.UngroupedDevicesGroup.Devices)
             {
@@ -198,6 +211,7 @@ namespace Openn._03_ApiManager
                     var device = (plcGroup != null ? plcGroup.Devices : project.Devices)
                         .CreateWithItem(HwDb.Identifier[c.identifier].identifier, c.name, c.name);
                     ioControllers.Add(new Tuple<Device, DeviceItem>(device, null));
+                    LastCreatedStations.Add(device.Name);
                     Log("IoController Creation Ok: device " + device.Name + " (" + HwDb.Identifier[c.identifier].comment + ") created");
 
                     netInterface = FindNetworkInterface(device.DeviceItems, c.connector, c.name);
@@ -478,10 +492,144 @@ namespace Openn._03_ApiManager
 
                 Log("IoDevice Creation Ok: IoDevice " + _device.Name + " (" + HwDb.Identifier[d.Item1.identifier].comment + ") created - " + stationParameters);
                 createdCount++;
+                LastCreatedStations.Add(_device.Name);
             }
 
-            Log("IoDevice generation finished: " + createdCount + " of " + _devicesList.Count + " IO device(s) created" + SkippedSuffix(skippedCount));
+            Log("IoDevice generation finished: " + createdCount + " of " + _devicesList.Count + " IO device(s) created" + SkippedSuffix(skippedCount) +
+                (createdCount > 0 ? " - the new stations sit on one row of the network view: Files tab > Re-arrange devices.. lays them out by group" : string.Empty));
         }
+
+        #region PROFINET port interconnections (topology)
+
+        /// <summary>
+        /// Wires the port interconnections of the Topology column (Stations.csv column 10; HardwareTopology) once the
+        /// stations exist: for every link, this station's X&lt;i&gt;-P&lt;n&gt; port to the partner's X&lt;j&gt;-P&lt;m&gt; port through
+        /// NetworkPort.ConnectToPort - the topology view and the online topology diagnostics then match the plant.
+        /// A pair already connected is left alone (the partner's row, or an earlier run); a port connected ELSEWHERE
+        /// is reported and skipped, never disconnected; a station, interface or port that cannot be found is
+        /// reported. Stations the generation skipped (already in the project) are wired too - the links describe
+        /// the plant, not the run.
+        /// </summary>
+        private void WirePorts()
+        {
+            var links = new List<Tuple<string, TopologyLink>>();
+            foreach (HwIoC._Controller c in HwIoC.DevicesList)
+                foreach (TopologyLink link in c.topology) links.Add(Tuple.Create(c.name, link));
+            foreach (var d in HwIoD.DevicesList)
+                foreach (TopologyLink link in d.Item1.topology) links.Add(Tuple.Create(d.Item1.name, link));
+            if (links.Count == 0)
+            {
+                Log("Wire PROFINET ports: no Topology links in Stations.csv - nothing to wire");
+                return;
+            }
+
+            Log("--- Wiring " + links.Count + " PROFINET port link(s) from the Topology column ---");
+            int wired = 0, already = 0, skipped = 0;
+            foreach (var entry in links)
+            {
+                if (TiaWorker.CurrentCancellation.IsCancellationRequested)
+                {
+                    Log("Port wiring CANCELLED - " + wired + " link(s) wired");
+                    return;
+                }
+                string station = entry.Item1;
+                TopologyLink link = entry.Item2;
+                string label = station + " " + link.OwnDesignation + " <-> " + link.PartnerStation + " " + link.PartnerDesignation;
+                try
+                {
+                    NetworkPort own = FindPort(station, link.OwnInterface, link.OwnPort, label);
+                    NetworkPort partner = FindPort(link.PartnerStation, link.PartnerInterface, link.PartnerPort, label);
+                    if (own == null || partner == null)
+                    {
+                        skipped++;
+                        continue;
+                    }
+                    if (own.ConnectedPorts.Any(p => p.Equals(partner)))
+                    {
+                        already++;
+                        continue;
+                    }
+                    if (own.ConnectedPorts.Count > 0 || partner.ConnectedPorts.Count > 0)
+                    {
+                        Log("WARNING: port link " + label + " NOT wired - a port is already connected elsewhere (" + station + " " + link.OwnDesignation + ": " +
+                            own.ConnectedPorts.Count + " connection(s), " + link.PartnerStation + " " + link.PartnerDesignation + ": " + partner.ConnectedPorts.Count +
+                            " connection(s)) - disconnect it in TIA first");
+                        skipped++;
+                        continue;
+                    }
+                    own.ConnectToPort(partner);
+                    Log("Port link wired: " + label);
+                    wired++;
+                }
+                catch (Exception e)
+                {
+                    Log("ERROR wiring port link " + label + " \n" + e.Message);
+                    skipped++;
+                }
+            }
+            Log("Port wiring finished: " + wired + " wired, " + already + " already connected, " + skipped + " skipped (see above)");
+        }
+
+        /// <summary>The NetworkPort of port P&lt;n&gt; on interface X&lt;i&gt; of a station in the project; null (reported) when anything is missing.</summary>
+        private NetworkPort FindPort(string stationName, int interfaceNumber, int portNumber, string label)
+        {
+            Device device = FindDevice(stationName, project.Devices) ?? FindDevice(stationName, project.UngroupedDevicesGroup.Devices) ?? FindDeviceInGroups(stationName, project.DeviceGroups);
+            if (device == null)
+            {
+                Log("WARNING: port link " + label + " NOT wired - station " + stationName + " is not in the project");
+                return null;
+            }
+            DeviceItem interfaceItem = FindInterfaceItem(device.DeviceItems, interfaceNumber);
+            if (interfaceItem == null)
+            {
+                Log("WARNING: port link " + label + " NOT wired - " + stationName + " has no Ethernet interface X" + interfaceNumber);
+                return null;
+            }
+            DeviceItem portItem = FindPortItem(interfaceItem, portNumber);
+            if (portItem == null)
+            {
+                Log("WARNING: port link " + label + " NOT wired - " + stationName + " X" + interfaceNumber + " has no port P" + portNumber);
+                return null;
+            }
+            return portItem.GetService<NetworkPort>();
+        }
+
+        /// <summary>The device item carrying Ethernet interface X&lt;n&gt; (item name token or PositionNumber), depth first.</summary>
+        private DeviceItem FindInterfaceItem(DeviceItemComposition devices, int n)
+        {
+            foreach (DeviceItem device in devices)
+            {
+                NetworkInterface networkInterface = device.GetService<NetworkInterface>();
+                if (networkInterface != null && GetAttribute(device, "InterfaceType") == "Ethernet" && ItemMatchesConnector(device, n))
+                    return device;
+                DeviceItem nested = FindInterfaceItem(device.DeviceItems, n);
+                if (nested != null) return nested;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Port P&lt;n&gt; of an interface item: among the children carrying the NetworkPort service, the one whose name
+        /// says "Port n" / "Pn" or whose PositionNumber is n, else the n-th one in item order.
+        /// </summary>
+        private DeviceItem FindPortItem(DeviceItem interfaceItem, int n)
+        {
+            var ports = new List<DeviceItem>();
+            foreach (DeviceItem child in interfaceItem.DeviceItems)
+            {
+                NetworkPort port = null;
+                try { port = child.GetService<NetworkPort>(); } catch { }
+                if (port != null) ports.Add(child);
+            }
+            foreach (DeviceItem port in ports)
+            {
+                if (System.Text.RegularExpressions.Regex.IsMatch(port.Name, "(^|[^0-9A-Za-z])[Pp](ort)?[ _]*0*" + n + "([^0-9]|$)")) return port;
+                if (GetAttribute(port, "PositionNumber") == n.ToString()) return port;
+            }
+            return n >= 1 && n <= ports.Count ? ports[n - 1] : null;
+        }
+
+        #endregion PROFINET port interconnections (topology)
 
         /// <summary>", N SKIPPED (already in project)" for the generation summary lines; "" when nothing was skipped.</summary>
         private static string SkippedSuffix(int skippedCount) =>

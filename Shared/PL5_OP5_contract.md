@@ -41,12 +41,12 @@ format stays the gate.
 
 The kind id is written in the header (`kind: hw/stations`). `schema` is the per-kind column/shape version
 (hardware csvs continue the format-2 numbering; everything else starts at 1); it bumps only on a breaking
-change — a trailing added column (the 9th `Connector`) does not bump it.
+change — a trailing added column (the 9th `Connector`, the 10th `Topology` - 2026-10-10) does not bump it.
 
 | kind | what | file | lives in (TIA folder) | OP5 route | order | schema | producer |
 |---|---|---|---|---|---|---|---|
 | `hw/device-types` | model database (order no → type identifier, device type, default custom parameters) | `DeviceTypesDatabase.csv` | `Devices & networks` (or `Shared/HardwareConfigBuilderData`) | reference data for hardware generation | 0 | 1 | hand-maintained (the original); PL5 phase 700 (the workspace copy) |
-| `hw/stations` | one row per station: `Plc` / `PlcCardCm` / `IoDevice`, IP, PN number, subnet, custom parameters, group, connector | `Stations.csv` | `Devices & networks` | hardware generation | 10 | 2 | PL5 phase 700 |
+| `hw/stations` | one row per station: `Plc` / `PlcCardCm` / `IoDevice`, IP, PN number, subnet, custom parameters, group, connector, topology (optional column 10: PROFINET port links `X1-P2 > <partner station>:X1-P1`, `|` separated - OP5 wires them after the generation when "Wire PROFINET ports" is on; PL5 emits the column once the I/O list provides the partner ports - OPEN) | `Stations.csv` | `Devices & networks` | hardware generation | 10 | 2 | PL5 phase 700 |
 | `hw/modules` | one row per plugged module of a station: slot order, model, I/Q address, custom parameters | `Modules.csv` | `Devices & networks` | hardware generation | 11 | 2 | PL5 phase 700 |
 | `sw/udt` | one PLC data type | `<Name>.xml` (`SW.Types.PlcStruct`) | `<PLC>/PLC data types/…` | `TypeGroup.Types.Import` | 20 | 1 | PL5 (not emitted yet) |
 | `sw/tag-table` | one PLC tag table | `<Table>.xml` (`SW.Tags.PlcTagTable`) | `<PLC>/PLC tags/…` | `TagTableGroup.TagTables.Import` | 30 | 1 | PL5 phase 510 (since 2026-10-09) |

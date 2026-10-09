@@ -791,8 +791,9 @@ namespace Openn
             }
 
             bool createNew = rbWsCreateNewControllers.IsChecked == true;
+            bool wirePorts = WirePortsSelected;
             IList<WorkspaceImportResult> results = null;
-            await RunBackend(() => TiaWorker.Run(() => { results = tia.ImportWorkspaceItems(catalog, items, createNew); }));
+            await RunBackend(() => TiaWorker.Run(() => { results = tia.ImportWorkspaceItems(catalog, items, createNew, wirePorts); }));
             if (results == null) return;
 
             var byItem = new Dictionary<WorkspaceItem, WorkspaceImportResult>();

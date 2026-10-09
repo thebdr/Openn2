@@ -113,6 +113,8 @@ namespace Openn._01_Constructor
         /// IO connector on devices that expose more than one - ignored elsewhere. PL emits the
         /// I/O-List cell VERBATIM there, e.g. "X1-P1 R" = port + direction; the loader extracts
         /// the bare X&lt;n&gt; designation per the coordination brief.)
+        /// Column 10 = Topology (optional): PROFINET port links "X1-P2 > &lt;partner station&gt;:X1-P1", '|' separated
+        /// (HardwareTopology), wired after the generation when "Wire PROFINET ports" is on.
         /// </summary>
         private static void ParseStations(CsvTable stations, List<string> errors,
             List<HardwareIoControllers._Controller> controllers, List<HardwareIoDevices._Device> devices)
@@ -133,6 +135,7 @@ namespace Openn._01_Constructor
                 string role = row.Get(0), name = row.Get(1), modelId = row.Get(2),
                        ip = row.Get(3), pnNumber = row.Get(4), subnet = row.Get(5), customParameters = row.Get(6),
                        group = row.Get(7), connectorCell = row.Get(8), connector = ExtractConnector(connectorCell);
+                List<TopologyLink> topology = HardwareTopology.Parse(row.Get(9), where, errors);
 
                 if (name.Length == 0)
                     errors.Add(where + "Station Name is empty");
@@ -168,11 +171,15 @@ namespace Openn._01_Constructor
                 {
                     if (pnNumber.Length > 0)
                         errors.Add(where + "PN Number applies to IoDevice stations only");
-                    controllers.Add(new HardwareIoControllers._Controller(name, modelId, ip, subnet, connector, group, customParameters, stations.FilePath, row.LineNumber));
+                    var controller = new HardwareIoControllers._Controller(name, modelId, ip, subnet, connector, group, customParameters, stations.FilePath, row.LineNumber);
+                    controller.topology = topology;
+                    controllers.Add(controller);
                 }
                 else if (role.Equals("IoDevice", StringComparison.OrdinalIgnoreCase))
                 {
-                    devices.Add(new HardwareIoDevices._Device(name, modelId, ip, pnNumber, subnet, connector, group, customParameters, stations.FilePath, row.LineNumber));
+                    var device = new HardwareIoDevices._Device(name, modelId, ip, pnNumber, subnet, connector, group, customParameters, stations.FilePath, row.LineNumber);
+                    device.topology = topology;
+                    devices.Add(device);
                 }
                 else
                 {

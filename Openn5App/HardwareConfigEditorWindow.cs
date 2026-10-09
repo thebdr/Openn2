@@ -57,6 +57,8 @@ namespace Openn
         private readonly TextBox stationIpBox;
         private readonly TextBox stationPnBox;
         private readonly TextBox stationSubnetBox;
+        private readonly TextBox stationConnectorBox;
+        private readonly TextBox stationTopologyBox;
         private readonly TextBox stationParamsBox;
 
         //module edit panel
@@ -123,6 +125,8 @@ namespace Openn
             stationIpBox = new TextBox();
             stationPnBox = new TextBox();
             stationSubnetBox = new TextBox();
+            stationConnectorBox = new TextBox { ToolTip = "Interface designation X1 / X2 for devices with more than one connector (PLC X1/X2, PN/PN coupler); empty = the first one. The verbatim I/O-List cell (e.g. X1-P1 R) is accepted - the X<n> part is used" };
+            stationTopologyBox = new TextBox { ToolTip = "PROFINET port links, | separated: X1-P2 > <partner station>:X1-P1 - the generation wires them when \"Wire PROFINET ports\" is on (pairs already connected are left alone)" };
             stationParamsBox = new TextBox { TextWrapping = TextWrapping.Wrap, AcceptsReturn = false, MinHeight = 40 };
 
             stationPanel = new GroupBox
@@ -139,6 +143,8 @@ namespace Openn
                     Tuple.Create("IP Address:", (FrameworkElement)stationIpBox),
                     Tuple.Create("PN Number:", (FrameworkElement)stationPnBox),
                     Tuple.Create("Subnet:", (FrameworkElement)stationSubnetBox),
+                    Tuple.Create("Connector (X1/X2):", (FrameworkElement)stationConnectorBox),
+                    Tuple.Create("Topology (port links):", (FrameworkElement)stationTopologyBox),
                     Tuple.Create("Custom Parameters:", (FrameworkElement)stationParamsBox),
                 }),
                 Visibility = Visibility.Collapsed,
@@ -576,6 +582,8 @@ namespace Openn
             stationIpBox.TextChanged += (s, e) => Apply(st => st.IpAddress = stationIpBox.Text);
             stationPnBox.TextChanged += (s, e) => Apply(st => st.PnNumber = stationPnBox.Text);
             stationSubnetBox.TextChanged += (s, e) => Apply(st => st.Subnet = stationSubnetBox.Text);
+            stationConnectorBox.TextChanged += (s, e) => Apply(st => st.Connector = stationConnectorBox.Text);
+            stationTopologyBox.TextChanged += (s, e) => Apply(st => st.Topology = stationTopologyBox.Text);
             stationParamsBox.TextChanged += (s, e) => Apply(st => st.CustomParameters = stationParamsBox.Text);
         }
 
@@ -623,6 +631,8 @@ namespace Openn
                     stationIpBox.Text = station.IpAddress;
                     stationPnBox.Text = station.PnNumber;
                     stationSubnetBox.Text = station.Subnet;
+                    stationConnectorBox.Text = station.Connector;
+                    stationTopologyBox.Text = station.Topology;
                     stationParamsBox.Text = station.CustomParameters;
                     ShowModelDetails(station.ModelId, stationModelInfo, stationModelDefaults);
                 }
