@@ -34,8 +34,11 @@ class LogView(ttk.Frame):
         self.on_link = on_link                    # on_link(doc, sheet, cell)
         self.on_errtreat = on_errtreat            # on_errtreat(uid, level)
         self.on_errjump = on_errjump              # on_errjump(uid) - left-click [LEVEL] -> the Findings row
-        self._links = 0
-        self._errs = 0
+        # the clickable spans, per LINE: {line: [(first col, end col, (doc, sheet, cell))]} / {line: uid}. ONE
+        # shared `link` / `errlink` tag carries the look and the bindings - a tag per link made thousands
+        # of tags on a validation run, and tk.Text slows to a crawl with them (a `see` took 52 s)
+        self._link_spans: dict = {}
+        self._err_uids: dict = {}
         self._family = theme.MONO_FONT[0]         # the log font family + a live-resizable size (Font dropdown)
         self._size = int(font_size or theme.MONO_FONT[1])
         self._accent = _ACCENT_DARK               # updated by set_theme() on a mode toggle
@@ -63,8 +66,13 @@ class LogView(ttk.Frame):
             self.text.tag_configure(level, foreground=color, font=self._tag_font(level, bold))
         self._config_cmp_tags("dark")             # re-skinned below by set_theme(mode)
         self.text.tag_configure("errlink", underline=True)
-        self.text.tag_bind("errlink", "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
-        self.text.tag_bind("errlink", "<Leave>", lambda _e: self.text.configure(cursor=""))
+        self.text.tag_configure("link", underline=True)
+        for shared in ("errlink", "link"):
+            self.text.tag_bind(shared, "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
+            self.text.tag_bind(shared, "<Leave>", lambda _e: self.text.configure(cursor=""))
+        self.text.tag_bind("link", "<Button-1>", self._click_link)
+        self.text.tag_bind("errlink", "<Button-1>", self._click_err)
+        self.text.tag_bind("errlink", "<Button-3>", self._click_err_menu)
         self._apply_elide()                       # hide the not-shown levels (lines are inserted, then elided)
         self.set_theme(mode)                      # skin from the PERSISTED mode (the widget defaults are dark;
                                                   # a light-theme launch must not open a dark pane)
@@ -103,9 +111,15 @@ class LogView(ttk.Frame):
         else:
             self.text.xview(*args)
 
-    def append(self, level: str, message: str) -> None:
+    def scroll_end(self) -> None:
+        """Bring the newest line into view - once per drained batch (a `see` per line re-lays the Text out
+        every time, which stalled the busy animation); scrolling to the bottom fraction is the cheaper way."""
+        self.text.yview_moveto(1.0)
+
+    def append(self, level: str, message: str, scroll: bool = True) -> None:
         """A plain (link-less) line - level-coloured. Inserted regardless of the shown set; a not-shown
-        level's tag is ELIDED, so the Levels dropdown can show/hide it live."""
+        level's tag is ELIDED, so the Levels dropdown can show/hide it live. `scroll=False` leaves the
+        view for the caller's one `scroll_end` after a batch."""
         level = (level or "INFO").upper()
         tag = level if level in theme.LOG_COLORS else "INFO"
         self._track_width(message)
@@ -113,7 +127,8 @@ class LogView(ttk.Frame):
         if level == "PHASE":
             self._phase_gap()
         self.text.insert("end", f"{message}\n", tag)
-        self.text.see("end")
+        if scroll:
+            self.text.see("end")
         self.text.configure(state="disabled")
         self._tee(f"[{level}] {message}")
 
@@ -123,7 +138,7 @@ class LogView(ttk.Frame):
         if self.text.compare("end-1c", ">", "1.0"):
             self.text.insert("end", "\n" * lines)
 
-    def append_records(self, records) -> None:
+    def append_records(self, records, scroll: bool = True) -> None:
         """Append structured records (`io.render.render_records`): sub-phase banners (the SMALLER
         SUBPHASE header - the main phase header arrives via `append('PHASE', …)`), level-coloured
         finding lines, clickable `Sheet!Cell` link spans, a treatable line's errlink, and the
@@ -148,7 +163,8 @@ class LogView(ttk.Frame):
                     self.text.tag_add(_MARK_TAGS[mark.style],
                                       f"{start}+{mark.start}c", f"{start}+{mark.end}c")
             self._tee(rec.text)
-        self.text.see("end")
+        if scroll:
+            self.text.see("end")
         self.text.configure(state="disabled")
 
     def set_sink(self, sink) -> None:
@@ -191,8 +207,7 @@ class LogView(ttk.Frame):
 
     def set_theme(self, mode: str) -> None:
         """Re-theme the log pane for a light/dark mode switch: background, foreground, all level tag
-        colours, and the link accent colour. New content after this call uses the new palette; existing
-        content keeps its old colours (the Text is not re-rendered)."""
+        colours, and the link accent colour (every link, old ones too - they share the one `link` tag)."""
         self._accent = theme.LOG_COLORS_LIGHT["PHASE"][0] if mode != "dark" else _ACCENT_DARK
         bg = theme.bg_for(mode)
         fg = theme.fg_for(mode)
@@ -201,6 +216,8 @@ class LogView(ttk.Frame):
         for level, (color, bold) in palette.items():
             self.text.tag_configure(level, foreground=color, font=self._tag_font(level, bold))
         self._config_cmp_tags(mode)
+        self.text.tag_configure("link", foreground=self._accent)
+        self.text.tag_raise("link")               # over the level colours
 
     def set_font_size(self, size: int) -> None:
         """Resize the log font live (the Text body + every level tag, preserving each tag's bold). The
@@ -222,14 +239,34 @@ class LogView(ttk.Frame):
         s, e = f"{line_start}+{span.start}c", f"{line_start}+{span.end}c"
         token = self.text.get(s, e)
         sheet, cell = token.split("!", 1) if "!" in token else ("", "")
-        tag = f"link{self._links}"
-        self._links += 1
-        self.text.tag_add(tag, s, e)
-        self.text.tag_configure(tag, foreground=self._accent, underline=True)
-        self.text.tag_bind(tag, "<Enter>", lambda _e: self.text.configure(cursor="hand2"))
-        self.text.tag_bind(tag, "<Leave>", lambda _e: self.text.configure(cursor=""))
-        self.text.tag_bind(tag, "<Button-1>",
-                           lambda _e, d=span.doc, sh=sheet, c=cell: self.on_link(d, sh, c))
+        self.text.tag_add("link", s, e)
+        line, col = (int(v) for v in self.text.index(s).split("."))
+        self._link_spans.setdefault(line, []).append((col, col + (span.end - span.start), (span.doc, sheet, cell)))
+
+    def _at(self, event) -> tuple:
+        """(line, col) of the character under the mouse."""
+        line, col = self.text.index(f"@{event.x},{event.y}").split(".")
+        return int(line), int(col)
+
+    def _click_link(self, event) -> None:
+        """A click on a `Sheet!Cell` span -> `on_link(doc, sheet, cell)` of the span under the mouse."""
+        line, col = self._at(event)
+        for first, end, (doc, sheet, cell) in self._link_spans.get(line, ()):
+            if first <= col < end and self.on_link:
+                self.on_link(doc, sheet, cell)
+                return
+
+    def _click_err(self, event) -> None:
+        """A left-click on a treatable line's `[LEVEL]` -> `on_errjump(uid)` (the Findings row)."""
+        uid = self._err_uids.get(self._at(event)[0])
+        if uid and self.on_errjump:
+            self.on_errjump(uid)
+
+    def _click_err_menu(self, event) -> None:
+        """A right-click on a treatable line's `[LEVEL]` -> the treat menu."""
+        uid = self._err_uids.get(self._at(event)[0])
+        if uid and self.on_errtreat:
+            self._err_menu(event, uid)
 
     def _tag_errlink(self, line_start, rec) -> None:
         """The leading `[LEVEL]` of a treatable line: LEFT-click jumps to the finding's row in the
@@ -239,13 +276,7 @@ class LogView(ttk.Frame):
             return
         end = f"{line_start}+{len(rec.level) + 2}c"            # "[" + level + "]"
         self.text.tag_add("errlink", line_start, end)
-        tag = f"err{self._errs}"
-        self._errs += 1
-        self.text.tag_add(tag, line_start, end)
-        if self.on_errtreat:
-            self.text.tag_bind(tag, "<Button-3>", lambda e, u=rec.uid: self._err_menu(e, u))
-        if self.on_errjump:
-            self.text.tag_bind(tag, "<Button-1>", lambda _e, u=rec.uid: self.on_errjump(u))
+        self._err_uids[int(self.text.index(line_start).split(".")[0])] = rec.uid
 
     def _err_menu(self, event, uid: str) -> None:
         from pipeline5.findings import treatments
@@ -265,7 +296,7 @@ class LogView(ttk.Frame):
         self.text.configure(state="normal")
         self.text.delete("1.0", "end")
         self.text.configure(state="disabled")
-        self._links = 0
-        self._errs = 0
+        self._link_spans.clear()
+        self._err_uids.clear()
         self._max_chars = 0                  # the ONLY reset of the stable h-scroll domain (user spec)
         self._hsb.set(0.0, 1.0)

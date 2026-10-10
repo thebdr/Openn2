@@ -11,9 +11,12 @@ tiers + Database/<sid> + Output/<sid> and re-drives the phase bar from the new s
 """
 from __future__ import annotations
 
+import collections
 import os
 import queue
+import sys
 import threading
+import time
 import tkinter as tk
 import traceback
 from tkinter import ttk
@@ -37,6 +40,23 @@ from pipeline5.project import project_manager as project
 from pipeline5.project import app_state as state
 
 APP_TITLE = "Pipeline5 - SSOT database build"
+DRAIN_BUDGET_S = 0.008        # the UI thread's share per drain call - the busy animation keeps its frames
+DRAIN_IDLE_MS = 30            # the drain cadence when the queue is empty
+RECORD_CHUNK = 150            # a records batch is appended this many at a time (validation sends thousands)
+# While a phase runs, the worker thread holds Python's GIL and the UI thread waits its turn for every animation
+# frame; at the default 5 ms switch interval that cost ~60 frame stalls >100 ms per phase (21 fps). Under 1 ms the
+# hand-over is immediate on Windows (a sub-millisecond wait rounds down): 57 fps, p95 18 ms, ~10% longer phases -
+# measured on FVT phase 300 (2026-10-10). Set only while the App runs a phase, restored when it is idle.
+BUSY_SWITCH_S = 0.0005
+
+
+def busy_switch(busy: bool, _saved=[]) -> None:          # noqa: B006 - the one saved interval, module state
+    """The GIL switch interval for a running phase (BUSY_SWITCH_S) / back to the one before when idle."""
+    if busy and not _saved:
+        _saved.append(sys.getswitchinterval())
+        sys.setswitchinterval(BUSY_SWITCH_S)
+    elif not busy and _saved:
+        sys.setswitchinterval(_saved.pop())
 ICON = os.path.join(config.APP_ROOT, "assets", "Pipeline5.png")
 
 
@@ -59,6 +79,7 @@ class App:
         self._busy = False
         self._run_halted = False              # set by _gate on a blocking FAIL -> Run-all stops the chain
         self._q: queue.Queue = queue.Queue()
+        self._backlog: collections.deque = collections.deque()   # a records batch's not-yet-drawn rest
         app_ui = config.load_app_ui()
         self.mode = app_ui["theme"]           # light | dark (live-toggled by the theme button, persisted)
         self.lang = app_ui["language"]        # en | it (live-toggled by the Lang button, persisted)
@@ -669,15 +690,26 @@ class App:
         return sections
 
     def _drain(self):
-        """Main thread: apply the queued log/status/done events to the widgets, then reschedule."""
+        """Main thread: apply the queued log/status/done events to the widgets, then reschedule - within
+        DRAIN_BUDGET_S per call (a big records batch is cut into RECORD_CHUNK pieces, the rest kept, in order,
+        for the next call) and ONE scroll per batch, so the busy animation keeps its frames while a phase
+        logs thousands of lines. More left -> the next call right away; nothing -> DRAIN_IDLE_MS."""
+        deadline = time.perf_counter() + DRAIN_BUDGET_S
+        logged = False
         try:
-            while True:
-                event = self._q.get_nowait()
+            while time.perf_counter() < deadline:
+                event = self._backlog.popleft() if self._backlog else self._q.get_nowait()
                 kind = event[0]
                 if kind == "log":
-                    self.log.append(event[1], event[2])
+                    self.log.append(event[1], event[2], scroll=False)
+                    logged = True
                 elif kind == "records":
-                    self.log.append_records(event[1])
+                    records = list(event[1])
+                    if len(records) > RECORD_CHUNK:
+                        self._backlog.appendleft(("records", records[RECORD_CHUNK:]))
+                        records = records[:RECORD_CHUNK]
+                    self.log.append_records(records, scroll=False)
+                    logged = True
                 elif kind == "status":
                     self.status.configure(text=event[1])
                 elif kind == "progress_step":     # a Run-all per-phase tick (determinate bar)
@@ -693,10 +725,13 @@ class App:
                     self.files.refresh()             # the run (re)wrote output files - re-scan the tree
         except queue.Empty:
             pass
-        self.root.after(50, self._drain)
+        if logged:
+            self.log.scroll_end()
+        self.root.after(1 if (self._backlog or not self._q.empty()) else DRAIN_IDLE_MS, self._drain)
 
     def _set_busy(self, busy: bool, *, determinate: bool = False, total: int = 0):
         self._busy = busy
+        busy_switch(busy)                     # the UI thread gets the GIL in time for every animation frame
         self.phasebar.set_enabled(not busy)
         if busy and determinate:              # Run-all: the chase + a real 0..N underline per phase
             self.progress.configure(mode="determinate", maximum=max(1, total), value=0)

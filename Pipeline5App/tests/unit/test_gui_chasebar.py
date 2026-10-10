@@ -148,6 +148,77 @@ def test_chase_step_left_border():
     eq(s["dir"], 1, "the chase reverses to rightwards")
 
 
+def test_chase_step_is_time_based():
+    """User 2026-10-10 ("the animation during the running phases lags, can it be smooth?"): a step of k reference
+    ticks moves k times as far - two half steps land where one full step does, a late frame (k=3) keeps the speed -
+    the jump progresses by k / JUMP_TICKS, and the early-retarget chance scales as 1 - (1 - p)**k (k=1: exactly p)."""
+    steady = lambda: 0.45
+    full = cb.chase_step(_state(gap=30.0, gap_t=80.0), 2000.0, steady, 1.0)
+    half = cb.chase_step(cb.chase_step(_state(gap=30.0, gap_t=80.0), 2000.0, steady, 0.5), 2000.0, steady, 0.5)
+    eq((half["cx"], half["gap"]), (full["cx"], full["gap"]), "two half steps = one full step")
+    eq(cb.chase_step(_state(), 2000.0, steady, 3.0)["cx"], 200.0 + 3 * cb.SPEED, "a late frame keeps the speed")
+    eq(cb.chase_step(_state(jump=0.0, jump_from=0.0, jump_to=0.0), 2000.0, steady, 0.5)["jump"],
+       0.5 / cb.JUMP_TICKS, "the jump advances by k / JUMP_TICKS")
+    draws = []
+    rand = lambda: draws.append(None) or 0.019           # just under RETARGET_P (0.02): retargets at k=1 ...
+    cb.chase_step(_state(gap=30.0, gap_t=80.0), 2000.0, rand, 1.0)
+    eq(len(draws), 2, "... (the chance, then the new target)")
+    draws.clear()
+    cb.chase_step(_state(gap=30.0, gap_t=80.0), 2000.0, rand, 0.5)
+    eq(len(draws), 1, "... but not on a half step (chance 1 - 0.98**0.5 < 0.019)")
+    eq(cb.chase_step(_state(), 2000.0, steady)["cx"], 200.0 + cb.SPEED, "the default is one reference tick")
+
+
+def test_the_bar_frames_run_on_the_clock():
+    """The canvas: a frame every FRAME_MS (~60 fps) moving by the REAL time since the last frame - a frame the busy
+    UI thread delivers late moves further, not slower; a stall catches up at most MAX_STEP_S (no teleport)."""
+    import tkinter as tk
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        bar = cb.ChaseBar(root)
+        bar.start(12)
+        eq(bar._interval, cb.FRAME_MS, "the app's 12 ms request runs at FRAME_MS")
+        clock = iter([10.0, 10.0, 10.05, 10.05, 15.05, 15.05])   # each frame reads the clock twice (dt, its own cost)
+        original = cb.time.perf_counter
+        cb.time.perf_counter = lambda: next(clock)
+        try:
+            bar.after_cancel(bar._job)
+            bar.winfo_width = lambda: 4000                  # a withdrawn canvas reports 1 px - room to run
+            bar._state.update(cx=300.0, dir=1, gap=30.0, gap_t=30.0, jump=None)
+            bar._tick()                                     # the first frame: no elapsed time yet
+            x0 = bar._state["cx"]
+            bar._tick()                                     # 50 ms later: two reference ticks
+            x1 = bar._state["cx"]
+            bar._tick()                                     # after a 5 s stall: capped at MAX_STEP_S
+            x2 = bar._state["cx"]
+        finally:
+            cb.time.perf_counter = original
+        eq((x0, round(x1 - x0, 6)), (300.0, round(2 * cb.SPEED, 6)), "50 ms = 2 reference ticks of travel")
+        ok(abs(x2 - x1) <= cb.SPEED * cb.MAX_STEP_S / cb.TICK_S + 1e-6, f"a stall never teleports ({x2 - x1})")
+        bar.stop()
+    finally:
+        root.destroy()
+
+
+def test_busy_switch_hands_the_gil_over_while_a_phase_runs():
+    """The App gives the UI thread the GIL in time for every frame while a phase runs (BUSY_SWITCH_S) and puts the
+    interval back when idle; a second busy call keeps the ORIGINAL to restore."""
+    import sys
+    from pipeline5.workbench import app_main
+    before = sys.getswitchinterval()
+    try:
+        app_main.busy_switch(True)
+        eq(sys.getswitchinterval(), app_main.BUSY_SWITCH_S)
+        app_main.busy_switch(True)
+        app_main.busy_switch(False)
+        eq(sys.getswitchinterval(), before, "restored to the interval before the run")
+        app_main.busy_switch(False)
+        eq(sys.getswitchinterval(), before, "an idle call changes nothing")
+    finally:
+        sys.setswitchinterval(before)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("gui_chasebar", [
@@ -158,4 +229,7 @@ if __name__ == "__main__":
         ("chase_step_train_joins_per_border", test_chase_step_train_joins_per_border),
         ("chase_step_border_jump_and_flip", test_chase_step_border_jump_and_flip),
         ("chase_step_left_border", test_chase_step_left_border),
+        ("chase_step_is_time_based", test_chase_step_is_time_based),
+        ("the_bar_frames_run_on_the_clock", test_the_bar_frames_run_on_the_clock),
+        ("busy_switch_hands_the_gil_over_while_a_phase_runs", test_busy_switch_hands_the_gil_over_while_a_phase_runs),
     ]))

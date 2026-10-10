@@ -12,10 +12,17 @@ while the chase runs above it.
 The sprites are two-frame pixel maps rendered ONCE into transparent tk.PhotoImages (right + left
 facings); each tick only moves two canvas image items - no per-frame redraw of pixels. The chase
 maths (`chase_step`, `jump_arc`) is pure and unit-tested without a display.
+
+The motion is TIME-BASED (user 2026-10-10: "the animation during the running phases lags, can it be
+smooth?"): a frame every FRAME_MS (~60 fps) moves the chase by the REAL time since the last frame -
+every per-tick constant below is per TICK_S, the pace the user set - so a frame the busy UI thread
+delivers late keeps the speed instead of stuttering it (a stall catches up at most MAX_STEP_S: no
+teleport), and the steps are a third smaller than the old fixed 25 ms ticks.
 """
 from __future__ import annotations
 
 import random
+import time
 import tkinter as tk
 
 from pipeline5.workbench import theme
@@ -32,6 +39,10 @@ JUMP_TICKS = 12               # jump duration (ticks) - snappy at the 10x pace
 JUMP_LIFT = 17                # apex height (px) - clears the 16px coyote inside BAR_HEIGHT
 MARGIN = 3                    # border padding (px)
 FOLLOWER_GAP_LO, FOLLOWER_GAP_HI = 2.0, 50.0   # a follower's wandering distance behind its front
+TICK_S = 0.025                # the reference tick every per-tick constant above is counted in (the pace)
+FRAME_MS = 16                 # the frame interval (~60 fps) - each frame moves by the real time elapsed
+GALLOP_S = 0.05               # one leg frame per 50 ms (two reference ticks)
+MAX_STEP_S = 0.1              # a late frame catches up at most this much (a stall never teleports)
 
 # --- the sprites (facing RIGHT; '.' transparent). Two frames each = the leg gallop. -------------- #
 _RR_COLORS = {"P": "#5b6ee1", "Y": "#f4b41a"}                 # the bird: blue body, yellow legs/beak
@@ -164,8 +175,10 @@ def jump_arc(t: float) -> float:
     return 4.0 * t * (1.0 - t)
 
 
-def chase_step(state: dict, width: float, rand) -> dict:
-    """One pure animation tick. `state`: dir (+1 right / -1 left), cx (coyote centre), gap + gap_t
+def chase_step(state: dict, width: float, rand, k: float = 1.0) -> dict:
+    """One pure animation step of `k` reference ticks (k = elapsed / TICK_S; 1.0 = one tick - every
+    per-tick rate scales by it, a per-tick chance becomes 1 - (1 - p)**k). `state`: dir (+1 right / -1 left),
+    cx (coyote centre), gap + gap_t
     (the bird's lead and its current random TARGET), rw/cw (sprite widths), fw (the follower
     widths, in join order), followers ([{x, gap}] - the border-event chase train so far), and the
     jump fields (jump = None or the 0..1 progress; jump_from/jump_to = the arc endpoints).
@@ -182,7 +195,7 @@ def chase_step(state: dict, width: float, rand) -> dict:
     s["followers"] = [dict(f) for f in state.get("followers", [])]
     spans = s["cw"] / 2 + s["rw"] / 2
     if s["jump"] is not None:                     # mid-air: only the arc progresses
-        t = s["jump"] + 1.0 / JUMP_TICKS
+        t = s["jump"] + k / JUMP_TICKS
         if t >= 1.0:                              # landed: reverse the chase
             old_dir = s["dir"]
             s["dir"] = -old_dir
@@ -197,11 +210,12 @@ def chase_step(state: dict, width: float, rand) -> dict:
             s["jump"] = t
         return s
     # the bird's lead wanders between random targets - visibly stretching and squeezing
-    if abs(s["gap"] - s["gap_t"]) < GAP_RATE or rand() < RETARGET_P:
+    rate = GAP_RATE * k
+    if abs(s["gap"] - s["gap_t"]) < rate or rand() < 1.0 - (1.0 - RETARGET_P) ** k:
         s["gap_t"] = GAP_MIN + rand() * (GAP_MAX - GAP_MIN)
-    s["gap"] += max(-GAP_RATE, min(GAP_RATE, s["gap_t"] - s["gap"]))
+    s["gap"] += max(-rate, min(rate, s["gap_t"] - s["gap"]))
     s["gap"] = max(GAP_MIN, min(GAP_MAX, s["gap"]))
-    s["cx"] += s["dir"] * SPEED
+    s["cx"] += s["dir"] * SPEED * k
     s["cx"] = max(MARGIN + s["cw"] / 2, min(width - MARGIN - s["cw"] / 2, s["cx"]))
     rx = s["cx"] + s["dir"] * (spans + s["gap"])
     hi, lo = width - MARGIN - s["rw"] / 2, MARGIN + s["rw"] / 2
@@ -215,9 +229,10 @@ def chase_step(state: dict, width: float, rand) -> dict:
     front_x, front_w = s["cx"], s["cw"]
     for i, follower in enumerate(s["followers"]):
         follower["gap"] = max(FOLLOWER_GAP_LO,
-                              min(FOLLOWER_GAP_HI, follower["gap"] + (rand() * 6.0 - 3.0)))
+                              min(FOLLOWER_GAP_HI, follower["gap"] + (rand() * 6.0 - 3.0) * k))
         target = front_x - s["dir"] * (front_w / 2 + s["fw"][i] / 2 + follower["gap"])
-        follower["x"] += max(-FOLLOWER_SPEED, min(FOLLOWER_SPEED, target - follower["x"]))
+        step = FOLLOWER_SPEED * k
+        follower["x"] += max(-step, min(step, target - follower["x"]))
         front_x, front_w = follower["x"], s["fw"][i]
     return s
 
@@ -247,8 +262,8 @@ class ChaseBar(tk.Canvas):
         self._max = 100.0
         self._value = 0.0
         self._job = None
-        self._interval = 30
-        self._ticks = 0
+        self._interval = FRAME_MS
+        self._last = None             # the previous frame's time (perf_counter) - the step's real dt
         rw, _rh = sprite_size(ROADRUNNER)
         cw, _ch = sprite_size(COYOTE)
         self._state = {"dir": 1, "cx": 120.0, "gap": 30.0, "gap_t": 30.0, "rx": 180.0,
@@ -294,11 +309,13 @@ class ChaseBar(tk.Canvas):
             return {"value": self._value, "maximum": self._max, "mode": self._mode}[key]
         return super().__getitem__(key)
 
-    def start(self, interval: int = 30) -> None:
-        """Begin a FRESH chase (both modes; determinate keeps its real progress underline).
-        The follower train waits for its border entrances again on every new run."""
-        self._interval = max(25, int(interval))
+    def start(self, interval: int = FRAME_MS) -> None:
+        """Begin a FRESH chase (both modes; determinate keeps its real progress underline) - a frame every
+        `interval` ms, never faster than FRAME_MS. The follower train waits for its border entrances again
+        on every new run."""
+        self._interval = max(FRAME_MS, int(interval))
         if self._job is None:
+            self._last = None
             self._state.update(cx=max(60.0, self.winfo_width() * 0.3 or 120.0),
                                dir=1, jump=None, gap=30.0, gap_t=30.0, followers=[])
             self._job = self.after(self._interval, self._tick)
@@ -317,12 +334,14 @@ class ChaseBar(tk.Canvas):
         if not self.winfo_exists():
             self._job = None
             return
-        self._ticks += 1
+        now = time.perf_counter()
+        dt = 0.0 if self._last is None else min(MAX_STEP_S, max(0.0, now - self._last))
+        self._last = now
         width = float(max(self.winfo_width(), 160))
         in_jump = self._state["jump"] is not None
-        self._state = chase_step(self._state, width, random.random)
+        self._state = chase_step(self._state, width, random.random, dt / TICK_S)
         s = self._state
-        frame = (self._ticks // 2) % 2             # fast gallop to match the 10x pace
+        frame = int(now / GALLOP_S) % 2           # the gallop runs on the clock, not the frame count
         facing = 0 if s["dir"] > 0 else 1
         if s["jump"] is not None:                  # mid-air: interpolate the arc; the coyote skids
             t = s["jump"]
@@ -345,7 +364,8 @@ class ChaseBar(tk.Canvas):
                                image=self._f_imgs[i][facing][0 if s["jump"] is not None else frame])
             self.coords(self._f_items[i], follower["x"], self._ground_y)
         self.tag_raise(self._rr_item)              # the bird passes OVER the coyote
-        self._job = self.after(self._interval, self._tick)
+        spent_ms = int((time.perf_counter() - now) * 1000)
+        self._job = self.after(max(1, self._interval - spent_ms), self._tick)
 
     def _draw_fill(self) -> None:
         """The determinate progress underline (bottom 4px, accent) - hidden at value 0."""
