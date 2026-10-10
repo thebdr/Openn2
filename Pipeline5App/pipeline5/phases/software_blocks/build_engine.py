@@ -123,6 +123,18 @@ def _drop_stale_csv(out_dir: str, name: str) -> None:
         os.remove(stale)
 
 
+def block_tables(database: DB) -> dict:
+    """{block name -> its @-row Table} - the network rows of every `software_blocks` block in `seq` order, the
+    shape every emitter projects (and the signal-paths report renders a ready block from)."""
+    members: dict = {}
+    if "software_block_members" in database:
+        for m in database["software_block_members"]:
+            members.setdefault(m["block"], []).append(m)
+    return {b["name"]: Table(b["name"], columns=list(b["columns"]),
+                             rows=[dict(m["values"]) for m in sorted(members.get(b["name"], []), key=lambda m: int(m["seq"]))])
+            for b in (database["software_blocks"] if "software_blocks" in database else [])}
+
+
 def project(database: DB | None = None, out_dir: str | None = None, import_dir: str | None = None,
             system=None, tpl_dir: str | None = None) -> dict:
     """Project `software_blocks` + `software_block_members` -> the `$/#/%/@` CreationInfo CSVs in `out_dir`,
@@ -145,15 +157,11 @@ def project(database: DB | None = None, out_dir: str | None = None, import_dir: 
         tpl_dir = tpl_dir or delivery["templates"]
     tpl_dir = tpl_dir or os.path.join(out_dir, "Templates")
     os.makedirs(out_dir, exist_ok=True)
-    members: dict = {}
-    if "software_block_members" in database:
-        for m in database["software_block_members"]:
-            members.setdefault(m["block"], []).append(m)
+    tables = block_tables(database)
 
     files, xml_files, scl_files = [], [], []
     for b in (database["software_blocks"] if "software_blocks" in database else []):
-        rows = [dict(m["values"]) for m in sorted(members.get(b["name"], []), key=lambda m: int(m["seq"]))]
-        table = Table(b["name"], columns=list(b["columns"]), rows=rows)
+        table = tables[b["name"]]
         # Emit-kind routing (PL4 coupling #2, final form): EVERY kind - including "csv" - resolves
         # through the system's emitter table; an undeclared kind raises, never a silent default.
         kind = system.builders.emit_kind(b["name"])

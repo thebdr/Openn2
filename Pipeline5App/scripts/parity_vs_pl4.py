@@ -110,6 +110,9 @@ def run_pl5(db_dir: str, out_dir: str) -> None:
     engine.write_instance_dbs(db, system=SYSTEM)
     db, _ = coverage.build(db, system=SYSTEM)
     coverage.project(db, system=SYSTEM)
+    from pipeline5.phases.coverage import signal_paths       # PL5-only (C-038): checked, never compared
+    from pipeline5.systems.plc_based.siemens_s7.safety.main import _ready_block_xml
+    signal_paths.project(db, ready=_ready_block_xml(db, SYSTEM))
 
 
 def _tree(root: str) -> dict:
@@ -184,7 +187,8 @@ _WORKSPACE = "TiaPortalProjectInterface/BuilderData/"
 _TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
 _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
 SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
-              "device_types_copy": 0}
+              "device_types_copy": 0, "signal_paths_page": 0}
+_SIGNAL_PATHS = "ProjectDocumentation/Reports/io_signal_paths.html"
 _DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
 _SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
 _INTERFACE_SCL = "10_Machine Interfaces.scl"
@@ -277,6 +281,27 @@ def _check_device_types_copy(path: str, label: str) -> list:
     return problems
 
 
+def _check_signal_paths(path: str, ref_coverage: str, label: str) -> list:
+    """The signal-paths page (C-038, since 2026-10-10) - a PL5-only report: its embedded JSON parses and lists one
+    entry per row of the coverage report (the reference's csv), every entry pointing at a node of the graph."""
+    import json
+    text = open(path, encoding="utf-8").read()
+    m = re.search(r'<script id="data" type="application/json">(.*?)</script>', text, re.S)
+    if not m:
+        return [f"{label}: the signal-paths page carries no data block"]
+    try:
+        data = json.loads(m.group(1))
+    except ValueError as error:
+        return [f"{label}: the signal-paths page's data is no JSON ({error})"]
+    rows = max(0, sum(1 for line in open(ref_coverage, encoding="utf-8-sig") if line.strip()) - 1)
+    problems = []
+    if len(data.get("signals", [])) != rows:
+        problems.append(f"{label}: the signal-paths page lists {len(data.get('signals', []))} rows, the coverage report {rows}")
+    if any(not 0 <= s[0] < len(data.get("nodes", [])) for s in data.get("signals", [])):
+        problems.append(f"{label}: a signal-paths entry points at no node")
+    return problems
+
+
 def _legacy_rel(rel: str):
     """A PL5 output path -> the frozen reference's path: the VCI-shaped workspace (contract §4) onto the
     legacy BuilderData folders (§4.1, inverted). None = a PL5-only file by design (the workspace config,
@@ -313,6 +338,11 @@ def compare(a_root: str, b_root: str, label: str) -> list:
         if rel == _DEVICE_TYPES_COPY:                  # the shipped database: checked against its original
             diffs += _check_device_types_copy(path, label)
             SANCTIONED["device_types_copy"] += 1
+            continue
+        if rel == _SIGNAL_PATHS:                       # the signal-paths page: its data checked, never compared
+            diffs += _check_signal_paths(path, os.path.join(a_root, "ProjectDocumentation", "Reports",
+                                                            "io_project_coverage_report.csv"), label)
+            SANCTIONED["signal_paths_page"] += 1
             continue
         legacy = _legacy_rel(rel)
         if legacy is None:
@@ -397,7 +427,8 @@ def main() -> int:
               f"{SANCTIONED['transfer_area_rows']} PL5-only transfer-area rows, "
               f"{SANCTIONED['interface_descriptions']} interface descriptions + "
               f"{SANCTIONED['region_comments']} SCL region comments, {SANCTIONED['device_types_copy']} shipped "
-              "DeviceTypesDatabase checked against its original)")
+              f"DeviceTypesDatabase checked against its original, {SANCTIONED['signal_paths_page']} signal-paths "
+              "page checked against the coverage rows)")
         return 0
 
 

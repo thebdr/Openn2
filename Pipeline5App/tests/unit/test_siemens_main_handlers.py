@@ -1403,6 +1403,29 @@ def test_the_interface_description_reaches_the_scl():
         ("REGION SORTER+DIAG-02", "    // IO COUPLER - SORTER INTERFACE")])
 
 
+def test_reporting_writes_the_signal_paths_page():
+    """C-038 through the REAL 910 handler on the fixture: beside the coverage report it writes
+    io_signal_paths.html - one entry per coverage row (the csv's), its graph embedded - and reports it."""
+    import csv
+    import glob
+    import json
+    import re
+    host = _Host()
+    SYSTEM.handlers["reporting"](host.ctx(), only=910)
+    eq(host.halted, False)
+    page = glob.glob(os.path.join(p5paths._BUILTIN_OUTPUT, "**", "io_signal_paths.html"), recursive=True)
+    eq(len(page), 1, page)
+    coverage_csv = os.path.join(os.path.dirname(page[0]), "io_project_coverage_report.csv")
+    with open(coverage_csv, encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+    text = open(page[0], encoding="utf-8").read()
+    data = json.loads(re.search(r'<script id="data" type="application/json">(.*?)</script>', text, re.S).group(1))
+    eq(len(data["signals"]), len(rows), "one entry per coverage row")
+    eq(sorted({s[3] for s in data["signals"]}), sorted({r["FLD"] for r in rows}), "the same rows")
+    ok(any(s[7]["outputs"] for s in data["signals"]), "some row reaches a physical output on the fixture")
+    ok(any("910 signal paths:" in msg for lvl, msg in host.lines if lvl == "RSLT"), host.lines)
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("siemens_main_handlers", [
@@ -1443,4 +1466,5 @@ if __name__ == "__main__":
         ("a_transfer_area_fail_halts_the_interface_outputs",
          _sandboxed(test_a_transfer_area_fail_halts_the_interface_outputs)),
         ("the_interface_description_reaches_the_scl", _sandboxed(test_the_interface_description_reaches_the_scl)),
+        ("reporting_writes_the_signal_paths_page", _sandboxed(test_reporting_writes_the_signal_paths_page)),
     ]))

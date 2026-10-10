@@ -655,12 +655,31 @@ def run_reporting(ctx, only=None):
     database, fb = engine.build(database, system=ctx.system); proj += fb
     database, fc = coverage.build(database, system=ctx.system); proj += fc
     res = coverage.project(database, system=ctx.system)
+    from pipeline5.phases.coverage import signal_paths
+    paths = signal_paths.project(database, ready=_ready_block_xml(database, ctx.system))
     ctx.render(proj, label="900 coverage")
     st = res["stats"]
     gen = f"gen {st['kinds']['generated']}/" if st["kinds"].get("generated") else ""
     ctx.emit("RSLT", f"  910 coverage: {st['rows']} rows (sig {st['kinds']['signal']}/{gen}"
                      f"chan {st['kinds']['channel']}/struct {st['kinds']['structural']}), "
                      f"{st['orphans']} ORPHAN, {st['unplaced']} UNPLACED -> {res['txt']}")
+    ctx.emit("RSLT", f"  910 signal paths: {paths['traced']} of {paths['signals']} rows with a path"
+                     + "".join(f"; {note}" for note in paths["notes"]) + f" -> {paths['html']}")
+
+
+def _ready_block_xml(database, system) -> dict:
+    """{block name -> the XML PL5 renders for it} for every block that ships READY (emit fc_xml / fdback_xml -
+    03 Zone Cumulative): the signal-paths report traces those networks as rendered (all their inputs, whatever the
+    template's capacity), the template-filled ones (csv) from their template and rows. In memory - no file read."""
+    from pipeline5.phases.software_blocks import build_engine as engine
+    from pipeline5.systems.plc_based.siemens_s7 import fc_xml_emitter
+    tables, out = engine.block_tables(database), {}
+    for block in (database["software_blocks"] if "software_blocks" in database else []):
+        emit = fc_xml_emitter.EMIT_FUNCS.get(system.builders.emit_kind(block["name"]))
+        ref = str(block.get("template_ref") or "")
+        if emit is not None and ref and os.path.isfile(ref):
+            out[block["name"]] = emit(tables[block["name"]], ref, block["name"])
+    return out
 
 
 # The dispatch table System.handlers carries - Phase.handler / a special Sub.opens key -> handler.
