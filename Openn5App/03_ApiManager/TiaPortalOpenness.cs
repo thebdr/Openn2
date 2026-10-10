@@ -47,7 +47,7 @@ namespace Openn._03_ApiManager
         /// </summary>
         private bool ownsPortal = false;
 
-        /// <summary>The TIA Portal process this instance is attached to (its main window is where the "Re-arrange devices" robot drags); null when unknown.</summary>
+        /// <summary>The TIA Portal process this instance is attached to; null when unknown.</summary>
         public int? AttachedProcessId { get; private set; }
 
         #endregion Connection state
