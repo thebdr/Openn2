@@ -25,7 +25,8 @@ namespace Openn
     /// which measures the scroll step) and a model of every station's canvas position kept by counting arrow
     /// clicks. A far station travels down in hops of one viewport and left along its target row's free columns
     /// (beyond the planned ones), then one drag puts it in its cell. F12 stops, and so does a foreground change.
-    /// The window is a step-by-step wizard - colourful on purpose: it underlines what is being worked around.
+    /// The window is a step-by-step wizard - colourful on purpose: it underlines what is being worked around, and a
+    /// strip under the header keeps the score (what Openness tells us about a device, and the two numbers it does not).
     /// </summary>
     public class ArrangeDevicesWindow : Window
     {
@@ -33,7 +34,7 @@ namespace Openn
         private const int HotkeyStop = 0x5002;    //F12
         private const double EdgeMargin = 60;     //px kept between a grabbed / dropped station and the canvas edges
         private const int StepClicksX = 8;        //clicks the robot makes to measure the horizontal step
-        private const int StepClicksY = 6;        //clicks the robot makes to measure the vertical step
+        private const int StepClicksY = 3;        //clicks the robot makes to measure the vertical step (more and the first row leaves the canvas)
         private const int MaxHops = 60;
 
         //calibration steps: seven are hover + F9; the last two are "hover the first station again" after the robot clicked
@@ -50,6 +51,9 @@ namespace Openn
         private static readonly Brush Paper = Frozen(0xF6, 0xF4, 0xFB);
         private static readonly Brush Station = Frozen(0xB8, 0xC4, 0xD6);
         private static readonly Brush Canvas = Frozen(0xEE, 0xF1, 0xF7);
+        private static readonly Brush Red = Frozen(0xC0, 0x39, 0x2B);      //what Openness does not expose
+        private static readonly Brush Mint = Frozen(0xDD, 0xF3, 0xE4);
+        private static readonly Brush Rose = Frozen(0xFD, 0xE2, 0xE2);
 
         private readonly IList<NetworkViewLayout.Station> stations;
         private readonly string stationsSource;
@@ -96,13 +100,13 @@ namespace Openn
         {
             "Two numbers. X and Y. Siemens has them. We don't.",
             "This step exists because a position API doesn't.",
-            "Somewhere, an Openness engineer could have typed \"public Point Position\".",
-            "We measure what should simply have been readable.",
-            "Teaching a robot to hover, so nobody has to drag 65 boxes.",
-            "Hover like nobody is watching. (TIA isn't - it can't.)",
-            "Almost there. Still no API.",
-            "Fourteen clicks to learn what a property would have told us.",
-            "Last one. Then the robot earns its keep.",
+            "Somewhere, an Openness engineer could have typed \"public Point Position\". Five versions later, nobody has.",
+            "Openness reports a firmware version to the last digit. Where the device is drawn? Not its department.",
+            "A scrollbar button, hovered by hand, because the API has no Scroll() either.",
+            "TIA saves every position in the project. Openness opens that project. Draw your own conclusions.",
+            "Teaching a robot to hover, so nobody drags 65 boxes by hand ever again.",
+            "Eight clicks to learn what a property getter would have told us in a microsecond.",
+            "Last one. Then the robot does Siemens' homework.",
         };
 
         public ArrangeDevicesWindow(IList<NetworkViewLayout.Station> stationsInCreationOrder, string stationsSource, Func<int?> tiaProcessId)
@@ -114,7 +118,7 @@ namespace Openn
 
             Title = "Openn5 - Re-arrange devices";
             Width = 1040;
-            Height = 760;
+            Height = 800;
             MinWidth = 860;
             MinHeight = 600;
             Topmost = true; //stays readable in front of TIA; it is never the foreground window while the robot works
@@ -123,6 +127,7 @@ namespace Openn
             FontFamily = new FontFamily("Segoe UI");
 
             var root = new Grid();
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -138,12 +143,24 @@ namespace Openn
             headerStack.Children.Add(new TextBlock { Text = "Re-arrange devices", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Brushes.White });
             headerStack.Children.Add(new TextBlock
             {
-                Text = "Openness tells us everything about a device except where it is drawn. No X, no Y, no \"move\". So a mouse robot learns the two numbers the long way round - and then does the dragging for you.",
+                Text = "TIA knows where every station is drawn - it saves it in the project. Openness just won't say: no X, no Y, no Move(). Two numbers, withheld through five API versions. So a mouse robot learns them the long way round, then does the dragging for you.",
                 FontSize = 13, Foreground = Brushes.White, Opacity = 0.92, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0),
             });
             header.Child = headerStack;
             Grid.SetRow(header, 0);
             root.Children.Add(header);
+
+            // ---- the score: what the API tells us about a device, and the two numbers it does not
+            var score = new WrapPanel { Margin = new Thickness(22, 12, 22, 0) };
+            score.Children.Add(ScoreLabel("Openness tells us"));
+            foreach (string known in new[] { "name", "type", "order number", "firmware", "IP address", "modules", "tags" })
+                score.Children.Add(Chip("✓ " + known, Mint, Done));
+            score.Children.Add(ScoreLabel("but not"));
+            foreach (string missing in new[] { "X", "Y", "Move()" })
+                score.Children.Add(Chip("✗ " + missing, Rose, Red));
+            score.Children.Add(ScoreLabel("- checked in the PublicAPI docs of V15 to V19"));
+            Grid.SetRow(score, 1);
+            root.Children.Add(score);
 
             // ---- step strip
             var strip = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 14, 22, 6), HorizontalAlignment = HorizontalAlignment.Left };
@@ -162,7 +179,7 @@ namespace Openn
                 if (i < CaptureCount - 1)
                     strip.Children.Add(new Rectangle { Width = 14, Height = 2, Fill = Pending, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(-14, 15, 0, 0) });
             }
-            Grid.SetRow(strip, 1);
+            Grid.SetRow(strip, 2);
             root.Children.Add(strip);
 
             // ---- body: the wizard card + the side panel
@@ -184,7 +201,7 @@ namespace Openn
                 HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0),
                 Effect = new DropShadowEffect { BlurRadius = 10, ShadowDepth = 2, Opacity = 0.25 },
             };
-            f9PillText = new TextBlock { Text = "hover it, then press  F9", Foreground = Brushes.White, FontWeight = FontWeights.Bold, FontSize = 14 };
+            f9PillText = new TextBlock { Text = "hover its center, then press  F9", Foreground = Brushes.White, FontWeight = FontWeights.Bold, FontSize = 14 };
             f9Pill.Child = f9PillText;
             cardStack.Children.Add(f9Pill);
             whimsy = new TextBlock { FontSize = 12, FontStyle = FontStyles.Italic, Foreground = Muted, Margin = new Thickness(0, 16, 0, 0), TextWrapping = TextWrapping.Wrap };
@@ -241,7 +258,7 @@ namespace Openn
             Grid.SetColumn(side, 1);
             body.Children.Add(side);
 
-            Grid.SetRow(body, 2);
+            Grid.SetRow(body, 3);
             root.Children.Add(body);
 
             // ---- footer: status, progress, buttons
@@ -275,7 +292,7 @@ namespace Openn
             Grid.SetColumn(buttons, 1);
             footerGrid.Children.Add(buttons);
             footer.Child = footerGrid;
-            Grid.SetRow(footer, 3);
+            Grid.SetRow(footer, 4);
             root.Children.Add(footer);
 
             Content = root;
@@ -301,6 +318,17 @@ namespace Openn
         {
             Background = Card, CornerRadius = new CornerRadius(10), Padding = new Thickness(18, 16, 18, 16),
             Effect = new DropShadowEffect { BlurRadius = 14, ShadowDepth = 2, Opacity = 0.12 },
+        };
+
+        private static TextBlock ScoreLabel(string text) => new TextBlock
+        {
+            Text = text, Foreground = Muted, FontSize = 12, FontStyle = FontStyles.Italic, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 4),
+        };
+
+        private static Border Chip(string text, Brush background, Brush foreground) => new Border
+        {
+            Background = background, CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 2, 9, 3), Margin = new Thickness(0, 0, 6, 4),
+            Child = new TextBlock { Text = text, Foreground = foreground, FontSize = 12, FontWeight = FontWeights.SemiBold },
         };
 
         private static Button MakeButton(string caption, Brush background)
@@ -333,14 +361,6 @@ namespace Openn
             element.BeginAnimation(OpacityProperty, animation);
         }
 
-        private static void Bounce(UIElement element)
-        {
-            var transform = new TranslateTransform();
-            element.RenderTransform = transform;
-            var animation = new DoubleAnimation(0, 7, TimeSpan.FromMilliseconds(450)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase() };
-            transform.BeginAnimation(TranslateTransform.YProperty, animation);
-        }
-
         // ============================== the wizard ==============================
 
         private static readonly string[] StepTitles =
@@ -356,15 +376,15 @@ namespace Openn
             string second = stations.Count > 1 ? stations[1].Name : "(none)";
             switch (step)
             {
-                case CapFirst: return "With the view scrolled fully LEFT and fully UP, hover the CENTER of the first created station, " + first + ". Zoom first so that at least " + (layout.MaxPerRow + 1) + " columns of stations fit the canvas - and do not zoom again afterwards.";
-                case CapSecond: return "Hover the center of the second created station, " + second + ". The distance between the two is the pitch of the whole row.";
-                case CapRow2: return "Hover the spot where the FIRST station of row 2 should sit: straight below the first station, one row down. That distance is the row pitch.";
-                case CapLeft: return "Hover the  <  arrow button at the left end of the canvas's bottom scrollbar.";
-                case CapRight: return "Hover the  >  arrow button at the right end of the bottom scrollbar. Its position also tells the robot where the canvas ends.";
-                case CapUp: return "Hover the  ^  arrow button at the top of the canvas's right scrollbar.";
-                case CapDown: return "Hover the  v  arrow button at the bottom of the right scrollbar. After this one the robot starts clicking.";
-                case CapAfterX: return "The robot clicked  >  " + StepClicksX + " times, so the whole picture slid left. Hover the first station, " + first + ", at its NEW position. That measures the horizontal step per click.";
-                default: return "The robot scrolled back, then clicked  v  " + StepClicksY + " times, so the picture slid up. Hover the first station, " + first + ", at its NEW position. That measures the vertical step per click.";
+                case CapFirst: return "Scroll the view fully left and fully up. Zoom until at least " + (layout.MaxPerRow + 1) + " columns fit, then leave the zoom alone.\nHover the center of " + first + ".";
+                case CapSecond: return "Hover the center of " + second + ".";
+                case CapRow2: return "Hover the spot straight below " + first + ", one row down - where row 2 begins.";
+                case CapLeft: return "Hover the  <  button at the left end of the bottom scrollbar.";
+                case CapRight: return "Hover the  >  button at the right end of the bottom scrollbar.";
+                case CapUp: return "Hover the  ^  button at the top of the right scrollbar.";
+                case CapDown: return "Hover the  v  button at the bottom of the right scrollbar. Then the robot clicks.";
+                case CapAfterX: return "The robot clicked  >  " + StepClicksX + " times. Hover the center of " + first + " where it is NOW.";
+                default: return "The robot clicked  v  " + StepClicksY + " times. Hover the center of " + first + " where it is NOW.";
             }
         }
 
@@ -394,16 +414,16 @@ namespace Openn
             if (running)
             {
                 stepTitle.Text = "The robot is at work";
-                stepInstruction.Text = "Hands off the mouse and the keyboard. It scrolls with the arrow buttons, drags station by station, and stops on F12 or when another window comes to the front.";
+                stepInstruction.Text = "Hands off the mouse and the keyboard. F12 stops it; so does any other window coming to the front.";
                 illustrationHost.Content = DrawIllustration(-1);
                 f9Pill.Visibility = Visibility.Collapsed;
-                whimsy.Text = "Every drag below is one the API could have spared us.";
+                whimsy.Text = "Every drag below is one line of API Siemens never wrote.";
                 return;
             }
             if (complete)
             {
-                stepTitle.Text = "Calibrated. Two numbers, learned the hard way.";
-                stepInstruction.Text = "The robot knows the pitch, the row pitch, the scroll step and the viewport. Press \"Start the robot\" and keep your hands off the mouse until it reports done. Reset to calibrate again.";
+                stepTitle.Text = "Calibrated. Two numbers Siemens wouldn't tell, learned the hard way.";
+                stepInstruction.Text = "Pitch, row pitch, scroll step and viewport are known. Press Start and keep your hands off the mouse until it reports done.";
                 illustrationHost.Content = DrawIllustration(-1);
                 f9Pill.Visibility = Visibility.Collapsed;
                 whimsy.Text = Whimsies[Whimsies.Length - 1];
@@ -412,7 +432,7 @@ namespace Openn
             if (calibrating)
             {
                 stepTitle.Text = "Clicking...";
-                stepInstruction.Text = "The robot is clicking the scrollbar arrow. Watch the picture slide, then wait for the next instruction.";
+                stepInstruction.Text = "The robot is clicking the arrow. Watch the picture slide, then wait for the next instruction.";
                 illustrationHost.Content = DrawIllustration(step);
                 f9Pill.Visibility = Visibility.Collapsed;
                 whimsy.Text = "Counting clicks, because counting pixels was not an option either.";
@@ -423,7 +443,7 @@ namespace Openn
             stepInstruction.Text = StepInstruction(step);
             illustrationHost.Content = DrawIllustration(step);
             f9Pill.Visibility = Visibility.Visible;
-            f9PillText.Text = step >= CapAfterX ? "hover it again, then press  F9" : "hover it, then press  F9";
+            f9PillText.Text = step >= CapAfterX ? "hover its center again, then press  F9" : step >= CapLeft ? "hover the button, then press  F9" : "hover its center, then press  F9";
             whimsy.Text = Whimsies[Math.Min(step, Whimsies.Length - 1)];
         }
 
@@ -443,7 +463,7 @@ namespace Openn
             AddButton(canvas, w - bar + 1, h - 2 * bar + 1, bar - 2, "v", step == CapDown || step == CapAfterY);
 
             //the default row, shifted for the two measuring steps
-            double shiftX = step == CapAfterX ? -34 : 0, shiftY = step == CapAfterY ? -22 : 0;
+            double shiftX = step == CapAfterX ? -34 : 0, shiftY = step == CapAfterY ? -12 : 0;
             double x0 = 28 + shiftX, y0 = 34 + shiftY;
             for (int i = 0; i < 9; i++)
             {
@@ -497,18 +517,32 @@ namespace Openn
             if (hot) AddCursor(canvas, x + size / 2, y + size / 2);
         }
 
-        /// <summary>A bouncing pointer glyph above the thing to hover.</summary>
+        /// <summary>The pointer with its tip exactly on the point to hover; a dot and a pulsing ring mark that point.</summary>
         private static void AddCursor(System.Windows.Controls.Canvas canvas, double x, double y)
         {
+            var ring = new Ellipse { Width = 14, Height = 14, Stroke = Accent, StrokeThickness = 2, Fill = Brushes.Transparent, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1) };
+            System.Windows.Controls.Canvas.SetLeft(ring, x - 7);
+            System.Windows.Controls.Canvas.SetTop(ring, y - 7);
+            canvas.Children.Add(ring);
+            var grow = new DoubleAnimation(0.6, 2.0, TimeSpan.FromMilliseconds(1100)) { RepeatBehavior = RepeatBehavior.Forever };
+            var fade = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(1100)) { RepeatBehavior = RepeatBehavior.Forever };
+            ((ScaleTransform)ring.RenderTransform).BeginAnimation(ScaleTransform.ScaleXProperty, grow);
+            ((ScaleTransform)ring.RenderTransform).BeginAnimation(ScaleTransform.ScaleYProperty, grow);
+            ring.BeginAnimation(OpacityProperty, fade);
+
+            var dot = new Ellipse { Width = 4, Height = 4, Fill = Brushes.White, Stroke = Ink, StrokeThickness = 1 };
+            System.Windows.Controls.Canvas.SetLeft(dot, x - 2);
+            System.Windows.Controls.Canvas.SetTop(dot, y - 2);
+            canvas.Children.Add(dot);
+
             var pointer = new Polygon
             {
                 Points = new PointCollection { new Point(0, 0), new Point(0, 16), new Point(4, 12), new Point(7, 18), new Point(10, 16), new Point(7, 11), new Point(12, 11) },
                 Fill = Ink, Stroke = Brushes.White, StrokeThickness = 1,
             };
-            System.Windows.Controls.Canvas.SetLeft(pointer, x - 2);
-            System.Windows.Controls.Canvas.SetTop(pointer, y - 26);
+            System.Windows.Controls.Canvas.SetLeft(pointer, x);
+            System.Windows.Controls.Canvas.SetTop(pointer, y);
             canvas.Children.Add(pointer);
-            Bounce(pointer);
         }
 
         private void RefreshNumbers()
@@ -520,8 +554,10 @@ namespace Openn
             if (stepX > 0) lines.Add("step >       " + stepX.ToString("0.0") + " px per click");
             if (stepY > 0) lines.Add("step v       " + stepY.ToString("0.0") + " px per click");
             if (calibrationStep > CapDown && Pitch() > 0 && RowPitch() > 0) lines.Add("viewport     " + VisibleColumns + " columns x " + VisibleRows + " rows");
+            var captured = new List<string>();
             for (int i = 0; i < CaptureCount; i++)
-                if (calibration[i].HasValue) lines.Add("capture " + (i + 1) + "    " + ((int)calibration[i].Value.X) + ", " + ((int)calibration[i].Value.Y));
+                if (calibration[i].HasValue) captured.Add((i + 1) + ": " + (int)calibration[i].Value.X + "," + (int)calibration[i].Value.Y);
+            if (captured.Count > 0) lines.Add("captures     " + string.Join("   ", captured));
             numbers.Text = lines.Count > 0 ? string.Join("\n", lines) : "nothing yet - the first hover is the origin";
         }
 
