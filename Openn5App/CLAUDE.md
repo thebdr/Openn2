@@ -235,7 +235,7 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   on the side; colourful on purpose - it underlines the two numbers,
   X and Y, that Openness will not give) - with the global hotkey F9: the first station, the second, the first cell of
   row 2, the four scrollbar
-  ARROW buttons (< > ^ v); the robot then clicks > 8 times and v 6 times and the user re-hovers the first station
+  ARROW buttons (< > ^ v); the robot then clicks > 8 times and v 3 times (more and the first row leaves the canvas) and the user re-hovers the first station
   after each, which measures the scroll step in px per click. From then on the robot scrolls by COUNTED clicks
   (the user's model, 2026-10-10: exact, no pixel reading), brings TIA to the front (`AttachedProcessId`) and drags
   with SendInput, keeping every station's canvas position. A far station travels down in hops of one viewport at a
@@ -494,7 +494,7 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
    present logs `Topology links in Stations.csv NOT wired`.
 18. **Re-arrange devices**: right after a generation, open the network view at its origin (fully left and up), zoom so that 8 columns fit, press
    "Re-arrange devices..", F9 on the first station, the second, one row below the first, the four arrow buttons,
-   then F9 on the first station after the robot clicked > 8 times and again after it clicked v 6 times (the status
+   then F9 on the first station after the robot clicked > 8 times and again after it clicked v 3 times (the status
    shows the measured step and the viewport in columns x rows), Start: the view scrolls by arrow clicks, far stations
    hop down and left along their row's free columns (`after N hop(s)` in the log), then every
    Group gets its own row(s), at most 7 per row (the box in the window; a group of 9 fills row 1 with 7 and puts 2 on

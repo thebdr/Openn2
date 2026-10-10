@@ -34,7 +34,7 @@ namespace Openn
         private const int HotkeyStop = 0x5002;    //F12
         private const double EdgeMargin = 60;     //px kept between a grabbed / dropped station and the canvas edges
         private const int StepClicksX = 8;        //clicks the robot makes to measure the horizontal step
-        private const int StepClicksY = 6;        //clicks the robot makes to measure the vertical step
+        private const int StepClicksY = 3;        //clicks the robot makes to measure the vertical step (more and the first row leaves the canvas)
         private const int MaxHops = 60;
 
         //calibration steps: seven are hover + F9; the last two are "hover the first station again" after the robot clicked
@@ -463,7 +463,7 @@ namespace Openn
             AddButton(canvas, w - bar + 1, h - 2 * bar + 1, bar - 2, "v", step == CapDown || step == CapAfterY);
 
             //the default row, shifted for the two measuring steps
-            double shiftX = step == CapAfterX ? -34 : 0, shiftY = step == CapAfterY ? -22 : 0;
+            double shiftX = step == CapAfterX ? -34 : 0, shiftY = step == CapAfterY ? -12 : 0;
             double x0 = 28 + shiftX, y0 = 34 + shiftY;
             for (int i = 0; i < 9; i++)
             {
