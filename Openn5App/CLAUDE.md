@@ -241,8 +241,12 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   with SendInput, keeping every station's canvas position. A far station travels down in hops of one viewport at a
   free column (columns beyond "max per row" are free on every row - the lane is its target row, row 2 for the
   first row), then left in hops along that lane, then one drag into its cell. Requirements: at least "max per row
-  + 1" columns and 2 rows visible (the zoom); the plan is refused otherwise. F12 or a foreground change stops it;
-  the drags never run while another window is in front.
+  + 1" columns and 2 rows visible (the zoom); the plan is refused otherwise. F12 or a foreground change stops it (the message names
+  the window that took it). Every click is refused when another process's window covers the point (`WindowFromPoint`):
+  the first real run (2026-10-10) stopped at 1 of 58 because the topmost wizard window sat over the canvas and swallowed
+  a click; so while the robot works the wizard shrinks to its footer and moves to a corner of TIA's window clear of the
+  canvas (minimized when none is clear), arrow clicks alternate 3 px left/right and a re-grab at the spot of the last
+  release waits out the double-click time (a double-click opens the device in TIA).
 - **Transfer areas** (PN/PN coupler 6ES7158-3AD10 V4.x, I-devices): NOT device items - they live in
   `NetworkInterface.TransferAreas` of the station's PROFINET interface, so a `DeviceItems` walk never
   sees them (the dump prints them as `::TransferArea(i)` with `.Addr(j)` local / `.PartnerAddr(j)`

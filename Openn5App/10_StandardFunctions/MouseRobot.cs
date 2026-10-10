@@ -7,14 +7,18 @@ namespace Openn._10_StandardFunctions
     /// <summary>
     /// Win32 glue for the "Re-arrange devices" robot (ArrangeDevicesWindow): the cursor position for the
     /// calibration, absolute mouse moves and button events through SendInput for the drags, the foreground
-    /// window (the robot refuses to drag inside any window but TIA's), and global hotkeys so the capture / stop
-    /// keys work while TIA Portal has the focus. Coordinates are what GetCursorPos reports in this process;
+    /// window (the robot refuses to drag inside any window but TIA's), global hotkeys (so the capture / stop
+    /// keys work while TIA Portal has the focus), the window under a point (a click is refused when another process's
+    /// window covers it) and window bounds (the wizard moves off the canvas while the robot works). Coordinates are what GetCursorPos reports in this process;
     /// SendInput normalizes them over the same virtual screen, so capture and playback agree whatever the DPI mode.
     /// </summary>
     internal static class MouseRobot
     {
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT { public int X; public int Y; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct MOUSEINPUT
@@ -53,6 +57,14 @@ namespace Openn._10_StandardFunctions
         [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
         [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
         [DllImport("user32.dll", SetLastError = true)] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+        [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(POINT point);
+        [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
+        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int max);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder text, int max);
+        [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+        [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+        [DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
 
         /// <summary>Where the mouse is now, in this process's screen coordinates.</summary>
         public static System.Windows.Point CursorPosition
@@ -71,6 +83,55 @@ namespace Openn._10_StandardFunctions
                                     GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
 
         public static IntPtr ForegroundWindow => GetForegroundWindow();
+
+        /// <summary>The id of the process that owns a window; 0 for no window.</summary>
+        public static int ProcessIdOf(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return 0;
+            uint pid;
+            GetWindowThreadProcessId(hWnd, out pid);
+            return (int)pid;
+        }
+
+        /// <summary>The top-level window under a screen point - what a click there would hit (a topmost window in front of TIA, say).</summary>
+        public static IntPtr TopLevelWindowAt(System.Windows.Point p)
+        {
+            IntPtr hit = WindowFromPoint(new POINT { X = (int)Math.Round(p.X), Y = (int)Math.Round(p.Y) });
+            if (hit == IntPtr.Zero) return IntPtr.Zero;
+            IntPtr root = GetAncestor(hit, 2); //GA_ROOT
+            return root == IntPtr.Zero ? hit : root;
+        }
+
+        /// <summary>'title' (process) - for the messages that name the window that got in the way.</summary>
+        public static string Describe(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return "(no window)";
+            var title = new System.Text.StringBuilder(256);
+            GetWindowText(hWnd, title, title.Capacity);
+            var cls = new System.Text.StringBuilder(256);
+            GetClassName(hWnd, cls, cls.Capacity);
+            string process = "?";
+            try { process = Process.GetProcessById(ProcessIdOf(hWnd)).ProcessName; } catch { /* gone */ }
+            return "'" + (title.Length > 0 ? title.ToString() : cls.ToString()) + "' (" + process + ")";
+        }
+
+        /// <summary>A window's screen rectangle; Rect.Empty for no window.</summary>
+        public static System.Windows.Rect WindowBounds(IntPtr hWnd)
+        {
+            RECT r;
+            if (hWnd == IntPtr.Zero || !GetWindowRect(hWnd, out r)) return System.Windows.Rect.Empty;
+            return new System.Windows.Rect(r.Left, r.Top, Math.Max(0, r.Right - r.Left), Math.Max(0, r.Bottom - r.Top));
+        }
+
+        /// <summary>Moves and sizes a window (screen px) without activating it or changing its z-order.</summary>
+        public static void SetWindowBounds(IntPtr hWnd, System.Windows.Rect bounds)
+        {
+            if (hWnd == IntPtr.Zero || bounds.IsEmpty) return;
+            SetWindowPos(hWnd, IntPtr.Zero, (int)bounds.X, (int)bounds.Y, (int)bounds.Width, (int)bounds.Height, 0x0004 | 0x0010); //SWP_NOZORDER | SWP_NOACTIVATE
+        }
+
+        /// <summary>The system double-click time in ms: two presses closer than this, at the same spot, make a double-click.</summary>
+        public static int DoubleClickTime => (int)GetDoubleClickTime();
 
         /// <summary>Restores a minimized window and brings it to the front; false when Windows refused (focus rules).</summary>
         public static bool BringToFront(IntPtr hWnd)

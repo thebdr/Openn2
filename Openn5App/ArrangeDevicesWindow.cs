@@ -24,7 +24,10 @@ namespace Openn
     /// calibration (seven hovers with F9, then the robot clicks the scrollbar arrows and the user re-hovers twice,
     /// which measures the scroll step) and a model of every station's canvas position kept by counting arrow
     /// clicks. A far station travels down in hops of one viewport and left along its target row's free columns
-    /// (beyond the planned ones), then one drag puts it in its cell. F12 stops, and so does a foreground change.
+    /// (beyond the planned ones), then one drag puts it in its cell. F12 stops, and so does a foreground change (the
+    /// message names the window that took it). A click is refused when another process's window covers the point, and
+    /// while the robot works this window shrinks to its footer and moves to a corner clear of the canvas: a topmost
+    /// window over the network view swallows the clicks (the first real run, 2026-10-10, stopped that way at 1 of 58).
     /// The window is a step-by-step wizard - colourful on purpose: it underlines what is being worked around, and a
     /// strip under the header keeps the score (what Openness tells us about a device, and the two numbers it does not).
     /// </summary>
@@ -95,6 +98,17 @@ namespace Openn
         private int stepDelay = 25;
         private HwndSource source;
         private readonly Random dice = new Random();
+
+        //the run: TIA's window and process, the click guards, the compact layout
+        private IntPtr runTia;
+        private int runTiaPid;
+        private readonly int ownPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+        private string robotProblem;     //why the robot refused a click: a window covering the point
+        private int lastUpTick;          //the last release: a press there within the double-click time would be a double-click
+        private Point lastUpPoint;
+        private readonly UIElement[] fullViewParts;
+        private Rect savedBounds = Rect.Empty;
+        private bool compact;
 
         private static readonly string[] Whimsies =
         {
@@ -296,6 +310,7 @@ namespace Openn
             root.Children.Add(footer);
 
             Content = root;
+            fullViewParts = new UIElement[] { header, score, strip, body };
 
             RebuildPlan();
             ShowStep();
@@ -653,26 +668,30 @@ namespace Openn
             ShowStep();
             try
             {
-                IntPtr tia = MouseRobot.FindTiaPortalWindow(tiaProcessId());
-                if (tia != IntPtr.Zero) MouseRobot.BringToFront(tia);
+                runTia = MouseRobot.FindTiaPortalWindow(tiaProcessId());
+                runTiaPid = MouseRobot.ProcessIdOf(runTia);
+                if (runTia != IntPtr.Zero) MouseRobot.BringToFront(runTia);
                 await Task.Delay(400);
+                robotProblem = null;
                 await ClickAsync(button, clicks, "measuring the scroll step");
             }
             finally
             {
                 calibrating = false;
             }
-            statusText.Text = thenAsk;
+            statusText.Text = robotProblem != null ? robotProblem + " - move it away, then Reset and calibrate again." : thenAsk;
             ShowStep();
         }
 
         private async Task ClickAsync(Point button, int clicks, string what)
         {
             statusText.Text = what + " (" + clicks + " click(s))...";
+            if (!CanClick(button, "the scrollbar button")) return;
             for (int i = 0; i < clicks; i++)
             {
                 if (stopRequested) break;
-                MouseRobot.MoveTo(button);
+                //3 px left, then 3 px right of the point: two presses inside the double-click rectangle would pair into a double-click
+                MouseRobot.MoveTo(new Point(button.X + (i % 2 == 0 ? -3 : 3), button.Y));
                 await Task.Delay(stepDelay);
                 MouseRobot.LeftDown();
                 await Task.Delay(stepDelay);
@@ -680,6 +699,27 @@ namespace Openn
                 await Task.Delay(stepDelay);
             }
             await Task.Delay(stepDelay * 6); //let TIA repaint
+        }
+
+        /// <summary>False, with the reason in robotProblem, when a click at the point would hit a window of another process - a topmost window over the canvas, say.</summary>
+        private bool CanClick(Point p, string what)
+        {
+            if (runTiaPid == 0) return true;
+            IntPtr window = MouseRobot.TopLevelWindowAt(p);
+            if (MouseRobot.ProcessIdOf(window) == runTiaPid) return true;
+            robotProblem = what + " at " + (int)p.X + ", " + (int)p.Y + " is covered by " + MouseRobot.Describe(window) + OwnWindowHint(window);
+            return false;
+        }
+
+        private string OwnWindowHint(IntPtr window) =>
+            MouseRobot.ProcessIdOf(window) == ownPid ? " - an Openn5 window is sitting on the network view; keep this window and the log pop-out off the canvas" : string.Empty;
+
+        private bool TiaInFront() => MouseRobot.ProcessIdOf(MouseRobot.ForegroundWindow) == runTiaPid;
+
+        private string LostForeground()
+        {
+            IntPtr front = MouseRobot.ForegroundWindow;
+            return "TIA Portal lost the foreground to " + MouseRobot.Describe(front) + OwnWindowHint(front);
         }
 
         private void ResetCalibration()
@@ -743,7 +783,7 @@ namespace Openn
                 await ClickAsync(wantY > clicksY ? calibration[CapDown].Value : calibration[CapUp].Value, n, "scrolling");
                 clicksY = wantY;
             }
-            return !stopRequested;
+            return !stopRequested && robotProblem == null;
         }
 
         // ============================== the run ==============================
@@ -767,6 +807,9 @@ namespace Openn
                 statusText.Text = "No TIA Portal window found.";
                 return;
             }
+            runTia = tia;
+            runTiaPid = MouseRobot.ProcessIdOf(tia);
+            robotProblem = null;
 
             canvasX = new double[stations.Count];
             canvasY = new double[stations.Count];
@@ -786,6 +829,7 @@ namespace Openn
             string outcome;
             try
             {
+                EnterRunLayout(tia);
                 MouseRobot.BringToFront(tia);
                 await Task.Delay(800);
                 //the origin: the robot scrolled back after measuring, but make sure (the clicks clamp at the ends)
@@ -793,13 +837,14 @@ namespace Openn
                 await ClickAsync(calibration[CapUp].Value, 3, "at the origin");
                 clicksX = 0;
                 clicksY = 0;
+                if (robotProblem != null) { outcome = "stopped: " + robotProblem; goto Done; }
 
                 foreach (NetworkViewLayout.Cell cell in layout.MovesInSafeOrder())
                 {
                     if (stopRequested) { outcome = "stopped by you (F12)"; goto Done; }
-                    if (MouseRobot.ForegroundWindow != tia) { outcome = "stopped: TIA Portal lost the foreground (another window came up)"; goto Done; }
+                    if (!TiaInFront()) { outcome = "stopped: " + LostForeground(); goto Done; }
 
-                    Tuple<int, string> result = await MoveStationAsync(cell, tia, moved + 1);
+                    Tuple<int, string> result = await MoveStationAsync(cell, moved + 1);
                     if (result.Item1 < 0)
                     {
                         outcome = stopRequested ? "stopped by you (F12)" : "failed at " + cell.Name + ": " + result.Item2;
@@ -821,6 +866,7 @@ namespace Openn
             }
             Done:
             running = false;
+            LeaveRunLayout();
             stopButton.IsEnabled = false;
             resetButton.IsEnabled = true;
             maxPerRowBox.IsEnabled = true;
@@ -832,13 +878,67 @@ namespace Openn
             ShowStep();
         }
 
+        // ============================== the compact run layout ==============================
+
+        /// <summary>
+        /// While the robot works this window shrinks to its footer (status, progress, Stop) and moves to a corner of
+        /// TIA's window clear of the canvas and its scrollbars - a topmost window over the network view swallows the
+        /// robot's clicks and takes the foreground. When no corner is clear the window minimizes instead (F12 keeps
+        /// working: a global hotkey). The full layout and the bounds come back when the run ends.
+        /// </summary>
+        private void EnterRunLayout(IntPtr tia)
+        {
+            IntPtr self = new WindowInteropHelper(this).Handle;
+            savedBounds = MouseRobot.WindowBounds(self);
+            foreach (UIElement part in fullViewParts) part.Visibility = Visibility.Collapsed;
+            MinWidth = 320;
+            MinHeight = 80;
+            compact = true;
+            Rect bar = PlaceClearOfCanvas(MouseRobot.WindowBounds(tia), 820, 150);
+            if (bar.IsEmpty) bar = PlaceClearOfCanvas(MouseRobot.VirtualScreen, 820, 150);
+            if (bar.IsEmpty) WindowState = WindowState.Minimized;
+            else MouseRobot.SetWindowBounds(self, bar);
+        }
+
+        private void LeaveRunLayout()
+        {
+            if (!compact) return;
+            compact = false;
+            if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+            foreach (UIElement part in fullViewParts) part.Visibility = Visibility.Visible;
+            MinWidth = 860;
+            MinHeight = 600;
+            MouseRobot.SetWindowBounds(new WindowInteropHelper(this).Handle, savedBounds);
+        }
+
+        /// <summary>A w x h spot inside the area - a corner first, then an edge - that keeps clear of the canvas and its scrollbars; Rect.Empty when there is none.</summary>
+        private Rect PlaceClearOfCanvas(Rect area, double w, double h)
+        {
+            if (area.IsEmpty || area.Width < w || area.Height < h) return Rect.Empty;
+            const double keep = 24; //px kept clear around the canvas and the arrow buttons
+            double left = calibration[CapLeft].Value.X - keep;
+            double right = Math.Max(calibration[CapRight].Value.X, Math.Max(calibration[CapUp].Value.X, calibration[CapDown].Value.X)) + keep;
+            double top = calibration[CapUp].Value.Y - keep;
+            double bottom = Math.Max(calibration[CapDown].Value.Y, Math.Max(calibration[CapLeft].Value.Y, calibration[CapRight].Value.Y)) + keep;
+            var canvas = new Rect(new Point(left, top), new Point(right, bottom));
+            const double margin = 8;
+            double x0 = area.Left + margin, x1 = area.Right - w - margin, xm = area.Left + (area.Width - w) / 2;
+            double y0 = area.Top + margin, y1 = area.Bottom - h - margin, ym = area.Top + (area.Height - h) / 2;
+            foreach (Point corner in new[] { new Point(x1, y1), new Point(x0, y1), new Point(x1, y0), new Point(x0, y0), new Point(xm, y1), new Point(xm, y0), new Point(x1, ym), new Point(x0, ym) })
+            {
+                var candidate = new Rect(corner.X, corner.Y, w, h);
+                if (!candidate.IntersectsWith(canvas)) return candidate;
+            }
+            return Rect.Empty;
+        }
+
         /// <summary>
         /// One station to its cell. Its lane is its target row (row 2 for a station bound for the first row); the
         /// columns beyond the planned ones (column &gt; max per row) are free on every row, so hops drop there. Journey:
         /// down in hops of one viewport at a free column, then left in hops of one viewport along the lane, then the
         /// one drag into the cell. Returns the hop count and null, or -1 and the reason.
         /// </summary>
-        private async Task<Tuple<int, string>> MoveStationAsync(NetworkViewLayout.Cell cell, IntPtr tia, int number)
+        private async Task<Tuple<int, string>> MoveStationAsync(NetworkViewLayout.Cell cell, int number)
         {
             int i = cell.Index;
             double pitch = Pitch(), rowPitch = RowPitch();
@@ -851,14 +951,15 @@ namespace Openn
 
             while (true)
             {
-                if (stopRequested || MouseRobot.ForegroundWindow != tia) return Fail("stopped");
+                if (stopRequested) return Fail("stopped");
+                if (!TiaInFront()) return Fail(LostForeground());
                 double x = canvasX[i], y = canvasY[i];
 
                 //the one drag into the cell, when it is within reach
                 if (Math.Abs(x - tx) <= spanX && Math.Abs(y - ty) <= spanY)
                 {
                     statusText.Text = "Moving " + cell.Name + " to row " + (cell.Row + 1) + ", column " + (cell.Column + 1) + " (" + number + " of " + layout.Moves + ")";
-                    if (!await DragOnCanvasAsync(i, Math.Min(x, tx), Math.Min(y, ty), tx, ty)) return Fail(stopRequested ? "stopped" : "the station or its cell is outside the viewport after scrolling");
+                    if (!await DragOnCanvasAsync(i, Math.Min(x, tx), Math.Min(y, ty), tx, ty)) return Fail(stopRequested ? "stopped" : robotProblem ?? "the station or its cell is outside the viewport after scrolling");
                     return Tuple.Create(hops, (string)null);
                 }
                 if (++hops > MaxHops) return Fail("too many hops");
@@ -869,7 +970,7 @@ namespace Openn
                     double nextY = y + Math.Min(laneY - y, spanY);
                     double parkX = Math.Max(x, freeX);
                     statusText.Text = "Hop " + hops + ": " + cell.Name + " down (" + number + " of " + layout.Moves + ")";
-                    if (!await DragOnCanvasAsync(i, Math.Min(x, parkX), y, parkX, nextY)) return Fail(stopRequested ? "stopped" : "a hop left the viewport");
+                    if (!await DragOnCanvasAsync(i, Math.Min(x, parkX), y, parkX, nextY)) return Fail(stopRequested ? "stopped" : robotProblem ?? "a hop left the viewport");
                     continue;
                 }
 
@@ -877,7 +978,7 @@ namespace Openn
                 double newX = Math.Max(x - spanX, freeX);
                 if (newX >= x - 1) return Fail("cannot hop left any further");
                 statusText.Text = "Hop " + hops + ": " + cell.Name + " left (" + number + " of " + layout.Moves + ")";
-                if (!await DragOnCanvasAsync(i, newX, y, newX, y)) return Fail(stopRequested ? "stopped" : "a hop left the viewport");
+                if (!await DragOnCanvasAsync(i, newX, y, newX, y)) return Fail(stopRequested ? "stopped" : robotProblem ?? "a hop left the viewport");
             }
         }
 
@@ -900,8 +1001,12 @@ namespace Openn
         /// <summary>One drag: press, wiggle past the drag threshold, glide to the target in steps, release. False when stopped mid-way.</summary>
         private async Task<bool> DragAsync(Point from, Point to, int delay)
         {
+            if (!CanClick(from, "the station's spot") || !CanClick(to, "the drop spot")) return false;
             MouseRobot.MoveTo(from);
             await Task.Delay(delay * 4);
+            //a press where the last release was, within the double-click time, is a double-click - TIA would open the device view
+            int wait = MouseRobot.DoubleClickTime + 100 - (Environment.TickCount - lastUpTick);
+            if (wait > 0 && Math.Abs(from.X - lastUpPoint.X) < 12 && Math.Abs(from.Y - lastUpPoint.Y) < 12) await Task.Delay(wait);
             MouseRobot.LeftDown();
             await Task.Delay(delay * 4);
             MouseRobot.MoveTo(new Point(from.X + 6, from.Y + 6)); //past the drag threshold
@@ -921,6 +1026,8 @@ namespace Openn
             MouseRobot.MoveTo(to);
             await Task.Delay(delay * 4);
             MouseRobot.LeftUp();
+            lastUpTick = Environment.TickCount;
+            lastUpPoint = to;
             await Task.Delay(delay * 4);
             return true;
         }
