@@ -220,33 +220,12 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   disconnected, a missing station/interface/port is reported; skipped (existing) stations are wired too. Unticked
   with links present = one log line saying so. The data source is OPEN: PL5 emits column 9 `Connector` from the
   I/O list's column I verbatim and nothing about partners yet.
-- **Re-arrange devices** (`ArrangeDevicesWindow.cs`, `01_Constructor/NetworkViewLayout.cs`,
-  `10_StandardFunctions/MouseRobot.cs`, 2026-10-10): Openness creates every station on ONE row of the network view
+- **Network view layout - NOT pursued** (2026-10-10): Openness creates every station on ONE row of the network view
   and has no layout call; TIA's editors are invisible to UI Automation and keys do not move objects (verified
-  2026-10-09) - only a mouse drag does. So the Files tab's "Re-arrange devices.." takes the last generation's
-  stations in creation order (`TiaPortalOpenness.LastCreatedStations`; the loaded IO-device list stands in without
-  a generation, with a warning), plans rows by the Stations.csv Group column (one row per group, at most 7 per row - the box in the
-  window - a longer group wraps onto the next free row; rows in order of first appearance; the first row is
-  compacted LAST, after the others moved away, so every drop lands on a free spot - `MovesInSafeOrder`), and
-  after the user opens the view, zooms until the rows fit vertically and the first columns horizontally, and
-  calibrates - in a step-by-step WIZARD (a coloured step strip, one card per step with a drawing of what to hover, a
-  pulsing "then press F9" pill - the drawing puts the pointer's tip on the exact point to hover -, a score strip of chips
-  under the header (what Openness tells us about a device, and what it does not: X, Y, Move()), the derived numbers
-  on the side; colourful on purpose - it underlines the two numbers,
-  X and Y, that Openness will not give) - with the global hotkey F9: the first station, the second, the first cell of
-  row 2, the four scrollbar
-  ARROW buttons (< > ^ v); the robot then clicks > 8 times and v 3 times (more and the first row leaves the canvas) and the user re-hovers the first station
-  after each, which measures the scroll step in px per click. From then on the robot scrolls by COUNTED clicks
-  (the user's model, 2026-10-10: exact, no pixel reading), brings TIA to the front (`AttachedProcessId`) and drags
-  with SendInput, keeping every station's canvas position. A far station travels down in hops of one viewport at a
-  free column (columns beyond "max per row" are free on every row - the lane is its target row, row 2 for the
-  first row), then left in hops along that lane, then one drag into its cell. Requirements: at least "max per row
-  + 1" columns and 2 rows visible (the zoom); the plan is refused otherwise. F12 or a foreground change stops it (the message names
-  the window that took it). Every click is refused when another process's window covers the point (`WindowFromPoint`):
-  the first real run (2026-10-10) stopped at 1 of 58 because the topmost wizard window sat over the canvas and swallowed
-  a click; so while the robot works the wizard shrinks to its footer and moves to a corner of TIA's window clear of the
-  canvas (minimized when none is clear), arrow clicks alternate 3 px left/right and a re-grab at the spot of the last
-  release waits out the double-click time (a double-click opens the device in TIA).
+  2026-10-09) - only a mouse drag does. A mouse-drag robot ("Re-arrange devices": F9 calibration, counted scrollbar
+  clicks, SendInput drags - commits 2cec57d..759d2b4) was built and stripped out again the same day after its first
+  run: stations have DIFFERENT WIDTHS, so a constant pitch does not hold, and the user judged the approach would keep
+  failing for one reason or another. Do not bring it back; the stations stay where Openness puts them.
 - **Transfer areas** (PN/PN coupler 6ES7158-3AD10 V4.x, I-devices): NOT device items - they live in
   `NetworkInterface.TransferAreas` of the station's PROFINET interface, so a `DeviceItems` walk never
   sees them (the dump prints them as `::TransferArea(i)` with `.Addr(j)` local / `.PartnerAddr(j)`
@@ -496,11 +475,3 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
    PROFINET ports", generate: the log shows `Port link wired: …`, the topology view shows the line between the two
    ports; generate again: `already connected`; a malformed cell fails the load with file/line; unticked with links
    present logs `Topology links in Stations.csv NOT wired`.
-18. **Re-arrange devices**: right after a generation, open the network view at its origin (fully left and up), zoom so that 8 columns fit, press
-   "Re-arrange devices..", F9 on the first station, the second, one row below the first, the four arrow buttons,
-   then F9 on the first station after the robot clicked > 8 times and again after it clicked v 3 times (the status
-   shows the measured step and the viewport in columns x rows), Start: the view scrolls by arrow clicks, far stations
-   hop down and left along their row's free columns (`after N hop(s)` in the log), then every
-   Group gets its own row(s), at most 7 per row (the box in the window; a group of 9 fills row 1 with 7 and puts 2 on
-   the next free row), logged `Re-arrange: <station> -> row r, column c (<group>)`; the first group's row is compacted
-   last; F12 stops mid-way; alt-tabbing away stops with `lost the foreground`; a plan off-screen is refused.

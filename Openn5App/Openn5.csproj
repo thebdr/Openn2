@@ -121,7 +121,6 @@
     <Compile Include="01_Constructor\HardwareIoControllers.cs" />
     <Compile Include="01_Constructor\HardwareIoDevices.cs" />
     <Compile Include="01_Constructor\HardwareTopology.cs" />
-    <Compile Include="01_Constructor\NetworkViewLayout.cs" />
     <Compile Include="03_ApiManager\CustomParameterApplier.cs" />
     <Compile Include="03_ApiManager\OpennessSetup.cs" />
     <Compile Include="03_ApiManager\PlcBlockInfo.cs" />
@@ -132,14 +131,12 @@
     <Compile Include="03_ApiManager\TiaPortalOpenness.Workspace.cs" />
     <Compile Include="BlockSearchWindow.cs" />
     <Compile Include="HardwareConfigEditorWindow.cs" />
-    <Compile Include="ArrangeDevicesWindow.cs" />
     <Compile Include="LogWindow.cs" />
     <Compile Include="03_ApiManager\OpennessVersionDialog.cs" />
     <Compile Include="03_ApiManager\TiaPortalOpenness.cs" />
     <Compile Include="03_ApiManager\TiaWorker.cs" />
     <Compile Include="10_StandardFunctions\AppPaths.cs" />
     <Compile Include="10_StandardFunctions\CsvTable.cs" />
-    <Compile Include="10_StandardFunctions\MouseRobot.cs" />
     <Compile Include="10_StandardFunctions\StandardFunctions.cs" />
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>

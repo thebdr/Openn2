@@ -576,27 +576,6 @@ namespace Openn
             await RunBackend(() => TiaWorker.Run(() => tia.DumpDeviceAttributes(deviceNameFilter)));
         }
 
-        /// <summary>
-        /// "Re-arrange devices..": the mouse-drag layout of the last generation's stations (ArrangeDevicesWindow). Without
-        /// a generation in this session the loaded configuration's IO devices stand in - with a warning, since stations
-        /// already in the project were never on the default row.
-        /// </summary>
-        private void btnArrangeDevices_Click(object sender, RoutedEventArgs e)
-        {
-            IList<NetworkViewLayout.Station> stations = tia.LastCreatedStations.ToList();
-            string source = "the last hardware generation run";
-            if (stations.Count == 0)
-            {
-                var loaded = Openn._01_Constructor.HardwareIoDevices.DevicesList;
-                stations = loaded != null
-                    ? loaded.Select(d => new NetworkViewLayout.Station { Name = d.Item1.name, Group = d.Item1.group }).ToList()
-                    : new List<NetworkViewLayout.Station>();
-                source = "the loaded configuration - no generation ran in this session, so stations that already existed are NOT on the default row";
-            }
-            var window = new ArrangeDevicesWindow(stations, source, () => tia.AttachedProcessId) { Owner = this };
-            window.Show();
-        }
-
         #endregion Files tab: hardware + discovery
 
         #region Log toolbar

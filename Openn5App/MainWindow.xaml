@@ -468,9 +468,7 @@
                                     <CheckBox x:Name="cbWirePorts" Margin="24,0,0,0" VerticalAlignment="Center" Content="Wire PROFINET ports" Checked="WirePorts_Changed" Unchecked="WirePorts_Changed"
                                               ToolTip="After the stations exist, connect the PROFINET ports listed in the Topology column of Stations.csv (X1-P2 &gt; station:X1-P1, | separated). The same choice as on the Workspace tab (kept in sync); remembered."/>
                                 </StackPanel>
-                                <Button x:Name="btnArrangeDevices" Click="btnArrangeDevices_Click" Grid.Row="1" Grid.Column="1" Style="{StaticResource ActionButton}" Margin="4,0,0,2" Content="Re-arrange devices.."
-                                        ToolTip="Lay the stations of the last generation out by group in TIA's network or topology view with mouse drags - Openness cannot place objects, and only a drag moves one. The window says what to open, how to zoom and how to calibrate three points with F9 before it starts; F12 stops it."/>
-                                <Button x:Name="btnGenerateHardware" Click="btnGenerateHardware_Click" Grid.Row="1" Grid.Column="2" Style="{StaticResource ActionButton}" Margin="4,0,0,2" FontWeight="SemiBold" Content="Generate Hardware"/>
+                                <Button x:Name="btnGenerateHardware" Click="btnGenerateHardware_Click" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource ActionButton}" Margin="4,0,0,2" FontWeight="SemiBold" Content="Generate Hardware"/>
                             </Grid>
                         </GroupBox>
 

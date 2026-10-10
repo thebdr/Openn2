@@ -36,13 +36,6 @@ namespace Openn._03_ApiManager
         /// <summary>Find-or-created device groups of the current run, by Group path.</summary>
         private Dictionary<string, DeviceUserGroup> deviceGroupCache;
 
-        /// <summary>
-        /// The stations the last generation run created, in creation order - their slots on the ONE row Openness puts
-        /// them on in the network view ("Re-arrange devices" drags them from there, one row per Stations.csv Group).
-        /// Controllers only in create-new mode.
-        /// </summary>
-        public List<NetworkViewLayout.Station> LastCreatedStations { get; } = new List<NetworkViewLayout.Station>();
-
         #endregion Hardware generation state
 
         /// <summary>
@@ -76,7 +69,6 @@ namespace Openn._03_ApiManager
             }
 
             deviceGroupCache = new Dictionary<string, DeviceUserGroup>(StringComparer.OrdinalIgnoreCase);
-            LastCreatedStations.Clear();
 
             //generating while a TIA editor is open re-creates the stale per-device
             //"IO device not connected to an IO system" compile messages - CONFIRMED 2026-07:
@@ -212,7 +204,6 @@ namespace Openn._03_ApiManager
                     var device = (plcGroup != null ? plcGroup.Devices : project.Devices)
                         .CreateWithItem(HwDb.Identifier[c.identifier].identifier, c.name, c.name);
                     ioControllers.Add(new Tuple<Device, DeviceItem>(device, null));
-                    LastCreatedStations.Add(new NetworkViewLayout.Station { Name = device.Name, Group = c.group });
                     Log("IoController Creation Ok: device " + device.Name + " (" + HwDb.Identifier[c.identifier].comment + ") created");
 
                     netInterface = FindNetworkInterface(device.DeviceItems, c.connector, c.name);
@@ -493,11 +484,9 @@ namespace Openn._03_ApiManager
 
                 Log("IoDevice Creation Ok: IoDevice " + _device.Name + " (" + HwDb.Identifier[d.Item1.identifier].comment + ") created - " + stationParameters);
                 createdCount++;
-                LastCreatedStations.Add(new NetworkViewLayout.Station { Name = _device.Name, Group = d.Item1.group });
             }
 
-            Log("IoDevice generation finished: " + createdCount + " of " + _devicesList.Count + " IO device(s) created" + SkippedSuffix(skippedCount) +
-                (createdCount > 0 ? " - the new stations sit on one row of the network view: Files tab > Re-arrange devices.. lays them out by group" : string.Empty));
+            Log("IoDevice generation finished: " + createdCount + " of " + _devicesList.Count + " IO device(s) created" + SkippedSuffix(skippedCount));
         }
 
         #region PROFINET port interconnections (topology)
