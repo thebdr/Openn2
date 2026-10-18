@@ -11,13 +11,33 @@ def test_sprites_well_formed():
                                  ("mario", cb.MARIO, cb._MARIO_COLORS),
                                  ("morty", cb.MORTY, cb._MORTY_COLORS),
                                  ("mickey", cb.MICKEY, cb._MICKEY_COLORS),
-                                 ("rocket", cb.ROCKET, cb._ROCKET_COLORS)):
+                                 ("rocket", cb.ROCKET, cb._ROCKET_COLORS),
+                                 *((f"extra {i}", frames, colors) for i, (frames, colors) in enumerate(cb.EXTRAS))):
         widths = {len(row) for frame in frames for row in frame}
         eq(len(widths), 1, f"{name}: every row of every frame has the same width")
         eq(len({len(frame) for frame in frames}), 1, f"{name}: both frames have the same row count")
         chars = {ch for frame in frames for row in frame for ch in row}
         ok(chars <= set(colors) | {"."}, f"{name}: only declared colours + transparent ({chars})")
         ok(any(ch != "." for ch in chars), f"{name}: not empty")
+
+
+def test_pick_train_regulars_then_random_extras():
+    """User 2026-10-18 ("add more random cartoon characters after the last one (up to 10)"): a run's train is the
+    four regulars in their order, then TRAIN_LEN - 4 EXTRAS drawn at random - none twice, a new draw per run."""
+    import random
+    eq((cb.TRAIN_LEN, len(cb.EXTRAS)), (10, 8), "a train of 10; 8 extras to draw 6 from")
+    seen = set()
+    for seed in range(30):
+        train = cb.pick_train(random.Random(seed).sample)
+        eq(len(train), cb.TRAIN_LEN, "TRAIN_LEN members")
+        eq(train[:4], list(cb.FOLLOWERS), "Mario, Morty, Mickey, the rocket first, in their order")
+        extras = [frames for frames, _c in train[4:]]
+        eq(len(set(extras)), 6, "six extras, none twice")
+        ok(set(extras) <= {frames for frames, _c in cb.EXTRAS}, "drawn from the EXTRAS")
+        seen.add(tuple(cb.EXTRAS.index(m) for m in train[4:]))
+    ok(len(seen) > 1, f"the draw varies run to run ({len(seen)} orders over 30 seeds)")
+    names = {cb.PACMAN, cb.GHOST, cb.PIKACHU, cb.SONIC, cb.KIRBY, cb.SPONGEBOB, cb.TWEETY, cb.BUGS}
+    eq({frames for frames, _c in cb.EXTRAS}, names, "the eight extras")
 
 
 def test_jump_arc():
@@ -100,6 +120,17 @@ def test_chase_step_train_joins_per_border():
             break
     ok(landings >= 6, "the chase kept cycling")
     eq(len(s["followers"]), 4, "landings past the 4th add NO more followers")
+    # a full train (TRAIN_LEN widths): ten landings, ten members, then no more
+    s, landings = _state(cx=300.0, fw=[24.0] * cb.TRAIN_LEN), 0
+    for _ in range(20000):
+        was_jumping = s["jump"] is not None
+        s = cb.chase_step(s, 600.0, steady)
+        if was_jumping and s["jump"] is None:
+            landings += 1
+            eq(len(s["followers"]), min(landings, cb.TRAIN_LEN), f"landing {landings}")
+        if landings >= cb.TRAIN_LEN + 2:
+            break
+    eq(len(s["followers"]), cb.TRAIN_LEN, "the train stops at TRAIN_LEN")
 
 
 def test_chase_step_border_jump_and_flip():
@@ -171,7 +202,8 @@ def test_chase_step_is_time_based():
 
 def test_the_bar_frames_run_on_the_clock():
     """The canvas: a frame every FRAME_MS (~60 fps) moving by the REAL time since the last frame - a frame the busy
-    UI thread delivers late moves further, not slower; a stall catches up at most MAX_STEP_S (no teleport)."""
+    UI thread delivers late moves further, not slower; a stall catches up at most MAX_STEP_S (no teleport) - all at
+    PACE (user 2026-10-18: "speed: 1/6"). Each run draws its train anew: TRAIN_LEN slots, its widths the capacity."""
     import tkinter as tk
     root = tk.Tk()
     root.withdraw()
@@ -179,6 +211,7 @@ def test_the_bar_frames_run_on_the_clock():
         bar = cb.ChaseBar(root)
         bar.start(12)
         eq(bar._interval, cb.FRAME_MS, "the app's 12 ms request runs at FRAME_MS")
+        eq((len(bar._f_items), len(bar._train_imgs), len(bar._state["fw"])), (cb.TRAIN_LEN,) * 3, "TRAIN_LEN slots")
         clock = iter([10.0, 10.0, 10.05, 10.05, 15.05, 15.05])   # each frame reads the clock twice (dt, its own cost)
         original = cb.time.perf_counter
         cb.time.perf_counter = lambda: next(clock)
@@ -194,8 +227,9 @@ def test_the_bar_frames_run_on_the_clock():
             x2 = bar._state["cx"]
         finally:
             cb.time.perf_counter = original
-        eq((x0, round(x1 - x0, 6)), (300.0, round(2 * cb.SPEED, 6)), "50 ms = 2 reference ticks of travel")
-        ok(abs(x2 - x1) <= cb.SPEED * cb.MAX_STEP_S / cb.TICK_S + 1e-6, f"a stall never teleports ({x2 - x1})")
+        eq(cb.PACE, 1 / 6, "the user's pace")
+        eq((x0, round(x1 - x0, 6)), (300.0, round(2 * cb.SPEED / 6, 6)), "50 ms = 2 reference ticks of travel, at 1/6")
+        ok(abs(x2 - x1) <= cb.SPEED * cb.PACE * cb.MAX_STEP_S / cb.TICK_S + 1e-6, f"a stall never teleports ({x2 - x1})")
         bar.stop()
     finally:
         root.destroy()
@@ -223,6 +257,7 @@ if __name__ == "__main__":
     import sys
     sys.exit(run("gui_chasebar", [
         ("sprites_well_formed", test_sprites_well_formed),
+        ("pick_train_regulars_then_random_extras", test_pick_train_regulars_then_random_extras),
         ("jump_arc", test_jump_arc),
         ("chase_step_running", test_chase_step_running),
         ("chase_step_follower_train", test_chase_step_follower_train),
