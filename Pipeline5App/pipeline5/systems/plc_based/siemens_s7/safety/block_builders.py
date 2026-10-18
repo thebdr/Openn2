@@ -112,18 +112,28 @@ def _fld_key(row) -> str:
     return str(row.get("iol_FLD") or "")
 
 
+_PB_SLOTS = 4   # the 00_Push-Button_Input FB's channels (IN_1..4 / 01_PushButton.<member>_1..4 / Lamp_1..4)
+
+
+def _push_button_variant(n: int, lit: bool) -> str:
+    """The v1.3 02 template's network type for a chunk of `n` channels: 01..04 = 4/3/2/1 channels WITH lamps,
+    05..08 = 4/3/2/1 WITHOUT - the unused pins open in the template itself."""
+    return f"{_PB_SLOTS - n + 1 + (0 if lit else _PB_SLOTS):02d}"
+
+
 @builds("02_EM Push Button")
 def build_02_em_push_button(db: Database) -> Table:
-    """One 00_Push-Button_Input FB instance per node: the node's emergency-stop INPUTS - both
-    E1/2 / E (single-row) emergency-push-buttons AND B1/2 safety-breakers (grouped by node, in address order),
-    chunked to the FB's 4 channels. The v1.2 template carries 12 !!ITERATOR_STRINGS$$ in document
-    order - the IN_1..4 bare-symbol quartet, the 01_PushButton.<member> quartet, then the Lamp_1..4
-    bare-symbol quartet - so the iterator is the padded name_in_db quartet emitted TWICE (same values,
-    padded identically) followed by the lamp quartet: each channel's EL lamp output = the EL row with
-    the same I/O-List FLD (the lamp of that push-button; the first one when several), its PLC tag;
-    PAD when the channel has none (a breaker, a button without a lamp). Bypass_ET200 is the node's
+    """One 00_Push-Button_Input FB instance per chunk of a node's emergency-stop INPUTS - both E1/2 / E
+    (single-row) emergency-push-buttons AND B1/2 safety-breakers (grouped by node, in address order), up to
+    the FB's 4 channels. Each channel's lamp = the EL row with the same I/O-List FLD (the lamp of that
+    push-button; the first one when several), its PLC tag. A node's LAMPED channels are chunked first, then its
+    lamp-less ones (a breaker, a button without a lamp), and every chunk picks its network type
+    (`_push_button_variant`, the v1.3 template: 4/3/2/1 channels with lamps, 4/3/2/1 without - the unused pins
+    left open): no slot is ever padded - a 'No Operation' in a bare tag slot named a tag no table defines and
+    TIA could not read those F_LAD networks (user 2026-10-18; FVT: 40 of 74). The template's
+    !!ITERATOR_STRINGS$$ in document order = the chunk's IN symbols, its 01_PushButton members (the same
+    name_in_db list twice), then its lamp tags (lamped chunks only). Bypass_ET200 is the node's
     '<profinet_name> <profinet_ip>' (the same 00_Commissioning member as block 00)."""
-    SLOTS = 4   # the FB's 4 channels (IN_1..4 / 01_PushButton.<member>_1..4 / Lamp_1..4)
     lamps: dict = {}
     for lamp in db.by_type("EL"):
         if _fld_key(lamp) and lamp.get("name_in_tagtable"):
@@ -131,18 +141,19 @@ def build_02_em_push_button(db: Database) -> Table:
     t = Table("02_EM Push Button")
     for node, members in _group_by_node(db, "E1/2", "E", "B1/2"):
         ident = f"{node['profinet_name']} {node['profinet_ip']}".strip()
-        for i, chunk in enumerate(_chunked(members, SLOTS), start=1):
+        lit = [m for m in members if lamps.get(_fld_key(m))]          # lamps has no '' key
+        dark = [m for m in members if not lamps.get(_fld_key(m))]
+        chunks = [(c, True) for c in _chunked(lit, _PB_SLOTS)] + [(c, False) for c in _chunked(dark, _PB_SLOTS)]
+        for i, (chunk, has_lamps) in enumerate(chunks, start=1):
             inst = f"EMPB_{node['profinet_name']}_{i}"
             names = [m["name_in_db"] for m in chunk]
-            names += [PAD] * (SLOTS - len(names))            # pad the quartet to the 4 fixed slots
-            lamp_tags = [lamps.get(_fld_key(m), PAD) for m in chunk]   # lamps has no '' key
-            lamp_tags += [PAD] * (SLOTS - len(lamp_tags))
+            lamp_tags = [lamps[_fld_key(m)] for m in chunk] if has_lamps else []
             t.add(
-                template_type="01",
+                template_type=_push_button_variant(len(chunk), has_lamps),
                 **{"instanceOf-00_Push-Button_Input": inst},
                 **{"00_Commissioning.{db_element}": ident},
                 NetworkComment=f"{inst} {node['profinet_ip']}",
-                ITERATOR_STRINGS=names + names + lamp_tags,  # 3 quartets: IN_1..4, 01_PushButton.<member>, Lamp_1..4
+                ITERATOR_STRINGS=names + names + lamp_tags,  # IN_1..n, 01_PushButton.<member>_1..n, Lamp_1..n
             )
     return t
 

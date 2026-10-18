@@ -235,7 +235,12 @@ def test_the_page_embeds_the_graph():
 def test_the_shipped_push_button_template_is_traced_per_channel():
     """The SHIPPED 02 EM Push Button template: IN_n read, OUT_n (01_PushButton members) and Lamp_n written on
     channels 1-4, the commissioning bypass read on none - what keeps one button out of its neighbours' paths."""
-    path = os.path.join(paths.TEMPLATES_DIR, "Tia Portal Software Blocks", "TEMPLATE--v1.2--02_EM Push Button.xml")
+    path = os.path.join(paths.TEMPLATES_DIR, "Tia Portal Software Blocks", "TEMPLATE--v1.3--02_EM Push Button.xml")
+    eq(len(sp.template_variants(path)), 8, "v1.3: eight network types")
+    eq([(c, d, ch[1] if ch else None) for c, d, ch in sp.template_variants(path)[7]],
+       [(("00_Commissioning", "!!00_Commissioning.{db_element}$$"), "read", None),
+        (("!!ITERATOR_STRINGS$$",), "read", 1), (("01_PushButton", "!!ITERATOR_STRINGS$$"), "write", 1)],
+       "type 08 (one channel, no lamp): only channel 1's IN and member")
     accesses = sp.template_variants(path)[0]
     eq([(c, d, ch[1] if ch else None) for c, d, ch in accesses],
        [(("00_Commissioning", "!!00_Commissioning.{db_element}$$"), "read", None)]

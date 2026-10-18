@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import csv
 import os
+import re
 
 from pipeline5 import config
 from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
@@ -96,12 +97,17 @@ def template_source(template_ref: str) -> str:
     return "Shared/" + rel.replace(os.sep, "/")
 
 
+_VERSION_PREFIX = re.compile(r"^TEMPLATE--v\d+(?:\.\d+)*--", re.IGNORECASE)
+
+
 def ship_template(template_ref: str, tpl_dir: str) -> str:
     """Copy a csv-emitting block's template XML into the workspace's `Templates/` folder, stamped
     `sw/block-template` (the header as the first comment after the declaration; the original's BOM and
     line ends kept, an older stamp replaced), and return the RELATIVE reference written into the csv
     (`Templates/<file>.xml`, forward slash - machine-independent). A missing source ships nothing but still
-    writes the relative ref (the OP import reports it, exactly like the old dangling absolute path did)."""
+    writes the relative ref (the OP import reports it, exactly like the old dangling absolute path did).
+    A shipped copy SUPERSEDES the same block's template of another version left there by an earlier run (the 02
+    EM Push Button v1.2 -> v1.3, 2026-10-18): that stale copy is removed - one template per block."""
     base = os.path.basename(str(template_ref or ""))
     if not base:
         return ""
@@ -112,6 +118,12 @@ def ship_template(template_ref: str, tpl_dir: str) -> str:
         stamp = header.fields("sw/block-template", PHASE_BLOCKS, source=template_source(template_ref))
         with open(os.path.join(tpl_dir, base), "w", encoding="utf-8", newline="") as copy:
             copy.write(header.stamp_xml(text, stamp))
+        block = _VERSION_PREFIX.sub("", base).lower()
+        if block != base.lower():
+            for name in os.listdir(tpl_dir):
+                if (name != base and _VERSION_PREFIX.match(name)
+                        and _VERSION_PREFIX.sub("", name).lower() == block):
+                    os.remove(os.path.join(tpl_dir, name))   # a superseded version of this block's template
     return f"{header.TEMPLATES_FOLDER}/{base}"
 
 

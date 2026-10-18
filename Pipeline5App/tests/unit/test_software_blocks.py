@@ -122,17 +122,25 @@ def test_builder_02_em_push_button_groups_inputs():
     eq(len(t), 1, "4 inputs (E1/2 + B1/2) -> one chunk of 4")
     eq(t.rows[0]["instanceOf-00_Push-Button_Input"], "EMPB_n1_1")
     quartet = ["PB0", "PB1", "PB2", "BRK0"]
-    pads = [builders.PAD] * 4
-    eq(t.rows[0]["ITERATOR_STRINGS"], quartet + quartet + pads,
-       "the padded quartet emitted twice, then the lamp quartet (no EL rows -> all PAD)")
+    eq((t.rows[0]["TemplateType"], t.rows[0]["ITERATOR_STRINGS"]), ("05", quartet + quartet),
+       "4 channels without lamps: network type 05, the quartet twice - no lamp slots, no PAD")
+    six = ins + [{"script_type": "E1/2", "bit": f"I{b}.0", "name_in_db": f"PB{b}"} for b in (4, 5)]
+    t = builders.build_02_em_push_button(Database([node] + six))
+    eq([(r["instanceOf-00_Push-Button_Input"], r["TemplateType"], r["ITERATOR_STRINGS"]) for r in t.rows],
+       [("EMPB_n1_1", "05", quartet + quartet), ("EMPB_n1_2", "07", ["PB4", "PB5"] * 2)],
+       "6 channels: a full chunk, then 2 channels on their own network type (07) - never a 'No Operation' slot")
+    eq(builders._push_button_variant(4, True), "01", "the v1.2 network kept as type 01")
+    eq([builders._push_button_variant(n, lit) for lit in (True, False) for n in (4, 3, 2, 1)],
+       ["01", "02", "03", "04", "05", "06", "07", "08"], "4/3/2/1 with lamps, 4/3/2/1 without")
 
 
 def test_builder_02_lamps_by_fld():
     """C-027: Lamp_1..4 = each channel's EL lamp (the EL row with the same I/O-List designation, its PLC
-    tag); PAD for a breaker / a button without a lamp / an unused slot. The match is the designation AS
-    WRITTEN - the 200 index's pairing key (refute round 1: a case/spacing variant is another object there,
-    so it pairs nothing here either); of two lamps with one designation the first wins; a lamp with no
-    button is no channel."""
+    tag). The match is the designation AS WRITTEN - the 200 index's pairing key (refute round 1: a case/spacing
+    variant is another object there, so it pairs nothing here either); of two lamps with one designation the
+    first wins; a lamp with no button is no channel. User 2026-10-18: a lamp-less channel (a breaker, a button
+    without a lamp) never gets a 'No Operation' lamp - the node's lamped channels chunk first, the lamp-less ones
+    after, each chunk on the network type whose unused pins are open."""
     node = _node("n1", "1.2.3.4", i0="0", i1="20", q0="0", q1="20")
     ins = [{"script_type": "E1/2", "bit": "I0.0", "name_in_db": "PB0", "iol_FLD": "=ES-0001"},
            {"script_type": "E1/2", "bit": "I0.1", "name_in_db": "PB1", "iol_FLD": "=ES-0002"},   # no lamp
@@ -142,12 +150,12 @@ def test_builder_02_lamps_by_fld():
              {"script_type": "EL", "bit": "Q0.4", "iol_FLD": "=es -0002", "name_in_tagtable": "LAMP VARIANT"},  # no pair
              {"script_type": "EL", "bit": "Q0.6", "iol_FLD": "=ES-0099", "name_in_tagtable": "LAMP ORPHAN"}]
     t = builders.build_02_em_push_button(Database([node] + ins + lamps))
-    eq(len(t), 1, "the 3 inputs -> one chunk; the EL rows are not channels")
-    it = t.rows[0]["ITERATOR_STRINGS"]
-    eq(len(it), 12, "3 quartets -> the v1.2 template's 12 iterator slots")
-    eq(it[:8], ["PB0", "PB1", "BRK0", builders.PAD] * 2, "the IN and 01_PushButton quartets unchanged")
-    eq(it[8:], ["LAMP ES-0001", builders.PAD, builders.PAD, builders.PAD],
-       "lamp by designation (the first one), PAD for the lamp-less button, the breaker and the unused slot")
+    eq([(r["instanceOf-00_Push-Button_Input"], r["TemplateType"], r["ITERATOR_STRINGS"]) for r in t.rows],
+       [("EMPB_n1_1", "04", ["PB0", "PB0", "LAMP ES-0001"]),
+        ("EMPB_n1_2", "07", ["PB1", "BRK0", "PB1", "BRK0"])],
+       "the lamped button on a 1-channel lamped network (its lamp by designation, the first one); the lamp-less "
+       "button and the breaker on a 2-channel network without lamps; the EL rows are no channels")
+    ok(all(builders.PAD not in r["ITERATOR_STRINGS"] for r in t.rows), "no 'No Operation' anywhere")
 
 
 def test_area_descriptions_reads_list_cells():
@@ -471,7 +479,13 @@ def test_project_ships_templates_with_relative_refs():
         blk.add(name="00_X", template_stem="TEMPLATE--v1.0--00_X", template_ref=src,
                 keys=["TemplateType"], columns=["TemplateType"])
         mem.add(block="00_X", seq=0, values={"TemplateType": "01"})
+        os.makedirs(os.path.join(creation, "Templates"))
+        for stale in ("TEMPLATE--v0.9--00_X.xml", "TEMPLATE--v1.0--00_XY.xml", "notes.xml"):   # an earlier run's
+            open(os.path.join(creation, "Templates", stale), "w").close()
         res = engine.project(DB([blk, mem]), system=SYSTEM, out_dir=creation)
+        eq(sorted(os.listdir(os.path.join(creation, "Templates"))),
+           ["TEMPLATE--v1.0--00_X.xml", "TEMPLATE--v1.0--00_XY.xml", "notes.xml"],
+           "the block's older template version is swept (one template per block); another block's and a foreign file stay")
         lines = open(res["files"][0], encoding="utf-8").read().splitlines()
         eq(lines[lines.index("#!end") + 1], "$,template=Templates/TEMPLATE--v1.0--00_X.xml",
            "the CSV references the SHIPPED template, relative (OP5 walks up to the workspace's Templates/)")
@@ -640,17 +654,40 @@ def test_shipped_el_tag_identity():
 
 
 def test_shipped_v12_template_lamp_slots():
-    """C-027: the SHIPPED v1.2 02_EM Push Button template carries exactly 12 `!!ITERATOR_STRINGS$$` slots
-    (the builder's 3 quartets) and its slots 9-12 are wired to the FB's Lamp_1..4 outputs."""
+    """C-027: the SHIPPED 02_EM Push Button template's network type 01 carries exactly 12 `!!ITERATOR_STRINGS$$`
+    slots (the builder's 3 quartets) and its slots 9-12 are wired to the FB's Lamp_1..4 outputs. v1.3 (user
+    2026-10-18): network types 02..08 = 3/2/1 channels with lamps, 4/3/2/1 without - each wires exactly the
+    channels `_push_button_variant` sends it and leaves every other IN / OUT / Lamp pin OPEN, ON_Lamp TRUE."""
     import glob
     import xml.etree.ElementTree as ET
     here = os.path.dirname(os.path.abspath(__file__))
     repo = os.path.abspath(os.path.join(here, "..", "..", ".."))
     path = glob.glob(os.path.join(repo, "Shared", "Templates", "Tia Portal Software Blocks",
-                                  "TEMPLATE--v1.2--02_EM Push Button.xml"))
-    eq(len(path), 1, "the v1.2 template ships")
-    root = ET.parse(path[0]).getroot()
+                                  "TEMPLATE--v*--02_EM Push Button.xml"))
+    eq([os.path.basename(p) for p in path], ["TEMPLATE--v1.3--02_EM Push Button.xml"], "only the v1.3 template ships")
     local = lambda e: e.tag.rsplit("}", 1)[-1]
+    networks = [cu for cu in ET.parse(path[0]).getroot().iter() if local(cu) == "SW.Blocks.CompileUnit"]
+    eq(len(networks), 8, "eight network types")
+    for lit in (True, False):
+        for n in (4, 3, 2, 1):
+            cu = networks[int(builders._push_button_variant(n, lit)) - 1]
+            access = {a.get("UId"): a for a in cu.iter() if local(a) == "Access"}
+            pins = {}
+            for w in cu.iter():
+                if local(w) != "Wire":
+                    continue
+                name = next((c.get("Name") for c in w if local(c) == "NameCon"), None)
+                ident = next((c.get("UId") for c in w if local(c) == "IdentCon"), None)
+                pins[name] = "open" if ident is None else access[ident]
+            slots = [a for a in access.values() if any(local(c) == "Component" and c.get("Name") == "!!ITERATOR_STRINGS$$"
+                                                       for c in a.iter())]
+            eq(len(slots), n * (3 if lit else 2), f"{n} channels, lamps {lit}: the iterator slots the builder fills")
+            for i in range(1, 5):
+                used = i <= n
+                eq((pins[f"IN_{i}"] != "open", pins[f"OUT_{i}"] != "open", pins[f"Lamp_{i}"] != "open"),
+                   (used, used, used and lit), f"{n}/{lit}: channel {i} wired only when used (its lamp only when lit)")
+            eq(pins["ON_Lamp"].find(".//{*}ConstantValue").text, "TRUE", "ON_Lamp <- TRUE in every network")
+    root = networks[0]                                       # network type 01 - the v1.2 network, unchanged
     slots = [a.get("UId") for a in root.iter() if local(a) == "Access"
              and any(local(c) == "Component" and c.get("Name") == "!!ITERATOR_STRINGS$$" for c in a.iter())]
     eq(len(slots), 12, "12 iterator slots = 3 quartets")
@@ -679,11 +716,9 @@ def test_single_row_e_joins_02_and_03():
             {"script_type": "E1/2", "bit": "I0.1", "name_in_db": "PB_P", "iol_FLD": "=ES-2"},
             {"script_type": "EL", "bit": "Q0.0", "iol_FLD": "=ES-1", "name_in_tagtable": "LAMP 1"}]
     t = builders.build_02_em_push_button(Database([node] + rows))
-    eq(len(t), 1, "one chunk")
-    it = t.rows[0]["ITERATOR_STRINGS"]
-    eq(sorted(it[:2]), ["PB_P", "PB_S"], "both e-stop forms are channels")
-    eq(it[8 + it.index("PB_S")], "LAMP 1", "the single-row e-stop's lamp on its channel")
-    eq(it[8 + it.index("PB_P")], builders.PAD, "no lamp for the other")
+    eq([(r["TemplateType"], r["ITERATOR_STRINGS"]) for r in t.rows],
+       [("04", ["PB_S", "PB_S", "LAMP 1"]), ("08", ["PB_P", "PB_P"])],
+       "both e-stop forms are channels: the single-row one with its lamp, the other on a lamp-less network")
     rows3 = [{"script_type": "E", "matrix_areas": ["AREA 1"], "areas_description": ["Infeed"],
               "name_in_db": "PB_S", "datablocks": ["01_Pushbutton"]},
              {"script_type": "KQ", "matrix_areas": ["AREA 1"], "areas_description": ["Infeed"],

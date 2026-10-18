@@ -23,6 +23,11 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
         sorter feedback `PNC_I_SORTER-<index> SORTER- RUNNING` -> `... SORTER RUNNING` (the name 07 Speed Control
         always used): the reference's old spelling read as the new one, counted - interface_elements (its uid
         re-stamped from the old spelling), the IF_ workbooks, the SCL, 08 Gate Manager
+      * the 02 EM Push Button template v1.3 (2026-10-18, user): network types 01..08 by channel count and lamps,
+        the unused pins open - no 'No Operation' pad: the name `TEMPLATE--v1.2--02_EM Push Button` read as v1.3
+        (counted with the renames), the shipped v1.3 template checked against Shared's (never compared - the
+        reference ships v1.2), and the reference's padded 02 rows (the CreationInfo CSV, software_block_members)
+        read in their variant form - the chunk's channels only, on the type `_push_button_variant` names (counted)
       * the 05_EM_STATE DB (2026-10-18, user): the power coil `<area> POWER_CUT` -> `<area> POWER ENABLED` (read
         as the new name, counted with the renames; db_members' uid re-stamped from the old name) and its members'
         comments reduced to what each signal is - the comments of that DB not compared (dropped on both sides,
@@ -167,7 +172,8 @@ def _strip_header(text: str) -> tuple:
 _TEMPLATE_RENAMES = (("Clock 1Hz", "Clock_1Hz"),          # (old, new): the interface template's tags renamed
                      ("SORTER- RUNNING", "SORTER RUNNING"))  # 2026-10-18 (user) - the clock's TIA name; 07's spelling
 _MEMBER_RENAMES = ((" POWER_CUT", " POWER ENABLED"),)      # the 05_EM_STATE power coil, renamed 2026-10-18 (user)
-_RENAMED = _TEMPLATE_RENAMES + _MEMBER_RENAMES
+_PB_TEMPLATE = ("TEMPLATE--v1.2--02_EM Push Button", "TEMPLATE--v1.3--02_EM Push Button")   # (old, new) 2026-10-18
+_RENAMED = _TEMPLATE_RENAMES + _MEMBER_RENAMES + (_PB_TEMPLATE,)
 
 
 def _norm_str(text: str) -> str:
@@ -207,7 +213,8 @@ _WORKSPACE = "TiaPortalProjectInterface/BuilderData/"
 _TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
 _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
 SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
-              "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0, "renamed_tags": 0, "em_state_comments": 0}
+              "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0, "renamed_tags": 0, "em_state_comments": 0,
+              "pb_template": 0, "pb_rows": 0}
 _SIGNAL_PATHS = "ProjectDocumentation/Reports/io_signal_paths.html"
 _DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
 _SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
@@ -327,6 +334,75 @@ def _drop_em_state_comments(rel: str, data: bytes, pl5: bool) -> bytes:
             row = row[:at] + [""] + row[at + 1:]
         writer.writerow(row)
     return (bom + out.getvalue()).encode("utf-8")
+
+
+_PAD = "No Operation"
+
+
+def _pb_variant(values: list, tt: str):
+    """(network type, iterator) of a reference 02 row in the v1.3 form, or None when it is not one a v1.3 run makes:
+    the chunk's n channels (the non-pad IN slots, padded at the end only), their IN + member lists, and their lamps
+    when EVERY channel has one - type 01..04 = 4..1 lamped, 05..08 = 4..1 lamp-less (a mixed chunk re-chunks in v1.3:
+    no row-to-row reading, left as it is - a difference then)."""
+    if tt != "01" or len(values) != 12:
+        return None
+    ins, outs, lamps = values[0:4], values[4:8], values[8:12]
+    n = sum(1 for v in ins if v != _PAD)
+    if ins[n:] != [_PAD] * (4 - n) or outs[n:] != [_PAD] * (4 - n) or lamps[n:] != [_PAD] * (4 - n) or n == 0:
+        return None
+    lit = all(v != _PAD for v in lamps[:n])
+    if not lit and any(v != _PAD for v in lamps[:n]):
+        return None
+    return f"{4 - n + 1 + (0 if lit else 4):02d}", ins[:n] + outs[:n] + (lamps[:n] if lit else [])
+
+
+def _unpad_push_buttons(rel: str, data: bytes) -> bytes:
+    """The REFERENCE's padded 02 EM Push Button rows read in their v1.3 form (`_pb_variant`): the CreationInfo CSV's
+    `@` rows and software_block_members' 02 rows (their JSON re-dumped as the Table writer does); counted."""
+    import csv
+    import io
+    import json
+    name = os.path.basename(rel)
+    if name not in ("02_EM Push Button.csv", "software_block_members.csv") or _PAD.encode() not in data:
+        return data
+    text = data.decode("utf-8")
+    bom = "\ufeff" if text.startswith("\ufeff") else ""
+    lines = text[len(bom):].split("\r\n" if "\r\n" in text else "\n")
+    sep = "\r\n" if "\r\n" in text else "\n"
+    out = []
+    for line in lines:
+        cells = next(csv.reader([line])) if line else []
+        new = None
+        if name == "02_EM Push Button.csv" and cells[:1] == ["@"]:
+            v = _pb_variant(cells[5:], cells[1])
+            if v:
+                new = ["@", v[0]] + cells[2:5] + v[1]
+        elif name == "software_block_members.csv" and len(cells) == 4 and cells[1] == "02_EM Push Button":
+            values = json.loads(cells[3])
+            v = _pb_variant(values.get("ITERATOR_STRINGS") or [], values.get("TemplateType", ""))
+            if v:
+                values["TemplateType"], values["ITERATOR_STRINGS"] = v
+                new = cells[:3] + [json.dumps(values, ensure_ascii=False, sort_keys=True, separators=(",", ":"))]
+        if new is None:
+            out.append(line)
+            continue
+        buf = io.StringIO()
+        csv.writer(buf, lineterminator="").writerow(new)
+        out.append(buf.getvalue())
+        SANCTIONED["pb_rows"] += 1
+    return (bom + sep.join(out)).encode("utf-8")
+
+
+_PB_SHIPPED = _WORKSPACE + "Templates/" + _PB_TEMPLATE[1] + ".xml"
+_PB_RETIRED = _WORKSPACE + "SoftwareBlocks/CreationInfo/Templates/" + _PB_TEMPLATE[0] + ".xml"
+_PB_SHARED = os.path.join(REPO, "Shared", "Templates", "Tia Portal Software Blocks", _PB_TEMPLATE[1] + ".xml")
+
+
+def _check_pb_template(path: str, label: str) -> list:
+    """The shipped v1.3 02 template (2026-10-18) - the reference ships v1.2: its header-less body is Shared's v1.3."""
+    body, _h = _strip_header(open(path, "rb").read().decode("utf-8"))
+    original, _h = _strip_header(open(_PB_SHARED, "rb").read().decode("utf-8"))
+    return [] if body == original else [f"{label}: the shipped {_PB_TEMPLATE[1]}.xml differs from Shared's"]
 
 
 def _is_tag_table_xml(rel: str) -> bool:
@@ -461,6 +537,10 @@ def compare(a_root: str, b_root: str, label: str) -> list:
             diffs += _check_areas_table(path, os.path.join(a_root, "signals.csv"), label)
             SANCTIONED["areas_table"] += 1
             continue
+        if rel == _PB_SHIPPED:                         # the v1.3 02 template: checked against Shared's
+            diffs += _check_pb_template(path, label)
+            SANCTIONED["pb_template"] += 1
+            continue
         if rel == _SIGNAL_PATHS:                       # the signal-paths page: its data checked, never compared
             diffs += _check_signal_paths(path, os.path.join(a_root, "ProjectDocumentation", "Reports",
                                                             "io_project_coverage_report.csv"), label)
@@ -472,6 +552,8 @@ def compare(a_root: str, b_root: str, label: str) -> list:
         if legacy in b:
             diffs.append(f"{label}: two PL5 files map onto {legacy}: {rel}")
         b[legacy] = path
+    if SANCTIONED["pb_template"] and _PB_RETIRED in a:  # the reference's v1.2 template: retired by v1.3
+        del a[_PB_RETIRED]
     for rel in sorted(set(a) | set(b)):
         if rel not in a:
             diffs.append(f"{label}: PL5-only file {rel}")
@@ -494,7 +576,7 @@ def compare(a_root: str, b_root: str, label: str) -> list:
                 headered = False
             if not headered:
                 diffs.append(f"{label}: no #!openn header: {rel}")
-        da = _norm_text(_drop_em_state_comments(rel, open(a[rel], "rb").read(), pl5=False))
+        da = _norm_text(_unpad_push_buttons(rel, _drop_em_state_comments(rel, open(a[rel], "rb").read(), pl5=False)))
         db = _norm_text(_drop_em_state_comments(rel, _restamp_renamed_rows(rel, _drop_interface_descriptions(
             rel, _drop_transfer_areas(rel, raw_b))), pl5=True))
         if da != db:
@@ -553,7 +635,8 @@ def main() -> int:
               f"DeviceTypesDatabase checked against its original, {SANCTIONED['signal_paths_page']} signal-paths "
               f"page checked against the coverage rows, {SANCTIONED['areas_table']} areas table checked against "
               f"the signals' areas, {SANCTIONED['renamed_tags']} renamed name(s) read in their new spelling, "
-              f"{SANCTIONED['em_state_comments']} 05_EM_STATE comments not compared)")
+              f"{SANCTIONED['em_state_comments']} 05_EM_STATE comments not compared, {SANCTIONED['pb_template']} "
+              f"v1.3 02 template checked against Shared, {SANCTIONED['pb_rows']} padded 02 rows read as v1.3 variants)")
         return 0
 
 
