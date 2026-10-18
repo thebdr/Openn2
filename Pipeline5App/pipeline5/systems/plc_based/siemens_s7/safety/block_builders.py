@@ -238,6 +238,12 @@ def _area_nn(area) -> str:
     return f"{int(m.group(1)):02d}" if m else str(area)
 
 
+def _sorter_running(nn: str) -> str:
+    """Sorter `nn`'s running feedback - the MachineInterfaces template's `PNC_I_SORTER-<index> SORTER RUNNING` (its
+    `SORTER- RUNNING` corrected 2026-10-18, user), the one name 07 Speed Control and 08 Gate Manager both read."""
+    return f"PNC_I_SORTER-{nn} SORTER RUNNING"
+
+
 @builds("03_Diagnostic Nodes", emit="scl")
 def build_03_diagnostic_nodes(db: Database) -> Table:
     """One SCL assignment per PROFINET node - the PROFINET_NODES member mirror (user spec 2026-07-07):
@@ -470,7 +476,7 @@ def build_07_speed_control(db: Database) -> Table:
             **{"instanceOf-01_Speed_Control_SLS": f"SLS_SORTER_{nn}"},
             **{"tagName:EncoderSensor1": enc1.get("name_in_tagtable", "")},
             **{"tagName:EncoderSensor2": enc2.get("name_in_tagtable", "") if enc2 else ""},
-            **{"tagName:SorterRunningIOC": f"PNC_I_SORTER-{nn} SORTER RUNNING"},
+            **{"tagName:SorterRunningIOC": _sorter_running(nn)},
             **{"04_SPEED.{db_element:ENC1/2}": enc1.get("name_in_db", "")},
             **{"04_SPEED.{db_element:ENC2/2}": enc2.get("name_in_db", "") if enc2 else ""},
             **{"04_SPEED.{db_element:ENC}": f"Safety Encoder Failure [ {enc1.get('iol_FLD', '')} ]"},
@@ -507,7 +513,7 @@ def build_08_gate_manager(db: Database) -> Table:
             template_type="01",
             **{"instanceOf-02_Safety_Door": ""},
             NetworkComment=f"SORTER {nn} SPEED CONTROL",
-            **{"tagName:SorterRunningIOC": f"PNC_I_SORTER-{nn} SORTER- RUNNING"},
+            **{"tagName:SorterRunningIOC": _sorter_running(nn)},
             **{"SPEED_STATE_REC.SORTER_{index}_STOPPED": f"SORTER_{nn}_STOPPED"},
             **{"05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING": f"SORTER_{nn}_NOT_RUNNING"},
             **{"00_Commissioning.{db_element}": ""},
@@ -567,10 +573,9 @@ def build_08_gate_manager(db: Database) -> Table:
             **{"tagName:DoorSolenoidUnlock": tag(dq)},
             **{"tagName:DoorResetLamp": tag(dl)},
             # the door network consumes the sorter interlock itself (the template's TT02 references
-            # these; empty Component slots break the TIA import - user spec 2026-07-07). The tag
-            # spelling ('SORTER- RUNNING') is the MachineInterfaces template's native row - the tag
-            # that actually exists in PLCTags (not 'SORTER RUNNING').
-            **{"tagName:SorterRunningIOC": f"PNC_I_SORTER-{nn} SORTER- RUNNING" if nn else ""},
+            # these; empty Component slots break the TIA import - user spec 2026-07-07): the
+            # MachineInterfaces template's own sorter-running row, the tag that exists in PLCTags.
+            **{"tagName:SorterRunningIOC": _sorter_running(nn) if nn else ""},
             **{"05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING": f"SORTER_{nn}_NOT_RUNNING" if nn else ""},
             **{"07_DOOR.{db_element:DI1/2}": member(door)},
             **{"07_DOOR.{db_element:DI2/2}": (door_members[1] if len(door_members) > 1 else "") if di else member(di2)},

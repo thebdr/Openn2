@@ -279,8 +279,8 @@ def test_builder_08_gate_manager_sorters_and_doors():
     eq(d["tagName:DoorSolenoidUnlock"], "TDQ")
     eq(d["tagName:DoorReset"], "TDR", "the DR tag feeds BOTH the open-request and the reset pin")
     eq(d["tagName:DoorOpenRequest"], "TDR")
-    eq(d["tagName:SorterRunningIOC"], "PNC_I_SORTER-01 SORTER- RUNNING",
-       "the door's sorter via the DI's area; 'SORTER- RUNNING' = the MachineInterfaces native tag")
+    eq(d["tagName:SorterRunningIOC"], "PNC_I_SORTER-01 SORTER RUNNING",
+       "the door's sorter via the DI's area; the MachineInterfaces template's tag (07's spelling, 2026-10-18)")
     eq(d["05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING"], "SORTER_01_NOT_RUNNING",
        "the door row consumes the sorter interlock member itself (template TT02)")
     eq((d["choice:IsSorterDoor"], d["choice:DoorResetNecessary"]), ("AlwaysTRUE", "AlwaysTRUE"))
@@ -852,7 +852,7 @@ def test_builder_08_door_of_a_sorter_sub_area():
     d = next(r for r in builders.build_08_gate_manager(Database(rows, areas=_fvt_areas())).rows
              if r["TemplateType"] == "02")
     eq((d["tagName:SorterRunningIOC"], d["05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING"], d["choice:IsSorterDoor"]),
-       ("PNC_I_SORTER-02 SORTER- RUNNING", "SORTER_02_NOT_RUNNING", "AlwaysTRUE"), "the TRIH door is sorter 02's")
+       ("PNC_I_SORTER-02 SORTER RUNNING", "SORTER_02_NOT_RUNNING", "AlwaysTRUE"), "the TRIH door is sorter 02's")
 
 
 def test_builder_03_titles_from_the_areas_table():
