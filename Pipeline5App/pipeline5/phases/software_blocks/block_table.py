@@ -21,6 +21,7 @@ class Table:
     name: str                                  # the block/output name (template stem, prefix dropped)
     columns: list = field(default_factory=list)
     rows: list = field(default_factory=list)   # list[dict]
+    findings: list = field(default_factory=list)   # Findings the builder raises (the engine records + gates them)
 
     def add(self, template_type: str = "01", **values) -> "Table":
         """Append one row. `template_type` -> the TemplateType column; **values are the placeholder

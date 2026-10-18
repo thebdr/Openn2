@@ -33,6 +33,7 @@ from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
 
 builds = SYSTEM.builders.builds
 from pipeline5.phases.software_blocks.block_table import Table
+from pipeline5.findings.finding import Finding
 
 PAD = "No Operation"   # iterator filler for a template's unused fixed slots (a DB no-op member, ph520)
 
@@ -161,7 +162,10 @@ def _area_descriptions(db: Database) -> dict:
     SAME `if area_desc.get(a)` filter as PL3's `|`-join, so its i-th entry maps to the i-th area that HAS
     a description (first non-empty wins). `matrix_areas` is read via `_as_list` (PL3 drops empties too);
     `areas_description` is read KEEPING empties (PL3's `descs` strips but does not filter) to preserve the
-    positional indexing exactly."""
+    positional indexing exactly. With the staged `areas` table ([[C-040]]) its descriptions win - matched by
+    NAME at staging, a sub-area's inherited from its parent; the row reading stays for a run without it."""
+    if db.area_rows:
+        return {str(a["name"]): str(a["description"]) for a in db.area_rows if str(a.get("description") or "")}
     out = {}
     for r in db.rows:
         areas = _as_list(r.get("matrix_areas"))
@@ -205,14 +209,28 @@ def build_03_zone_cumulative(db: Database) -> Table:
 
 
 def _sorter_areas(db: Database) -> set:
-    """Areas that are sorter areas - inferred from single-area rows flagged IsSorterArea (the staged
-    flag is per-row: a row touches a sorter area, so only a single-area row pins it to one area)."""
+    """Areas that are sorter areas - the staged `areas` table's kind ([[C-040]]: `matrix_params.sorter_areas`
+    lists their numbers, a sub-area's included); without that table, inferred from single-area rows flagged
+    IsSorterArea (the staged flag is per-row: a row touches a sorter area, so only a single-area row pins it)."""
+    if db.area_rows:
+        return {str(a["name"]) for a in db.area_rows if a.get("sorter") == "yes"}
     s = set()
     for r in db.rows:
         areas = _as_list(r.get("matrix_areas"))
         if len(areas) == 1 and r.get("IsSorterArea") == "yes":
             s.add(areas[0])
     return s
+
+
+def _sorter_nn(db: Database, area) -> str:
+    """The SORTER number (2 digits) of the sorter area `area` ([[C-040]]): a sub-area's ordinal under its parent
+    (`AREA 1_TRIB` = 1001 -> '01', `AREA 1_TRIH` = 1002 -> '02' - user 2026-10-18), a plain area's own number
+    (`AREA 1` -> '01'); without a staged number, the area name's trailing digits (`_area_nn`)."""
+    info = db.area(area)
+    number = str((info or {}).get("number", "")).strip()
+    if number.isdigit():
+        return f"{int(number) % 1000:02d}" if (info or {}).get("parent") else f"{int(number):02d}"
+    return _area_nn(area)
 
 
 def _area_nn(area) -> str:
@@ -254,7 +272,10 @@ def build_04_estop(db: Database) -> Table:
     STOP, reset required). TT01 ('Safety STOP', reset-not-required / ACK_NEC=FALSE) is reserved for the
     future. Per area: the 02_COM PB/FDB cumulatives (always) + DOORS/SAFETY_BREAKERS (only when the
     area has them), the 05_EM_STATE Q/Q_DELAYED/RESET state members + the per-area POWER_CUT coil, and
-    the sorter's encoder-healthy SPEED_STATE_REC member (TT06 only)."""
+    the sorter's encoder-healthy SPEED_STATE_REC member (TT06 only) - of its own sorter, `_sorter_nn` ([[C-040]]).
+    TT06 references the area's DOORS and SAFETY_BREAKERS: a sorter area missing either gets NO row and a blocking
+    `blk_estop_sorter_incomplete` FAIL naming it - an empty symbol slot would make the block generation refuse
+    the whole block (FVT 2026-10-18: AREA 1, doorless, flagged sorter)."""
     sorter = _sorter_areas(db)
     t = Table("04_ESTOP")
     for area in db.areas():
@@ -264,6 +285,14 @@ def build_04_estop(db: Database) -> Table:
                         for r in inarea)
         has_breakers = any(str(r.get("script_type", "")).upper() == "B1/2" and r.get("name_in_db")
                            for r in inarea)
+        if is_sorter and not (has_doors and has_breakers):     # TT06 needs both - never an empty slot
+            missing = " and ".join(m for m, have in (("doors", has_doors), ("safety breakers", has_breakers)) if not have)
+            t.findings.append(Finding(
+                phase=800, type="blk_estop_sorter_incomplete", severity="FAIL", location=f"04_ESTOP / {area}",
+                detail=f"{area} is a sorter area (matrix_params.sorter_areas) but has no {missing} - its ESTOP "
+                       "network (TemplateType 06: E-STOP + doors + breakers + encoder) cannot be built; list the "
+                       "sorter's own area there (a sub-area by its number, e.g. 1001, with matrix_params.sub_areas on)"))
+            continue
         if is_sorter:                                            # E-STOP + doors + breakers + encoder
             tt = "06"
         elif has_doors and has_breakers:
@@ -274,7 +303,7 @@ def build_04_estop(db: Database) -> Table:
             tt = "03"
         else:
             tt = "02"                                            # Emergency STOP (reset required); TT01 = future
-        nn = _area_nn(area)                                      # the SORTER number (zero-padded), TT06 only
+        nn = _sorter_nn(db, area)                                # the SORTER number (zero-padded), TT06 only
         encoder = f"SORTER_{nn}_ENCODER_HEALTHY" if is_sorter else ""
         t.add(
             template_type=tt,
@@ -510,7 +539,7 @@ def build_08_gate_manager(db: Database) -> Table:
             if idx.isdigit() and areas & set(_as_list(r.get("matrix_areas"))):
                 return f"{int(idx):02d}"
         for area in sorted(areas & _sorter_areas(db)):
-            return _area_nn(area)
+            return _sorter_nn(db, area)
         return ""
 
     for dq in db.by_type("DQ"):

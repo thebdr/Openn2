@@ -1426,6 +1426,33 @@ def test_reporting_writes_the_signal_paths_page():
     ok(any("910 signal paths:" in msg for lvl, msg in host.lines if lvl == "RSLT"), host.lines)
 
 
+def test_an_incomplete_sorter_area_halts_800():
+    """C-040 through the REAL 800 handler on the fixture: a sorter area without doors and breakers (the bare
+    AREA 2 listed in `matrix_params.sorter_areas` - what FVT's `[1]` did to its doorless AREA 1) is a blocking
+    `blk_estop_sorter_incomplete` FAIL, and phase 800 halts BEFORE writing any block - never a 04_ESTOP.csv whose
+    TemplateType 06 row carries an empty DOORS slot for the block generation to refuse."""
+    import glob
+    sandboxed = config.load_params
+
+    def with_area_2_as_sorter(path=None):
+        params = sandboxed(path)
+        params.setdefault("matrix_params", {})["sorter_areas"] = [1, 2]
+        return params
+    config.load_params = with_area_2_as_sorter
+    try:
+        host = _Host()
+        SYSTEM.handlers["software"](host.ctx())
+    finally:
+        config.load_params = sandboxed
+    eq(host.halted, True, "800 halts")
+    found = [(f.type, f.location) for batch in host.rendered for f in batch if f.type.startswith("blk_estop")]
+    eq(found, [("blk_estop_sorter_incomplete", "04_ESTOP / AREA 2")], "the bare sorter area is named")
+    eq(glob.glob(os.path.join(p5paths._BUILTIN_OUTPUT, "**", "04_ESTOP.csv"), recursive=True), [],
+       "no 04_ESTOP.csv written")
+    eq(glob.glob(os.path.join(p5paths._BUILTIN_OUTPUT, "**", "Program blocks", "*.csv"), recursive=True), [],
+       "no block written at all")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("siemens_main_handlers", [
@@ -1467,4 +1494,5 @@ if __name__ == "__main__":
          _sandboxed(test_a_transfer_area_fail_halts_the_interface_outputs)),
         ("the_interface_description_reaches_the_scl", _sandboxed(test_the_interface_description_reaches_the_scl)),
         ("reporting_writes_the_signal_paths_page", _sandboxed(test_reporting_writes_the_signal_paths_page)),
+        ("an_incomplete_sorter_area_halts_800", _sandboxed(test_an_incomplete_sorter_area_halts_800)),
     ]))

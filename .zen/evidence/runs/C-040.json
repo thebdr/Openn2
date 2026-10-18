@@ -1,0 +1,31 @@
+{
+  "clause": "C-040",
+  "command": "bash -c cd Pipeline5App && for t in test_iolist_staging test_software_blocks test_siemens_main_handlers; do C:/Source/Repos/_Openn2/.venv/Scripts/python.exe tests/unit/$t.py || exit 1; done",
+  "commandArgv": [
+    "bash",
+    "-c",
+    "cd Pipeline5App && for t in test_iolist_staging test_software_blocks test_siemens_main_handlers; do C:/Source/Repos/_Openn2/.venv/Scripts/python.exe tests/unit/$t.py || exit 1; done"
+  ],
+  "exitCode": 0,
+  "outputSha": "73cdfdf6ff6393cda7909433907380d46844dd9570b1f15abb4857321ff02add",
+  "outputTail": "  PASS  spawns_are_saved_beside_a_ragged_record\r\n  PASS  a_hidden_record_file_is_saved_whole_through_the_run_plan\r\n  PASS  a_blank_range_end_invents_nothing_on_the_real_fixture\r\n  PASS  generated_signals_reach_generation\r\n  PASS  generated_signals_change_only_their_own_outputs\r\n  PASS  lone_buttons_in_a_fresh_project\r\n  PASS  cascade_orphan_and_validation_see_absorbed_rows\r\n  PASS  310_leg_appends_reaction_findings_to_the_existing_record\r\n  PASS  sub_phase_dispatch\r\n  PASS  run_all_writes_a_ready_op5_workspace\r\n  PASS  a_transfer_area_fail_halts_the_interface_outputs\r\n  PASS  the_interface_description_reaches_the_scl\r\n  PASS  reporting_writes_the_signal_paths_page\r\n  PASS  an_incomplete_sorter_area_halts_800\r\n  -> 27/27 passed",
+  "ranAt": "2026-10-18T15:46:15.156Z",
+  "headCommit": "300e92058aa9f460bebfb874561c66c4baba5919",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_iolist_staging.py",
+      "file": "Pipeline5App/tests/unit/test_iolist_staging.py",
+      "fileSha": "9ef7d726f20f7d69db0c5513511b4d6059384927350e009947031aedb0940080"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_software_blocks.py",
+      "file": "Pipeline5App/tests/unit/test_software_blocks.py",
+      "fileSha": "b66f5e5d9ab9e033783b8550cdf1c7f272e18d44d6306c1a7d8ab24435ef6399"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "file": "Pipeline5App/tests/unit/test_siemens_main_handlers.py",
+      "fileSha": "60c8bebe8d703fb1ade3a3c93732b0905446e4c9296713713db0ee57ab604b7a"
+    }
+  ]
+}

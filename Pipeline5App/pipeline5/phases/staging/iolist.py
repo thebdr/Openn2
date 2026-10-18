@@ -27,6 +27,7 @@ from pipeline5.truth.content_hash import uid as content_uid
 from pipeline5.truth import identity
 from pipeline5.phases.staging import cematrix as matrix
 from pipeline5.truth.diagnosis import diagnosis_cabinets_table
+from pipeline5.truth.areas import areas_table
 from pipeline5.truth.signals import signals_table, is_generated   # noqa: F401 - re-exported
 from pipeline5.documents import xlsx_reader as workbook
 
@@ -198,7 +199,7 @@ def _read_iolist(params: dict, signal_types: dict, io_path: str) -> tuple:
     return rows, matched
 
 
-def _finalize_identity(params: dict, rows: list) -> None:
+def _finalize_identity(params: dict, rows: list, areas: list | None = None) -> None:
     """Derive each row's staging identity from its CURRENT fields: the I/O-List FLD + the PLC tag
     name/table + the positional node ranges, AND the C&E-dependent `ce_FLD`/`combined_FLD`/`IsSorterArea`/
     `diag_desc` (which read the `ce_*`/`matrix_areas` fields that `matrix.annotate` writes).
@@ -207,11 +208,11 @@ def _finalize_identity(params: dict, rows: list) -> None:
     (the C&E fields absent -> `ce_FLD` '' -> `combined_FLD` == `iol_FLD`, `IsSorterArea` '') and AGAIN after
     `matrix.annotate` (the C&E values now present overwrite the I/O-only ones) and you land on exactly the
     monolithic result. `combined_FLD` is part of the signals uid key, so the caller re-stamps the uid after
-    the C&E pass."""
+    the C&E pass. `areas` = the staged area hierarchy ([[C-040]]) - a sorter sub-area is named by its number."""
     colmap = config.load_column_map("IoList")
     signal_diag = config.load_signal_diagnosis()
     fu_col = next((m["column"] for m in colmap if m["canonical"] == "functional_unit"), "O")
-    sorter_names = _sorter_area_names(params)
+    sorter_names = _sorter_area_names(params, areas)
     for row in rows:
         if not row.get("source_cell") and row.get("source_row"):
             row["source_cell"] = f"{row.get('source_sheet', '')}!{fu_col}{row['source_row']}"
@@ -268,7 +269,7 @@ def absorb_spawned(database, params: dict | None = None) -> int:
     params = params or config.load_params()
     signal_types = config.load_signal_types()
     signal_diag = config.load_signal_diagnosis()
-    sorter_names = _sorter_area_names(params)
+    sorter_names = _sorter_area_names(params, list(database["areas"]) if "areas" in database else None)
     seen: dict = {}
     for row in spawned:
         row["bit"] = _canonical_addr(row.get("bit"))
@@ -290,17 +291,33 @@ def load_io_list(params: dict, signal_types: dict, io_path: str) -> tuple:
     rows, matched = _read_iolist(params, signal_types, io_path)
     if not matched:
         return rows, matched        # the caller (stage) emits the blocking stg_no_io_sheet FAIL
-    matrix.annotate(params, rows)   # C&E enrichment: matrix_areas / ce_* / numerazione_linea / areas_description
-    _finalize_identity(params, rows)
+    areas: list = []
+    matrix.annotate(params, rows, areas)   # C&E enrichment: matrix_areas / ce_* / numerazione_linea / areas_description
+    _finalize_identity(params, rows, areas)
     return rows, matched
 
 
-def _sorter_area_names(params: dict) -> set:
+def _sorter_numbers(params: dict) -> set:
+    """The configured sorter area NUMBERS (`matrix_params.sorter_areas`, e.g. `[1]` or, a sub-area's,
+    `[1001, 1002]` - [[C-040]]); a value that is no whole number is ignored."""
+    out = set()
+    for n in config.get_param(params, "matrix_params.sorter_areas", []) or []:
+        try:
+            out.add(int(str(n).strip()))
+        except ValueError:
+            continue
+    return out
+
+
+def _sorter_area_names(params: dict, areas: list | None = None) -> set:
     """The Sorter area NAMES, built from the configured sorter area NUMBERS. The user keeps
     `matrix_params.sorter_areas` as numbers (`[1]`); a row IsSorterArea when its `matrix_areas` intersect
-    these names (`1` -> "AREA 1"). Empty when nothing is configured."""
-    numbers = config.get_param(params, "matrix_params.sorter_areas", []) or []
-    return {f"AREA {n}" for n in numbers}
+    these names: `1` -> "AREA 1", and every area of the staged hierarchy (`areas`, [[C-040]]) carrying a listed
+    number - a sub-area by its own (`1001` -> "AREA 1_TRIB"). Empty when nothing is configured."""
+    numbers = _sorter_numbers(params)
+    names = {f"AREA {n}" for n in numbers}
+    names |= {a["name"] for a in (areas or []) if str(a.get("number", "")) != "" and int(a["number"]) in numbers}
+    return names
 
 
 def _is_sorter_area(row: dict, sorter_names: set) -> str:
@@ -408,6 +425,22 @@ def stage_iolist(params: dict | None = None, save: bool = True, system=None) -> 
     return database, notation
 
 
+def _store_areas(database, params: dict, areas: list) -> None:
+    """The `areas` table ([[C-040]]) from the staged hierarchy: one row per C&E area in column order - its number,
+    parent / part, CONCEPT description and kind (`sorter` "yes" when `matrix_params.sorter_areas` lists its number).
+    Declared on first use (the C&E pass owns it, like `validation_issues`); rebuilt on every pass."""
+    if "areas" not in database:
+        database.add_table(areas_table())
+    table = database["areas"]
+    table.rows = []
+    numbers = _sorter_numbers(params)
+    for a in areas:
+        number = a.get("number", "")
+        table.add(name=a["name"], number=str(number), parent=a.get("parent", ""), part=a.get("part", ""),
+                  order=str(a.get("order", "")), description=a.get("description", ""),   # text: as a reload reads it
+                  sorter="yes" if str(number) != "" and int(number) in numbers else "")
+
+
 def annotate_cematrix(database, params: dict | None = None, save: bool = True) -> tuple:
     """Phase 320 - Stage C&E Matrix: enrich the already-staged `signals` (built by `stage_iolist`) with the
     Cause&Effect data (`matrix_areas` / `ce_*` / `numerazione_linea` / `areas_description`) and the fields
@@ -416,8 +449,10 @@ def annotate_cematrix(database, params: dict | None = None, save: bool = True) -
     return (database, findings)."""
     params = params or config.load_params()
     table = database["signals"]
-    matrix.annotate(params, table.rows)               # C&E enrichment, in place on the staged rows
-    _finalize_identity(params, table.rows)            # recompute the C&E-dependent identity (the rest idempotent)
+    areas: list = []
+    matrix.annotate(params, table.rows, areas)        # C&E enrichment, in place on the staged rows
+    _finalize_identity(params, table.rows, areas)     # recompute the C&E-dependent identity (the rest idempotent)
+    _store_areas(database, params, areas)             # the declared area hierarchy ([[C-040]])
     for row in table.rows:                            # combined_FLD (the uid key) changed -> re-stamp
         row["uid"] = content_uid(*(row.get(key) for key in table.key_columns))
     findings = _dup_findings(table) + _dup_type_index_findings(table)   # dup uid WARN + (type,index) FAIL

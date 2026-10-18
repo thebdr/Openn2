@@ -19,6 +19,8 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
       * the tag-table XML (`<PLC>/PLC tags/<Table>.xml`, contract §9.1 decided 2026-10-09): a sanctioned NEW
         surface PL4 never had - not compared, but every file must carry the header and be a well-formed
         `SW.Tags.PlcTagTable` document (counted in the summary line)
+      * the `areas` SSOT table (C-040, since 2026-10-18): a sanctioned NEW table PL4 never had - not compared, but
+        every area the reference's signals name must be a row, plain and numbered by its digits, AREA 1 the sorter
       * the coupler transfer areas (C-031, contract §2.1): the `TransferArea-*` rows of `hardware_modules.csv`
         and `Modules.csv` are PL5-only (PL4 never emitted them) - dropped from the PL5 side only, counted in the
         verdict; a reference row of that model would still be a difference
@@ -187,7 +189,7 @@ _WORKSPACE = "TiaPortalProjectInterface/BuilderData/"
 _TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
 _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
 SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
-              "device_types_copy": 0, "signal_paths_page": 0}
+              "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0}
 _SIGNAL_PATHS = "ProjectDocumentation/Reports/io_signal_paths.html"
 _DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
 _SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
@@ -302,6 +304,34 @@ def _check_signal_paths(path: str, ref_coverage: str, label: str) -> list:
     return problems
 
 
+def _check_areas_table(path: str, ref_signals: str, label: str) -> list:
+    """The `areas` SSOT table (C-040, since 2026-10-18) - PL5-only: one row per C&E area the reference's signals
+    name (`matrix_areas`), each a plain area numbered by its digits (the builtin project keeps sub-areas off: no
+    parent, no part), the configured sorter area (`sorter_areas: [1]`) the only `sorter` one."""
+    import csv
+    import json
+    def rows(p):
+        with open(p, encoding="utf-8", newline="") as fh:
+            return list(csv.DictReader(line for line in fh if not line.startswith("#")))
+    want = []
+    for r in rows(ref_signals):
+        for a in json.loads(r.get("matrix_areas") or "[]"):
+            if a not in want:
+                want.append(a)
+    got = rows(path)
+    problems = []
+    missing = sorted(set(want) - {a["name"] for a in got})
+    if missing:
+        problems.append(f"{label}: areas.csv lacks an area the signals name: {missing}")
+    for a in got:
+        digits = re.findall(r"\d+", a["name"])
+        if a["parent"] or a["part"] or not digits or a["number"] != str(int(digits[-1])):
+            problems.append(f"{label}: areas.csv row {a['name']!r} is no plain area numbered by its digits: {dict(a)}")
+    if sorted(a["name"] for a in got if a["sorter"] == "yes") != ["AREA 1"]:
+        problems.append(f"{label}: areas.csv sorter areas differ from the configured [1]")
+    return problems
+
+
 def _legacy_rel(rel: str):
     """A PL5 output path -> the frozen reference's path: the VCI-shaped workspace (contract §4) onto the
     legacy BuilderData folders (§4.1, inverted). None = a PL5-only file by design (the workspace config,
@@ -338,6 +368,10 @@ def compare(a_root: str, b_root: str, label: str) -> list:
         if rel == _DEVICE_TYPES_COPY:                  # the shipped database: checked against its original
             diffs += _check_device_types_copy(path, label)
             SANCTIONED["device_types_copy"] += 1
+            continue
+        if label == "SSOT" and rel == "areas.csv":    # the area hierarchy (C-040): checked, never compared
+            diffs += _check_areas_table(path, os.path.join(a_root, "signals.csv"), label)
+            SANCTIONED["areas_table"] += 1
             continue
         if rel == _SIGNAL_PATHS:                       # the signal-paths page: its data checked, never compared
             diffs += _check_signal_paths(path, os.path.join(a_root, "ProjectDocumentation", "Reports",
@@ -428,7 +462,8 @@ def main() -> int:
               f"{SANCTIONED['interface_descriptions']} interface descriptions + "
               f"{SANCTIONED['region_comments']} SCL region comments, {SANCTIONED['device_types_copy']} shipped "
               f"DeviceTypesDatabase checked against its original, {SANCTIONED['signal_paths_page']} signal-paths "
-              "page checked against the coverage rows)")
+              f"page checked against the coverage rows, {SANCTIONED['areas_table']} areas table checked against "
+              "the signals' areas)")
         return 0
 
 

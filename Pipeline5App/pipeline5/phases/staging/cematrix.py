@@ -8,6 +8,12 @@ PL3's matrix, reading the nested `matrix_params` and storing the multi-valued fi
   * output signal (Q-address): matched by address on the AREA n sheets -> those sheet names +
     `numerazione_linea`.
 Paired channels of one device share the union of their C&E data (the matrix lists the device once).
+
+The AREAS themselves ([[C-040]]): `area_hierarchy` numbers every area - a plain area its own (`AREA 3` -> 3), with
+`matrix_params.sub_areas` on a sub-area `<parent>_<part>` its parent's x 1000 + its ordinal (`AREA 1_TRIB` ->
+1001) - and `concept_descriptions` matches each CONCEPT cell to the area it NAMES (position only for a cell
+naming none); a sub-area without its own cell takes its parent's description. Staging stores the result in
+the `areas` table (`iolist._store_areas`).
 """
 from __future__ import annotations
 
@@ -40,15 +46,88 @@ def _area_regex(params):
         return None
 
 
+def _name_key(name) -> str:
+    """An area name compared whitespace- and case-insensitively (a header 'AREA 1' == a CONCEPT 'area  1')."""
+    return " ".join(str(name or "").split()).upper()
+
+
+def _area_number(name: str, area_re) -> int | None:
+    """A PLAIN area's own number: the digits of the area pattern's match when that match IS the whole name
+    (`AREA 3` -> 3; `AREA 1_TRIB` is no plain area -> None); without a pattern, a name ending in its digits."""
+    key = " ".join(str(name).split())
+    if area_re is not None:
+        m = area_re.search(key)
+        if not m or m.group(0).strip().upper() != key.upper():
+            return None
+        digits = re.findall(r"\d+", m.group(0))
+    else:
+        m = re.fullmatch(r"\D*?(\d+)", key)
+        digits = [m.group(1)] if m else []
+    return int(digits[-1]) if digits else None
+
+
+def area_hierarchy(names: list, area_re, sub_areas: bool) -> list:
+    """The declared area hierarchy ([[C-040]]): one dict per area name, in the given order - `number` (a plain area
+    its own; a SUB-AREA its parent's x 1000 + its ordinal among that parent's sub-areas, `AREA 1_TRIB` -> 1001;
+    '' when neither), `parent` / `part` (a sub-area: `<parent>_<part>` with `<parent>` a plain area of `names`, the
+    longest such) and `order` (1-based). `sub_areas` off = every name an independent area (no parent)."""
+    plain = {n: _area_number(n, area_re) for n in names}
+    parents = sorted((n for n in names if plain[n] is not None), key=len, reverse=True)
+    out, ordinals = [], {}
+    for i, name in enumerate(names, start=1):
+        parent = ""
+        if sub_areas and plain[name] is None:
+            parent = next((p for p in parents if _name_key(name).startswith(_name_key(p) + "_")), "")
+        if parent:
+            ordinals[parent] = ordinals.get(parent, 0) + 1
+            number = plain[parent] * 1000 + ordinals[parent]
+            part = " ".join(name.split())[len(" ".join(parent.split())) + 1:]
+        else:
+            number, part = plain[name], ""
+        out.append({"name": name, "number": "" if number is None else number, "parent": parent,
+                    "part": part, "order": i})
+    return out
+
+
+def _names_area(text: str, name: str) -> bool:
+    """A CONCEPT cell `text` NAMES `name` when it starts with it at a word boundary ('AREA 1 (TRIB+TRIH)' names
+    AREA 1; 'AREA 12 ...' and 'AREA 1_TRIB ...' do not)."""
+    t, n = _name_key(text), _name_key(name)
+    if not t.startswith(n):
+        return False
+    nxt = t[len(n):len(n) + 1]
+    return not nxt or not (nxt.isalnum() or nxt == "_")
+
+
+def concept_descriptions(cells: list, column_areas: list, all_areas: list) -> dict:
+    """{area name: CONCEPT description} ([[C-040]], every project): a cell describes the area it NAMES (the longest
+    name it starts with, at a word boundary - first such cell wins); the cells naming no area fall back to
+    position - the i-th of them to the i-th matrix area column still without one (a CONCEPT sheet whose cells
+    name no area reads exactly as before)."""
+    desc, unnamed = {}, []
+    candidates = sorted(all_areas, key=lambda n: len(_name_key(n)), reverse=True)
+    for text in cells:
+        hit = next((n for n in candidates if _names_area(text, n)), None)
+        if hit is None:
+            unnamed.append(text)
+        elif hit not in desc:
+            desc[hit] = text
+    for name, text in zip([n for n in column_areas if n not in desc], unnamed):
+        desc[name] = text
+    return desc
+
+
 def area_lookup(params: dict) -> tuple:
-    """(inputs, outputs, area_desc):
+    """(inputs, outputs, area_desc, areas):
       inputs:  norm(I-addr) -> {areas:[names], ce_functional_unit, ce_location, ce_device}
       outputs: norm(Q-addr) -> {areas:[sheet names], numerazione_linea}
-      area_desc: area name -> its CONCEPT description
+      area_desc: area name -> its CONCEPT description (a sub-area without its own: its parent's)
+      areas: the declared hierarchy (`area_hierarchy` + `description`), matrix columns first, then any area only
+             an AREA sheet names
     Empty when the C&E document is missing."""
     matrix_path = params.get("matrix_path")
     if not matrix_path or not os.path.exists(matrix_path):
-        return {}, {}, {}
+        return {}, {}, {}, []
     wb = workbook.open_workbook(matrix_path, data_only=True, read_only=True)
     inputs, outputs, area_desc = {}, {}, {}
     cemap = {m["canonical"]: m["column"] for m in config.load_column_map("CE")}
@@ -95,7 +174,14 @@ def area_lookup(params: dict) -> tuple:
             if not entry["numerazione_linea"] and num_c:
                 entry["numerazione_linea"] = _s(a.cell(r, num_c).value)
 
-    # --- CONCEPT sheet: one description per area, positionally aligned with the matrix area columns ---
+    # --- the areas: the matrix columns, then any area only an AREA sheet names; their hierarchy ([[C-040]]) ---
+    names = [nm for _, nm in area_cols]
+    for sheet in area_sheets:
+        if sheet.strip() not in names:
+            names.append(sheet.strip())
+    areas = area_hierarchy(names, area_re, bool(config.get_param(params, "matrix_params.sub_areas", False)))
+
+    # --- CONCEPT sheet: one description per area, matched by NAME (position for the cells naming none) ---
     concept_name = config.get_param(params, "matrix_params.concept_sheet.name")
     csheet = config.resolve_sheet(concept_name, wb.sheetnames) if concept_name else None
     if csheet and area_cols:
@@ -103,20 +189,25 @@ def area_lookup(params: dict) -> tuple:
         crow = int(config.get_param(params, "matrix_params.concept_sheet.header_row", 2) or 2)
         descs = [" ".join(_s(cs.cell(crow, c).value).split())
                  for c in range(1, cs.max_column + 1) if _s(cs.cell(crow, c).value)]
-        for name, desc in zip([nm for _, nm in area_cols], descs):
-            area_desc[name] = desc
+        area_desc.update(concept_descriptions(descs, [nm for _, nm in area_cols], names))
+    for a in areas:                                   # a sub-area without its own cell: its parent's description
+        if a["parent"] and not area_desc.get(a["name"]) and area_desc.get(a["parent"]):
+            area_desc[a["name"]] = area_desc[a["parent"]]
+        a["description"] = area_desc.get(a["name"], "")
     wb.close()
-    return inputs, outputs, area_desc
+    return inputs, outputs, area_desc, areas
 
 
 _CE_FIELDS = ("ce_functional_unit", "ce_location", "ce_device", "numerazione_linea")
 
 
-def annotate(params: dict, rows: list) -> list:
+def annotate(params: dict, rows: list, areas: list | None = None) -> list:
     """Set matrix_areas (list) + ce_FLD + numerazione_linea + areas_description (list) on every staged
     row by its I/Q address. Paired channels (same pair_key + FLD) share the union of areas + each
-    other's C&E fields."""
-    inputs, outputs, area_desc = area_lookup(params)
+    other's C&E fields. `areas`, when given, receives the declared area hierarchy ([[C-040]])."""
+    inputs, outputs, area_desc, hierarchy = area_lookup(params)
+    if areas is not None:
+        areas[:] = hierarchy
     found = {}
     for row in rows:
         bit = _addr_key(row.get("bit"))

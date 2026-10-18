@@ -70,7 +70,8 @@ def build(database: DB | None = None, system=None) -> tuple:
         colmap = config.load_column_map("IoList")
         database = DB([signals_table([m["canonical"] for m in colmap])]).load(config.database_dir())
     db = Database(list(database["signals"]),
-                  members=list(database["db_members"]) if "db_members" in database else [])
+                  members=list(database["db_members"]) if "db_members" in database else [],
+                  areas=list(database["areas"]) if "areas" in database else [])
     templates = system.templates
     inventory = templates.template_keys()                    # {block name -> [keys]} from the shipped .xml
 
@@ -78,6 +79,7 @@ def build(database: DB | None = None, system=None) -> tuple:
     findings = []
     for name, fn in system.builders.registry().items():
         table = fn(db) or Table(name)
+        findings.extend(getattr(table, "findings", None) or [])     # what the builder itself raised ([[C-040]])
         if len(table) == 0:
             findings.append(_f("blk_builder_no_rows", "WARN",
                                "builder returned no rows (stub or no matching signals) - header only", name))

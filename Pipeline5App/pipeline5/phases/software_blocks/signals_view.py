@@ -16,8 +16,11 @@ def _as_list(value) -> list:
 
 
 class Database:
-    def __init__(self, rows, members=None):
+    def __init__(self, rows, members=None, areas=None):
         self.rows = list(rows or [])
+        # the staged `areas` hierarchy ([[C-040]], read-only): number / parent / description / sorter per C&E area;
+        # [] when the C&E pass did not run (a builder then falls back to what the signal rows carry)
+        self.area_rows = list(areas or [])
         # the 520 `db_members` rows (read-only): a builder reads a signal's members beyond its leftmost one
         # (`name_in_db`) through `members_of` - in the config's element order, never re-rendered by name
         self.members = list(members or [])
@@ -59,6 +62,10 @@ class Database:
         uid = str((row or {}).get("uid", ""))
         return [str(m.get("member", "")) for m in self.members
                 if uid and str(m.get("source", "")) == uid and str(m.get("db_name", "")) == db_name]
+
+    def area(self, name: str) -> dict | None:
+        """The staged `areas` row of the C&E area `name` ([[C-040]]), or None."""
+        return next((a for a in self.area_rows if str(a.get("name", "")) == name), None)
 
     def areas(self) -> list:
         """The distinct C&E areas present, in first-seen order."""

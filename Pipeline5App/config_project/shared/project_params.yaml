@@ -15,7 +15,8 @@ iolist_params:
   diag_bits_range: [0, 62]                                # valid diagnosis bit range (inclusive); ph200 §8 diag allocation reads this (node non-P up from min / P down from max)
 
 matrix_params:
-  sorter_areas: [1]                                       # the Sorter area numbers (matched against the C&E areas)
+  sorter_areas: [1]                                       # the Sorter area numbers (matched against the C&E areas; a sub-area by its own, e.g. 1001)
+  sub_areas: false                                        # true = a C&E column <area>_<part> (AREA 1_TRIB) is a sub-area of <area>, numbered <area> x 1000 + its ordinal (1001)
 
   ce_sheet:
     name: CAUSE&EFFECT MATRIX         # a single sheet name, a list of names or a regular expression
@@ -29,7 +30,7 @@ matrix_params:
 
   concept_sheet:                      # per-area descriptions (areas_description column)
     name: CONCEPT                     # a single sheet name, a list of names or a regular expression
-    header_row: 2                     # the row carrying one description per area (positional)
+    header_row: 2                     # the row carrying one description per area (matched by the area name it starts with; positional for a cell naming none)
 
 
 # Phase 100: documents validation (error seeking - helping corrections)

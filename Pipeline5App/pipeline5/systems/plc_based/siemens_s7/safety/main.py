@@ -596,6 +596,10 @@ def run_software(ctx, only=None):
         ctx.emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
         return
     database, blk_findings = engine.build(database, system=ctx.system)
+    # a builder's own blocking finding halts BEFORE any block is written ([[C-040]]: a sorter area whose TT06
+    # network cannot be built - a CSV with an empty symbol slot would only fail at the block generation)
+    if not ctx.gate(blk_findings, label="800 software blocks"):
+        return
     # the verbose per-block log (user spec): each generated block, its template (when a shipped
     # one exists), the declared output surface, and the builder function that produced it
     surface = {"csv": "CreationInfo CSV", "fc_xml": "FC XML (Program blocks)",
@@ -606,7 +610,7 @@ def run_software(ctx, only=None):
         ctx.emit("INFO", f"  {r['name']}  <-  {r['builder']}(){tmpl}  ->  "
                          f"{surface.get(r['emit'], r['emit'])}, {r['rows']} rows{inst_note}")
     dirs = _begin_generation(ctx, database)
-    rendered, res, inst = list(blk_findings), None, None
+    rendered, res, inst = [], None, None                 # the builders' findings were rendered by the gate
     if only in (None, 820):
         res = engine.project(database, system=ctx.system); rendered += res["findings"]
     if only in (None, 830):

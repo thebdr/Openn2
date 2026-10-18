@@ -341,6 +341,130 @@ def test_absorb_keeps_a_rule_set_table_and_finds_generated_duplicates():
     eq(staging.generated_dup_findings(signals_table(["script_type"])), [], "no generated rows: nothing")
 
 
+# =================================================================================================== #
+# [[C-040]] - sub-areas: the declared hierarchy, its numbers, CONCEPT by name, the sorter kind
+# =================================================================================================== #
+def _area_re():
+    import re
+    return re.compile(r"AREA\s?\d{1,2}", re.IGNORECASE)          # the shipped `area_sheets.name`, unanchored
+
+
+def test_area_hierarchy_numbers_parents_parts():
+    from pipeline5.phases.staging import cematrix
+    names = ["AREA 1", "AREA 1_TRIB", "AREA 1_TRIH", "AREA 2", "AREA 2_X", "AREA 12", "AREA 1X", "AREA 3_Y"]
+    on = cematrix.area_hierarchy(names, _area_re(), True)
+    eq([(a["name"], a["number"], a["parent"], a["part"], a["order"]) for a in on], [
+        ("AREA 1", 1, "", "", 1),
+        ("AREA 1_TRIB", 1001, "AREA 1", "TRIB", 2),               # parent x 1000 + its ordinal, column order
+        ("AREA 1_TRIH", 1002, "AREA 1", "TRIH", 3),
+        ("AREA 2", 2, "", "", 4),
+        ("AREA 2_X", 2001, "AREA 2", "X", 5),                     # the ordinal counts per parent
+        ("AREA 12", 12, "", "", 6),                               # a plain area, not a part of AREA 1
+        ("AREA 1X", "", "", "", 7),                               # no `_`: no part of AREA 1, no plain area either
+        ("AREA 3_Y", "", "", "", 8),                              # its prefix is no area of the matrix
+    ], "the hierarchy with sub_areas on")
+    off = cematrix.area_hierarchy(names, _area_re(), False)
+    eq([(a["number"], a["parent"]) for a in off], [(1, ""), ("", ""), ("", ""), (2, ""), ("", ""), (12, ""),
+                                                   ("", ""), ("", "")],
+       "sub_areas off: every column an independent area, only the plain ones numbered")
+    eq([a["number"] for a in cematrix.area_hierarchy(["ZONE 7", "ZONE 7_A", "ZONE"], None, True)], [7, 7001, ""],
+       "without an area pattern: a name ending in its digits is plain")
+    eq([a["number"] for a in cematrix.area_hierarchy(["area  1", "AREA 1_trib"], _area_re(), True)], [1, 1001],
+       "names compare whitespace- and case-insensitively")
+
+
+def test_concept_descriptions_by_name_then_position():
+    from pipeline5.phases.staging import cematrix
+    cols = ["AREA 1", "AREA 1_TRIB", "AREA 1_TRIH", "AREA 2"]
+    eq(cematrix.concept_descriptions(["AREA 1 (TRIB+TRIH+TRIC)", "AREA 2 (CAROUSEL)"], cols, cols),
+       {"AREA 1": "AREA 1 (TRIB+TRIH+TRIC)", "AREA 2": "AREA 2 (CAROUSEL)"},
+       "FVT: each cell to the area it names - AREA 1_TRIB no longer takes AREA 2's text by position")
+    eq(cematrix.concept_descriptions(["Infeed", "Sorter"], ["AREA 1", "AREA 2"], ["AREA 1", "AREA 2"]),
+       {"AREA 1": "Infeed", "AREA 2": "Sorter"}, "cells naming no area: by position, as before")
+    eq(cematrix.concept_descriptions(["AREA 2 (B)", "Loose"], ["AREA 1", "AREA 2"], ["AREA 1", "AREA 2"]),
+       {"AREA 2": "AREA 2 (B)", "AREA 1": "Loose"}, "mixed: the unnamed cell to the first area still without one")
+    eq(cematrix.concept_descriptions(["AREA 12 (x)", "AREA 1_TRIB special", "AREA 1 (a)", "AREA 1 (dup)"],
+                                     ["AREA 1", "AREA 12", "AREA 1_TRIB"], ["AREA 1", "AREA 12", "AREA 1_TRIB"]),
+       {"AREA 12": "AREA 12 (x)", "AREA 1_TRIB": "AREA 1_TRIB special", "AREA 1": "AREA 1 (a)"},
+       "a word boundary, the longest name, the first cell for an area")
+
+
+def test_sorter_area_names_by_number():
+    hierarchy = [{"name": "AREA 1", "number": 1}, {"name": "AREA 1_TRIB", "number": 1001},
+                 {"name": "AREA 1_TRIH", "number": 1002}, {"name": "AREA 1X", "number": ""}]
+    names = staging._sorter_area_names({"matrix_params": {"sorter_areas": [1001, "1002"]}}, hierarchy)
+    ok({"AREA 1_TRIB", "AREA 1_TRIH"} <= names and "AREA 1" not in names, f"a sub-area by its number: {names}")
+    eq(staging._is_sorter_area({"matrix_areas": ["AREA 1_TRIB"]}, names), "yes", "a door of the sorter sub-area")
+    eq(staging._is_sorter_area({"matrix_areas": ["AREA 1"]}, names), "", "the parent is no sorter")
+    eq(staging._sorter_area_names({"matrix_params": {"sorter_areas": [1]}}, hierarchy), {"AREA 1"},
+       "a plain number as before")
+    eq(staging._sorter_area_names({"matrix_params": {"sorter_areas": ["x"]}}, hierarchy), set(),
+       "a value that is no number is ignored")
+
+
+def _sub_area_ce(path):
+    """An FVT-shaped C&E: matrix areas AREA 1, AREA 1_TRIB, AREA 1_TRIH, AREA 2; an E-stop in the first three,
+    a door in TRIB, a push button in AREA 2; the four AREA sheets (an output in TRIB); CONCEPT naming AREA 1 / 2."""
+    wb = Workbook()
+    m = wb.active
+    m.title = "CAUSE&EFFECT MATRIX"
+    m["F2"] = "BIT (ADDRESS)"
+    for col, name in zip("STUV", ("AREA 1", "AREA 1_TRIB", "AREA 1_TRIH", "AREA 2")):
+        m[f"{col}2"] = name
+    m["F5"], m["S5"], m["T5"], m["U5"] = "I1.0", "X", "X", "X"
+    m["F6"], m["T6"] = "I1.1", "X"
+    m["F7"], m["V7"] = "I1.2", "X"
+    for name in ("AREA 1", "AREA 1_TRIB", "AREA 1_TRIH", "AREA 2"):
+        wb.create_sheet(name)
+    wb["AREA 1_TRIB"]["C4"] = "Q2.0"
+    c = wb.create_sheet("CONCEPT")
+    c["C2"], c["D2"] = "AREA 1\n(TRIB+TRIH+TRIC)", "AREA 2\n(CAROUSEL)"
+    wb.save(path)
+
+
+def test_annotate_cematrix_stages_the_area_hierarchy():
+    """Through the real C&E pass (320): the `areas` table, the sorter kind by a sub-area's number, the rows'
+    IsSorterArea and descriptions (a sub-area inherits its parent's CONCEPT text); with the switch off, the same
+    C&E reads as independent areas and AREA 1_TRIB no longer takes AREA 2's description."""
+    from pipeline5.truth.database import Database
+    from pipeline5.truth.diagnosis import diagnosis_cabinets_table
+
+    def staged(params):
+        table = signals_table(["functional_unit", "location", "device", "script_type", "bit"])
+        for i, (st, bit) in enumerate((("E", "I1.0"), ("DI", "I1.1"), ("E", "I1.2"), ("KQ", "Q2.0"))):
+            table.add_row({"functional_unit": f"F{i}", "location": "+L", "device": "-D", "script_type": st,
+                           "bit": bit, "type": {"category": "Safety"}, "source_cell": f"NET!O{i + 2}"})
+        db = Database([table, diagnosis_cabinets_table()])
+        staging.annotate_cematrix(db, params, save=False)
+        return db
+
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "ce.xlsx"); _sub_area_ce(p)
+        mp = {"ce_sheet": {"name": "CAUSE&EFFECT MATRIX", "header_row": 2, "data_row": 5},
+              "area_sheets": {"name": "/AREA\\s?\\d{1,2}/gmi", "header_row": 3, "data_row": 4},
+              "concept_sheet": {"name": "CONCEPT", "header_row": 2}}
+        on = staged({"matrix_path": p, "matrix_params": dict(mp, sub_areas=True, sorter_areas=[1001, 1002])})
+        off = staged({"matrix_path": p, "matrix_params": dict(mp, sorter_areas=[1])})
+    eq([(a["name"], a["number"], a["parent"], a["part"], a["description"], a["sorter"]) for a in on["areas"]], [
+        ("AREA 1", "1", "", "", "AREA 1 (TRIB+TRIH+TRIC)", ""),
+        ("AREA 1_TRIB", "1001", "AREA 1", "TRIB", "AREA 1 (TRIB+TRIH+TRIC)", "yes"),
+        ("AREA 1_TRIH", "1002", "AREA 1", "TRIH", "AREA 1 (TRIB+TRIH+TRIC)", "yes"),
+        ("AREA 2", "2", "", "", "AREA 2 (CAROUSEL)", ""),
+    ], "the areas table: numbers, parents, inherited descriptions, the sorter kind")
+    rows = {r["bit"]: r for r in on["signals"].rows}
+    eq((rows["I1.0"]["IsSorterArea"], rows["I1.1"]["IsSorterArea"], rows["I1.2"]["IsSorterArea"],
+        rows["Q2.0"]["IsSorterArea"]), ("yes", "yes", "", "yes"), "rows touching a sorter sub-area")
+    eq(rows["I1.1"]["areas_description"], ["AREA 1 (TRIB+TRIH+TRIC)"], "the door's area described by its parent")
+    eq(rows["Q2.0"]["matrix_areas"], ["AREA 1_TRIB"], "an output from its AREA sheet")
+    eq([(a["number"], a["parent"], a["description"], a["sorter"]) for a in off["areas"]],
+       [("1", "", "AREA 1 (TRIB+TRIH+TRIC)", "yes"), ("", "", "", ""), ("", "", "", ""),
+        ("2", "", "AREA 2 (CAROUSEL)", "")], "switch off: independent areas, CONCEPT by name, [1] = AREA 1")
+    offrows = {r["bit"]: r for r in off["signals"].rows}
+    eq((offrows["I1.1"]["IsSorterArea"], offrows["I1.0"]["IsSorterArea"]), ("", "yes"),
+       "switch off: only AREA 1 is the sorter, as before")
+    eq(offrows["I1.1"]["areas_description"], [], "AREA 1_TRIB takes no description (it took AREA 2's by position)")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("staging", [
@@ -362,4 +486,8 @@ if __name__ == "__main__":
         ("cematrix_matches_a_dotted_ce", test_cematrix_matches_a_dotted_ce),
         ("absorb_spawned_makes_a_generated_signal_first_class", test_absorb_spawned_makes_a_generated_signal_first_class),
         ("absorb_keeps_a_rule_set_table_and_finds_generated_duplicates", test_absorb_keeps_a_rule_set_table_and_finds_generated_duplicates),
+        ("area_hierarchy_numbers_parents_parts", test_area_hierarchy_numbers_parents_parts),
+        ("concept_descriptions_by_name_then_position", test_concept_descriptions_by_name_then_position),
+        ("sorter_area_names_by_number", test_sorter_area_names_by_number),
+        ("annotate_cematrix_stages_the_area_hierarchy", test_annotate_cematrix_stages_the_area_hierarchy),
     ]))

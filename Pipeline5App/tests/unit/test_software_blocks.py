@@ -778,6 +778,134 @@ def test_shipped_pushbutton_members_take_e():
     ok("AREA 1 PB" in com and "AREA 2 PB" in com, f"both areas get a PB member: {com}")
 
 
+# =================================================================================================== #
+# [[C-040]] - sub-areas: the staged `areas` table drives the sorter kind, its encoder and the titles
+# =================================================================================================== #
+def _fvt_areas(sorters=("AREA 1_TRIB", "AREA 1_TRIH")):
+    """FVT's staged hierarchy (as text, the way a reload reads it): AREA 1 with its two sorter sub-areas."""
+    rows = [("AREA 1", "1", "", "", "AREA 1 (TRIB+TRIH+TRIC)"), ("AREA 1_TRIB", "1001", "AREA 1", "TRIB", "AREA 1 (TRIB+TRIH+TRIC)"),
+            ("AREA 1_TRIH", "1002", "AREA 1", "TRIH", "AREA 1 (TRIB+TRIH+TRIC)"), ("AREA 2", "2", "", "", "AREA 2 (CAROUSEL)")]
+    return [{"name": n, "number": num, "parent": p, "part": part, "order": str(i), "description": desc,
+             "sorter": "yes" if n in sorters else ""} for i, (n, num, p, part, desc) in enumerate(rows, start=1)]
+
+
+def _fvt_rows():
+    """FVT's shape: an E-stop and a breaker crossed in AREA 1 and both sorter sub-areas, a door in each sub-area, a
+    push button in AREA 2 - and a contactor flagged IsSorterArea in AREA 1 alone (what `sorter_areas: [1]` staged:
+    the OLD inference would make AREA 1 the sorter; the staged table says otherwise)."""
+    three = ["AREA 1", "AREA 1_TRIB", "AREA 1_TRIH"]
+    return [
+        {"script_type": "E", "matrix_areas": three, "IsSorterArea": "yes", "name_in_db": "PB1"},
+        {"script_type": "B1/2", "matrix_areas": three, "IsSorterArea": "yes", "name_in_db": "BRK1"},
+        {"script_type": "DI", "matrix_areas": ["AREA 1_TRIB"], "IsSorterArea": "yes", "name_in_db": "DOOR_B"},
+        {"script_type": "DI", "matrix_areas": ["AREA 1_TRIH"], "IsSorterArea": "yes", "name_in_db": "DOOR_H"},
+        {"script_type": "KQ", "matrix_areas": ["AREA 1"], "IsSorterArea": "yes", "name_in_db": "KQ1"},
+        {"script_type": "E", "matrix_areas": ["AREA 2"], "name_in_db": "PB2"},
+    ]
+
+
+def test_builder_04_estop_sorter_sub_areas():
+    t = builders.build_04_estop(Database(_fvt_rows(), areas=_fvt_areas()))
+    by = {r["instanceOf-F_ESTOP1"]: r for r in t.rows}
+    eq(list(by), ["ESTOP_AREA 1", "ESTOP_AREA 1_TRIB", "ESTOP_AREA 1_TRIH", "ESTOP_AREA 2"], "one network per area")
+    a1 = by["ESTOP_AREA 1"]
+    eq((a1["TemplateType"], a1["02_COM.{matrix_area} DOORS"], a1["02_COM.{matrix_area} SAFETY_BREAKERS"],
+        a1["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"]), ("04", "", "AREA 1 SAFETY_BREAKERS", ""),
+       "AREA 1 (breakers, no doors) is no sorter by the table, whatever a row's flag says -> TT04")
+    for area, nn in (("AREA 1_TRIB", "01"), ("AREA 1_TRIH", "02")):
+        r = by[f"ESTOP_{area}"]
+        eq((r["TemplateType"], r["02_COM.{matrix_area} DOORS"], r["02_COM.{matrix_area} SAFETY_BREAKERS"],
+            r["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], r["NetworkComment"]),
+           ("06", f"{area} DOORS", f"{area} SAFETY_BREAKERS", f"SORTER_{nn}_ENCODER_HEALTHY", f"{area} ESTOP"),
+           f"{area}: the sorter variant with its own encoder - the sub-area's ordinal")
+    eq(by["ESTOP_AREA 2"]["TemplateType"], "02", "AREA 2 bare -> TT02")
+    eq(t.findings, [], "nothing to report")
+    eq(builders._sorter_nn(Database([], areas=_fvt_areas()), "AREA 2"), "02", "a plain area: its own number")
+    eq(builders._sorter_nn(Database([]), "AREA 7"), "07", "no staged table: the name's trailing digits")
+
+
+def test_builder_04_estop_incomplete_sorter_fails():
+    """FVT before the fix: `sorter_areas: [1]` made AREA 1 - doorless - the sorter; TT06 left its DOORS slot empty
+    and the block generation refused the block. Now: no row for it, a blocking FAIL naming it."""
+    t = builders.build_04_estop(Database(_fvt_rows(), areas=_fvt_areas(sorters=("AREA 1",))))
+    eq([r["instanceOf-F_ESTOP1"] for r in t.rows], ["ESTOP_AREA 1_TRIB", "ESTOP_AREA 1_TRIH", "ESTOP_AREA 2"],
+       "no network for the incomplete sorter area")
+    eq([(f.phase, f.type, f.severity, f.location) for f in t.findings],
+       [(800, "blk_estop_sorter_incomplete", "FAIL", "04_ESTOP / AREA 1")], "one blocking finding")
+    eq(t.findings[0].detail, "AREA 1 is a sorter area (matrix_params.sorter_areas) but has no doors - its ESTOP "
+       "network (TemplateType 06: E-STOP + doors + breakers + encoder) cannot be built; list the sorter's own area "
+       "there (a sub-area by its number, e.g. 1001, with matrix_params.sub_areas on)", "the exact detail")
+    bare = builders.build_04_estop(Database(_fvt_rows(), areas=_fvt_areas(sorters=("AREA 2",))))
+    ok("has no doors and safety breakers" in bare.findings[0].detail, f"both missing: {bare.findings[0].detail}")
+    eq([r["TemplateType"] for r in builders.build_04_estop(Database(_fvt_rows(), areas=_fvt_areas())).rows
+        if r["instanceOf-F_ESTOP1"] == "ESTOP_AREA 1"], ["04"], "listed correctly, AREA 1 is built again")
+
+
+def test_builder_08_door_of_a_sorter_sub_area():
+    """A door of a sorter SUB-area (no encoder crosses it - FVT's encoders are cabinet-mounted) takes its sorter's
+    number from the staged table: AREA 1_TRIH = 1002 -> SORTER_02."""
+    node = _node("n1", "1.2.3.4", i0="0", i1="20", q0="0", q1="20")
+    rows = [node,
+            {"script_type": "DI", "index": "6", "bit": "I1.0", "name_in_db": "D_in", "iol_FLD": "DOORH",
+             "name_in_tagtable": "TDI", "IsSorterArea": "yes", "matrix_areas": ["AREA 1_TRIH"]},
+            {"script_type": "DQ", "index": "6", "name_in_tagtable": "TDQ"}]
+    d = next(r for r in builders.build_08_gate_manager(Database(rows, areas=_fvt_areas())).rows
+             if r["TemplateType"] == "02")
+    eq((d["tagName:SorterRunningIOC"], d["05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING"], d["choice:IsSorterDoor"]),
+       ("PNC_I_SORTER-02 SORTER- RUNNING", "SORTER_02_NOT_RUNNING", "AlwaysTRUE"), "the TRIH door is sorter 02's")
+
+
+def test_builder_03_titles_from_the_areas_table():
+    """The zone networks' titles: the staged descriptions (matched by name, a sub-area's inherited) - not the
+    position in a row's description list (FVT: 'AREA 1_TRIB PB - AREA 2 (CAROUSEL)', P-018 item 7)."""
+    rows = [{"script_type": "E", "matrix_areas": ["AREA 1", "AREA 1_TRIB"], "areas_description": ["x", "AREA 2 (CAROUSEL)"],
+             "name_in_db": "PB1", "datablocks": ["01_Pushbutton"]}]
+    t = builders.build_03_zone_cumulative(Database(rows, areas=_fvt_areas()))
+    eq([r["NetworkComment"] for r in t.rows], ["AREA 1 PB - AREA 1 (TRIB+TRIH+TRIC)",
+                                               "AREA 1_TRIB PB - AREA 1 (TRIB+TRIH+TRIC)"], "the staged descriptions")
+    eq(builders._area_descriptions(Database(rows)), {"AREA 1": "x", "AREA 1_TRIB": "AREA 2 (CAROUSEL)"},
+       "no staged table: the rows' list, by position, as before")
+
+
+def test_engine_records_a_builders_findings():
+    """A builder's own findings (Table.findings) reach engine.build's result - the 800 handler gates on them."""
+    from pipeline5 import config
+    from pipeline5.findings.finding import Finding
+    from pipeline5.truth.signals import signals_table
+
+    class _Templates:
+        def template_keys(self):
+            return {}
+
+        def stem_ref_by_name(self):
+            return {}
+
+        def template_ref(self, name):
+            return ""
+
+    class _Registry:
+        @staticmethod
+        def registry():
+            def build(db):
+                t = Table("X")
+                t.add(A="a")
+                t.findings.append(Finding(phase=800, type="blk_test", severity="FAIL", detail="d", location="X"))
+                return t
+            return {"X": build}
+
+    class _System:
+        builders, templates = _Registry(), _Templates()
+
+    original = config.database_dir
+    with tempfile.TemporaryDirectory() as d:
+        config.database_dir = lambda: d
+        try:
+            _db, findings = engine.build(DB([signals_table(["script_type"])]), system=_System())
+        finally:
+            config.database_dir = original
+    eq([(f.type, f.severity) for f in findings], [("blk_test", "FAIL")], "the builder's finding is returned")
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("blocks", [
@@ -817,4 +945,9 @@ if __name__ == "__main__":
         ("fdback_reproduces_12_template_networks", test_fdback_reproduces_12_template_networks),
         ("fdback_row_reconstructs_and_drops_pad", test_fdback_row_reconstructs_and_drops_pad),
         ("fdback_fc_emits_oversized_and_flag_wired", test_fdback_fc_emits_oversized_and_flag_wired),
+        ("builder_04_estop_sorter_sub_areas", test_builder_04_estop_sorter_sub_areas),
+        ("builder_04_estop_incomplete_sorter_fails", test_builder_04_estop_incomplete_sorter_fails),
+        ("builder_08_door_of_a_sorter_sub_area", test_builder_08_door_of_a_sorter_sub_area),
+        ("builder_03_titles_from_the_areas_table", test_builder_03_titles_from_the_areas_table),
+        ("engine_records_a_builders_findings", test_engine_records_a_builders_findings),
     ]))
