@@ -201,7 +201,7 @@ def test_builder_04_estop_feature_types():
     eq(s["02_COM.{matrix_area} DOORS"], "AREA 1 DOORS")
     eq(s["02_COM.{matrix_area} SAFETY_BREAKERS"], "AREA 1 SAFETY_BREAKERS")
     eq(s["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "SORTER_01_ENCODER_HEALTHY", "sorter-only")
-    eq(s["05_EM_STATE.{matrix_area}_POWER_CUT"], "AREA 1 POWER_CUT", "power-cut is per area now")
+    eq(s["05_EM_STATE.{matrix_area}_POWER_CUT"], "AREA 1 POWER ENABLED", "the power coil is per area")
 
     eq(by["ESTOP_AREA 2"]["TemplateType"], "05", "doors + breakers, non-sorter -> TT05")
     eq(by["ESTOP_AREA 3"]["TemplateType"], "04", "breakers only -> TT04")
@@ -212,7 +212,7 @@ def test_builder_04_estop_feature_types():
     eq(g["02_COM.{matrix_area} DOORS"], "", "no doors cumulative on a bare area")
     eq(g["02_COM.{matrix_area} SAFETY_BREAKERS"], "", "no breakers cumulative on a bare area")
     eq(g["SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY"], "", "no encoder on a non-sorter area")
-    eq(g["05_EM_STATE.{matrix_area}_POWER_CUT"], "AREA 5 POWER_CUT", "every area gets a POWER_CUT")
+    eq(g["05_EM_STATE.{matrix_area}_POWER_CUT"], "AREA 5 POWER ENABLED", "every area gets a POWER ENABLED")
 
 
 def test_of_variant_picks_smallest_cover():
@@ -242,7 +242,7 @@ def test_builder_05_output_feedback_source_row_orders_unit():
     eq(r["tagName:Contactor1_Output"], "TAGQ1")
     eq(r["tagName:Contactor1_QBadInput"], "QBAD_TAGQ1")
     eq(r["NetworkComment"], "AREA 1 Contactor Output FLDx L1", "matrix_areas |-joined, whitespace collapsed")
-    eq(r["05_EM_STATE.{matrix_areas.1}"], "AREA 1 POWER_CUT")
+    eq(r["05_EM_STATE.{matrix_areas.1}"], "AREA 1 POWER ENABLED")
 
 
 def test_builder_05_output_feedback_pads_feedback_slots():
@@ -590,12 +590,12 @@ def test_fdback_row_reconstructs_and_drops_pad():
     for k in (1, 2):
         row[f"tagName:Contactor{k}_Output"] = f"o{k}"
         row[f"tagName:Contactor{k}_QBadInput"] = f"q{k}"
-        row[f"05_EM_STATE.{{matrix_areas.{k}}}"] = f"AREA {k} POWER_CUT"
+        row[f"05_EM_STATE.{{matrix_areas.{k}}}"] = f"AREA {k} POWER ENABLED"
         row[f"05_EM_STATE.{{matrix_areas.{k}}}_RESET"] = f"AREA {k} RESET"
     u = xml_emit._fdback_row(row)
     eq(u["feedbacks"], ["f1", "f2", "f3"], "the 'No Operation' pad is dropped -> the EXACT feedback count")
     eq((u["outputs"], u["qbads"]), (["o1", "o2"], ["q1", "q2"]), "C outputs + C qbads")
-    eq(u["areas"], ["AREA 1 POWER_CUT", "AREA 2 POWER_CUT"])
+    eq(u["areas"], ["AREA 1 POWER ENABLED", "AREA 2 POWER ENABLED"])
     eq((u["error_member"], u["instance"]), ("ERR", "FDBACK_X"))
     eq(xml_emit._fdback_row({"NetworkComment": "c"}), None, "no contactor output -> None (skipped)")
 
@@ -610,7 +610,7 @@ def test_fdback_fc_emits_oversized_and_flag_wired():
         row[f"tagName:Contactor{k}_Output"] = f"O{k}"
         row[f"tagName:Contactor{k}_QBadInput"] = f"Q{k}"
         row[f"tagName:Contactor{k}_FeedbackInput"] = f"FB{k}"
-        row[f"05_EM_STATE.{{matrix_areas.{k}}}"] = f"AREA {k} POWER_CUT"
+        row[f"05_EM_STATE.{{matrix_areas.{k}}}"] = f"AREA {k} POWER ENABLED"
         row[f"05_EM_STATE.{{matrix_areas.{k}}}_RESET"] = f"AREA {k} RESET"
     t.add_row(row)
     xml = xml_emit.fdback_fc(t, tpl, "05_Output Feedback")
@@ -778,6 +778,27 @@ def test_shipped_pushbutton_members_take_e():
     ok("AREA 1 PB" in com and "AREA 2 PB" in com, f"both areas get a PB member: {com}")
 
 
+def test_shipped_em_state_members():
+    """The SHIPPED 05_EM_STATE rules (user 2026-10-18): per area the emergency-stop state pair, its reset and the
+    power coil `<area> POWER ENABLED` (was POWER_CUT) - the very name 04_ESTOP writes and 05 Output Feedback reads -
+    one NOT_RUNNING per sorter; every comment is just what the signal is."""
+    from pipeline5.config import paths, loaders
+    from pipeline5.phases.datablocks import generator as datablocks
+    paths.use_system(SYSTEM)
+    defs = [d for d in loaders.load_db_definitions() if d["db_name"] == "05_EM_STATE"]
+    els = [e for e in loaders.load_db_elements() if e["db_name"] == "05_EM_STATE"]
+    rows = [{"uid": "u1", "script_type": "E", "combined_FLD": "=ES-1", "matrix_areas": ["AREA 1"]},
+            {"uid": "u2", "script_type": "N1/2", "index": "1", "combined_FLD": "=ENC-1", "matrix_areas": []}]
+    g, _inst, _f = datablocks.generate(rows, defs, els, loaders.load_db_types())
+    eq([(m["name"], m["comment"]) for m in g["05_EM_STATE"]["members"]],
+       [("AREA 1 Q", "the area's emergency-stop state (immediate)"),
+        ("AREA 1 Q_Delayed", "the area's emergency-stop state (delayed)"),
+        ("AREA 1 RESET", "the area's emergency-stop reset (acknowledge)"),
+        ("AREA 1 POWER ENABLED", "cumulative of all the causes that contribute to the area's safety cut"),
+        ("SORTER_01_NOT_RUNNING", "the sorter is stopped (standstill from its speed control)")], "names + comments")
+    eq(builders._power_enabled("AREA 1"), "AREA 1 POWER ENABLED", "the name 04 writes and 05 reads is the member")
+
+
 # =================================================================================================== #
 # [[C-040]] - sub-areas: the staged `areas` table drives the sorter kind, its encoder and the titles
 # =================================================================================================== #
@@ -925,6 +946,7 @@ if __name__ == "__main__":
         ("shipped_v12_template_lamp_slots", test_shipped_v12_template_lamp_slots),
         ("single_row_e_joins_02_and_03", test_single_row_e_joins_02_and_03),
         ("shipped_pushbutton_members_take_e", test_shipped_pushbutton_members_take_e),
+        ("shipped_em_state_members", test_shipped_em_state_members),
         ("area_descriptions_reads_list_cells", test_area_descriptions_reads_list_cells),
         ("builder_03_zone_cumulative_per_area_group", test_builder_03_zone_cumulative_per_area_group),
         ("builder_04_estop_feature_types", test_builder_04_estop_feature_types),

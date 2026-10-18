@@ -244,6 +244,12 @@ def _sorter_running(nn: str) -> str:
     return f"PNC_I_SORTER-{nn} SORTER RUNNING"
 
 
+def _power_enabled(area) -> str:
+    """The area's 05_EM_STATE power coil - the cumulative of every cause of the area's safety cut, written by
+    04_ESTOP, read by 05 Output Feedback (`<area> POWER_CUT` until 2026-10-18, user)."""
+    return f"{area} POWER ENABLED"
+
+
 @builds("03_Diagnostic Nodes", emit="scl")
 def build_03_diagnostic_nodes(db: Database) -> Table:
     """One SCL assignment per PROFINET node - the PROFINET_NODES member mirror (user spec 2026-07-07):
@@ -277,7 +283,7 @@ def build_04_estop(db: Database) -> Table:
     else doors+breakers -> TT05, breakers-only -> TT04, doors-only -> TT03, bare -> TT02 (Emergency
     STOP, reset required). TT01 ('Safety STOP', reset-not-required / ACK_NEC=FALSE) is reserved for the
     future. Per area: the 02_COM PB/FDB cumulatives (always) + DOORS/SAFETY_BREAKERS (only when the
-    area has them), the 05_EM_STATE Q/Q_DELAYED/RESET state members + the per-area POWER_CUT coil, and
+    area has them), the 05_EM_STATE Q/Q_DELAYED/RESET state members + the per-area POWER ENABLED coil, and
     the sorter's encoder-healthy SPEED_STATE_REC member (TT06 only) - of its own sorter, `_sorter_nn` ([[C-040]]).
     TT06 references the area's DOORS and SAFETY_BREAKERS: a sorter area missing either gets NO row and a blocking
     `blk_estop_sorter_incomplete` FAIL naming it - an empty symbol slot would make the block generation refuse
@@ -320,7 +326,7 @@ def build_04_estop(db: Database) -> Table:
             **{"05_EM_STATE.{matrix_area}_Q": f"{area} Q"},       # UNPADDED area, consistent with 02_COM + 05
             **{"05_EM_STATE.{matrix_area}_Q_DELAYED": f"{area} Q_Delayed"},
             **{"05_EM_STATE.{matrix_areas.1}_RESET": f"{area} RESET"},
-            **{"05_EM_STATE.{matrix_area}_POWER_CUT": f"{area} POWER_CUT"},   # per area now (was sorter-only)
+            **{"05_EM_STATE.{matrix_area}_POWER_CUT": _power_enabled(area)},   # the template's slot name
             **{"02_COM.{matrix_area} DOORS": f"{area} DOORS" if has_doors else ""},
             **{"02_COM.{matrix_area} SAFETY_BREAKERS": f"{area} SAFETY_BREAKERS" if has_breakers else ""},
             **{"SPEED_STATE_REC.SORTER_{index}_ENCODER_HEALTHY": encoder},
@@ -364,8 +370,8 @@ def build_05_output_feedback(db: Database) -> Table:
       ContactorOutput = the unit's KQ(s) - 1 or a KQ1/2+KQ2/2 pair (Contactor{n}_Output = name_in_tagtable,
         QBadInput = 'QBAD_'+tag),
       FeedbackInput   = the unit's KI(s) incl. a KIx/n series, in row order (Contactor{n}_FeedbackInput),
-      OnCondition     = the union of the KQ matrix areas -> 05_EM_STATE."AREA nn POWER_CUT" / "..._RESET"
-                        (the per-area power-cut coil the 04_ESTOP v1.1 block writes; was "AREA nn Q_Delayed").
+      OnCondition     = the union of the KQ matrix areas -> 05_EM_STATE."AREA nn POWER ENABLED" / "... RESET"
+                        (the per-area power coil the 04_ESTOP v1.1 block writes; was "AREA nn Q_Delayed").
     TemplateType = the smallest variant covering (OnCondition, FeedbackInput, ContactorOutput); unused
     FeedbackInput slots (a count between the 1/2/4 tiers) pad with PAD. Error member = the first KQ's
     name_in_db in 03_FDBACK_RAW; instanceOf-F_FDBACK = 'FDBACK_'+that KQ's FLD (+ '_<device>' per extra KQ)."""
@@ -417,7 +423,7 @@ def build_05_output_feedback(db: Database) -> Table:
             ki = kis[n - 1] if n - 1 < len(kis) else None
             row[f"tagName:Contactor{n}_FeedbackInput"] = ki.get("name_in_tagtable", "") if ki else PAD
         for i, area in enumerate(areas, start=1):                   # OnCondition: area number UNPADDED (-> "AREA 1")
-            row[f"05_EM_STATE.{{matrix_areas.{i}}}"] = f"{area} POWER_CUT"   # the per-area power-cut coil (04 v1.1)
+            row[f"05_EM_STATE.{{matrix_areas.{i}}}"] = _power_enabled(area)   # the per-area power coil (04 v1.1)
             row[f"05_EM_STATE.{{matrix_areas.{i}}}_RESET"] = f"{area} RESET"
         t.add_row(row)
     return t

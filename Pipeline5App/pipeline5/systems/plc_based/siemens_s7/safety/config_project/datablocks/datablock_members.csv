@@ -21,8 +21,8 @@ PROFINET_NODES_WARNING,{$profinet_name} {$profinet_ip},row where $script_type = 
 02_COM,{$area} FDB,area in unique($matrix_areas) where $script_type = 'KQ',Bool,,false,true,true,true,false,Zone cumulative: contactor feedback - one per area with KQ members
 02_COM,{$area} SAFETY_BREAKERS,area in unique($matrix_areas) where $script_type = 'B1/2',Bool,,false,true,true,true,false,Zone cumulative: safety breakers - one per area with B1/2 members
 02_COM,{$area} DOORS,area in unique($matrix_areas) where ($script_type = 'DI1/2' or $script_type = 'DI'),Bool,,false,true,true,true,false,Zone cumulative: safety doors - one per area with DI1/2 members
-05_EM_STATE,{$area} Q,area in unique($matrix_areas),Bool,,false,true,true,true,false,Per-area emergency state (referenced by the 04/05/08 builders)
-05_EM_STATE,{$area} Q_Delayed,area in unique($matrix_areas),Bool,,false,true,true,true,false,
-05_EM_STATE,{$area} RESET,area in unique($matrix_areas),Bool,,false,true,true,true,false,
-05_EM_STATE,{$area} POWER_CUT,area in unique($matrix_areas),Bool,,false,true,true,true,false,Per-area emergency power-cut coil written by the 04_ESTOP block (v1.1: one per area - was the sorter-only literal AREA 1 POWER_CUT; the _SAFETY_BREAKERS_COM/_SAFETY_DOORS_COM intermediates moved to the 02_COM cumulatives)
-05_EM_STATE,SORTER_{$nn:02d}_NOT_RUNNING,nn in unique($index) where $script_type = 'N1/2',Bool,,false,true,true,true,false,One per sorter - nn = the safety-encoder index (as builders 07/08 number the sorters)
+05_EM_STATE,{$area} Q,area in unique($matrix_areas),Bool,,false,true,true,true,false,the area's emergency-stop state (immediate)
+05_EM_STATE,{$area} Q_Delayed,area in unique($matrix_areas),Bool,,false,true,true,true,false,the area's emergency-stop state (delayed)
+05_EM_STATE,{$area} RESET,area in unique($matrix_areas),Bool,,false,true,true,true,false,the area's emergency-stop reset (acknowledge)
+05_EM_STATE,{$area} POWER ENABLED,area in unique($matrix_areas),Bool,,false,true,true,true,false,cumulative of all the causes that contribute to the area's safety cut
+05_EM_STATE,SORTER_{$nn:02d}_NOT_RUNNING,nn in unique($index) where $script_type = 'N1/2',Bool,,false,true,true,true,false,the sorter is stopped (standstill from its speed control)

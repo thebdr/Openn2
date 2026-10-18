@@ -23,6 +23,10 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
         sorter feedback `PNC_I_SORTER-<index> SORTER- RUNNING` -> `... SORTER RUNNING` (the name 07 Speed Control
         always used): the reference's old spelling read as the new one, counted - interface_elements (its uid
         re-stamped from the old spelling), the IF_ workbooks, the SCL, 08 Gate Manager
+      * the 05_EM_STATE DB (2026-10-18, user): the power coil `<area> POWER_CUT` -> `<area> POWER ENABLED` (read
+        as the new name, counted with the renames; db_members' uid re-stamped from the old name) and its members'
+        comments reduced to what each signal is - the comments of that DB not compared (dropped on both sides,
+        counted; their text is asserted by the unit tests)
       * the `areas` SSOT table (C-040, since 2026-10-18): a sanctioned NEW table PL4 never had - not compared, but
         every area the reference's signals name must be a row, plain and numbered by its digits, AREA 1 the sorter
       * the coupler transfer areas (C-031, contract §2.1): the `TransferArea-*` rows of `hardware_modules.csv`
@@ -160,8 +164,10 @@ def _strip_header(text: str) -> tuple:
     return text, False
 
 
-_RENAMED = (("Clock 1Hz", "Clock_1Hz"),          # (old, new): the interface template's tags renamed 2026-10-18
-            ("SORTER- RUNNING", "SORTER RUNNING"))  # (user) - the clock's TIA name; the sorter's 07 spelling
+_TEMPLATE_RENAMES = (("Clock 1Hz", "Clock_1Hz"),          # (old, new): the interface template's tags renamed
+                     ("SORTER- RUNNING", "SORTER RUNNING"))  # 2026-10-18 (user) - the clock's TIA name; 07's spelling
+_MEMBER_RENAMES = ((" POWER_CUT", " POWER ENABLED"),)      # the 05_EM_STATE power coil, renamed 2026-10-18 (user)
+_RENAMED = _TEMPLATE_RENAMES + _MEMBER_RENAMES
 
 
 def _norm_str(text: str) -> str:
@@ -201,7 +207,7 @@ _WORKSPACE = "TiaPortalProjectInterface/BuilderData/"
 _TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
 _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
 SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
-              "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0, "renamed_tags": 0}
+              "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0, "renamed_tags": 0, "em_state_comments": 0}
 _SIGNAL_PATHS = "ProjectDocumentation/Reports/io_signal_paths.html"
 _DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
 _SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
@@ -253,11 +259,18 @@ def _drop_interface_descriptions(rel: str, data: bytes) -> bytes:
     return data
 
 
+# a renamed name's table -> (its uid's key columns, the renames that can reach them)
+_RESTAMP = {"interface_elements.csv": (("interface", "direction", "category", "expression"), _TEMPLATE_RENAMES),
+            "db_members.csv": (("db_name", "member"), _MEMBER_RENAMES)}
+
+
 def _restamp_renamed_rows(rel: str, data: bytes) -> bytes:
-    """A PL5 `interface_elements` row carrying a renamed tag (`_RENAMED`, 2026-10-18) re-stamped as the reference
-    spells it: its `uid` hashes (interface, direction, category, expression), so a rename re-stamps the row - here
-    its uid is recomputed from the old spelling; every other field is compared (normalized) as is."""
-    if os.path.basename(rel) != "interface_elements.csv" or not any(n.encode() in data for _o, n in _RENAMED):
+    """A PL5 row whose uid hashes a renamed name (`_RESTAMP`, 2026-10-18) re-stamped as the reference spells it:
+    `interface_elements` hashes (interface, direction, category, expression), `db_members` (db_name, member) - so
+    a rename re-stamps the row; here its uid is recomputed from the old spelling, every other field compared
+    (normalized) as is."""
+    keys, renames = _RESTAMP.get(os.path.basename(rel), ((), ()))
+    if not any(n.encode() in data for _o, n in renames):
         return data
     import csv
     import io
@@ -266,16 +279,52 @@ def _restamp_renamed_rows(rel: str, data: bytes) -> bytes:
     bom = "\ufeff" if text.startswith("\ufeff") else ""
     rows = list(csv.reader(io.StringIO(text[len(bom):], newline="")))
     head = rows[0]
-    at = {k: head.index(k) for k in ("uid", "interface", "direction", "category", "expression")}
+    at = {k: head.index(k) for k in ("uid",) + keys}
     out = io.StringIO(newline="")
     writer = csv.writer(out)                               # the Table writer's dialect (CRLF, minimal quoting)
     for row in rows:
-        if row is not rows[0] and any(n in row[at["expression"]] for _o, n in _RENAMED):
-            old = row[at["expression"]]
-            for o, n in _RENAMED:
-                old = old.replace(n, o)
+        if row is not rows[0] and any(n in row[at[k]] for k in keys for _o, n in renames):
+            old = []
+            for k in keys:
+                value = row[at[k]]
+                for o, n in renames:
+                    value = value.replace(n, o)
+                old.append(value)
             row = list(row)
-            row[at["uid"]] = content_uid(row[at["interface"]], row[at["direction"]], row[at["category"]], old)
+            row[at["uid"]] = content_uid(*old)
+        writer.writerow(row)
+    return (bom + out.getvalue()).encode("utf-8")
+
+
+_EM_STATE_DB = "05_EM_STATE"
+_XML_COMMENT = re.compile(r"\s*<Comment>.*?</Comment>", re.DOTALL)
+
+
+def _drop_em_state_comments(rel: str, data: bytes, pl5: bool) -> bytes:
+    """The 05_EM_STATE members' comments out of either side (reduced to what each signal is 2026-10-18, user): the
+    `<Comment>` blocks of `05_EM_STATE.xml` and the `comment` of the 05_EM_STATE rows of `db_members` - every other
+    byte kept; the PL5 side's counted."""
+    name = os.path.basename(rel)
+    if name == _EM_STATE_DB + ".xml":
+        text = data.decode("utf-8")
+        if pl5:
+            SANCTIONED["em_state_comments"] += len(_XML_COMMENT.findall(text))
+        return _XML_COMMENT.sub("", text).encode("utf-8")
+    if name != "db_members.csv":
+        return data
+    import csv
+    import io
+    text = data.decode("utf-8")
+    bom = "\ufeff" if text.startswith("\ufeff") else ""
+    rows = list(csv.reader(io.StringIO(text[len(bom):], newline="")))
+    db_at, at = rows[0].index("db_name"), rows[0].index("comment")
+    out = io.StringIO(newline="")
+    writer = csv.writer(out)                               # the Table writer's dialect (CRLF, minimal quoting)
+    for row in rows:
+        if row is not rows[0] and row[db_at] == _EM_STATE_DB and row[at]:
+            if pl5:
+                SANCTIONED["em_state_comments"] += 1
+            row = row[:at] + [""] + row[at + 1:]
         writer.writerow(row)
     return (bom + out.getvalue()).encode("utf-8")
 
@@ -445,8 +494,9 @@ def compare(a_root: str, b_root: str, label: str) -> list:
                 headered = False
             if not headered:
                 diffs.append(f"{label}: no #!openn header: {rel}")
-        da = _norm_text(open(a[rel], "rb").read())
-        db = _norm_text(_restamp_renamed_rows(rel, _drop_interface_descriptions(rel, _drop_transfer_areas(rel, raw_b))))
+        da = _norm_text(_drop_em_state_comments(rel, open(a[rel], "rb").read(), pl5=False))
+        db = _norm_text(_drop_em_state_comments(rel, _restamp_renamed_rows(rel, _drop_interface_descriptions(
+            rel, _drop_transfer_areas(rel, raw_b))), pl5=True))
         if da != db:
             diffs.append(f"{label}: bytes differ: {rel}")
     return diffs
@@ -502,7 +552,8 @@ def main() -> int:
               f"{SANCTIONED['region_comments']} SCL region comments, {SANCTIONED['device_types_copy']} shipped "
               f"DeviceTypesDatabase checked against its original, {SANCTIONED['signal_paths_page']} signal-paths "
               f"page checked against the coverage rows, {SANCTIONED['areas_table']} areas table checked against "
-              f"the signals' areas, {SANCTIONED['renamed_tags']} renamed template tag(s) read in their new spelling)")
+              f"the signals' areas, {SANCTIONED['renamed_tags']} renamed name(s) read in their new spelling, "
+              f"{SANCTIONED['em_state_comments']} 05_EM_STATE comments not compared)")
         return 0
 
 
