@@ -190,9 +190,13 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   hardware run Cancelled and stops) and changes nothing. Stations.csv column 8 `Group` = a device-group path the
   generation find-or-creates (`ResolveDeviceGroup`, per-run cache; attach mode searches the groups too) and
   column 9 `Connector` (`X1`/`X2`; the verbatim I/O-List cell "X1-P1 R" is fine -
-  `HardwareConfigLoader.ExtractConnector`) picks the interface by item name or PositionNumber and the IO
-  connector by ordinal (`PickIoConnector`: the PN/PN coupler's X2 = its second connector, logged
-  `<station>: Connector X2 -> IO connector 2 of 2`); without a designation the FIRST connector is used -
+  `HardwareConfigLoader.ExtractConnector`) picks the interface by item name or PositionNumber - the PN/PN coupler
+  has one per side, "PROFINET interface X1" / "X2", each with two IO connectors - and THAT interface's first IO
+  connector (`PickIoConnector`, logged `<station>: Connector X2 -> PROFINET interface X2, IO connector 1 of 2`;
+  only an interface the designation did not name picks its n-th connector - until 2026-10-18 the coupler got the
+  2nd connector of its X2 interface, X2 applied twice); wired on another half than the one CreateWithItem named,
+  the halves swap names (`NameConnectedHalf`: the coupler's "Name [X2]" = the station, "Name [X1]" = the X2
+  half's default; user 2026-10-18); without a designation the FIRST connector is used -
   X1 on a coupler - and an unmarked multi-connector station logs a WARNING (user decision 2026-10-09: the historical
   `Last()` came from the pre-AI single-connector version; PL5 emits the designation explicitly anyway). Association is the documented
   two-step (node `ConnectToSubnet`, then `ConnectToIoSystem`). A missing Ethernet interface skips the station /
@@ -230,7 +234,10 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   `NetworkInterface.TransferAreas` of the station's PROFINET interface, so a `DeviceItems` walk never
   sees them (the dump prints them as `::TransferArea(i)` with `.Addr(j)` local / `.PartnerAddr(j)`
   partner address objects). Generated from Modules.csv rows whose model (DeviceTypesDatabase.csv) is
-  of type `TransferArea`: that model's Tia Identifier column is the Openness `TransferAreaType` name
+  of type `TransferArea`, created on the interface the station's Connector designates (the one wired to
+  the IO controller - "PROFINET interface X2" on an X2 coupler; until 2026-10-18 always the first
+  interface, X1, whose partner side has no controller on an X2 coupler: `I Addr ... NOT written - a IN
+  area has no writable partner Input address`): that model's Tia Identifier column is the Openness `TransferAreaType` name
   (`IN`, `OUT`, `IN_OUT`, `PROFISAFE_IN12_OUT6`, ...), Module Name = area name, Slot = position
   number, I/Q Addr = start addresses in the station's IO controller, custom parameters relative to the
   area (`PartnerToLocalLength=128`, `Addr(0).StartAddress=100`). Created by `CreateTransferArea`
@@ -398,9 +405,13 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
    "Openn5 - Hardware Generation" OK/Cancel checkpoint asks to close ALL TIA tabs (Cancel: `Hardware generation
    CANCELLED at the checkpoint`, nothing changed; from Import Workspace the hardware row reads Cancelled and the
    run stops). Every created station / plugged module / transfer area line ends with `custom parameters: …` (or
-   `no custom parameters`). A station with `Connector` X2 (the PN/PN coupler) is wired to its second IO connector
-   (`<station>: Connector X2 -> IO connector 2 of 2` in the log) - before the port every coupler landed on the
-   same connector.
+   `no custom parameters`). A station with `Connector` X2 (the PN/PN coupler) is wired through its X2 interface
+   (`<station>: Connector X2 -> PROFINET interface X2, IO connector 1 of 2` in the log): the network view shows X2
+   on the PLC's IO system, the coupler's "Name [X2]" is the station name and "Name [X1]" the default (`<station>:
+   the station name is on the half of its connected PROFINET interface X2 ...`), and its transfer areas are created
+   on "PROFINET interface X2" with their I/Q Addr written (no `NOT written` WARNING; a dump of the station shows
+   `::TransferArea(i).PartnerAddr(0) StartAddress` = the base) - before the port every coupler landed on the same
+   connector.
 6. **Regenerate on the same project** ("Use existing IO controllers"): every station already in
    the project logs `WARNING: IoDevice <name> (...) already exists in the project - station SKIPPED
    with its N module(s)`, nothing is created and the summary line reads

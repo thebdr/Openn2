@@ -436,7 +436,8 @@ namespace Openn._03_ApiManager
                 SetAttribute(_device.DeviceItems, "Author", "bdragoi");
                 SetAttribute(_device.DeviceItems, "Comment", "Tia Portal Openness");
 
-                var network = FindNetworkInterface(_device.DeviceItems, d.Item1.connector, d.Item1.name);
+                DeviceItem interfaceItem = FindInterfaceItem(_device.DeviceItems, d.Item1.connector, d.Item1.name);
+                var network = interfaceItem == null ? null : interfaceItem.GetService<NetworkInterface>();
                 if (network == null)
                 {
                     Log("ERROR on IoDevice Creation: " + d.Item1.name + " has no Ethernet network interface - device skipped, check it in TIA" + "\n" +
@@ -453,8 +454,9 @@ namespace Openn._03_ApiManager
                 //V18/V19 REFUSES it: "The io connector is not connected to same subnet (as io system)".
                 network.Nodes.First().ConnectToSubnet(ioSystems[d.Item1.subnet].Item1);
 
-                IoConnector connector = PickIoConnector(network, d.Item1.connector, d.Item1.name);
+                IoConnector connector = PickIoConnector(network, interfaceItem, d.Item1.connector, d.Item1.name);
                 connector.ConnectToIoSystem(ioSystems[d.Item1.subnet].Item2);
+                NameConnectedHalf(_device, interfaceItem, d.Item1.name);
 
                 if (Uri.CheckHostName(d.Item1.IP) != UriHostNameType.IPv4)
                 {
@@ -730,6 +732,10 @@ namespace Openn._03_ApiManager
         /// Module row of model type "TransferArea" (PN/PN coupler, I-device): creates a
         /// transfer area on the station's PROFINET interface instead of plugging a
         /// module - transfer areas are not device items (NetworkInterface.TransferAreas).
+        /// The interface is the one the station's Connector designates (the one wired to
+        /// the IO controller - a coupler on X2 gets its areas on "PROFINET interface X2";
+        /// until 2026-10-18 they were always created on the first interface, X1, whose
+        /// partner side has no controller when the coupler is wired on X2).
         /// Module Name = area name, the model's Tia Identifier = the TransferAreaType
         /// name (IN, OUT, IN_OUT, PROFISAFE_IN12_OUT6, ...), Slot = position number.
         /// Then the custom parameters are applied relative to the area (model defaults
@@ -758,13 +764,18 @@ namespace Openn._03_ApiManager
             int position = Int32.Parse(s.position); //validated by the loader (positive integer)
 
             TransferArea area = null;
+            string interfaceName = "";
             while (area == null) //repeated while the user chooses Retry
             {
                 try
                 {
-                    NetworkInterface network = FindNetworkInterface(_device.DeviceItems);
+                    //on the interface the station's Connector designates - the one wired to the IO controller:
+                    //its PartnerAddresses are that controller's I/Q (a coupler wired on X2 has no controller on X1)
+                    DeviceItem interfaceItem = FindInterfaceItem(_device.DeviceItems, _mainDeviceData.connector, _device.Name);
+                    NetworkInterface network = interfaceItem == null ? null : interfaceItem.GetService<NetworkInterface>();
                     if (network == null)
                         throw new InvalidOperationException("the station has no PROFINET interface to create transfer areas on");
+                    interfaceName = interfaceItem.Name;
                     area = network.TransferAreas.Create(s.name, areaType, position);
                 }
                 catch (Exception e)
@@ -789,7 +800,8 @@ namespace Openn._03_ApiManager
 
             string areaParameters = CustomParameterApplier.Apply(area, HwDb.Identifier[s.identifier].customParameters, s.customParameters, _mainDeviceData.IP, context);
             WriteTransferAreaStartAddresses(area, s, _device.Name);
-            Log("Transfer area " + s.name + " (" + areaType + ", position " + position + ") created on IoDevice " + _device.Name + AddressSuffix(s) + " - " + areaParameters);
+            Log("Transfer area " + s.name + " (" + areaType + ", position " + position + ") created on IoDevice " + _device.Name + " / " + interfaceName +
+                AddressSuffix(s) + " - " + areaParameters);
             return true;
         }
 
@@ -1005,21 +1017,31 @@ namespace Openn._03_ApiManager
         /// </summary>
         private NetworkInterface FindNetworkInterface(DeviceItemComposition devices)
         {
-            NetworkInterface networkInterface = null;
+            DeviceItem item = FindInterfaceItem(devices);
+            return item == null ? null : item.GetService<NetworkInterface>();
+        }
 
+        /// <summary>
+        /// The device item carrying the first Ethernet network interface (with at least one node) in the
+        /// device item tree, searched recursively - the item, so the caller can see which half / slot owns it.
+        /// </summary>
+        private DeviceItem FindInterfaceItem(DeviceItemComposition devices)
+        {
             foreach (var device in devices)
             {
-                if (networkInterface != null) continue;
-                networkInterface = device.GetService<NetworkInterface>();
-                if (networkInterface != null)
-                {
-                    if (GetAttribute(device, "InterfaceType") != "Ethernet") networkInterface = null;
-                    else if (networkInterface.Nodes == null || networkInterface.Nodes.Count == 0) networkInterface = null;
-                }
-                if (networkInterface == null) networkInterface = FindNetworkInterface(device.DeviceItems);
+                if (IsEthernetInterface(device)) return device;
+                DeviceItem nested = FindInterfaceItem(device.DeviceItems);
+                if (nested != null) return nested;
             }
+            return null;
+        }
 
-            return networkInterface;
+        /// <summary>The item exposes an Ethernet NetworkInterface with at least one node.</summary>
+        private bool IsEthernetInterface(DeviceItem item)
+        {
+            NetworkInterface networkInterface = item.GetService<NetworkInterface>();
+            return networkInterface != null && GetAttribute(item, "InterfaceType") == "Ethernet"
+                && networkInterface.Nodes != null && networkInterface.Nodes.Count > 0;
         }
 
         /// <summary>
@@ -1040,24 +1062,31 @@ namespace Openn._03_ApiManager
         /// </summary>
         private NetworkInterface FindNetworkInterface(DeviceItemComposition devices, string connectorSpec, string stationName)
         {
-            int n = ConnectorNumber(connectorSpec);
-            if (n == 0) return FindNetworkInterface(devices);
-            NetworkInterface match = FindNetworkInterfaceBySpec(devices, n);
-            if (match != null) return match;
-            Log("WARNING: " + stationName + ": no Ethernet interface matches Connector \"" + connectorSpec + "\" - using the first one");
-            return FindNetworkInterface(devices);
+            DeviceItem item = FindInterfaceItem(devices, connectorSpec, stationName);
+            return item == null ? null : item.GetService<NetworkInterface>();
         }
 
-        private NetworkInterface FindNetworkInterfaceBySpec(DeviceItemComposition devices, int n)
+        /// <summary>
+        /// The device item carrying the Ethernet interface the Connector designation selects (see
+        /// FindNetworkInterface(devices, connectorSpec, stationName)); the first interface's item when there is
+        /// no designation or nothing matches (WARNING).
+        /// </summary>
+        private DeviceItem FindInterfaceItem(DeviceItemComposition devices, string connectorSpec, string stationName)
+        {
+            int n = ConnectorNumber(connectorSpec);
+            if (n == 0) return FindInterfaceItem(devices);
+            DeviceItem match = FindInterfaceItemBySpec(devices, n);
+            if (match != null) return match;
+            Log("WARNING: " + stationName + ": no Ethernet interface matches Connector \"" + connectorSpec + "\" - using the first one");
+            return FindInterfaceItem(devices);
+        }
+
+        private DeviceItem FindInterfaceItemBySpec(DeviceItemComposition devices, int n)
         {
             foreach (var device in devices)
             {
-                NetworkInterface networkInterface = device.GetService<NetworkInterface>();
-                if (networkInterface != null && GetAttribute(device, "InterfaceType") == "Ethernet"
-                    && networkInterface.Nodes != null && networkInterface.Nodes.Count > 0
-                    && ItemMatchesConnector(device, n))
-                    return networkInterface;
-                NetworkInterface nested = FindNetworkInterfaceBySpec(device.DeviceItems, n);
+                if (IsEthernetInterface(device) && ItemMatchesConnector(device, n)) return device;
+                DeviceItem nested = FindInterfaceItemBySpec(device.DeviceItems, n);
                 if (nested != null) return nested;
             }
             return null;
@@ -1071,16 +1100,25 @@ namespace Openn._03_ApiManager
         }
 
         /// <summary>
-        /// The IO connector to associate: the Connector designation picks the n-th one on a
-        /// multi-connector interface (PN/PN coupler: X1 = first, X2 = second). Without a
-        /// designation the FIRST connector is used - X1 on a coupler (user decision 2026-10-09: the
-        /// historical Last() dated from the pre-AI single-connector version); CreateIoDevices logs a
-        /// WARNING for an unmarked multi-connector station, so the fallback is never silent.
+        /// The IO connector to associate. When the Connector designation already selected the INTERFACE (its item
+        /// carries the Xn token / PositionNumber n - the PN/PN coupler's "PROFINET interface X1" / "X2", one interface
+        /// per side, each exposing two IO connectors) that interface's FIRST connector is the one: a GUI-configured
+        /// coupler has its controller on the side's IoConnector(0) (attribute dump 2026-10-08) - taking the n-th
+        /// connector of the n-th interface applied the X2 twice (2026-10-18). Only an interface the designation did
+        /// not name (one interface exposing several connectors) picks its n-th connector. Without a designation the
+        /// FIRST connector is used - X1 on a coupler (user decision 2026-10-09: the historical Last() dated from the
+        /// pre-AI single-connector version); CreateIoDevices logs a WARNING for an unmarked multi-connector station,
+        /// so the fallback is never silent.
         /// </summary>
-        private IoConnector PickIoConnector(NetworkInterface network, string connectorSpec, string stationName)
+        private IoConnector PickIoConnector(NetworkInterface network, DeviceItem interfaceItem, string connectorSpec, string stationName)
         {
             int count = network.IoConnectors.Count;
             int n = ConnectorNumber(connectorSpec);
+            if (n > 0 && interfaceItem != null && ItemMatchesConnector(interfaceItem, n))
+            {
+                Log(stationName + ": Connector " + connectorSpec + " -> " + interfaceItem.Name + ", IO connector 1 of " + count);
+                return network.IoConnectors.First();
+            }
             if (n > 0 && count > 1)
             {
                 if (n <= count)
@@ -1091,6 +1129,41 @@ namespace Openn._03_ApiManager
                 Log("WARNING: " + stationName + ": Connector \"" + connectorSpec + "\" is out of range (the interface has " + count + ") - using the first one");
             }
             return network.IoConnectors.First();
+        }
+
+        /// <summary>
+        /// A station whose connected interface sits on ANOTHER IO-device half than the one CreateWithItem named -
+        /// the PN/PN coupler: Item(1) = the X1 half, Item(2) = the X2 half, each with its own name (GUI "Name [X1]" /
+        /// "Name [X2]") from which its PROFINET device name is generated - gets the station name on the connected
+        /// half: wired on X2, the two halves swap names, so the X2 side is the station on its IO system and the
+        /// unused X1 side takes the default name the X2 half had (user 2026-10-18: "the name should be set for X2,
+        /// not for X1"). A device whose interface belongs to the named head (every other station) is left alone; a
+        /// rename TIA refuses is a WARNING and leaves the names as they were created.
+        /// </summary>
+        private void NameConnectedHalf(Device device, DeviceItem interfaceItem, string stationName)
+        {
+            DeviceItem half = interfaceItem == null ? null : interfaceItem.Parent as DeviceItem;
+            if (half == null || half.Name == stationName) return;
+            DeviceItem named = device.DeviceItems.FirstOrDefault(i => i.Name == stationName);
+            if (named == null) return;
+            string other = half.Name;
+            try
+            {
+                half.Name = stationName + "_" + interfaceItem.Name.Replace(" ", "_"); //never two items of one name
+                named.Name = other;
+                half.Name = stationName;
+                Log(stationName + ": the station name is on the half of its connected " + interfaceItem.Name + "; the other half is now \"" + other + "\"");
+            }
+            catch (Exception e)
+            {
+                try //back to the names as created, best effort
+                {
+                    if (named.Name != stationName) { half.Name = other + "_"; named.Name = stationName; }
+                    half.Name = other;
+                }
+                catch (Exception) { }
+                Log("WARNING: " + stationName + ": could not move the station name to the half of " + interfaceItem.Name + " - check \"Name [X1]\" / \"Name [X2]\" in TIA \n" + e.Message);
+            }
         }
 
         /// <summary>Reads an attribute as string, or "" when the item does not expose it.</summary>
