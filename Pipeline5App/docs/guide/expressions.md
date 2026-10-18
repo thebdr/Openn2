@@ -26,6 +26,10 @@ P and Q or not R   boolean composition, ( ) groups
 - Strings: `clean($f)` `strip($f)` `concat(a,b,…)` `join(sep,a,…)`
 - Tests: `present($f)` `blank($f)` `numeric(x)` `isdigit(x)` `startswith($f,"p")` `len(x)`
 - Control: `if(cond, then, else)` `coalesce(a,b,…)` `let(a := e1; body)`
+- Addresses: `nth_bit(first, n)` - the n-th bit address counting from `first` (n = 1 is `first`, 8 bits a
+  byte): `nth_bit("M200.0", 9)` = `M201.0`. A generated flag's address from a base and its 1-based index -
+  `nth_bit($_params.door_params.open_request_base, $index)`. A blank `n` gives blank; a `first` that is no
+  `<area><byte>.<bit>` address (a base never set) or an `n` that is no whole number from 1 is an error.
 - Extraction: `extract($f, /re/ [, slice])` - group(1) if the regex captures, else the whole match;
   the optional slice (`-1:` `:3` `1:3` `2`) then applies.
 - Data (over the SSOT tables): `where(table, pred)` `first(table, pred)`

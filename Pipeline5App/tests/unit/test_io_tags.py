@@ -66,6 +66,15 @@ def test_source_a_direct_io_signal():
        "the direct-I/O tag row (Bool, %-addr, resolved comment; empty Typeobject/Version read as None)")
 
 
+def test_source_a_memory_flag():
+    """[[C-041]]: a generated memory flag is a tag like an I/O point's - Bool, its %M address, its table."""
+    sig = {"script_type": "DOR", "bit": "M200.3", "name_in_tagtable": "Open Door Request [ =D1 ]",
+           "tagtable": "SAFETY_Doors", "type": {"type_id": "DOR", "category": "Std", "io_comment": "[ {$script_type} ]"}}
+    res, rows, _p = _project(signals=[sig])
+    eq(res["io_count"], 1, "tagged")
+    eq(rows[1][:5], ["Open Door Request [ =D1 ]", "SAFETY_Doors", "Bool", "%M200.3", "[ DOR ]"], "the %M tag row")
+
+
 def test_source_a_skips_blank_and_non_io():
     sigs = [
         {"script_type": "DI1/2", "bit": "I1.0", "name_in_tagtable": "",            # blank name -> skip
@@ -265,6 +274,7 @@ if __name__ == "__main__":
         ("tia_dtype_and_logical_address", test_tia_dtype_and_logical_address),
         ("two_sheet_structure_and_headers", test_two_sheet_structure_and_headers),
         ("source_a_direct_io_signal", test_source_a_direct_io_signal),
+        ("source_a_memory_flag", test_source_a_memory_flag),
         ("source_a_skips_blank_and_non_io", test_source_a_skips_blank_and_non_io),
         ("source_b_interface_tag_from_ssot", test_source_b_interface_tag_from_ssot),
         ("source_b_word_and_unresolved", test_source_b_word_and_unresolved),

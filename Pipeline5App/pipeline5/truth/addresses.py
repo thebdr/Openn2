@@ -152,6 +152,16 @@ def has_io_prefix(bit) -> bool:
             or first in ("I", "Q"))
 
 
+_MEMORY_BIT = re.compile(r"M\d+\.[0-7]")
+
+
+def is_memory(bit) -> bool:
+    """True when the cell is a MEMORY bit `M<byte>.<bit>` (`M200.0`) - a generated flag's address ([[C-041]]): a
+    tag like an I/O point's, but no I/O - `parse` / `addr_byte` / `node_of` keep returning None for it (no node
+    owns it, no hardware carries it). Whitespace tolerated, case-insensitive."""
+    return bool(_MEMORY_BIT.fullmatch(norm(bit)))
+
+
 # --- positional Profinet-node lookup (moved from the diagnosis chapter - coupling truths #2/#g) --- #
 def addr_byte(bit):
     """(canonical 'I'|'Q', byte) parsed from the ACTIVE notation's full address (`I100.3` ->

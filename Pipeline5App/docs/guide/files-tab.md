@@ -199,7 +199,10 @@ chain-reaction templates (see *Strict templates* in [Expressions](guide://expres
   signals spawned `after_300` are GENERATED signals - every generation phase (400-900) re-fires the
   rule and takes them in as staged signals, so they get tags, blocks, hardware and coverage (validation
   and the fill never see them: they judge and write the documents); rows spawned into any other staged
-  table reach only the saved Database (later phases re-stage it from the documents).
+  table reach only the saved Database (later phases re-stage it from the documents). A generated signal
+  may also carry a MEMORY bit (`M200.0`) - a flag the program writes, tagged like an I/O point (its
+  type's table, a `%M` address) but on no hardware; `nth_bit(first, n)` gives each spawned flag its own
+  bit from a base without arithmetic (see [Expressions](guide://expressions)).
 - **Autocomplete** offers what fits at the cursor:
   - `$` offers the rule's columns (in the templates the rule renders), your loop variables,
     `_params` and `_rule`; inside a `where` - or a data function's predicate, `count(signals, $` -

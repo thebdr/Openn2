@@ -88,10 +88,10 @@ def collect_outputs(database, system=None) -> dict:
     (PL4 coupling #1); None falls back to the TIA regex until step 4 makes the system mandatory."""
     _refs = (system.symbols.find_bindings if system is not None
              else lambda text: [(m.group(1), m.group(2)) for m in _QUALREF.finditer(text or "")])
-    # (510) the tag names 510 would emit: io-signal name_in_tagtable + interface_elements signal_name.
+    # (510) the tag names 510 would emit: tag-signal name_in_tagtable + interface_elements signal_name.
     tags = set()
     for r in (database["signals"] if "signals" in database else []):
-        if identity.is_io_signal(r):
+        if identity.is_tag_signal(r):
             n = str(r.get("name_in_tagtable") or "").strip()
             if n:
                 tags.add(n)

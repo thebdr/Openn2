@@ -56,6 +56,8 @@ FUNCTIONS:
     if(cond, then, else)        `then` if cond is truthy, else `else`                      -> value
     coalesce(a, b, ...)         the first value non-empty after string-coercion           -> value
     let(a := e1, b := f($a); body)   sequential BIND-ONCE locals (see below)              -> value
+    nth_bit(first, n)           the n-th bit address from `first` (n = 1 -> first; 8 bits  -> str
+                       a byte): nth_bit("M200.0", 9) -> "M201.0"; a blank n -> ""; a bad first/n -> error
 
 extract - DECISION (b) CAPTURE-FIRST, implicit IGNORECASE:
     if the regex has >=1 capturing group, the result is group(1); else it is the whole match group(0).

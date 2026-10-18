@@ -74,6 +74,16 @@ def is_io_signal(row) -> bool:
     return has_io_prefix(row.get("bit"))
 
 
+def is_tag_signal(row) -> bool:
+    """A row the tag tables carry: an I/O signal (`is_io_signal`), or - a resolved non-interface type too - one
+    whose bit is a MEMORY bit `M<byte>.<bit>`, a generated flag ([[C-041]]: the door open request)."""
+    if is_io_signal(row):
+        return True
+    t = _type_of(row)
+    from pipeline5.truth.addresses import is_memory
+    return bool(t) and t.get("category") != "Interface" and is_memory(row.get("bit"))
+
+
 def tag_name(row) -> str:
     """PLC I/O tag name (the type's `tag_name` template); '' when the type isn't tagged on its own."""
     return interp(_type_of(row).get("tag_name", ""), row)

@@ -18,6 +18,7 @@ DD,Door Closed Diag Input,Diag,,,no,SAFETY_Doors,Door Closed Diagnosis Input [ {
 DR,Door Reset Input,Std,,,no,SAFETY_Doors,Door Reset Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
 DL,Door Lamp Output,Std,,,no,SAFETY_Doors,Door Lamp Output [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
 DQ,Door Unlock Output,Std,,,no,SAFETY_Doors,Door Unlock Output [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
+DOR,Door Open Request (generated memory flag),Std,,,no,SAFETY_Doors,Open Door Request [ {$functional_unit}{$location}{$device} ],[ {$script_type} {$index}  {$drawing} ],no
 KI,Contactor Feedback Input,Safety,,,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
 KI1/2,Contactor Feedback Input,Safety,KI,1,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no
 KI2/2,Contactor Feedback Input,Safety,KI,2,no,SAFETY_Contactors,Contactor Feedback Input [ {$iol_FLD} ],[ {$script_type} {$index}  {$drawing} ],no

@@ -29,6 +29,9 @@ def test_siemens_default_matches_pl4_literal_parser():
     ok(addresses.has_io_prefix("I100"), "prefix predicate stays LOOSER than the full parse")
     ok(addresses.has_io_prefix("q"), "a bare direction letter still prefixes")
     ok(not addresses.has_io_prefix("M10.1"), "a non-direction letter does not")
+    eq([addresses.is_memory(v) for v in ("M200.0", " m 12.7 ", "M200.8", "M200", "I1.0", "MW10", "", None)],
+       [True, True, False, False, False, False, False, False], "[[C-041]]: a memory BIT M<byte>.<0-7> only")
+    eq((addresses.parse("M200.0"), addresses.addr_byte("M200.0")), (None, None), "a memory bit is no I/O address")
 
 
 def test_alternate_notation_is_config_only():

@@ -1,0 +1,51 @@
+{
+  "clause": "C-041",
+  "command": "bash -c cd Pipeline5App && for t in test_expr test_address_format test_iolist_staging test_io_tags test_signal_coverage test_signal_paths test_software_blocks; do C:/Source/Repos/_Openn2/.venv/Scripts/python.exe tests/unit/$t.py || exit 1; done",
+  "commandArgv": [
+    "bash",
+    "-c",
+    "cd Pipeline5App && for t in test_expr test_address_format test_iolist_staging test_io_tags test_signal_coverage test_signal_paths test_software_blocks; do C:/Source/Repos/_Openn2/.venv/Scripts/python.exe tests/unit/$t.py || exit 1; done"
+  ],
+  "exitCode": 0,
+  "outputSha": "f5e4a2234ace1d534b6911e3ee93bf6ca41880a2c09ef28faeb6a45d908d3513",
+  "outputTail": "  PASS  builder_03_diagnostic_nodes_pa_pw_rows\r\n  PASS  scl_emit_diagnostic_nodes_regions\r\n  PASS  project_scl_block_ships_and_drops_csv\r\n  PASS  project_ships_templates_with_relative_refs\r\n  PASS  block_report_verbose_log_data\r\n  PASS  write_instance_dbs_merge_and_dedup\r\n  PASS  fdback_reproduces_12_template_networks\r\n  PASS  fdback_row_reconstructs_and_drops_pad\r\n  PASS  fdback_fc_emits_oversized_and_flag_wired\r\n  PASS  builder_04_estop_sorter_sub_areas\r\n  PASS  builder_04_estop_incomplete_sorter_fails\r\n  PASS  builder_08_door_of_a_sorter_sub_area\r\n  PASS  builder_03_titles_from_the_areas_table\r\n  PASS  engine_records_a_builders_findings\r\n  -> 42/42 passed",
+  "ranAt": "2026-10-18T17:25:38.280Z",
+  "headCommit": "a15b0c4b6ad5217f95f80ba72120ea752a89e51b",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_expr.py",
+      "file": "Pipeline5App/tests/unit/test_expr.py",
+      "fileSha": "a4f6e219936076f303eb739b5a76112c7e2a36a610b09b51273fa54753b0a8e2"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_address_format.py",
+      "file": "Pipeline5App/tests/unit/test_address_format.py",
+      "fileSha": "38ca06d64efbe35b948e9319091adf29ef59166a664c2dda2530afa4f0b5e523"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_iolist_staging.py",
+      "file": "Pipeline5App/tests/unit/test_iolist_staging.py",
+      "fileSha": "7cabb11775a26873b25f9c99cd175592ee5ae44f8814b70b06e6322791b3fd9e"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_io_tags.py",
+      "file": "Pipeline5App/tests/unit/test_io_tags.py",
+      "fileSha": "f2bf87346473854da054a3d408dc55d4471c25420b74f6f55e4f6b361f4ac1ea"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_signal_coverage.py",
+      "file": "Pipeline5App/tests/unit/test_signal_coverage.py",
+      "fileSha": "0adba9eb0a415b14b8c195582ee9db276c45f37a3ca5516e660e08a48401e681"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_signal_paths.py",
+      "file": "Pipeline5App/tests/unit/test_signal_paths.py",
+      "fileSha": "958a25a7316f34fe18007bfdb72c20cf39bd907197a85ea554e88e6b50459afd"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_software_blocks.py",
+      "file": "Pipeline5App/tests/unit/test_software_blocks.py",
+      "fileSha": "229aa954937db9e6308ffbcd1a8e71c008d0844747d2f8f9605041acb301d912"
+    }
+  ]
+}

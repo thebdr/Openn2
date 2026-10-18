@@ -294,7 +294,7 @@ def build_graph(database, ready: dict | None = None) -> tuple:
         node = g.add(f"r:{r.get('uid')}", "row", f"{r.get('script_type') or '-'}  {r.get('FLD') or ''}".strip(),
                      f"{r.get('address') or ''} · {r.get('source_cell') or ''}")
         tag, address = str(r.get("tag") or "").strip(), str(r.get("address") or "").strip().upper()
-        if tag and address.startswith("Q"):
+        if tag and address.startswith(("Q", "M")):        # an output - or a memory flag the program writes
             g.edge(g.var((tag,)), node)
         elif tag:
             g.edge(node, g.var((tag,)))

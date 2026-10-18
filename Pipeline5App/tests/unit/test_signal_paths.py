@@ -168,6 +168,13 @@ def test_the_graph_traces_an_estop_to_its_outputs():
     eq(sp.ends(g, out, "r:q1", inn)["feeders"], 2, "the contactor is driven by both buttons")
     eq(sp.ends(g, out, "r:c1", inn), {"outputs": 0, "alarms": 0, "interfaces": 0, "unread": 0, "steps": 0,
                                        "feeders": 0}, "an untyped channel: no path")
+    with tempfile.TemporaryDirectory() as d:                 # [[C-041]]: a memory flag the program writes
+        db = _estop_db(d)
+        db["coverage"].append(dict(uid="m1", kind="signal", script_type="DOR", FLD="=D1", address="M200.0",
+                                   tag="Open Request D1", source_cell="door_open_request:x"))
+        g2, _n = sp.build_graph(db)
+    ok("r:m1" in sp.reach(g2.adjacency(), 'v:"pnc_i_open request d1"'), "the interface tag reaches the flag's row")
+    eq(sp.ends(g2, g2.adjacency(), "r:m1", g2.adjacency(reverse=True))["steps"], 0, "the flag's row drives nothing")
     upstream = {g.nodes[n][1] for n in sp.reach(inn, 'v:"open request d1"')}
     ok('"PNC_I_Open Request D1"' in upstream, "an incoming element: the interface tag feeds the expression")
     ok('"Open Request D1"' not in {g.nodes[n][1] for n in sp.reach(inn, 'v:"pnc_i_open request d1"')}, "not back")

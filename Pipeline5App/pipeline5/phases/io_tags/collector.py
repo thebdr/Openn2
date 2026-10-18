@@ -58,11 +58,12 @@ def _logical_address(addr) -> str:
 # --- the two tag sources (each tag = {name, path, data_type, address, comment} + the source link:
 # `location` = the producing I/O-List row's Sheet!Cell, `source_uid` = the producing entity's uid) ---- #
 def io_signal_tags(database) -> list:
-    """One tag per taggable I/O signal (is_io_signal + a non-empty name_in_tagtable). Data Type is Bool
-    (PL3 hard-codes Bool for direct I/O points); the comment resolves the type's io_comment template."""
+    """One tag per taggable signal (is_tag_signal - an I/O point or a generated memory flag, [[C-041]] - + a
+    non-empty name_in_tagtable). Data Type is Bool (PL3 hard-codes Bool for direct I/O points; a memory flag is
+    a bit too); the comment resolves the type's io_comment template."""
     tags = []
     for row in database["signals"]:
-        if not identity.is_io_signal(row):
+        if not identity.is_tag_signal(row):
             continue
         name = str(row.get("name_in_tagtable") or "").strip()
         if not name:

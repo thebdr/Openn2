@@ -96,6 +96,33 @@ def regex_replace(text, pattern, replacement: str) -> str:
         raise ExprError(f"regex_replace: bad replacement {replacement!r}: {e}")
 
 
+# --- bit addresses ------------------------------------------------------------------------------ #
+_BIT_ADDRESS = re.compile(r"([A-Za-z]+)(\d+)\.([0-7])")
+
+
+def nth_bit(first, n) -> str:
+    """The n-th BIT address counting from `first` - n = 1 is `first` itself, 8 bits a byte, the area letter(s)
+    kept: `nth_bit("M200.0", 9)` -> "M201.0" (a generated flag's address from a base + its 1-based index, with
+    no arithmetic in the language). A blank `n` stays blank; a `first` that is no `<area><byte>.<bit>` address
+    (blank too - a base never set) or an `n` that is no whole number >= 1 raises a located ExprError."""
+    if n is None or s(n).strip() == "":
+        return ""
+    m = _BIT_ADDRESS.fullmatch(s(first).strip())
+    if not m:
+        raise ExprError(f"nth_bit: {s(first)!r} is no <area><byte>.<bit> address (e.g. M200.0)")
+    try:
+        k = float(s(n).strip())                  # "0001" (an index) and a literal 8 (a float) alike
+    except ValueError:
+        k = 0.5
+    if not k.is_integer():
+        raise ExprError(f"nth_bit: {s(n)!r} is no whole number")
+    k = int(k)
+    if k < 1:
+        raise ExprError(f"nth_bit: n = {k} - the first bit is n = 1")
+    at = int(m.group(2)) * 8 + int(m.group(3)) + k - 1
+    return f"{m.group(1).upper()}{at // 8}.{at % 8}"
+
+
 # --- render-time format spec coercion ----------------------------------------------------------- #
 # Merge of identity._format_value (int via int(float(x))) + dbtemplate.format_field (the conversion sets).
 # Integer conversions coerce via int(float(value)); float conversions via float(value). A BLANK value

@@ -155,6 +155,20 @@ def test_if_and_coalesce():
     eq(expr.evaluate("coalesce($a, $b)", {"a": "", "b": ""}), "", "all empty -> ''")
 
 
+# --- nth_bit: a bit address from a base + a 1-based count ([[C-041]]) --------------------------------- #
+def test_nth_bit():
+    nb = lambda first, n: expr.evaluate("nth_bit($f, $n)", {"f": first, "n": n})
+    eq([nb("M200.0", n) for n in ("1", "0001", "8", "9", "17")], ["M200.0", "M200.0", "M200.7", "M201.0", "M202.0"],
+       "n = 1 is the base itself, 8 bits a byte, an index's leading zeros read")
+    eq((nb("m200.6", "3"), nb("Q4.7", "2")), ("M201.0", "Q5.0"), "any start bit carries; the area letter upper-cased")
+    eq(expr.evaluate('nth_bit("M10.0", 8)', {}), "M10.7", "a number literal")
+    eq(nb("M200.0", ""), "", "a blank n stays blank")
+    for first, n in (("", "1"), ("M200.8", "1"), ("200.0", "1"), ("M200.0", "0"), ("M200.0", "1.5"),
+                     ("M200.0", "x"), ("M200.0", "nan")):     # no base set, bit 8, no area, n < 1, not whole/numeric
+        raises(ExprError, lambda first=first, n=n: nb(first, n))
+    raises(ExprError, lambda: expr.evaluate('nth_bit("M1.0")', {}))   # arity
+
+
 # --- let: sequential bind-once, shadowing, nesting ----------------------------------------------- #
 def test_let():
     eq(expr.evaluate("let(a := $x ; $a)", {"x": "v"}), "v", "single bind")
@@ -272,6 +286,7 @@ if __name__ == "__main__":
         ("strip", test_strip),
         ("single_quoted_strings", test_single_quoted_strings),
         ("if_and_coalesce", test_if_and_coalesce),
+        ("nth_bit", test_nth_bit),
         ("let", test_let),
         ("render_basic", test_render_basic),
         ("render_format_spec", test_render_format_spec),

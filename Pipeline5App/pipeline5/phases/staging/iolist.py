@@ -234,11 +234,11 @@ def _derive_identity(row: dict, signal_diag: dict, sorter_names: set, keep: froz
         row["diag_desc"] = identity.interp(diag_template, row)   # the resolved per-type diagnosis text
     set_table = row.get("tagtable") if "tagtable" in keep else ""     # a table the RULE set, kept on its own
     if "name_in_tagtable" in keep and row.get("name_in_tagtable"):
-        if identity.is_io_signal(row):
+        if identity.is_tag_signal(row):
             row["tagtable"] = set_table or identity.tagtable(row)
         else:
             row["name_in_tagtable"], row["tagtable"] = "", ""
-    elif identity.is_io_signal(row) and identity.tag_name(row):
+    elif identity.is_tag_signal(row) and identity.tag_name(row):
         row["name_in_tagtable"] = identity.tag_name(row)
         row["tagtable"] = set_table or identity.tagtable(row)
     else:

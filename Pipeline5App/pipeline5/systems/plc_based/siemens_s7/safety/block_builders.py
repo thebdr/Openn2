@@ -501,8 +501,9 @@ def build_08_gate_manager(db: Database) -> Table:
     IsSorterArea; choice:DoorResetNecessary = whether a same-index DR (reset input) exists. The door
     network ALSO consumes the sorter interlock (template evolution, user spec 2026-07-07):
     tagName:SorterRunningIOC + the 05_EM_STATE SORTER_nn_NOT_RUNNING member, nn resolved via the DI's
-    matrix_areas x the N1/2 encoders (`sorter_nn`); tagName:DoorReset = the DR tag (the one reset
-    button feeds both the open-request and the reset FB pins). A ONE-row door (DI - both channels on one 1oo2
+    matrix_areas x the N1/2 encoders (`sorter_nn`); tagName:DoorReset = the DR tag; tagName:DoorOpenRequest =
+    the door's same-index DOR - the generated `Open Door Request [ <door> ]` memory flag the machine interface
+    writes ([[C-041]], user 2026-10-18) - else the DR tag (the one reset button feeds both pins). A ONE-row door (DI - both channels on one 1oo2
     F-DI input, [[C-032]]) is its own CH1 and CH2, and its two 07_DOOR members (SAFE_STATE, DIAGNOSIS - the
     config's element order) are the EM_Cut and Diag_Open outputs a DI1/2 + DI2/2 pair fills one each."""
     t = Table("08_Gate Manager")
@@ -559,7 +560,7 @@ def build_08_gate_manager(db: Database) -> Table:
         di1, di2, dd = first_of("DI1/2", idx), first_of("DI2/2", idx), first_of("DD", idx)
         di = None if di1 else first_of("DI", idx)            # the one-row door: CH1 = CH2, both 07_DOOR outputs
         door = di1 or di
-        dr, dl = first_of("DR", idx), first_of("DL", idx)
+        dr, dl, dor = first_of("DR", idx), first_of("DL", idx), first_of("DOR", idx)
         anchor = door or dq
         node = _node_of(db, door or dq)                      # bypass the DI's node (the safety input)
         door_members = db.members_of(di, "07_DOOR") if di else []
@@ -574,8 +575,8 @@ def build_08_gate_manager(db: Database) -> Table:
             **{"tagName:DoorClosedCh1": tag(door)},
             **{"tagName:DoorClosedCh2": tag(di) if di else tag(di2)},
             **{"tagName:DoorClosedDiagInput": tag(dd)},
-            **{"tagName:DoorOpenRequest": tag(dr)},
-            **{"tagName:DoorReset": tag(dr)},                # the one reset button feeds both FB pins
+            **{"tagName:DoorOpenRequest": tag(dor) if dor else tag(dr)},   # the interface's request ([[C-041]])
+            **{"tagName:DoorReset": tag(dr)},
             **{"tagName:DoorSolenoidUnlock": tag(dq)},
             **{"tagName:DoorResetLamp": tag(dl)},
             # the door network consumes the sorter interlock itself (the template's TT02 references

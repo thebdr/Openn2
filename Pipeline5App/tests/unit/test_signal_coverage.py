@@ -109,7 +109,9 @@ def test_collect_outputs_from_tables():
               ["source_cell", "bit", "name_in_tagtable", "type"], ["type"], ["source_cell"],
               [{"source_cell": "S1", "bit": "I0.0", "name_in_tagtable": "TAG1",
                 "type": {"type_id": "07_DOOR", "category": "Input"}},
-               {"source_cell": "S2", "bit": "", "name_in_tagtable": "", "type": None}])
+               {"source_cell": "S2", "bit": "", "name_in_tagtable": "", "type": None},
+               {"source_cell": "S3", "bit": "M200.0", "name_in_tagtable": "FLAG1",          # [[C-041]] memory flag
+                "type": {"type_id": "DOR", "category": "Std"}}])
     dbm = _ct("db_members", ["db_name", "member"], [], ["db_name", "member"],
               [{"db_name": "07_DOOR", "member": "m1"}])
     de = _ct("diagnosis_entries", ["source", "in_binding", "diag_columns"], ["diag_columns"],
@@ -128,7 +130,7 @@ def test_collect_outputs_from_tables():
                 "values": {"00_Commissioning.{db_element}": "n1 1.2.3.4", "02_COM.{db_element}": "AREA 1 PB"}}])
     db = DB([sig, dbm, de, ie, itab, hs, hm, blk, mem])
     o = coverage.collect_outputs(db)
-    eq(o["tags"], {"TAG1", "IFTAG"}, "io-signal name_in_tagtable + interface_elements signal_name")
+    eq(o["tags"], {"TAG1", "FLAG1", "IFTAG"}, "tag-signal name_in_tagtable (a memory flag too) + interface tags")
     eq(o["db_members"]["07_DOOR"], {"m1"})
     ok("02_COM" not in o["db_members"], "02_COM flows through db_members like any config DB now "
                                         "(this synthetic db_members has no 02_COM rows)")

@@ -45,7 +45,7 @@ _TOKEN_RE = re.compile(
 # host / leaf funcs (non-data). Data funcs are dispatched separately (they take a table NAME word).
 _FUNCS = frozenset({
     "clean", "strip", "concat", "join", "numeric", "isdigit", "len", "present", "blank",
-    "startswith", "extract", "regex_replace", "if", "coalesce", "let",
+    "startswith", "extract", "regex_replace", "if", "coalesce", "let", "nth_bit",
 })
 _DATA_FUNCS = frozenset({"where", "first", "lookup", "unique", "count", "node_of"})
 _KEYWORDS = frozenset({"and", "or", "not", "in"})
@@ -310,6 +310,10 @@ class _Parser:
             return lambda ctx: runtime.s(sep(ctx)).join(runtime.s(p(ctx)) for p in parts)
         if name == "coalesce":
             return self._coalesce(args)
+        if name == "nth_bit":
+            self._arity(name, args, 2)
+            first, n = args
+            return lambda ctx: runtime.nth_bit(first(ctx), n(ctx))
         raise ExprError(f"unknown function {name!r} in {self.src!r}")
 
     def _arity(self, name, args, n):

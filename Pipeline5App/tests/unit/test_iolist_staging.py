@@ -341,6 +341,35 @@ def test_absorb_keeps_a_rule_set_table_and_finds_generated_duplicates():
     eq(staging.generated_dup_findings(signals_table(["script_type"])), [], "no generated rows: nothing")
 
 
+def test_absorb_spawned_tags_a_memory_flag():
+    """[[C-041]]: a spawned row whose bit is a MEMORY bit (the door open request, M200.0) is a tag signal - the
+    shipped DOR type resolved, its tag name from the type (the follower element's spelling, so the interface SCL's
+    target exists), its table SAFETY_Doors, the bit unchanged; an I/O-only predicate still says no."""
+    from pipeline5.config import paths
+    from pipeline5.truth.database import Database
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    paths.use_system(SYSTEM)
+    sig = signals_table(["functional_unit", "location", "device", "script_type", "bit", "index"])
+    di = sig.add(functional_unit="=TRIB", location="-CA01", device="-B1", script_type="DI", bit="I645.1",
+                 index="0001", source_cell="NET!O7")
+    sig.add_row({"functional_unit": "=TRIB", "location": "-CA01", "device": "-B1", "script_type": "DOR",
+                 "bit": "M200.0", "index": "0001", "spawned_by": "door_open_request", "source_uid": di["uid"]})
+    sig.add_row({"functional_unit": "=TRIB", "location": "-CA01", "device": "-B2", "script_type": "DOR",
+                 "bit": "M200.1", "index": "0002", "name_in_tagtable": "MY REQUEST", "spawned_by": "named",
+                 "source_uid": di["uid"]})
+    staging.absorb_spawned(Database([sig]), params={})
+    g = next(r for r in sig.rows if r.get("spawned_by") == "door_open_request")
+    named = next(r for r in sig.rows if r.get("spawned_by") == "named")
+    eq((named["name_in_tagtable"], named["tagtable"]), ("MY REQUEST", "SAFETY_Doors"),
+       "a name the RULE set is kept on a memory flag too, its table derived")
+    eq(((g.get("type") or {}).get("type_id"), g["bit"]), ("DOR", "M200.0"), "the type resolved, the bit kept")
+    eq((g["name_in_tagtable"], g["tagtable"]), ("Open Door Request [ =TRIB-CA01-B1 ]", "SAFETY_Doors"),
+       "tagged: the follower element's name, the doors' table")
+    ok(identity.is_tag_signal(g) and not identity.is_io_signal(g), "a tag signal, not an I/O signal")
+    ok(not identity.is_tag_signal({"bit": "M1.0", "type": {"category": "Interface"}}), "never an interface type")
+    ok(not identity.is_tag_signal({"bit": "M1.0", "type": None}), "never an untyped row")
+
+
 # =================================================================================================== #
 # [[C-040]] - sub-areas: the declared hierarchy, its numbers, CONCEPT by name, the sorter kind
 # =================================================================================================== #
@@ -486,6 +515,7 @@ if __name__ == "__main__":
         ("cematrix_matches_a_dotted_ce", test_cematrix_matches_a_dotted_ce),
         ("absorb_spawned_makes_a_generated_signal_first_class", test_absorb_spawned_makes_a_generated_signal_first_class),
         ("absorb_keeps_a_rule_set_table_and_finds_generated_duplicates", test_absorb_keeps_a_rule_set_table_and_finds_generated_duplicates),
+        ("absorb_spawned_tags_a_memory_flag", test_absorb_spawned_tags_a_memory_flag),
         ("area_hierarchy_numbers_parents_parts", test_area_hierarchy_numbers_parents_parts),
         ("concept_descriptions_by_name_then_position", test_concept_descriptions_by_name_then_position),
         ("sorter_area_names_by_number", test_sorter_area_names_by_number),

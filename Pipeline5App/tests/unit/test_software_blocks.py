@@ -277,8 +277,12 @@ def test_builder_08_gate_manager_sorters_and_doors():
     eq(d["00_Commissioning.{db_element}"], "n1 1.2.3.4", "bypass = the DI's node")
     eq(d["tagName:DoorClosedCh1"], "TDI1")
     eq(d["tagName:DoorSolenoidUnlock"], "TDQ")
-    eq(d["tagName:DoorReset"], "TDR", "the DR tag feeds BOTH the open-request and the reset pin")
+    eq(d["tagName:DoorReset"], "TDR", "no DOR flag: the DR tag feeds BOTH the open-request and the reset pin")
     eq(d["tagName:DoorOpenRequest"], "TDR")
+    rows.append({"script_type": "DOR", "index": "5", "bit": "M200.4", "name_in_tagtable": "Open Door Request [ DOORA ]"})
+    d = next(r for r in builders.build_08_gate_manager(Database(rows)).rows if r["TemplateType"] == "02")
+    eq((d["tagName:DoorOpenRequest"], d["tagName:DoorReset"]), ("Open Door Request [ DOORA ]", "TDR"),
+       "[[C-041]]: the door's same-index DOR flag is the open request; the reset stays the DR button")
     eq(d["tagName:SorterRunningIOC"], "PNC_I_SORTER-01 SORTER RUNNING",
        "the door's sorter via the DI's area; the MachineInterfaces template's tag (07's spelling, 2026-10-18)")
     eq(d["05_EM_STATE.{matrix_area}_SORTER_NOT_RUNNING"], "SORTER_01_NOT_RUNNING",
