@@ -28,6 +28,9 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
         (counted with the renames), the shipped v1.3 template checked against Shared's (never compared - the
         reference ships v1.2), and the reference's padded 02 rows (the CreationInfo CSV, software_block_members)
         read in their variant form - the chunk's channels only, on the type `_push_button_variant` names (counted)
+      * the DeviceTypesDatabase's DR rule (2026-10-18, user: "a rule for DR, same as DD"): a door reset input's F-DI
+        channel gets `Failsafe_SensorEvaluation=0` + `Failsafe_SensorSupply=8` - those two entries of every DR channel
+        (the reference's DR signals, on the module whose input byte holds them) out of PL5's module tables, counted
       * the 05_EM_STATE DB (2026-10-18, user): the power coil `<area> POWER_CUT` -> `<area> POWER ENABLED` (read
         as the new name, counted with the renames; db_members' uid re-stamped from the old name) and its members'
         comments reduced to what each signal is - the comments of that DB not compared (dropped on both sides,
@@ -214,7 +217,7 @@ _TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
 _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
 SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
               "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0, "renamed_tags": 0, "em_state_comments": 0,
-              "pb_template": 0, "pb_rows": 0}
+              "pb_template": 0, "pb_rows": 0, "dr_channel_params": 0}
 _SIGNAL_PATHS = "ProjectDocumentation/Reports/io_signal_paths.html"
 _DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
 _SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
@@ -232,6 +235,54 @@ def _drop_transfer_areas(rel: str, data: bytes) -> bytes:
     kept = [line for line in lines if not _TRANSFER_AREA_ROW.search(line.rstrip())]
     SANCTIONED["transfer_area_rows"] += len(lines) - len(kept)
     return "".join(kept).encode("utf-8")
+
+
+_DR_PARAMS = ("Ch({ch}).Failsafe_SensorEvaluation=0", "Ch({ch}).Failsafe_SensorSupply=8")
+
+
+def _dr_bits() -> set:
+    """{(input byte, bit)} of the reference's DR (door reset input) signals."""
+    import csv
+    with open(os.path.join(REFERENCE, "db", "signals.csv"), encoding="utf-8", newline="") as fh:
+        rows = csv.DictReader(line for line in fh if not line.startswith("#"))
+        found = set()
+        for r in rows:
+            m = re.fullmatch(r"I(\d+)\.(\d)", (r.get("bit") or "").strip())
+            if r.get("script_type") == "DR" and m:
+                found.add((int(m.group(1)), int(m.group(2))))
+    return found
+
+
+def _strip_dr_params(rel: str, data: bytes) -> bytes:
+    """The DR rule's channel parameters (`_DR_PARAMS`) out of a PL5 module table (hardware_modules.csv / Modules.csv):
+    in the row of the module whose input start byte holds a reference DR signal, that channel's two entries - every
+    other byte kept; counted per entry."""
+    import csv
+    import io
+    name = os.path.basename(rel)
+    if name not in _MODULE_TABLES:
+        return data
+    at = 5 if name == "hardware_modules.csv" else 4           # i_addr; custom_parameters two columns on
+    bits = _dr_bits()
+    text = data.decode("utf-8")
+    out = []
+    for line in text.splitlines(keepends=True):
+        body = line.rstrip("\r\n")
+        cells = next(csv.reader([body])) if body and not body.startswith("#") else []
+        start = cells[at] if len(cells) > at + 2 else ""
+        channels = [(byte - int(start)) * 8 + bit for byte, bit in bits if start.isdigit() and byte == int(start)]
+        params = cells[at + 2].split(" | ") if channels else []
+        drop = {e.format(ch=ch) for ch in channels for e in _DR_PARAMS}
+        kept = [e for e in params if e not in drop]
+        if len(kept) == len(params):
+            out.append(line)
+            continue
+        SANCTIONED["dr_channel_params"] += len(params) - len(kept)
+        cells[at + 2] = " | ".join(kept)
+        buf = io.StringIO()
+        csv.writer(buf, lineterminator="").writerow(cells)
+        out.append(buf.getvalue() + line[len(body):])
+    return "".join(out).encode("utf-8")
 
 
 def _drop_interface_descriptions(rel: str, data: bytes) -> bytes:
@@ -578,7 +629,7 @@ def compare(a_root: str, b_root: str, label: str) -> list:
                 diffs.append(f"{label}: no #!openn header: {rel}")
         da = _norm_text(_unpad_push_buttons(rel, _drop_em_state_comments(rel, open(a[rel], "rb").read(), pl5=False)))
         db = _norm_text(_drop_em_state_comments(rel, _restamp_renamed_rows(rel, _drop_interface_descriptions(
-            rel, _drop_transfer_areas(rel, raw_b))), pl5=True))
+            rel, _strip_dr_params(rel, _drop_transfer_areas(rel, raw_b)))), pl5=True))
         if da != db:
             diffs.append(f"{label}: bytes differ: {rel}")
     return diffs
@@ -636,7 +687,8 @@ def main() -> int:
               f"page checked against the coverage rows, {SANCTIONED['areas_table']} areas table checked against "
               f"the signals' areas, {SANCTIONED['renamed_tags']} renamed name(s) read in their new spelling, "
               f"{SANCTIONED['em_state_comments']} 05_EM_STATE comments not compared, {SANCTIONED['pb_template']} "
-              f"v1.3 02 template checked against Shared, {SANCTIONED['pb_rows']} padded 02 rows read as v1.3 variants)")
+              f"v1.3 02 template checked against Shared, {SANCTIONED['pb_rows']} padded 02 rows read as v1.3 variants, "
+              f"{SANCTIONED['dr_channel_params']} DR channel parameter(s) of the new DTD rule)")
         return 0
 
 

@@ -180,6 +180,22 @@ def test_shipped_fdi_dd_channel_block():
     ok("Ch(0).Failsafe_SensorSupply=8" in text, "the DI1/2 block at channel 0")
 
 
+def test_shipped_fdi_dr_channel_block():
+    """User 2026-10-18 ("a rule for DR, same as DD" - TIA: 'F-I/O access "Door Reset Input [ ... ]" accesses a channel
+    of the F-I/O that is either disabled or cannot be used'): every shipped F-DI card carries a DR block identical to
+    its DD block, and a DR row gets it at its own channel - sensor evaluation off, sensor supply 8."""
+    from pipeline5.config.loaders import load_device_types_db
+    db = load_device_types_db()
+    for model in ("6ES7136-6BA00-0CA0", "6ES7136-6BA01-0CA0"):
+        rows = _sfb_rows([("-K30004", "I10.0", "DR", model), ("-K30004", "I10.4", "DR", model),
+                          ("-K30004", "I10.2", "DD", model)])
+        _stations, modules, _f = hardware.extract(rows, db)
+        params = modules[0]["custom_parameters"].split(" | ")
+        for ch in (0, 4, 2):
+            ok({f"Ch({ch}).Failsafe_SensorEvaluation=0", f"Ch({ch}).Failsafe_SensorSupply=8"} <= set(params),
+               f"{model}: channel {ch} (DR at 0 and 4, DD at 2) - the same block: {params}")
+
+
 def test_sfb_without_output_rows_drops_the_q_entries():
     """C-028 (refute round 1): a station with no output row cannot place its `%Q%` entries - they are DROPPED
     (never a literal `%Q%` the importer cannot convert) with a hw_addr_unresolved WARN; the inputs still land."""
@@ -717,6 +733,7 @@ if __name__ == "__main__":
         ("format2_projection", test_format2_projection),
         ("shipped_sfb_v2_station_addresses", test_shipped_sfb_v2_station_addresses),
         ("shipped_fdi_dd_channel_block", test_shipped_fdi_dd_channel_block),
+        ("shipped_fdi_dr_channel_block", test_shipped_fdi_dr_channel_block),
         ("sfb_without_output_rows_drops_the_q_entries", test_sfb_without_output_rows_drops_the_q_entries),
         ("sfb_base_is_the_lowest_row_and_col_ag_overrides", test_sfb_base_is_the_lowest_row_and_col_ag_overrides),
         ("sfb_base_is_the_lowest_row_whatever_the_order", test_sfb_base_is_the_lowest_row_whatever_the_order),
