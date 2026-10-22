@@ -224,6 +224,110 @@ def test_db_xml_normal_db_follows_opc():
     ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in datablock_xml.db_xml("D", db, 1))
 
 
+def _attrs(indent, ea="true", ev="true", ew="true", sp="false"):
+    return [f'{indent}<AttributeList>',
+            f'{indent}  <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">{ea}</BooleanAttribute>',
+            f'{indent}  <BooleanAttribute Name="ExternalVisible" SystemDefined="true">{ev}</BooleanAttribute>',
+            f'{indent}  <BooleanAttribute Name="ExternalWritable" SystemDefined="true">{ew}</BooleanAttribute>',
+            f'{indent}  <BooleanAttribute Name="SetPoint" SystemDefined="true">{sp}</BooleanAttribute>',
+            f'{indent}</AttributeList>']
+
+
+def _static(xml) -> list:
+    return xml.split('<Section Name="Static">\r\n', 1)[1].split("\r\n  </Section>", 1)[0].split("\r\n")
+
+
+def test_db_xml_struct_members_nest_as_tia_exports():
+    """C-042: the members of a Struct sit inside it - the Struct opens where its first member stands (a later member
+    of it joins it there), takes that member's remanence + access attributes, and its members carry their
+    attributes, comment and start value but no Remanence / Accessibility - the way TIA exports 99_Commissioning."""
+    m = lambda name, struct="", **kw: {"member": name, "struct": struct, "datatype": "Bool", "retain": False,
+                                       "comment": "", "start_value": "", **kw}
+    db = {"prog_lang": "DB", "opc_ua": False, "members": [
+        m("RESET_VIA_TIA", comment="Used for emergency reset"),
+        m("n1 10.0.0.1", "NodesNotInstalled", retain=True, ext_writable=False),
+        m("Top", start_value="true"),
+        m("n2 10.0.0.2", "NodesNotInstalled", comment="two", start_value="true")]}
+    eq(_static(datablock_xml.db_xml("99_Commissioning", db, 1)),
+       ['    <Member Name="RESET_VIA_TIA" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">',
+        *_attrs("      "),
+        '      <Comment>',
+        '        <MultiLanguageText Lang="en-US">Used for emergency reset</MultiLanguageText>',
+        '      </Comment>',
+        '    </Member>',
+        '    <Member Name="NodesNotInstalled" Datatype="Struct" Remanence="Retain" Accessibility="Public">',
+        *_attrs("      ", ew="false"),
+        '      <Member Name="n1 10.0.0.1" Datatype="Bool">',
+        *_attrs("        ", ew="false"),
+        '      </Member>',
+        '      <Member Name="n2 10.0.0.2" Datatype="Bool">',
+        *_attrs("        "),
+        '        <Comment>',
+        '          <MultiLanguageText Lang="en-US">two</MultiLanguageText>',
+        '        </Comment>',
+        '        <StartValue>true</StartValue>',
+        '      </Member>',
+        '    </Member>',
+        '    <Member Name="Top" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">',
+        *_attrs("      "),
+        '      <StartValue>true</StartValue>',
+        '    </Member>'], "RESET, the Struct with both its members, then Top")
+    db["members"] = [m("Top")]
+    eq(_static(datablock_xml.db_xml("D", db, 1))[0],
+       '    <Member Name="Top" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">', "no struct: as before")
+
+
+def test_generate_struct_column_reaches_db_members():
+    """C-042: an element's `struct` reaches its members and the db_members table ('' for the seeds and the
+    top-level ones); a member name stays unique within its DB, Struct or not (the second kept out, WARN)."""
+    defs = [_def("D", seed=True)]
+    els = [_el("D", "{$combined_FLD}", "row where $script_type = 'DI1/2'", struct="S"),
+           _el("D", "S1-D1", ""), _el("D", "Lone", "")]
+    g, _inst, findings = datablocks.generate(_ROWS, defs, els, _TYPES)
+    eq([(x["name"], x["struct"]) for x in g["D"]["members"]],
+       [("AlwaysFALSE", ""), ("AlwaysTRUE", ""), ("No Operation", ""), ("S1-D1", "S"), ("S2-D2", "S"), ("Lone", "")])
+    ok(_has(findings, "db_member_duplicate"), "the top-level 'S1-D1' is the Struct's name twice -> WARN, kept 1")
+    dbm = db_members_table()
+    datablocks._fill_db_members(dbm, g)
+    eq([(r["member"], r["struct"]) for r in dbm.rows][3:5], [("S1-D1", "S"), ("S2-D2", "S")], "the table keeps it")
+    eq(dbm.duplicate_uids(), set())
+
+
+def test_shipped_99_commissioning():
+    """C-042: the SHIPPED registry makes 99_Commissioning a standard DB (OPC UA off, web server on, no seeds):
+    RESET_VIA_TIA, then the Struct NodesNotInstalled - one member per PA node (a node's PW row adds none), named as
+    its 00_Commissioning member; it attributes to no signal (the PA rows keep their DBs); the XML nests them."""
+    from pipeline5.config import paths, loaders
+    from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
+    paths.use_system(SYSTEM)
+    want = {"99_Commissioning", "00_Commissioning", "PROFINET_NODES_ALARM", "PROFINET_NODES_WARNING"}
+    defs = [d for d in loaders.load_db_definitions() if d["db_name"] in want]
+    els = [e for e in loaders.load_db_elements() if e["db_name"] in want]
+    rows = [{"uid": "u1", "script_type": "PA", "profinet_name": "n0001-a", "profinet_ip": "192.168.20.1"},
+            {"uid": "u2", "script_type": "PW", "profinet_name": "n0001-a", "profinet_ip": "192.168.20.1"},
+            {"uid": "u3", "script_type": "PA", "profinet_name": "n0006-b", "profinet_ip": "192.168.20.6"},
+            {"uid": "u4", "script_type": "DI", "profinet_name": "n0006-b", "profinet_ip": "192.168.20.6"}]
+    g, _inst, findings = datablocks.generate(rows, defs, els, loaders.load_db_types())
+    ok(_no_fail(findings), "the shipped rows are clean")
+    db = g["99_Commissioning"]
+    eq({k: db[k] for k in ("prog_lang", "opc_ua", "webserver", "memory_layout")},
+       {"prog_lang": "DB", "opc_ua": False, "webserver": True, "memory_layout": "Optimized"})
+    nodes = ["n0001-a 192.168.20.1", "n0006-b 192.168.20.6"]
+    eq([(x["name"], x["struct"], x["comment"]) for x in db["members"]],
+       [("RESET_VIA_TIA", "", "Used for emergency reset during commissioning")]
+       + [(n, "NodesNotInstalled", "") for n in nodes], "no comment on a node flag (as the export)")
+    eq([x["name"] for x in g["00_Commissioning"]["members"]][3:], nodes, "the same names as 00_Commissioning's")
+    datablocks.write_back(rows, g)
+    eq(rows[0]["datablocks"], ["PROFINET_NODES_ALARM", "00_Commissioning"], "the PA row keeps its DBs")
+    static = _static(datablock_xml.db_xml("99_Commissioning", {"prog_lang": db["prog_lang"], "opc_ua": db["opc_ua"],
+                                                               "members": [dict(x, member=x["name"])
+                                                                           for x in db["members"]]}, 1))
+    eq([line.strip() for line in static if line.strip().startswith("<Member")],
+       ['<Member Name="RESET_VIA_TIA" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">',
+        '<Member Name="NodesNotInstalled" Datatype="Struct" Remanence="NonRetain" Accessibility="Public">',
+        '<Member Name="n0001-a 192.168.20.1" Datatype="Bool">', '<Member Name="n0006-b 192.168.20.6" Datatype="Bool">'])
+
+
 def test_project_writes_only_its_own_dbs():
     defs = [_def("07_DOOR", db_programming_language="F_DB", opc_ua=False, seed=True)]
     els = [_el("07_DOOR", "Door Closed [ {$combined_FLD} ]", "row where $script_type = 'DI1/2'")]
@@ -266,4 +370,7 @@ if __name__ == "__main__":
         ("db_xml_f_db_opc_lock_and_member", test_db_xml_f_db_opc_lock_and_member),
         ("db_xml_normal_db_follows_opc", test_db_xml_normal_db_follows_opc),
         ("project_writes_only_its_own_dbs", test_project_writes_only_its_own_dbs),
+        ("db_xml_struct_members_nest_as_tia_exports", test_db_xml_struct_members_nest_as_tia_exports),
+        ("generate_struct_column_reaches_db_members", test_generate_struct_column_reaches_db_members),
+        ("shipped_99_commissioning", test_shipped_99_commissioning),
     ]))

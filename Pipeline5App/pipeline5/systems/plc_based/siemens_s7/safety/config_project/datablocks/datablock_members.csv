@@ -1,4 +1,4 @@
-db_name,member,for_each,datatype,start_value,retain,ext_accessible,ext_visible,ext_writable,setpoint,comment
+db_name,member,for_each,datatype,start_value,retain,ext_accessible,ext_visible,ext_writable,setpoint,comment,struct
 DiagnosticTags,S1.CABINET{$cabinet:03d}.STATE,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),UDInt,,false,true,true,true,false,
 DiagnosticTags,S1.CABINET{$cabinet:03d}.ALARM1,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),UDInt,,false,true,true,true,false,
 DiagnosticTags,S1.CABINET{$cabinet:03d}.ALARM2,cabinet in unique($diag_cabinet) where numeric($diag_cabinet),UDInt,,false,true,true,true,false,
@@ -26,3 +26,5 @@ PROFINET_NODES_WARNING,{$profinet_name} {$profinet_ip},row where $script_type = 
 05_EM_STATE,{$area} RESET,area in unique($matrix_areas),Bool,,false,true,true,true,false,the area's emergency-stop reset (acknowledge)
 05_EM_STATE,{$area} POWER ENABLED,area in unique($matrix_areas),Bool,,false,true,true,true,false,cumulative of all the causes that contribute to the area's safety cut
 05_EM_STATE,SORTER_{$nn:02d}_NOT_RUNNING,nn in unique($index) where $script_type = 'N1/2',Bool,,false,true,true,true,false,the sorter is stopped (standstill from its speed control)
+99_Commissioning,RESET_VIA_TIA,,Bool,,false,true,true,true,false,Used for emergency reset during commissioning,
+99_Commissioning,{$profinet_name} {$profinet_ip},node in unique($profinet_name) where $script_type = 'PA',Bool,,false,true,true,true,false,,NodesNotInstalled

@@ -332,7 +332,8 @@ def load_db_definitions() -> list:
 def load_db_elements() -> list:
     """The Global-DB members (phase 520). Columns: db_name, member (PEP-3101 template), for_each (the
     iteration DSL), datatype, start_value, retain (bool), ext_accessible/ext_visible/ext_writable (bool),
-    setpoint (bool), comment. Missing file -> []."""
+    setpoint (bool), comment, struct (the Struct of the DB the member sits in - blank or absent = a
+    top-level member; [[C-042]]). Missing file -> []."""
     out = []
     for r in read_config_csv(find("datablocks/datablock_members.csv")):
         if not (r.get("db_name") or "").strip():
@@ -349,6 +350,7 @@ def load_db_elements() -> list:
             "ext_writable": _bool_default(r.get("ext_writable"), True),
             "setpoint": _bool_default(r.get("setpoint"), False),
             "comment": (r.get("comment") or "").strip(),
+            "struct": (r.get("struct") or "").strip(),
         })
     return out
 

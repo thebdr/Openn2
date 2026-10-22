@@ -92,13 +92,19 @@ def _chunked(seq, n) -> list:
 def build_00_commissioning(db: Database) -> Table:
     """One commissioning-bypass network per Profinet IO-device node - the nodes that carry a diagnosis
     member (a non-empty name_in_db, i.e. those in PROFINET_NODES_ALARM/WARNING); the PLC/CM heads + their
-    partner cards are skipped. Both the `00_Commissioning` DB member and the network title are the node's
-    "<profinet_name> <profinet_ip>"."""
+    partner cards are skipped. Template v1.2 ([[C-042]]): network type 01 is the block's fixed opening
+    network (commissioning on -> the temp BYPASS_PERMITTED), emitted once ahead of the nodes; each node's
+    network (type 02) bypasses it only while that holds and its `99_Commissioning.NodesNotInstalled` flag is
+    set. The `00_Commissioning` member, the `NodesNotInstalled` member and the network title are all the
+    node's "<profinet_name> <profinet_ip>". No node, no network."""
     t = Table("00_Only for Commissioning")
     for n in db.where(lambda r: r.get("profinet_name") and r.get("name_in_db")):
+        if not t.rows:
+            t.add(template_type="01")
         node = f"{n['profinet_name']} {n['profinet_ip']}".strip()
         t.add(
-            template_type="01",
+            template_type="02",
+            **{"99_Commissioning.NodesNotInstalled.{db_element}": node},
             **{"00_Commissioning.{db_element}": node},
             NetworkComment=node,
         )

@@ -45,10 +45,42 @@ def _xml_text(value) -> str:
     return str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _member_lines(m, indent: str, nested: bool = False, close: bool = True) -> list:
+    """One `<Member>` as TIA exports it: a top-level member carries Remanence + Accessibility, a member inside a
+    Struct only its name and type ([[C-042]]); `close=False` leaves it open (a Struct, its members follow)."""
+    dtype = _xml_attr(m.get("datatype") or "Bool")
+    rem = "Retain" if m.get("retain") else "NonRetain"
+    ea = "true" if m.get("ext_accessible", True) else "false"
+    ev = "true" if m.get("ext_visible", True) else "false"
+    ew = "true" if m.get("ext_writable", True) else "false"
+    sp = "true" if m.get("setpoint", False) else "false"
+    access = "" if nested else f' Remanence="{rem}" Accessibility="Public"'
+    lines = [
+        f'{indent}<Member Name="{_xml_attr(m["member"])}" Datatype="{dtype}"{access}>',
+        f'{indent}  <AttributeList>',
+        f'{indent}    <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">{ea}</BooleanAttribute>',
+        f'{indent}    <BooleanAttribute Name="ExternalVisible" SystemDefined="true">{ev}</BooleanAttribute>',
+        f'{indent}    <BooleanAttribute Name="ExternalWritable" SystemDefined="true">{ew}</BooleanAttribute>',
+        f'{indent}    <BooleanAttribute Name="SetPoint" SystemDefined="true">{sp}</BooleanAttribute>',
+        f'{indent}  </AttributeList>',
+    ]
+    if m.get("comment"):
+        lines += [f'{indent}  <Comment>',
+                  f'{indent}    <MultiLanguageText Lang="en-US">{_xml_text(m["comment"])}</MultiLanguageText>',
+                  f'{indent}  </Comment>']
+    if m.get("start_value"):
+        lines.append(f'{indent}  <StartValue>{_xml_text(m["start_value"])}</StartValue>')
+    if close:
+        lines.append(f'{indent}</Member>')
+    return lines
+
+
 def db_xml(name, db, number) -> str:
     """ONE Global DB as the SW.Blocks.GlobalDB XML string (no BOM - the writer adds it). `db` = the
     db_blocks attributes + `members` (db_members rows: member/datatype/retain/start_value/comment/ext_*/
-    setpoint). An absent/blank attribute reproduces the historical default EXACTLY (byte parity)."""
+    setpoint/struct). An absent/blank attribute reproduces the historical default EXACTLY (byte parity). The
+    members of a Struct (`struct`) sit inside it, the Struct where its first member stands; the Struct takes
+    that member's remanence + access attributes ([[C-042]])."""
     prog_lang = (db.get("prog_lang") or "DB").strip()
     if prog_lang.upper() == "F_DB":
         prog_lang = "F_DB"                                   # canonicalize the fail-safe marker
@@ -79,29 +111,19 @@ def db_xml(name, db, number) -> str:
         f'      <Interface><Sections xmlns="{_XML_IFACE_NS}">',
         '  <Section Name="Static">',
     ]
+    structs: dict = {}
     for m in db["members"]:
-        dtype = _xml_attr(m.get("datatype") or "Bool")
-        rem = "Retain" if m.get("retain") else "NonRetain"
-        ea = "true" if m.get("ext_accessible", True) else "false"
-        ev = "true" if m.get("ext_visible", True) else "false"
-        ew = "true" if m.get("ext_writable", True) else "false"
-        sp = "true" if m.get("setpoint", False) else "false"
-        lines += [
-            f'    <Member Name="{_xml_attr(m["member"])}" Datatype="{dtype}" Remanence="{rem}" Accessibility="Public">',
-            '      <AttributeList>',
-            f'        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">{ea}</BooleanAttribute>',
-            f'        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">{ev}</BooleanAttribute>',
-            f'        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">{ew}</BooleanAttribute>',
-            f'        <BooleanAttribute Name="SetPoint" SystemDefined="true">{sp}</BooleanAttribute>',
-            '      </AttributeList>',
-        ]
-        if m.get("comment"):
-            lines += ['      <Comment>',
-                      f'        <MultiLanguageText Lang="en-US">{_xml_text(m["comment"])}</MultiLanguageText>',
-                      '      </Comment>']
-        if m.get("start_value"):
-            lines.append(f'      <StartValue>{_xml_text(m["start_value"])}</StartValue>')
-        lines.append('    </Member>')
+        structs.setdefault(str(m.get("struct") or ""), []).append(m)
+    for m in db["members"]:
+        struct = str(m.get("struct") or "")
+        if not struct:
+            lines += _member_lines(m, "    ")
+        elif struct in structs:                              # a Struct opens where its first member stands
+            lines += _member_lines(dict(m, member=struct, datatype="Struct", comment="", start_value=""), "    ",
+                                   close=False)
+            for inner in structs.pop(struct):
+                lines += _member_lines(inner, "      ", nested=True)
+            lines.append('    </Member>')
     lines += [
         '  </Section>',
         '</Sections></Interface>',

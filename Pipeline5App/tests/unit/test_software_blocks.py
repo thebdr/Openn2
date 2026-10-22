@@ -78,13 +78,83 @@ def _node(name, ip, **kw):
 
 
 def test_builder_00_commissioning():
+    """C-042 (template v1.2): the fixed network (type 01, no value) once, ahead of one type-02 network per node -
+    its NodesNotInstalled member, its 00_Commissioning member and its title all the node; no node, no network."""
     rows = [_node("n1", "1.2.3.4", name_in_db="n1 1.2.3.4"),
             _node("n2", "1.2.3.5", name_in_db=""),                       # no name_in_db -> skipped
-            {"profinet_name": "", "name_in_db": "x"}]                    # no profinet_name -> skipped
+            {"profinet_name": "", "name_in_db": "x"},                    # no profinet_name -> skipped
+            _node("n3", "1.2.3.6", name_in_db="n3 1.2.3.6")]
     t = builders.build_00_commissioning(Database(rows))
-    eq(len(t), 1, "only the node with a name_in_db")
-    eq(t.rows[0]["00_Commissioning.{db_element}"], "n1 1.2.3.4")
-    eq(t.rows[0]["NetworkComment"], "n1 1.2.3.4")
+    eq(t.rows, [{"TemplateType": "01"}]
+       + [{"TemplateType": "02", "99_Commissioning.NodesNotInstalled.{db_element}": node,
+           "00_Commissioning.{db_element}": node, "NetworkComment": node} for node in ("n1 1.2.3.4", "n3 1.2.3.6")],
+       "the fixed network, then the nodes with a name_in_db")
+    eq(len(builders.build_00_commissioning(Database(rows[1:3]))), 0, "no node: no network, not even the fixed one")
+
+
+def test_shipped_v12_commissioning_template():
+    """C-042: the SHIPPED 00_Only for Commissioning template is v1.2 only; network type 01 = commissioning on ->
+    the temp BYPASS_PERMITTED (declared Bool in Temp), type 02 = BYPASS_PERMITTED AND the node's NodesNotInstalled
+    member -> its 00_Commissioning coil, titled by the node; the CreationInfo csv carries the fixed row empty."""
+    import glob
+    import xml.etree.ElementTree as ET
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo = os.path.abspath(os.path.join(here, "..", "..", ".."))
+    path = glob.glob(os.path.join(repo, "Shared", "Templates", "Tia Portal Software Blocks",
+                                  "TEMPLATE--v*--00_Only for Commissioning.xml"))
+    eq([os.path.basename(p) for p in path], ["TEMPLATE--v1.2--00_Only for Commissioning.xml"], "only v1.2 ships")
+    local = lambda e: e.tag.rsplit("}", 1)[-1]
+    root = ET.parse(path[0]).getroot()
+
+    def rung(cu):
+        """The network as a series rung: [(part, its operand's (scope, components))] from the power rail on."""
+        access = {a.get("UId"): (a.get("Scope"), tuple(c.get("Name") for c in a.iter() if local(c) == "Component"))
+                  for a in cu.iter() if local(a) == "Access"}
+        parts = {p.get("UId"): p.get("Name") for p in cu.iter() if local(p) == "Part"}
+        operand, follows, first = {}, {}, None
+        for w in (w for w in cu.iter() if local(w) == "Wire"):
+            ends = [(local(c), c.get("UId"), c.get("Name")) for c in w]
+            if ends[0][0] == "Powerrail":
+                first = ends[1][1]
+            elif ends[0][0] == "IdentCon":
+                operand[ends[1][1]] = access[ends[0][1]]
+            else:
+                follows[ends[0][1]] = ends[1][1]
+        chain = [first]
+        while chain[-1] in follows:
+            chain.append(follows[chain[-1]])
+        eq(len(chain), len(parts), "every part on the one rung")
+        return [(parts[u], operand[u]) for u in chain]
+
+    def title(cu):
+        texts = [m for m in cu.iter() if local(m) == "MultilingualText" and m.get("CompositionName") == "Title"]
+        return next(t.text for t in texts[0].iter() if local(t) == "Text")
+
+    networks = [cu for cu in root.iter() if local(cu) == "SW.Blocks.CompileUnit"]
+    eq(len(networks), 2, "two network types")
+    temp = [m for s in root.iter() if local(s) == "Section" and s.get("Name") == "Temp" for m in s]
+    eq([(m.get("Name"), m.get("Datatype")) for m in temp], [("BYPASS_PERMITTED", "Bool")], "the temp is declared")
+    eq(rung(networks[0]), [("Contact", ("GlobalVariable", ("06_Settings", "CommissioningFunctionsActive"))),
+                           ("Coil", ("LocalVariable", ("BYPASS_PERMITTED",)))], "01: commissioning on -> the temp")
+    eq(rung(networks[1]),
+       [("Contact", ("LocalVariable", ("BYPASS_PERMITTED",))),
+        ("Contact", ("GlobalVariable", ("99_Commissioning", "NodesNotInstalled",
+                                        "!!99_Commissioning.NodesNotInstalled.{db_element}$$"))),
+        ("Coil", ("GlobalVariable", ("00_Commissioning", "!!00_Commissioning.{db_element}$$")))],
+       "02: the temp AND the node not installed -> the node's bypass")
+    eq((title(networks[0]), title(networks[1])),
+       ("Commissioning Ongoing, Bypass functonality enabled", "!!NetworkComment$$"), "the titles (the export's own)")
+    from pipeline5.systems.plc_based.siemens_s7 import template_scanner
+    keys = template_scanner.template_keys()["00_Only for Commissioning"]
+    eq(keys, ["99_Commissioning.NodesNotInstalled.{db_element}", "00_Commissioning.{db_element}", "NetworkComment"])
+    t = builders.build_00_commissioning(Database([_node("n1", "1.2.3.4", name_in_db="n1 1.2.3.4")]))
+    with tempfile.TemporaryDirectory() as d:
+        body = open(creation_csv.write_creation_csv(d, "00", "Templates/x.xml", t, ["TemplateType"] + keys),
+                    encoding="utf-8").read().splitlines()[-4:]
+    eq(body, ["#,generated by pipeline5 (phase 800)",
+              "%,TemplateType,!!99_Commissioning.NodesNotInstalled.{db_element}$$,!!00_Commissioning.{db_element}$$,"
+              "!!NetworkComment$$",
+              "@,01,,,", "@,02,n1 1.2.3.4,n1 1.2.3.4,n1 1.2.3.4"], "the csv: the fixed row empty, then the node")
 
 
 def test_builder_06_feedback_error_chunks_to_8():
@@ -977,6 +1047,7 @@ if __name__ == "__main__":
         ("serialization_wrap_order_and_iterator", test_serialization_wrap_order_and_iterator),
         ("write_creation_csv_layout", test_write_creation_csv_layout),
         ("builder_00_commissioning", test_builder_00_commissioning),
+        ("shipped_v12_commissioning_template", test_shipped_v12_commissioning_template),
         ("builder_06_feedback_error_chunks_to_8", test_builder_06_feedback_error_chunks_to_8),
         ("builder_07_speed_control_pairs_encoders", test_builder_07_speed_control_pairs_encoders),
         ("builder_02_em_push_button_groups_inputs", test_builder_02_em_push_button_groups_inputs),

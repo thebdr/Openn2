@@ -249,9 +249,36 @@ def test_the_shipped_push_button_template_is_traced_per_channel():
        + [(("!!ITERATOR_STRINGS$$",), "write", n) for n in (1, 2, 3, 4)])
 
 
+def test_the_shipped_commissioning_template_reads_the_node_flag():
+    """C-042: the SHIPPED 00_Only for Commissioning v1.2 - the fixed network (type 01) holds no generated variable,
+    a node's network (type 02) reads its NodesNotInstalled member and writes its 00_Commissioning member."""
+    path = os.path.join(paths.TEMPLATES_DIR, "Tia Portal Software Blocks",
+                        "TEMPLATE--v1.2--00_Only for Commissioning.xml")
+    eq([[(c, d) for c, d, _ch in v] for v in sp.template_variants(path)],
+       [[], [(("99_Commissioning", "NodesNotInstalled", "!!99_Commissioning.NodesNotInstalled.{db_element}$$"), "read"),
+             (("00_Commissioning", "!!00_Commissioning.{db_element}$$"), "write")]])
+    node = "n0001-a 192.168.20.1"
+    db = {"software_blocks": [{"name": "00_Only for Commissioning", "template_ref": path}],
+          "software_block_members": [
+              {"block": "00_Only for Commissioning", "seq": "0", "values": {"TemplateType": "01"}},
+              {"block": "00_Only for Commissioning", "seq": "1",
+               "values": {"TemplateType": "02", "99_Commissioning.NodesNotInstalled.{db_element}": node,
+                          "00_Commissioning.{db_element}": node, "NetworkComment": node}}]}
+    g, notes = sp.build_graph(db)
+    eq(notes, [])
+    flag = "v:" + sp.symbol(("99_Commissioning", "NodesNotInstalled", node)).lower()
+    bypass = "v:" + sp.symbol(("00_Commissioning", node)).lower()
+    eq(sorted((a, b) for a, b in g.edges),
+       sorted([(flag, "n:00_Only for Commissioning#1"), ("n:00_Only for Commissioning#1", bypass)]),
+       "the node's flag -> its network -> its bypass; the fixed network wires nothing")
+    eq(g.nodes["n:00_Only for Commissioning#1"], ("net", "00_Only for Commissioning", node))
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("signal_paths", [
+        ("the_shipped_commissioning_template_reads_the_node_flag",
+         test_the_shipped_commissioning_template_reads_the_node_flag),
         ("network_wiring_directions_and_channels", test_network_wiring_directions_and_channels),
         ("variants_follow_document_order", test_variants_follow_document_order),
         ("iterator_handed_out_in_order_and_pads_dropped", test_iterator_handed_out_in_order_and_pads_dropped),

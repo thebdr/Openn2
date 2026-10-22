@@ -39,7 +39,7 @@ def _f(type: str, severity: str, detail: str, location: str = "", source_uid: st
 
 
 def _seed_member(name) -> dict:
-    return {"name": name, "datatype": "Bool", "retain": False, "start_value": "", "comment": "",
+    return {"name": name, "struct": "", "datatype": "Bool", "retain": False, "start_value": "", "comment": "",
             "ext_accessible": True, "ext_visible": True, "ext_writable": True, "setpoint": False,
             "source": "seed", "source_row": None, "seq": -1}
 
@@ -62,6 +62,8 @@ def generate(rows, definitions, elements, types) -> tuple:
     """-> (global_dbs, instance_dbs, findings).
       global_dbs   = {db_name: {prog_lang, memory_layout, opc_ua, webserver, only_load_memory,
                      write_protected, retain_reserve, memory_reserve, create_when, members: [member, ...]}}
+                     (a member's `struct` = the Struct of its DB it sits in, '' = a top-level member - [[C-042]];
+                     a member name stays unique within its DB, Struct or not)
       instance_dbs = [(name, fb), ...]   (-> InstanceDBs.csv)
     `findings` is the phase-520 report (severity.LEVELS); a raw FAIL means the phase must halt and the dbs are
     then partial/ignored (the caller's `run.has_blocking` guard). Each member carries the PL4 bookkeeping
@@ -178,7 +180,7 @@ def generate(rows, definitions, elements, types) -> tuple:
             else:                                              # a literal member (no source row)
                 source, source_row = "literal", None
             g["members"].append({
-                "name": name, "datatype": dtype, "retain": el.get("retain", False),
+                "name": name, "struct": el.get("struct", ""), "datatype": dtype, "retain": el.get("retain", False),
                 "start_value": start, "comment": comment,
                 "ext_accessible": el.get("ext_accessible", True), "ext_visible": el.get("ext_visible", True),
                 "ext_writable": el.get("ext_writable", True), "setpoint": el.get("setpoint", False),
@@ -256,7 +258,8 @@ def _fill_db_members(table, global_dbs) -> None:
             table.add(db_name=db_name, member=m["name"], datatype=m["datatype"],
                       start_value=m["start_value"], comment=m["comment"], retain=m["retain"],
                       ext_accessible=m["ext_accessible"], ext_visible=m["ext_visible"],
-                      ext_writable=m["ext_writable"], setpoint=m["setpoint"], source=m.get("source", ""))
+                      ext_writable=m["ext_writable"], setpoint=m["setpoint"], source=m.get("source", ""),
+                      struct=m.get("struct", ""))
 
 
 def _fill_db_blocks(table, global_dbs) -> None:

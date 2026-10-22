@@ -37,6 +37,15 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
         counted; their text is asserted by the unit tests)
       * the `areas` SSOT table (C-040, since 2026-10-18): a sanctioned NEW table PL4 never had - not compared, but
         every area the reference's signals name must be a row, plain and numbered by its digits, AREA 1 the sorter
+      * the commissioning bypass per node (C-042, 2026-10-22, user): the 00 template v1.2 - the name
+        `TEMPLATE--v1.1--00_Only for Commissioning` read as v1.2 (counted with the renames), the shipped v1.2 checked
+        against Shared's, the reference's 00 rows read in the v1.2 form (the fixed type-01 row first, every node
+        row type 02 with its NodesNotInstalled key = its 00_Commissioning value: the CreationInfo CSV,
+        software_block_members, software_blocks' key lists; counted) - and the new DB 99_Commissioning: its file
+        checked (RESET_VIA_TIA + a NodesNotInstalled Struct of exactly the reference's 00_Commissioning nodes),
+        its db_blocks / db_members rows, db_members' `struct` column (every other member's empty) and its name in
+        the coverage outputs dropped from the PL5 side, the reference DBs named after it numbered one up (the
+        name-sorted `<Number>` placeholder; all counted)
       * the coupler transfer areas (C-031, contract §2.1): the `TransferArea-*` rows of `hardware_modules.csv`
         and `Modules.csv` are PL5-only (PL4 never emitted them) - dropped from the PL5 side only, counted in the
         verdict; a reference row of that model would still be a difference
@@ -176,7 +185,8 @@ _TEMPLATE_RENAMES = (("Clock 1Hz", "Clock_1Hz"),          # (old, new): the inte
                      ("SORTER- RUNNING", "SORTER RUNNING"))  # 2026-10-18 (user) - the clock's TIA name; 07's spelling
 _MEMBER_RENAMES = ((" POWER_CUT", " POWER ENABLED"),)      # the 05_EM_STATE power coil, renamed 2026-10-18 (user)
 _PB_TEMPLATE = ("TEMPLATE--v1.2--02_EM Push Button", "TEMPLATE--v1.3--02_EM Push Button")   # (old, new) 2026-10-18
-_RENAMED = _TEMPLATE_RENAMES + _MEMBER_RENAMES + (_PB_TEMPLATE,)
+_CM_TEMPLATE = ("TEMPLATE--v1.1--00_Only for Commissioning", "TEMPLATE--v1.2--00_Only for Commissioning")  # C-042
+_RENAMED = _TEMPLATE_RENAMES + _MEMBER_RENAMES + (_PB_TEMPLATE, _CM_TEMPLATE)
 
 
 def _norm_str(text: str) -> str:
@@ -217,7 +227,8 @@ _TRANSFER_AREA_ROW = re.compile(r"(?:^|,)TransferArea-(?:IN|OUT|IN_OUT)(?:,|$)")
 _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
 SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
               "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0, "renamed_tags": 0, "em_state_comments": 0,
-              "pb_template": 0, "pb_rows": 0, "dr_channel_params": 0}
+              "pb_template": 0, "pb_rows": 0, "dr_channel_params": 0, "cm_template": 0, "cm_rows": 0, "cm_db": 0, "cm_db_rows": 0,
+              "cm_db_numbers": 0, "cm_coverage": 0}
 _SIGNAL_PATHS = "ProjectDocumentation/Reports/io_signal_paths.html"
 _DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
 _SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
@@ -456,6 +467,158 @@ def _check_pb_template(path: str, label: str) -> list:
     return [] if body == original else [f"{label}: the shipped {_PB_TEMPLATE[1]}.xml differs from Shared's"]
 
 
+# --- C-042: the commissioning bypass per node (template v1.2 + the DB 99_Commissioning) --------------------------- #
+_CM_BLOCK = "00_Only for Commissioning"
+_CM_KEY, _CM_FLAG = "00_Commissioning.{db_element}", "99_Commissioning.NodesNotInstalled.{db_element}"
+_CM_DB = "99_Commissioning"
+_CM_SHIPPED = _WORKSPACE + "Templates/" + _CM_TEMPLATE[1] + ".xml"
+_CM_RETIRED = _WORKSPACE + "SoftwareBlocks/CreationInfo/Templates/" + _CM_TEMPLATE[0] + ".xml"
+_CM_SHARED = os.path.join(REPO, "Shared", "Templates", "Tia Portal Software Blocks", _CM_TEMPLATE[1] + ".xml")
+
+
+def _csv_lines(data: bytes):
+    """(bom, line separator, [cells per line]) of a CSV text - `_csv_join` writes them back."""
+    import csv
+    text = data.decode("utf-8")
+    bom = "\ufeff" if text.startswith("\ufeff") else ""
+    sep = "\r\n" if "\r\n" in text else "\n"
+    return bom, sep, [next(csv.reader([line])) if line else [] for line in text[len(bom):].split(sep)]
+
+
+def _csv_join(bom: str, sep: str, rows) -> bytes:
+    import csv
+    import io
+    out = []
+    for cells in rows:
+        buf = io.StringIO()
+        csv.writer(buf, lineterminator="").writerow(cells)
+        out.append(buf.getvalue() if cells else "")
+    return (bom + sep.join(out)).encode("utf-8")
+
+
+def _commissioning_v12(rel: str, data: bytes) -> bytes:
+    """The REFERENCE's 00 rows read in the v1.2 form (C-042): the fixed type-01 row first, every node row type 02 with
+    the NodesNotInstalled key carrying its 00_Commissioning value - the CreationInfo CSV, software_block_members
+    (uids re-stamped from (block, seq)), software_blocks' key / column lists; counted."""
+    import json
+    from pipeline5.truth.content_hash import uid
+    name = os.path.basename(rel)
+    if name not in (_CM_BLOCK + ".csv", "software_block_members.csv", "software_blocks.csv"):
+        return data
+    if name != _CM_BLOCK + ".csv" and _CM_BLOCK.encode() not in data:
+        return data
+    bom, sep, rows = _csv_lines(data)
+    out, header_done = [], False
+    for cells in rows:
+        if name == _CM_BLOCK + ".csv" and cells[:1] == ["%"] and f"!!{_CM_KEY}$$" in cells:
+            at = cells.index(f"!!{_CM_KEY}$$")
+            out.append(cells[:at] + [f"!!{_CM_FLAG}$$"] + cells[at:])
+            out.append(["@", "01"] + [""] * (len(cells) - 1))   # the fixed network: every key cell empty
+            continue
+        if name == _CM_BLOCK + ".csv" and cells[:2] == ["@", "01"]:
+            out.append(["@", "02", cells[2]] + cells[2:])    # the NodesNotInstalled cell = the 00 cell
+            SANCTIONED["cm_rows"] += 1
+            continue
+        if name == "software_block_members.csv" and len(cells) == 4 and cells[1] == _CM_BLOCK:
+            if not header_done:
+                out.append([uid(_CM_BLOCK, 0), _CM_BLOCK, "0",
+                            json.dumps({"TemplateType": "01"}, separators=(",", ":"))])
+                header_done = True
+            values = json.loads(cells[3])
+            values.update({"TemplateType": "02", _CM_FLAG: values.get(_CM_KEY, "")})
+            seq = int(cells[2]) + 1
+            out.append([uid(_CM_BLOCK, seq), _CM_BLOCK, str(seq),
+                        json.dumps(values, ensure_ascii=False, sort_keys=True, separators=(",", ":"))])
+            SANCTIONED["cm_rows"] += 1
+            continue
+        if name == "software_blocks.csv" and len(cells) == 6 and cells[1] == _CM_BLOCK:
+            lists = [json.loads(c) for c in cells[4:6]]
+            for keys in lists:
+                keys.insert(keys.index(_CM_KEY), _CM_FLAG)
+            out.append(cells[:4] + [json.dumps(k, ensure_ascii=False, separators=(",", ":")) for k in lists])
+            SANCTIONED["cm_rows"] += 1
+            continue
+        out.append(cells)
+    return _csv_join(bom, sep, out)
+
+
+_DB_NAME = re.compile(rb"<Name>([^<]*)</Name>")
+_DB_NUMBER = re.compile(rb"<Number>(\d+)</Number>")
+
+
+def _renumber_after_cm_db(rel: str, data: bytes) -> bytes:
+    """A REFERENCE GlobalDB named after 99_Commissioning takes the next `<Number>` (the placeholder is assigned
+    name-sorted - the new DB takes a place in the order); counted."""
+    if not rel.lower().endswith(".xml") or b"<SW.Blocks.GlobalDB" not in data:
+        return data
+    name = _DB_NAME.search(data)
+    if not name or name.group(1).decode("utf-8") <= _CM_DB:
+        return data
+    SANCTIONED["cm_db_numbers"] += 1
+    return _DB_NUMBER.sub(lambda m: b"<Number>%d</Number>" % (int(m.group(1)) + 1), data, count=1)
+
+
+def _drop_cm_db(rel: str, data: bytes) -> bytes:
+    """PL5's 99_Commissioning out of the shared tables (C-042): its db_blocks / db_members rows, db_members' `struct`
+    column (every other member's must be empty - else left, a difference) and its name in the coverage outputs;
+    counted."""
+    name = os.path.basename(rel)
+    db = _CM_DB.encode()
+    if name in ("coverage.csv", "io_project_coverage_report.csv"):
+        SANCTIONED["cm_coverage"] += data.count(b"|" + db + b"|") + data.count(b"," + db + b"|")
+        return data.replace(b"|" + db + b"|", b"|").replace(b"," + db + b"|", b",")
+    if name == "io_project_coverage_report.txt":
+        SANCTIONED["cm_coverage"] += data.count(b", " + db + b",")
+        return data.replace(b", " + db + b",", b",")
+    if name not in ("db_blocks.csv", "db_members.csv") or db not in data:
+        return data
+    bom, sep, rows = _csv_lines(data)
+    head = rows[0]
+    struct = name == "db_members.csv" and head[-1:] == ["struct"]
+    out = [head[:-1] if struct else head]
+    for cells in rows[1:]:
+        if len(cells) > 1 and cells[1] == _CM_DB:
+            SANCTIONED["cm_db_rows"] += 1
+            continue
+        out.append(cells[:-1] if struct and cells and cells[-1] == "" else cells)
+    return _csv_join(bom, sep, out)
+
+
+def _check_cm_template(path: str, label: str) -> list:
+    """The shipped v1.2 00 template (C-042) - the reference ships v1.1: its header-less body is Shared's v1.2."""
+    body, _h = _strip_header(open(path, "rb").read().decode("utf-8"))
+    original, _h = _strip_header(open(_CM_SHARED, "rb").read().decode("utf-8"))
+    return [] if body == original else [f"{label}: the shipped {_CM_TEMPLATE[1]}.xml differs from Shared's"]
+
+
+def _check_cm_db(path: str, ref_members: str, label: str) -> list:
+    """PL5's 99_Commissioning.xml (C-042) - a NEW file: headered, a standard DB (OPC UA off, web server on), its Static
+    = RESET_VIA_TIA then the Struct NodesNotInstalled holding exactly the reference's 00_Commissioning nodes."""
+    import csv
+    import xml.etree.ElementTree as ET
+    text, headered = _strip_header(open(path, "rb").read().decode("utf-8"))
+    problems = [] if headered else [f"{label}: no #!openn header: {_CM_DB}.xml"]
+    try:
+        root = ET.fromstring(text.lstrip("\ufeff").encode("utf-8"))
+    except ET.ParseError as e:
+        return problems + [f"{label}: {_CM_DB}.xml is not well-formed: {e}"]
+    local = lambda e: e.tag.rsplit("}", 1)[-1]
+    find = lambda tag: next((e.text for e in root.iter() if local(e) == tag), None)
+    if (find("ProgrammingLanguage"), find("DBAccessibleFromOPCUA"), find("DBAccessibleFromWebserver")) \
+            != ("DB", "false", "true"):
+        problems.append(f"{label}: {_CM_DB}.xml is not a standard DB with OPC UA off and the web server on")
+    static = next(s for s in root.iter() if local(s) == "Section" and s.get("Name") == "Static")
+    top = [(m.get("Name"), m.get("Datatype")) for m in static if local(m) == "Member"]
+    struct = next((m for m in static if local(m) == "Member" and m.get("Name") == "NodesNotInstalled"), None)
+    nodes = [m.get("Name") for m in struct if local(m) == "Member"] if struct is not None else []
+    with open(ref_members, encoding="utf-8-sig", newline="") as handle:
+        want = [r["member"] for r in csv.DictReader(handle)
+                if r["db_name"] == "00_Commissioning" and r["source"] != "seed"]
+    if top != [("RESET_VIA_TIA", "Bool"), ("NodesNotInstalled", "Struct")] or nodes != want:
+        problems.append(f"{label}: {_CM_DB}.xml holds {top} / {nodes} - expected RESET_VIA_TIA + the nodes {want}")
+    return problems
+
+
 def _is_tag_table_xml(rel: str) -> bool:
     """A PL5 `<PLC>/PLC tags/<Table>.xml` (contract §9.1, since 2026-10-09) - the sanctioned new surface."""
     if not rel.startswith(_WORKSPACE) or not rel.lower().endswith(".xml"):
@@ -588,6 +751,14 @@ def compare(a_root: str, b_root: str, label: str) -> list:
             diffs += _check_areas_table(path, os.path.join(a_root, "signals.csv"), label)
             SANCTIONED["areas_table"] += 1
             continue
+        if rel == _CM_SHIPPED:                         # the v1.2 00 template (C-042): checked against Shared's
+            diffs += _check_cm_template(path, label)
+            SANCTIONED["cm_template"] += 1
+            continue
+        if rel.startswith(_WORKSPACE) and rel.endswith("/Program blocks/" + _CM_DB + ".xml"):   # C-042: the new DB
+            diffs += _check_cm_db(path, os.path.join(os.path.dirname(a_root), "db", "db_members.csv"), label)
+            SANCTIONED["cm_db"] += 1
+            continue
         if rel == _PB_SHIPPED:                         # the v1.3 02 template: checked against Shared's
             diffs += _check_pb_template(path, label)
             SANCTIONED["pb_template"] += 1
@@ -605,6 +776,8 @@ def compare(a_root: str, b_root: str, label: str) -> list:
         b[legacy] = path
     if SANCTIONED["pb_template"] and _PB_RETIRED in a:  # the reference's v1.2 template: retired by v1.3
         del a[_PB_RETIRED]
+    if SANCTIONED["cm_template"] and _CM_RETIRED in a:  # the reference's v1.1 00 template: retired by v1.2
+        del a[_CM_RETIRED]
     for rel in sorted(set(a) | set(b)):
         if rel not in a:
             diffs.append(f"{label}: PL5-only file {rel}")
@@ -627,9 +800,10 @@ def compare(a_root: str, b_root: str, label: str) -> list:
                 headered = False
             if not headered:
                 diffs.append(f"{label}: no #!openn header: {rel}")
-        da = _norm_text(_unpad_push_buttons(rel, _drop_em_state_comments(rel, open(a[rel], "rb").read(), pl5=False)))
-        db = _norm_text(_drop_em_state_comments(rel, _restamp_renamed_rows(rel, _drop_interface_descriptions(
-            rel, _strip_dr_params(rel, _drop_transfer_areas(rel, raw_b)))), pl5=True))
+        da = _norm_text(_renumber_after_cm_db(rel, _commissioning_v12(rel, _unpad_push_buttons(
+            rel, _drop_em_state_comments(rel, open(a[rel], "rb").read(), pl5=False)))))
+        db = _norm_text(_drop_cm_db(rel, _drop_em_state_comments(rel, _restamp_renamed_rows(
+            rel, _drop_interface_descriptions(rel, _strip_dr_params(rel, _drop_transfer_areas(rel, raw_b)))), pl5=True)))
         if da != db:
             diffs.append(f"{label}: bytes differ: {rel}")
     return diffs
@@ -688,7 +862,11 @@ def main() -> int:
               f"the signals' areas, {SANCTIONED['renamed_tags']} renamed name(s) read in their new spelling, "
               f"{SANCTIONED['em_state_comments']} 05_EM_STATE comments not compared, {SANCTIONED['pb_template']} "
               f"v1.3 02 template checked against Shared, {SANCTIONED['pb_rows']} padded 02 rows read as v1.3 variants, "
-              f"{SANCTIONED['dr_channel_params']} DR channel parameter(s) of the new DTD rule)")
+              f"{SANCTIONED['dr_channel_params']} DR channel parameter(s) of the new DTD rule; C-042: "
+              f"{SANCTIONED['cm_template']} v1.2 00 template checked against Shared, {SANCTIONED['cm_rows']} 00 rows "
+              f"read in the v1.2 form, {SANCTIONED['cm_db']} 99_Commissioning checked against the reference's nodes, "
+              f"{SANCTIONED['cm_db_rows']} of its table rows + {SANCTIONED['cm_coverage']} coverage mention(s) "
+              f"dropped, {SANCTIONED['cm_db_numbers']} DB number(s) shifted)")
         return 0
 
 

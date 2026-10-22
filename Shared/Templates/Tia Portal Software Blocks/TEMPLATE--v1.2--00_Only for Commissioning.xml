@@ -54,7 +54,9 @@
   <Section Name="Input" />
   <Section Name="Output" />
   <Section Name="InOut" />
-  <Section Name="Temp" />
+  <Section Name="Temp">
+    <Member Name="BYPASS_PERMITTED" Datatype="Bool" />
+  </Section>
   <Section Name="Constant" />
   <Section Name="Return">
     <Member Name="Ret_Val" Datatype="Void" Accessibility="Public" />
@@ -62,7 +64,7 @@
 </Sections></Interface>
       <IsIECCheckEnabled>false</IsIECCheckEnabled>
       <MemoryLayout>Optimized</MemoryLayout>
-      <Name>TEMPLATE--v1.1--00_Only for Commissioning</Name>
+      <Name>TEMPLATE--v1.2--00_Only for Commissioning</Name>
       <Namespace />
       <Number>4</Number>
       <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
@@ -76,7 +78,8 @@
             <AttributeList>
               <Culture>en-US</Culture>
               <Text>1.0 First Emission
-1.1 Aligned Syntax to signal_types.csv of the py_builder</Text>
+1.1 Aligned Syntax to signal_types.csv of the py_builder
+1.2 Bypass a node only while commissioning is on (06_Settings) and the node is not installed (99_Commissioning.NodesNotInstalled)</Text>
             </AttributeList>
           </MultilingualTextItem>
         </ObjectList>
@@ -87,13 +90,13 @@
   <Parts>
     <Access Scope="GlobalVariable" UId="21">
       <Symbol>
-        <Component Name="AlwaysTRUE" />
+        <Component Name="06_Settings" />
+        <Component Name="CommissioningFunctionsActive" />
       </Symbol>
     </Access>
-    <Access Scope="GlobalVariable" UId="22">
+    <Access Scope="LocalVariable" UId="22">
       <Symbol>
-        <Component Name="00_Commissioning" />
-        <Component Name="!!00_Commissioning.{db_element}$$" />
+        <Component Name="BYPASS_PERMITTED" />
       </Symbol>
     </Access>
     <Part Name="Contact" UId="23" />
@@ -126,9 +129,7 @@
               <MultilingualTextItem ID="5" CompositionName="Items">
                 <AttributeList>
                   <Culture>en-US</Culture>
-                  <Text>One network per node
-TRUE if the node is not ready to be used
-FALSE if the node is ready</Text>
+                  <Text />
                 </AttributeList>
               </MultilingualTextItem>
             </ObjectList>
@@ -138,6 +139,86 @@ FALSE if the node is ready</Text>
               <MultilingualTextItem ID="7" CompositionName="Items">
                 <AttributeList>
                   <Culture>en-US</Culture>
+                  <Text>Commissioning Ongoing, Bypass functonality enabled</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="8" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4">
+  <Parts>
+    <Access Scope="LocalVariable" UId="21">
+      <Symbol>
+        <Component Name="BYPASS_PERMITTED" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="22">
+      <Symbol>
+        <Component Name="99_Commissioning" />
+        <Component Name="NodesNotInstalled" />
+        <Component Name="!!99_Commissioning.NodesNotInstalled.{db_element}$$" />
+      </Symbol>
+    </Access>
+    <Access Scope="GlobalVariable" UId="23">
+      <Symbol>
+        <Component Name="00_Commissioning" />
+        <Component Name="!!00_Commissioning.{db_element}$$" />
+      </Symbol>
+    </Access>
+    <Part Name="Contact" UId="24" />
+    <Part Name="Contact" UId="25" />
+    <Part Name="Coil" UId="26" />
+  </Parts>
+  <Wires>
+    <Wire UId="27">
+      <Powerrail />
+      <NameCon UId="24" Name="in" />
+    </Wire>
+    <Wire UId="28">
+      <IdentCon UId="21" />
+      <NameCon UId="24" Name="operand" />
+    </Wire>
+    <Wire UId="29">
+      <NameCon UId="24" Name="out" />
+      <NameCon UId="25" Name="in" />
+    </Wire>
+    <Wire UId="30">
+      <IdentCon UId="22" />
+      <NameCon UId="25" Name="operand" />
+    </Wire>
+    <Wire UId="31">
+      <NameCon UId="25" Name="out" />
+      <NameCon UId="26" Name="in" />
+    </Wire>
+    <Wire UId="32">
+      <IdentCon UId="23" />
+      <NameCon UId="26" Name="operand" />
+    </Wire>
+  </Wires>
+</FlgNet></NetworkSource>
+          <ProgrammingLanguage>F_LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="9" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="A" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>One network per node
+TRUE if the node is not ready to be used
+FALSE if the node is ready</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="B" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="C" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
                   <Text>!!NetworkComment$$</Text>
                 </AttributeList>
               </MultilingualTextItem>
@@ -145,9 +226,9 @@ FALSE if the node is ready</Text>
           </MultilingualText>
         </ObjectList>
       </SW.Blocks.CompileUnit>
-      <MultilingualText ID="8" CompositionName="Title">
+      <MultilingualText ID="D" CompositionName="Title">
         <ObjectList>
-          <MultilingualTextItem ID="9" CompositionName="Items">
+          <MultilingualTextItem ID="E" CompositionName="Items">
             <AttributeList>
               <Culture>en-US</Culture>
               <Text>bypass activation by profinet node to use during commissioning</Text>

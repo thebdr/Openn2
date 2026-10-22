@@ -36,13 +36,14 @@ def db_blocks_table() -> Table:
 
 
 def db_members_table() -> Table:
-    """The empty `db_members` table: `uid`, the member's DB + name + type + attributes, and `source`
-    (the FK to what produced it). `uid` = content hash of (`db_name`, `member`) - unique, since 520
-    dedups a member name within its DB."""
+    """The empty `db_members` table: `uid`, the member's DB + name + type + attributes, `source` (the FK
+    to what produced it) and `struct` (the Struct of the DB the member sits in, '' = top level - [[C-042]]).
+    `uid` = content hash of (`db_name`, `member`) - unique, since 520 dedups a member name within its DB
+    (Struct or not)."""
     return Table(
         "db_members",
         columns=["uid", "db_name", "member", "datatype", "start_value", "comment",
-                 "retain", "ext_accessible", "ext_visible", "ext_writable", "setpoint", "source"],
+                 "retain", "ext_accessible", "ext_visible", "ext_writable", "setpoint", "source", "struct"],
         json_columns=DB_MEMBERS_BOOL_COLUMNS,
         key_columns=["db_name", "member"],
     )
