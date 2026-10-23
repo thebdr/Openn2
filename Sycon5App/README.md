@@ -326,6 +326,14 @@ records 3 / 12309 / 12312 (`00 03 00 06 01 00 00 00 00 00`, `30 19 00 08 01 01 0
 08 01 01 00 00 00 01 00 00` - the dialog shows the bytes in decimal) compared by `verify`. The driver reaches
 the PN-IO as the DAP's second submodule row (`set_module_parameters(..., subslot=32768)`). Not yet run on the
 VM (the user's SYCON.net was open); LOWER SORTER: 5 switches (n0010, n0015, n0040, n0070, n0100).
+**Combo ports and SFPs** (the I/O Lists say nothing; the cabinet drawings' parts lists do - `8FVT_Q0012` p.73:
+`6GK5991-1AD00-8GA0` x4 for the XC216-4C -K26501; `8FVT_P1001` p.94: x1 for its XC216-4C -K26501-AE01 and
+`6GK5991-1AD00-8AA0` for the XC206-2SFP -K28001; the SUM_BOM workbooks list the switches and C-PLUGs only):
+the transceiver is always the SFP991-1 (100 Mbit/s multimode, LC). In the official XC-200 GSDML
+(`GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml`, the user's download) the XC216-4C's combo ports 1-4
+are PLUGGABLE port submodules (subslots 32769-32772): `RJ45 1 GBit`, `SFP 991-1 A`, `SFP 991-1 LD A`,
+`SFP 992-1`, ... - the project must say which; the XC208's 8 ports and the XC206-2's 6 RJ45 + 2 FO ports are
+fixed. The 2021 file's XC216-4C DAPs (V4.1-V4.3) have the same pluggable ports.
 
 **Maximized dialogs, geometry** (user: "you could maximize the configuration windows ... some systems may
 have 100+ nodes"): every configuration dialog is maximized when it opens (`ConfigDialog.maximize`, SW_MAXIMIZE)

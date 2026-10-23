@@ -100,6 +100,11 @@ def verify(handoff, project, plugged):
             got = d.submodules.get((int(m["slot"]), int(m["subslot"])), "")
             v.check(same_text(got, m["module_text"]),
                     "station %s slot %s sub %s: %r (table %r)" % (name, m["slot"], m["subslot"], got, m["module_text"]))
+        for m in handoff.dap_rows(s["station_name"]):
+            if m["module_text"] and int(m["subslot"]) > 0x8000:          # a pluggable port of the device itself
+                got = d.submodules.get((0, int(m["subslot"])), "")
+                v.check(same_text(got, m["module_text"]) or same_text(got.split(" - ")[-1], m["module_text"]),
+                        "station %s slot 0 sub %s: %r (table %r)" % (name, m["subslot"], got, m["module_text"]))
         for m in handoff.dap_rows(s["station_name"]) + handoff.submodule_rows(s["station_name"]):
             for pname, pvalue in parse_parameters(m["parameters"]):
                 if pname.startswith("record:"):
@@ -186,7 +191,12 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
         rows, subs, daps = h.plug_rows(station), h.submodule_rows(station), h.dap_rows(station)
         if not rows and not subs and not daps:
             continue
-        for m in daps:                   # the device's own submodules: parameters only (idempotent, resume too)
+        # the device's own submodules: the pluggable ports chosen (a switch's combo ports), the parameters set
+        # (idempotent, on a resume too)
+        ports = [(int(m["subslot"]), m["module_text"]) for m in daps if m["module_text"] and int(m["subslot"]) > 0x8000]
+        if ports:
+            d.set_dap_submodules(station, sorted(ports))
+        for m in daps:
             d.set_module_parameters(station, 0, parse_parameters(m["parameters"]), subslot=int(m["subslot"]))
         if not rows and not subs:
             checkpoint()

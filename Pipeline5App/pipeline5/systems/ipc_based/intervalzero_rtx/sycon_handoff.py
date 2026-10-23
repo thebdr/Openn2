@@ -76,6 +76,12 @@ SCALANCE_PNIO_PARAMS = ("2=Off | 4=Off"
                         " | record:3=00 03 00 06 01 00 00 00 00 00"
                         " | record:12309=30 19 00 08 01 01 00 01 01 00 00 02"
                         " | record:12312=30 1C 00 08 01 01 00 00 00 01 00 00")
+# The XC216-4C's four combo ports (1-4, subslots 32769-32772) and the XC206-2 SFP's two fibre ports (7-8) are
+# pluggable port submodules; the project's SFP is the SFP991-1 everywhere (the cabinet drawings' parts lists:
+# 6GK5991-1AD00-8GA0 / -8AA0) and every such port takes it (user 2026-10-23: "Configure all four combo ports of
+# every XC216-4C as SFP 991-1 A" - the GSDML's submodule text). The XC208's eight ports are fixed.
+SCALANCE_COMBO_PORTS = {"6GK5216-4BS00-2AC2": ((1, 2, 3, 4), "SFP 991-1 A", "6GK5991-1AD00-8GA0"),
+                        "6GK5206-2BS00-2AC2": ((7, 8), "SFP 991-1 A", "6GK5991-1AD00-8AA0")}
 # ET200SP (policy `iolist`): the first module and the first output module open a new potential group (a light
 # BaseUnit) - the module's last parameter row in SYCON.net, `Potential group` (user 2026-10-23). A card is an
 # output module by its signals' addresses (`Q.` and no `I.`), else by its order-number family (DQ 6ES7132, AQ 6ES7135).
@@ -244,6 +250,10 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
             modules.append({"station_name": cur["name"], "slot": "0", "subslot": "32768", "module_id": "",
                             "module_text": "PN-IO", "parameters": SCALANCE_PNIO_PARAMS,
                             "comment": "PN-IO: Loop Detection Interface Mode Off, Port Mirroring Mode Off"})
+            port_numbers, text, sfp = SCALANCE_COMBO_PORTS.get(rec["model_id"].upper(), ((), "", ""))
+            for n in port_numbers:
+                modules.append({"station_name": cur["name"], "slot": "0", "subslot": str(0x8000 + n), "module_id": sfp,
+                                "module_text": text, "parameters": "", "comment": "port %d: SFP991-1" % n})
             return
         if rec["modules"] == "iolink-ports":
             ports = port_rows(cur["signals"])
@@ -387,14 +397,17 @@ def project(rows, out_dir: str, dtd_path: str | None = None, source_label: str =
             "controller": next((s["station_name"] for s in stations if s["role"] == "controller"), "")}
 
 
-def stage_rows(iolist_path: str) -> tuple:
+def stage_rows(iolist_path: str, sheet: str = "") -> tuple:
     """Stage an I/O List with the active configuration (the builtin params with the path swapped in) and return
-    (its signal rows in document order, the staging findings)."""
+    (its signal rows in document order, the staging findings); `sheet` keeps the rows of one source sheet only
+    (a list with one cabinet sheet per cifX card, e.g. the chutes' R5.S1.C1 / C2 / C3: one project per card)."""
     from pipeline5.phases.staging import iolist as staging
     params = dict(config.load_params() or {})
     params["iolist_path"] = iolist_path
     database, findings = staging.stage_iolist(params, save=False)
     rows = list(database["signals"]) if "signals" in database else []
+    if sheet:
+        rows = [r for r in rows if str(r.get("source_sheet") or "").strip().lower() == sheet.strip().lower()]
     return rows, findings
 
 
@@ -405,9 +418,11 @@ def main(argv=None) -> int:
     p.add_argument("--out", required=True, help="the SyconNetProjectInterface folder to write")
     p.add_argument("--dtd", default="", help="the SYCON device-types database (default: Shared/HardwareConfigBuilderData)")
     p.add_argument("--update-time-ms", type=int, default=DEFAULT_UPDATE_TIME_MS, help="every station's PROFINET updating time")
+    p.add_argument("--sheet", default="", help="one source sheet only (one cifX card of a multi-card list, e.g. R5.S1.C1)")
     a = p.parse_args(argv)
-    rows, findings = stage_rows(a.iolist)
-    res = project(rows, a.out, a.dtd or None, source_label=os.path.basename(a.iolist), update_time_ms=a.update_time_ms)
+    rows, findings = stage_rows(a.iolist, a.sheet)
+    label = os.path.basename(a.iolist) + (" [%s]" % a.sheet if a.sheet else "")
+    res = project(rows, a.out, a.dtd or None, source_label=label, update_time_ms=a.update_time_ms)
     for f in findings + res["findings"]:
         print("[%s] %s - %s  @ %s" % (f.severity, f.type, f.detail, f.location))
     print("SYCON handoff: %d stations (controller %r) + %d module rows -> %s" % (res["stations"], res["controller"], res["modules"], res["dir"]))

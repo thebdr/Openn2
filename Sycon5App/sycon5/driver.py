@@ -321,6 +321,32 @@ class SyconDriver:
         log("submodules plugged on %s slot %d: %r" % (station, slot, chosen))
         return chosen
 
+    def set_dap_submodules(self, station, wanted):
+        """wanted: [(subslot, submodule text)] for the pluggable port submodules of the device itself (a SCALANCE
+        XC216-4C's combo ports 32769-32772: `SFP 991-1 A` / `RJ45 1 GBit`). The DAP (row 1) expanded shows its
+        submodule rows in subslot order - 1 (the device), 32768 (PN-IO), 32769.. (the ports) - so port n sits
+        on row 3 + n; each one's submodule is chosen through the in-place combo like a module's. Draft of
+        2026-10-23 20:30, to be verified by scripts/probe_switch.py."""
+        dlg = DeviceDialog(self.session, station)
+        chosen = []
+        try:
+            dlg.modules_page()
+            dlg.collapse_all()
+            dlg.ensure_expanded(1)
+            for subslot, text in wanted:
+                row = 3 + (subslot - 0x8000)
+                chosen.append(dlg.set_submodule(row, text))
+            errs = dlg.apply()
+            if errs:
+                raise SyconError("Apply refused: %r" % errs)
+            dlg.close(keep=True)
+        except SyconError:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            raise
+        log("port submodules set on %s: %r" % (station, chosen))
+        return chosen
+
     # ---- modules and parameters -------------------------------------------------------------------------------
     def plug_module(self, station, module, slot=None):
         """Append a module to the slave (next free slot, or `slot` through the Slot combo) and choose it."""
