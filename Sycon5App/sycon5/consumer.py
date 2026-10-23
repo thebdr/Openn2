@@ -100,6 +100,14 @@ def verify(handoff, project, plugged):
             got = d.submodules.get((int(m["slot"]), int(m["subslot"])), "")
             v.check(same_text(got, m["module_text"]),
                     "station %s slot %s sub %s: %r (table %r)" % (name, m["slot"], m["subslot"], got, m["module_text"]))
+        for m in handoff.dap_rows(s["station_name"]) + handoff.submodule_rows(s["station_name"]):
+            for pname, pvalue in parse_parameters(m["parameters"]):
+                if pname.startswith("record:"):
+                    idx = int(pname[7:])
+                    want = bytes.fromhex(pvalue.replace(" ", ""))
+                    rec = d.records.get((int(m["slot"]), int(m["subslot"]), idx), b"")
+                    v.check(rec[:len(want)] == want, "station %s slot %s sub %s record %d: %s (table %s)" % (
+                        name, m["slot"], m["subslot"], idx, rec[:len(want)].hex(" ") or "nothing", want.hex(" ")))
     extra = [n for n in by_name if n != (ctrl.device_no.lower() if ctrl else "") and n not in {s["station_name"].lower() for s in handoff.stations}]
     v.check(not extra, "no station outside the table (extra: %r)" % extra)
     return v
@@ -175,8 +183,13 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     # 3. the modules and the submodules (an AL1202's ports)
     for s in h.stations:
         station = s["station_name"]
-        rows, subs = h.plug_rows(station), h.submodule_rows(station)
+        rows, subs, daps = h.plug_rows(station), h.submodule_rows(station), h.dap_rows(station)
+        if not rows and not subs and not daps:
+            continue
+        for m in daps:                   # the device's own submodules: parameters only (idempotent, resume too)
+            d.set_module_parameters(station, 0, parse_parameters(m["parameters"]), subslot=int(m["subslot"]))
         if not rows and not subs:
+            checkpoint()
             continue
         plug_needed = True
         if resume and station.lower() in done_names:

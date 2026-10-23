@@ -22,8 +22,11 @@ the TIA workspace:
                          without spaces; empty for a port), Module Text (the SYCON.net module name when known;
                          empty = Sycon5App resolves it by the order number the catalog shows in brackets; the port
                          submodule text for a port), Parameters (name=value | ...: a parameter index within the
-                         module's first record, or `potential_group` = the module's last parameter row - set on
-                         an ET200SP's first module and first output module), Comment
+                         module's first record, `potential_group` = the module's last parameter row - set on
+                         an ET200SP's first module and first output module -, `record:<index>=<hex bytes>` = the
+                         saved record must read these bytes, verification only), Comment. A row with Slot 0 is
+                         a submodule of the device itself (a SCALANCE switch's PN-IO, policy `scalance-pnio`):
+                         never plugged, its parameters set and its records checked
 The head rule is the staging's (`profinet_name` opens a node); the card rule is phase 700's (each distinct slot
 tag under the head that is not the head's own tag is a card, the first row's Part No. its model). The second
 controller of a redundant pair (same IP) is skipped with an INFO; a head without a mapped model is a WARN.
@@ -62,7 +65,17 @@ MODULES_KEYS = ["station_name", "slot", "subslot", "module_id", "module_text", "
 MODULES_HDR = ("# Station Name,Slot (plug order),Subslot (empty = a module row; a submodule's subslot),Module Id,"
                "Module Text,Parameters (name=value | ...: a parameter index in the first record or potential_group = the "
                "last parameter row),Comment")
-MODULE_POLICIES = ("default", "iolist", "iolink-ports")
+MODULE_POLICIES = ("default", "iolist", "iolink-ports", "scalance-pnio")
+# SCALANCE XC200 switches (policy `scalance-pnio`, user 2026-10-23 "let's also add the scalance switches, with the
+# following parameters"): the DAP's PN-IO interface submodule (slot 0, subslot 32768) takes Loop Detection
+# `Interface Mode` = Off and Port Mirroring `Mirroring Mode` = Off (the GSDML defaults are 'Local configuration');
+# Media redundancy `Not by STEP7` Off, Monitor Barrier Off, Monitor Port 1 are the defaults. The parameter grid
+# rows: 1 Not by STEP7, 3 Interface Mode, 5 Mirroring Mode, 6 Monitor Barrier, 7 Monitor Port (index = row - 1);
+# the saved records (GSDML-V2.42-Siemens-002A-SCALANCE_XC200: index 3 / 12309 / 12312) must read these bytes.
+SCALANCE_PNIO_PARAMS = ("2=Off | 4=Off"
+                        " | record:3=00 03 00 06 01 00 00 00 00 00"
+                        " | record:12309=30 19 00 08 01 01 00 01 01 00 00 02"
+                        " | record:12312=30 1C 00 08 01 01 00 00 00 01 00 00")
 # ET200SP (policy `iolist`): the first module and the first output module open a new potential group (a light
 # BaseUnit) - the module's last parameter row in SYCON.net, `Potential group` (user 2026-10-23). A card is an
 # output module by its signals' addresses (`Q.` and no `I.`), else by its order-number family (DQ 6ES7132, AQ 6ES7135).
@@ -227,6 +240,11 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
             cur["station"]["update_time_ms"] = str(FAST_UPDATE_TIME_MS)
             cur["station"]["comment"] = (cur["station"]["comment"] + " | fast: " + ", ".join(
                 sorted({k for s in cur["signals"] for k in FAST_SIGNAL_KEYWORDS if k in signal_text(s)}))).strip(" |")
+        if rec["modules"] == "scalance-pnio":
+            modules.append({"station_name": cur["name"], "slot": "0", "subslot": "32768", "module_id": "",
+                            "module_text": "PN-IO", "parameters": SCALANCE_PNIO_PARAMS,
+                            "comment": "PN-IO: Loop Detection Interface Mode Off, Port Mirroring Mode Off"})
+            return
         if rec["modules"] == "iolink-ports":
             ports = port_rows(cur["signals"])
             for n in range(1, PORT_COUNT + 1):

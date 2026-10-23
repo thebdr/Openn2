@@ -140,6 +140,17 @@ def test_potential_group_by_signal_direction():
     assert sycon.card_is_output([{}], "6ES7 132-6BH01-0BA0") is True                        # no addresses: by family
 
 
+def test_scalance_pnio_row():
+    dtd = dict(DTD, **{"6GK5216-4BS00-2AC2": {"model_id": "6GK5216-4BS00-2AC2", "role": "slave", "catalog_item": "SCALANCE XC216-4C V4.4",
+                                              "modules": "scalance-pnio", "gsdml": "GSDML-X.xml", "comment": ""}})
+    rows = [_head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+            _head("n0010-trib-aec01-K26501", "192.168.1.10", "6GK5216-4BS00-2AC2", "-K26501", "10")]
+    stations, modules, _f = sycon.build(rows, dtd)
+    assert [s["station_name"] for s in stations] == ["n0001-trib-aec01-K22101.1", "n0010-trib-aec01-K26501"]
+    assert len(modules) == 1 and modules[0]["slot"] == "0" and modules[0]["subslot"] == "32768" and modules[0]["module_text"] == "PN-IO"
+    assert modules[0]["parameters"].startswith("2=Off | 4=Off | record:3=00 03 00 06") and "record:12312=30 1C" in modules[0]["parameters"]
+
+
 def test_unknown_modules_policy_is_refused():
     with tempfile.TemporaryDirectory() as d:
         dtd = os.path.join(d, "SyconDeviceTypesDatabase.csv")

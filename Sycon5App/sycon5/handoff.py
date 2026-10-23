@@ -85,7 +85,12 @@ class Handoff:
         return [m for m in self.module_rows(station) if not m.get("subslot")]
 
     def submodule_rows(self, station):
-        return [m for m in self.module_rows(station) if m.get("subslot")]
+        """The submodule rows to PLUG (a slot of the station's own modules, never the DAP's slot 0)."""
+        return [m for m in self.module_rows(station) if m.get("subslot") and m["slot"] != "0"]
+
+    def dap_rows(self, station):
+        """The rows of the device's own submodules (slot 0, e.g. a switch's PN-IO): parameters and records only."""
+        return [m for m in self.module_rows(station) if m.get("subslot") and m["slot"] == "0"]
 
 
 def load_handoff(folder):

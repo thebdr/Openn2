@@ -312,6 +312,21 @@ the read-back decodes each slave's `sendClockFactor x 31.25 us x reductionRatio`
 takes the VISIBLE combo only: every page of a dialog is instantiated at once and the ids repeat across pages
 (220 is also a port-speed combo of another page - the first pass picked that one, 18:22).
 
+**SCALANCE switches** (user 2026-10-23: "let's also add the scalance switches, with the following parameters" -
+the XC206-2 dialog's PN-IO Parameter dataset): policy `scalance-pnio` in the device-types database
+(6GK5216-4BS00-2AC2 = `SCALANCE XC216-4C V4.4`; the folder's V4.4 DAPs live in three hand-modified `_MOD_`
+XC200 GSDMLs - user: "no modified gsdml files, just the official ones", the latest official SCALANCE XC-200
+file to be downloaded and named in the database, the catalog item following its newest DAP; the GSDML cell
+stays empty until then). PL5 writes ONE row for the device's own
+PN-IO submodule (Slot 0, Subslot 32768, Module Text PN-IO): never plugged (a Slot-0 row is the DAP's), its
+Parameters `2=Off | 4=Off` (Loop Detection `Interface Mode` and Port Mirroring `Mirroring Mode`, parameter grid
+rows 3 and 5 - the GSDML defaults are `Local configuration` = 255; `Not by STEP7` Off, Monitor Barrier Off,
+Monitor Port 1 are the defaults) plus `record:<index>=<hex>` entries, the verification-only form: the saved
+records 3 / 12309 / 12312 (`00 03 00 06 01 00 00 00 00 00`, `30 19 00 08 01 01 00 01 01 00 00 02`, `30 1C 00
+08 01 01 00 00 00 01 00 00` - the dialog shows the bytes in decimal) compared by `verify`. The driver reaches
+the PN-IO as the DAP's second submodule row (`set_module_parameters(..., subslot=32768)`). Not yet run on the
+VM (the user's SYCON.net was open); LOWER SORTER: 5 switches (n0010, n0015, n0040, n0070, n0100).
+
 **Maximized dialogs, geometry** (user: "you could maximize the configuration windows ... some systems may
 have 100+ nodes"): every configuration dialog is maximized when it opens (`ConfigDialog.maximize`, SW_MAXIMIZE)
 so the grids show dozens of rows; the custom grids' columns scale with the width, so the column offsets

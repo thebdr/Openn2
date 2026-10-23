@@ -353,24 +353,29 @@ class SyconDriver:
         """values: {parameter index within the submodule's first record (0 = first): value text}."""
         return self.set_module_parameters(station, slot, [(str(k), v) for k, v in sorted(values.items())])
 
-    def set_module_parameters(self, station, slot, params):
+    def set_module_parameters(self, station, slot, params, subslot=1):
         """params: [(name, value)] - a numeric name is the parameter's index within the module's first record,
-        `potential_group` the module's last parameter row (an ET200SP's `Potential group`). ONE dialog: the module
-        row is 1 + its slot (the slots are contiguous from 1 in the projects this driver builds - no model
-        needed, so a resumed build can set them too); its first submodule row is the one below it once expanded,
-        the Dataset `Parameter` shows the grid."""
+        `potential_group` the module's last parameter row (an ET200SP's `Potential group`); `record:<index>` entries
+        are verification-only and skipped here. ONE dialog: the module row is 1 + its slot (the slots are
+        contiguous from 1 in the projects this driver builds - no model needed, so a resumed build can set them
+        too); its submodule rows follow it once expanded - the first one for `subslot` 1, the DAP's interface
+        submodule 32768 (a switch's PN-IO) second; the Dataset `Parameter` shows the grid."""
         row = 1 + slot
+        params = [(n, v) for n, v in params if not str(n).startswith("record:")]
         by_index = {int(n): v for n, v in params if str(n).isdigit()}
         others = [(n, v) for n, v in params if not str(n).isdigit()]
         unknown = [n for n, _v in others if n != "potential_group"]
         if unknown:
             raise SyconError("unknown parameter names %r for %s slot %d" % (unknown, station, slot))
+        if not by_index and not others:
+            return
+        sub_offset = 1 if subslot == 1 else (2 + subslot - 0x8000 if subslot >= 0x8000 else subslot)
         dlg = DeviceDialog(self.session, station)
         try:
             dlg.modules_page()
             dlg.collapse_all()
             dlg.ensure_expanded(row)
-            dlg.select_row(row + 1)
+            dlg.select_row(row + sub_offset)
             dlg.dataset("Parameter")
             if by_index:
                 dlg.set_parameters(by_index)
