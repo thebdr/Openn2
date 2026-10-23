@@ -11,7 +11,7 @@ from collections import Counter, defaultdict
 import win32gui, win32ui, win32con
 from _probe_lib import sycon_main
 
-STEP = int(sys.argv[1]) if len(sys.argv) > 1 else 2
+STEP = 2
 
 
 def capture(rect):
@@ -49,10 +49,11 @@ def lines(rect, step=STEP):
 
 
 if __name__ == "__main__":
+    STEP = int(sys.argv[1]) if len(sys.argv) > 1 else 2
     main = sycon_main()
     pane = [p for p in main.descendants(control_type="Pane") if p.element_info.automation_id == "3000"][0]
     r = pane.rectangle()
-    cols, rows, n, grey_rows = lines(r)
+    cols, rows, n, grey_rows = lines(r, STEP)
     print("pane rect:", r, "step", STEP)
     print("grey rows (dy: hits):", grey_rows.most_common(4))
     for key, cnt in n.most_common(8):

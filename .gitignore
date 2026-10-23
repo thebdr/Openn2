@@ -61,3 +61,4 @@ Openn5App/*.csproj.user
 # Sycon5App (SYCON.net GUI driver, spike stage) - scratch copies of the base project opened in SYCON.net
 Sycon5App/spike/scratch/
 Sycon5App/spike/*.txt
+Sycon5App/spike/*.log

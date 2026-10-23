@@ -101,21 +101,56 @@ through UIA/win32 dumps and the netProject tree, which is the oracle for every a
   signal/module tags are detected..." from the controller DTM).
 - SYCON.net works on a temp copy of the open project (`%LOCALAPPDATA%\Temp\Sycon\<name>\`), written only on save.
 
+### End-to-end round 1 — written, saved and read back (2026-10-23, `scripts/e2e_round1.py`)
+
+The whole chain ran as one staged script (`--from N --to M`) and the result is the tracked fixture
+`spike/references/E2E_Round1/` (the saved `.spj` + `SYCON_net.xml` + the run logs): a new project, the
+controller `CIFX RE/PNM` from the catalog (grey line), `IM 155-6 PN ST V4.2` and the NORD `SK CU4-ETH` (its
+GSDML V2.46 imported by the user that day, catalog rebuilt 12:25) from the catalog (green line), the controller's
+IP 192.168.2.1, the ET200SP renamed `n0005-ms1-k2501` at 192.168.2.5 through the controller grids, the module
+`DI 8x24VDC HF V2.0` plugged into its slot 1, `Save as` into `spike/scratch`, and the XML read back: `deviceNo`
+per device, each slave's `PNIODeviceDataModelBasic` (name, IP, mask, GSDML path), the slot table from
+`STLModuleMap/<slot>/PNIOModuleBasic` (ET200SP: slot 0 DAP + slot 1 `DI 8x24VDC HF V2.0`; NORD: its default
+`Dig-IN (1 word)` slot 2 + `PPO 4 (4 words)` slot 3) and the controller's own device list
+(`FdtChannelColl/PROFINET_IO/SlaveDTMsGetParameters/DTMProxy00n`: name + IP of every slave). Learned on the way:
+
+- **Writing works through plain Win32**: `Edit.select()` + typed text for the Device Table's Name-of-station
+  cell, `set_edit_text` on the four `Field0..3` edits of a `SysIPAddress32` (both in-place grid editors and the
+  Controller Network Settings page), commit = click a read-only cell; `ComboBoxWrapper.select(text)` for the
+  module cell. All verified by reopening the cell.
+- **Order matters for the IP**: set the controller's IP first (`Controller Network Settings`, SysIPAddress32
+  213), answer the `Warning` "Changing subnet will automatically modify IP addresses ..." with Yes (id 6), then
+  the slave IPs; a slave IP outside the controller's subnet makes OK refuse with an `Error` that re-fires at
+  every dismissal, and after such a loop every UIA pattern call on that dialog times out (2 min each) — back
+  out with Win32 messages only (Cancel id 2, Question No id 7) or restart.
+- **Dialog buttons by Win32 `BM_CLICK`** (`press()` in the script), never by mouse: the controller dialog's OK
+  closes it; a **slave dialog's OK never closes it** (proved three times, no message anywhere) — use **Apply**
+  (2204) to commit, then **Cancel** (2); if a `Question` "save the data?" follows, Yes (6) keeps the data.
+- **Never post a command to the main window while a modal dialog is open** (PostMessage bypasses modality):
+  a `Save as` posted behind an open slave dialog was followed by a silent exit of SYCON.net.
+- **Silent exits**: SYCON.net exited four times today without any crash dialog, WER record or event-log entry —
+  twice in the base project (the unreadable DTM data), once after the modal-bypass above, once while a driver
+  process stuck in a UIA call was killed. The user is investigating; the driver must check `sycon_pids()` after
+  every dialog close and drop.
+- **The `Save As` dialog** (Windows common dialog, title `Save As`): the file name box is the Edit with
+  automation id 1148 (the folder view's items are Edits too — pick by id), `set_edit_text(path)` + Enter; the
+  main window title then becomes `SYCON.net - [<name>.spj]`. SYCON.net's Save needs a named project.
+- The win32 TreeView item API (`get_item`) hangs from 64-bit Python on the 32-bit navigation tree — select pages
+  with the UIA pattern only.
+- The subnet `Warning` and the DTM messages also land in the Output window log.
+
 ### Open on the VM (next session)
 
-1. **Module parameters**: after Add Module + module choice the Dataset combo 311 stayed disabled with the row
-   selected (clicks on x+450 / row 1 / row 2). Hypotheses: press **Apply** (2204) first, or parameters hang on
-   the submodule row (Add Submodule). Probe: Apply → select the row → `Dataset = Parameter` (win32 select) →
-   click the lower grid's cells → expect win32 Edit / ComboBox editors (ctrl ids ≥ 1900); `probe_parameters3.py`
-   is the starting point.
-2. Submodules (Add Submodule + its combo), Remove, slot numbering (combo 1901); the NORD drive (`SK CU4-PNT`,
-   `SK TU4-PNT` in this catalog — no `SK CU4-ETH`) and the coupler / ServoOne catalog names.
-3. Writing: type into the controller's in-place Edit 1902 / SysIPAddress32 (commit by clicking another cell),
-   rename via Symbolic Name; then `Save as...` (57604, standard file dialog, scratch path) and the XML read-back
-   (`deviceNo`, `BinData` → olefile → `PNIODeviceDataModelBasic`, `STLModuleMap`).
-4. Then the driver API as `Sycon5App` operations — `new_project`, `add_station(catalog, name, ip)`,
+1. **Module parameters**: the Dataset combo 311 stays disabled after Add Module, the module choice and even
+   Apply; hypotheses left: parameters hang on the submodule row (Add Submodule), or the dialog must be
+   reopened after Apply. Probe: reopen → select the module row → `Dataset = Parameter` (win32 select) → click
+   the lower grid's cells → expect win32 Edit / ComboBox editors (ctrl ids ≥ 1900).
+2. Submodules (Add Submodule + its combo), Remove, slot numbering (combo 1901, SYCON numbers new rows 1, 2, …);
+   the coupler / ServoOne / AC140x catalog names; a second slave of the same type (`-001` suffix) renamed.
+3. Then the driver API as `Sycon5App` operations — `new_project`, `add_station(catalog, name, ip)`,
    `plug_module(station, slot, module)`, `set_parameters(station, slot, {name: value})`, `save_as`,
-   `read_back()` — and the PL5 handoff kinds (decisions unchanged, below).
+   `read_back()` (the stage functions of `e2e_round1.py` are their first draft) — and the PL5 handoff kinds
+   (decisions unchanged, below).
 
 ### Scripts (`spike/scripts/`, run from `spike\` with the repo venv: `..\..\.venv\Scripts\python -I scripts\<name>.py ...`)
 
@@ -135,6 +170,7 @@ through UIA/win32 dumps and the netProject tree, which is the oracle for every a
 | `probe_modules_page.py`, `probe_modules_grid.py` | Modules page: editability, Add Module, cell clicks with dropdown detection |
 | `probe_parameters.py`, `probe_parameters2.py`, `probe_parameters3.py` | module selection via the in-place combo (v3 = win32, the one that works) and the Dataset / lower grid probe |
 | `probe_symbolic_name.py <station>` | the Symbolic Name dialog |
+| `e2e_round1.py [--from N] [--to M]` | **writes** (in memory + one `Save as` into `spike/scratch`): the 8-stage end-to-end round above — restart + New, controller, ET200SP, controller IP + station name + slave IP (controller grids), NORD, module plug (Apply, Cancel), Save as, XML read-back; its stage functions are the first draft of the driver operations |
 
 ## Inputs
 

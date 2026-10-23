@@ -1,0 +1,30 @@
+13:23:46 ===== stage 7 : Save as spike/scratch/E2E_Round1.spj
+13:23:49   file dialog: 'Save As' (L477, T186, R1678, B1092)
+13:23:50   edits: [('AutomateSyconProj_BaseProj', ''), ('AutomateSyconProj_BaseProj.spj', ''), ('File name:', '1148')]
+13:23:50   typed: 'C:\\Source\\Repos\\_Openn5\\Sycon5App\\spike\\scratch\\E2E_Round1.spj'
+13:23:56   saved file exists: True | main: SYCON.net - [E2E_Round1.spj] | windows: [('SYCON.net - [E2E_Round1.spj]', 'Afx:00400000:8:00010003:00000000:0024095D')] | errors: []
+13:23:56 ===== stage 8 : read back the saved SYCON_net.xml and the DTM blobs
+13:23:56 read back: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\E2E_Round1\_S129\SYCON_net.xml 265775 chars
+13:23:56   Device deviceNo= 'controller' symbolic= 'CIFX_RE_PNM' progId= Hilscher.PNIOControllerDTM2.1 gsdml= 
+13:23:56   Device deviceNo= 'n0005-ms1-k2501' symbolic= 'IM_155-6_PN_ST_V4.2' progId= Hilscher.PNIOGenDevDTM2.1 gsdml= 
+13:23:56   Device deviceNo= 'sk-cu4-eth' symbolic= 'SK_CU4-ETH' progId= Hilscher.PNIOGenDevDTM2.1 gsdml= 
+13:23:56   blob of 'controller' : 75780 bytes, 79 streams, module streams: 55
+13:23:56     FdtChannelColl/PROFINET_IO/PNIODataModel/STLDeviceList/0/PNIODeviceDataModelBasic : strings ['n0005-ms1-k2501', 'IM 155-6 PN ST V4.2', 'Finely graduated modular distributed I/O system with degree of protection IP20', 'IM_155-6_PN_ST_V4.2', 'SIEMENS', '192.168.2.5', '255.255.255.0', '0.0.0.0', '8 16 32 64 128 ', '1  2  4  8  16  32  64  128  256  512  ', 'C:\\ProgramData\\SYCONnet\\PROFINET\\GSDML\\GSDML-V2.35-Siemens-ET200SP-20210401.xml']
+13:23:56     FdtChannelColl/PROFINET_IO/PNIODataModel/STLDeviceList/1/PNIODeviceDataModelBasic : strings ['sk-cu4-eth', 'SK CU4-ETH', 'SK TU3-PNT / SK CU4-PNT / SK TU4-PNT / SK TU4-PNS / SK 550P / SK 300P / SK CU4-ETH /  SK TU4-ETH PROFINET IO interface for drives', 'SK_CU4-ETH', 'NORD Electronic DRIVESYSTEMS GmbH', '192.168.2.2', '255.255.255.0', '0.0.0.0', '32 64 128 ', '1  2  4  8  16  32  64  128  256  512  ', 'C:\\ProgramData\\SYCONnet\\PROFINET\\GSDML\\GSDML-V2.46-NORDDRIVESYSTEMS-PNT-20260803.xml']
+13:23:56     slot 0 -> ['IM 155-6 PN ST V4.2', 'not used']
+13:23:56     slot 1 -> ['DI 8x24VDC HF V2.0 <Slot 1>', 'not used']
+13:23:56     slot 0 -> ['SK CU4-ETH', 'not used']
+13:23:56     slot 2 -> ['Dig-IN (1 word) <Slot 2>', 'not used']
+13:23:56     slot 3 -> ['PPO 4 (4 words) <Slot 3>', 'not used']
+13:23:56     FdtChannelColl/PROFINET_IO/SlaveDTMsGetParameters/DTMProxy000 : network entries: [('n0005-ms1-k2501', '192.168.2.5')]
+13:23:56     FdtChannelColl/PROFINET_IO/SlaveDTMsGetParameters/DTMProxy001 : network entries: [('sk-cu4-eth', '192.168.2.2')]
+13:23:56   blob of 'n0005-ms1-k2501' : 28676 bytes, 45 streams, module streams: 35
+13:23:56     PNIODeviceDataModelBasic : strings ['n0005-ms1-k2501', 'IM 155-6 PN ST V4.2', 'IM 155-6 PN ST V4.2', 'Finely graduated modular distributed I/O system with degree of protection IP20', 'Info_ET 200SP', 'IM_155-6_PN_ST_V4.2', 'SIEMENS', 'DIM ST V4.2', '192.168.2.5', '255.255.255.0', '0.0.0.0', '8 16 32 64 128']
+13:23:56     slot 0 -> ['DIM ST V4.2', 'IM 155-6 PN ST V4.2']
+13:23:56     slot 1 -> ['DI 8x24VDC HF V2.0', 'DI 8x24VDC HF V2.0']
+13:23:56   blob of 'sk-cu4-eth' : 27140 bytes, 46 streams, module streams: 36
+13:23:56     PNIODeviceDataModelBasic : strings ['sk-cu4-eth', 'SK CU4-ETH', 'TOK_DAP_NAME_CU4ETH', 'SK TU3-PNT / SK CU4-PNT / SK TU4-PNT / SK TU4-PNS / SK 550P / SK 300P / SK CU4-ETH /  SK TU4-ETH PROFINET IO interface for drives', 'TOK_PN_IO_DEVICE_DESCRIPTION', 'SK_CU4-ETH', 'NORD Electronic DRIVESYSTEMS GmbH', 'DAP7:CU4ETH_I', '192.168.2.2', '255.255.255.0', '0.0.0.0', '32 64 128']
+13:23:56     slot 0 -> ['DAP7:CU4ETH_I', 'SK CU4-ETH']
+13:23:56     slot 2 -> ['TUPNTIN', 'Dig-IN (1 word)']
+13:23:56     slot 3 -> ['PPO4', 'PPO 4 (4 words)']
+13:23:56 done through stage 8

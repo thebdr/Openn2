@@ -1,0 +1,31 @@
+13:19:37 ===== stage 4 : controller dialog: station name + IP of the ET200SP, OK
+13:19:37 dialog already open: netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)
+13:19:39   controller IP before: 192.168.2.1
+13:19:40   controller IP after: 192.168.2.1
+13:19:43   row 1 : Name of station = 'et200sp'
+13:19:47   Name of station after edit: 'n0005-ms1-k2501'
+13:19:50   IP before: 192.168.2.2
+13:19:53   IP after edit: 192.168.2.5
+13:19:55   dialog closed after OK
+13:19:57   after OK: dialogs [] errors []
+13:20:00   tree: ['Project: Untitled', 'CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)', 'IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<n0005-ms1-k2501>']
+13:20:02 ===== stage 5 : NORD SK CU4-ETH onto the green line
+13:20:03 lines: pane (L213, T100, R1401, B896) grey root line dy= 52 green= ('h', 72, 432, 948)
+13:20:28 drop 'SK CU4-ETH' at (602, 72) errors= [] new= ['SK_CU4-ETH[SK CU4-ETH]<sk-cu4-eth>']
+13:20:28 ===== stage 6 : ET200SP dialog: Add Module + module choice (win32), Apply, parameter test, OK
+13:20:36 dialog: netProject - Configuration IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<n0005-ms1-k2501>
+13:20:43   module combo before: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]'
+13:20:44   module combo editor alive: False
+13:20:45   module cell reopened: 'DI 8x24VDC HF V2.0  [6ES7 131-6BF00-0CA0]'
+13:20:48   after Apply: errors [] windows [('netProject - Configuration IM_155-6_PN_ST_V4.2[IM ', '#32770'), ('SYCON.net - [Untitled.spj]', 'Afx:00400000:8:00010003:00000000:0024095D')]
+13:20:48   combo 311 enabled= False selected= 'I/O data' items= ['Parameter', 'I/O data']
+13:20:48   combo 312 enabled= False selected= 'Decimal' items= ['Hexadecimal', 'Decimal']
+13:20:49   Dataset combo still disabled after Apply
+Traceback (most recent call last):
+  File "C:\Source\Repos\_Openn5\Sycon5App\spike\scripts\e2e_round1.py", line 491, in <module>
+    STAGES[n_]()
+  File "C:\Source\Repos\_Openn5\Sycon5App\spike\scripts\e2e_round1.py", line 405, in stage6
+    press(dlg, pid, "OK")
+  File "C:\Source\Repos\_Openn5\Sycon5App\spike\scripts\e2e_round1.py", line 201, in press
+    raise RuntimeError("dialog still open 60 s after " + name)
+RuntimeError: dialog still open 60 s after OK
