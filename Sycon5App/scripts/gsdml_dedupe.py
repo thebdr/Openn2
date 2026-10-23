@@ -40,14 +40,30 @@ def classify(files):
     return groups, odd
 
 
+def installer_owned(folder, files):
+    """The GSDMLs the SYCON.net installer ships (its Hilscher device descriptions): removing one makes the
+    Windows Installer re-run its self-repair at every start - which fails once its source folder is gone
+    (2026-10-23: 'Detection of product ..., feature netFrame ... failed. The resource C:\\ProgramData\\SYCONnet\\
+    PROFINET\\GSDML\\... ', three failed reconfigurations, SYCON.net would not start). Owned = a HILSCHER file, or
+    a file carrying the installer's timestamp (the modification time most Hilscher files share)."""
+    from collections import Counter
+    stamps = Counter(int(os.path.getmtime(os.path.join(folder, f))) for f in files if "hilscher" in f.lower())
+    stamp = stamps.most_common(1)[0][0] if stamps else None
+    return {f for f in files if "hilscher" in f.lower() or (stamp is not None and int(os.path.getmtime(os.path.join(folder, f))) == stamp)}
+
+
 def plan(folder):
     files = sorted(f for f in os.listdir(folder) if f.lower().endswith(".xml") and os.path.isfile(os.path.join(folder, f)))
+    owned = installer_owned(folder, files)
     groups, odd = classify(files)
     keep, move, notes = [], [], []
     for key, items in sorted(groups.items()):
         items.sort(key=lambda it: (it["date"], it["schema"]), reverse=True)
         keep.append(items[0]["file"])
         for it in items[1:]:
+            if it["file"] in owned:
+                notes.append(it["file"] + "   (installer-owned: never moved)")
+                continue
             move.append((it["file"], items[0]["file"]))
         if items[0]["special"]:
             notes.append(items[0]["file"])

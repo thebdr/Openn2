@@ -216,6 +216,15 @@ lower-cases every name of station: all comparisons are case-insensitive. Grid ge
 16 px rows in the controller grids AND the Modules grid (row n centre at y+27+16n / y+26+16(n−1)).
 Smoke (3 stations, 7 modules, 15:38): 22 PASS, 0 FAIL in 172 s (`spike/references/LowerSorter/`).
 
+**GSDML folder hygiene** (`scripts/gsdml_dedupe.py`, dry run by default, `--apply` moves): the catalog listed every
+version of a family (3 PN/PN coupler files, 2 ET200SP, ...); the script keeps the newest date per vendor + family
+and moves the rest to `GSDML_superseded_<date>` beside the folder. **Never move the installer's own files**
+(the Hilscher GSDMLs, 2020-10-21 timestamp): the Windows Installer then re-runs SYCON.net's self-repair at every
+start, which fails without its source folder ("Configuration failed" 1603, 2026-10-23 16:04) - put them back
+and SYCON.net starts again. The `#Siemens-PreConf_` per-node exports and the `_MOD_` SCALANCE files are left to
+the user; a project saved against a moved GSDML loses its DTM (the spike fixtures reference the 2021 ET200SP).
+Reload the catalog (Network > Device Catalog > Reload) after any change to the folder.
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run
