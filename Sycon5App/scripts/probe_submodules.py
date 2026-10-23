@@ -35,7 +35,7 @@ def editors(dlg):
         kind = c.class_name()
         text = c.selected_text() if kind == "ComboBox" else c.window_text()
         items = c.item_texts() if kind == "ComboBox" else None
-        out.append((kind, c.control_id(), tuple(c.rectangle()), text, items))
+        out.append((kind, c.control_id(), str(c.rectangle()), text, items))
     return out
 
 
@@ -45,6 +45,7 @@ def main(argv=None):
     p.add_argument("--station", default="n0035-trib-sm006-k1")
     p.add_argument("--module-row", type=int, default=2, help="the module row to expand (1 = DAP)")
     p.add_argument("--rows", type=int, nargs="+", default=[3, 4, 5], help="the rows whose cells are probed")
+    p.add_argument("--leave-open", action="store_true", help="leave the dialog open (for a look at the screen)")
     a = p.parse_args(argv)
     d = SyconDriver()
     launched = not d.session.attach_if_running()
@@ -69,10 +70,13 @@ def main(argv=None):
                 time.sleep(0.4)
         log("bands at the end:", bands(dlg))
     finally:
-        if dlg.is_open():
-            dlg.close(keep=False)
-        if launched:
-            d.close()
+        if a.leave_open:
+            log("dialog left open")
+        else:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            if launched:
+                d.close()
     return 0
 
 

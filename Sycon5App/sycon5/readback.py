@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 
 UTF16_RUN = re.compile(rb"(?:[\x20-\x7e]\x00){3,}")
 IPV4 = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 RECORD_MARKER = b"\x11\x20"
 
 
@@ -32,6 +33,8 @@ class Device:
     mask: str = ""
     gateway: str = ""
     type_name: str = ""
+    dap: str = ""                                  # the DAP id text of slot 0 (`DAP V2.1 X2`, `DIM ST V4.2`, `DIM 1`)
+    order_no: str = ""                             # the DAP's order number (`6ES7 158-3AD00-0XA0`, `AL1202`)
     slots: dict = field(default_factory=dict)      # slot -> module name
     submodules: dict = field(default_factory=dict) # (slot, subslot) -> submodule name (the DAP's 0x8000+ ones too)
     records: dict = field(default_factory=dict)    # (slot, subslot, index) -> bytes
@@ -101,6 +104,10 @@ def _parse_blob(dev, hexdata):
                 slot = int(path.split("/")[1])
                 strs = _strings(data)
                 dev.slots[slot] = strs[1] if len(strs) > 1 else (strs[0] if strs else "")
+                if slot == 0 and strs:
+                    dev.dap = strs[0]
+                    tail = [s for s in strs[1:] if not GUID.match(s)]
+                    dev.order_no = tail[-1] if tail and tail[-1] != dev.slots[0] else ""
             elif path.endswith("/PNIOSubModuleBasic") and path.startswith("STLModuleMap/"):
                 p = path.split("/")
                 try:
@@ -145,8 +152,9 @@ def read_project(xml_path):
 def describe(project):
     lines = [project.path]
     for d in project.devices:
-        lines.append("  %s%s symbolic=%s type=%r ip=%s mask=%s gsdml=%s" % (
-            d.device_no, " (controller)" if d.is_controller else "", d.symbolic, d.type_name, d.ip, d.mask, d.gsdml))
+        lines.append("  %s%s symbolic=%s type=%r ip=%s mask=%s gsdml=%s dap=%r order=%r" % (
+            d.device_no, " (controller)" if d.is_controller else "", d.symbolic, d.type_name, d.ip, d.mask, d.gsdml,
+            d.dap, d.order_no))
         for slot in sorted(d.slots):
             lines.append("    slot %d: %s" % (slot, d.slots[slot]))
             for (s, sub), name in sorted(d.submodules.items()):

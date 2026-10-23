@@ -22,6 +22,8 @@ def parse_node(label):
 
 
 GSDML_RE = re.compile(r"\[([^\[\]]*\.xml)\]", re.I)
+TOKEN_RE = re.compile(r"\[([^\[\]]+)\]")
+ITEM_RE = re.compile(r"^(?P<name>.*?)\s*\[(?P<variant>[^\[\]]+)\]\s*$")
 _chosen = {}          # (kind, item, gsdml lower) -> the index among the same-named entries found last time
 
 
@@ -30,12 +32,28 @@ def info_files(text):
     return GSDML_RE.findall(text or "")
 
 
+def info_tokens(text):
+    """Every bracketed token of the info pane: `0x00010006`, `DAP X2 V4.2`, the GSDML file."""
+    return TOKEN_RE.findall(text or "")
+
+
+def split_item(item):
+    """'PN/PN Coupler X2 [DAP X2 V4.2]' -> ('PN/PN Coupler X2', 'DAP X2 V4.2'): the bracketed variant names the
+    DAP the info pane must cite when several entries share the name AND the GSDML file (the five PN/PN Coupler
+    X2 entries are the DAPs V1.0 / V2.2 / V3.0 / V4.0 / V4.2 of one file, 2026-10-23)."""
+    m = ITEM_RE.match(item or "")
+    return (m.group("name"), m.group("variant")) if m else (item, "")
+
+
+def _child_items(element):
+    """The tree items directly under an element (never the whole catalog: thousands of UIA calls, 15-30 s)."""
+    return [c for c in element.children() if c.element_info.control_type == "TreeItem"]
+
+
 def _kind_node(session: Session, kind):
-    cat = session.catalog_tree()
-    node = None
+    node = session.catalog_tree()
     for name in (FIELDBUS, KINDS[kind]):
-        scope = session._iter_items(cat) if node is None else session._iter_items(node)
-        found = [i for i in scope if i.window_text() == name]
+        found = [i for i in _child_items(node) if i.window_text() == name]
         if not found:
             raise SyconError("catalog node %r not found under %s > %s" % (name, FIELDBUS, KINDS[kind]))
         node = found[0]
@@ -44,49 +62,55 @@ def _kind_node(session: Session, kind):
     return node
 
 
-def _cites(session: Session, entry, gsdml):
-    """Select the catalog entry and tell whether the info pane cites the GSDML file. Returns (cited, files)."""
+def _cites(session: Session, entry, gsdml, variant=""):
+    """Select the catalog entry and tell whether its info pane cites the GSDML file and the variant (each when
+    given). Returns (cited, files, tokens)."""
     entry.ensure_visible()
     time.sleep(0.3)
     session.safe_click(entry)
     time.sleep(0.6)
-    files = info_files(session.catalog_info())
-    return any(f.lower() == gsdml.lower() for f in files), files
+    text = session.catalog_info()
+    files, tokens = info_files(text), info_tokens(text)
+    ok = (not gsdml or any(f.lower() == gsdml.lower() for f in files)) and \
+         (not variant or any(Session.same_text(t, variant) for t in tokens))
+    return ok, files, tokens
 
 
 def catalog_item(session: Session, kind, item, gsdml=None):
     """The catalog tree item to drag: PROFINET IO > <kind> > <item>. The catalog lists one same-named entry per
-    GSDML version of a device (five `PN/PN Coupler X2` on 2026-10-23); with `gsdml` given, the entry whose info
-    pane cites that file is the one (verified by selecting it - the last index found is tried first), without it
-    the first entry is taken and its GSDML logged."""
+    GSDML version of a device AND per DAP of one file (five `PN/PN Coupler X2` on 2026-10-23, all from one
+    GSDML); `item` may carry the DAP as `name [DAP X2 V4.2]` (what the info pane cites in brackets). With a
+    GSDML or a variant given, the entry whose info pane cites them is the one (verified by selecting it - the
+    index found last is tried first); without either the first entry is taken and its info logged."""
+    name, variant = split_item(item)
     node = _kind_node(session, kind)
-    entries = [i for i in session._iter_items(node) if i.window_text() == item]
+    entries = [i for i in _child_items(node) if i.window_text() == name]
     if not entries:
-        raise SyconError("catalog item %r not found under %s > %s" % (item, FIELDBUS, KINDS[kind]))
-    if not gsdml:
+        raise SyconError("catalog item %r not found under %s > %s" % (name, FIELDBUS, KINDS[kind]))
+    if not gsdml and not variant:
         entries[0].ensure_visible()
         time.sleep(0.4)
         if len(entries) > 1:
             session.safe_click(entries[0])
             time.sleep(0.6)
-            log("catalog: %d entries named %r, the first taken (no GSDML given): %r" % (
-                len(entries), item, info_files(session.catalog_info())))
+            log("catalog: %d entries named %r, the first taken (no GSDML / variant given): %r" % (
+                len(entries), name, info_tokens(session.catalog_info())))
         return entries[0]
-    key = (kind, item, gsdml.lower())
+    key = (kind, item, (gsdml or "").lower())
     order = list(range(len(entries)))
     if key in _chosen and _chosen[key] < len(entries):
         order.insert(0, order.pop(_chosen[key]))
     seen = {}
     for n in order:
-        cited, files = _cites(session, entries[n], gsdml)
-        seen[n + 1] = files
+        cited, files, tokens = _cites(session, entries[n], gsdml or "", variant)
+        seen[n + 1] = tokens
         if cited:
             if _chosen.get(key) != n:
-                log("catalog: %r from %s is entry %d of %d" % (item, gsdml, n + 1, len(entries)))
+                log("catalog: %r from %s is entry %d of %d" % (item, gsdml or "(any file)", n + 1, len(entries)))
             _chosen[key] = n
             return entries[n]
-    raise SyconError("no catalog entry %r comes from %s - the %d entries cite %r (reload the device catalog, or fix "
-                     "the device-types database)" % (item, gsdml, len(entries), seen))
+    raise SyconError("no catalog entry %r cites %s - the %d entries cite %r (reload the device catalog, or fix the "
+                     "device-types database)" % (item, " + ".join(x for x in (gsdml, variant) if x), len(entries), seen))
 
 
 def drop(session: Session, item, dx, dy, settle=6.0):

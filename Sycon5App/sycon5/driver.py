@@ -4,6 +4,7 @@ the netProject tree and, in the end, by `read_project` on the saved file.
 Nothing is saved unless the caller calls save() / save_as() (the OP5 rule: the user saves after review).
 """
 import os
+import re
 import time
 
 from pywinauto import keyboard
@@ -132,8 +133,8 @@ class SyconDriver:
     def clone_station(self, source, count=1):
         """Copy the source node in the netProject tree and paste it `count` times - SYCON.net names a clone
         `<source>-001`, `-002`, ... and gives it the next free IP (the AutoHotkey way: click, Ctrl+C, click,
-        Ctrl+V; here the context menu's Copy / Paste command ids posted to the main window, the keystrokes as
-        the fallback). Seconds per station instead of a catalog drag-drop. Returns the new nodes."""
+        Ctrl+V - verified 2026-10-23; the context menu's Copy / Paste command ids posted to the main window
+        produce nothing and stay as the fallback). Returns the new nodes."""
         s = self.session
         s.close_menus()
         s.bring_front()
@@ -141,7 +142,7 @@ class SyconDriver:
         for _ in range(count):
             before = s.nodes()
             node = None
-            for way in ("command", "keys"):
+            for way in ("keys", "command"):
                 item = s.station_item(source)
                 s.safe_click(item)
                 time.sleep(0.4)
@@ -247,9 +248,20 @@ class SyconDriver:
                 dlg.set_module(row, text)
                 chosen.append(text)
             errs = dlg.apply()
-            if errs and any("without submodul" in e for e in errs):
-                dlg.press("Add Submodule", settle=1.5)
-                errs = self.session.dismiss_errors() + dlg.apply()
+            for _round in range(2):
+                # 'Slot [1] contains a module without submoduls': select THAT module's row and Add Submodule
+                # (pressed with another row current it answers 'No possible submodule found', 2026-10-23 17:21)
+                without = sorted({int(n) for e in errs if "without submodul" in e for n in re.findall(r"Slot \[(\d+)\]", e)})
+                if not without:
+                    break
+                for n in without:
+                    log("  slot %d without submodule -> its row selected, Add Submodule" % n)
+                    dlg.select_row(1 + n)
+                    dlg.press("Add Submodule", settle=1.5)
+                    more = self.session.dismiss_errors()
+                    if more:
+                        raise SyconError("Add Submodule on slot %d refused: %r" % (n, more))
+                errs = dlg.apply()
             if errs:
                 raise SyconError("Apply refused: %r" % errs)
             dlg.close(keep=True)
@@ -263,21 +275,24 @@ class SyconDriver:
         log("modules plugged on %s: %r" % (station, chosen))
         return chosen
 
-    def plug_submodules(self, station, slot, wanted, existing_subs=1):
+    def plug_submodules(self, station, slot, wanted, first_subslot=2):
         """wanted: [(subslot, submodule text)] in subslot order, appended under the module in `slot` (an AL1202's
-        `8 Ports` in slot 1 holds the IO-Link Master in sub 1 by default = `existing_subs`). Draft of 2026-10-23
-        evening - the grid mechanics assumed equal to the module rows' - to be verified on the VM
-        (scripts/probe_submodules.py) before the LOWER SORTER build plugs its 19 AL1202."""
+        `8 Ports` in slot 1 holds the IO-Link Master in sub 1; SYCON.net numbers every added submodule itself,
+        from `first_subslot` on, so the wanted subslots must be exactly that sequence). Each 'Add Submodule'
+        appends a row at the end of the grid; its submodule is chosen through the in-place combo."""
+        expected = list(range(first_subslot, first_subslot + len(wanted)))
+        if [sub for sub, _t in wanted] != expected:
+            raise SyconError("subslots %r wanted on %s slot %d, SYCON.net assigns %r" % (
+                [sub for sub, _t in wanted], station, slot, expected))
         dlg = DeviceDialog(self.session, station)
         chosen = []
         try:
             dlg.modules_page()
             row = 1 + slot                      # the DAP is row 1, the slots contiguous from 1
-            dlg.expand_row(row)
-            for i, (subslot, text) in enumerate(wanted):
-                dlg.add_submodule(row)
-                sub_row = row + existing_subs + 1 + i
-                dlg.set_subslot(sub_row, subslot)
+            if not dlg.is_expanded(row):
+                dlg.expand_row(row)
+            for _subslot, text in wanted:
+                sub_row = dlg.add_submodule(row)
                 chosen.append(dlg.set_submodule(sub_row, text))
             errs = dlg.apply()
             if errs:

@@ -224,24 +224,44 @@ and moves the rest to `GSDML_superseded_<date>` beside the folder. **Never move 
 start, which fails without its source folder ("Configuration failed" 1603, 2026-10-23 16:04) - put them back
 and SYCON.net starts again. The `#Siemens-PreConf_` per-node exports and the `_MOD_` SCALANCE files are left to
 the user; a project saved against a moved GSDML loses its DTM (the spike fixtures reference the 2021 ET200SP).
-Reload the catalog (Network > Device Catalog > Reload) after any change to the folder.
+Reload the catalog (Network > Device Catalog > Reload) after any change to the folder. **The newest file is not
+always the usable one**: with the 2024 `GSDML-V2.43-Siemens-ET200SP-20240425.xml` SYCON.net 1.500 logs
+`CreateSubModule failed` / `GetIOProperties failed` in the Output window and the first DI module ended "without
+submoduls" on Apply (two builds, 17:21 and 17:36, the 2024 file alone in the folder); the afternoon smoke with
+the 2021 V2.35 file had plugged them fine. The user re-imported the 2021 file and the database names it (user
+2026-10-23: "use the 2021 gsdml"); the dedupe script never moves a file the database names (`--database`,
+default `Shared/HardwareConfigBuilderData/SyconDeviceTypesDatabase.csv`). **One file per device identity**: with
+both ET200SP files installed (17:57 build) the catalog shows two `IM 155-6 PN ST V4.2` entries, the driver
+dragged the one whose pane cites the 2021 file, the 7 modules plugged with their submodules - and the saved
+device still records `deviceTypeInformation` = the 2024 file: the generic DTM resolves the GSDML by vendor /
+device / DAP identity, not by the catalog entry, so the verification's GSDML check fails (48 PASS, 1 FAIL) until
+the 2024 file leaves the folder (moved by hand to `GSDML_superseded_<date>`, catalog reloaded). The DAP suffix
+of the catalog item still works where the DAPs differ (the coupler: the V4.2 DAP saved from entry 2 of 5).
 
 **Catalog versions** (user 2026-10-23: "the pnpncoupler that was inserted was the wrong version"): the catalog shows
-one same-named entry per GSDML file (five `PN/PN Coupler X2`, five `X1` before the reload), and nothing in the tree
-tells them apart - the info pane under the catalog (RichEdit20W 59664, `Session.catalog_info`) does: its `Device:`
-block cites the file in brackets, `[GSDML-V2.35-Siemens-PNPNIOC-20200924.xml]`. `catalog.catalog_item(session,
-kind, item, gsdml)` selects the same-named entries one by one until the pane cites the wanted file (the index found
-last is tried first), and refuses with the files it saw when none does; the device-types database's GSDML column
-is that file, `hw/sycon-stations` carries it per station, and `verify` compares it with the saved device's
-`deviceTypeInformation`. Without a GSDML the first entry is taken and its file logged.
+one same-named entry per GSDML file AND per DAP of a file, and nothing in the tree tells them apart - the info pane
+under the catalog (RichEdit20W 59664, `Session.catalog_info`) does: its `Device:` block cites the DAP and the file
+in brackets, `firmware V4.2 [0x00010006] [DAP X2 V4.2] [GSDML-V2.35-Siemens-PNPNIOC-20200924.xml]`. Probed 17:00:
+the five `PN/PN Coupler X2` entries all come from that one file and are its DAPs V1.0 (`DAP V2.1 X2`, order
+6ES7 158-3AD00), V2.2, V3.0, V4.0 and V4.2 (entry 5, order 6ES7 158-3AD10 = the I/O List's part; the smoke project
+of 15:38 had taken entry 1, the V1.0 DAP). So the device-types database names the catalog item with the DAP as a
+bracketed suffix, `PN/PN Coupler X2 [DAP X2 V4.2]`, beside the GSDML column; `catalog.catalog_item(session, kind,
+item, gsdml)` splits the suffix (`split_item`) and selects the same-named entries one by one until the pane cites
+the wanted file and DAP (the index found last is tried first), refusing with the tokens it saw when none does
+(a wrong file was refused, 16:57). `read_project` now reads the saved DAP id and its order number (slot 0's
+`PNIOModuleBasic`), and `verify` checks the GSDML, the type name, the DAP and the order number against the
+model id - the oracle of the version. Without a GSDML or a variant the first entry is taken and its info logged.
+Speed: `_kind_node` / `catalog_item` look at the direct children of a tree node only - walking the whole catalog
+tree cost 15-30 s per lookup; `Session.project_tree` likewise looks at each tree's root item only (it used to walk
+the catalog tree looking for `Project:` - that was most of the ~50 s per station of the afternoon).
 
 **Cloning** (user: "once a device of a type was placed, Copy, Click, Paste in the left tab is a quick way to
 replicate (see the .ahk script)"): `SyconDriver.clone_station(source, count)` selects the source node in the
-netProject tree, posts the context menu's Copy (34503), selects it again and posts Paste (34504) - the keystrokes
-Ctrl+C / Ctrl+V as the fallback - and reads the new node from the tree; SYCON.net names a clone `<source>-001`,
-`-002` and the rename pass maps them like any auto name. The consumer adds only the first station of each
-(kind, catalog item, GSDML) from the catalog and clones the rest. Written 2026-10-23 evening, to be verified on
-the VM (the smoke build with cloning, then the 55-station build).
+netProject tree, sends Ctrl+C, selects it again, sends Ctrl+V and reads the new node from the tree; SYCON.net
+names a clone `<source>-001`, `-002` (the AL1202 cloned twice, 17:00) and the rename pass maps them like any
+auto name. The context menu's Copy / Paste command ids (34503 / 34504) posted to the main window produce
+nothing - they stay as the fallback. The consumer adds only the first station of each (kind, catalog item,
+GSDML) from the catalog and clones the rest.
 
 **IO-Link ports (AL1202)** (user 2026-10-23: "how to configure the modules for the iolink devices, rules in the
 file" = `TAG_IFM_PROFINET_AL1202_R0.17.xlsm`, the Fives IO creator tool: its sheet `Tab` and the `DATA INSER`
@@ -262,9 +282,25 @@ verified on the VM), Module Text = the submodule. LOWER SORTER (19 AL1202, 152 p
 In/Out 32/32 (the modulators), 21 Digital Input, 14 Out 2 Byte (stack lights), 10 In 2 Byte, 1 Digital Output.
 Consumer side: `read_project` lists the submodules (`STLSubModuleMap/<sub>/PNIOSubModuleBasic`; the smoke
 project's AL1202 shows slot 1 `8 Ports` / sub 1 `IO-Link Master` only), `verify` compares every port row with
-them (spacing collapsed), `SyconDriver.plug_submodules(station, slot, [(subslot, text)])` is a DRAFT (Add
-Submodule under the expanded module row, Subslot combo 1901, submodule combo 1904 assumed like the module rows,
-no scrolling yet) - `scripts/probe_submodules.py` is the probe to run on the VM first (nothing saved).
+them (spacing collapsed), `SyconDriver.plug_submodules(station, slot, [(subslot, text)])` plugs them - verified
+17:12 (`scripts/probe_plug_ports.py`: the 8 ports of n0035 plugged in 200 s, saved as `Smoke_ports.spj`, 8 of
+8 read back as wanted; 81 s for 8 ports in the 17:57 build after the grid rectangle was cached and the texts
+read through win32).
+**Smoke 4 stations** (17:47-17:57, `spike/references/LowerSorter/smoke4_*`): controller, coupler [DAP X2 V4.2],
+ET200SP with 7 modules, AL1202 + its clone with 8 ports each - 598 s, 48 PASS, 1 FAIL (the ET200SP GSDML path,
+see "one file per device identity" above). Per station: a catalog add ~25 s, a clone 12 s, the rename / IP pass
+~1 min for 4, 7 modules 58 s, 8 ports 81 s. The module pass of the 17:21 / 17:36 builds was refused ("Slot [1]
+contains a module without submoduls") - the recovery now selects the row of each slot the error names before
+`Add Submodule` (pressed with another row current it answers "No possible submodule found"), and the module
+combo is never re-opened on a row where it is already open (`_open_combo_on`); the 17:57 build needed neither. The Modules grid, probed with `scripts/probe_submodules.py` (17:05): the AL1202's
+`8 Ports` row (row 2) shows its `IO-Link Master` sub row from the start (`is_expanded` counts the text bands
+against `Use of slots`, so `expand_row` is only double-clicked when needed); `Add Submodule` with the module row
+selected appends a row at the END with the next subslot assigned by SYCON.net (2, 3, ... - its Sub Slot cell opens
+no editor, so the table's subslots must be exactly 2..9) and the GSDML's first submodule preselected (`IO-Link
+In/Out 32/32 Byte + PQI`; the `State of data length` text changes - the proof the press worked, pressed again when
+an in-place editor swallowed it); its Submodule cell (x+150) opens the in-place ComboBox 1904 with the 22 port
+submodules, texts verbatim the Fives tool's. The grid shows 8 rows: before every press the grid is wheeled to the
+top (the module row at its place), after it to the end, and the new row is the last text band.
 
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
@@ -278,9 +314,9 @@ everything with the repo venv (`C:\Source\Repos\_Openn5\.venv\Scripts\python -I`
 | `catalog.py` | `add_device(session, kind, item, gsdml)`: the catalog tree item (PROFINET IO > Master / Slave / Gateway, the same-named entry whose info pane cites the GSDML file), the drag-drop with the tree as oracle, `parse_node` of a tree label |
 | `dialog.py` | `ConfigDialog`: open from the context menu, `select_page` (UIA), win32 `controls()` (ids ≥ 1900), `press` (BM_CLICK), `apply`, `close(keep)` (Cancel → Question Yes/No, Warning Yes/No, Error → raise), `ok` |
 | `controller.py` | `ControllerDialog`: `set_network(ip, mask, gw)` (+ the subnet Warning), `device_rows` / `find_row` / `set_station_name`, `set_station_ip` |
-| `device.py` | `DeviceDialog`: `add_module`, `set_module(row, text)`, `resolve_module(row, "order:<no>")`, `set_slot`, `expand_row`, `select_row`, `dataset("Parameter")`, `set_param_visual`, `set_parameters({index: value})` (wheel scrolling with the pixel shift measured); drafts `add_submodule`, `set_subslot`, `set_submodule` |
-| `readback.py` | `read_project(xml or spj)` → `Project` / `Device` (name, ip, mask, gateway, gsdml, `slots`, `submodules`, `records`, the controller's `network`), `describe` |
-| `driver.py` | `SyconDriver`: `open(project)`, `new_project`, `add_controller`, `add_station(item, kind, gsdml)`, `clone_station(source, count)`, `set_controller_network`, `set_station_name_ip`, `rename_stations({old: (new, ip)})`, `plug_modules(station, specs)`, `plug_module(station, module, slot)`, `plug_submodules(station, slot, [(subslot, text)])` (draft), `set_parameters(station, slot, {index: value})`, `save_as`, `save`, `read_back`, `close` |
+| `device.py` | `DeviceDialog`: `add_module`, `set_module(row, text)`, `resolve_module(row, "order:<no>")`, `set_slot`, `expand_row`, `is_expanded`, `select_row`, `visible_rows` / `scroll_to_end` (text bands of the Modules grid), `add_submodule(module_row)` → the new row, `set_submodule(row, text)`, `dataset("Parameter")`, `set_param_visual`, `set_parameters({index: value})` (wheel scrolling with the pixel shift measured) |
+| `readback.py` | `read_project(xml or spj)` → `Project` / `Device` (name, ip, mask, gateway, gsdml, `dap`, `order_no`, `slots`, `submodules`, `records`, the controller's `network`), `describe` |
+| `driver.py` | `SyconDriver`: `open(project)`, `new_project`, `add_controller`, `add_station(item, kind, gsdml)` (item = `name [DAP]`), `clone_station(source, count)`, `set_controller_network`, `set_station_name_ip`, `rename_stations({old: (new, ip)})`, `plug_modules(station, specs)`, `plug_module(station, module, slot)`, `plug_submodules(station, slot, [(subslot, text)])`, `set_parameters(station, slot, {index: value})`, `save_as`, `save`, `read_back`, `close` |
 
 - **Verification**: every operation checks the GUI (the tree label, the reopened cell, the editor's text) and
   the round ends with `read_back` on the saved file — `tests/test_readback.py` pins the parser on the two
@@ -295,9 +331,9 @@ everything with the repo venv (`C:\Source\Repos\_Openn5\.venv\Scripts\python -I`
   closing the editor with a click elsewhere left the module without its submodule ("Slot [1] contains a module
   without submoduls" on Apply); the driver also recovers from that message with `Add Submodule` + Apply.
 - **Not yet in the driver**: Remove, the base project's other device types, SYCON.net launched without a
-  project (it is launched on the scratch base project, then File > New). Drafted and not yet verified on the
-  VM: station cloning, the submodule rows (an AL1202's ports). Done since: a second station of the same type
-  (the rename pass maps SYCON's `-001` names), the PL5 handoff consumption (`consumer.py`).
+  project (it is launched on the scratch base project, then File > New). Done since round 3: a second station
+  of the same type (the rename pass maps SYCON's `-001` names; cloning), the PL5 handoff consumption
+  (`consumer.py`), the submodule rows (an AL1202's ports), the catalog entry by GSDML file and DAP.
 
 ### Scripts (`spike/scripts/`, run from `spike\` with the repo venv: `..\..\.venv\Scripts\python -I scripts\<name>.py ...`)
 

@@ -305,8 +305,11 @@ class Session:
             yield from Session._iter_items(c)
 
     def project_tree(self):
+        """The netProject tree = the Tree whose root item is `Project: <name>` (only the root is looked at: walking
+        every item of the device catalog tree instead cost 15-30 s per call, 2026-10-23)."""
         for t in self.main().descendants(control_type="Tree"):
-            if any(i.window_text().startswith("Project:") for i in self._iter_items(t)):
+            first = [c for c in t.children() if c.element_info.control_type == "TreeItem"][:1]
+            if first and first[0].window_text().startswith("Project:"):
                 return t
         raise SyconError("netProject tree not found")
 

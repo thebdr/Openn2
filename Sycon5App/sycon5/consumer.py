@@ -11,6 +11,7 @@ of SYCON.net loses little; `--resume` reopens the saved project and skips what t
 import os
 import time
 
+from .catalog import split_item
 from .driver import SyconDriver
 from .handoff import load_handoff
 from .readback import read_project
@@ -63,6 +64,13 @@ def verify(handoff, project, plugged):
                     "station %s GSDML %s (read %s)" % (name, s["gsdml"], d.gsdml))
         else:
             v.note("station %s type %r from %s (no GSDML in the table)" % (name, d.type_name, d.gsdml))
+        type_name, variant = split_item(s["catalog_item"])
+        v.check(same_text(d.type_name, type_name), "station %s type %r (read %r)" % (name, type_name, d.type_name))
+        if variant:
+            v.check(same_text(d.dap, variant), "station %s DAP %s (read %r)" % (name, variant, d.dap))
+        if d.order_no and s.get("model_id"):          # the DAP's order number = the I/O List's Part No.
+            v.check(d.order_no.replace(" ", "").upper() == s["model_id"].replace(" ", "").upper(),
+                    "station %s model %s (the saved DAP %r is order %s)" % (name, s["model_id"], d.dap, d.order_no))
         rows = handoff.plug_rows(s["station_name"])
         if rows:
             slots = {k: v_ for k, v_ in d.slots.items() if k != 0}

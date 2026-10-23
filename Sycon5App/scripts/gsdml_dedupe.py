@@ -5,9 +5,11 @@
 A family = the vendor + family part of the file name (`GSDML-V<schema>-<vendor>-<family>-<yyyymmdd>[suffix].xml`),
 normalised (case, spaces, underscores, hyphens). Files with a hand-modification suffix (`_MOD_...`) and the
 `#<Vendor>-PreConf_...` per-node exports are their own families (kept, reported) - which of them is "the
-newest" is the user's call.
+newest" is the user's call. The files the device-types database names (its GSDML column) are never moved: the
+newest is not always the usable one (SYCON.net 1.500 fails the submodules of the 2024 V2.43 ET200SP file; the
+2021 V2.35 one works - user 2026-10-23).
 
-Usage:  python -I scripts/gsdml_dedupe.py [--apply] [--folder <GSDML folder>]
+Usage:  python -I scripts/gsdml_dedupe.py [--apply] [--folder <GSDML folder>] [--database <SyconDeviceTypesDatabase.csv>]
 """
 import argparse
 import datetime
@@ -52,9 +54,28 @@ def installer_owned(folder, files):
     return {f for f in files if "hilscher" in f.lower() or (stamp is not None and int(os.path.getmtime(os.path.join(folder, f))) == stamp)}
 
 
-def plan(folder):
+DATABASE_DEFAULT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                                "Shared", "HardwareConfigBuilderData", "SyconDeviceTypesDatabase.csv")
+
+
+def pinned_files(database):
+    """The GSDML files the device-types database names (column 5), lower-cased."""
+    if not database or not os.path.exists(database):
+        return set()
+    import csv
+    with open(database, encoding="utf-8-sig") as f:
+        rows = [ln for ln in f.read().splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+    out = set()
+    for row in csv.reader(rows):
+        if len(row) > 4 and row[4].strip().lower().endswith(".xml"):
+            out.add(row[4].strip().lower())
+    return out
+
+
+def plan(folder, database=None):
     files = sorted(f for f in os.listdir(folder) if f.lower().endswith(".xml") and os.path.isfile(os.path.join(folder, f)))
     owned = installer_owned(folder, files)
+    pinned = pinned_files(database)
     groups, odd = classify(files)
     keep, move, notes = [], [], []
     for key, items in sorted(groups.items()):
@@ -63,6 +84,9 @@ def plan(folder):
         for it in items[1:]:
             if it["file"] in owned:
                 notes.append(it["file"] + "   (installer-owned: never moved)")
+                continue
+            if it["file"].lower() in pinned:
+                notes.append(it["file"] + "   (named by the device-types database: never moved)")
                 continue
             move.append((it["file"], items[0]["file"]))
         if items[0]["special"]:
@@ -74,8 +98,9 @@ def main(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument("--folder", default=r"C:\ProgramData\SYCONnet\PROFINET\GSDML")
     p.add_argument("--apply", action="store_true", help="move the superseded files (default: dry run)")
+    p.add_argument("--database", default=DATABASE_DEFAULT, help="the device-types database whose GSDML files are never moved")
     a = p.parse_args(argv)
-    keep, move, notes, odd = plan(a.folder)
+    keep, move, notes, odd = plan(a.folder, a.database)
     print("GSDML files: %d | kept %d | superseded %d | special (kept, your call) %d | unparsed %d"
           % (len(keep) + len(move), len(keep), len(move), len(notes), len(odd)))
     for f, by in move:

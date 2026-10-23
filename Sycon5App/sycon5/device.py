@@ -17,12 +17,13 @@ import win32con
 from pywinauto import keyboard, mouse
 
 from .dialog import ConfigDialog
-from .drawing import capture
+from .drawing import capture, text_bands
 from .session import SyconError, log
 
 MODULES_PAGE = "Modules"
 MODULES_GRID_ID, PARAM_GRID_ID, IO_GRID_ID = "321", "320", "322"
 DATASET_COMBO_ID, DISPLAY_COMBO_ID = 311, 312
+SLOTS_TEXT_ID, DATA_LENGTH_TEXT_ID = 310, 293          # 'Use of slots: 2/2', 'State of data length: Input ...'
 SLOT_COMBO_ID, MODULE_COMBO_ID, EDITOR_ID = 1901, 1904, 1902
 ROW_Y0, ROW_H = 26, 16             # an 18 px header, 16 px rows (editor rectangles, 2026-10-23)
 GLYPH_X, ICON_X, SLOT_X, MODULE_X, RIGHT_X = 17, 9, 60, 150, 560
@@ -36,15 +37,32 @@ def row_y(n):
 
 class DeviceDialog(ConfigDialog):
     # ---- Modules grid -------------------------------------------------------------------------------------
+    _grid = None
+
     def modules_page(self):
         self.select_page(MODULES_PAGE)
-        return self.pane(MODULES_GRID_ID).rectangle()
+        self._grid = self.pane(MODULES_GRID_ID).rectangle()
+        return self._grid
+
+    def grid_rect(self):
+        """The Modules grid rectangle, read once per page selection (every UIA descendants walk of the dialog
+        costs about a second)."""
+        if self._grid is None:
+            self._grid = self.pane(MODULES_GRID_ID).rectangle()
+        return self._grid
+
+    def _static(self, cid):
+        """The text of a win32 Static of the dialog by control id (fast; the UIA Text walk is slow)."""
+        for c in self.w32.descendants(class_name="Static"):
+            if c.control_id() == cid:
+                return c.window_text()
+        return ""
 
     def slots_used(self):
-        t = self.texts("Use of slots")
+        t = self._static(SLOTS_TEXT_ID) or (self.texts("Use of slots") or [""])[0]
         if not t:
             raise SyconError("'Use of slots' text not found")
-        return int(t[0].split(":")[1].split("/")[0])
+        return int(t.split(":")[1].split("/")[0])
 
     def _close_dropdowns(self):
         for c in self.controls(("ComboBox",)):
@@ -54,18 +72,31 @@ class DeviceDialog(ConfigDialog):
         """Append a module row; returns its row index (1 = DAP, so the new row is the new slot count)."""
         before = self.slots_used()
         for attempt in range(3):          # a first press only closes an open in-place editor
-            self.press("Add Module", settle=1.5)
+            self.press("Add Module", settle=1.2)
             after = self.slots_used()
             if after == before + 1:
                 return after
             log("  Add Module: slots still %d (attempt %d)" % (after, attempt + 1))
         raise SyconError("Add Module: slots %d -> %d" % (before, after))
 
+    def _open_combo_on(self, y):
+        """The in-place module combo when it is already open on the row at grid offset y (re-opening it cost a
+        module its submodule, round 3)."""
+        for cb in self.controls(("ComboBox",), cid=MODULE_COMBO_ID):
+            rc = cb.rectangle()
+            if abs((rc.top + rc.bottom) // 2 - y) <= ROW_H // 2 + 2:
+                return cb
+        return None
+
     def module_combo(self, row):
-        r = self.modules_page()
+        r = self.grid_rect()
+        y = r.top + row_y(row)
         for attempt in range(3):          # a first click may only close an editor left open on another cell
-            mouse.click(coords=(r.left + MODULE_X, r.top + row_y(row)))
-            time.sleep(1.5)
+            cb = self._open_combo_on(y)
+            if cb is not None:
+                return cb
+            mouse.click(coords=(r.left + MODULE_X, y))
+            time.sleep(1.0)
             cb = self.controls(("ComboBox",), cid=MODULE_COMBO_ID)
             if cb:
                 return cb[0]
@@ -84,7 +115,7 @@ class DeviceDialog(ConfigDialog):
             except (IndexError, ValueError) as ex:
                 self._close_dropdowns()
                 raise SyconError("module %r not offered on row %d: %s" % (text, row, ex))
-            time.sleep(1.5)
+            time.sleep(1.0)
         else:
             self._close_dropdowns()
         self.select_row(row)
@@ -114,7 +145,7 @@ class DeviceDialog(ConfigDialog):
         return (plain or matches)[0]
 
     def set_slot(self, row, slot):
-        r = self.modules_page()
+        r = self.grid_rect()
         mouse.click(coords=(r.left + SLOT_X, r.top + row_y(row)))
         time.sleep(1.2)
         cb = self.controls(("ComboBox",), cid=SLOT_COMBO_ID)
@@ -128,28 +159,62 @@ class DeviceDialog(ConfigDialog):
         time.sleep(0.6)
 
     def expand_row(self, row):
-        r = self.pane(MODULES_GRID_ID).rectangle()
+        r = self.grid_rect()
         mouse.double_click(coords=(r.left + GLYPH_X, r.top + row_y(row)))
         time.sleep(1.2)
         self._close_dropdowns()
 
     def select_row(self, row):
-        r = self.pane(MODULES_GRID_ID).rectangle()
+        r = self.grid_rect()
         mouse.click(coords=(r.left + ICON_X, r.top + row_y(row)))
-        time.sleep(0.8)
+        time.sleep(0.6)
         self._close_dropdowns()
 
     # ---- submodules (an AL1202's ports) -------------------------------------------------------------------
-    # Draft of 2026-10-23 evening, to be verified on the VM (scripts/probe_submodules.py): 'Add Submodule' with
-    # the (expanded) module row selected appends a submodule row under its existing ones; the new row's Subslot
-    # cell (x+60) is assumed to open ComboBox 1901 and its Submodule cell (x+150) ComboBox 1904 like a module
-    # row's; rows beyond the grid's ~8 visible ones still need scrolling (open).
-    def add_submodule(self, module_row):
-        self.select_row(module_row)
-        self.press("Add Submodule", settle=1.5)
+    # Probed 2026-10-23 17:05 (scripts/probe_submodules.py): the AL1202's `8 Ports` row (row 2) shows its
+    # `IO-Link Master` sub row (row 3) from the start; 'Add Submodule' with the module row selected appends a
+    # submodule row at the end with the NEXT subslot assigned by SYCON.net (2, 3, ...; its Sub Slot cell opens
+    # no editor) and the first submodule of the GSDML preselected (`IO-Link In/Out 32/32 Byte + PQI`, 22 items,
+    # the texts of the Fives tool verbatim); its Submodule cell (x+150) opens the in-place ComboBox 1904 like a
+    # module row's. The grid shows 8 rows: the new row is found as the last text band after scrolling to the end.
+    def visible_rows(self):
+        """The visual row indices (1 = the first row under the header) that carry text."""
+        return [y // ROW_H for y, n in text_bands(self.grid_rect(), ROW_H) if y >= ROW_H and n > 100]
 
-    def set_subslot(self, row, subslot):
-        self.set_slot(row, subslot)
+    def data_length(self):
+        return self._static(DATA_LENGTH_TEXT_ID) or (self.texts("State of data length") or [""])[0]
+
+    def scroll_to_end(self, up=False):
+        """Wheel the Modules grid down (up) until nothing shifts any more."""
+        r = self.grid_rect()
+        for _ in range(12):
+            if self._scroll_pixels(r, -3 if up else 3) <= 0:
+                return
+        raise SyconError("the Modules grid keeps scrolling")
+
+    def is_expanded(self, module_row, slots_used=None):
+        """A module row is expanded when the grid shows more rows than the DAP + the modules."""
+        slots_used = slots_used if slots_used is not None else self.slots_used()
+        return len(self.visible_rows()) > slots_used
+
+    def add_submodule(self, module_row):
+        """Append a submodule row under the module (the module row must be expanded and selected); returns the
+        visual row of the new submodule (the last row of the grid, scrolled into view)."""
+        before = self.data_length()
+        self.scroll_to_end(up=True)       # the module row at its unscrolled place
+        self.select_row(module_row)
+        for attempt in range(3):          # a first press only closes an open in-place editor
+            self.press("Add Submodule", settle=1.2)
+            if self.data_length() != before:
+                break
+            log("  Add Submodule: data length unchanged (attempt %d)" % (attempt + 1))
+        else:
+            raise SyconError("Add Submodule added nothing (data length %r)" % before)
+        self.scroll_to_end()
+        rows = self.visible_rows()
+        if not rows:
+            raise SyconError("no rows visible in the Modules grid after Add Submodule")
+        return rows[-1]
 
     def set_submodule(self, row, text):
         """Choose a submodule row's submodule by text (spacing collapsed, case ignored) through the in-place combo."""
@@ -162,7 +227,7 @@ class DeviceDialog(ConfigDialog):
         current = cb.selected_text()
         if current != match[0]:
             cb.select(match[0])
-            time.sleep(1.5)
+            time.sleep(1.0)
         else:
             self._close_dropdowns()
         self.select_row(row)
@@ -196,14 +261,20 @@ class DeviceDialog(ConfigDialog):
         return prof
 
     def _scroll_pixels(self, r, notches):
-        """Scroll the parameter grid by wheel notches; returns the measured pixel shift of its text."""
+        """Scroll a grid by wheel notches (negative = up); returns the measured pixel shift of its text (0 when
+        nothing moved)."""
         before = self._dark_profile(r)
         mouse.scroll(coords=(r.left + r.width() // 2, r.top + r.height() // 2), wheel_dist=-notches)
         time.sleep(1.0)
         after = self._dark_profile(r)
+        if before == after:
+            return 0
         best, best_err = 0, None
         for s in range(0, r.height() - 20):
-            err = sum(abs(before[y + s] - after[y]) for y in range(18, r.height() - s))
+            if notches >= 0:
+                err = sum(abs(before[y + s] - after[y]) for y in range(18, r.height() - s))
+            else:
+                err = sum(abs(before[y] - after[y + s]) for y in range(18, r.height() - s))
             err = err / max(1, (r.height() - s - 18))
             if best_err is None or err < best_err:
                 best, best_err = s, err
