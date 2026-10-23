@@ -120,14 +120,14 @@ class Session:
         raise SyconError("the main window did not appear")
 
     def close(self, timeout=30.0):
-        """Close SYCON.net WITHOUT saving: Alt+F4, answer No to the save prompt, kill if stuck."""
+        """Close SYCON.net WITHOUT saving: WM_CLOSE to its own main window (never a key to the foreground window),
+        answer No to the save prompt, kill if stuck."""
         if not self.is_alive():
             return "not running"
         self.dismiss_errors()
         self.close_menus()
         try:
-            self.bring_front()
-            keyboard.send_keys("%{F4}")
+            user32.PostMessageW(self.main().handle, 0x0010, 0, 0)        # WM_CLOSE
         except Exception:  # noqa: BLE001
             pass
         t0 = time.time()
@@ -153,11 +153,34 @@ class Session:
         return self.main().window_text()
 
     def bring_front(self):
-        try:
-            self.main().set_focus()
-        except Exception:  # noqa: BLE001
-            pass
-        time.sleep(0.5)
+        """Put the main window above everything (the Claude app window covers it when the user is away): the
+        window is made TOPMOST for the session (clicks then reach it; a click also gives it the keyboard focus),
+        SetForegroundWindow is attempted on top of that (Windows may refuse it to a background process - fine).
+        Verified by the pixel owner at two points. No key is ever sent to an unknown foreground window."""
+        import win32con
+        import win32gui
+        main = self.main()
+        hwnd = main.handle
+        flags = win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE
+        for attempt in range(3):
+            try:
+                if win32gui.IsIconic(hwnd):
+                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, flags)
+            except Exception as ex:  # noqa: BLE001
+                log("bring_front: SetWindowPos failed:", ex)
+            try:
+                win32gui.SetForegroundWindow(hwnd)
+            except Exception:  # noqa: BLE001 - refused to a background process; TOPMOST is enough for the clicks
+                pass
+            time.sleep(0.5)
+            r = main.rectangle()
+            h, owner = pid_at_point((r.left + r.right) // 2, (r.top + r.bottom) // 2)
+            h2, owner2 = pid_at_point(r.right - 300, r.top + 300)      # the catalog side
+            if owner == self.pid and owner2 == self.pid:
+                return
+            time.sleep(1.0)
+        raise SyconError("SYCON.net cannot be brought in front (pid %d / %d covers it)" % (owner, owner2))
 
     def top_windows(self):
         """Visible top-level windows of the process (win32 enumeration), as UIA wrappers."""
