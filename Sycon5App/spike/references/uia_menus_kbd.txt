@@ -1,0 +1,24 @@
+==== Alt+f: popup=True
+  MenuItem | 'New' | auto=57600
+  MenuItem | 'Open...' | auto=57601
+  MenuItem | 'Close' | auto=57602
+  MenuItem | 'Save' | auto=57603
+  MenuItem | 'Save as...' | auto=57604
+  MenuItem | 'No Project List' | auto=57616
+  MenuItem | 'Exit' | auto=57665
+==== Alt+v: popup=True
+  MenuItem | 'Status bar' | auto=59393
+  MenuItem | 'Standard' | auto=59392
+  MenuItem | 'Layout' | auto=59502
+  MenuItem | 'Network' | auto=59592
+  MenuItem | 'Debug' | auto=59593
+  MenuItem | 'netDevice' | auto=59492
+  MenuItem | 'netProject' | auto=59493
+  MenuItem | 'Output Window' | auto=59501
+==== Alt+d: popup=False
+==== Alt+n: popup=False
+==== Alt+e: popup=False
+==== Alt+h: popup=True
+  MenuItem | 'Content and Index' | auto=57669
+  MenuItem | 'Hilscher on the web' | auto=32770
+  MenuItem | 'About' | auto=57664
