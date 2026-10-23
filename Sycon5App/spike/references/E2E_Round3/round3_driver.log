@@ -1,0 +1,39 @@
+14:33:04 opened: SYCON.net - [AutomateSyconProj_BaseProj.spj]
+14:33:14 new project: SYCON.net - [Untitled.spj] ['Project: Untitled']
+14:33:19 lines: grey root dy=52 green=None
+14:33:35 drop 'CIFX RE/PNM' at (400, 52) errors [] new ['CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)']
+14:33:35 controller added: {'symbolic': 'CIFX_RE_PNM', 'type': 'CIFX RE/PNM', 'station': 'controller', 'suffix': '(#1)'}
+14:33:52 lines: grey root dy=52 green=('h', 72, 432, 948)
+14:34:19 drop 'IM 155-6 PN ST V4.2' at (602, 72) errors [] new ['IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<et200sp>']
+14:34:19 station added: {'symbolic': 'IM_155-6_PN_ST_V4.2', 'type': 'IM 155-6 PN ST V4.2', 'station': 'et200sp', 'suffix': ''}
+14:34:42 dialog: netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)
+14:34:45   network control 213 -> 192.168.2.1
+14:34:56 Warning: Changing subnet will automatically modify IP addresses for PN Devices in the configuration by using this new subnet.Pro -> Yes
+14:34:57 dialog closed after OK
+14:35:24 dialog: netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)
+14:36:01   Device Table row y+30: name -> 'n0005-ms1-k2501'
+14:36:08   IP Address Table row y+30: 192.168.2.2 -> 192.168.2.5
+14:36:10 dialog closed after OK
+14:36:21 station et200sp -> n0005-ms1-k2501 @ 192.168.2.5
+14:36:39 dialog: netProject - Configuration IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<n0005-ms1-k2501>
+14:36:57   row 2 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 8x24VDC HF V2.0  [6ES7 131-6BF00-0CA0]'
+14:37:02 dialog closed after Cancel
+14:37:05 module plugged on n0005-ms1-k2501: 'DI 8x24VDC HF V2.0  [6ES7 131-6BF00-0CA0]' (row 2)
+14:37:24 dialog: netProject - Configuration IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<n0005-ms1-k2501>
+14:37:39   parameter visual row 3 (Edit): -> '1'
+14:37:45   parameter visual row 2 (ComboBox): -> '0.4 ms'
+14:37:50 dialog closed after Cancel
+14:37:53 parameters set on n0005-ms1-k2501 slot 1: {2: '1', 4: '0.4 ms'}
+14:38:05 saved as: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\E2E_Round3.spj | title: SYCON.net - [E2E_Round3.spj] | errors: []
+14:38:06 stations: [{'symbolic': 'CIFX_RE_PNM', 'type': 'CIFX RE/PNM', 'station': 'controller', 'suffix': '(#1)'}, {'symbolic': 'IM_155-6_PN_ST_V4.2', 'type': 'IM 155-6 PN ST V4.2', 'station': 'n0005-ms1-k2501', 'suffix': ''}]
+C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\E2E_Round3\_S129\SYCON_net.xml
+  controller (controller) symbolic=CIFX_RE_PNM type='' ip= mask= gsdml=
+    network: n0005-ms1-k2501 192.168.2.5
+  n0005-ms1-k2501 symbolic=IM_155-6_PN_ST_V4.2 type='IM 155-6 PN ST V4.2' ip=192.168.2.5 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml
+    slot 0: IM 155-6 PN ST V4.2
+    slot 1: DI 8x24VDC HF V2.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 03 10 83 00 00 86 00 00 86 00 00 86 00 00 86 00 00 86 00 00 86 00 00 86 00 00 00
+    record slot 1 sub 1 index 243: 00 00 00 00 00 00
+14:38:06 ROUND 3 VERIFIED: n0005-ms1-k2501 192.168.2.5 DI 8x24VDC HF V2.0 00 03 10 83
+14:38:08 close: closed

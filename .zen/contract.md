@@ -315,6 +315,13 @@ release) live as `P-xxx` deltas under **Pending Contract Deltas**. Legacy apps (
 
 Parked ideas and not-yet-built workstreams. Promote a `P-xxx` to a `C-xxx` once agreed and underway.
 
+### P-019: Sycon5App - the SYCON.net GUI driver (2026-10-23)
+- **Date:** 2026-10-23
+- **Source:** user (2026-10-23: "resume the sycon5app activities"; the decisions of the spike brief: GUI automation only, projects built from the catalog, the PL5 hardware tables as the input, the user saves)
+- **Description:** The OP5-like consumer for Hilscher SYCON.net PROFINET projects: `Sycon5App/sycon5` drives the SYCON.net 1.500 GUI (pywinauto / UI Automation for the trees and pages, Win32 messages for the dialog buttons and the custom grids' in-place editors, a colour scan of the drawing for the bus lines) through `SyconDriver` - `new_project`, `add_controller`, `add_station` (drag-drop from the device catalog), `set_controller_network`, `set_station_name_ip` (the controller's Device Table / IP Address Table), `plug_module` (the Modules grid's module combo), `set_parameters` (the submodule's Parameter dataset, by parameter index), `save_as` / `save`, `read_back` (the saved `SYCON_net.xml` + the DTM blobs decoded: names, IPs, slots, parameter records, the controller's device list). The read-back is the oracle of every operation; the driver never saves unless asked. Brief, control maps, the four silent exits of SYCON.net and the open items (submodules, Remove, the other device types, the PL5 handoff kinds `hw/sycon-*`) in `Sycon5App/README.md`.
+- **Progress (2026-10-23):** round 3 verified on the VM `Win11-Test`: a project built by the driver alone (controller, ET200SP `n0005-ms1-k2501` @ 192.168.2.5, `DI 8x24VDC HF V2.0` in slot 1, Wire break = 1, Input delay = 0.4 ms), saved, read back and asserted (`Sycon5App/scripts/e2e_driver_round3.py`, 5 minutes); `Sycon5App/tests/test_readback.py` pins the parser on the saved fixtures.
+- **Proposed verification:** automated: the read-back tests on the fixtures; the driver round on the VM re-run after every driver change (its assertions); later the PL5 → Sycon5App handoff round-trip: `hw/sycon-stations` / `hw/sycon-modules` consumed, the saved project's names, IPs, slots and records equal to the tables.
+
 ### P-018: FVT LaPoste - generator defects found by the independent check (2026-10-07)
 - **Date:** 2026-10-07
 - **Source:** discovery (independent verification of the PL4-generated FVT safety program against the I/O List, the C&E, the templates and the old TIA blocks)

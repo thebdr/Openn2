@@ -3,6 +3,10 @@
 Layout of this folder:
 
 - `README.md` — this brief (the handoff for the next session)
+- `sycon5/` — **the driver package** (see "The driver" below): `session`, `drawing`, `catalog`, `dialog`,
+  `controller`, `device`, `readback`, `driver` (the `SyconDriver` facade)
+- `tests/test_readback.py` — the read-back on the two fixtures (no GUI); `scripts/e2e_driver_round3.py` — the
+  driver end to end on the VM (writes one project into `spike/scratch`)
 - `spike/scripts/` — the pywinauto probe scripts (read-only on the project: nothing is ever saved), listed below
 - `spike/references/` — the UI Automation dumps that are the **control maps** of the dialogs (tracked; the future
   skill's `references/`)
@@ -175,6 +179,38 @@ per device, each slave's `PNIODeviceDataModelBasic` (name, IP, mask, GSDML path)
    `plug_module(station, slot, module)`, `set_parameters(station, slot, {name: value})`, `save_as`,
    `read_back()` (the stage functions of `e2e_round1.py` are their first draft) — and the PL5 handoff kinds
    (decisions unchanged, below).
+
+## The driver — `sycon5` (2026-10-23, round 3 verified)
+
+The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run
+everything with the repo venv (`C:\Source\Repos\_Openn5\.venv\Scripts\python -I`), from `Sycon5App\`.
+
+| module | holds |
+|---|---|
+| `session.py` | the process (launch on a project, login, close without saving, kill), the main window, the top-level windows enumerated through win32 (owned dialogs, message boxes), `dismiss_errors`, `answer_box(title, button)`, `post_command` (File commands as WM_COMMAND, refused while a modal dialog is open), popup menus, `safe_click`, the netProject tree (`nodes`, `station_item`), the catalog tree, the Output log |
+| `drawing.py` | the BitBlt capture of the netDevice pane, the bus lines by colour (`locate_lines` → grey root dy, green line), the drop-point candidates, `text_bands` for custom grids |
+| `catalog.py` | `add_device(session, kind, item)`: the catalog tree item (PROFINET IO > Master / Slave / Gateway), the drag-drop with the tree as oracle, `parse_node` of a tree label |
+| `dialog.py` | `ConfigDialog`: open from the context menu, `select_page` (UIA), win32 `controls()` (ids ≥ 1900), `press` (BM_CLICK), `apply`, `close(keep)` (Cancel → Question Yes/No, Warning Yes/No, Error → raise), `ok` |
+| `controller.py` | `ControllerDialog`: `set_network(ip, mask, gw)` (+ the subnet Warning), `device_rows` / `find_row` / `set_station_name`, `set_station_ip` |
+| `device.py` | `DeviceDialog`: `add_module`, `set_module(row, text)`, `set_slot`, `expand_row`, `select_row`, `dataset("Parameter")`, `set_param_visual`, `set_parameters({index: value})` (wheel scrolling with the pixel shift measured) |
+| `readback.py` | `read_project(xml or spj)` → `Project` / `Device` (name, ip, mask, gateway, gsdml, `slots`, `records`, the controller's `network`), `describe` |
+| `driver.py` | `SyconDriver`: `open(project)`, `new_project`, `add_controller`, `add_station(item)`, `set_controller_network`, `set_station_name_ip`, `plug_module(station, module, slot)`, `set_parameters(station, slot, {index: value})`, `save_as`, `save`, `read_back`, `close` |
+
+- **Verification**: every operation checks the GUI (the tree label, the reopened cell, the editor's text) and
+  the round ends with `read_back` on the saved file — `tests/test_readback.py` pins the parser on the two
+  fixtures (run the file directly; pytest is not installed in the venv), `scripts/e2e_driver_round3.py` is the
+  whole chain on the VM: new project → controller → ET200SP → controller IP 192.168.2.1 → `n0005-ms1-k2501` @
+  192.168.2.5 → `DI 8x24VDC HF V2.0` in slot 1 → Wire break = 1, Input delay = 0.4 ms → `Save as` → read back →
+  assertions (names, IPs, the controller's list, slot 1, record bytes `10 83`). Verified 14:38, 5 minutes;
+  log in `spike/references/E2E_Round3/`.
+- **Parameters are addressed by index** within the submodule's record (0 = the first parameter row): the names
+  are not readable from the custom grid, the order comes from the GSDML; the record bytes are the proof.
+- **Module commit**: after choosing the module leave its in-place editor open (dropdown closed) and press Apply —
+  closing the editor with a click elsewhere left the module without its submodule ("Slot [1] contains a module
+  without submoduls" on Apply); the driver also recovers from that message with `Add Submodule` + Apply.
+- **Not yet in the driver**: submodule choice, Remove, a second station of the same type (`-001`), the base
+  project's other device types, SYCON.net launched without a project (it is launched on the scratch base
+  project, then File > New), the PL5 handoff consumption (the operations take plain names and texts).
 
 ### Scripts (`spike/scripts/`, run from `spike\` with the repo venv: `..\..\.venv\Scripts\python -I scripts\<name>.py ...`)
 
