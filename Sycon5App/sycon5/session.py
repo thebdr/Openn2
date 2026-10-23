@@ -284,13 +284,17 @@ class Session:
     # ---- commands -----------------------------------------------------------------------------------------
     def post_command(self, name):
         """Post a File command to the main window. Refused while a modal dialog is open."""
+        self.post_command_id(COMMANDS[name], name)
+
+    def post_command_id(self, command_id, label=""):
+        """Post an MFC command id (a menu / context-menu entry) to the main window; refused while modal."""
         open_ = self.modal_open()
         if open_:
-            raise SyconError("modal dialog open, command %r refused: %r" % (name, open_))
+            raise SyconError("modal dialog open, command %r refused: %r" % (label or command_id, open_))
         main = self.main()
         if not main.is_enabled():
-            raise SyconError("main window disabled, command %r refused" % name)
-        user32.PostMessageW(main.handle, WM_COMMAND, COMMANDS[name], 0)
+            raise SyconError("main window disabled, command %r refused" % (label or command_id))
+        user32.PostMessageW(main.handle, WM_COMMAND, command_id, 0)
 
     # ---- the netProject tree --------------------------------------------------------------------------------
     @staticmethod
@@ -324,6 +328,23 @@ class Session:
         if not trees:
             raise SyconError("device catalog tree not found")
         return trees[0]
+
+    @staticmethod
+    def same_text(a, b):
+        """SYCON.net texts compared with their spacing collapsed (`IO-Link In/Out  2/ 2 Byte + PQI`), case ignored."""
+        return " ".join(str(a).split()).lower() == " ".join(str(b).split()).lower()
+
+    def catalog_info(self):
+        """The text of the info pane under the device catalog (RichEdit20W 59664): the DTM and the device the
+        selected catalog item stands for - its GSDML file cited in brackets, `[GSDML-V2.35-Siemens-PNPNIOC-
+        20200924.xml]`. Empty when nothing is selected."""
+        for e in self.main().descendants(class_name="RichEdit20W"):
+            if e.element_info.automation_id == "59664":
+                try:
+                    return e.get_value() or ""
+                except Exception:
+                    return (e.legacy_properties() or {}).get("Value", "") or ""
+        return ""
 
     def output_log(self):
         out = []

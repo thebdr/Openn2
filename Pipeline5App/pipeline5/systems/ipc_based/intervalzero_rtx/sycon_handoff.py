@@ -6,16 +6,20 @@ the TIA workspace:
   hw/sycon-device-types  SyconDeviceTypesDatabase.csv  the hand-maintained model database phase read, shipped
                          beside the tables with its `source` cited (as phase 700 ships DeviceTypesDatabase.csv):
                          Model Id (the I/O List Part No. without spaces) -> role (controller | slave | gateway |
-                         ignore), the SYCON.net catalog item, whether the I/O List cards are plugged (`iolist`)
-                         or the catalog defaults stay (`default`)
+                         ignore), the SYCON.net catalog item, whether the I/O List cards are plugged (`iolist`),
+                         the catalog defaults stay (`default`) or the IO-Link ports are configured from the
+                         I/O List's connector rows (`iolink-ports`, the AL1202 rule below)
   hw/sycon-stations      SyconStations.csv  one row per PROFINET head of the I/O List with a mapped model:
                          Role, Station Name (the PROFINET name), Catalog Kind (master | slave | gateway),
-                         Catalog Item, Model Id, IP Address, Subnet Mask, Gateway, Device Number (col F),
-                         Description, Comment
-  hw/sycon-modules       SyconModules.csv  one row per card of a station whose database row says `iolist`:
-                         Station Name, Slot (plug order), Module Id (the card's Part No. without spaces),
-                         Module Text (the SYCON.net module name when known; empty = Sycon5App resolves it by the
-                         order number the catalog shows in brackets), Parameters (index=value | ...), Comment
+                         Catalog Item, Model Id, GSDML (the file of the catalog entry to take: the catalog lists
+                         one same-named entry per GSDML version of a device), IP Address, Subnet Mask, Gateway,
+                         Device Number (col F), Description, Comment
+  hw/sycon-modules       SyconModules.csv  one row per card of a station whose database row says `iolist`, one
+                         per port of a station whose row says `iolink-ports`: Station Name, Slot (plug order),
+                         Subslot (empty = a module row; a submodule row's subslot), Module Id (the card's Part No.
+                         without spaces; empty for a port), Module Text (the SYCON.net module name when known;
+                         empty = Sycon5App resolves it by the order number the catalog shows in brackets; the port
+                         submodule text for a port), Parameters (index=value | ...), Comment
 The head rule is the staging's (`profinet_name` opens a node); the card rule is phase 700's (each distinct slot
 tag under the head that is not the head's own tag is a card, the first row's Part No. its model). The second
 controller of a redundant pair (same IP) is skipped with an INFO; a head without a mapped model is a WARN.
@@ -38,14 +42,92 @@ DTD_FILE = "SyconDeviceTypesDatabase.csv"
 STATIONS_FILE, MODULES_FILE = "SyconStations.csv", "SyconModules.csv"
 KIND_DTD, KIND_STATIONS, KIND_MODULES = "hw/sycon-device-types", "hw/sycon-stations", "hw/sycon-modules"
 ROLES = {"controller": "master", "slave": "slave", "gateway": "gateway", "ignore": ""}
-STATIONS_KEYS = ["role", "station_name", "catalog_kind", "catalog_item", "model_id", "ip_address", "subnet_mask",
-                 "gateway", "device_number", "description", "comment"]
-STATIONS_HDR = ("# Role,Station Name,Catalog Kind,Catalog Item,Model Id,IP Address,Subnet Mask,Gateway,"
-                "Device Number,Description,Comment")
-MODULES_KEYS = ["station_name", "slot", "module_id", "module_text", "parameters", "comment"]
-MODULES_HDR = "# Station Name,Slot (plug order),Module Id,Module Text,Parameters (index=value | ...),Comment"
+STATIONS_KEYS = ["role", "station_name", "catalog_kind", "catalog_item", "model_id", "gsdml", "ip_address",
+                 "subnet_mask", "gateway", "device_number", "description", "comment"]
+STATIONS_HDR = ("# Role,Station Name,Catalog Kind,Catalog Item,Model Id,GSDML (the file of the catalog entry to take),"
+                "IP Address,Subnet Mask,Gateway,Device Number,Description,Comment")
+MODULES_KEYS = ["station_name", "slot", "subslot", "module_id", "module_text", "parameters", "comment"]
+MODULES_HDR = ("# Station Name,Slot (plug order),Subslot (empty = a module row; a submodule's subslot),Module Id,"
+               "Module Text,Parameters (index=value | ...),Comment")
+MODULE_POLICIES = ("default", "iolist", "iolink-ports")
 DEFAULT_MASK = "255.255.255.0"
 SYCON_DTD_DEFAULT = os.path.join(config.SHARED, "HardwareConfigBuilderData", DTD_FILE)
+
+# --- the IO-Link ports of an AL1202 (policy `iolink-ports`) ------------------------------------------ #
+# The rules of the Fives tool TAG_IFM_PROFINET_AL1202_R0.17.xlsm (sheet Tab + the DATA INSER macro): a port's
+# SYCON.net submodule is fixed by its device's footprint - the input bytes (the PQI byte included) and the
+# output bytes; "not used" is `Disabled`; a port whose pin 4 is unused and whose pin 2 carries a digital input
+# is a `Digital Input + PQI` all the same. Read back from the I/O List: the rows of a port are the rows with its
+# connector (`X01`..`X08`) plus the connector-less rows that follow (a stack light's lamps), its footprint the
+# span of their `I.<node>.<byte>.<bit>` / `Q...` addresses (a 32-byte IO-Link device lists its output start only:
+# the input span tells the family, any output row the In/Out variant), a digital output the Q address on the
+# pin-4 row itself. The `8 Ports` module sits in slot 1 by default with the `IO-Link Master` in sub 1; the ports
+# follow it (port n = sub n + PORT_SUBSLOT_BASE - to be verified on the VM).
+PORT_COUNT = 8
+PORT_SUBSLOT_BASE = 1
+PORT_SUBMODULES = {
+    (0, 0): "Disabled",
+    (1, 0): "Digital Input + PQI",
+    (1, 1): "Digital Output + PQI",
+    (1, 2): "IO-Link Out  2 Byte + PQI",
+    (1, 16): "IO-Link Out 16 Byte + PQI",
+    (3, 0): "IO-Link In 2 Byte + PQI",
+    (3, 2): "IO-Link In/Out  2/ 2 Byte + PQI",
+    (33, 0): "IO-Link In 32 Byte + PQI",
+    (33, 32): "IO-Link In/Out 32/32 Byte + PQI",
+}
+PORT_RE = re.compile(r"^X(\d{1,2})$", re.I)
+BIT_RE = re.compile(r"^([IQ])\.(\d+)\.(\d+)\.(\d+)$", re.I)
+
+
+def port_rows(signals) -> dict:
+    """{'X01': [rows], ...}: a row with a connector opens (or continues) its port; a row without one belongs to
+    the port opened last."""
+    ports, cur = {}, None
+    for s in signals:
+        m = PORT_RE.match(str(s.get("connector") or "").strip())
+        if m:
+            cur = "X%02d" % int(m.group(1))
+            ports.setdefault(cur, [])
+        if cur is not None:
+            ports[cur].append(s)
+    return ports
+
+
+def port_footprint(rows) -> tuple:
+    """(input bytes, output bytes, digital output) of a port from its rows' addresses."""
+    ins, outs, do = set(), set(), False
+    for s in rows:
+        m = BIT_RE.match(str(s.get("bit") or "").strip())
+        if not m:
+            continue
+        byte = int(m.group(3))
+        if m.group(1).upper() == "I":
+            ins.add(byte)
+        else:
+            outs.add(byte)
+            if str(s.get("pin_no") or "").strip() == "4":
+                do = True
+    size_in = (max(ins) - min(ins) + 1) if ins else 0
+    size_out = (max(outs) - min(outs) + 1) if outs else 0
+    return size_in, size_out, do
+
+
+def port_submodule(size_in, size_out, do) -> str:
+    """The SYCON.net port submodule of a footprint, '' when none of the table fits."""
+    if do and size_in <= 1 and size_out == 1:
+        return PORT_SUBMODULES[(1, 1)]
+    if size_in == 33:
+        return PORT_SUBMODULES[(33, 32 if size_out else 0)]
+    if size_in == 3:
+        return PORT_SUBMODULES[(3, 2 if size_out else 0)]
+    if size_in == 1 and size_out == 0:
+        return PORT_SUBMODULES[(1, 0)]
+    if size_in <= 1 and size_out:
+        return PORT_SUBMODULES[(1, 2 if size_out <= 2 else 16)]
+    if size_in == 0 and size_out == 0:
+        return PORT_SUBMODULES[(0, 0)]
+    return ""
 
 
 def _f(type_, severity, detail, location=""):
@@ -85,8 +167,11 @@ def load_dtd(path: str | None = None) -> dict:
         role = row[1].lower()
         if role not in ROLES:
             raise ValueError("SyconDeviceTypesDatabase: unknown role %r for %r" % (row[1], row[0]))
+        policy = row[3].lower() or "default"
+        if policy not in MODULE_POLICIES:
+            raise ValueError("SyconDeviceTypesDatabase: unknown modules policy %r for %r" % (row[3], row[0]))
         out[model_id(row[0]).upper()] = {"model_id": model_id(row[0]), "role": role, "catalog_item": row[2],
-                                         "modules": (row[3].lower() or "default"), "gsdml": row[4], "comment": row[5]}
+                                         "modules": policy, "gsdml": row[4], "comment": row[5]}
     return out
 
 
@@ -101,6 +186,24 @@ def build(rows, dtd: dict) -> tuple:
         if cur is None:
             return
         rec = cur["rec"]
+        if rec["modules"] == "iolink-ports":
+            ports = port_rows(cur["signals"])
+            for n in range(1, PORT_COUNT + 1):
+                port = "X%02d" % n
+                prow = ports.get(port, [])
+                size_in, size_out, do = port_footprint(prow)
+                text = port_submodule(size_in, size_out, do)
+                devices = sorted({str(r.get("device") or r.get("location") or "").strip() for r in prow
+                                  if str(r.get("device") or r.get("location") or "").strip()})
+                if not text:
+                    findings.append(_f("sycon_port_footprint_unknown", "WARN", "station %r port %s: %d input, %d output "
+                                       "bytes%s fit no port submodule - no row" % (cur["name"], port, size_in, size_out,
+                                                                                   " (digital output)" if do else ""), cur["where"]))
+                    continue
+                modules.append({"station_name": cur["name"], "slot": "1", "subslot": str(PORT_SUBSLOT_BASE + n),
+                                "module_id": "", "module_text": text, "parameters": "",
+                                "comment": "%s [%d in, %d out] %s" % (port, size_in, size_out, " ".join(devices))})
+            return
         if rec["modules"] != "iolist":
             return
         cards, order = {}, []
@@ -118,8 +221,8 @@ def build(rows, dtd: dict) -> tuple:
                 findings.append(_f("sycon_card_without_model", "WARN", "station %r: slot tag %r has no Part No. - no module row"
                                    % (cur["name"], slot), cur["where"]))
                 continue
-            modules.append({"station_name": cur["name"], "slot": str(n), "module_id": model, "module_text": "",
-                            "parameters": "", "comment": slot})
+            modules.append({"station_name": cur["name"], "slot": str(n), "subslot": "", "module_id": model,
+                            "module_text": "", "parameters": "", "comment": slot})
 
     for row in rows:
         name = str(row.get("profinet_name") or "").strip()
@@ -150,7 +253,7 @@ def build(rows, dtd: dict) -> tuple:
                 continue
             controller = name
         stations.append({"role": rec["role"], "station_name": name, "catalog_kind": ROLES[rec["role"]],
-                         "catalog_item": rec["catalog_item"], "model_id": model, "ip_address": ip,
+                         "catalog_item": rec["catalog_item"], "model_id": model, "gsdml": rec["gsdml"], "ip_address": ip,
                          "subnet_mask": DEFAULT_MASK, "gateway": "",
                          "device_number": str(row.get("id_node") or "").strip(),
                          "description": " ".join(str(row.get("description_module") or "").split()),

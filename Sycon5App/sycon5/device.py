@@ -139,6 +139,36 @@ class DeviceDialog(ConfigDialog):
         time.sleep(0.8)
         self._close_dropdowns()
 
+    # ---- submodules (an AL1202's ports) -------------------------------------------------------------------
+    # Draft of 2026-10-23 evening, to be verified on the VM (scripts/probe_submodules.py): 'Add Submodule' with
+    # the (expanded) module row selected appends a submodule row under its existing ones; the new row's Subslot
+    # cell (x+60) is assumed to open ComboBox 1901 and its Submodule cell (x+150) ComboBox 1904 like a module
+    # row's; rows beyond the grid's ~8 visible ones still need scrolling (open).
+    def add_submodule(self, module_row):
+        self.select_row(module_row)
+        self.press("Add Submodule", settle=1.5)
+
+    def set_subslot(self, row, subslot):
+        self.set_slot(row, subslot)
+
+    def set_submodule(self, row, text):
+        """Choose a submodule row's submodule by text (spacing collapsed, case ignored) through the in-place combo."""
+        cb = self.module_combo(row)
+        items = cb.item_texts()
+        match = [it for it in items if self.session.same_text(it, text)]
+        if not match:
+            self._close_dropdowns()
+            raise SyconError("submodule %r not offered on row %d: %r" % (text, row, items))
+        current = cb.selected_text()
+        if current != match[0]:
+            cb.select(match[0])
+            time.sleep(1.5)
+        else:
+            self._close_dropdowns()
+        self.select_row(row)
+        log("  row %d submodule: %r -> %r" % (row, current, match[0]))
+        return match[0]
+
     # ---- parameters ----------------------------------------------------------------------------------------
     def dataset(self, name="Parameter"):
         cb = self.combo(DATASET_COMBO_ID)

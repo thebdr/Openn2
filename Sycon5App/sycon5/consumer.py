@@ -14,7 +14,7 @@ import time
 from .driver import SyconDriver
 from .handoff import load_handoff
 from .readback import read_project
-from .session import SyconError, log
+from .session import Session, SyconError, log
 
 CHECKPOINT_EVERY = 12
 
@@ -40,6 +40,9 @@ class Verification:
         return "verification: %d PASS, %d FAIL\n" % (self.ok, self.failed) + "\n".join(self.lines)
 
 
+same_text = Session.same_text
+
+
 def verify(handoff, project, plugged):
     """Compare the read-back with the handoff tables; `plugged` = {station: [module texts the driver chose]}."""
     v = Verification()
@@ -55,9 +58,12 @@ def verify(handoff, project, plugged):
             continue
         v.check(d.ip == ip, "station %s IP %s (read %s)" % (name, ip, d.ip))
         v.check(network.get(name) == ip, "controller lists %s at %s (read %s)" % (name, ip, network.get(name)))
-        v.check(d.type_name.replace("_", " ").startswith(s["catalog_item"].split(" [")[0].replace("_", " ")[:10]) or True,
-                "station %s type %r for catalog item %r" % (name, d.type_name, s["catalog_item"]))
-        rows = handoff.module_rows(s["station_name"])
+        if s.get("gsdml"):
+            v.check(d.gsdml.lower() == s["gsdml"].lower(),
+                    "station %s GSDML %s (read %s)" % (name, s["gsdml"], d.gsdml))
+        else:
+            v.note("station %s type %r from %s (no GSDML in the table)" % (name, d.type_name, d.gsdml))
+        rows = handoff.plug_rows(s["station_name"])
         if rows:
             slots = {k: v_ for k, v_ in d.slots.items() if k != 0}
             v.check(len(slots) == len(rows), "station %s: %d modules plugged (table %d)" % (name, len(slots), len(rows)))
@@ -67,6 +73,10 @@ def verify(handoff, project, plugged):
                 head = chosen.split("  [")[0].strip()
                 v.check(bool(got) and (not head or got == head or got.startswith(head[:12])),
                         "station %s slot %s: %r (chosen %r, table %s)" % (name, m["slot"], got, chosen, m["module_id"]))
+        for m in handoff.submodule_rows(s["station_name"]):
+            got = d.submodules.get((int(m["slot"]), int(m["subslot"])), "")
+            v.check(same_text(got, m["module_text"]),
+                    "station %s slot %s sub %s: %r (table %r)" % (name, m["slot"], m["subslot"], got, m["module_text"]))
     extra = [n for n in by_name if n != (ctrl.device_no.lower() if ctrl else "") and n not in {s["station_name"].lower() for s in handoff.stations}]
     v.check(not extra, "no station outside the table (extra: %r)" % extra)
     return v
@@ -89,7 +99,7 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     else:
         d.open(base_project)
         d.new_project()
-        d.add_controller(h.controller["catalog_item"])
+        d.add_controller(h.controller["catalog_item"], h.controller.get("gsdml"))
         d.set_controller_network(h.controller["ip_address"], h.controller["subnet_mask"] or None)
     saved = resume and os.path.exists(xml)
 
@@ -112,9 +122,15 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
             log("resume: %s -> will be %s" % (auto, s["station_name"]))
         todo = todo[len(leftovers):]
     added = 0
+    first_of = {}                    # (kind, catalog item, GSDML) -> the auto name of its first station (the clone source)
     for i, s in enumerate(todo, start=1):
         added += 1
-        node = d.add_station(s["catalog_item"], kind=s["catalog_kind"] or "slave")
+        key = (s["catalog_kind"] or "slave", s["catalog_item"], (s.get("gsdml") or "").lower())
+        if key in first_of:
+            node = d.clone_station(first_of[key], 1)[0]
+        else:
+            node = d.add_station(s["catalog_item"], kind=s["catalog_kind"] or "slave", gsdml=s.get("gsdml"))
+            first_of[key] = node["station"]
         mapping[node["station"]] = (s["station_name"], s["ip_address"])
         log("[%d/%d] %s -> will be %s @ %s" % (i, len(todo), node["station"], s["station_name"], s["ip_address"]))
         if i % CHECKPOINT_EVERY == 0:
@@ -125,18 +141,26 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
         # 2. names and IPs in one controller dialog pass
         d.rename_stations(mapping)
         checkpoint()
-    # 3. the modules
+    # 3. the modules and the submodules (an AL1202's ports)
     for s in h.stations:
-        rows = h.module_rows(s["station_name"])
-        if not rows:
+        station = s["station_name"]
+        rows, subs = h.plug_rows(station), h.submodule_rows(station)
+        if not rows and not subs:
             continue
-        if resume and s["station_name"].lower() in done_names:
+        if resume and station.lower() in done_names:
             p = read_project(xml)
-            dev = next(dv for dv in p.devices if dv.device_no.lower() == s["station_name"].lower())
-            if len([k for k in dev.slots if k != 0]) >= len(rows):
+            dev = next(dv for dv in p.devices if dv.device_no.lower() == station.lower())
+            if len([k for k in dev.slots if k != 0]) >= len(rows) and all(
+                    dev.submodules.get((int(m["slot"]), int(m["subslot"]))) for m in subs):
                 continue
-        chosen = d.plug_modules(s["station_name"], [m["module_text"] or ("order:" + m["module_id"]) for m in rows])
-        plugged[s["station_name"]] = {m["slot"]: chosen[i] for i, m in enumerate(rows)}
+        if rows:
+            chosen = d.plug_modules(station, [m["module_text"] or ("order:" + m["module_id"]) for m in rows])
+            plugged[station] = {m["slot"]: chosen[i] for i, m in enumerate(rows)}
+        by_slot = {}
+        for m in subs:
+            by_slot.setdefault(int(m["slot"]), []).append((int(m["subslot"]), m["module_text"]))
+        for slot, wanted in sorted(by_slot.items()):
+            d.plug_submodules(station, slot, sorted(wanted))
         checkpoint()
     if not saved:
         checkpoint()

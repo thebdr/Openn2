@@ -188,9 +188,9 @@ the IPC-based sorter: its cifX PROFINET controller and IO devices), three kinds 
 
 | kind | file | columns |
 |---|---|---|
-| `hw/sycon-device-types` | `SyconDeviceTypesDatabase.csv` (hand-maintained original: `Shared/HardwareConfigBuilderData/`, shipped beside the tables with its `source`) | Model Id (the I/O List Part No. without spaces), Role (controller / slave / gateway / ignore), Catalog Item (the SYCON.net catalog entry under PROFINET IO > Master / Slave / Gateway), Modules (`iolist` = the I/O List cards are plugged, `default` = the catalog defaults stay), GSDML (documentation), Comment |
-| `hw/sycon-stations` | `SyconStations.csv` | Role, Station Name (the PROFINET name), Catalog Kind, Catalog Item, Model Id, IP Address, Subnet Mask, Gateway, Device Number (col F), Description, Comment |
-| `hw/sycon-modules` | `SyconModules.csv` | Station Name, Slot (plug order), Module Id (the card's order number), Module Text (empty = resolved by the consumer from the order number the catalog shows in brackets), Parameters (index=value), Comment (the slot tag) |
+| `hw/sycon-device-types` | `SyconDeviceTypesDatabase.csv` (hand-maintained original: `Shared/HardwareConfigBuilderData/`, shipped beside the tables with its `source`) | Model Id (the I/O List Part No. without spaces), Role (controller / slave / gateway / ignore), Catalog Item (the SYCON.net catalog entry under PROFINET IO > Master / Slave / Gateway), Modules (`iolist` = the I/O List cards are plugged, `iolink-ports` = the IO-Link ports are configured from the connector rows, `default` = the catalog defaults stay), GSDML (the file whose catalog entry is taken - the catalog lists one same-named entry per GSDML version; checked by read-back), Comment |
+| `hw/sycon-stations` | `SyconStations.csv` | Role, Station Name (the PROFINET name), Catalog Kind, Catalog Item, Model Id, GSDML (the file of the catalog entry to take; column added 2026-10-23 pm - the reader tells by the `#` column line), IP Address, Subnet Mask, Gateway, Device Number (col F), Description, Comment |
+| `hw/sycon-modules` | `SyconModules.csv` | Station Name, Slot (plug order), Subslot (empty = a module row; a submodule row's subslot - column added 2026-10-23 pm, the reader tells by the `#` column line), Module Id (the card's order number; empty for a port), Module Text (empty = resolved by the consumer from the order number the catalog shows in brackets; a port's submodule text), Parameters (index=value), Comment (the slot tag; a port's connector, footprint and devices) |
 
 Rules: the staging's head rule (`profinet_name` opens a node), phase 700's card rule (each distinct slot tag under
 the head that is not the head's own is a card); a card's model is its Part No. unless that is a Fives code
@@ -203,7 +203,8 @@ Coupler X2, 6 ET200SP, 26 ServoOne Junior, 19 AL1202, 1 Anybus Communicator) + 2
 backup cifX card, 5 SCALANCE switches (no XC216 in the catalog), 2 Vitronic controllers without a part number.
 
 **Consumer** — `sycon5/handoff.py` (the reader, by position) + `sycon5/consumer.py` (`build`, `verify`) +
-`scripts/build_from_handoff.py --handoff <folder> --out <project.spj> [--resume]`: new project, the controller
+`scripts/build_from_handoff.py --handoff <folder> --out <project.spj> [--resume]` (`scripts/handoff_cut.py
+--handoff <folder> --out <folder> --stations <names>` cuts a handoff down to a few stations for a smoke): new project, the controller
 from the catalog and its network IP, every station from the catalog (SYCON names them `al1202`, `al1202-001`, ...),
 ONE controller-dialog pass renaming every row and setting every IP (`ControllerDialog.rename_and_address`: the
 Device Table read row by row - the name is read before it is written, the grids scrolled by wheel with the
@@ -225,6 +226,46 @@ and SYCON.net starts again. The `#Siemens-PreConf_` per-node exports and the `_M
 the user; a project saved against a moved GSDML loses its DTM (the spike fixtures reference the 2021 ET200SP).
 Reload the catalog (Network > Device Catalog > Reload) after any change to the folder.
 
+**Catalog versions** (user 2026-10-23: "the pnpncoupler that was inserted was the wrong version"): the catalog shows
+one same-named entry per GSDML file (five `PN/PN Coupler X2`, five `X1` before the reload), and nothing in the tree
+tells them apart - the info pane under the catalog (RichEdit20W 59664, `Session.catalog_info`) does: its `Device:`
+block cites the file in brackets, `[GSDML-V2.35-Siemens-PNPNIOC-20200924.xml]`. `catalog.catalog_item(session,
+kind, item, gsdml)` selects the same-named entries one by one until the pane cites the wanted file (the index found
+last is tried first), and refuses with the files it saw when none does; the device-types database's GSDML column
+is that file, `hw/sycon-stations` carries it per station, and `verify` compares it with the saved device's
+`deviceTypeInformation`. Without a GSDML the first entry is taken and its file logged.
+
+**Cloning** (user: "once a device of a type was placed, Copy, Click, Paste in the left tab is a quick way to
+replicate (see the .ahk script)"): `SyconDriver.clone_station(source, count)` selects the source node in the
+netProject tree, posts the context menu's Copy (34503), selects it again and posts Paste (34504) - the keystrokes
+Ctrl+C / Ctrl+V as the fallback - and reads the new node from the tree; SYCON.net names a clone `<source>-001`,
+`-002` and the rename pass maps them like any auto name. The consumer adds only the first station of each
+(kind, catalog item, GSDML) from the catalog and clones the rest. Written 2026-10-23 evening, to be verified on
+the VM (the smoke build with cloning, then the 55-station build).
+
+**IO-Link ports (AL1202)** (user 2026-10-23: "how to configure the modules for the iolink devices, rules in the
+file" = `TAG_IFM_PROFINET_AL1202_R0.17.xlsm`, the Fives IO creator tool: its sheet `Tab` and the `DATA INSER`
+macro, extracted from the VBA). An AL1202 has 8 ports `X01`..`X08`, each with pin 4 (IO-Link, DI, DO or unused)
+and, on the class-A ports X01-X04, pin 2 (a DI); its SYCON.net `8 Ports` module (slot 1, there by default) holds
+the `IO-Link Master` in sub 1 and one port submodule per port after it, fixed by the port's device: `Disabled`,
+`Digital Input + PQI` (a pin-4 or a pin-2 DI: 1 input byte), `Digital Output + PQI` (1 in, 1 out), `IO-Link In
+2 Byte + PQI` (3 in), `IO-Link In/Out  2/ 2 Byte + PQI` (3 in, 2 out), `IO-Link Out  2 Byte + PQI` / `Out 16
+Byte` (stack lights: 1 in), `IO-Link In 32 Byte + PQI` / `In/Out 32/32` (33 in = 32 data + the PQI byte). The
+I/O List addresses follow the ports in order (a port's PQI bit = bit 7 of its last input byte, `DIAGNOSTIC OF
+PORT Xnn (PQI)`; a DO reserves an input byte without a row; a 32-byte device lists its output start only). PL5
+reads that backwards - `sycon_handoff.port_rows / port_footprint / port_submodule`, policy `iolink-ports` in
+the device-types database: a port's rows are those with its connector plus the connector-less rows after them
+(a stack light's lamps), its footprint the span of their `I.<node>.<byte>.<bit>` / `Q...` addresses, the
+submodule from the footprint table (`sycon_port_footprint_unknown` WARN and no row when none fits);
+`hw/sycon-modules` carries one row per port: Slot 1, Subslot = port + 1 (the IO-Link Master being sub 1 - to be
+verified on the VM), Module Text = the submodule. LOWER SORTER (19 AL1202, 152 port rows): 73 Disabled, 33
+In/Out 32/32 (the modulators), 21 Digital Input, 14 Out 2 Byte (stack lights), 10 In 2 Byte, 1 Digital Output.
+Consumer side: `read_project` lists the submodules (`STLSubModuleMap/<sub>/PNIOSubModuleBasic`; the smoke
+project's AL1202 shows slot 1 `8 Ports` / sub 1 `IO-Link Master` only), `verify` compares every port row with
+them (spacing collapsed), `SyconDriver.plug_submodules(station, slot, [(subslot, text)])` is a DRAFT (Add
+Submodule under the expanded module row, Subslot combo 1901, submodule combo 1904 assumed like the module rows,
+no scrolling yet) - `scripts/probe_submodules.py` is the probe to run on the VM first (nothing saved).
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run
@@ -234,12 +275,12 @@ everything with the repo venv (`C:\Source\Repos\_Openn5\.venv\Scripts\python -I`
 |---|---|
 | `session.py` | the process (launch on a project, login, close without saving, kill), the main window, the top-level windows enumerated through win32 (owned dialogs, message boxes), `dismiss_errors`, `answer_box(title, button)`, `post_command` (File commands as WM_COMMAND, refused while a modal dialog is open), popup menus, `safe_click`, the netProject tree (`nodes`, `station_item`), the catalog tree, the Output log |
 | `drawing.py` | the BitBlt capture of the netDevice pane, the bus lines by colour (`locate_lines` → grey root dy, green line), the drop-point candidates, `text_bands` for custom grids |
-| `catalog.py` | `add_device(session, kind, item)`: the catalog tree item (PROFINET IO > Master / Slave / Gateway), the drag-drop with the tree as oracle, `parse_node` of a tree label |
+| `catalog.py` | `add_device(session, kind, item, gsdml)`: the catalog tree item (PROFINET IO > Master / Slave / Gateway, the same-named entry whose info pane cites the GSDML file), the drag-drop with the tree as oracle, `parse_node` of a tree label |
 | `dialog.py` | `ConfigDialog`: open from the context menu, `select_page` (UIA), win32 `controls()` (ids ≥ 1900), `press` (BM_CLICK), `apply`, `close(keep)` (Cancel → Question Yes/No, Warning Yes/No, Error → raise), `ok` |
 | `controller.py` | `ControllerDialog`: `set_network(ip, mask, gw)` (+ the subnet Warning), `device_rows` / `find_row` / `set_station_name`, `set_station_ip` |
-| `device.py` | `DeviceDialog`: `add_module`, `set_module(row, text)`, `set_slot`, `expand_row`, `select_row`, `dataset("Parameter")`, `set_param_visual`, `set_parameters({index: value})` (wheel scrolling with the pixel shift measured) |
-| `readback.py` | `read_project(xml or spj)` → `Project` / `Device` (name, ip, mask, gateway, gsdml, `slots`, `records`, the controller's `network`), `describe` |
-| `driver.py` | `SyconDriver`: `open(project)`, `new_project`, `add_controller`, `add_station(item)`, `set_controller_network`, `set_station_name_ip`, `plug_module(station, module, slot)`, `set_parameters(station, slot, {index: value})`, `save_as`, `save`, `read_back`, `close` |
+| `device.py` | `DeviceDialog`: `add_module`, `set_module(row, text)`, `resolve_module(row, "order:<no>")`, `set_slot`, `expand_row`, `select_row`, `dataset("Parameter")`, `set_param_visual`, `set_parameters({index: value})` (wheel scrolling with the pixel shift measured); drafts `add_submodule`, `set_subslot`, `set_submodule` |
+| `readback.py` | `read_project(xml or spj)` → `Project` / `Device` (name, ip, mask, gateway, gsdml, `slots`, `submodules`, `records`, the controller's `network`), `describe` |
+| `driver.py` | `SyconDriver`: `open(project)`, `new_project`, `add_controller`, `add_station(item, kind, gsdml)`, `clone_station(source, count)`, `set_controller_network`, `set_station_name_ip`, `rename_stations({old: (new, ip)})`, `plug_modules(station, specs)`, `plug_module(station, module, slot)`, `plug_submodules(station, slot, [(subslot, text)])` (draft), `set_parameters(station, slot, {index: value})`, `save_as`, `save`, `read_back`, `close` |
 
 - **Verification**: every operation checks the GUI (the tree label, the reopened cell, the editor's text) and
   the round ends with `read_back` on the saved file — `tests/test_readback.py` pins the parser on the two
@@ -253,9 +294,10 @@ everything with the repo venv (`C:\Source\Repos\_Openn5\.venv\Scripts\python -I`
 - **Module commit**: after choosing the module leave its in-place editor open (dropdown closed) and press Apply —
   closing the editor with a click elsewhere left the module without its submodule ("Slot [1] contains a module
   without submoduls" on Apply); the driver also recovers from that message with `Add Submodule` + Apply.
-- **Not yet in the driver**: submodule choice, Remove, a second station of the same type (`-001`), the base
-  project's other device types, SYCON.net launched without a project (it is launched on the scratch base
-  project, then File > New), the PL5 handoff consumption (the operations take plain names and texts).
+- **Not yet in the driver**: Remove, the base project's other device types, SYCON.net launched without a
+  project (it is launched on the scratch base project, then File > New). Drafted and not yet verified on the
+  VM: station cloning, the submodule rows (an AL1202's ports). Done since: a second station of the same type
+  (the rename pass maps SYCON's `-001` names), the PL5 handoff consumption (`consumer.py`).
 
 ### Scripts (`spike/scripts/`, run from `spike\` with the repo venv: `..\..\.venv\Scripts\python -I scripts\<name>.py ...`)
 

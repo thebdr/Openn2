@@ -2,6 +2,8 @@
 hex blob (after a 4-byte length) is an OLE compound file with the DTM's persisted data:
   PNIODeviceDataModelBasic                      station name, type, IP, mask, gateway, GSDML path (UTF-16 strings)
   STLModuleMap/<slot>/PNIOModuleBasic          the module of a slot (id text, name)
+  STLModuleMap/<slot>/STLSubModuleMap/<sub>/PNIOSubModuleBasic   a submodule (id text, name) - an AL1202's
+                                                `8 Ports` module holds `IO-Link Master` in sub 1 and its ports after
   STLModuleMap/<slot>/STLSubModuleMap/<sub>/STLRecordParamDataMap/<index>/PNIORecordParamDataBasic
                                                 a parameter record: after the marker 11 20 <len u32> its bytes
 The controller's blob also lists every slave (name + IP) in FdtChannelColl/PROFINET_IO/SlaveDTMsGetParameters.
@@ -31,6 +33,7 @@ class Device:
     gateway: str = ""
     type_name: str = ""
     slots: dict = field(default_factory=dict)      # slot -> module name
+    submodules: dict = field(default_factory=dict) # (slot, subslot) -> submodule name (the DAP's 0x8000+ ones too)
     records: dict = field(default_factory=dict)    # (slot, subslot, index) -> bytes
     network: list = field(default_factory=list)    # controller only: [(name of station, ip)]
 
@@ -98,6 +101,14 @@ def _parse_blob(dev, hexdata):
                 slot = int(path.split("/")[1])
                 strs = _strings(data)
                 dev.slots[slot] = strs[1] if len(strs) > 1 else (strs[0] if strs else "")
+            elif path.endswith("/PNIOSubModuleBasic") and path.startswith("STLModuleMap/"):
+                p = path.split("/")
+                try:
+                    key = (int(p[1]), int(p[3]))
+                except (IndexError, ValueError):
+                    continue
+                strs = _strings(data)
+                dev.submodules[key] = strs[1] if len(strs) > 1 else (strs[0] if strs else "")
             elif path.endswith("/PNIORecordParamDataBasic") and path.startswith("STLModuleMap/"):
                 p = path.split("/")
                 try:
@@ -138,6 +149,9 @@ def describe(project):
             d.device_no, " (controller)" if d.is_controller else "", d.symbolic, d.type_name, d.ip, d.mask, d.gsdml))
         for slot in sorted(d.slots):
             lines.append("    slot %d: %s" % (slot, d.slots[slot]))
+            for (s, sub), name in sorted(d.submodules.items()):
+                if s == slot and sub < 0x8000:
+                    lines.append("      sub %d: %s" % (sub, name))
         for key in sorted(d.records):
             lines.append("    record slot %d sub %d index %d: %s" % (key + (d.records[key].hex(" "),)))
         for name, ip in d.network:

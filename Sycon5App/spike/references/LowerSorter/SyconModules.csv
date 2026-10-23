@@ -2,32 +2,184 @@
 #! kind: hw/sycon-modules
 #! schema: 1
 #! producer: Pipeline5 5.0 (phase 730)
-#! generated: 2026-10-23T13:12:48Z
-#! run: 20261023-131248-13cb
+#! generated: 2026-10-23T14:52:10Z
+#! run: 20261023-145210-2777
 #! project: 8XXX
 #! target: SyconNetProjectInterface
 #! source: 8FVT_IO0010 - Sorter I-O List - LOWER SORTER_R1.2.xlsx
 #!end
-# Station Name,Slot (plug order),Module Id,Module Text,Parameters (index=value | ...),Comment
-n0005-trib-aep01-K35001,1,6ES7131-6BH01-0BA0,,,-K35002
-n0005-trib-aep01-K35001,2,6ES7131-6BH01-0BA0,,,-K35003
-n0005-trib-aep01-K35001,3,6ES7131-6BH01-0BA0,,,-K35004
-n0005-trib-aep01-K35001,4,6ES7131-6BH01-0BA0,,,-K35005
-n0005-trib-aep01-K35001,5,6ES7131-6BH01-0BA0,,,-K35006
-n0005-trib-aep01-K35001,6,6ES7131-6BH01-0BA0,,,-K35007
-n0005-trib-aep01-K35001,7,6ES7132-6BH01-0BA0,,,-K35008
-n0020-trib-ae01-K35001,1,6ES7131-6BH01-0BA0,,,-K35002
-n0020-trib-ae01-K35001,2,6ES7131-6BH01-0BA0,,,-K35003
-n0020-trib-ae01-K35001,3,6ES7132-6BH01-0BA0,,,-K35004
-n0045-trib-ae02-K35001,1,6ES7131-6BH01-0BA0,,,-K35002
-n0045-trib-ae02-K35001,2,6ES7131-6BH01-0BA0,,,-K35003
-n0045-trib-ae02-K35001,3,6ES7132-6BH01-0BA0,,,-K35004
-n0075-trib-ae03-K35001,1,6ES7131-6BH01-0BA0,,,-K35002
-n0075-trib-ae03-K35001,2,6ES7131-6BH01-0BA0,,,-K35003
-n0075-trib-ae03-K35001,3,6ES7132-6BH01-0BA0,,,-K35004
-n0105-trib-ae04-K35001,1,6ES7131-6BH01-0BA0,,,-K35002
-n0105-trib-ae04-K35001,2,6ES7131-6BH01-0BA0,,,-K35003
-n0105-trib-ae04-K35001,3,6ES7131-6BH01-0BA0,,,-K35004
-n0105-trib-ae04-K35001,4,6ES7132-6BH01-0BA0,,,-K35005
-n0032-trib-ma01-aec1-K35001,1,6ES7131-6BH01-0BA0,,,-K35002
-n0032-trib-ma01-aec1-K35001,2,6ES7132-6BH01-0BA0,,,-K35003
+# Station Name,Slot (plug order),Subslot (empty = a module row; a submodule's subslot),Module Id,Module Text,Parameters (index=value | ...),Comment
+n0005-trib-aep01-K35001,1,,6ES7131-6BH01-0BA0,,,-K35002
+n0005-trib-aep01-K35001,2,,6ES7131-6BH01-0BA0,,,-K35003
+n0005-trib-aep01-K35001,3,,6ES7131-6BH01-0BA0,,,-K35004
+n0005-trib-aep01-K35001,4,,6ES7131-6BH01-0BA0,,,-K35005
+n0005-trib-aep01-K35001,5,,6ES7131-6BH01-0BA0,,,-K35006
+n0005-trib-aep01-K35001,6,,6ES7131-6BH01-0BA0,,,-K35007
+n0005-trib-aep01-K35001,7,,6ES7132-6BH01-0BA0,,,-K35008
+n0020-trib-ae01-K35001,1,,6ES7131-6BH01-0BA0,,,-K35002
+n0020-trib-ae01-K35001,2,,6ES7131-6BH01-0BA0,,,-K35003
+n0020-trib-ae01-K35001,3,,6ES7132-6BH01-0BA0,,,-K35004
+n0035-trib-sm006-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0035-trib-sm006-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0035-trib-sm006-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0035-trib-sm006-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0035-trib-sm006-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0035-trib-sm006-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0035-trib-sm006-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE01"
+n0035-trib-sm006-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0034-trib-sm011-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0034-trib-sm011-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0034-trib-sm011-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0034-trib-sm011-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0034-trib-sm011-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0034-trib-sm011-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0034-trib-sm011-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE02"
+n0034-trib-sm011-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0036-trib-sm016-K1,1,2,,Disabled,,"X01 [0 in, 0 out] "
+n0036-trib-sm016-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0036-trib-sm016-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0036-trib-sm016-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0036-trib-sm016-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0036-trib-sm016-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0036-trib-sm016-K1,1,8,,Disabled,,"X07 [0 in, 0 out] "
+n0036-trib-sm016-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0037-trib-sm020-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0037-trib-sm020-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0037-trib-sm020-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0037-trib-sm020-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0037-trib-sm020-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0037-trib-sm020-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0037-trib-sm020-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE03"
+n0037-trib-sm020-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0045-trib-ae02-K35001,1,,6ES7131-6BH01-0BA0,,,-K35002
+n0045-trib-ae02-K35001,2,,6ES7131-6BH01-0BA0,,,-K35003
+n0045-trib-ae02-K35001,3,,6ES7132-6BH01-0BA0,,,-K35004
+n0057-trib-sm033-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0057-trib-sm033-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0057-trib-sm033-K1,1,4,,Digital Input + PQI,,"X03 [1 in, 0 out] -B1R -B2R"
+n0057-trib-sm033-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0057-trib-sm033-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0057-trib-sm033-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0057-trib-sm033-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE04"
+n0057-trib-sm033-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0056-trib-sm038-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0056-trib-sm038-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0056-trib-sm038-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0056-trib-sm038-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0056-trib-sm038-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0056-trib-sm038-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0056-trib-sm038-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE05"
+n0056-trib-sm038-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0058-trib-sm043-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0058-trib-sm043-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0058-trib-sm043-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0058-trib-sm043-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0058-trib-sm043-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0058-trib-sm043-K1,1,7,,Digital Output + PQI,,"X06 [1 in, 1 out] -MO2"
+n0058-trib-sm043-K1,1,8,,Disabled,,"X07 [0 in, 0 out] "
+n0058-trib-sm043-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0059-trib-sm047-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0059-trib-sm047-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0059-trib-sm047-K1,1,4,,Digital Input + PQI,,"X03 [1 in, 0 out] -B1"
+n0059-trib-sm047-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0059-trib-sm047-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0059-trib-sm047-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0059-trib-sm047-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE06"
+n0059-trib-sm047-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0075-trib-ae03-K35001,1,,6ES7131-6BH01-0BA0,,,-K35002
+n0075-trib-ae03-K35001,2,,6ES7131-6BH01-0BA0,,,-K35003
+n0075-trib-ae03-K35001,3,,6ES7132-6BH01-0BA0,,,-K35004
+n0086-trib-sm061-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0086-trib-sm061-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0086-trib-sm061-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0086-trib-sm061-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0086-trib-sm061-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0086-trib-sm061-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0086-trib-sm061-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE08"
+n0086-trib-sm061-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0087-trib-rc01-K1,1,2,,IO-Link In 2 Byte + PQI,,"X01 [3 in, 0 out] -B2"
+n0087-trib-rc01-K1,1,3,,IO-Link In 2 Byte + PQI,,"X02 [3 in, 0 out] -B3"
+n0087-trib-rc01-K1,1,4,,Digital Input + PQI,,"X03 [1 in, 0 out] -B1"
+n0087-trib-rc01-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0087-trib-rc01-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO2"
+n0087-trib-rc01-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO1"
+n0087-trib-rc01-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE07"
+n0087-trib-rc01-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0089-trib-sm066-K1,1,2,,Disabled,,"X01 [0 in, 0 out] "
+n0089-trib-sm066-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0089-trib-sm066-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0089-trib-sm066-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0089-trib-sm066-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0089-trib-sm066-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0089-trib-sm066-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE09"
+n0089-trib-sm066-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0090-trib-sm071-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0090-trib-sm071-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0090-trib-sm071-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0090-trib-sm071-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0090-trib-sm071-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0090-trib-sm071-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0090-trib-sm071-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE10"
+n0090-trib-sm071-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0091-trib-rc02-K1,1,2,,IO-Link In 2 Byte + PQI,,"X01 [3 in, 0 out] -B2"
+n0091-trib-rc02-K1,1,3,,IO-Link In 2 Byte + PQI,,"X02 [3 in, 0 out] -B3"
+n0091-trib-rc02-K1,1,4,,Digital Input + PQI,,"X03 [1 in, 0 out] -B1"
+n0091-trib-rc02-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0091-trib-rc02-K1,1,6,,IO-Link In 2 Byte + PQI,,"X05 [3 in, 0 out] -B1"
+n0091-trib-rc02-K1,1,7,,IO-Link In 2 Byte + PQI,,"X06 [3 in, 0 out] -B2"
+n0091-trib-rc02-K1,1,8,,IO-Link In 2 Byte + PQI,,"X07 [3 in, 0 out] -B3"
+n0091-trib-rc02-K1,1,9,,IO-Link In 2 Byte + PQI,,"X08 [3 in, 0 out] -B4"
+n0105-trib-ae04-K35001,1,,6ES7131-6BH01-0BA0,,,-K35002
+n0105-trib-ae04-K35001,2,,6ES7131-6BH01-0BA0,,,-K35003
+n0105-trib-ae04-K35001,3,,6ES7131-6BH01-0BA0,,,-K35004
+n0105-trib-ae04-K35001,4,,6ES7132-6BH01-0BA0,,,-K35005
+n0117-trib-sm086-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0117-trib-sm086-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0117-trib-sm086-K1,1,4,,Digital Input + PQI,,"X03 [1 in, 0 out] -B1R -B2R"
+n0117-trib-sm086-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0117-trib-sm086-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0117-trib-sm086-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0117-trib-sm086-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE11"
+n0117-trib-sm086-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0116-trib-sm091-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0116-trib-sm091-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0116-trib-sm091-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0116-trib-sm091-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0116-trib-sm091-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0116-trib-sm091-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0116-trib-sm091-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE12"
+n0116-trib-sm091-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0118-trib-sm096-K1,1,2,,Disabled,,"X01 [0 in, 0 out] "
+n0118-trib-sm096-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0118-trib-sm096-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0118-trib-sm096-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0118-trib-sm096-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0118-trib-sm096-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0118-trib-sm096-K1,1,8,,Disabled,,"X07 [0 in, 0 out] "
+n0118-trib-sm096-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0119-trib-sm098-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0119-trib-sm098-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0119-trib-sm098-K1,1,4,,Digital Input + PQI,,"X03 [1 in, 0 out] -B1"
+n0119-trib-sm098-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0119-trib-sm098-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0119-trib-sm098-K1,1,7,,IO-Link In/Out 32/32 Byte + PQI,,"X06 [33 in, 1 out] -MO2"
+n0119-trib-sm098-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [1 in, 2 out] -VE13"
+n0119-trib-sm098-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0120-trib-rc03-K1,1,2,,IO-Link In 2 Byte + PQI,,"X01 [3 in, 0 out] -B2"
+n0120-trib-rc03-K1,1,3,,IO-Link In 2 Byte + PQI,,"X02 [3 in, 0 out] -B3"
+n0120-trib-rc03-K1,1,4,,Digital Input + PQI,,"X03 [1 in, 0 out] -B1"
+n0120-trib-rc03-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0120-trib-rc03-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1 -MO2"
+n0120-trib-rc03-K1,1,7,,Digital Input + PQI,,"X06 [1 in, 0 out] "
+n0120-trib-rc03-K1,1,8,,Disabled,,"X07 [0 in, 0 out] "
+n0120-trib-rc03-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0121-trib-sm104-K1,1,2,,Digital Input + PQI,,"X01 [1 in, 0 out] -B1R -B2R"
+n0121-trib-sm104-K1,1,3,,Disabled,,"X02 [0 in, 0 out] "
+n0121-trib-sm104-K1,1,4,,Disabled,,"X03 [0 in, 0 out] "
+n0121-trib-sm104-K1,1,5,,Disabled,,"X04 [0 in, 0 out] "
+n0121-trib-sm104-K1,1,6,,IO-Link In/Out 32/32 Byte + PQI,,"X05 [33 in, 1 out] -MO1"
+n0121-trib-sm104-K1,1,7,,Disabled,,"X06 [0 in, 0 out] "
+n0121-trib-sm104-K1,1,8,,IO-Link Out  2 Byte + PQI,,"X07 [0 in, 2 out] -VE14"
+n0121-trib-sm104-K1,1,9,,Disabled,,"X08 [0 in, 0 out] "
+n0032-trib-ma01-aec1-K35001,1,,6ES7131-6BH01-0BA0,,,-K35002
+n0032-trib-ma01-aec1-K35001,2,,6ES7132-6BH01-0BA0,,,-K35003

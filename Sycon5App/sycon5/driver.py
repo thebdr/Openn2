@@ -15,6 +15,7 @@ from .readback import read_project
 from .session import Session, SyconError, log
 
 DriverError = SyconError
+CONTEXT_COPY, CONTEXT_PASTE = 34503, 34504      # the netProject context menu's Copy / Paste command ids
 
 
 class SyconDriver:
@@ -115,16 +116,67 @@ class SyconDriver:
         return read_project(xml_or_spj)
 
     # ---- stations --------------------------------------------------------------------------------------------
-    def add_controller(self, item="CIFX RE/PNM"):
-        node = catalog.add_device(self.session, "master", item)
+    def add_controller(self, item="CIFX RE/PNM", gsdml=None):
+        node = catalog.add_device(self.session, "master", item, gsdml or None)
         log("controller added:", node)
         return node
 
-    def add_station(self, item, kind="slave"):
-        node = catalog.add_device(self.session, kind, item)
+    def add_station(self, item, kind="slave", gsdml=None):
+        """Add a station from the catalog; `gsdml` names the file its catalog entry must come from (the catalog
+        lists one same-named entry per GSDML version)."""
+        node = catalog.add_device(self.session, kind, item, gsdml or None)
         self.model.setdefault(node["station"], {"slots": {}})
         log("station added:", node)
         return node
+
+    def clone_station(self, source, count=1):
+        """Copy the source node in the netProject tree and paste it `count` times - SYCON.net names a clone
+        `<source>-001`, `-002`, ... and gives it the next free IP (the AutoHotkey way: click, Ctrl+C, click,
+        Ctrl+V; here the context menu's Copy / Paste command ids posted to the main window, the keystrokes as
+        the fallback). Seconds per station instead of a catalog drag-drop. Returns the new nodes."""
+        s = self.session
+        s.close_menus()
+        s.bring_front()
+        new_nodes = []
+        for _ in range(count):
+            before = s.nodes()
+            node = None
+            for way in ("command", "keys"):
+                item = s.station_item(source)
+                s.safe_click(item)
+                time.sleep(0.4)
+                if way == "command":
+                    s.post_command_id(CONTEXT_COPY, "Copy")
+                else:
+                    keyboard.send_keys("^c")
+                time.sleep(0.8)
+                item = s.station_item(source)
+                s.safe_click(item)
+                time.sleep(0.4)
+                if way == "command":
+                    s.post_command_id(CONTEXT_PASTE, "Paste")
+                else:
+                    keyboard.send_keys("^v")
+                t0 = time.time()
+                while time.time() - t0 < (10 if way == "command" else 30):
+                    time.sleep(1.0)
+                    errs = s.dismiss_errors()
+                    s.ensure_alive("the paste of %s" % source)
+                    if errs:
+                        raise SyconError("errors after pasting %s: %r" % (source, errs))
+                    new = [n for n in s.nodes() if n not in before]
+                    if new:
+                        node = catalog.parse_node(new[0])
+                        break
+                if node:
+                    break
+                log("  paste by %s produced no node" % way)
+            if node is None:
+                raise SyconError("no node appeared after pasting %s" % source)
+            self.model.setdefault(node["station"], {"slots": {}})
+            new_nodes.append(node)
+            log("cloned %s -> %s" % (source, node["station"]))
+        return new_nodes
 
     def controller_station(self):
         for n in self.stations():
@@ -209,6 +261,36 @@ class SyconDriver:
         for text in chosen:
             used[max(used) + 1 if used else 1] = text
         log("modules plugged on %s: %r" % (station, chosen))
+        return chosen
+
+    def plug_submodules(self, station, slot, wanted, existing_subs=1):
+        """wanted: [(subslot, submodule text)] in subslot order, appended under the module in `slot` (an AL1202's
+        `8 Ports` in slot 1 holds the IO-Link Master in sub 1 by default = `existing_subs`). Draft of 2026-10-23
+        evening - the grid mechanics assumed equal to the module rows' - to be verified on the VM
+        (scripts/probe_submodules.py) before the LOWER SORTER build plugs its 19 AL1202."""
+        dlg = DeviceDialog(self.session, station)
+        chosen = []
+        try:
+            dlg.modules_page()
+            row = 1 + slot                      # the DAP is row 1, the slots contiguous from 1
+            dlg.expand_row(row)
+            for i, (subslot, text) in enumerate(wanted):
+                dlg.add_submodule(row)
+                sub_row = row + existing_subs + 1 + i
+                dlg.set_subslot(sub_row, subslot)
+                chosen.append(dlg.set_submodule(sub_row, text))
+            errs = dlg.apply()
+            if errs:
+                raise SyconError("Apply refused: %r" % errs)
+            dlg.close(keep=True)
+        except SyconError:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            raise
+        subs = self.model.setdefault(station, {"slots": {}}).setdefault("submodules", {})
+        for (subslot, _text), text in zip(wanted, chosen):
+            subs[(slot, subslot)] = text
+        log("submodules plugged on %s slot %d: %r" % (station, slot, chosen))
         return chosen
 
     # ---- modules and parameters -------------------------------------------------------------------------------
