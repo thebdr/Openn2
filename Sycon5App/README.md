@@ -159,8 +159,14 @@ per device, each slave's `PNIODeviceDataModelBasic` (name, IP, mask, GSDML path)
    - Parameter names are not readable (custom grid): the driver addresses a parameter by its **row index = the
      order of the record's parameters in the GSDML**, and verifies through the saved XML
      (`STLRecordParamDataMap/<n>/PNIORecordParamDataBasic`).
-   - Still to prove (round 2): that the edits reach the record and the saved file — the "Inputs" byte string did
-     not visibly change before Apply. Probe: edit → Apply → Cancel/Yes → Save → read the record bytes back.
+   - **Proved (round 2, 14:12)**: Wire break = 1 (Edit) and Input delay = 0.4 ms (ComboBox, committed by a click
+     on the row's Name cell), **Apply** (2204, then disabled), **Cancel closes without a question** once applied,
+     `Save` (WM_COMMAND 57603, the project is named) rewrote the XML, and the DI module's record
+     `STLModuleMap/1/STLSubModuleMap/1/STLRecordParamDataMap/128` changed in exactly two bytes of channel 0:
+     diagnostics byte `00 → 10` (the Wire break bit) and delay byte `86 → 83` (code 6 = 3.2 ms → code 3 =
+     0.4 ms, bit 7 "channel activated" kept); the other seven channels and record 243 untouched. The grid's
+     "Inputs" byte string never refreshes on screen — verify in the file. Fixture: `spike/references/E2E_Round2/`
+     (the saved project + `records_n0005-ms1-k2501.txt` from `read_records.py`).
 2. Submodules: `Add Submodule` on a module with one fixed submodule raises the modal `Error` "No possible
    submodule found for insertion!" (blocks everything until dismissed); Remove, slot numbering (combo 1901, SYCON
    numbers new rows 1, 2, …); the coupler / ServoOne / AC140x catalog names; a second slave of the same type
@@ -188,6 +194,7 @@ per device, each slave's `PNIODeviceDataModelBasic` (name, IP, mask, GSDML path)
 | `probe_modules_page.py`, `probe_modules_grid.py` | Modules page: editability, Add Module, cell clicks with dropdown detection |
 | `probe_parameters.py`, `probe_parameters2.py`, `probe_parameters3.py` | module selection via the in-place combo (v3 = win32, the one that works) and the Dataset / lower grid probe |
 | `probe_symbolic_name.py <station>` | the Symbolic Name dialog |
+| `read_records.py <SYCON_net.xml> <deviceNo>` | the parameter records of one slave from a saved project (the blob's `STLRecordParamDataMap` streams, hex) - the read-back oracle for `set_parameters` |
 | `probe_params_e2e.py`, `probe_params_e2e2.py`, `probe_params_e2e3.py`, `probe_params_e2e4.py`, `probe_grid_pixels.py` | the module-parameter probes on the saved round-1 project (row scans, expansion keys, pixel bands of the Modules grid, the DAP/submodule rows, the CParamGrid); the mechanism they found is written up above |
 | `e2e_round1.py [--from N] [--to M]` | **writes** (in memory + one `Save as` into `spike/scratch`): the 8-stage end-to-end round above — restart + New, controller, ET200SP, controller IP + station name + slave IP (controller grids), NORD, module plug (Apply, Cancel), Save as, XML read-back; its stage functions are the first draft of the driver operations |
 
