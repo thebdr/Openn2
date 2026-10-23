@@ -98,6 +98,30 @@ def slave_points(green):
     return [(dx, (y0 + y1) // 2), (dx, y0 + 150), (dx, y1 - 150)]
 
 
+def dark_profile(rect, threshold=600, x0=40, step=2):
+    """Dark-pixel count per pixel row of a captured rectangle (a signature of the rows a custom grid shows)."""
+    bits, stride, bpp, w, h = capture(rect)
+    prof = []
+    for y in range(h):
+        row = bits[y * stride:(y + 1) * stride]
+        prof.append(sum(1 for x in range(x0, w, step) if (row[x * bpp] + row[x * bpp + 1] + row[x * bpp + 2]) < threshold))
+    return prof
+
+
+def measure_shift(before, after, skip=18, max_shift=None):
+    """The upward pixel shift of a profile between two captures (0 when nothing moved)."""
+    h = len(before)
+    best, best_err = 0, None
+    for s in range(0, (max_shift or h - 20)):
+        n = h - s - skip
+        if n <= 10:
+            break
+        err = sum(abs(before[y + s] - after[y]) for y in range(skip, h - s)) / n
+        if best_err is None or err < best_err - 1e-9:
+            best, best_err = s, err
+    return best
+
+
 def text_bands(rect, band, threshold=600, x0=40):
     """Dark-pixel count per horizontal band of a captured rectangle (to find the text rows of a custom grid)."""
     bits, stride, bpp, w, h = capture(rect)

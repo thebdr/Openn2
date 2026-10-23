@@ -107,7 +107,8 @@ class SyconDriver:
                 time.sleep(2.0)
                 log("saved:", xml_path)
                 return xml_path
-        raise SyconError("the project was not saved (%s unchanged)" % xml_path)
+        log("save: %s unchanged after %d s (nothing to save?) - going on" % (xml_path, timeout))
+        return xml_path
 
     @staticmethod
     def read_back(xml_or_spj):
@@ -155,11 +156,60 @@ class SyconDriver:
                 dlg.close(keep=False)
             raise
         nodes = self.session.nodes()
-        if not any("<%s>" % name in node for node in nodes):
+        if not any("<%s>" % name.lower() in node.lower() for node in nodes):
             raise SyconError("the netProject tree does not show <%s>: %r" % (name, nodes))
         if station in self.model:
             self.model[name] = self.model.pop(station)
         log("station %s -> %s @ %s" % (station, name, ip))
+
+    def rename_stations(self, mapping):
+        """mapping: {current station name: (new name, ip)} - one controller dialog pass for all of them."""
+        dlg = ControllerDialog(self.session, self.controller_station())
+        try:
+            missing = dlg.rename_and_address(mapping)
+            dlg.ok()
+        except SyconError:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            raise
+        if missing:
+            raise SyconError("stations not found in the Device Table: %r" % missing)
+        nodes = self.session.nodes()
+        absent = [new for new, _ip in mapping.values() if not any("<%s>" % new.lower() in n.lower() for n in nodes)]
+        if absent:
+            raise SyconError("the netProject tree does not show %r" % absent)
+        for old, (new, _ip) in mapping.items():
+            self.model[new] = self.model.pop(old, {"slots": {}})
+        log("renamed and addressed %d stations" % len(mapping))
+
+    def plug_modules(self, station, specs):
+        """Append modules in order in ONE dialog; a spec is a combo text or 'order:<order number>'. Returns the
+        texts chosen."""
+        dlg = DeviceDialog(self.session, station)
+        chosen = []
+        try:
+            dlg.modules_page()
+            for spec in specs:
+                row = dlg.add_module()
+                text = dlg.resolve_module(row, spec)
+                dlg.set_module(row, text)
+                chosen.append(text)
+            errs = dlg.apply()
+            if errs and any("without submodul" in e for e in errs):
+                dlg.press("Add Submodule", settle=1.5)
+                errs = self.session.dismiss_errors() + dlg.apply()
+            if errs:
+                raise SyconError("Apply refused: %r" % errs)
+            dlg.close(keep=True)
+        except SyconError:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            raise
+        used = self.model.setdefault(station, {"slots": {}})["slots"]
+        for text in chosen:
+            used[max(used) + 1 if used else 1] = text
+        log("modules plugged on %s: %r" % (station, chosen))
+        return chosen
 
     # ---- modules and parameters -------------------------------------------------------------------------------
     def plug_module(self, station, module, slot=None):

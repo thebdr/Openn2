@@ -290,8 +290,9 @@ class Session:
             return []
 
     def station_item(self, station):
+        want = "<%s>" % station.lower()                  # SYCON.net lower-cases a name of station
         for i in self._iter_items(self.project_tree()):
-            if "<%s>" % station in i.window_text():
+            if want in i.window_text().lower():
                 return i
         raise SyconError("station <%s> not in the netProject tree" % station)
 

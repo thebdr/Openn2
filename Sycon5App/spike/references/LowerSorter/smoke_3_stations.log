@@ -1,0 +1,84 @@
+15:35:25 handoff: 3 stations, controller n0001-trib-aec01-K22101.1 @ 192.168.1.1 | modules for ['n0005-trib-aep01-K35001']
+15:35:25 resume: 3 stations already in the saved project
+15:35:40 opened: SYCON.net - [Smoke.spj]
+15:35:52 dialog: netProject - Configuration IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<n0005-trib-aep01-k35001>
+15:36:09   row 2 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+15:36:12   Add Module: slots still 2 (attempt 1)
+15:36:27   row 3 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+15:36:30   Add Module: slots still 3 (attempt 1)
+15:36:45   row 4 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+15:36:48   Add Module: slots still 4 (attempt 1)
+15:37:04   row 5 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+15:37:07   Add Module: slots still 5 (attempt 1)
+15:37:22   row 6 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+15:37:25   Add Module: slots still 6 (attempt 1)
+15:37:40   row 7 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+15:37:43   Add Module: slots still 7 (attempt 1)
+15:37:59   row 8 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]'
+15:38:06 Question: Configuration data has been changed.Do you want to save the data?
+ -> Yes
+15:38:07 dialog closed after Cancel
+15:38:10 modules plugged on n0005-trib-aep01-K35001: ['DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]']
+15:38:15 saved: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke\Smoke\_S129\SYCON_net.xml
+verification: 22 PASS, 0 FAIL
+PASS controller present: controller
+PASS station n0006-trib-aec01-k24501 exists
+PASS station n0006-trib-aec01-k24501 IP 192.168.1.6 (read 192.168.1.6)
+PASS controller lists n0006-trib-aec01-k24501 at 192.168.1.6 (read 192.168.1.6)
+PASS station n0006-trib-aec01-k24501 type 'PN/PN Coupler X2' for catalog item 'PN/PN Coupler X2'
+PASS station n0005-trib-aep01-k35001 exists
+PASS station n0005-trib-aep01-k35001 IP 192.168.1.5 (read 192.168.1.5)
+PASS controller lists n0005-trib-aep01-k35001 at 192.168.1.5 (read 192.168.1.5)
+PASS station n0005-trib-aep01-k35001 type 'IM 155-6 PN ST V4.2' for catalog item 'IM 155-6 PN ST V4.2'
+PASS station n0005-trib-aep01-k35001: 7 modules plugged (table 7)
+PASS station n0005-trib-aep01-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 3: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 4: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 5: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 6: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 7: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0035-trib-sm006-k1 exists
+PASS station n0035-trib-sm006-k1 IP 192.168.1.35 (read 192.168.1.35)
+PASS controller lists n0035-trib-sm006-k1 at 192.168.1.35 (read 192.168.1.35)
+PASS station n0035-trib-sm006-k1 type 'AL1202' for catalog item 'AL1202'
+PASS no station outside the table (extra: [])
+
+C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke\Smoke\_S129\SYCON_net.xml
+  controller (controller) symbolic=CIFX_RE_PNM type='' ip= mask= gsdml=
+    network: n0006-trib-aec01-k24501 192.168.1.6
+    network: n0005-trib-aep01-k35001 192.168.1.5
+    network: n0035-trib-sm006-k1 192.168.1.35
+  n0006-trib-aec01-k24501 symbolic=PN_PN_Coupler_X2 type='PN/PN Coupler X2' ip=192.168.1.6 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml
+    slot 0: PN/PN Coupler X2
+    record slot 0 sub 1 index 1: 00 00 00 02 00 00
+  n0005-trib-aep01-k35001 symbolic=IM_155-6_PN_ST_V4.2 type='IM 155-6 PN ST V4.2' ip=192.168.1.5 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml
+    slot 0: IM 155-6 PN ST V4.2
+    slot 1: DI 16x24VDC ST V0.0
+    slot 2: DI 16x24VDC ST V0.0
+    slot 3: DI 16x24VDC ST V0.0
+    slot 4: DI 16x24VDC ST V0.0
+    slot 5: DI 16x24VDC ST V0.0
+    slot 6: DI 16x24VDC ST V0.0
+    slot 7: DQ 16x24VDC/0.5A ST V0.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 1 sub 1 index 243: 00 00 00 00 00 00
+    record slot 2 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 2 sub 1 index 243: 00 00 00 00 00 00
+    record slot 3 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 3 sub 1 index 243: 00 00 00 00 00 00
+    record slot 4 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 4 sub 1 index 243: 00 00 00 00 00 00
+    record slot 5 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 5 sub 1 index 243: 00 00 00 00 00 00
+    record slot 6 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 6 sub 1 index 243: 00 00 00 00 00 00
+    record slot 7 sub 1 index 128: 00 02 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 00
+    record slot 7 sub 1 index 243: 00 00 00 00 00 00
+  n0035-trib-sm006-k1 symbolic=AL1202 type='AL1202' ip=192.168.1.35 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml
+    slot 0: AL1202
+    slot 1: 8 Ports
+    record slot 1 sub 1 index 301: ff 00 00
+15:38:17 report: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke\Smoke.verification.txt | elapsed 172 s
+15:38:20 close: closed

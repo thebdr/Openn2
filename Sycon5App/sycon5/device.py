@@ -1,6 +1,6 @@
 """A slave (GSDML generic device) dialog: the Modules page.
 
-Modules grid (`CModulesGrid`, auto id 321): header 18 px, rows 18 px (row n centre at y+27+18(n-1)); row 1 is
+Modules grid (`CModulesGrid`, auto id 321): header 18 px, rows 16 px (row n centre at y+26+16(n-1)); row 1 is
 the DAP, then one row per module in slot order. 'Add Module' appends a row with the first GSDML module; the
 row's Slot cell (x+60) opens a win32 ComboBox 1901, its Module cell (x+150) a ComboBox 1904 listing every module
 of the GSDML - select by text through win32. A module row's submodule rows are hidden: double-click its glyph
@@ -24,7 +24,7 @@ MODULES_PAGE = "Modules"
 MODULES_GRID_ID, PARAM_GRID_ID, IO_GRID_ID = "321", "320", "322"
 DATASET_COMBO_ID, DISPLAY_COMBO_ID = 311, 312
 SLOT_COMBO_ID, MODULE_COMBO_ID, EDITOR_ID = 1901, 1904, 1902
-ROW_Y0, ROW_H = 27, 18
+ROW_Y0, ROW_H = 26, 16             # an 18 px header, 16 px rows (editor rectangles, 2026-10-23)
 GLYPH_X, ICON_X, SLOT_X, MODULE_X, RIGHT_X = 17, 9, 60, 150, 560
 PARAM_ROW_Y0, PARAM_ROW_H, PARAM_VALUE_X, PARAM_NAME_X = 25, 16, 395, 60
 PARAM_VISIBLE_ROWS = 4
@@ -53,22 +53,29 @@ class DeviceDialog(ConfigDialog):
     def add_module(self):
         """Append a module row; returns its row index (1 = DAP, so the new row is the new slot count)."""
         before = self.slots_used()
-        self.press("Add Module", settle=1.5)
-        after = self.slots_used()
-        if after != before + 1:
-            raise SyconError("Add Module: slots %d -> %d" % (before, after))
-        return after
+        for attempt in range(3):          # a first press only closes an open in-place editor
+            self.press("Add Module", settle=1.5)
+            after = self.slots_used()
+            if after == before + 1:
+                return after
+            log("  Add Module: slots still %d (attempt %d)" % (after, attempt + 1))
+        raise SyconError("Add Module: slots %d -> %d" % (before, after))
 
     def module_combo(self, row):
         r = self.modules_page()
-        mouse.click(coords=(r.left + MODULE_X, r.top + row_y(row)))
-        time.sleep(1.5)
-        cb = self.controls(("ComboBox",), cid=MODULE_COMBO_ID)
-        if not cb:
-            raise SyconError("no module combo on row %d" % row)
-        return cb[0]
+        for attempt in range(3):          # a first click may only close an editor left open on another cell
+            mouse.click(coords=(r.left + MODULE_X, r.top + row_y(row)))
+            time.sleep(1.5)
+            cb = self.controls(("ComboBox",), cid=MODULE_COMBO_ID)
+            if cb:
+                return cb[0]
+            log("  module cell of row %d: no combo yet (attempt %d)" % (row, attempt + 1))
+        raise SyconError("no module combo on row %d" % row)
 
     def set_module(self, row, text):
+        """Choose the module of a row through its in-place combo (win32 select: the editor closes itself =
+        committed), then make the row the current line through its icon column (no editor left open: the next
+        'Add Module' needs that, and re-opening the combo for a read-back cost the module its submodule)."""
         cb = self.module_combo(row)
         current = cb.selected_text()
         if current != text:
@@ -78,15 +85,33 @@ class DeviceDialog(ConfigDialog):
                 self._close_dropdowns()
                 raise SyconError("module %r not offered on row %d: %s" % (text, row, ex))
             time.sleep(1.5)
-        # verify: reopen the cell and read the combo; leave the editor open (closed dropdown) as the proven
-        # round-1 sequence did before Apply - closing it with a click elsewhere left the module without its
-        # submodule ("Slot [1] contains a module without submoduls" on Apply)
+        else:
+            self._close_dropdowns()
+        self.select_row(row)
+        log("  row %d module: %r -> %r" % (row, current, text))
+
+    @staticmethod
+    def _order_of(item):
+        """'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]' -> '6ES7131-6BH01-0BA0'."""
+        if "[" in item and item.endswith("]"):
+            return item.rsplit("[", 1)[1][:-1].replace(" ", "").upper()
+        return ""
+
+    def resolve_module(self, row, spec):
+        """The combo text for a module spec: the text itself, or 'order:<order number>' resolved against the
+        combo's items (the first plain variant of that order number - no ', QI' / ', MSI' suffix - else the
+        first)."""
+        if not spec.startswith("order:"):
+            return spec
+        order = spec[6:].replace(" ", "").upper()
         cb = self.module_combo(row)
-        value = cb.selected_text()
+        items = cb.item_texts()
         self._close_dropdowns()
-        log("  row %d module: %r -> %r" % (row, current, value))
-        if value != text:
-            raise SyconError("module reads %r after selecting %r" % (value, text))
+        matches = [it for it in items if self._order_of(it) == order]
+        if not matches:
+            raise SyconError("no module with order number %s among %d items (e.g. %r)" % (order, len(items), items[:3]))
+        plain = [it for it in matches if "," not in it.rsplit("[", 1)[0]]
+        return (plain or matches)[0]
 
     def set_slot(self, row, slot):
         r = self.modules_page()

@@ -180,6 +180,42 @@ per device, each slave's `PNIODeviceDataModelBasic` (name, IP, mask, GSDML path)
    `read_back()` (the stage functions of `e2e_round1.py` are their first draft) — and the PL5 handoff kinds
    (decisions unchanged, below).
 
+## The PL5 handoff and its consumer (2026-10-23 afternoon)
+
+**PL5 side** — `Pipeline5App/pipeline5/systems/ipc_based/intervalzero_rtx/sycon_handoff.py` (the cPCI hardware of
+the IPC-based sorter: its cifX PROFINET controller and IO devices), three kinds with the contract-v1 header
+(`openn_header.SCHEMAS` knows them, `target: SyconNetProjectInterface`), written into `SyconNetProjectInterface/`:
+
+| kind | file | columns |
+|---|---|---|
+| `hw/sycon-device-types` | `SyconDeviceTypesDatabase.csv` (hand-maintained original: `Shared/HardwareConfigBuilderData/`, shipped beside the tables with its `source`) | Model Id (the I/O List Part No. without spaces), Role (controller / slave / gateway / ignore), Catalog Item (the SYCON.net catalog entry under PROFINET IO > Master / Slave / Gateway), Modules (`iolist` = the I/O List cards are plugged, `default` = the catalog defaults stay), GSDML (documentation), Comment |
+| `hw/sycon-stations` | `SyconStations.csv` | Role, Station Name (the PROFINET name), Catalog Kind, Catalog Item, Model Id, IP Address, Subnet Mask, Gateway, Device Number (col F), Description, Comment |
+| `hw/sycon-modules` | `SyconModules.csv` | Station Name, Slot (plug order), Module Id (the card's order number), Module Text (empty = resolved by the consumer from the order number the catalog shows in brackets), Parameters (index=value), Comment (the slot tag) |
+
+Rules: the staging's head rule (`profinet_name` opens a node), phase 700's card rule (each distinct slot tag under
+the head that is not the head's own is a card); a card's model is its Part No. unless that is a Fives code
+(`14C_00051`) - this I/O List shifts the card rows one column (the order number in `Manufacturer`); the second
+controller of a redundant pair (same IP) and `ignore` models are INFO findings, a head without a mapped model a
+WARN, no controller a FAIL. `python -m pipeline5.systems.ipc_based.intervalzero_rtx.sycon_handoff --iolist <xlsx>
+--out <folder>` stages the list with the builtin params and writes the folder; `tests/unit/test_sycon_handoff.py`.
+The LOWER SORTER list (`8FVT_IO0010 ... LOWER SORTER_R1.2.xlsx`) gives 1 controller + 55 stations (3 PN/PN
+Coupler X2, 6 ET200SP, 26 ServoOne Junior, 19 AL1202, 1 Anybus Communicator) + 22 module rows; skipped: the
+backup cifX card, 5 SCALANCE switches (no XC216 in the catalog), 2 Vitronic controllers without a part number.
+
+**Consumer** — `sycon5/handoff.py` (the reader, by position) + `sycon5/consumer.py` (`build`, `verify`) +
+`scripts/build_from_handoff.py --handoff <folder> --out <project.spj> [--resume]`: new project, the controller
+from the catalog and its network IP, every station from the catalog (SYCON names them `al1202`, `al1202-001`, ...),
+ONE controller-dialog pass renaming every row and setting every IP (`ControllerDialog.rename_and_address`: the
+Device Table read row by row - the name is read before it is written, the grids scrolled by wheel with the
+pixel shift measured; the IPs in two phases, every row parked on 192.168.x.200+ first because a target IP may
+still be auto-held by another row, each row's current IP checked before it is written), the modules of the
+`iolist` stations in one dialog each (`plug_modules`: 'Add Module' pressed again when a first press only closed
+an open editor, the module text resolved from the order number in the combo's brackets, the plain variant
+preferred), checkpoint saves, `read_project` compared with the tables (`<project>.verification.txt`). SYCON.net
+lower-cases every name of station: all comparisons are case-insensitive. Grid geometry: an 18 px header and
+16 px rows in the controller grids AND the Modules grid (row n centre at y+27+16n / y+26+16(n−1)).
+Smoke (3 stations, 7 modules, 15:38): 22 PASS, 0 FAIL in 172 s (`spike/references/LowerSorter/`).
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run

@@ -1,0 +1,19 @@
+#!openn
+#! kind: hw/sycon-device-types
+#! schema: 1
+#! producer: Pipeline5 5.0 (phase 730)
+#! generated: 2026-10-23T13:12:48Z
+#! run: 20261023-131248-13cb
+#! project: 8XXX
+#! target: SyconNetProjectInterface
+#! source: Shared/HardwareConfigBuilderData/SyconDeviceTypesDatabase.csv
+#! comment: the database the SYCON handoff read - rewritten by every run: edit the source
+#!end
+# Model Id (the I/O List Part No. without spaces),Role (controller | slave | gateway | ignore),Catalog Item (SYCON.net device catalog: PROFINET IO > Master | Slave | Gateway / Stand-Alone Slave > this item),Modules (iolist = the I/O List cards by slot tag are plugged | default = the catalog defaults stay),GSDML (the file the catalog entry comes from - documentation only),Comment
+CIFX80-RE/ML,controller,CIFX RE/PNM,default,,Hilscher cifX 80 compact PCI card = the PROFINET IO controller of the sorter PC (the second card of a redundant pair is skipped)
+6ES7158-3AD10-0XA0,slave,PN/PN Coupler X2,default,GSDML-V2.35-Siemens-PNPNIOC-20200618.xml,PN/PN coupler - the X2 side faces the sorter network (I/O List Connector X2)
+6ES7155-6AU01-0BN0,slave,IM 155-6 PN ST V4.2,iolist,GSDML-V2.35-Siemens-ET200SP-20210401.xml,ET200SP interface module - its cards come from the I/O List slot tags
+AL1202,slave,AL1202,default,GSDML-V2.34-ifm-AL1202-20181105.xml,ifm IO-Link master 8 x M12
+SO24.004.007D.0101.x,slave,ServoOne Junior,default,GSDML-V2.3-LT-i-ServoOne-20130515.xml,LTI / LUST ServoOne junior drive
+ABC3013-A,slave,Anybus Communicator,default,GSDML-V2.35-HMS-Anybus-Communicator-20210909.xml,HMS Anybus Communicator (cell test antenna)
+6GK5216-4BS00-2AC2,ignore,,,,SCALANCE XC216-4C switch - not configured in SYCON.net (the catalog has no XC216 entry)

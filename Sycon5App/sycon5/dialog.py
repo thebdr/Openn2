@@ -17,11 +17,11 @@ QUESTION = "Question"
 
 
 class ConfigDialog:
-    def __init__(self, session: Session, station: str, timeout=90.0):
+    def __init__(self, session: Session, station: str, timeout=300.0):
         self.session = session
         self.station = station
         already = session.dialogs()
-        mine = [d for d in already if "<%s>" % station in d.window_text()]
+        mine = [d for d in already if "<%s>" % station.lower() in d.window_text().lower()]
         if mine:
             self.uia = mine[0]
         elif already:
@@ -52,7 +52,7 @@ class ConfigDialog:
             if errs:
                 raise SyconError("errors while opening the dialog of <%s>: %r" % (self.station, errs))
             for d in s.dialogs():
-                if "<%s>" % self.station in d.window_text():
+                if "<%s>" % self.station.lower() in d.window_text().lower():
                     time.sleep(3.0)
                     return d
             s.ensure_alive("opening the dialog of <%s>" % self.station)

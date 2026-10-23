@@ -15,7 +15,7 @@ NETWORK_PAGE = "Controller Network Settings"
 DEVICE_TABLE_PAGE, DEVICE_TABLE_ID = "Device Table", "210"
 IP_TABLE_PAGE, IP_TABLE_ID = "IP Address Table", "212"
 NET_IP_ID, NET_MASK_ID, NET_GATEWAY_ID = 213, 214, 215
-ROW_Y0, ROW_H = 30, 18               # rows of the custom grids: row n centre at ROW_Y0 + ROW_H * (n - 1)
+ROW_Y0, ROW_H = 27, 16               # the custom grids: an 18 px header, 16 px rows - row n (0-based) centre at ROW_Y0 + ROW_H * n (measured 2026-10-23)
 NAME_X, COMMIT_X, IP_X, IP_COMMIT_X = 200, 400, 260, 500
 NAME_EDIT_ID = 1902
 
@@ -60,7 +60,7 @@ class ControllerDialog(ConfigDialog):
         rows = []
         for n in range(1, max_rows + 1):
             y = ROW_Y0 + ROW_H * (n - 1)
-            if r.top + y > r.bottom - 5:
+            if r.top + y > r.bottom - 8:
                 break
             mouse.click(coords=(r.left + NAME_X, r.top + y))
             time.sleep(0.8)
@@ -99,8 +99,142 @@ class ControllerDialog(ConfigDialog):
         mouse.click(coords=(r.left + COMMIT_X, r.top + row_y))
         time.sleep(0.6)
         log("  Device Table row y+%d: name -> %r" % (row_y, value))
-        if value != name:
+        if value.lower() != name.lower():
             raise SyconError("name of station reads %r after writing %r" % (value, name))
+
+    # ---- many stations: the grids scrolled by wheel, the shift measured from the pixels ------------------
+    def _scroll(self, r, notches):
+        from .drawing import dark_profile, measure_shift
+        before = dark_profile(r)
+        mouse.scroll(coords=(r.left + r.width() // 2, r.top + r.height() // 2), wheel_dist=-notches)
+        time.sleep(0.9)
+        return measure_shift(before, dark_profile(r))
+
+    def _rows_visible(self, r):
+        return max(1, (r.height() - ROW_Y0 - 6) // ROW_H + 1)
+
+    def rename_and_address(self, mapping):
+        """mapping: {current name of station: (new name, ip)}. One pass down the Device Table (the names are
+        read on every row, so a row is identified before it is edited), then one pass down the IP Address Table
+        by the same row positions. Returns the names it could not find."""
+        self.select_page(DEVICE_TABLE_PAGE)
+        r = self._grid(DEVICE_TABLE_ID)
+        visible = self._rows_visible(r)
+        order = []                  # (absolute row index, current name) in table order
+        scrolled = 0
+        pending = dict(mapping)
+        px_per_notch = None
+        while True:
+            first_abs = -(-scrolled // ROW_H)                       # the first fully visible absolute row
+            page_rows = 0
+            for k in range(visible + 1):
+                abs_row = first_abs + k
+                y = ROW_Y0 + ROW_H * abs_row - scrolled
+                if y < ROW_Y0 - 4 or y > r.height() - 10:
+                    continue
+                if any(a == abs_row for a, _ in order):
+                    continue
+                mouse.click(coords=(r.left + NAME_X, r.top + y))
+                time.sleep(0.7)
+                eds = self.controls(("Edit",), cid=NAME_EDIT_ID)
+                if not eds:
+                    page_rows = -1
+                    break
+                name = eds[0].window_text()
+                order.append((abs_row, name))
+                page_rows += 1
+                if name in pending:
+                    new, _ip = pending.pop(name)
+                    eds[0].select()
+                    time.sleep(0.2)
+                    keyboard.send_keys(new, with_spaces=True)
+                    time.sleep(0.3)
+                    mouse.click(coords=(r.left + COMMIT_X, r.top + y))
+                    time.sleep(0.7)
+                    mouse.click(coords=(r.left + NAME_X, r.top + y))
+                    time.sleep(0.7)
+                    value = self.controls(("Edit",), cid=NAME_EDIT_ID)[0].window_text()
+                    mouse.click(coords=(r.left + COMMIT_X, r.top + y))
+                    time.sleep(0.4)
+                    if value.lower() != new.lower():          # SYCON.net lower-cases a name of station
+                        raise SyconError("row %d: name reads %r after writing %r" % (abs_row, value, new))
+                    log("  row %d: %s -> %s" % (abs_row, name, new))
+            if page_rows < 0 or not pending:
+                break
+            notches = 3 if px_per_notch is None else max(1, int((visible - 2) * ROW_H / px_per_notch))
+            shift = self._scroll(r, notches)
+            if shift <= 0:
+                break
+            if px_per_notch is None:
+                px_per_notch = shift / notches
+            scrolled += shift
+        if pending:
+            log("  not found in the Device Table:", sorted(pending))
+        mouse.click(coords=(r.left + COMMIT_X, r.top + ROW_Y0))
+        time.sleep(0.4)
+        # the IPs, by the same absolute rows - in TWO passes, because a target IP may still be held by another
+        # row's auto-assigned address: first every row to a parking address, then the targets. Each row's current
+        # IP is checked against the expected one before it is written (the row identity on this page).
+        self.select_page(IP_TABLE_PAGE)
+        r = self._grid(IP_TABLE_ID)
+        rows = [(abs_row, name) for abs_row, name in order if name in mapping]
+        parking = {}
+        for i, (abs_row, name) in enumerate(rows):
+            new, ip = mapping[name]
+            parking[abs_row] = "%s.%d" % (".".join(ip.split(".")[:3]), 200 + i % 55)
+        expected = dict(self.expected_ips or {})
+        for phase_name, targets in (("park", {a: (n, parking[a]) for a, n in rows}),
+                                    ("target", {a: mapping[n] for a, n in rows})):
+            targets = dict(targets)
+            scrolled = 0
+            px_per_notch = None
+            while targets:
+                page = sorted(a for a in targets if ROW_Y0 - 4 <= ROW_Y0 + ROW_H * a - scrolled <= r.height() - 10)
+                for abs_row in page:
+                    y = ROW_Y0 + ROW_H * abs_row - scrolled
+                    new, ip = targets.pop(abs_row)
+                    before = self._set_ip_at(r, y, ip, "%s row %d (%s)" % (phase_name, abs_row, new), expect=expected.get(abs_row))
+                    expected[abs_row] = ip
+                    if phase_name == "park":
+                        log("  row %d auto IP was %s" % (abs_row, before))
+                if not targets:
+                    break
+                notches = 3 if px_per_notch is None else max(1, int((visible - 2) * ROW_H / px_per_notch))
+                shift = self._scroll(r, notches)
+                if shift <= 0:
+                    raise SyconError("the IP Address Table did not scroll; rows left: %r" % sorted(targets))
+                if px_per_notch is None:
+                    px_per_notch = shift / notches
+                scrolled += shift
+            if phase_name == "park":
+                self._scroll(r, -200)                     # back to the top for the second pass
+        return sorted(pending)
+
+    expected_ips = None       # {absolute row: the IP the row must show before it is written} - set by the caller
+
+    def _set_ip_at(self, r, y, ip, label, expect=None):
+        mouse.click(coords=(r.left + IP_X, r.top + y))
+        time.sleep(0.8)
+        ipc = self.controls(("SysIPAddress32",))
+        if not ipc:
+            raise SyconError("no IP editor at %s" % label)
+        before = ".".join(f.window_text() for f in sorted(ipc[0].children(), key=lambda c: c.rectangle().left))
+        if expect and before != expect:
+            mouse.click(coords=(r.left + IP_COMMIT_X, r.top + y))
+            raise SyconError("%s shows IP %s, expected %s - row mismatch, nothing written" % (label, before, expect))
+        _set_ip_control(ipc[0], ip)
+        mouse.click(coords=(r.left + IP_COMMIT_X, r.top + y))
+        time.sleep(0.8)
+        mouse.click(coords=(r.left + IP_X, r.top + y))
+        time.sleep(0.8)
+        ipc = self.controls(("SysIPAddress32",))
+        after = ".".join(f.window_text() for f in sorted(ipc[0].children(), key=lambda c: c.rectangle().left)) if ipc else ""
+        mouse.click(coords=(r.left + IP_COMMIT_X, r.top + y))
+        time.sleep(0.4)
+        log("  IP at %s: %s -> %s" % (label, before, after))
+        if after != ip:
+            raise SyconError("IP reads %s after writing %s at %s" % (after, ip, label))
+        return before
 
     # ---- IP Address Table ---------------------------------------------------------------------------------
     def set_station_ip(self, row_y, ip):

@@ -63,6 +63,7 @@ RESERVED_ROOT_FOLDERS = frozenset({CONFIG_FOLDER, ".vci", HARDWARE_FOLDER, TEMPL
 # kind id -> the schema this producer writes (§2): the hardware csvs continue the format-2 numbering.
 SCHEMAS = {
     "hw/device-types": 1, "hw/stations": 2, "hw/modules": 2,
+    "hw/sycon-device-types": 1, "hw/sycon-stations": 1, "hw/sycon-modules": 1,     # the SYCON.net handoff (Sycon5App)
     "sw/udt": 1, "sw/tag-table": 1, "sw/data-block": 1, "sw/instance-db": 1, "sw/block-gen": 1,
     "sw/code-block": 1, "sw/source": 1, "sw/block-template": 1,
     "doc/plc-tags-workbook": 1, "doc/other": 1,
