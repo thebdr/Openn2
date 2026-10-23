@@ -141,12 +141,30 @@ per device, each slave's `PNIODeviceDataModelBasic` (name, IP, mask, GSDML path)
 
 ### Open on the VM (next session)
 
-1. **Module parameters**: the Dataset combo 311 stays disabled after Add Module, the module choice and even
-   Apply; hypotheses left: parameters hang on the submodule row (Add Submodule), or the dialog must be
-   reopened after Apply. Probe: reopen → select the module row → `Dataset = Parameter` (win32 select) → click
-   the lower grid's cells → expect win32 Edit / ComboBox editors (ctrl ids ≥ 1900).
-2. Submodules (Add Submodule + its combo), Remove, slot numbering (combo 1901, SYCON numbers new rows 1, 2, …);
-   the coupler / ServoOne / AC140x catalog names; a second slave of the same type (`-001` suffix) renamed.
+1. **Module parameters — mechanism found** (14:05, with computer use for supervision; `probe_params_e2e4.py`,
+   `probe_grid_pixels.py`, then by hand on screen):
+   - The Modules grid (header 18 px, rows 18 px: row n centre at y+27+18·(n−1)) hides each module's **submodule
+     rows**: **double-click the row's glyph at x+17** expands them (single clicks, spacebar, keypad +, Right do
+     nothing). **Select a submodule row through the icon column at x+9** — a click in the Module column opens
+     the module combo, a click at the far right selects the module row instead.
+   - The **Dataset combo 311 enables only for a selected submodule that has parameters** (the ET200SP DAP's own
+     submodule 1 has none; the DI module's submodule 1 has the record "Inputs"). Win32 `select("Parameter")`
+     replaces the IOs grid 322 by the **`CParamGrid` (auto id 320)**: one row per record ("Inputs", expanded,
+     Value = the raw record bytes) and one row per parameter (Name / Value / Data type / Data range, ~12 px rows,
+     mouse-wheel scrolling).
+   - **Double-click the Value cell's text** (right-aligned) → a Win32 editor, child of the CParamGrid, ctrl id
+     **1902**: an `Edit` for numbers / bits (Wire break: `select()` + typed `1`, read back `1`) or a `ComboBox`
+     for enumerations (Input delay: `None, 0.05 ms … 20 ms`; win32 `select("0.4 ms")` closes the editor =
+     committed, the cell shows 0.4 ms). Single clicks, F2, Space and Down do nothing in that grid.
+   - Parameter names are not readable (custom grid): the driver addresses a parameter by its **row index = the
+     order of the record's parameters in the GSDML**, and verifies through the saved XML
+     (`STLRecordParamDataMap/<n>/PNIORecordParamDataBasic`).
+   - Still to prove (round 2): that the edits reach the record and the saved file — the "Inputs" byte string did
+     not visibly change before Apply. Probe: edit → Apply → Cancel/Yes → Save → read the record bytes back.
+2. Submodules: `Add Submodule` on a module with one fixed submodule raises the modal `Error` "No possible
+   submodule found for insertion!" (blocks everything until dismissed); Remove, slot numbering (combo 1901, SYCON
+   numbers new rows 1, 2, …); the coupler / ServoOne / AC140x catalog names; a second slave of the same type
+   (`-001` suffix) renamed.
 3. Then the driver API as `Sycon5App` operations — `new_project`, `add_station(catalog, name, ip)`,
    `plug_module(station, slot, module)`, `set_parameters(station, slot, {name: value})`, `save_as`,
    `read_back()` (the stage functions of `e2e_round1.py` are their first draft) — and the PL5 handoff kinds
@@ -170,6 +188,7 @@ per device, each slave's `PNIODeviceDataModelBasic` (name, IP, mask, GSDML path)
 | `probe_modules_page.py`, `probe_modules_grid.py` | Modules page: editability, Add Module, cell clicks with dropdown detection |
 | `probe_parameters.py`, `probe_parameters2.py`, `probe_parameters3.py` | module selection via the in-place combo (v3 = win32, the one that works) and the Dataset / lower grid probe |
 | `probe_symbolic_name.py <station>` | the Symbolic Name dialog |
+| `probe_params_e2e.py`, `probe_params_e2e2.py`, `probe_params_e2e3.py`, `probe_params_e2e4.py`, `probe_grid_pixels.py` | the module-parameter probes on the saved round-1 project (row scans, expansion keys, pixel bands of the Modules grid, the DAP/submodule rows, the CParamGrid); the mechanism they found is written up above |
 | `e2e_round1.py [--from N] [--to M]` | **writes** (in memory + one `Save as` into `spike/scratch`): the 8-stage end-to-end round above — restart + New, controller, ET200SP, controller IP + station name + slave IP (controller grids), NORD, module plug (Apply, Cancel), Save as, XML read-back; its stage functions are the first draft of the driver operations |
 
 ## Inputs
