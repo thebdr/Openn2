@@ -13,11 +13,12 @@ import time
 
 from .catalog import split_item
 from .driver import SyconDriver
-from .handoff import load_handoff
+from .handoff import load_handoff, parse_parameters
 from .readback import read_project
 from .session import Session, SyconError, log
 
 CHECKPOINT_EVERY = 12
+POTENTIAL_GROUP_RECORD = 243          # an ET200SP module's `Potential group` record (its first byte 01 = a new group)
 
 
 class Verification:
@@ -51,6 +52,7 @@ def verify(handoff, project, plugged):
     ctrl = project.controller
     v.check(ctrl is not None, "controller present: %s" % (ctrl.device_no if ctrl else None))
     network = {k.lower(): v for k, v in ctrl.network} if ctrl else {}
+    timing = {k.lower(): v for k, v in ctrl.timing.items()} if ctrl else {}
     for s in handoff.stations:
         name, ip = s["station_name"].lower(), s["ip_address"]
         d = by_name.get(name)
@@ -59,6 +61,10 @@ def verify(handoff, project, plugged):
             continue
         v.check(d.ip == ip, "station %s IP %s (read %s)" % (name, ip, d.ip))
         v.check(network.get(name) == ip, "controller lists %s at %s (read %s)" % (name, ip, network.get(name)))
+        if s.get("update_time_ms"):
+            t = timing.get(name)
+            v.check(t is not None and abs(t[0] - float(s["update_time_ms"])) < 1e-6,
+                    "station %s update time %s ms (read %s)" % (name, s["update_time_ms"], "%g ms, watchdog %g ms" % t if t else None))
         if s.get("gsdml"):
             v.check(d.gsdml.lower() == s["gsdml"].lower(),
                     "station %s GSDML %s (read %s)" % (name, s["gsdml"], d.gsdml))
@@ -81,6 +87,15 @@ def verify(handoff, project, plugged):
                 head = chosen.split("  [")[0].strip()
                 v.check(bool(got) and (not head or got == head or got.startswith(head[:12])),
                         "station %s slot %s: %r (chosen %r, table %s)" % (name, m["slot"], got, chosen, m["module_id"]))
+                for pname, pvalue in parse_parameters(m["parameters"]):
+                    if pname == "potential_group":
+                        rec = d.records.get((int(m["slot"]), 1, POTENTIAL_GROUP_RECORD), b"")
+                        want = b"\x01" if pvalue.lower().startswith("enable new") else b"\x00"
+                        v.check(rec[:1] == want, "station %s slot %s potential group %r (record %d reads %s)" % (
+                            name, m["slot"], pvalue, POTENTIAL_GROUP_RECORD, rec.hex(" ") or "nothing"))
+                    else:
+                        v.note("station %s slot %s parameter %s=%s set through the GUI (read back there)" % (
+                            name, m["slot"], pname, pvalue))
         for m in handoff.submodule_rows(s["station_name"]):
             got = d.submodules.get((int(m["slot"]), int(m["subslot"])), "")
             v.check(same_text(got, m["module_text"]),
@@ -149,21 +164,38 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
         # 2. names and IPs in one controller dialog pass
         d.rename_stations(mapping)
         checkpoint()
+    # 2b. the stations' updating times (one Stations Timing pass; on a resume only the ones the saved project shows wrong)
+    wanted = {s["station_name"]: float(s["update_time_ms"]) for s in h.stations if s.get("update_time_ms")}
+    if wanted and resume and os.path.exists(xml):
+        have = {k.lower(): v for k, v in read_project(xml).controller.timing.items()}
+        wanted = {st: ms for st, ms in wanted.items() if not have.get(st.lower()) or abs(have[st.lower()][0] - ms) > 1e-6}
+    if wanted:
+        d.set_stations_timing(wanted)
+        checkpoint()
     # 3. the modules and the submodules (an AL1202's ports)
     for s in h.stations:
         station = s["station_name"]
         rows, subs = h.plug_rows(station), h.submodule_rows(station)
         if not rows and not subs:
             continue
+        plug_needed = True
         if resume and station.lower() in done_names:
             p = read_project(xml)
             dev = next(dv for dv in p.devices if dv.device_no.lower() == station.lower())
             if len([k for k in dev.slots if k != 0]) >= len(rows) and all(
                     dev.submodules.get((int(m["slot"]), int(m["subslot"]))) for m in subs):
-                continue
-        if rows:
+                if not any(m["parameters"] for m in rows):
+                    continue
+                plug_needed = False          # the modules are there; their parameters are set again (idempotent)
+        if rows and plug_needed:
             chosen = d.plug_modules(station, [m["module_text"] or ("order:" + m["module_id"]) for m in rows])
             plugged[station] = {m["slot"]: chosen[i] for i, m in enumerate(rows)}
+        for m in rows:
+            if m["parameters"]:
+                d.set_module_parameters(station, int(m["slot"]), parse_parameters(m["parameters"]))
+        if not plug_needed:
+            checkpoint()
+            continue
         by_slot = {}
         for m in subs:
             by_slot.setdefault(int(m["slot"]), []).append((int(m["subslot"]), m["module_text"]))

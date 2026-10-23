@@ -39,6 +39,7 @@ class Device:
     submodules: dict = field(default_factory=dict) # (slot, subslot) -> submodule name (the DAP's 0x8000+ ones too)
     records: dict = field(default_factory=dict)    # (slot, subslot, index) -> bytes
     network: list = field(default_factory=list)    # controller only: [(name of station, ip)]
+    timing: dict = field(default_factory=dict)     # controller only: name of station -> (update ms, watchdog ms)
 
     @property
     def is_controller(self):
@@ -125,7 +126,14 @@ def _parse_blob(dev, hexdata):
                 dev.records[key] = _record_bytes(data)
             elif "SlaveDTMsGetParameters" in path:
                 text = data.decode("utf-16-le", "replace") if "nameOfStation".encode("utf-16-le") in data else data.decode("latin-1", "replace")
-                dev.network.extend(re.findall(r'nameOfStation="([^"]*)"[^>]*ipAddress="([^"]*)"', text))
+                pairs = re.findall(r'nameOfStation="([^"]*)"[^>]*ipAddress="([^"]*)"', text)
+                dev.network.extend(pairs)
+                # one DTMProxy stream per slave: its timing = send clock (x 31.25 us) x reduction ratio, the
+                # watchdog that times the factor (sendClockFactor="32" reductionRatio="8" watchdogFactor="3" = 8 / 24 ms)
+                m = re.search(r'sendClockFactor="(\d+)"\s+reductionRatio="(\d+)"\s+watchdogFactor="(\d+)"', text)
+                if pairs and m:
+                    update_ms = int(m.group(1)) * 31.25 / 1000 * int(m.group(2))
+                    dev.timing[pairs[0][0]] = (update_ms, update_ms * int(m.group(3)))
     finally:
         ole.close()
 
@@ -163,5 +171,6 @@ def describe(project):
         for key in sorted(d.records):
             lines.append("    record slot %d sub %d index %d: %s" % (key + (d.records[key].hex(" "),)))
         for name, ip in d.network:
-            lines.append("    network: %s %s" % (name, ip))
+            t = d.timing.get(name)
+            lines.append("    network: %s %s%s" % (name, ip, " (update %g ms, watchdog %g ms)" % t if t else ""))
     return "\n".join(lines)

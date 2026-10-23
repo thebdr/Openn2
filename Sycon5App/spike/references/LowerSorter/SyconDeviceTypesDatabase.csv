@@ -2,8 +2,8 @@
 #! kind: hw/sycon-device-types
 #! schema: 1
 #! producer: Pipeline5 5.0 (phase 730)
-#! generated: 2026-10-23T15:47:08Z
-#! run: 20261023-154708-7884
+#! generated: 2026-10-23T17:03:24Z
+#! run: 20261023-170324-a4b8
 #! project: 8XXX
 #! target: SyconNetProjectInterface
 #! source: Shared/HardwareConfigBuilderData/SyconDeviceTypesDatabase.csv

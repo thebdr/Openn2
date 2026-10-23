@@ -15,6 +15,7 @@ import time
 
 import win32con
 from pywinauto import keyboard, mouse
+from pywinauto.win32structures import RECT
 
 from .dialog import ConfigDialog
 from .drawing import capture, text_bands
@@ -38,11 +39,20 @@ def row_y(n):
 class DeviceDialog(ConfigDialog):
     # ---- Modules grid -------------------------------------------------------------------------------------
     _grid = None
+    GRID_REF_W, PARAM_GRID_REF_W = 571, 561     # the grids' widths at the dialog's default size (the control maps)
 
     def modules_page(self):
         self.select_page(MODULES_PAGE)
         self._grid = self.pane(MODULES_GRID_ID).rectangle()
         return self._grid
+
+    def sx(self, x):
+        """A Modules-grid column offset measured at the reference width, scaled to the grid as shown (maximized)."""
+        return int(round(x * self.grid_rect().width() / self.GRID_REF_W))
+
+    def psx(self, x, r):
+        """The same for the parameter grid."""
+        return int(round(x * r.width() / self.PARAM_GRID_REF_W))
 
     def grid_rect(self):
         """The Modules grid rectangle, read once per page selection (every UIA descendants walk of the dialog
@@ -75,6 +85,7 @@ class DeviceDialog(ConfigDialog):
             self.press("Add Module", settle=1.2)
             after = self.slots_used()
             if after == before + 1:
+                self.collapse_all()       # the new row may come expanded: slot n on row 1 + n only when none is
                 return after
             log("  Add Module: slots still %d (attempt %d)" % (after, attempt + 1))
         raise SyconError("Add Module: slots %d -> %d" % (before, after))
@@ -89,18 +100,23 @@ class DeviceDialog(ConfigDialog):
         return None
 
     def module_combo(self, row):
-        r = self.grid_rect()
-        y = r.top + row_y(row)
-        for attempt in range(3):          # a first click may only close an editor left open on another cell
+        for attempt in range(5):          # a first click may only close an editor left open on another cell
+            if attempt == 3:              # a dialog on a freshly loaded project answered no click at 18:24: the
+                self._grid = None         # grid rectangle read again, more time given
+                self.select_page(MODULES_PAGE)
+                time.sleep(1.5)
+            r = self.grid_rect()
+            y = r.top + row_y(row)
             cb = self._open_combo_on(y)
             if cb is not None:
                 return cb
-            mouse.click(coords=(r.left + MODULE_X, y))
-            time.sleep(1.0)
+            mouse.click(coords=(r.left + self.sx(MODULE_X), y))
+            time.sleep(1.0 if attempt < 3 else 2.0)
             cb = self.controls(("ComboBox",), cid=MODULE_COMBO_ID)
             if cb:
                 return cb[0]
-            log("  module cell of row %d: no combo yet (attempt %d)" % (row, attempt + 1))
+            log("  module cell of row %d: no combo yet (attempt %d, grid %s, rows %r)" % (
+                row, attempt + 1, r, self.visible_rows()))
         raise SyconError("no module combo on row %d" % row)
 
     def set_module(self, row, text):
@@ -146,7 +162,7 @@ class DeviceDialog(ConfigDialog):
 
     def set_slot(self, row, slot):
         r = self.grid_rect()
-        mouse.click(coords=(r.left + SLOT_X, r.top + row_y(row)))
+        mouse.click(coords=(r.left + self.sx(SLOT_X), r.top + row_y(row)))
         time.sleep(1.2)
         cb = self.controls(("ComboBox",), cid=SLOT_COMBO_ID)
         if not cb:
@@ -155,12 +171,15 @@ class DeviceDialog(ConfigDialog):
             cb[0].select(str(slot))
             time.sleep(1.0)
         self._close_dropdowns()
-        mouse.click(coords=(r.left + RIGHT_X, r.top + row_y(row)))
+        mouse.click(coords=(r.left + self.sx(RIGHT_X), r.top + row_y(row)))
         time.sleep(0.6)
 
     def expand_row(self, row):
+        """Double-click the row's expand box (located by its pixels; GLYPH_X scaled as the fallback)."""
         r = self.grid_rect()
-        mouse.double_click(coords=(r.left + GLYPH_X, r.top + row_y(row)))
+        _cols, has_box, centre = self._glyph_columns(row)
+        x = centre if has_box else self.sx(GLYPH_X)
+        mouse.double_click(coords=(r.left + x, r.top + row_y(row)))
         time.sleep(1.2)
         self._close_dropdowns()
 
@@ -193,9 +212,82 @@ class DeviceDialog(ConfigDialog):
         raise SyconError("the Modules grid keeps scrolling")
 
     def is_expanded(self, module_row, slots_used=None):
-        """A module row is expanded when the grid shows more rows than the DAP + the modules."""
+        """A module row is expanded when the grid shows more rows than the DAP + the modules (one module only)."""
         slots_used = slots_used if slots_used is not None else self.slots_used()
         return len(self.visible_rows()) > slots_used
+
+    def row_expanded(self, row):
+        """Whether THIS module row shows its submodule rows: its glyph is a '-' (expanded) or a '+' (collapsed,
+        a vertical stroke in the box) - read from the pixels, since a double-click toggles (2026-10-23 18:34: a
+        loaded project showed slot 1 expanded already and the blind toggle collapsed it)."""
+        run, has_box, _centre = self._glyph_columns(row)
+        if not has_box:
+            return False
+        core = run[1:-1] if len(run) >= 6 and run[0] >= 6 and run[-1] >= 6 else run   # the current row's box is black:
+        return max(core) <= 3                                                          # its borders bracket the run
+        # measured 18:56: grey '+' [1,1,5,1,1], grey '-' [1,1,1,1,1], black '+' [8,2,3,3,7,3,3,2,8], black '-' [8,2,3,3,3,3,3,2,8]
+
+    def has_glyph(self, row):
+        """A module row (the DAP too) carries an expand box; a submodule row does not."""
+        return self._glyph_columns(row)[1]
+
+    GLYPH_X0, GLYPH_X1 = 9, 24         # the expand box lies here; the row marker sits left of it, the Slot cell right
+
+    def _glyph_columns(self, row):
+        """The '+' / '-' strokes of the row's expand box, read from the pixels (dark < 300 per column over a
+        13 px band): the horizontal stroke is a run of >= 4 columns with a dark pixel each, the '+' adds a
+        column of >= 4 in its middle. The box border is black on the DAP row and light on a module row (18:50),
+        so the strokes are what is looked for. Returns (the run's column counts, whether a box is there, the
+        run centre's x offset)."""
+        r = self.grid_rect()
+        y = r.top + row_y(row)
+        band = RECT(r.left + self.GLYPH_X0, y - 6, r.left + self.GLYPH_X1, y + 7)
+        bits, stride, bpp, w, h = capture(band)
+        cols = [sum(1 for yy in range(h) if sum(bits[yy * stride + x * bpp: yy * stride + x * bpp + 3]) < 300)
+                for x in range(w)]
+        inner = [min(n, 8) if n < h - 2 else 0 for n in cols]      # a full column is a border / grid line, not a stroke
+        best, start = None, None
+        for x, n in enumerate(inner + [0]):
+            if n >= 1 and start is None:
+                start = x
+            elif n < 1 and start is not None:
+                if x - start >= 4 and (best is None or x - start > best[1] - best[0]):
+                    best = (start, x)
+                start = None
+        if best is None:
+            return cols or [0], False, None
+        run = inner[best[0]:best[1]]
+        return run, True, self.GLYPH_X0 + (best[0] + best[1]) // 2
+
+    def collapse_all(self):
+        """Collapse every expanded module row (the DAP included) so that slot n sits on row 1 + n: SYCON.net
+        reopens a dialog with the rows expanded as they were left (2026-10-23 18:42: slot 1 expanded, slot 7
+        one row lower than expected)."""
+        for _ in range(16):
+            for k in self.visible_rows():
+                if self.has_glyph(k) and self.row_expanded(k):
+                    self.expand_row(k)
+                    break
+            else:
+                return
+        raise SyconError("the Modules grid keeps showing expanded rows")
+
+    def ensure_expanded(self, row):
+        """Show the module row's submodule rows: the glyph read first, the row count the proof (a double-click
+        toggles; if it removed rows the row was expanded and is toggled back)."""
+        if self.row_expanded(row):
+            return
+        before = self.visible_rows()
+        self.expand_row(row)
+        after = self.visible_rows()
+        if self.row_expanded(row) or len(after) > len(before):
+            return
+        if len(after) < len(before):
+            self.expand_row(row)
+            log("  row %d: the glyph read collapsed (%r) but the double-click removed rows - toggled back" % (
+                row, self._glyph_columns(row)))
+            return
+        raise SyconError("row %d did not expand (glyph columns %r, rows %r -> %r)" % (row, self._glyph_columns(row), before, after))
 
     def add_submodule(self, module_row):
         """Append a submodule row under the module (the module row must be expanded and selected); returns the
@@ -280,44 +372,102 @@ class DeviceDialog(ConfigDialog):
                 best, best_err = s, err
         return best
 
-    def open_param_editor(self, visual_row, r=None):
-        r = r or self.param_grid()
-        y = PARAM_ROW_Y0 + PARAM_ROW_H * visual_row
-        mouse.double_click(coords=(r.left + PARAM_VALUE_X, r.top + y))
-        time.sleep(1.2)
-        eds = self.controls(("Edit", "ComboBox"), cid=EDITOR_ID)
-        if not eds:
-            raise SyconError("no value editor on visual row %d" % visual_row)
-        return eds[0], y
+    _value_x = None
 
-    def set_param_visual(self, visual_row, value, r=None):
-        """Set the Value of the parameter shown on visual row v (0 = the first row of the grid)."""
+    def open_param_editor_at(self, y, r=None):
+        """Double-click the Value cell of the parameter row at grid offset y; returns its win32 editor. The
+        Value column's place is not proportional to the grid width (the measured 395 of 561 landed on 'Data
+        type' in a maximized dialog, 18:58), so a few fractions of the width are tried and the one that opens
+        an editor is kept for the dialog."""
         r = r or self.param_grid()
-        ed, y = self.open_param_editor(visual_row, r)
+        candidates = [self._value_x] if self._value_x is not None else []
+        candidates += [self.psx(PARAM_VALUE_X, r)] + [int(r.width() * f) for f in (0.55, 0.47, 0.62, 0.40)]
+        tried = []
+        for x in candidates:
+            if x in tried:
+                continue
+            tried.append(x)
+            mouse.double_click(coords=(r.left + x, r.top + y))
+            time.sleep(1.2)
+            eds = self.controls(("Edit", "ComboBox"), cid=EDITOR_ID)
+            if eds:
+                self._value_x = x
+                return eds[0]
+        raise SyconError("no value editor on the parameter row at y=%d (x tried %r of width %d)" % (y, tried, r.width()))
+
+    def open_param_editor(self, visual_row, r=None):
+        y = PARAM_ROW_Y0 + PARAM_ROW_H * visual_row
+        return self.open_param_editor_at(y, r), y
+
+    def set_param_at_y(self, y, value, r=None, what=""):
+        """Set the Value of the parameter row at grid offset y (a combo item matched with its spacing collapsed
+        and case ignored, or text typed into an Edit); the editor is re-opened to read the value back."""
+        r = r or self.param_grid()
+        ed = self.open_param_editor_at(y, r)
         kind = ed.class_name()
+        want = str(value)
         if kind == "ComboBox":
             items = ed.item_texts()
-            if value not in items:
+            match = [it for it in items if self.session.same_text(it, value)]
+            if not match:
                 self._close_dropdowns()
                 raise SyconError("value %r not among %r" % (value, items))
-            if ed.selected_text() != value:
-                ed.select(value)
+            want = match[0]
+            if ed.selected_text() != want:
+                ed.select(want)
                 time.sleep(0.8)
         else:
             ed.select()
             time.sleep(0.2)
             keyboard.send_keys(str(value), with_spaces=True)
             time.sleep(0.3)
-        mouse.click(coords=(r.left + PARAM_NAME_X, r.top + y))     # commit: the row's Name cell
+        mouse.click(coords=(r.left + self.psx(PARAM_NAME_X, r), r.top + y))     # commit: the row's Name cell
         time.sleep(0.8)
-        ed2, _ = self.open_param_editor(visual_row, r)
+        ed2 = self.open_param_editor_at(y, r)
         shown = ed2.selected_text() if ed2.class_name() == "ComboBox" else ed2.window_text()
         self._close_dropdowns()
-        mouse.click(coords=(r.left + PARAM_NAME_X, r.top + y))
+        mouse.click(coords=(r.left + self.psx(PARAM_NAME_X, r), r.top + y))
         time.sleep(0.6)
-        log("  parameter visual row %d (%s): -> %r" % (visual_row, kind, shown))
-        if str(shown) != str(value):
-            raise SyconError("parameter reads %r after writing %r" % (shown, value))
+        log("  parameter %s(%s): -> %r" % (what, kind, shown))
+        if str(shown) != want:
+            raise SyconError("parameter reads %r after writing %r" % (shown, want))
+        return shown
+
+    def set_param_visual(self, visual_row, value, r=None):
+        """Set the Value of the parameter shown on visual row v (0 = the first row of the grid)."""
+        return self.set_param_at_y(PARAM_ROW_Y0 + PARAM_ROW_H * visual_row, value, r, "visual row %d " % visual_row)
+
+    def param_rows_y(self, r=None):
+        """The centre y (grid offsets) of the text rows of the parameter grid below its header, from the
+        dark-pixel profile (alignment-free: the wheel may leave the rows anywhere)."""
+        r = r or self.param_grid()
+        prof = self._dark_profile(r)
+        rows, start = [], None
+        for y, n in enumerate(prof + [0]):
+            if n > 3 and start is None:
+                start = y
+            elif n <= 3 and start is not None:
+                if y - start >= 6 and start > 18:
+                    rows.append((start + y) // 2)
+                start = None
+        return rows
+
+    def scroll_param_grid_to_end(self, r=None):
+        r = r or self.param_grid()
+        for _ in range(40):
+            if self._scroll_pixels(r, 3) <= 0:
+                return
+        raise SyconError("the parameter grid keeps scrolling")
+
+    def set_last_param(self, value):
+        """Set the LAST parameter row of the grid (an ET200SP module's `Potential group`, the one parameter of
+        its last record): the grid wheeled to its end, the last text row located by its pixels."""
+        r = self.param_grid()
+        self.scroll_param_grid_to_end(r)
+        ys = self.param_rows_y(r)
+        if not ys:
+            raise SyconError("no parameter rows visible at the end of the grid")
+        return self.set_param_at_y(ys[-1], value, r, "last row ")
 
     def set_parameters(self, values):
         """values: {parameter index within the record (0 = its first parameter): value}. The record row is

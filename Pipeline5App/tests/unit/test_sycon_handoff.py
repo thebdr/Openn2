@@ -44,9 +44,10 @@ def test_build_stations_modules_findings():
         ("slave", "n0005-trib-aep01-K35001", "slave", "IM 155-6 PN ST V4.2", "192.168.1.5", "5"),
         ("slave", "n0035-trib-sm006-K1", "slave", "AL1202", "192.168.1.35", "35"),
     ]
-    assert [(m["station_name"], m["slot"], m["module_id"], m["comment"]) for m in modules] == [
-        ("n0005-trib-aep01-K35001", "1", "6ES7131-6BH01-0BA0", "-K35010"),
-        ("n0005-trib-aep01-K35001", "2", "6ES7132-6BH01-0BA0", "-K35030"),
+    pg = "potential_group=Enable new potential group (light BaseUnit)"
+    assert [(m["station_name"], m["slot"], m["module_id"], m["parameters"], m["comment"]) for m in modules] == [
+        ("n0005-trib-aep01-K35001", "1", "6ES7131-6BH01-0BA0", pg, "-K35010"),       # the first module
+        ("n0005-trib-aep01-K35001", "2", "6ES7132-6BH01-0BA0", pg, "-K35030"),       # the first output module (DQ)
     ]
     types = sorted(f.type for f in findings)
     assert types == ["sycon_card_without_model", "sycon_head_without_model", "sycon_model_ignored",
@@ -102,6 +103,43 @@ def test_iolink_ports_from_the_connector_rows():
     assert len(warn) == 1 and "n0036-trib-sm007-K1" in warn[0].detail and "X01" in warn[0].detail
 
 
+def test_fast_stations_take_2_ms():
+    rows = [
+        _head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+        _head("n0035-trib-sm006-K1", "192.168.1.35", "AL1202", "-K1", "35"),
+        {"profinet_name": "", "connector": "X01", "pin_no": "4", "bit": "I.35.0.0", "desc_l1": "PHOTOCELL", "desc_l1b": "MISSING BLADE"},
+        _head("n0059-trib-sm047-K1", "192.168.1.59", "AL1202", "-K1", "59"),
+        {"profinet_name": "", "connector": "X01", "pin_no": "4", "bit": "I.59.0.0", "desc_l1": "PHOTOCELL", "desc_l1b": "CONTROL ZONE =TRIB-CZ01"},
+        _head("n0061-trib-sm049-K1", "192.168.1.61", "AL1202", "-K1", "61"),
+        {"profinet_name": "", "connector": "X02", "pin_no": "4", "bit": "I.61.0.0", "mnemonic": "LOAD_ACCURACY_01", "desc_l1b": "Load accuracy photocell"},
+        _head("n0062-trib-sm050-K1", "192.168.1.62", "AL1202", "-K1", "62"),
+        {"profinet_name": "", "connector": "X01", "pin_no": "4", "bit": "I.62.0.0", "desc_l1": "DISTANCE SENSOR", "desc_l1b": "LEFT  SIDE RECENTERING 2"},
+    ]
+    stations, _m, _f = sycon.build(rows, DTD)
+    assert [(s["station_name"], s["update_time_ms"]) for s in stations] == [
+        ("n0001-trib-aec01-K22101.1", ""), ("n0035-trib-sm006-K1", "8"), ("n0059-trib-sm047-K1", "2"),
+        ("n0061-trib-sm049-K1", "2"), ("n0062-trib-sm050-K1", "2")]
+    assert stations[2]["comment"].endswith("fast: control zone") and stations[3]["comment"].endswith("fast: load accuracy")
+    assert stations[4]["comment"].endswith("fast: recentering")
+
+
+def test_potential_group_by_signal_direction():
+    """Three DI cards then a DQ then a DI: the first module and the first OUTPUT module get the potential group."""
+    rows = [
+        _head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+        _head("n0005-trib-aep01-K35001", "192.168.1.5", "6ES7155-6AU01-0BN0", "-K35001", "5"),
+        {"profinet_name": "", "slot": "-K1", "part_no": "6ES7131-6BH01-0BA0", "bit": "I.5.0.0"},
+        {"profinet_name": "", "slot": "-K2", "part_no": "6ES7131-6BH01-0BA0", "bit": "I.5.2.0"},
+        {"profinet_name": "", "slot": "-K3", "part_no": "UNKNOWN-DQ", "bit": "Q.5.0.0"},
+        {"profinet_name": "", "slot": "-K4", "part_no": "UNKNOWN-DQ", "bit": "Q.5.2.0"},
+        {"profinet_name": "", "slot": "-K5", "part_no": "6ES7131-6BH01-0BA0", "bit": "I.5.4.0"},
+    ]
+    _s, modules, _f = sycon.build(rows, DTD)
+    assert [(m["slot"], bool(m["parameters"])) for m in modules] == [("1", True), ("2", False), ("3", True), ("4", False), ("5", False)]
+    assert sycon.card_is_output([{"bit": "Q.5.0.0"}, {"bit": "I.5.0.0"}], "X") is False      # mixed: not an output module
+    assert sycon.card_is_output([{}], "6ES7 132-6BH01-0BA0") is True                        # no addresses: by family
+
+
 def test_unknown_modules_policy_is_refused():
     with tempfile.TemporaryDirectory() as d:
         dtd = os.path.join(d, "SyconDeviceTypesDatabase.csv")
@@ -139,10 +177,11 @@ def test_project_writes_headed_files():
             assert h.get("kind") == kind and h.get("target") == "SyconNetProjectInterface" and str(h.get("schema")) == "1", (path, h)
             assert "\r\n" in text and not text.startswith("﻿")
         stations = open(res["stations_path"], encoding="utf-8").read().splitlines()
-        assert stations[-1].startswith("slave,n0035-trib-sm006-K1,slave,AL1202,AL1202,,192.168.1.35,255.255.255.0,,35,")
+        assert stations[-1].startswith("slave,n0035-trib-sm006-K1,slave,AL1202,AL1202,,192.168.1.35,255.255.255.0,,8,35,")
+        assert stations[-3].startswith("controller,n0001-trib-aec01-K22101.1,master,CIFX RE/PNM,CIFX80-RE/ML,,192.168.1.1,255.255.255.0,,,1,")
         assert stations[-2].startswith("slave,n0005-trib-aep01-K35001,slave,IM 155-6 PN ST V4.2,6ES7155-6AU01-0BN0,"
                                        "GSDML-V2.43-Siemens-ET200SP-20240425.xml,192.168.1.5,")
         modules = open(res["modules_path"], encoding="utf-8").read().splitlines()
-        assert modules[-1] == "n0005-trib-aep01-K35001,2,,6ES7132-6BH01-0BA0,,,-K35030"
+        assert modules[-1] == "n0005-trib-aep01-K35001,2,,6ES7132-6BH01-0BA0,,potential_group=Enable new potential group (light BaseUnit),-K35030"
         db = open(res["device_types_db"], encoding="utf-8").read()
         assert "CIFX 80-RE/ML,controller" in db and db.count("#!openn") == 1

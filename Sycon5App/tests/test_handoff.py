@@ -18,6 +18,11 @@ NEW = (HEAD + "# Role,Station Name,Catalog Kind,Catalog Item,Model Id,GSDML (the
        "controller,n0001,master,CIFX RE/PNM,CIFX80-RE/ML,,192.168.1.1,255.255.255.0,,1,PC,HILSCHER\r\n"
        "slave,n0006,slave,PN/PN Coupler X2,6ES7158-3AD10-0XA0,GSDML-V2.35-Siemens-PNPNIOC-20200924.xml,"
        "192.168.1.6,255.255.255.0,,6,COUPLER,SIEMENS\r\n")
+NEWER = (HEAD + "# Role,Station Name,Catalog Kind,Catalog Item,Model Id,GSDML (the file),IP Address,Subnet Mask,"
+         "Gateway,Update Time (ms),Device Number,Description,Comment\r\n"
+         "controller,n0001,master,CIFX RE/PNM,CIFX80-RE/ML,,192.168.1.1,255.255.255.0,,,1,PC,HILSCHER\r\n"
+         "slave,n0006,slave,PN/PN Coupler X2 [DAP X2 V4.2],6ES7158-3AD10-0XA0,GSDML-V2.35-Siemens-PNPNIOC-20200924.xml,"
+         "192.168.1.6,255.255.255.0,,8,6,COUPLER,SIEMENS\r\n")
 
 
 def _load(text):
@@ -40,6 +45,15 @@ def test_stations_with_gsdml_column():
     assert s["gsdml"] == "GSDML-V2.35-Siemens-PNPNIOC-20200924.xml"
     assert s["ip_address"] == "192.168.1.6" and s["device_number"] == "6" and s["comment"] == "SIEMENS"
     assert h.headers["stations"]["columns"].startswith("Role,Station Name,Catalog Kind")
+
+
+def test_stations_with_update_time_column():
+    h = _load(NEWER)
+    s = h.stations[0]
+    assert s["update_time_ms"] == "8" and s["device_number"] == "6" and s["comment"] == "SIEMENS"
+    assert s["catalog_item"] == "PN/PN Coupler X2 [DAP X2 V4.2]"
+    assert h.controller["update_time_ms"] == "" and h.controller["device_number"] == "1"
+    assert _load(NEW).stations[0]["update_time_ms"] == ""
 
 
 def test_info_files():

@@ -13,13 +13,17 @@ the TIA workspace:
                          Role, Station Name (the PROFINET name), Catalog Kind (master | slave | gateway),
                          Catalog Item, Model Id, GSDML (the file of the catalog entry to take: the catalog lists
                          one same-named entry per GSDML version of a device), IP Address, Subnet Mask, Gateway,
-                         Device Number (col F), Description, Comment
+                         Update Time (ms; the controller's Stations Timing: 8, or 2 for a station whose signals
+                         mention a control zone, check position, load accuracy or synchronism), Device Number
+                         (col F), Description, Comment
   hw/sycon-modules       SyconModules.csv  one row per card of a station whose database row says `iolist`, one
                          per port of a station whose row says `iolink-ports`: Station Name, Slot (plug order),
                          Subslot (empty = a module row; a submodule row's subslot), Module Id (the card's Part No.
                          without spaces; empty for a port), Module Text (the SYCON.net module name when known;
                          empty = Sycon5App resolves it by the order number the catalog shows in brackets; the port
-                         submodule text for a port), Parameters (index=value | ...), Comment
+                         submodule text for a port), Parameters (name=value | ...: a parameter index within the
+                         module's first record, or `potential_group` = the module's last parameter row - set on
+                         an ET200SP's first module and first output module), Comment
 The head rule is the staging's (`profinet_name` opens a node); the card rule is phase 700's (each distinct slot
 tag under the head that is not the head's own tag is a card, the first row's Part No. its model). The second
 controller of a redundant pair (same IP) is skipped with an INFO; a head without a mapped model is a WARN.
@@ -43,13 +47,28 @@ STATIONS_FILE, MODULES_FILE = "SyconStations.csv", "SyconModules.csv"
 KIND_DTD, KIND_STATIONS, KIND_MODULES = "hw/sycon-device-types", "hw/sycon-stations", "hw/sycon-modules"
 ROLES = {"controller": "master", "slave": "slave", "gateway": "gateway", "ignore": ""}
 STATIONS_KEYS = ["role", "station_name", "catalog_kind", "catalog_item", "model_id", "gsdml", "ip_address",
-                 "subnet_mask", "gateway", "device_number", "description", "comment"]
+                 "subnet_mask", "gateway", "update_time_ms", "device_number", "description", "comment"]
 STATIONS_HDR = ("# Role,Station Name,Catalog Kind,Catalog Item,Model Id,GSDML (the file of the catalog entry to take),"
-                "IP Address,Subnet Mask,Gateway,Device Number,Description,Comment")
+                "IP Address,Subnet Mask,Gateway,Update Time (ms - the controller's Stations Timing; empty for the "
+                "controller),Device Number,Description,Comment")
+DEFAULT_UPDATE_TIME_MS = 8            # user 2026-10-23: "station timing 8ms for all nodes"
+# ... except the nodes that acquire fast signals (user 2026-10-23: "control zones, check position photocells of
+# sorter; load accuracy, check position, synchronism on induction lines -> Station Timing = 2ms"; then the
+# recentering sensors: "DISTANCE SENSOR / LEFT SIDE RECENTERING 2, PHOTOCELL / BETWEEN CELLS RECENTERING 2 ->
+# 2ms"): a station whose signal descriptions mention one of these takes FAST_UPDATE_TIME_MS
+FAST_UPDATE_TIME_MS = 2
+FAST_SIGNAL_KEYWORDS = ("control zone", "check position", "load accuracy", "synchronism", "recentering")
 MODULES_KEYS = ["station_name", "slot", "subslot", "module_id", "module_text", "parameters", "comment"]
 MODULES_HDR = ("# Station Name,Slot (plug order),Subslot (empty = a module row; a submodule's subslot),Module Id,"
-               "Module Text,Parameters (index=value | ...),Comment")
+               "Module Text,Parameters (name=value | ...: a parameter index in the first record or potential_group = the "
+               "last parameter row),Comment")
 MODULE_POLICIES = ("default", "iolist", "iolink-ports")
+# ET200SP (policy `iolist`): the first module and the first output module open a new potential group (a light
+# BaseUnit) - the module's last parameter row in SYCON.net, `Potential group` (user 2026-10-23). A card is an
+# output module by its signals' addresses (`Q.` and no `I.`), else by its order-number family (DQ 6ES7132, AQ 6ES7135).
+POTENTIAL_GROUP_PARAM = "potential_group"
+POTENTIAL_GROUP_NEW = "Enable new potential group (light BaseUnit)"
+OUTPUT_FAMILIES = ("6ES7132", "6ES7135")
 DEFAULT_MASK = "255.255.255.0"
 SYCON_DTD_DEFAULT = os.path.join(config.SHARED, "HardwareConfigBuilderData", DTD_FILE)
 
@@ -78,6 +97,23 @@ PORT_SUBMODULES = {
 }
 PORT_RE = re.compile(r"^X(\d{1,2})$", re.I)
 BIT_RE = re.compile(r"^([IQ])\.(\d+)\.(\d+)\.(\d+)$", re.I)
+
+
+def signal_text(row) -> str:
+    return " ".join(str(row.get(k) or "") for k in ("desc_l1", "desc_l1b", "desc_l2", "desc_l2b", "mnemonic")).lower()
+
+
+def station_is_fast(signals) -> bool:
+    """Whether a station acquires fast signals (a keyword of FAST_SIGNAL_KEYWORDS in a signal's descriptions)."""
+    return any(k in signal_text(s) for s in signals for k in FAST_SIGNAL_KEYWORDS)
+
+
+def card_is_output(rows, model) -> bool:
+    bits = [str(r.get("bit") or "").strip().upper() for r in rows]
+    has_i, has_q = any(b.startswith("I.") for b in bits), any(b.startswith("Q.") for b in bits)
+    if has_i or has_q:
+        return has_q and not has_i
+    return model_id(model).upper().startswith(OUTPUT_FAMILIES)
 
 
 def port_rows(signals) -> dict:
@@ -176,8 +212,9 @@ def load_dtd(path: str | None = None) -> dict:
 
 
 # --- the build ------------------------------------------------------------------------------------ #
-def build(rows, dtd: dict) -> tuple:
-    """(stations, modules, findings) from staged I/O List rows (dicts with the canonical columns), in order."""
+def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
+    """(stations, modules, findings) from staged I/O List rows (dicts with the canonical columns), in order;
+    every station gets `update_time_ms` as its PROFINET updating time."""
     stations, modules, findings = [], [], []
     cur = None
     controller = None
@@ -186,6 +223,10 @@ def build(rows, dtd: dict) -> tuple:
         if cur is None:
             return
         rec = cur["rec"]
+        if rec["role"] != "controller" and station_is_fast(cur["signals"]):
+            cur["station"]["update_time_ms"] = str(FAST_UPDATE_TIME_MS)
+            cur["station"]["comment"] = (cur["station"]["comment"] + " | fast: " + ", ".join(
+                sorted({k for s in cur["signals"] for k in FAST_SIGNAL_KEYWORDS if k in signal_text(s)}))).strip(" |")
         if rec["modules"] == "iolink-ports":
             ports = port_rows(cur["signals"])
             for n in range(1, PORT_COUNT + 1):
@@ -215,14 +256,21 @@ def build(rows, dtd: dict) -> tuple:
                 cards[slot] = []
                 order.append(slot)
             cards[slot].append(s)
+        first_done, first_output_done = False, False
         for n, slot in enumerate(order, start=1):
             model = next((m for s in cards[slot] if (m := card_model(s))), "")
             if not model:
                 findings.append(_f("sycon_card_without_model", "WARN", "station %r: slot tag %r has no Part No. - no module row"
                                    % (cur["name"], slot), cur["where"]))
                 continue
+            output = card_is_output(cards[slot], model)
+            params = []
+            if not first_done or (output and not first_output_done):
+                params.append("%s=%s" % (POTENTIAL_GROUP_PARAM, POTENTIAL_GROUP_NEW))
+            first_done = True
+            first_output_done = first_output_done or output
             modules.append({"station_name": cur["name"], "slot": str(n), "subslot": "", "module_id": model,
-                            "module_text": "", "parameters": "", "comment": slot})
+                            "module_text": "", "parameters": " | ".join(params), "comment": slot})
 
     for row in rows:
         name = str(row.get("profinet_name") or "").strip()
@@ -252,13 +300,16 @@ def build(rows, dtd: dict) -> tuple:
                                    % (name, model, ip, controller), where))
                 continue
             controller = name
-        stations.append({"role": rec["role"], "station_name": name, "catalog_kind": ROLES[rec["role"]],
-                         "catalog_item": rec["catalog_item"], "model_id": model, "gsdml": rec["gsdml"], "ip_address": ip,
-                         "subnet_mask": DEFAULT_MASK, "gateway": "",
-                         "device_number": str(row.get("id_node") or "").strip(),
-                         "description": " ".join(str(row.get("description_module") or "").split()),
-                         "comment": " ".join(str(row.get("manufacturer") or "").split())})
-        cur = {"name": name, "rec": rec, "head_tag": str(row.get("slot") or "").strip(), "signals": [], "where": where}
+        station = {"role": rec["role"], "station_name": name, "catalog_kind": ROLES[rec["role"]],
+                   "catalog_item": rec["catalog_item"], "model_id": model, "gsdml": rec["gsdml"], "ip_address": ip,
+                   "subnet_mask": DEFAULT_MASK, "gateway": "",
+                   "update_time_ms": "" if rec["role"] == "controller" else str(update_time_ms),
+                   "device_number": str(row.get("id_node") or "").strip(),
+                   "description": " ".join(str(row.get("description_module") or "").split()),
+                   "comment": " ".join(str(row.get("manufacturer") or "").split())}
+        stations.append(station)
+        cur = {"name": name, "rec": rec, "head_tag": str(row.get("slot") or "").strip(), "signals": [], "where": where,
+               "station": station}
     finalize()
     if controller is None:
         findings.append(_f("sycon_no_controller", "FAIL", "no controller head in the I/O List (a model with role "
@@ -304,11 +355,12 @@ def _strip(text: str) -> str:
     return "\r\n".join(lines) + "\r\n"
 
 
-def project(rows, out_dir: str, dtd_path: str | None = None, source_label: str = "signals") -> dict:
+def project(rows, out_dir: str, dtd_path: str | None = None, source_label: str = "signals",
+            update_time_ms=DEFAULT_UPDATE_TIME_MS) -> dict:
     """Build from staged rows and write the three files into `out_dir`. Returns the counts, paths and findings."""
     dtd_path = dtd_path or SYCON_DTD_DEFAULT
     dtd = load_dtd(dtd_path)
-    stations, modules, findings = build(rows, dtd)
+    stations, modules, findings = build(rows, dtd, update_time_ms)
     spath = _write(out_dir, STATIONS_FILE, _csv(KIND_STATIONS, STATIONS_HDR, stations, STATIONS_KEYS, source_label))
     mpath = _write(out_dir, MODULES_FILE, _csv(KIND_MODULES, MODULES_HDR, modules, MODULES_KEYS, source_label))
     dpath = _ship_dtd(out_dir, dtd_path)
@@ -334,9 +386,10 @@ def main(argv=None) -> int:
     p.add_argument("--iolist", required=True)
     p.add_argument("--out", required=True, help="the SyconNetProjectInterface folder to write")
     p.add_argument("--dtd", default="", help="the SYCON device-types database (default: Shared/HardwareConfigBuilderData)")
+    p.add_argument("--update-time-ms", type=int, default=DEFAULT_UPDATE_TIME_MS, help="every station's PROFINET updating time")
     a = p.parse_args(argv)
     rows, findings = stage_rows(a.iolist)
-    res = project(rows, a.out, a.dtd or None, source_label=os.path.basename(a.iolist))
+    res = project(rows, a.out, a.dtd or None, source_label=os.path.basename(a.iolist), update_time_ms=a.update_time_ms)
     for f in findings + res["findings"]:
         print("[%s] %s - %s  @ %s" % (f.severity, f.type, f.detail, f.location))
     print("SYCON handoff: %d stations (controller %r) + %d module rows -> %s" % (res["stations"], res["controller"], res["modules"], res["dir"]))

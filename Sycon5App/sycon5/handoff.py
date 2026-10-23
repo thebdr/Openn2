@@ -9,14 +9,34 @@ from dataclasses import dataclass, field
 
 STATIONS_FILE, MODULES_FILE, DTD_FILE = "SyconStations.csv", "SyconModules.csv", "SyconDeviceTypesDatabase.csv"
 STATION_KEYS = ["role", "station_name", "catalog_kind", "catalog_item", "model_id", "gsdml", "ip_address",
-                "subnet_mask", "gateway", "device_number", "description", "comment"]
-STATION_KEYS_WITHOUT_GSDML = [k for k in STATION_KEYS if k != "gsdml"]      # the exports before 2026-10-23 pm
+                "subnet_mask", "gateway", "update_time_ms", "device_number", "description", "comment"]
 MODULE_KEYS = ["station_name", "slot", "subslot", "module_id", "module_text", "parameters", "comment"]
-MODULE_KEYS_WITHOUT_SUBSLOT = [k for k in MODULE_KEYS if k != "subslot"]      # the exports before 2026-10-23 pm
+# the columns added on 2026-10-23 (key -> the words the `#` column line carries when the column is there): an
+# older export without them is read by its own positions
+OPTIONAL_STATION_KEYS = {"gsdml": "gsdml", "update_time_ms": "update time"}
+OPTIONAL_MODULE_KEYS = {"subslot": "subslot"}
+
+
+def keys_for(all_keys, optional, columns_line):
+    names = (columns_line or "").lower()
+    return [k for k in all_keys if k not in optional or optional[k] in names]
 
 
 class HandoffError(ValueError):
     pass
+
+
+def parse_parameters(text):
+    """'0=1 | 2=0.4 ms | potential_group=Enable new potential group (light BaseUnit)' -> [(name, value), ...]."""
+    out = []
+    for part in str(text or "").split("|"):
+        if "=" not in part:
+            if part.strip():
+                raise HandoffError("parameter without '=': %r" % part)
+            continue
+        name, _, value = part.partition("=")
+        out.append((name.strip(), value.strip()))
+    return out
 
 
 def read_headed_csv(path):
@@ -75,10 +95,11 @@ def load_handoff(folder):
     sh, srows = read_headed_csv(spath)
     if sh.get("kind") != "hw/sycon-stations":
         raise HandoffError("%s is not hw/sycon-stations (kind %r)" % (spath, sh.get("kind")))
-    keys = STATION_KEYS if "gsdml" in sh.get("columns", "").lower() else STATION_KEYS_WITHOUT_GSDML
+    keys = keys_for(STATION_KEYS, OPTIONAL_STATION_KEYS, sh.get("columns", ""))
     stations = [dict(zip(keys, r + [""] * len(keys))) for r in srows if r and r[0]]
     for s in stations:
-        s.setdefault("gsdml", "")
+        for k in OPTIONAL_STATION_KEYS:
+            s.setdefault(k, "")
     controllers = [s for s in stations if s["role"] == "controller"]
     if len(controllers) != 1:
         raise HandoffError("%d controller rows in %s (one expected)" % (len(controllers), spath))
@@ -87,12 +108,13 @@ def load_handoff(folder):
         mh, mrows = read_headed_csv(mpath)
         if mh.get("kind") != "hw/sycon-modules":
             raise HandoffError("%s is not hw/sycon-modules (kind %r)" % (mpath, mh.get("kind")))
-        mkeys = MODULE_KEYS if "subslot" in mh.get("columns", "").lower() else MODULE_KEYS_WITHOUT_SUBSLOT
+        mkeys = keys_for(MODULE_KEYS, OPTIONAL_MODULE_KEYS, mh.get("columns", ""))
         for r in mrows:
             if not r or not r[0]:
                 continue
             m = dict(zip(mkeys, r + [""] * len(mkeys)))
-            m.setdefault("subslot", "")
+            for k in OPTIONAL_MODULE_KEYS:
+                m.setdefault(k, "")
             modules.setdefault(m["station_name"], []).append(m)
     return Handoff(folder=folder, controller=controllers[0],
                    stations=[s for s in stations if s["role"] != "controller"], modules=modules,

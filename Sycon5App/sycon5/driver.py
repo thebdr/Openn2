@@ -235,6 +235,19 @@ class SyconDriver:
             self.model[new] = self.model.pop(old, {"slots": {}})
         log("renamed and addressed %d stations" % len(mapping))
 
+    def set_stations_timing(self, timing):
+        """timing: {station: updating time in ms} - one pass of the controller's Stations Timing page."""
+        dlg = ControllerDialog(self.session, self.controller_station())
+        try:
+            shown = dlg.set_stations_timing(timing)
+            dlg.ok()
+        except SyconError:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            raise
+        log("stations timing set: %r" % shown)
+        return shown
+
     def plug_modules(self, station, specs):
         """Append modules in order in ONE dialog; a spec is a combo text or 'order:<order number>'. Returns the
         texts chosen."""
@@ -289,8 +302,8 @@ class SyconDriver:
         try:
             dlg.modules_page()
             row = 1 + slot                      # the DAP is row 1, the slots contiguous from 1
-            if not dlg.is_expanded(row):
-                dlg.expand_row(row)
+            dlg.collapse_all()
+            dlg.ensure_expanded(row)
             for _subslot, text in wanted:
                 sub_row = dlg.add_submodule(row)
                 chosen.append(dlg.set_submodule(sub_row, text))
@@ -337,20 +350,32 @@ class SyconDriver:
         return row
 
     def set_parameters(self, station, slot, values):
-        """values: {parameter index within the submodule's record (0 = first): value text}. The module's row in
-        the Modules grid is 1 + its position among the plugged slots (this driver's model); its first submodule
-        row is the one below it once expanded."""
-        slots = sorted(self.model.get(station, {"slots": {}})["slots"])
-        if slot not in slots:
-            raise SyconError("slot %d of %s unknown to this driver (plug it first): %r" % (slot, station, slots))
-        row = 2 + slots.index(slot)
+        """values: {parameter index within the submodule's first record (0 = first): value text}."""
+        return self.set_module_parameters(station, slot, [(str(k), v) for k, v in sorted(values.items())])
+
+    def set_module_parameters(self, station, slot, params):
+        """params: [(name, value)] - a numeric name is the parameter's index within the module's first record,
+        `potential_group` the module's last parameter row (an ET200SP's `Potential group`). ONE dialog: the module
+        row is 1 + its slot (the slots are contiguous from 1 in the projects this driver builds - no model
+        needed, so a resumed build can set them too); its first submodule row is the one below it once expanded,
+        the Dataset `Parameter` shows the grid."""
+        row = 1 + slot
+        by_index = {int(n): v for n, v in params if str(n).isdigit()}
+        others = [(n, v) for n, v in params if not str(n).isdigit()]
+        unknown = [n for n, _v in others if n != "potential_group"]
+        if unknown:
+            raise SyconError("unknown parameter names %r for %s slot %d" % (unknown, station, slot))
         dlg = DeviceDialog(self.session, station)
         try:
             dlg.modules_page()
-            dlg.expand_row(row)
+            dlg.collapse_all()
+            dlg.ensure_expanded(row)
             dlg.select_row(row + 1)
             dlg.dataset("Parameter")
-            dlg.set_parameters(values)
+            if by_index:
+                dlg.set_parameters(by_index)
+            for name, value in others:
+                dlg.set_last_param(value)
             errs = dlg.apply()
             if errs:
                 raise SyconError("Apply refused: %r" % errs)
@@ -359,4 +384,4 @@ class SyconDriver:
             if dlg.is_open():
                 dlg.close(keep=False)
             raise
-        log("parameters set on %s slot %d: %r" % (station, slot, values))
+        log("parameters set on %s slot %d: %r" % (station, slot, params))

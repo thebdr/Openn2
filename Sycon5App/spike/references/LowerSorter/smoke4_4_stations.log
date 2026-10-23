@@ -1,100 +1,69 @@
-17:47:09 handoff: 4 stations, controller n0001-trib-aec01-K22101.1 @ 192.168.1.1 | modules for ['n0005-trib-aep01-K35001', 'n0034-trib-sm011-K1', 'n0035-trib-sm006-K1']
-17:47:26 opened: SYCON.net - [AutomateSyconProj_BaseProj.spj]
-17:47:36 new project: SYCON.net - [Untitled.spj] ['Project: Untitled']
-17:47:40 lines: grey root dy=52 green=None
-17:47:56 drop 'CIFX RE/PNM' at (400, 52) errors [] new ['CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)']
-17:47:56 controller added: {'symbolic': 'CIFX_RE_PNM', 'type': 'CIFX RE/PNM', 'station': 'controller', 'suffix': '(#1)'}
-17:48:11 dialog: netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)
-17:48:14   network control 213 -> 192.168.1.1
-17:48:15   network control 214 -> 255.255.255.0
-17:48:23 dialog closed after OK
-17:48:37 catalog: 'PN/PN Coupler X2 [DAP X2 V4.2]' from GSDML-V2.35-Siemens-PNPNIOC-20200924.xml is entry 2 of 5
-17:48:38 lines: grey root dy=52 green=('h', 72, 432, 948)
-17:48:54 drop 'PN/PN Coupler X2' at (602, 72) errors [] new []
-17:49:18 drop 'PN/PN Coupler X2' at (690, 72) errors [] new []
-17:49:43 drop 'PN/PN Coupler X2' at (532, 72) errors [] new []
-17:50:15 drop 'PN/PN Coupler X2' at (828, 72) errors [] new ['PN_PN_Coupler_X2[PN/PN Coupler X2]<pn-pn-coupler>']
-17:50:15 station added: {'symbolic': 'PN_PN_Coupler_X2', 'type': 'PN/PN Coupler X2', 'station': 'pn-pn-coupler', 'suffix': ''}
-17:50:15 [1/4] pn-pn-coupler -> will be n0006-trib-aec01-K24501 @ 192.168.1.6
-17:50:28 catalog: 'IM 155-6 PN ST V4.2' from GSDML-V2.35-Siemens-ET200SP-20210401.xml is entry 2 of 2
-17:50:29 lines: grey root dy=52 green=('h', 72, 432, 948)
-17:50:48 drop 'IM 155-6 PN ST V4.2' at (602, 72) errors [] new ['IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<et200sp>']
-17:50:48 station added: {'symbolic': 'IM_155-6_PN_ST_V4.2', 'type': 'IM 155-6 PN ST V4.2', 'station': 'et200sp', 'suffix': ''}
-17:50:48 [2/4] et200sp -> will be n0005-trib-aep01-K35001 @ 192.168.1.5
-17:50:59 catalog: 'AL1202' from GSDML-V2.34-ifm-AL1202-20181105.xml is entry 1 of 1
-17:51:00 lines: grey root dy=52 green=('h', 72, 432, 948)
-17:51:17 drop 'AL1202' at (602, 72) errors [] new ['AL1202[AL1202]<al1202>']
-17:51:17 station added: {'symbolic': 'AL1202', 'type': 'AL1202', 'station': 'al1202', 'suffix': ''}
-17:51:17 [3/4] al1202 -> will be n0035-trib-sm006-K1 @ 192.168.1.35
-17:51:29 cloned al1202 -> al1202-001
-17:51:29 [4/4] al1202-001 -> will be n0034-trib-sm011-K1 @ 192.168.1.34
-17:51:41 saved as: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4.spj | title: SYCON.net - [Smoke4.spj] | errors: []
-17:51:54 dialog: netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)
-17:52:02   row 0: pn-pn-coupler -> n0006-trib-aec01-K24501
-17:52:07   row 1: et200sp -> n0005-trib-aep01-K35001
-17:52:12   row 2: al1202 -> n0035-trib-sm006-K1
-17:52:17   row 3: al1202-001 -> n0034-trib-sm011-K1
-17:52:25   IP at park row 0 (pn-pn-coupler): 192.168.1.2 -> 192.168.1.200
-17:52:25   row 0 auto IP was 192.168.1.2
-17:52:28   IP at park row 1 (et200sp): 192.168.1.3 -> 192.168.1.201
-17:52:28   row 1 auto IP was 192.168.1.3
-17:52:32   IP at park row 2 (al1202): 192.168.1.4 -> 192.168.1.202
-17:52:32   row 2 auto IP was 192.168.1.4
-17:52:36   IP at park row 3 (al1202-001): 192.168.1.5 -> 192.168.1.203
-17:52:36   row 3 auto IP was 192.168.1.5
-17:52:41   IP at target row 0 (n0006-trib-aec01-K24501): 192.168.1.200 -> 192.168.1.6
-17:52:45   IP at target row 1 (n0005-trib-aep01-K35001): 192.168.1.201 -> 192.168.1.5
-17:52:49   IP at target row 2 (n0035-trib-sm006-K1): 192.168.1.202 -> 192.168.1.35
-17:52:52   IP at target row 3 (n0034-trib-sm011-K1): 192.168.1.203 -> 192.168.1.34
-17:52:55 dialog closed after OK
-17:52:59 renamed and addressed 4 stations
-17:53:04 saved: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S129\SYCON_net.xml
-17:53:14 dialog: netProject - Configuration IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<n0005-trib-aep01-k35001>
-17:53:21   row 2 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
-17:53:26   row 3 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
-17:53:27   Add Module: slots still 3 (attempt 1)
-17:53:32   row 4 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
-17:53:33   Add Module: slots still 4 (attempt 1)
-17:53:38   row 5 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
-17:53:39   Add Module: slots still 5 (attempt 1)
-17:53:44   row 6 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
-17:53:45   Add Module: slots still 6 (attempt 1)
-17:53:50   row 7 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
-17:53:54   row 8 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]'
-17:53:59 dialog closed after Cancel
-17:54:02 modules plugged on n0005-trib-aep01-K35001: ['DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]']
-17:54:07 saved: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S129\SYCON_net.xml
-17:54:15 dialog: netProject - Configuration AL1202[AL1202]<n0035-trib-sm006-k1>
-17:54:25   row 4 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Digital Input + PQI'
-17:54:33   row 5 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
-17:54:41   row 6 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
-17:54:48   row 7 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
-17:54:54   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link In/Out 32/32 Byte + PQI'
-17:55:02   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link In/Out 32/32 Byte + PQI'
-17:55:11   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link Out  2 Byte + PQI'
-17:55:21   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
-17:55:25 dialog closed after Cancel
-17:55:28 submodules plugged on n0035-trib-sm006-K1 slot 1: ['Digital Input + PQI', 'Disabled', 'Disabled', 'Disabled', 'IO-Link In/Out 32/32 Byte + PQI', 'IO-Link In/Out 32/32 Byte + PQI', 'IO-Link Out  2 Byte + PQI', 'Disabled']
-17:55:33 saved: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S129\SYCON_net.xml
-17:55:43 dialog: netProject - Configuration AL1202[AL1202]<n0034-trib-sm011-k1>
-17:55:53   row 4 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Digital Input + PQI'
-17:56:02   row 5 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
-17:56:09   row 6 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
-17:56:16   row 7 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
-17:56:22   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link In/Out 32/32 Byte + PQI'
-17:56:30   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link In/Out 32/32 Byte + PQI'
-17:56:39   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link Out  2 Byte + PQI'
-17:56:49   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
-17:56:56 Question: Configuration data has been changed.Do you want to save the data?
+19:00:20 handoff: 4 stations, controller n0001-trib-aec01-K22101.1 @ 192.168.1.1 | modules for ['n0005-trib-aep01-K35001', 'n0034-trib-sm011-K1', 'n0035-trib-sm006-K1']
+19:00:20 resume: 4 stations already in the saved project
+19:00:35 opened: SYCON.net - [Smoke4.spj]
+19:00:47 dialog: netProject - Configuration IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<n0005-trib-aep01-k35001>
+19:00:47   dialog maximized: 1934x1020
+19:00:55   row 2 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+19:00:56   Add Module: slots still 2 (attempt 1)
+19:01:01   row 3 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+19:01:06   row 4 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+19:01:07   Add Module: slots still 4 (attempt 1)
+19:01:12   row 5 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+19:01:14   Add Module: slots still 5 (attempt 1)
+19:01:19   row 6 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+19:01:20   Add Module: slots still 6 (attempt 1)
+19:01:25   row 7 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]'
+19:01:27   Add Module: slots still 7 (attempt 1)
+19:01:32   row 8 module: 'DI 16x24VDC ST V1.0  [6ES7 131-6BH00-0BA0]' -> 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]'
+19:01:36 dialog closed after Cancel
+19:01:39 modules plugged on n0005-trib-aep01-K35001: ['DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]']
+19:01:50 dialog: netProject - Configuration IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<n0005-trib-aep01-k35001>
+19:01:50   dialog maximized: 1934x1020
+19:02:11   parameter last row (ComboBox): -> 'Enable new potential group (light BaseUnit)'
+19:02:15 dialog closed after Cancel
+19:02:18 parameters set on n0005-trib-aep01-K35001 slot 1: [('potential_group', 'Enable new potential group (light BaseUnit)')]
+19:02:28 dialog: netProject - Configuration IM_155-6_PN_ST_V4.2[IM 155-6 PN ST V4.2]<n0005-trib-aep01-k35001>
+19:02:28   dialog maximized: 1934x1020
+19:02:50   parameter last row (ComboBox): -> 'Enable new potential group (light BaseUnit)'
+19:02:55 dialog closed after Cancel
+19:02:58 parameters set on n0005-trib-aep01-K35001 slot 7: [('potential_group', 'Enable new potential group (light BaseUnit)')]
+19:03:02 saved: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S129\SYCON_net.xml
+19:03:10 dialog: netProject - Configuration AL1202[AL1202]<n0035-trib-sm006-k1>
+19:03:10   dialog maximized: 1934x1020
+19:03:22   row 4 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Digital Input + PQI'
+19:03:30   row 5 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
+19:03:37   row 6 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
+19:03:45   row 7 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
+19:03:52   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link In/Out 32/32 Byte + PQI'
+19:03:58   row 9 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link In/Out 32/32 Byte + PQI'
+19:04:06   row 10 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link Out  2 Byte + PQI'
+19:04:13   row 11 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
+19:04:20 Question: Configuration data has been changed.Do you want to save the data?
  -> Yes
-17:56:57 dialog closed after Cancel
-17:57:00 submodules plugged on n0034-trib-sm011-K1 slot 1: ['Digital Input + PQI', 'Disabled', 'Disabled', 'Disabled', 'IO-Link In/Out 32/32 Byte + PQI', 'IO-Link In/Out 32/32 Byte + PQI', 'IO-Link Out  2 Byte + PQI', 'Disabled']
-17:57:05 saved: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S129\SYCON_net.xml
-verification: 48 PASS, 1 FAIL
+19:04:21 dialog closed after Cancel
+19:04:24 submodules plugged on n0035-trib-sm006-K1 slot 1: ['Digital Input + PQI', 'Disabled', 'Disabled', 'Disabled', 'IO-Link In/Out 32/32 Byte + PQI', 'IO-Link In/Out 32/32 Byte + PQI', 'IO-Link Out  2 Byte + PQI', 'Disabled']
+19:04:28 saved: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S129\SYCON_net.xml
+19:04:37 dialog: netProject - Configuration AL1202[AL1202]<n0034-trib-sm011-k1>
+19:04:37   dialog maximized: 1934x1020
+19:04:49   row 4 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Digital Input + PQI'
+19:04:57   row 5 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
+19:05:04   row 6 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
+19:05:12   row 7 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
+19:05:19   row 8 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link In/Out 32/32 Byte + PQI'
+19:05:25   row 9 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link In/Out 32/32 Byte + PQI'
+19:05:33   row 10 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'IO-Link Out  2 Byte + PQI'
+19:05:40   row 11 submodule: 'IO-Link In/Out 32/32 Byte + PQI' -> 'Disabled'
+19:05:47 Question: Configuration data has been changed.Do you want to save the data?
+ -> Yes
+19:05:48 dialog closed after Cancel
+19:05:51 submodules plugged on n0034-trib-sm011-K1 slot 1: ['Digital Input + PQI', 'Disabled', 'Disabled', 'Disabled', 'IO-Link In/Out 32/32 Byte + PQI', 'IO-Link In/Out 32/32 Byte + PQI', 'IO-Link Out  2 Byte + PQI', 'Disabled']
+19:05:56 saved: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S129\SYCON_net.xml
+verification: 54 PASS, 1 FAIL
 PASS controller present: controller
 PASS station n0006-trib-aec01-k24501 exists
 PASS station n0006-trib-aec01-k24501 IP 192.168.1.6 (read 192.168.1.6)
 PASS controller lists n0006-trib-aec01-k24501 at 192.168.1.6 (read 192.168.1.6)
+PASS station n0006-trib-aec01-k24501 update time 8 ms (read 8 ms, watchdog 24 ms)
 PASS station n0006-trib-aec01-k24501 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
 PASS station n0006-trib-aec01-k24501 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
 PASS station n0006-trib-aec01-k24501 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
@@ -102,20 +71,24 @@ PASS station n0006-trib-aec01-k24501 model 6ES7158-3AD10-0XA0 (the saved DAP 'DA
 PASS station n0005-trib-aep01-k35001 exists
 PASS station n0005-trib-aep01-k35001 IP 192.168.1.5 (read 192.168.1.5)
 PASS controller lists n0005-trib-aep01-k35001 at 192.168.1.5 (read 192.168.1.5)
+PASS station n0005-trib-aep01-k35001 update time 8 ms (read 8 ms, watchdog 24 ms)
 FAIL station n0005-trib-aep01-k35001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.43-Siemens-ET200SP-20240425.xml)
 PASS station n0005-trib-aep01-k35001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
 PASS station n0005-trib-aep01-k35001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
 PASS station n0005-trib-aep01-k35001: 7 modules plugged (table 7)
 PASS station n0005-trib-aep01-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
 PASS station n0005-trib-aep01-k35001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 3: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 4: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 5: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 6: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 7: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 7 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
 PASS station n0035-trib-sm006-k1 exists
 PASS station n0035-trib-sm006-k1 IP 192.168.1.35 (read 192.168.1.35)
 PASS controller lists n0035-trib-sm006-k1 at 192.168.1.35 (read 192.168.1.35)
+PASS station n0035-trib-sm006-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
 PASS station n0035-trib-sm006-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
 PASS station n0035-trib-sm006-k1 type 'AL1202' (read 'AL1202')
 PASS station n0035-trib-sm006-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
@@ -129,6 +102,7 @@ PASS station n0035-trib-sm006-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
 PASS station n0034-trib-sm011-k1 exists
 PASS station n0034-trib-sm011-k1 IP 192.168.1.34 (read 192.168.1.34)
 PASS controller lists n0034-trib-sm011-k1 at 192.168.1.34 (read 192.168.1.34)
+PASS station n0034-trib-sm011-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
 PASS station n0034-trib-sm011-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
 PASS station n0034-trib-sm011-k1 type 'AL1202' (read 'AL1202')
 PASS station n0034-trib-sm011-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
@@ -142,6 +116,6 @@ PASS station n0034-trib-sm011-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
 PASS no station outside the table (extra: [])
 
 C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S129\SYCON_net.xml
-17:57:07 report: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4.verification.txt | elapsed 598 s
-17:57:09 close: closed
+19:05:58 report: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4.verification.txt | elapsed 338 s
+19:05:59 close: closed
 exit 1

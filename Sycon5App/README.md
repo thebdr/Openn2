@@ -286,6 +286,45 @@ them (spacing collapsed), `SyconDriver.plug_submodules(station, slot, [(subslot,
 17:12 (`scripts/probe_plug_ports.py`: the 8 ports of n0035 plugged in 200 s, saved as `Smoke_ports.spj`, 8 of
 8 read back as wanted; 81 s for 8 ports in the 17:57 build after the grid rectangle was cached and the texts
 read through win32).
+**ET200SP potential groups** (user 2026-10-23 evening: "first module and first output module of the IM155-6 nodes
+should have the parameter PotentialGroup" = `Enable new potential group (light BaseUnit)`): PL5 writes it into
+the module row's Parameters cell as `potential_group=Enable new potential group (light BaseUnit)` for the first
+module and the first output module (a card is an output module by its signals' addresses, `Q.` and no `I.`,
+else by its order-number family 6ES7132 / 6ES7135); the Parameters cell is `name=value | ...` where a numeric
+name is the index within the module's first record and `potential_group` the module's LAST parameter row - the
+one parameter of the `Potential group` record that closes every ET200SP module's parameter grid.
+`SyconDriver.set_module_parameters(station, slot, [(name, value)])` opens the module's submodule, Dataset =
+Parameter, wheels the grid to its end, finds the last text row by its pixels (`param_rows_y`, alignment-free)
+and chooses the combo item (`set_param_at_y`, the value read back from the re-opened editor); `verify` reads the
+submodule's record 243 (first byte 01 = a new group). LOWER SORTER: 12 rows on the 6 ET200SP.
+
+**Stations timing** (user: "station timiming 8ms for all nodes"; then "nodes that acquire: control zones, check
+position photocells of sorter; load accuracy, check position, synchronism on induction lines -> Station Timing
+= 2ms"; then the recentering sensors, "DISTANCE SENSOR / LEFT SIDE RECENTERING 2, PHOTOCELL / BETWEEN CELLS
+RECENTERING 2 -> 2ms"): `hw/sycon-stations` carries an Update Time (ms) column - PL5 writes 8 for every slave
+(`--update-time-ms`) and 2 for a station whose signal descriptions mention one of `FAST_SIGNAL_KEYWORDS`
+(control zone, check position, load accuracy, synchronism, recentering; the station's Comment says which).
+The consumer runs one pass of the controller's Stations Timing page after the rename pass
+(`ControllerDialog.set_stations_timing`: the station picked in the 'Name of station' combo 220, the updating
+time chosen in combo 223, the watchdog Edit 224 follows at 3x - verified 18:23, 4 stations at 8 / 24 ms), and
+the read-back decodes each slave's `sendClockFactor x 31.25 us x reductionRatio` from the controller's
+`SlaveDTMsGetParameters/DTMProxy<n>` text (the default was 16 ms / watchdog 48 ms). `ConfigDialog.combo(cid)`
+takes the VISIBLE combo only: every page of a dialog is instantiated at once and the ids repeat across pages
+(220 is also a port-speed combo of another page - the first pass picked that one, 18:22).
+
+**Maximized dialogs, geometry** (user: "you could maximize the configuration windows ... some systems may
+have 100+ nodes"): every configuration dialog is maximized when it opens (`ConfigDialog.maximize`, SW_MAXIMIZE)
+so the grids show dozens of rows; the custom grids' columns scale with the width, so the column offsets
+measured on the control maps are scaled by the grid's width (`DeviceDialog.sx` from 571, `psx` for the
+parameter grid from 561, `ControllerDialog.cx` from 661); the row heights stay 16 px. The Modules grid's
+first column does not scale: a row's expand box sits at x 11-20 and is READ from its pixels (`_glyph_columns`:
+the '+' / '-' strokes - the box border is black on the current row and light elsewhere, 18:56), so
+`row_expanded`, `has_glyph` (a submodule row has no box), `collapse_all` (SYCON.net reopens a dialog with the
+rows expanded as they were left: slot n is on row 1 + n only when none is) and `ensure_expanded` are exact
+and a double-click (a toggle) is never blind. The parameter grid's Value column is not proportional to its
+width either: `open_param_editor_at` tries a few fractions of the width and keeps the one that opens an editor.
+`fit()` (resize the dialog back to the control maps' size) stays as a tool but is not used.
+
 **Smoke 4 stations** (17:47-17:57, `spike/references/LowerSorter/smoke4_*`): controller, coupler [DAP X2 V4.2],
 ET200SP with 7 modules, AL1202 + its clone with 8 ports each - 598 s, 48 PASS, 1 FAIL (the ET200SP GSDML path,
 see "one file per device identity" above). Per station: a catalog add ~25 s, a clone 12 s, the rename / IP pass

@@ -15,6 +15,8 @@ NETWORK_PAGE = "Controller Network Settings"
 DEVICE_TABLE_PAGE, DEVICE_TABLE_ID = "Device Table", "210"
 IP_TABLE_PAGE, IP_TABLE_ID = "IP Address Table", "212"
 NET_IP_ID, NET_MASK_ID, NET_GATEWAY_ID = 213, 214, 215
+TIMING_PAGE = "Stations Timing"
+TIMING_NAME_COMBO_ID, TIMING_UPDATE_COMBO_ID, TIMING_WATCHDOG_EDIT_ID = 220, 223, 224
 ROW_Y0, ROW_H = 27, 16               # the custom grids: an 18 px header, 16 px rows - row n (0-based) centre at ROW_Y0 + ROW_H * n (measured 2026-10-23)
 NAME_X, COMMIT_X, IP_X, IP_COMMIT_X = 200, 400, 260, 500
 NAME_EDIT_ID = 1902
@@ -49,9 +51,51 @@ class ControllerDialog(ConfigDialog):
         if warning:
             log("  Warning answered Yes:", warning[:80])
 
+    # ---- Stations Timing ----------------------------------------------------------------------------------
+    def set_stations_timing(self, timing):
+        """timing: {name of station: updating time in ms}. The Stations Timing page: each station picked in the
+        'Name of station' combo (220), its updating time chosen in the combo (223) - the watchdog (Edit 224)
+        follows, 3x (user 2026-10-23: 8 ms for every node). Returns {station: (updating, watchdog)} as shown."""
+        self.select_page(TIMING_PAGE)
+        names = self.combo(TIMING_NAME_COMBO_ID)
+        if names is None:
+            raise SyconError("the 'Name of station' combo (%d) not found on the Stations Timing page" % TIMING_NAME_COMBO_ID)
+        listed = names.item_texts()
+        by_lower = {n.lower(): n for n in listed}
+        missing = [st for st in timing if st.lower() not in by_lower]
+        if missing:
+            raise SyconError("stations not listed on the Stations Timing page: %r (listed %r)" % (missing, listed))
+        shown = {}
+        for st, ms in timing.items():
+            self.combo(TIMING_NAME_COMBO_ID).select(by_lower[st.lower()])
+            time.sleep(0.8)
+            upd = self.combo(TIMING_UPDATE_COMBO_ID)
+            want = str(int(ms)) if float(ms).is_integer() else str(ms)
+            if upd.selected_text() != want:
+                try:
+                    upd.select(want)
+                except (IndexError, ValueError) as ex:
+                    raise SyconError("updating time %r not offered for %s: %r (%s)" % (want, st, upd.item_texts(), ex))
+                time.sleep(0.8)
+            wd = [c for c in self.w32.descendants(class_name="Edit") if c.control_id() == TIMING_WATCHDOG_EDIT_ID and c.is_visible()]
+            shown[st] = (self.combo(TIMING_UPDATE_COMBO_ID).selected_text(), wd[0].window_text() if wd else "")
+            log("  timing %s: %s ms (watchdog %s ms)" % (st, shown[st][0], shown[st][1]))
+            if shown[st][0] != want:
+                raise SyconError("updating time of %s reads %r after choosing %r" % (st, shown[st][0], want))
+        return shown
+
     # ---- Device Table -------------------------------------------------------------------------------------
+    GRID_REF_W = 661                   # the Device Table / IP Address Table grids' width at the dialog's default size
+    _grid_rect = None
+
     def _grid(self, auto_id):
-        return self.pane(auto_id).rectangle()
+        self._grid_rect = self.pane(auto_id).rectangle()
+        return self._grid_rect
+
+    def cx(self, x):
+        """A grid column offset measured at the reference width, scaled to the grid as shown (maximized)."""
+        r = self._grid_rect or self._grid(DEVICE_TABLE_ID)
+        return int(round(x * r.width() / self.GRID_REF_W))
 
     def device_rows(self, max_rows=64):
         """[(row index, row y offset, name of station)] by clicking each row's name cell."""
@@ -62,13 +106,13 @@ class ControllerDialog(ConfigDialog):
             y = ROW_Y0 + ROW_H * (n - 1)
             if r.top + y > r.bottom - 8:
                 break
-            mouse.click(coords=(r.left + NAME_X, r.top + y))
+            mouse.click(coords=(r.left + self.cx(NAME_X), r.top + y))
             time.sleep(0.8)
             eds = self.controls(("Edit",), cid=NAME_EDIT_ID)
             if not eds:
                 break
             rows.append((n, y, eds[0].window_text()))
-        mouse.click(coords=(r.left + COMMIT_X, r.top + ROW_Y0))
+        mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + ROW_Y0))
         time.sleep(0.5)
         return rows
 
@@ -81,7 +125,7 @@ class ControllerDialog(ConfigDialog):
     def set_station_name(self, row_y, name):
         self.select_page(DEVICE_TABLE_PAGE)
         r = self._grid(DEVICE_TABLE_ID)
-        mouse.click(coords=(r.left + NAME_X, r.top + row_y))
+        mouse.click(coords=(r.left + self.cx(NAME_X), r.top + row_y))
         time.sleep(0.9)
         ed = self.controls(("Edit",), cid=NAME_EDIT_ID)
         if not ed:
@@ -91,12 +135,12 @@ class ControllerDialog(ConfigDialog):
             time.sleep(0.2)
             keyboard.send_keys(name, with_spaces=True)
             time.sleep(0.4)
-        mouse.click(coords=(r.left + COMMIT_X, r.top + row_y))      # commit: a read-only cell
+        mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + row_y))      # commit: a read-only cell
         time.sleep(0.9)
-        mouse.click(coords=(r.left + NAME_X, r.top + row_y))        # verify
+        mouse.click(coords=(r.left + self.cx(NAME_X), r.top + row_y))        # verify
         time.sleep(0.9)
         value = self.controls(("Edit",), cid=NAME_EDIT_ID)[0].window_text()
-        mouse.click(coords=(r.left + COMMIT_X, r.top + row_y))
+        mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + row_y))
         time.sleep(0.6)
         log("  Device Table row y+%d: name -> %r" % (row_y, value))
         if value.lower() != name.lower():
@@ -134,7 +178,7 @@ class ControllerDialog(ConfigDialog):
                     continue
                 if any(a == abs_row for a, _ in order):
                     continue
-                mouse.click(coords=(r.left + NAME_X, r.top + y))
+                mouse.click(coords=(r.left + self.cx(NAME_X), r.top + y))
                 time.sleep(0.7)
                 eds = self.controls(("Edit",), cid=NAME_EDIT_ID)
                 if not eds:
@@ -149,12 +193,12 @@ class ControllerDialog(ConfigDialog):
                     time.sleep(0.2)
                     keyboard.send_keys(new, with_spaces=True)
                     time.sleep(0.3)
-                    mouse.click(coords=(r.left + COMMIT_X, r.top + y))
+                    mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + y))
                     time.sleep(0.7)
-                    mouse.click(coords=(r.left + NAME_X, r.top + y))
+                    mouse.click(coords=(r.left + self.cx(NAME_X), r.top + y))
                     time.sleep(0.7)
                     value = self.controls(("Edit",), cid=NAME_EDIT_ID)[0].window_text()
-                    mouse.click(coords=(r.left + COMMIT_X, r.top + y))
+                    mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + y))
                     time.sleep(0.4)
                     if value.lower() != new.lower():          # SYCON.net lower-cases a name of station
                         raise SyconError("row %d: name reads %r after writing %r" % (abs_row, value, new))
@@ -170,7 +214,7 @@ class ControllerDialog(ConfigDialog):
             scrolled += shift
         if pending:
             log("  not found in the Device Table:", sorted(pending))
-        mouse.click(coords=(r.left + COMMIT_X, r.top + ROW_Y0))
+        mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + ROW_Y0))
         time.sleep(0.4)
         # the IPs, by the same absolute rows - in TWO passes, because a target IP may still be held by another
         # row's auto-assigned address: first every row to a parking address, then the targets. Each row's current
@@ -213,23 +257,23 @@ class ControllerDialog(ConfigDialog):
     expected_ips = None       # {absolute row: the IP the row must show before it is written} - set by the caller
 
     def _set_ip_at(self, r, y, ip, label, expect=None):
-        mouse.click(coords=(r.left + IP_X, r.top + y))
+        mouse.click(coords=(r.left + self.cx(IP_X), r.top + y))
         time.sleep(0.8)
         ipc = self.controls(("SysIPAddress32",))
         if not ipc:
             raise SyconError("no IP editor at %s" % label)
         before = ".".join(f.window_text() for f in sorted(ipc[0].children(), key=lambda c: c.rectangle().left))
         if expect and before != expect:
-            mouse.click(coords=(r.left + IP_COMMIT_X, r.top + y))
+            mouse.click(coords=(r.left + self.cx(IP_COMMIT_X), r.top + y))
             raise SyconError("%s shows IP %s, expected %s - row mismatch, nothing written" % (label, before, expect))
         _set_ip_control(ipc[0], ip)
-        mouse.click(coords=(r.left + IP_COMMIT_X, r.top + y))
+        mouse.click(coords=(r.left + self.cx(IP_COMMIT_X), r.top + y))
         time.sleep(0.8)
-        mouse.click(coords=(r.left + IP_X, r.top + y))
+        mouse.click(coords=(r.left + self.cx(IP_X), r.top + y))
         time.sleep(0.8)
         ipc = self.controls(("SysIPAddress32",))
         after = ".".join(f.window_text() for f in sorted(ipc[0].children(), key=lambda c: c.rectangle().left)) if ipc else ""
-        mouse.click(coords=(r.left + IP_COMMIT_X, r.top + y))
+        mouse.click(coords=(r.left + self.cx(IP_COMMIT_X), r.top + y))
         time.sleep(0.4)
         log("  IP at %s: %s -> %s" % (label, before, after))
         if after != ip:
@@ -240,20 +284,20 @@ class ControllerDialog(ConfigDialog):
     def set_station_ip(self, row_y, ip):
         self.select_page(IP_TABLE_PAGE)
         r = self._grid(IP_TABLE_ID)
-        mouse.click(coords=(r.left + IP_X, r.top + row_y))
+        mouse.click(coords=(r.left + self.cx(IP_X), r.top + row_y))
         time.sleep(0.9)
         ipc = self.controls(("SysIPAddress32",))
         if not ipc:
             raise SyconError("no IP editor on row y+%d" % row_y)
         before = ".".join(f.window_text() for f in sorted(ipc[0].children(), key=lambda c: c.rectangle().left))
         _set_ip_control(ipc[0], ip)
-        mouse.click(coords=(r.left + IP_COMMIT_X, r.top + row_y))   # commit
+        mouse.click(coords=(r.left + self.cx(IP_COMMIT_X), r.top + row_y))   # commit
         time.sleep(0.9)
-        mouse.click(coords=(r.left + IP_X, r.top + row_y))          # verify
+        mouse.click(coords=(r.left + self.cx(IP_X), r.top + row_y))          # verify
         time.sleep(0.9)
         ipc = self.controls(("SysIPAddress32",))
         after = ".".join(f.window_text() for f in sorted(ipc[0].children(), key=lambda c: c.rectangle().left))
-        mouse.click(coords=(r.left + IP_COMMIT_X, r.top + row_y))
+        mouse.click(coords=(r.left + self.cx(IP_COMMIT_X), r.top + row_y))
         time.sleep(0.6)
         log("  IP Address Table row y+%d: %s -> %s" % (row_y, before, after))
         if after != ip:

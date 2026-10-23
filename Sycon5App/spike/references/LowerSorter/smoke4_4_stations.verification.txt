@@ -1,8 +1,9 @@
-verification: 48 PASS, 1 FAIL
+verification: 54 PASS, 1 FAIL
 PASS controller present: controller
 PASS station n0006-trib-aec01-k24501 exists
 PASS station n0006-trib-aec01-k24501 IP 192.168.1.6 (read 192.168.1.6)
 PASS controller lists n0006-trib-aec01-k24501 at 192.168.1.6 (read 192.168.1.6)
+PASS station n0006-trib-aec01-k24501 update time 8 ms (read 8 ms, watchdog 24 ms)
 PASS station n0006-trib-aec01-k24501 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
 PASS station n0006-trib-aec01-k24501 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
 PASS station n0006-trib-aec01-k24501 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
@@ -10,20 +11,24 @@ PASS station n0006-trib-aec01-k24501 model 6ES7158-3AD10-0XA0 (the saved DAP 'DA
 PASS station n0005-trib-aep01-k35001 exists
 PASS station n0005-trib-aep01-k35001 IP 192.168.1.5 (read 192.168.1.5)
 PASS controller lists n0005-trib-aep01-k35001 at 192.168.1.5 (read 192.168.1.5)
+PASS station n0005-trib-aep01-k35001 update time 8 ms (read 8 ms, watchdog 24 ms)
 FAIL station n0005-trib-aep01-k35001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.43-Siemens-ET200SP-20240425.xml)
 PASS station n0005-trib-aep01-k35001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
 PASS station n0005-trib-aep01-k35001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
 PASS station n0005-trib-aep01-k35001: 7 modules plugged (table 7)
 PASS station n0005-trib-aep01-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
 PASS station n0005-trib-aep01-k35001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 3: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 4: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 5: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 6: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
 PASS station n0005-trib-aep01-k35001 slot 7: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 7 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
 PASS station n0035-trib-sm006-k1 exists
 PASS station n0035-trib-sm006-k1 IP 192.168.1.35 (read 192.168.1.35)
 PASS controller lists n0035-trib-sm006-k1 at 192.168.1.35 (read 192.168.1.35)
+PASS station n0035-trib-sm006-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
 PASS station n0035-trib-sm006-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
 PASS station n0035-trib-sm006-k1 type 'AL1202' (read 'AL1202')
 PASS station n0035-trib-sm006-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
@@ -37,6 +42,7 @@ PASS station n0035-trib-sm006-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
 PASS station n0034-trib-sm011-k1 exists
 PASS station n0034-trib-sm011-k1 IP 192.168.1.34 (read 192.168.1.34)
 PASS controller lists n0034-trib-sm011-k1 at 192.168.1.34 (read 192.168.1.34)
+PASS station n0034-trib-sm011-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
 PASS station n0034-trib-sm011-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
 PASS station n0034-trib-sm011-k1 type 'AL1202' (read 'AL1202')
 PASS station n0034-trib-sm011-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
@@ -51,10 +57,10 @@ PASS no station outside the table (extra: [])
 
 C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S129\SYCON_net.xml
   controller (controller) symbolic=CIFX_RE_PNM type='' ip= mask= gsdml= dap='' order=''
-    network: n0006-trib-aec01-k24501 192.168.1.6
-    network: n0005-trib-aep01-k35001 192.168.1.5
-    network: n0035-trib-sm006-k1 192.168.1.35
-    network: n0034-trib-sm011-k1 192.168.1.34
+    network: n0006-trib-aec01-k24501 192.168.1.6 (update 8 ms, watchdog 24 ms)
+    network: n0005-trib-aep01-k35001 192.168.1.5 (update 8 ms, watchdog 24 ms)
+    network: n0035-trib-sm006-k1 192.168.1.35 (update 8 ms, watchdog 24 ms)
+    network: n0034-trib-sm011-k1 192.168.1.34 (update 8 ms, watchdog 24 ms)
   n0006-trib-aec01-k24501 symbolic=PN_PN_Coupler_X2 type='PN/PN Coupler X2' ip=192.168.1.6 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0'
     slot 0: PN/PN Coupler X2
       sub 1: PN/PN Coupler X2
@@ -78,7 +84,7 @@ C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S
       sub 1: DQ 16x24VDC/0.5A ST V0.0
     record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
     record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
-    record slot 1 sub 1 index 243: 00 00 00 00 00 00
+    record slot 1 sub 1 index 243: 01 00 00 00 00 00
     record slot 2 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
     record slot 2 sub 1 index 243: 00 00 00 00 00 00
     record slot 3 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
@@ -90,7 +96,7 @@ C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_LowerSorter_smoke4\Smoke4\_S
     record slot 6 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
     record slot 6 sub 1 index 243: 00 00 00 00 00 00
     record slot 7 sub 1 index 128: 00 02 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 00
-    record slot 7 sub 1 index 243: 00 00 00 00 00 00
+    record slot 7 sub 1 index 243: 01 00 00 00 00 00
   n0035-trib-sm006-k1 symbolic=AL1202 type='AL1202' ip=192.168.1.35 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
     slot 0: AL1202
       sub 1: AL1202

@@ -6,6 +6,7 @@ Closing: the controller dialog's OK closes it; a slave dialog's OK never does - 
 Cancel after unapplied changes asks 'Configuration data has been changed. Do you want to save the data?'
 (Yes keeps the data, No discards it).
 """
+import ctypes
 import time
 
 from pywinauto import Desktop
@@ -30,6 +31,18 @@ class ConfigDialog:
             self.uia = self._open(timeout)
         self.w32 = Desktop(backend="win32").window(handle=self.uia.handle)
         log("dialog:", self.uia.window_text())
+        self.maximize()
+
+    def maximize(self):
+        """Maximize the dialog (user 2026-10-23: "maximize the configuration windows ... some systems may have
+        100+ nodes"): the grids show many rows at once. Their columns scale with the width, so every column
+        offset measured on the control maps is scaled by the grid's width (`DeviceDialog.sx`, `ControllerDialog.cx`)."""
+        user32 = ctypes.windll.user32
+        if not user32.IsZoomed(self.uia.handle):
+            user32.ShowWindow(self.uia.handle, 3)          # SW_MAXIMIZE
+            time.sleep(1.2)
+        d = self.uia.rectangle()
+        log("  dialog %s: %dx%d" % ("maximized" if user32.IsZoomed(self.uia.handle) else "NOT maximized", d.width(), d.height()))
 
     def _open(self, timeout):
         s = self.session
@@ -71,6 +84,29 @@ class ConfigDialog:
             raise SyconError("pane %s not found in the dialog" % auto_id)
         return panes[0]
 
+    def fit(self, pane_auto_id, ref_w, ref_h):
+        """Resize the dialog so that a pane (a custom grid) has its reference size: the grids' columns scale with
+        the dialog, every measured offset holds at the size of the control maps only, and SYCON.net reopens a
+        dialog at the size the user left it (2026-10-23 18:27: the Modules grid 187 px wider after a manual
+        check, the Module cell click landing in another column). Returns True when resized."""
+        resized = False
+        for _ in range(3):                # the pane's height follows the dialog's only in part: a few steps
+            r = self.pane(pane_auto_id).rectangle()
+            dw, dh = r.width() - ref_w, r.height() - ref_h
+            if abs(dw) < 4 and abs(dh) < 4:
+                break
+            d = self.uia.rectangle()
+            ctypes.windll.user32.MoveWindow(self.uia.handle, d.left, d.top, d.width() - dw, d.height() - dh, True)
+            time.sleep(1.0)
+            resized = True
+            r2 = self.pane(pane_auto_id).rectangle()
+            log("  dialog resized by (%d, %d): pane %s now %dx%d" % (-dw, -dh, pane_auto_id, r2.width(), r2.height()))
+        r = self.pane(pane_auto_id).rectangle()
+        if abs(r.width() - ref_w) >= 4:   # the columns scale with the width: that one must hold; the height only
+            raise SyconError("pane %s is %dx%d after the resize (reference %dx%d)" % (     # changes the rows shown
+                pane_auto_id, r.width(), r.height(), ref_w, ref_h))
+        return resized
+
     def panes_of_class(self, class_prefix):
         return [p for p in self.uia.descendants(control_type="Pane") if p.class_name().startswith(class_prefix)]
 
@@ -98,7 +134,10 @@ class ConfigDialog:
         return out
 
     def combo(self, cid):
-        c = [c for c in self.w32.descendants(class_name="ComboBox") if c.control_id() == cid]
+        """The VISIBLE ComboBox with this control id: every page of a dialog is instantiated at once and the ids
+        repeat across pages (220 is the Stations Timing page's 'Name of station' AND a port-speed combo of
+        another page - 2026-10-23 18:22)."""
+        c = [c for c in self.w32.descendants(class_name="ComboBox") if c.control_id() == cid and c.is_visible()]
         return c[0] if c else None
 
     def button(self, name):
