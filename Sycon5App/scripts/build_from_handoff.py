@@ -21,6 +21,7 @@ p.add_argument("--out", required=True)
 p.add_argument("--base", default=os.path.join(APP, "spike", "scratch", "AutomateSyconProj_BaseProj.spj"),
                help="a project to launch SYCON.net on before File > New (default: the scratch base project)")
 p.add_argument("--resume", action="store_true")
+p.add_argument("--report", default="", help="the verification report path (default: <project>.verification.txt beside it)")
 a = p.parse_args()
 t0 = time.time()
 driver = SyconDriver()
@@ -28,7 +29,8 @@ code = 1
 try:
     v, xml, plugged, driver = consumer.build(a.handoff, a.out, a.base, resume=a.resume, driver=driver)
     report = v.report() + "\n\n" + describe(read_project(xml))
-    rpath = a.out[:-4] + ".verification.txt"
+    rpath = a.report or (a.out[:-4] + ".verification.txt")
+    os.makedirs(os.path.dirname(os.path.abspath(rpath)), exist_ok=True)
     with open(rpath, "w", encoding="utf-8") as f:
         f.write(report + "\n")
     print(report)

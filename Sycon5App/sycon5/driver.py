@@ -258,6 +258,34 @@ class SyconDriver:
             self.model[new] = self.model.pop(old, {"slots": {}})
         log("renamed and addressed %d stations" % len(mapping))
 
+    def set_auto_addressing(self, enabled=True):
+        """The controller's Address Table: Auto addressing on (one dialog; Apply + OK when changed)."""
+        dlg = ControllerDialog(self.session, self.controller_station())
+        try:
+            changed = dlg.set_auto_addressing(enabled)
+            if changed:
+                errs = dlg.apply()
+                if errs:
+                    raise SyconError("errors after Apply (auto addressing): %r" % errs)
+                dlg.ok()
+            else:
+                dlg.close(keep=False)
+        except SyconError:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            raise
+        return changed
+
+    def export_process_data(self, path):
+        """Additional Functions > Export > XML... of the controller: the process data (`HilscherIO.xml`)."""
+        from . import exports
+        return exports.export(self.session, self.session.station_item(self.controller_station()), "xml", path)
+
+    def export_configuration(self, path):
+        """Additional Functions > Export > DBM/nxd... of the controller: the configuration database (`config.nxd`)."""
+        from . import exports
+        return exports.export(self.session, self.session.station_item(self.controller_station()), "nxd", path)
+
     def set_stations_timing(self, timing):
         """timing: {station: updating time in ms} - one pass of the controller's Stations Timing page."""
         dlg = ControllerDialog(self.session, self.controller_station())

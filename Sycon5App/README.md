@@ -435,10 +435,24 @@ for the handoff alone):
     HilscherPnCard_1.spj + HilscherPnCard_1/   the SYCON.net project of card 1, built by the driver
     HilscherPnCard_1.verification.txt   the read-back verification
     build.log
+    HilscherIO.xml                      the process-data export (the IO driver's input)
+    nWid/config.nxd + UpdateCardV4.bat  the configuration export and the card-update batch (Shared/HardwareConfigBuilderData/nWid)
   HilscherIOCard2/ ...                  one per card (one per PROFINET network of the list)
   IODriver/BusField.csv                 every card's nodes
-  export.log, build.log
+    _PL_Logs/                           build[_resume].log, HilscherPnCard_<n>.verification.txt (user: "keep the
+                                        _logs folder in the card folder. also, name it _PL_Logs")
+  _PL_Logs/                             export.log, build.log (the list)
 ```
+
+`UpdateCardV4.bat` is the FVZ reference's with one change (user 2026-10-24): the card chosen - the serial number
+that names its folder under `C:\Program Files\cifX Device Driver
+80100_*` - is remembered in `card.txt` beside
+the batch; a later run reports the remembered card and uses it when present, else the normal workflow (none /
+one / several to choose from) runs and remembers the choice. `CIFX_DRIVER_PATH` overrides the driver folder;
+`tests/test_update_card_bat.py` runs it three times against a fake one. The batch copies `config.nxd` AND
+`nwid.nxd` (renamed from `config_nwid.nxd`) into the card's `Channel0`. The DBM/nxd export writes TWO files
+(user: "the sycon export DBM/NXD function exports 2 files. i name them config or c, one has to be renamed"):
+`config.nxd` and `config_nwid.nxd`; the verification checks both are there after the export.
 
 **One project per card** — PL5's `sycon_handoff.cards_of` lists the cifX cards of the list: one per PROFINET
 network in document order (the redundant second card on a network is not a card); `build(rows, dtd, card=n)` keeps
@@ -482,6 +496,51 @@ List head has no Part No., so the database row `VITRONIC` is keyed by the head's
 on X1 (user: "couplers have no defined I/O modules, let's default to 128Byte IN + OUT; X1 will need to have the
 module positions mirrored") - the Fixed Modules column holds one list per connector (`X2: ... ; X1: ...`), the
 head row's Connector column picks it (a connector without a list: WARN `sycon_connector_unknown`).
+
+## Recording the user's actions, and the exports they taught (2026-10-24 evening)
+
+User: "we need to log the ui interactions. a few sycon functions that change and export data" - the process-data
+export among them. `scripts/ui_recorder.py --out spike\scratch
+ecordings\<name> [--minutes 30]` records the
+desktop while the user works (no hook library in the venv: the mouse buttons and every virtual key are polled at
+15 ms through GetAsyncKeyState's "pressed since the last check" flag): one line per click with the control under
+the cursor and its parent chain through UI Automation (a MenuItem in its Menu, a Button in its named dialog, the
+dialog's Edit / ComboBox / CheckBox values when a button is pressed), the keys typed and, when the typing pauses,
+the focused field and its value, every top-level window opening or closing, and a PNG of the active window after
+each click (pure-Python PNG, zlib). It stops on a `STOP` file in the folder, the time limit, or Ctrl+Alt+Q. One
+thing a log cannot name is the entry of a menu that closed under the click; `scripts/probe_context_menu.py` reads
+such menus afterwards (the controller node's context menu and every nested level - a hover opens no submenu
+there, the item's own `click_input` does).
+
+The first recording (`spike/scratch/recordings/process_data_export`, 96 events, 34 screenshots, 2026-10-24 19:11)
+gave four functions, now in the driver and at the end of every build (`consumer.build` step 4):
+
+1. **Auto addressing** - controller Configuration > Address Table > the `Auto addressing` check box (id 201) >
+   Warning "Enabling Auto Addressing causes all manually edited addresses to be lost. Proceed anyway?" > Yes >
+   Apply > OK (`ControllerDialog.set_auto_addressing`, idempotent: the box's state is read first).
+2. **Process-data export** - right-click the controller > Additional Functions > Export > `XML...` > Save As (XML
+   Files) > `<project folder>\HilscherIO.xml` (the IO driver's input; SYCON.net: "XML export of process data
+   succeeded with device ..."). `sycon5/exports.py`: the popup menus found at the Win32 level (class #32768) and
+   their items clicked through UI Automation, the Win32 Save As driven by its File name edit (id 1148) and Save
+   (id 1), a `Confirm Save As` answered Yes, the file's rewrite awaited; `process_data_devices` reads the export
+   back (`ProcessData/Controller/Channel/Device` display names `label[type]<station>`) and the verification checks
+   every station of the table is listed.
+3. **Configuration export** - the same menu > `DBM/nxd...` > `<project folder>
+Wid\config.nxd` ("Export of
+   DBM/nxd database succeeded") - two files come out, `config.nxd` and `config_nwid.nxd`.
+4. **Save** - the toolbar's Save.
+
+The Additional Functions submenu, for the record: Offline Compare..., Online Compare..., Setpoint Value...,
+Service > (Start Communication, Stop Communication), License, Export > (CSV..., DBM/nxd..., XML...), Print >
+(Configuration). The Controller Settings page the user showed: start of bus communication automatically by
+device, watchdog 1000 ms, process image big endian, module alignment byte boundaries, ports AUTO.
+
+Run on the sorter (2026-10-24 19:40-20:03, the desktop left alone, 1387 s): the resume re-confirmed the ET200SP
+parameters and the ports, found Auto addressing already on, exported HilscherIO.xml (657 KB, UTF-16, every one of
+the 62 stations listed) and nWid/config.nxd + config_nwid.nxd, shipped UpdateCardV4.bat, wrote 17 symbolic names
+and 63 positions, regenerated BusField.csv (the Vitronic and cell-test nodes 0x010C0020): verification 775 PASS /
+0 FAIL, 29 notes (`spike/references/FVT_tests/HilscherPnCard_1.verification.txt`; the recording's log in
+`spike/references/recordings/process_data_export/events.log`).
 
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 

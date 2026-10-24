@@ -16,6 +16,7 @@ DEVICE_TABLE_PAGE, DEVICE_TABLE_ID = "Device Table", "210"
 IP_TABLE_PAGE, IP_TABLE_ID = "IP Address Table", "212"
 NET_IP_ID, NET_MASK_ID, NET_GATEWAY_ID = 213, 214, 215
 TIMING_PAGE = "Stations Timing"
+ADDRESS_TABLE_PAGE, AUTO_ADDRESSING_ID = "Address Table", 201     # the page's `Auto addressing` check box
 TIMING_NAME_COMBO_ID, TIMING_UPDATE_COMBO_ID, TIMING_WATCHDOG_EDIT_ID = 220, 223, 224
 ROW_Y0, ROW_H = 27, 16               # the custom grids: an 18 px header, 16 px rows - row n (0-based) centre at ROW_Y0 + ROW_H * n (measured 2026-10-23)
 NAME_X, COMMIT_X, IP_X, IP_COMMIT_X = 200, 400, 260, 500
@@ -98,6 +99,30 @@ class ControllerDialog(ConfigDialog):
             if shown[st][0] != want:
                 raise SyconError("updating time of %s reads %r after choosing %r" % (st, shown[st][0], want))
         return shown
+
+    # ---- Address Table ------------------------------------------------------------------------------------
+    def set_auto_addressing(self, enabled=True):
+        """The Address Table page's `Auto addressing` check box (user, recorded 2026-10-24 19:11: ticked before the
+        process-data export; the Warning 'Enabling Auto Addressing causes all manually edited addresses to be
+        lost. Proceed anyway?' answered Yes). Returns True when the box was changed."""
+        self.select_page(ADDRESS_TABLE_PAGE)
+        boxes = [b for b in self.w32.descendants(class_name="Button") if b.control_id() == AUTO_ADDRESSING_ID and b.is_visible()]
+        if not boxes:
+            raise SyconError("no Auto addressing check box on the Address Table page")
+        box = boxes[0]
+        if bool(box.get_check_state()) == bool(enabled):
+            log("  Auto addressing already %s" % ("on" if enabled else "off"))
+            return False
+        box.click()
+        time.sleep(1.0)
+        text = self.session.answer_box("Warning", "Yes")
+        if text:
+            log("  Warning:", text[:100], "-> Yes")
+        time.sleep(0.8)
+        if bool(box.get_check_state()) != bool(enabled):
+            raise SyconError("Auto addressing did not change")
+        log("  Auto addressing -> %s" % ("on" if enabled else "off"))
+        return True
 
     # ---- Device Table -------------------------------------------------------------------------------------
     GRID_REF_W = 661                   # the Device Table / IP Address Table grids' width at the dialog's default size

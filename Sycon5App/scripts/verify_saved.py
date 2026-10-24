@@ -16,13 +16,15 @@ from sycon5.readback import describe, read_project   # noqa: E402
 p = argparse.ArgumentParser(description="verify a saved SYCON.net project against its handoff")
 p.add_argument("--handoff", required=True)
 p.add_argument("--out", required=True, help="the project .spj (its _S129\\SYCON_net.xml is read)")
+p.add_argument("--report", default="", help="the report path (default: <project>.verification.txt beside it)")
 a = p.parse_args()
 xml = a.out[:-4] + "\\_S129\\SYCON_net.xml"
 h = consumer.load_handoff(a.handoff)
 project = read_project(xml)
 v = consumer.verify(h, project, {}, None)
 report = v.report() + "\n\n" + describe(project)
-rpath = a.out[:-4] + ".verification.txt"
+rpath = a.report or (a.out[:-4] + ".verification.txt")
+os.makedirs(os.path.dirname(os.path.abspath(rpath)), exist_ok=True)
 with open(rpath, "w", encoding="utf-8") as f:
     f.write(report + "\n")
 print(v.report().splitlines()[0])

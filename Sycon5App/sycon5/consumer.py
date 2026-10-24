@@ -9,9 +9,10 @@ The project is saved at checkpoints (after the stations, after the renames, afte
 of SYCON.net loses little; `--resume` reopens the saved project and skips what the read-back already shows.
 """
 import os
+import shutil
 import time
 
-from . import canvas
+from . import canvas, exports
 from .catalog import split_item
 from .driver import SyconDriver
 from .handoff import load_handoff, natural_key, parse_parameters
@@ -19,6 +20,10 @@ from .readback import read_project
 from .session import Session, SyconError, log
 
 CHECKPOINT_EVERY = 12
+# the files shipped into the project's nWid\ folder beside config.nxd (user 2026-10-24: the FVZ reference's
+# UpdateCardV4.bat, with the chosen card remembered in card.txt) - hand-maintained in Shared
+NWID_ASSETS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Shared",
+                                            "HardwareConfigBuilderData", "nWid"))
 POTENTIAL_GROUP_RECORD = 243          # an ET200SP module's `Potential group` record (its first byte 01 = a new group)
 
 
@@ -287,10 +292,37 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
         checkpoint()
     if not saved:
         checkpoint()
+    # 4. the controller's Auto addressing and the two exports beside the project, as the user does them (recorded
+    # 2026-10-24 19:11): HilscherIO.xml (the process data, the IO driver's input) in the project's folder and
+    # nWid\config.nxd (the configuration database) - the production folder's layout
+    if d.set_auto_addressing(True):
+        checkpoint()
+    project_dir = os.path.dirname(out_spj)
+    process_xml = d.export_process_data(os.path.join(project_dir, "HilscherIO.xml"))
+    config_nxd = d.export_configuration(os.path.join(project_dir, "nWid", "config.nxd"))
+    for name in sorted(os.listdir(NWID_ASSETS)) if os.path.isdir(NWID_ASSETS) else []:
+        shutil.copy2(os.path.join(NWID_ASSETS, name), os.path.join(project_dir, "nWid", name))
+        log("  shipped nWid\\%s" % name)
     time.sleep(2.0)
     # the canvas (symbolic names, positions) is written into the XML with the project CLOSED, then read back
     log("close:", d.close())
     canvas.apply_layout(xml, h)
     project = read_project(xml)
     v = verify(h, project, plugged, timing_set)
+    verify_exports(v, h, process_xml, config_nxd)
     return v, xml, plugged, d
+
+
+def verify_exports(v, handoff, process_xml, config_nxd):
+    """The process-data export lists every station of the table (by name of station), the nxd exists."""
+    ctrl, devices = exports.process_data_devices(process_xml)
+    v.check(bool(ctrl), "process data export: controller %r" % ctrl)
+    listed = {exports.station_of(name).lower() for name in devices}
+    for s in handoff.stations:
+        v.check(s["station_name"].lower() in listed, "process data export lists %s" % s["station_name"])
+    # the DBM/nxd export writes TWO files (user 2026-10-24: "the sycon export DBM/NXD function exports 2 files. i name
+    # them config or c, one has to be renamed"): config.nxd and config_nwid.nxd - UpdateCardV4.bat renames the second
+    # to nwid.nxd when it copies them into the card
+    for path in (config_nxd, config_nxd[:-4] + "_nwid.nxd"):
+        v.check(os.path.exists(path) and os.path.getsize(path) > 0,
+                "configuration export %s (%d bytes)" % (os.path.basename(path), os.path.getsize(path) if os.path.exists(path) else 0))

@@ -1,0 +1,96 @@
+19:10:29.131 recorder started; 7 visible windows; the SYCON.net ones: []
+19:10:49.339 click L (734,406) win="FVT_Sorter_Lower - Modified Canvas Positions and 1 more tab - File Explorer" at Pane "PopupHost" (Microsoft.UI.Content.PopupWindowSiteBridge) < Window "FVT_Sorter_Lower - Modified Canvas Positions and 1 more tab " (CabinetWClass) < Pane "Desktop 1" (#32769)
+19:10:49.780   screenshot 0001_click.png of "SYCON.net"
+19:10:49.805 window opened: "SYCON.net User Login" (#32770, pid 1464)
+19:10:49.818 window opened: "SYCON.net" (Afx:00400000:0:00010003:00000000:00000000, pid 1464)
+19:10:51.243 click L (978,566) win="SYCON.net User Login" at (COMError)
+19:10:52.356   screenshot 0002_click.png of "SYCON.net"
+19:10:52.404 window opened: "SYCON.net" (Afx:00400000:8:00010003:00000000:002303D9, pid 1464)
+19:10:52.404 window closed: "SYCON.net User Login" (#32770)
+19:11:06.330 window closed: "SYCON.net" (Afx:00400000:0:00010003:00000000:00000000)
+19:11:08.462 click L (99,126) win="SYCON.net - [Sorter_Lower.spj]" at TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Sorter_Lower" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su) < Pane "netProject" [59493] (Afx:00400000:48:00000000:0010006D:00000000)
+19:11:09.469   screenshot 0003_click.png of "SYCON.net - [Sorter_Lower.spj]"
+19:11:09.616 click R (189,372) win="SYCON.net - [Sorter_Lower.spj]" at MenuItem "Measured Value..." [35557] < Menu "Context" (#32768) < Pane "Desktop 1" (#32769)
+19:11:10.650   screenshot 0004_click.png of "SYCON.net - [Sorter_Lower.spj]"
+19:11:13.044 click L (184,356) win="SYCON.net - [Sorter_Lower.spj]" at TreeItem "ServoOne_Junior[ServoOne Junior]<n0030-trib-du03-aec1-t57201" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Sorter_Lower" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+19:11:13.477   screenshot 0005_click.png of "Dialog"
+19:11:13.525 window opened: "netDevice" (#32770, pid 1464)
+19:11:17.644 window opened: "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" (#32770, pid 1464)
+19:11:17.952 window closed: "netDevice" (#32770)
+19:11:21.596 click L (75,343) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at TreeItem "Address Table" < TreeItem "Configuration" < Tree "" [2199] (SysTreeView32) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static)
+19:11:22.626   screenshot 0006_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:11:22.826 click L (276,126) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at CheckBox "Auto addressing" [201] (Button) < Pane "" [59649] (AfxWnd70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static) < Pane "" (AfxOleControl70su) < Window "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controll" (#32770)
+19:11:23.941   screenshot 0007_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:11:23.956 window opened: "Warning" (#32770, pid 1464)
+19:11:24.164 click L (643,256) win="Warning" at Pane "AddressGridIn" [204] (CIOAddressGridCtrl) < Pane "" [59649] (AfxWnd70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static) < Pane "" (AfxOleControl70su) < Window "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controll" (#32770)
+19:11:24.753   screenshot 0008_click.png of "Warning"
+19:11:25.115 click L (985,549) win="Warning" at Pane "" [59649] (AfxWnd70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static) < Pane "" (AfxOleControl70su) < Window "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controll" (#32770) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9)
+19:11:26.139   screenshot 0009_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:11:26.183 window closed: "Warning" (#32770)
+19:11:31.382 click L (1796,966) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at Button "Apply" [2204] < Pane "" (AfxOleControl70su) < Window "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controll" (#32770) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769) | fields: CheckBox "Auto addressing"='1' | ComboBox "Display mode:"='Display mode:' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='1' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='0' | Edit "227"='' | Edit "59664"=' \tAS-i \r'
+19:11:32.369   screenshot 0010_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:11:32.942 click L (1605,963) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at Button "OK" [1] < Pane "" (AfxOleControl70su) < Window "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controll" (#32770) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769)
+19:11:34.003   screenshot 0011_click.png of "SYCON.net - [Sorter_Lower.spj]"
+19:11:34.003 window closed: "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" (#32770)
+19:11:35.474 click R (109,122) win="SYCON.net - [Sorter_Lower.spj]" at TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Sorter_Lower" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su) < Pane "netProject" [59493] (Afx:00400000:48:00000000:0010006D:00000000)
+19:11:36.511   screenshot 0012_click.png of "SYCON.net - [Sorter_Lower.spj]"
+19:11:42.799 click L (568,619) win="SYCON.net - [Sorter_Lower.spj]" at Pane "" [3000] (AfxFrameOrView70su) < Pane "" [234] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+19:11:43.501   screenshot 0013_click.png of "Save As"
+19:11:43.536 window opened: "Save As" (#32770, pid 1464)
+19:11:50.888 click L (836,117) win="Save As" at Button "Up One Level" < ToolBar "" [1088] (ToolbarWindow32) < Window "Save As" (#32770) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769) | fields: ComboBox "Save in:"='Save in:' | Edit "nWid"='nWid' | Edit "Sorter_Lower"='Sorter_Lower' | Edit "SyconNetProjectInterface"='SyconNetProjectInterface' | Edit "HilscherIO.xml"='HilscherIO.xml' | ComboBox "File name:"='File name:' | Edit "File name:"='HilscherIO.xml' | ComboBox "Save as type:"='Save as type:' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='1' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='0' | Edit "227"='' | Edit "59664"=' \tAS-i \r'
+19:11:51.573   screenshot 0014_click.png of "Save As"
+19:11:53.717 click L (1555,923) win="Save As" at Button "Save" [1] < Window "Save As" (#32770) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769)
+19:11:54.812   screenshot 0015_click.png of "SYCON.net - [Sorter_Lower.spj]"
+19:11:54.824 window closed: "Save As" (#32770)
+19:11:55.246 click L (453,311) win="SYCON.net - [Sorter_Lower.spj]" at Pane "" [3000] (AfxFrameOrView70su) < Pane "" [234] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+19:11:56.261   screenshot 0016_click.png of "SYCON.net - [Sorter_Lower.spj]"
+19:11:56.357 click R (90,129) win="SYCON.net - [Sorter_Lower.spj]" at Menu "Context" (#32768) < Pane "Desktop 1" (#32769)
+19:11:57.367   screenshot 0017_click.png of "SYCON.net - [Sorter_Lower.spj]"
+19:12:00.737 click L (530,594) win="SYCON.net - [Sorter_Lower.spj]" at Pane "" [3000] (AfxFrameOrView70su) < Pane "" [234] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+19:12:01.439   screenshot 0018_click.png of "Save As"
+19:12:01.472 window opened: "Save As" (#32770, pid 1464)
+19:12:03.815 click L (586,168) win="Save As" at Edit "nWid" < ListItem "nWid"
+19:12:04.486   screenshot 0019_click.png of "Save As"
+19:12:04.692 click L (604,193) win="Save As" at Edit "config_nwid.nxd" < ListItem "config_nwid.nxd" < List "Folder View" [1] (SysListView32) < Window "Save As" (#32770) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769)
+19:12:05.358   screenshot 0020_click.png of "Save As"
+19:12:06.455 click L (591,173) win="Save As" at Edit "config.nxd" < ListItem "config.nxd" < List "Folder View" [1] (SysListView32) < Window "Save As" (#32770) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769)
+19:12:07.108   screenshot 0021_click.png of "Save As"
+19:12:07.979 click L (751,921) win="Save As" at Edit "File name:" [1148] (Edit) < ComboBox "File name:" [1148] (ComboBox) < Window "Save As" (#32770) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769)
+19:12:08.634   screenshot 0022_click.png of "Save As"
+19:12:11.192 keys: C O N F I G | focus: Edit "File name:" [1148] (Edit) < ComboBox "File name:" [1148] (ComboBox) < Window "Save As" (#32770) value='config'
+19:12:12.731 keys: Enter | focus: Button "No" [CommandButton_7] < Window "Confirm Save As" (#32770) < Window "Save As" (#32770) value='No'
+19:12:12.734 window opened: "Confirm Save As" (#32770, pid 1464)
+19:12:15.047 click L (1006,521) win="Confirm Save As" at (COMError)
+19:12:16.196   screenshot 0023_click.png of "SYCON.net - [Sorter_Lower.spj]"
+19:12:16.228 window closed: "Confirm Save As" (#32770)
+19:12:16.228 window closed: "Save As" (#32770)
+19:12:22.559 click L (65,64) win="SYCON.net - [Sorter_Lower.spj]" at Button "" < ToolBar "Standard" [59392] (ToolbarWindow32) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769) | fields: CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='1' | CheckBox ""='0' | CheckBox ""='0' | CheckBox ""='0' | Edit "227"='' | Edit "59664"=' \tAS-i \r'
+19:12:23.433   screenshot 0024_click.png of "SYCON.net - [Sorter_Lower.spj]"
+19:12:38.274 click L (106,131) win="SYCON.net - [Sorter_Lower.spj]" at TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Sorter_Lower" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su) < Pane "netProject" [59493] (Afx:00400000:48:00000000:0010006D:00000000)
+19:12:38.664 window opened: "netDevice" (#32770, pid 1464)
+19:12:43.075 window opened: "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" (#32770, pid 1464)
+19:12:43.393 window closed: "netDevice" (#32770)
+19:12:45.909 click L (98,272) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at TreeItem "Controller Network Settings" < TreeItem "Configuration" < Tree "" [2199] (SysTreeView32) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static)
+19:12:46.769   screenshot 0026_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:12:48.327 click L (98,288) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at TreeItem "Device Table" < TreeItem "Configuration" < Tree "" [2199] (SysTreeView32) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static)
+19:12:49.204   screenshot 0027_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:12:50.443 click L (98,305) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at TreeItem "IP Address Table" < TreeItem "Configuration" < Tree "" [2199] (SysTreeView32) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static)
+19:12:51.307   screenshot 0028_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:12:52.619 click L (98,320) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at TreeItem "Process Data" < TreeItem "Configuration" < Tree "" [2199] (SysTreeView32) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static)
+19:12:53.526   screenshot 0029_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:12:54.461 click L (98,333) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at TreeItem "Address Table" < TreeItem "Configuration" < Tree "" [2199] (SysTreeView32) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static)
+19:12:55.353   screenshot 0030_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:12:56.033 click L (103,360) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at TreeItem "FSU-/Port- Settings" < TreeItem "Configuration" < Tree "" [2199] (SysTreeView32) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static)
+19:12:56.909   screenshot 0031_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:12:57.347 click L (104,384) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at TreeItem "Stations Timing" < TreeItem "Configuration" < Tree "" [2199] (SysTreeView32) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static)
+19:12:58.195   screenshot 0032_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:12:59.579 click L (114,395) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at TreeItem "Controller Settings" < TreeItem "Configuration" < Tree "" [2199] (SysTreeView32) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Image "" [2245] (Static)
+19:13:00.475   screenshot 0033_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:13:10.473 click L (1742,947) win="netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" at Pane "" (AfxOleControl70su) < Window "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controll" (#32770) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769)
+19:13:11.401   screenshot 0034_click.png of "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)"
+19:13:18.532 click L (1724,976) win="SYCON.net - [Sorter_Lower.spj]" at Button "Page right" [DownPageButton] < ScrollBar "" [59904] (ScrollBar) < Pane "" [1002] (AfxWnd70su) < Pane "Output Window" [59501] (Afx:00400000:48:00000000:0010006D:00000000) < Window "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9) < Pane "Desktop 1" (#32769)
+19:13:19.112   screenshot 0035_click.png of "FVT_Sorter_Lower - Modified Canvas Positions and 1 more tab - File Explorer"
+19:13:19.117 window closed: "netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" (#32770)
+19:13:19.117 window closed: "SYCON.net - [Sorter_Lower.spj]" (Afx:00400000:8:00010003:00000000:002303D9)
+19:13:22.464 keys: D O N E Enter | focus: Edit "Prompt" (tiptap ProseMirror ProseMirror-focused) < Group "" (w-full max-h-96 min-h-[var(--cmp-row-h)] overflow-y-auto break-words [--cmp-type-size:max(var(--cds-font-size-text-entry-floor,0px),var(--cmp-font-size,var(--cds-font-size-prose)))] [--cmp-leading:round(var(--cmp-line-height,var(--cmp-type-size)*1.4),1px)] [--cmp-row-py:max(0px,(var(--cds-h-control)-var(--cmp-leading))/2)] [--cmp-row-h:calc(var(--cmp-leading)+2*var(--cmp-row-py))] py-[var(--cmp-row-py)] text-[length:var(--cmp-type-size)] leading-[var(--cmp-leading)] font-normal transition-opacity duration-200 motion-safe:transition-[opacity,padding-left,padding-right] motion-safe:duration-200 [&_.ProseMirror]:![font-feature-settings:inherit] [&_.ProseMirror]:![font-variant-ligatures:inherit] [&_.ProseMirror]:![-webkit-font-variant-ligatures:inherit] [&_.ProseMirror:focus]:outline-none [&_img.ProseMirror-separator]:inline [&_img.ProseMirror-separator]:m-0 [&_img.ProseMirror-separator]:size-0 [&_img.ProseMirror-separator]:border-none [&_.is-editor-empty]:before:!content-[''] [&_ul]:[list-style-type:unset] [&_ul]:ps-8 [&_ol]:[list-style-type:decimal] [&_ol]:ps-8 [&_a]:cursor-pointer [&_a]:font-medium [&_a]:[font-variation-settings:inherit] [&_a]:text-[hsl(214_72%_34%)] dark:[&_a]:text-[hsl(213_80%_79%)] [&_a:hover]:text-[hsl(213_68%_45%)] dark:[&_a:hover]:text-[hsl(212_75%_62%)] [&_.ProseMirror>p>code]:border-[0.5px] [&_.ProseMirror>p>code]:border-solid [&_.ProseMirror>p>code]:border-[hsl(60_2%_12%/0.25)] dark:[&_.ProseMirror>p>code]:border-[hsl(53_12%_87%/0.25)] [&_.ProseMirror>p>code]:bg-[hsl(60_3%_21%/0.05)] dark:[&_.ProseMirror>p>code]:bg-[hsl(55_9%_74%/0.05)] [&_.ProseMirror>p>code]:text-[0.9rem] [&_.ProseMirror>p>code]:text-[hsl(0_58%_35%)] dark:[&_.ProseMirror>p>code]:text-[hsl(0_77%_81%)] [&_.ProseMirror>p>code]:px-[4px] [&_.ProseMirror>p>code]:py-[1px] [&_.ProseMirror>p>code]:rounded-[0.3rem] [&_.ProseMirror>p>code]:whitespace-pre-wrap epitaxy-prompt-input) < Group "" value='\n'
+19:13:28.480 recorder stopped (STOP file)
