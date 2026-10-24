@@ -213,7 +213,8 @@ class ControllerDialog(ConfigDialog):
         self.select_page(DEVICE_TABLE_PAGE)
         r = self._grid(DEVICE_TABLE_ID)
         visible = self._rows_visible(r)
-        order = []                  # (absolute row index, current name) in table order
+        order = []                  # (absolute row index, the name read before any rename) in table order
+        shown = {}                  # absolute row index -> the name the row shows NOW (the new one once renamed)
         scrolled = 0
         pending = dict(mapping)
         px_per_notch = None
@@ -238,6 +239,7 @@ class ControllerDialog(ConfigDialog):
                     return -1
                 name = eds[0].window_text()
                 order.append((abs_row, name))
+                shown[abs_row] = name
                 page_rows += 1
                 if name in pending:
                     new, _ip = pending.pop(name)
@@ -257,6 +259,7 @@ class ControllerDialog(ConfigDialog):
                     time.sleep(0.4)
                     if value.lower() != new.lower():          # SYCON.net lower-cases a name of station
                         raise SyconError("row %d: name reads %r after writing %r" % (abs_row, value, new))
+                    shown[abs_row] = value
                     log("  row %d: %s -> %s" % (abs_row, name, new))
             return page_rows
 
@@ -273,7 +276,8 @@ class ControllerDialog(ConfigDialog):
                 px_per_notch = shift / notches
             scrolled += shift
             if order:                                               # the last row visited: where is it now?
-                scrolled = self._resync(r, scrolled, order[-1][0], order[-1][1], self._read_name_at)
+                last_abs = order[-1][0]                             # (2026-10-25: by the name it shows NOW)
+                scrolled = self._resync(r, scrolled, last_abs, shown[last_abs], self._read_name_at)
         if pending:
             log("  not found in the Device Table:", sorted(pending))
         mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + ROW_Y0))

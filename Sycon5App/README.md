@@ -542,6 +542,13 @@ and 63 positions, regenerated BusField.csv (the Vitronic and cell-test nodes 0x0
 0 FAIL, 29 notes (`spike/references/FVT_tests/HilscherPnCard_1.verification.txt`; the recording's log in
 `spike/references/recordings/process_data_export/events.log`).
 
+The same folder built FROM SCRATCH (2026-10-25 00:13-01:23, `PROD_Sorter_Lower_fresh`, 4161 s + the 28 min of the first
+attempt): 775 PASS / 0 FAIL (`HilscherPnCard_1_fresh.verification.txt`). The project holds its 62 devices grouped by
+type, each type once, the names in natural order within a type (3 Anybus, 6 ET200SP, 3 couplers, 5 switches, 26
+ServoOne, 19 AL1202 - the clones added twelve at a time); the IP Address Table scan put the 62 stations at rows
+0..61 and one pass addressed them all. The first attempt died in the names pass on the resync anchor: after a
+scroll the pass looked for the last row by the name it had just REPLACED - it now uses the name the row shows.
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run
