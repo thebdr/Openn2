@@ -23,6 +23,11 @@ NEWER = (HEAD + "# Role,Station Name,Catalog Kind,Catalog Item,Model Id,GSDML (t
          "controller,n0001,master,CIFX RE/PNM,CIFX80-RE/ML,,192.168.1.1,255.255.255.0,,,1,PC,HILSCHER\r\n"
          "slave,n0006,slave,PN/PN Coupler X2 [DAP X2 V4.2],6ES7158-3AD10-0XA0,GSDML-V2.35-Siemens-PNPNIOC-20200924.xml,"
          "192.168.1.6,255.255.255.0,,8,6,COUPLER,SIEMENS\r\n")
+NEWEST = (HEAD + "# Role,Station Name,Catalog Kind,Catalog Item,Model Id,GSDML (the file),IP Address,Subnet Mask,"
+          "Gateway,Update Time (ms),Device Number,Description,Comment,Symbolic Name (the netDevice label),FLD (the tag)\r\n"
+          "controller,n0001,master,CIFX RE/PNM,CIFX80-RE/ML,,192.168.1.1,255.255.255.0,,,1,PC,HILSCHER,,=TRIB-AEC01-K22101.1\r\n"
+          "slave,n0006,slave,PN/PN Coupler X2 [DAP X2 V4.2],6ES7158-3AD10-0XA0,GSDML-V2.35-Siemens-PNPNIOC-20200924.xml,"
+          "192.168.1.6,255.255.255.0,,8,6,COUPLER,SIEMENS,SORTER (=TRIB) / INDUCTION LINES GR1 (=TRIB-AEC01),=TRIB-AEC01-K24501\r\n")
 
 
 def _load(text):
@@ -54,6 +59,22 @@ def test_stations_with_update_time_column():
     assert s["catalog_item"] == "PN/PN Coupler X2 [DAP X2 V4.2]"
     assert h.controller["update_time_ms"] == "" and h.controller["device_number"] == "1"
     assert _load(NEW).stations[0]["update_time_ms"] == ""
+
+
+def test_stations_with_symbolic_and_fld_columns():
+    h = _load(NEWEST)
+    s = h.stations[0]
+    assert s["symbolic_name"] == "SORTER (=TRIB) / INDUCTION LINES GR1 (=TRIB-AEC01)" and s["fld"] == "=TRIB-AEC01-K24501"
+    assert s["update_time_ms"] == "8" and s["comment"] == "SIEMENS"
+    assert h.controller["symbolic_name"] == "" and h.controller["fld"] == "=TRIB-AEC01-K22101.1"
+    older = _load(NEWER).stations[0]
+    assert older["symbolic_name"] == "" and older["fld"] == "" and older["comment"] == "SIEMENS"
+
+
+def test_natural_key():
+    names = ["n0100-trib-sm011-k1", "n0010-trib-aec01-K26501", "n0005-trib-aep01-K35001", "n0035-trib-sm6-k1", "n0035-trib-sm11-k1"]
+    assert sorted(names, key=handoff.natural_key) == ["n0005-trib-aep01-K35001", "n0010-trib-aec01-K26501",
+                                                      "n0035-trib-sm6-k1", "n0035-trib-sm11-k1", "n0100-trib-sm011-k1"]
 
 
 def test_info_files():

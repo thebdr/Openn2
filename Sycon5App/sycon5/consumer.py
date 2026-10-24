@@ -11,9 +11,10 @@ of SYCON.net loses little; `--resume` reopens the saved project and skips what t
 import os
 import time
 
+from . import canvas
 from .catalog import split_item
 from .driver import SyconDriver
-from .handoff import load_handoff, parse_parameters
+from .handoff import load_handoff, natural_key, parse_parameters
 from .readback import read_project
 from .session import Session, SyconError, log
 
@@ -85,6 +86,9 @@ def verify(handoff, project, plugged, timing_set=None):
             v.note("station %s type %r from %s (no GSDML in the table)" % (name, d.type_name, d.gsdml))
         type_name, variant = split_item(s["catalog_item"])
         v.check(same_text(d.type_name, type_name), "station %s type %r (read %r)" % (name, type_name, d.type_name))
+        if s.get("symbolic_name"):                    # the netDevice label (canvas.apply_layout wrote it)
+            v.check(d.symbolic == s["symbolic_name"], "station %s symbolic name %r (read %r)" % (name, s["symbolic_name"], d.symbolic))
+        v.check(bool(d.manufacturer_id and d.device_type_id), "station %s node type %s" % (name, d.node_type))
         if variant:
             v.check(same_text(d.dap, variant), "station %s DAP %s (read %r)" % (name, variant, d.dap))
         if d.order_no and s.get("model_id"):          # the DAP's order number = the I/O List's Part No.
@@ -168,6 +172,7 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     mapping = {}
     first_of = {}                    # (kind, catalog item, GSDML) -> the auto name of its first station (the clone source)
     todo = [s for s in h.stations if s["station_name"].lower() not in done_names]
+    todo.sort(key=lambda s: natural_key(s["station_name"]))      # user 2026-10-24: "sorted naturally by profinet name"
     if resume:                       # auto-named nodes an earlier run added but never renamed: pair them with the
         wanted = {s["station_name"].lower() for s in h.stations}      # table's stations of the SAME type, in order
         leftovers = [n for n in d.stations() if n["station"].lower() not in wanted and not n["suffix"].startswith("(#")]
@@ -185,18 +190,31 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
         if leftovers:
             raise SyconError("saved nodes no table station of their type is left for: %r" % [n["station"] for n in leftovers])
         todo = remaining
-    added = 0
-    for i, s in enumerate(todo, start=1):
-        added += 1
+    # the stations by TYPE (kind, catalog item, GSDML), the types in the order they first appear in the table: the
+    # first of a type from the catalog, the rest its clones in one go - the devices of a type are CONSECUTIVE in the
+    # project (user 2026-10-24: "since devices of the same type are cloned, i would expect them to be consecutive in
+    # the sycon project"); the types in the order of their first name, within a type the names in natural order
+    # (the `todo` sort above), a checkpoint every CHECKPOINT_EVERY clones
+    groups = {}
+    for s in todo:
         key = (s["catalog_kind"] or "slave", s["catalog_item"], (s.get("gsdml") or "").lower())
-        if key in first_of:
-            node = d.clone_station(first_of[key], 1)[0]
-        else:
+        groups.setdefault(key, []).append(s)
+    added, i = 0, 0
+    for key, members in groups.items():
+        pending = list(members)
+        if key not in first_of:
+            s = pending.pop(0)
             node = d.add_station(s["catalog_item"], kind=s["catalog_kind"] or "slave", gsdml=s.get("gsdml"))
             first_of[key] = node["station"]
-        mapping[node["station"]] = (s["station_name"], s["ip_address"])
-        log("[%d/%d] %s -> will be %s @ %s" % (i, len(todo), node["station"], s["station_name"], s["ip_address"]))
-        if i % CHECKPOINT_EVERY == 0:
+            mapping[node["station"]] = (s["station_name"], s["ip_address"])
+            added, i = added + 1, i + 1
+            log("[%d/%d] %s -> will be %s @ %s" % (i, len(todo), node["station"], s["station_name"], s["ip_address"]))
+        while pending:
+            batch, pending = pending[:CHECKPOINT_EVERY], pending[CHECKPOINT_EVERY:]
+            for node, s in zip(d.clone_station(first_of[key], len(batch)), batch):
+                mapping[node["station"]] = (s["station_name"], s["ip_address"])
+                added, i = added + 1, i + 1
+                log("[%d/%d] %s -> will be %s @ %s" % (i, len(todo), node["station"], s["station_name"], s["ip_address"]))
             checkpoint()
     if added:
         checkpoint()
@@ -210,8 +228,9 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     if mapping:
         # 2. names and IPs in one controller dialog pass - saved even when the pass fails after its OK (the names
         # it did write stay; a resume pairs the rest), so a failure costs the pass, not the whole project state
+        current = {dev.device_no: dev.ip for dev in saved_devices.values() if dev.ip}   # a resume knows them
         try:
-            d.rename_stations(mapping)
+            d.rename_stations(mapping, current_ips=current)
         except SyconError:
             checkpoint()
             raise
@@ -269,6 +288,9 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     if not saved:
         checkpoint()
     time.sleep(2.0)
+    # the canvas (symbolic names, positions) is written into the XML with the project CLOSED, then read back
+    log("close:", d.close())
+    canvas.apply_layout(xml, h)
     project = read_project(xml)
     v = verify(h, project, plugged, timing_set)
     return v, xml, plugged, d

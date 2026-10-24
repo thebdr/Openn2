@@ -40,10 +40,19 @@ class Device:
     records: dict = field(default_factory=dict)    # (slot, subslot, index) -> bytes
     network: list = field(default_factory=list)    # controller only: [(name of station, ip)]
     timing: dict = field(default_factory=dict)     # controller only: name of station -> (update ms, watchdog ms)
+    manufacturer_id: int = 0                       # the GSDML DeviceIdentity VendorID (fdt:manufacturerId, decimal)
+    device_type_id: int = 0                        # ... and DeviceID (fdt:deviceTypeId)
+    rect: tuple = ()                               # the netDevice canvas box (top, left, bottom, right)
+    line_rect: tuple = ()                          # its drop line's box
 
     @property
     def is_controller(self):
         return "Controller" in self.prog_id
+
+    @property
+    def node_type(self):
+        """BusField.csv's Node Type: 0x<VendorID><DeviceID> (the ET200SP 0x002A0313, the cifX master 0x011E0203)."""
+        return "0x%04X%04X" % (self.manufacturer_id, self.device_type_id)
 
 
 @dataclass
@@ -144,12 +153,26 @@ def read_project(xml_path):
         xml_path = xml_path[:-4] + "\\_S129\\SYCON_net.xml"
     tree = ET.parse(xml_path)
     devices = []
+    line_of = {}                                   # a Device element -> its BusLine's first PositionRect
+    for bl in tree.getroot().iter():
+        if _local(bl.tag) != "BusLine":
+            continue
+        line = ()
+        for child in bl:
+            if _local(child.tag) == "PositionRect" and not line:
+                line = _rect(child)
+            elif _local(child.tag) == "Device":
+                line_of[id(child)] = line
     for el in tree.getroot().iter():
         if _local(el.tag) != "Device":
             continue
         dev = Device(device_no=_attr(el, "deviceNo"), symbolic=_attr(el, "symbolicName"), prog_id=_attr(el, "progId"),
-                     gsdml=_attr(el, "deviceTypeInformation").split("\\")[-1])
+                     gsdml=_attr(el, "deviceTypeInformation").split("\\")[-1],
+                     manufacturer_id=_int(_attr(el, "manufacturerId")), device_type_id=_int(_attr(el, "deviceTypeId")),
+                     line_rect=line_of.get(id(el), ()))
         for child in el:
+            if _local(child.tag) == "PositionRect" and not dev.rect:
+                dev.rect = _rect(child)
             if _local(child.tag) == "BinData" and child.text:
                 _parse_blob(dev, child.text)
                 break
@@ -157,12 +180,23 @@ def read_project(xml_path):
     return Project(path=xml_path, devices=devices)
 
 
+def _int(text):
+    try:
+        return int(str(text or "").strip() or 0)
+    except ValueError:
+        return 0
+
+
+def _rect(el):
+    return tuple(_int(_attr(el, k)) for k in ("top", "left", "bottom", "right"))
+
+
 def describe(project):
     lines = [project.path]
     for d in project.devices:
-        lines.append("  %s%s symbolic=%s type=%r ip=%s mask=%s gsdml=%s dap=%r order=%r" % (
+        lines.append("  %s%s symbolic=%s type=%r ip=%s mask=%s gsdml=%s dap=%r order=%r node=%s rect=%s" % (
             d.device_no, " (controller)" if d.is_controller else "", d.symbolic, d.type_name, d.ip, d.mask, d.gsdml,
-            d.dap, d.order_no))
+            d.dap, d.order_no, d.node_type, d.rect))
         for slot in sorted(d.slots):
             lines.append("    slot %d: %s" % (slot, d.slots[slot]))
             for (s, sub), name in sorted(d.submodules.items()):

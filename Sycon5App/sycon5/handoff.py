@@ -5,16 +5,25 @@ columns), like OP5 reads the TIA kinds.
 """
 import csv
 import os
+import re
 from dataclasses import dataclass, field
 
 STATIONS_FILE, MODULES_FILE, DTD_FILE = "SyconStations.csv", "SyconModules.csv", "SyconDeviceTypesDatabase.csv"
 STATION_KEYS = ["role", "station_name", "catalog_kind", "catalog_item", "model_id", "gsdml", "ip_address",
-                "subnet_mask", "gateway", "update_time_ms", "device_number", "description", "comment"]
+                "subnet_mask", "gateway", "update_time_ms", "device_number", "description", "comment",
+                "symbolic_name", "fld"]
 MODULE_KEYS = ["station_name", "slot", "subslot", "module_id", "module_text", "parameters", "comment"]
 # the columns added on 2026-10-23 (key -> the words the `#` column line carries when the column is there): an
 # older export without them is read by its own positions
-OPTIONAL_STATION_KEYS = {"gsdml": "gsdml", "update_time_ms": "update time"}
+OPTIONAL_STATION_KEYS = {"gsdml": "gsdml", "update_time_ms": "update time",
+                         "symbolic_name": "symbolic", "fld": "fld"}       # the two of 2026-10-24: the canvas, BusField
 OPTIONAL_MODULE_KEYS = {"subslot": "subslot"}
+
+
+def natural_key(name):
+    """A natural sort key of a station name: its digit runs as numbers (n0005-... < n0010-... < n0100-...,
+    sm006 < sm011) - user 2026-10-24: the devices of a type in the project "sorted naturally by profinet name"."""
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", str(name or "").lower())]
 
 
 def keys_for(all_keys, optional, columns_line):

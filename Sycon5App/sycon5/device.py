@@ -453,21 +453,37 @@ class DeviceDialog(ConfigDialog):
         return rows
 
     def scroll_param_grid_to_end(self, r=None):
+        """Wheel the parameter grid to its end: two scrolls in a row that move nothing (one measured 0 while the
+        grid was still settling, 2026-10-24 18:01: the last row taken for an input-delay row)."""
         r = r or self.param_grid()
-        for _ in range(40):
+        zeros = 0
+        for _ in range(60):
             if self._scroll_pixels(r, 3) <= 0:
-                return
+                zeros += 1
+                if zeros >= 2:
+                    return
+                time.sleep(0.5)
+            else:
+                zeros = 0
         raise SyconError("the parameter grid keeps scrolling")
 
     def set_last_param(self, value):
         """Set the LAST parameter row of the grid (an ET200SP module's `Potential group`, the one parameter of
         its last record): the grid wheeled to its end, the last text row located by its pixels."""
         r = self.param_grid()
-        self.scroll_param_grid_to_end(r)
-        ys = self.param_rows_y(r)
-        if not ys:
-            raise SyconError("no parameter rows visible at the end of the grid")
-        return self.set_param_at_y(ys[-1], value, r, "last row ")
+        for attempt in range(3):
+            self.scroll_param_grid_to_end(r)
+            ys = self.param_rows_y(r)
+            if not ys:
+                raise SyconError("no parameter rows visible at the end of the grid")
+            try:
+                return self.set_param_at_y(ys[-1], value, r, "last row ")
+            except SyconError as ex:
+                if "not among" not in str(ex) or attempt == 2:
+                    raise
+                log("  the last row shown is not the one (%s) - the grid scrolled to its end again" % str(ex)[:60])
+                self._close_dropdowns()
+                time.sleep(1.0)
 
     def set_parameters(self, values):
         """values: {parameter index within the record (0 = its first parameter): value}. The record row is

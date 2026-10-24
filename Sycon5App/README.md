@@ -215,9 +215,14 @@ backup cifX card, 5 SCALANCE switches (no XC216 in the catalog), 2 Vitronic cont
 --handoff <folder> --out <folder> --stations <names>` cuts a handoff down to a few stations for a smoke): new project, the controller
 from the catalog and its network IP, every station from the catalog (SYCON names them `al1202`, `al1202-001`, ...),
 ONE controller-dialog pass renaming every row and setting every IP (`ControllerDialog.rename_and_address`: the
-Device Table read row by row - the name is read before it is written, the grids scrolled by wheel with the
-pixel shift measured; the IPs in two phases, every row parked on 192.168.x.200+ first because a target IP may
-still be auto-held by another row, each row's current IP checked before it is written), the modules of the
+Device Table read row by row - the name is read before it is written, the grids scrolled by wheel HALF a view
+at a time with the pixel shift measured and, after every scroll, re-synchronised on a row already read (a grid
+of alike rows aliases at a row's pitch: 2026-10-24 17:19 two IPs landed three rows off); the IP Address Table
+has its OWN order - the stations sorted by IP, not the Device Table's rows (found 2026-10-24 17:30: two new
+stations with the auto IPs .3 / .4 sat at rows 1 / 2) - so it is scanned read-only once, a station's row is the
+row of its current IP (the saved one on a resume, else the unclaimed auto-assigned ones ascending in Device Table
+order), then ONE pass writes the targets straight away (user: duplicate IPs are refused at OK only, so no
+parking on .200+), each row's current IP checked before it is written), the modules of the
 `iolist` stations in one dialog each (`plug_modules`: 'Add Module' pressed again when a first press only closed
 an open editor, the module text resolved from the order number in the combo's brackets, the plain variant
 preferred), checkpoint saves, `read_project` compared with the tables (`<project>.verification.txt`). SYCON.net
@@ -412,6 +417,71 @@ In/Out 32/32 Byte + PQI`; the `State of data length` text changes - the proof th
 an in-place editor swallowed it); its Submodule cell (x+150) opens the in-place ComboBox 1904 with the 22 port
 submodules, texts verbatim the Fives tool's. The grid shows 8 rows: before every press the grid is wheeled to the
 top (the module row at its place), after it to the end, and the new row is the last text band.
+
+## The production folder (2026-10-24 afternoon)
+
+User: "each hilscher card gets its own, separate project", "name the projects as HilscherPnCard_n", "use
+`Z:\Work\0 Commesse\FVZ_Intermarche\3 Software\9_Backup\20261020_1731\FVZ_MSC_20261020_1731\PRODUCTION` as the folder
+structure reference, so the output can be easily pasted in the folder". The reference holds, per cifX card,
+`HilscherIOCard1\HilscherPNCard1.spj` (+ `HilscherPNCard1\_S129\SYCON_net.xml`, the card's `HilscherIO.xml` process-data
+export, a pre-configured coupler GSDML, `nWid\` firmware batches, `_FakeIO.*`) and `IODriver\BusField.csv` for all the
+cards. What we produce, `scripts/build_production.sh "<list.xlsx>" "<out>"` (`RESUME=1` to resume, `EXPORT_ONLY=1`
+for the handoff alone):
+
+```
+<out>/                                  = PRODUCTION
+  HilscherIOCard1/
+    SyconNetProjectInterface/           the PL5 handoff of card 1 (hw/sycon-* tables + the device-types database)
+    HilscherPnCard_1.spj + HilscherPnCard_1/   the SYCON.net project of card 1, built by the driver
+    HilscherPnCard_1.verification.txt   the read-back verification
+    build.log
+  HilscherIOCard2/ ...                  one per card (one per PROFINET network of the list)
+  IODriver/BusField.csv                 every card's nodes
+  export.log, build.log
+```
+
+**One project per card** — PL5's `sycon_handoff.cards_of` lists the cifX cards of the list: one per PROFINET
+network in document order (the redundant second card on a network is not a card); `build(rows, dtd, card=n)` keeps
+card n's controller and the stations on its network (the others are INFO findings `sycon_second_controller` "card
+m's controller" / `sycon_other_network` "card m's project"); `project()` writes every card into
+`HilscherIOCard<n>/SyconNetProjectInterface/` (`--card n` for one). The driver builds `HilscherPnCard_<n>.spj` beside
+it. A saved project can be RENAMED by renaming its `.spj` and its folder together (the sorter's `Sorter_Lower.spj`
+copied as `HilscherPnCard_1.spj` + `HilscherPnCard_1\` opened and resumed on 2026-10-24 17:07).
+
+**Symbolic names and canvas positions** (`sycon5/canvas.py`; user: "i edited the sorter lower project in
+`FVT_Sorter_Lower - Modified Canvas Positions`, we need to replicate positioning rules and symbolic name edits.
+maybe this can be done on the .xml"): the two projects' XMLs diffed device by device gave the rules. The symbolic
+name (the label before `[type]<station>`) follows the device type, now a column of the device-types database
+(`Symbolic Name`: `fld` = functional unit + the location's first segment, `=TRIB-AEP01`, for ET200SP and SCALANCE;
+`variable` = the description's variable part, `SORTER (=TRIB) / INDUCTION LINES GR1 (=TRIB-AEC01)`, for a coupler;
+`description` = the Description Module, `ANTENNA CELL TEST`, for an Anybus; `default` for drives, AL1202 and the
+controller) - PL5 writes it into the stations table (`Symbolic Name` column, with `FLD`), and the canvas: the
+controller top-left, rows per group (ET200SP, couplers, gateways, IO-Link masters, switches, drives) in FLD order
+(user: "the canvas rows should sort by FLD"; the project's own order is by PROFINET name), each row a stair of up to 8 (60 px right, 22 px down - the long labels stay readable), the next row of a group 200 px lower,
+the next group below. Written into `SYCON_net.xml` with the project CLOSED (`canvas.apply`: the `syc:symbolicName`
+attribute and the device's `PositionRect` + its BusLine's drop line, edited in place by regex - no
+re-serialisation), after the last save of the build; read back (`Device.symbolic`, `rect`, `line_rect`) and
+verified. Dry run on a copy of the sorter: 60 of 61 labels equal to the user's (the 61st was the location's full
+tag, since shortened to its first segment as the user did).
+
+**BusField.csv** (`scripts/busfield.py --production <out>`): the IO driver's node table, the reference's columns
+(`#;Board Number;Physical Node Address;Node Type;...;# Description`), one row per node of every card: Board Number
+= the card, Physical Node Address = the IP's last octet, Node Type = `0x<VendorID><DeviceID>` of the device's GSDML
+identity as the saved project records it (`fdt:manufacturerId` / `fdt:deviceTypeId` on the Device element, decimal:
+the ET200SP 42 / 787 = 0x002A0313, the cifX master 286 / 515 = 0x011E0203, the PN/PN coupler 0x002A0604, the
+SCALANCE 0x002A0A0B, the AL1202 0x0136AC55, the ServoOne 0x017C4E21, the Anybus Communicator 0x010C0020 - user:
+"Node Type eg 0x011E0203 is 0xVendorIDDeviceID", the GSDML Viewer's DeviceIdentity), the description `[station]
+DESCRIPTION (MANUFACTURER) FLD (ip)`. `@` = polled; `#` = listed, not polled: the master's own station and the
+switches (policy `scalance-pnio`); a station missing from the project gets `#` and 0x00000000.
+
+**The Anybus Communicators and the couplers' modules** (device-types database, policy `fixed` + the `Fixed Modules`
+column): the cell test antenna's ABC3013-A plugs `IN 0016` + `OUT 0012` (user's screenshot 2026-10-24), the
+Vitronic camera system's PROFINET controller is an HMS Anybus Communicator with `IN 0064` + `OUT 0064` - its I/O
+List head has no Part No., so the database row `VITRONIC` is keyed by the head's Manufacturer (`head_model`, INFO
+`sycon_model_by_manufacturer`); a PN/PN coupler plugs `*OUT 128 Byte` + `*IN 128 Byte` on its X2 side and the mirror
+on X1 (user: "couplers have no defined I/O modules, let's default to 128Byte IN + OUT; X1 will need to have the
+module positions mirrored") - the Fixed Modules column holds one list per connector (`X2: ... ; X1: ...`), the
+head row's Connector column picks it (a connector without a list: WARN `sycon_connector_unknown`).
 
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 

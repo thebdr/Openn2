@@ -22,6 +22,14 @@ NAME_X, COMMIT_X, IP_X, IP_COMMIT_X = 200, 400, 260, 500
 NAME_EDIT_ID = 1902
 
 
+def _ip_key(ip):
+    """An IPv4 address as a tuple of ints (the IP Address Table's order); a malformed one sorts last."""
+    try:
+        return tuple(int(x) for x in str(ip).split("."))
+    except ValueError:
+        return (999, 999, 999, 999)
+
+
 def _set_ip_control(ipc, ip):
     fields = sorted(ipc.children(), key=lambda c: c.rectangle().left)
     parts = ip.split(".")
@@ -159,15 +167,23 @@ class ControllerDialog(ConfigDialog):
         before = dark_profile(r)
         mouse.scroll(coords=(r.left + r.width() // 2, r.top + r.height() // 2), wheel_dist=-notches)
         time.sleep(0.9)
-        return measure_shift(before, dark_profile(r))
+        # the shift is measured on the overlap of the two captures: a grid of alike rows aliases at a row's pitch,
+        # and a shift beyond two thirds of the view leaves too little overlap to tell (2026-10-24 17:12: rows 60 and
+        # 61 of 62 taken for 99 and 100) - the pages are scrolled by HALF a view and the search capped there
+        return measure_shift(before, dark_profile(r), max_shift=r.height() * 2 // 3)
 
     def _rows_visible(self, r):
         return max(1, (r.height() - ROW_Y0 - 6) // ROW_H + 1)
 
-    def rename_and_address(self, mapping):
+    def rename_and_address(self, mapping, current_ips=None):
         """mapping: {current name of station: (new name, ip)}. One pass down the Device Table (the names are
         read on every row, so a row is identified before it is edited), then one pass down the IP Address Table
-        by the same row positions. Returns the names it could not find."""
+        by the same row positions. `current_ips` = {current name: the IP its row shows now} as far as the caller
+        knows (a resume knows every saved station's): the row identity check of the IP pass. After every scroll
+        both passes find a row they know again and correct the scroll offset by whole rows (the pixel-measured
+        shift of a grid of alike rows is ambiguous: 2026-10-24 17:19 the IPs of rows 60 / 61 were written on rows
+        57 / 58). Returns the names it could not find."""
+        current_ips = dict(current_ips or {})
         self.phase = "names"        # the caller's failure policy: the names pass is all-or-nothing, the IP pass keeps
         self.select_page(DEVICE_TABLE_PAGE)
         r = self._grid(DEVICE_TABLE_ID)
@@ -223,7 +239,7 @@ class ControllerDialog(ConfigDialog):
             page_rows = sweep(False)
             if page_rows < 0 or not pending:
                 break
-            notches = 3 if px_per_notch is None else max(1, int((visible - 2) * ROW_H / px_per_notch))
+            notches = 3 if px_per_notch is None else max(1, int((visible // 2) * ROW_H / px_per_notch))
             shift = self._scroll(r, notches)
             if shift <= 0:
                 sweep(True)                                         # the table's end: its bottom row
@@ -231,52 +247,136 @@ class ControllerDialog(ConfigDialog):
             if px_per_notch is None:
                 px_per_notch = shift / notches
             scrolled += shift
+            if order:                                               # the last row visited: where is it now?
+                scrolled = self._resync(r, scrolled, order[-1][0], order[-1][1], self._read_name_at)
         if pending:
             log("  not found in the Device Table:", sorted(pending))
         mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + ROW_Y0))
         time.sleep(0.4)
-        # the IPs, by the same absolute rows - in TWO passes, because a target IP may still be held by another
-        # row's auto-assigned address: first every row to a parking address, then the targets. Each row's current
-        # IP is checked against the expected one before it is written (the row identity on this page).
+        # the IPs: the IP Address Table has its own row order (see below), one pass straight to the targets
         self.phase = "ips"
         self.select_page(IP_TABLE_PAGE)
         r = self._grid(IP_TABLE_ID)
-        rows = [(abs_row, name) for abs_row, name in order if name in mapping]
-        parking = {}
-        for i, (abs_row, name) in enumerate(rows):
-            new, ip = mapping[name]
-            parking[abs_row] = "%s.%d" % (".".join(ip.split(".")[:3]), 200 + i % 55)
+        # the IP Address Table lists the stations SORTED BY IP, not in the Device Table's order (2026-10-24 17:19-17:30:
+        # the Device Table's rows 60 / 61 - two new stations with the auto IPs .3 / .4 - were this table's rows 1 / 2,
+        # and 'rows 60 / 61' here held the two highest IPs), and its rows do not move while the dialog is open. A
+        # read-only scan gives each row's IP; a station's row is the row of its CURRENT IP: the saved one the caller
+        # knows (a resume), else an auto-assigned one - the IPs of the scan no known station holds, ascending, given
+        # to the new stations in Device Table order (SYCON.net assigns the next free address at every add / paste).
+        # Every write reads the row's IP first and refuses a row that does not show the expected one.
+        ip_rows = self._scan_ips(r, visible)
+        self._scroll(r, -200)                                 # the scan ends at the bottom: back to the top
+        known = {n: ip for n, ip in current_ips.items() if ip}
+        unclaimed = sorted((ip for ip in ip_rows if ip not in set(known.values())), key=_ip_key)
+        for _abs_row, name in order:
+            if name not in known and unclaimed:
+                known[name] = unclaimed.pop(0)
+        rows = []
+        for name in mapping:
+            if name not in known or known[name] not in ip_rows:
+                raise SyconError("station %r: its current IP %r is not in the IP Address Table (%d rows)"
+                                 % (name, known.get(name), len(ip_rows)))
+            rows.append((ip_rows.index(known[name]), name))
+        rows.sort()
+        log("  IP Address Table: %d rows scanned; the %d stations to address sit at rows %s" % (
+            len(ip_rows), len(rows), [a for a, _n in rows]))
+        # ONE pass down the table, every row straight to its target (user 2026-10-24: "duplicate ip addresses raise
+        # an error only on save, i think we can drop the n.n.n.200+ pre-filling if we do the ip address fill in one
+        # run" - a target still held by another row is fine until OK, by when that row has its own)
         expected = dict(self.expected_ips or {})
-        for phase_name, targets in (("park", {a: (n, parking[a]) for a, n in rows}),
-                                    ("target", {a: mapping[n] for a, n in rows})):
-            targets = dict(targets)
-            scrolled = 0
-            px_per_notch = None
-            margin = 10                 # the bottom margin; 3 at the table's end (its last row's centre may sit in it)
-            while targets:
-                page = sorted(a for a in targets if ROW_Y0 - 4 <= ROW_Y0 + ROW_H * a - scrolled <= r.height() - margin)
-                for abs_row in page:
-                    y = min(ROW_Y0 + ROW_H * abs_row - scrolled, r.height() - 4)
-                    new, ip = targets.pop(abs_row)
-                    before = self._set_ip_at(r, y, ip, "%s row %d (%s)" % (phase_name, abs_row, new), expect=expected.get(abs_row))
-                    expected[abs_row] = ip
-                    if phase_name == "park":
-                        log("  row %d auto IP was %s" % (abs_row, before))
-                if not targets:
-                    break
-                if margin == 3:
-                    raise SyconError("the IP Address Table did not scroll; rows left: %r" % sorted(targets))
-                notches = 3 if px_per_notch is None else max(1, int((visible - 2) * ROW_H / px_per_notch))
-                shift = self._scroll(r, notches)
-                if shift <= 0:
-                    margin = 3
-                    continue
-                if px_per_notch is None:
-                    px_per_notch = shift / notches
-                scrolled += shift
-            if phase_name == "park":
-                self._scroll(r, -200)                     # back to the top for the second pass
+        for abs_row, name in rows:
+            expected[abs_row] = known[name]
+        targets = {a: mapping[n] for a, n in rows}
+        scrolled = 0
+        px_per_notch = None
+        margin = 10                 # the bottom margin; 3 at the table's end (its last row's centre may sit in it)
+        last = None                 # the last row written: (abs row, its IP) - the resync anchor after a scroll
+        while targets:
+            page = sorted(a for a in targets if ROW_Y0 - 4 <= ROW_Y0 + ROW_H * a - scrolled <= r.height() - margin)
+            for abs_row in page:
+                y = min(ROW_Y0 + ROW_H * abs_row - scrolled, r.height() - 4)
+                new, ip = targets.pop(abs_row)
+                before = self._set_ip_at(r, y, ip, "row %d (%s)" % (abs_row, new), expect=expected.get(abs_row))
+                expected[abs_row] = ip
+                last = (abs_row, ip)
+            if not targets:
+                break
+            if margin == 3:
+                raise SyconError("the IP Address Table did not scroll; rows left: %r" % sorted(targets))
+            notches = 3 if px_per_notch is None else max(1, int((visible // 2) * ROW_H / px_per_notch))
+            shift = self._scroll(r, notches)
+            if shift <= 0:
+                margin = 3
+                continue
+            if px_per_notch is None:
+                px_per_notch = shift / notches
+            scrolled += shift
+            if last is not None:
+                scrolled = self._resync(r, scrolled, last[0], last[1], self._read_ip_at)
         return sorted(pending)
+
+    def _scan_ips(self, r, visible):
+        """Every row's IP of the IP Address Table, top to bottom - a read-only pass, the scroll re-synchronised on
+        the last row read; stops at the first row that opens no editor (below the table)."""
+        ips, scrolled, px_per_notch, at_end = [], 0, None, False
+        while True:
+            first_abs = -(-scrolled // ROW_H)
+            for k in range(visible + 2):
+                abs_row = first_abs + k
+                if abs_row < len(ips):
+                    continue
+                if abs_row > len(ips):
+                    break
+                y = ROW_Y0 + ROW_H * abs_row - scrolled
+                if y < ROW_Y0 - 4 or y > r.height() - (3 if at_end else 10):
+                    continue
+                ip = self._read_ip_at(r, min(y, r.height() - 4))
+                if not ip:
+                    return ips
+                ips.append(ip)
+            if at_end:
+                return ips
+            notches = 3 if px_per_notch is None else max(1, int((visible // 2) * ROW_H / px_per_notch))
+            shift = self._scroll(r, notches)
+            if shift <= 0:
+                at_end = True
+                continue
+            if px_per_notch is None:
+                px_per_notch = shift / notches
+            scrolled += shift
+            if ips:
+                scrolled = self._resync(r, scrolled, len(ips) - 1, ips[-1], self._read_ip_at)
+
+    def _resync(self, r, scrolled, known_abs, known_value, read_at):
+        """The scroll offset corrected on a known row: it should sit at y = ROW_Y0 + ROW_H * abs - scrolled; read
+        there and up to 8 rows either side until its value shows; the offset moves by whole rows."""
+        for k in (0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8):
+            y = ROW_Y0 + ROW_H * known_abs - scrolled + k * ROW_H
+            if y < ROW_Y0 - 4 or y > r.height() - 4:
+                continue
+            if read_at(r, y) == known_value:
+                if k:
+                    log("  scroll resync: row %d (%s) sits %+d rows from where the measured shift put it" % (known_abs, known_value, k))
+                return scrolled - k * ROW_H
+        raise SyconError("scroll lost: row %d (%s) not found within 8 rows of its place" % (known_abs, known_value))
+
+    def _read_name_at(self, r, y):
+        mouse.click(coords=(r.left + self.cx(NAME_X), r.top + y))
+        time.sleep(0.7)
+        eds = self.controls(("Edit",), cid=NAME_EDIT_ID)
+        value = eds[0].window_text() if eds else ""
+        mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + y))
+        time.sleep(0.4)
+        return value
+
+    def _read_ip_at(self, r, y):
+        mouse.click(coords=(r.left + self.cx(IP_X), r.top + y))
+        time.sleep(0.8)
+        ipc = self.controls(("SysIPAddress32",))
+        value = ".".join(f.window_text() for f in sorted(ipc[0].children(), key=lambda c: c.rectangle().left)) if ipc else ""
+        mouse.click(coords=(r.left + self.cx(IP_COMMIT_X), r.top + y))
+        time.sleep(0.4)
+        return value
 
     expected_ips = None       # {absolute row: the IP the row must show before it is written} - set by the caller
 

@@ -9,7 +9,7 @@ Cancel after unapplied changes asks 'Configuration data has been changed. Do you
 import ctypes
 import time
 
-from pywinauto import Desktop
+from pywinauto import Desktop, mouse
 
 from .session import Session, SyconError, log
 
@@ -181,7 +181,18 @@ class ConfigDialog:
         raise SyconError("dialog still open %d s after %s" % (timeout, what))
 
     def apply(self):
-        """Apply = commit the dialog's data to the project; returns the Error texts (empty when fine)."""
+        """Apply = commit the dialog's data to the project; returns the Error texts (empty when fine). A disabled
+        Apply means nothing changed (a resume setting what is already set, 2026-10-24 17:21): nothing to press."""
+        apply_button = self.button("Apply")
+        if not apply_button.is_enabled():
+            # nothing changed - but an in-place editor may still be open (the Apply press used to close it, and an
+            # open one swallows the Cancel click: 2026-10-24 17:43 'dialog still open 60 s after Cancel'): a plain
+            # click on the disabled button closes it without doing anything
+            log("  Apply disabled: nothing changed")
+            rect = apply_button.rectangle()
+            mouse.click(coords=((rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2))
+            time.sleep(0.8)
+            return []
         self.press("Apply")
         errs = self.session.dismiss_errors()
         if errs:
@@ -192,7 +203,14 @@ class ConfigDialog:
         """Cancel the dialog; answer the 'save the data?' question with Yes (keep) or No (discard)."""
         self.session.dismiss_errors()
         self.press("Cancel")
-        self._wait_closed("Cancel", keep)
+        try:
+            self._wait_closed("Cancel", keep, timeout=15.0)
+        except SyconError as ex:
+            if "still open" not in str(ex):
+                raise
+            log("  Cancel again (the first click may have only closed an editor)")
+            self.press("Cancel")
+            self._wait_closed("Cancel", keep)
 
     def ok(self):
         """OK (closes the controller dialog). An Error after OK (e.g. 'not in the same subnet') is raised

@@ -29,6 +29,17 @@ def test_round1_devices():
     assert nord.slots == {0: "SK CU4-ETH", 2: "Dig-IN (1 word)", 3: "PPO 4 (4 words)"}
 
 
+def test_round1_ids_and_canvas():
+    """The GSDML identity (BusField's node type) and the canvas boxes the Device element carries."""
+    p = read_project(ROUND1)
+    assert p.controller.node_type == "0x011E0203" and p.controller.manufacturer_id == 286
+    et = p.device("n0005-ms1-k2501")
+    assert et.node_type == "0x002A0313" and (et.manufacturer_id, et.device_type_id) == (42, 787)
+    assert len(et.rect) == 4 and et.rect[2] > et.rect[0] and et.rect[3] > et.rect[1]
+    assert len(et.line_rect) == 4 and et.line_rect[2] <= et.rect[0] + 1
+    assert "node=0x002A0313" in describe(p)
+
+
 def test_round1_records():
     et = read_project(ROUND1).device("n0005-ms1-k2501")
     assert (1, 1, 128) in et.records and (1, 1, 243) in et.records and (0, 1, 2) in et.records

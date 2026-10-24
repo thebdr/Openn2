@@ -234,11 +234,12 @@ class SyconDriver:
             self.model[name] = self.model.pop(station)
         log("station %s -> %s @ %s" % (station, name, ip))
 
-    def rename_stations(self, mapping):
-        """mapping: {current station name: (new name, ip)} - one controller dialog pass for all of them."""
+    def rename_stations(self, mapping, current_ips=None):
+        """mapping: {current station name: (new name, ip)} - one controller dialog pass for all of them;
+        `current_ips` = {current name: the IP it has now} as far as known (the row identity check)."""
         dlg = ControllerDialog(self.session, self.controller_station())
         try:
-            missing = dlg.rename_and_address(mapping)
+            missing = dlg.rename_and_address(mapping, current_ips)
             dlg.ok()
         except SyconError:
             if dlg.is_open():
