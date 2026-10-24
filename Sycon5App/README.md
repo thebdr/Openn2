@@ -196,7 +196,15 @@ Rules: the staging's head rule (`profinet_name` opens a node), phase 700's card 
 the head that is not the head's own is a card); a card's model is its Part No. unless that is a Fives code
 (`14C_00051`) - this I/O List shifts the card rows one column (the order number in `Manufacturer`); the second
 controller of a redundant pair (same IP) and `ignore` models are INFO findings, a head without a mapped model a
-WARN, no controller a FAIL. `python -m pipeline5.systems.ipc_based.intervalzero_rtx.sycon_handoff --iolist <xlsx>
+WARN, no controller a FAIL. One project = one PROFINET network, the controller's (2026-10-24: the conveyor list
+`IO0013` has two cabinet sheets, R1.S2.C1 on 192.168.2.x and R1.S2.C2 on 192.168.3.x, each with its own cifX
+pair, and the second repeats the first's station names - `n0055-enc04-aec1-k11`, `n0078-enc06-aec1-k11`,
+`n0085-enc04-aec1-k11`; merged into one project they blocked the controller dialog's IP Address Table page):
+a controller on another network than the first is an INFO (`sycon_second_controller`, "another PROFINET
+network"), every station on another network than the controller's an INFO `sycon_other_network`, left out -
+`--sheet R1.S2.C2` exports that network's own project. A station name or IP repeated WITHIN the network is a
+document error: `sycon_duplicate_name` / `sycon_duplicate_ip` FAIL, the second left out (PL5's 110 now also
+raises `pname_duplicated` on a PROFINET name used twice). `python -m pipeline5.systems.ipc_based.intervalzero_rtx.sycon_handoff --iolist <xlsx>
 --out <folder>` stages the list with the builtin params and writes the folder; `tests/unit/test_sycon_handoff.py`.
 The LOWER SORTER list (`8FVT_IO0010 ... LOWER SORTER_R1.2.xlsx`) gives 1 controller + 55 stations (3 PN/PN
 Coupler X2, 6 ET200SP, 26 ServoOne Junior, 19 AL1202, 1 Anybus Communicator) + 22 module rows; skipped: the
@@ -351,6 +359,30 @@ later"): `scripts/build_fvt_tests.sh` exports and builds, in sequence, `FVT_Sort
 sheet R5.S1.C1 only - the list has one cabinet sheet per cifX card, `--sheet`) into `spike/scratch/`; the models
 without a GSDML yet (KEBA, NORD, SEW, Interroll, Inovance, Vitronic, Balluff) are skipped with the exporter's
 `sycon_model_not_in_dtd` WARN. Summary in `spike/scratch/dinner_builds.log`.
+Results (2026-10-24 morning, all four verified by read-back, `<name>.verification.txt`): Sorter_Lower 60 stations
+(3 PN/PN couplers, 6 ET200SP with their modules and potential groups, 26 ServoOne Junior, 19 AL1202 with 8 ports
+each, 5 SCALANCE XC216-4C with 4 SFP ports and the PN-IO parameters, 1 Anybus) 601 PASS / 0 FAIL, 27 notes (the
+order-number patterns below); Induction_LowerGR1 107 PASS / 0 FAIL (565 s); Upstream_ConveyorsLower, the first
+network (192.168.2.x) of the two the list holds, 23 stations, 265 PASS / 0 FAIL (2283 s); Chutes_Card1 528 PASS /
+0 FAIL (~48 min with the load). What the sorter's 60 stations taught the driver: the Device Table / IP Address
+Table passes visit the table's LAST row - at the end of the scroll its centre sits inside the 10 px bottom margin
+(a 3 px margin there, the click capped: `sweep(at_end)`); the IP cell's in-place editor is opened with up to
+three clicks (`_open_ip_editor` - one verify click of 120 opened none in 0.8 s and the whole pass was lost); a
+failure in the IP pass keeps the names and the IPs written so far (Cancel + Yes; `ControllerDialog.phase`) and
+a resume re-addresses the named stations whose saved IP is not the table's, a failed names pass is still
+checkpointed; the verification notes, instead of failing, a DAP whose GSDML order number is a pattern or a
+placeholder (`13xx.xx7x.xxxx.x` the LTi ServoOne Junior, `T_ID_DAP_DESCRIPTION` the Anybus Communicator:
+`order_is_pattern`). `scripts/verify_saved.py --handoff <folder> --out <project.spj>` re-runs the verification
+of a saved project without SYCON.net (the module texts judged by order number, the table's updating times).
+
+**PL5 project types for the hardware alone** (user 2026-10-24: "generic hardware (Siemens Tia Portal), generic
+hardware (Hilscher Sycon.Net) (only validation + hardware generation enabled)"): PL5 now offers, beside the
+safety system, `siemens_tia_generic_hw` and `hilscher_syconnet_generic_hw` (`pipeline5/systems/generic_hw.py`,
+registered in `systems/catalog.py`) - phases 0 / 100 / 700 only; 100 runs the 110 I/O List checks alone, 700
+writes the TIA tables (hw/stations, hw/modules) or this handoff (hw/sycon-*, into `<output>/SyconNetProjectInterface/`,
+params `sycon_device_types_db` / `sycon_update_time_ms`). The column map's `mandatory_in` names the project types
+a column must be filled for on a node row (Part No., PROFINET name, IP for both) - a 110 FAIL `mandatory_missing`
+otherwise; a PROFINET name used twice is a 110 FAIL `pname_duplicated`. Contract C-043.
 
 **Maximized dialogs, geometry** (user: "you could maximize the configuration windows ... some systems may
 have 100+ nodes"): every configuration dialog is maximized when it opens (`ConfigDialog.maximize`, SW_MAXIMIZE)

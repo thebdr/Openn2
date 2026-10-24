@@ -242,7 +242,10 @@ class SyconDriver:
             dlg.ok()
         except SyconError:
             if dlg.is_open():
-                dlg.close(keep=False)
+                # the names pass is all-or-nothing (Cancel, the data discarded); a failure in the IP pass keeps the
+                # names and the IPs written so far (Cancel, the data kept) - a resume re-addresses the stations
+                # whose saved IP differs from the table (2026-10-24: a 60-station pass lost to one slow editor)
+                dlg.close(keep=getattr(dlg, "phase", "") == "ips")
             raise
         if missing:
             raise SyconError("stations not found in the Device Table: %r" % missing)

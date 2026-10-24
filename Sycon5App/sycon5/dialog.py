@@ -116,7 +116,15 @@ class ConfigDialog:
         items = [i for i in Session._iter_items(nav) if i.window_text() == name]
         if not items:
             raise SyconError("page %r not in the navigation tree" % name)
-        items[0].select()
+        for attempt in range(3):
+            try:
+                items[0].select()
+                break
+            except Exception as ex:  # noqa: BLE001 - a COM error from the UIA Select (03:37, the IP Address
+                log("  select_page %r: %s (attempt %d)" % (name, ex, attempt + 1))   # Table after 40 renames)
+                time.sleep(2.0)
+                if attempt == 2:
+                    items[0].click_input()
         time.sleep(1.5)
 
     def texts(self, prefix):
@@ -199,4 +207,6 @@ class ConfigDialog:
             finally:
                 pass
             raise SyconError("OK refused: %r" % errs)
-        self._wait_closed("OK", keep=True)
+        # the controller's OK recomputes the configuration of every station: 60 stations took more than a
+        # minute (04:03, "dialog still open 60 s after OK")
+        self._wait_closed("OK", keep=True, timeout=900.0)

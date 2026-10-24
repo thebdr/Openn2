@@ -1,0 +1,809 @@
+verification: 265 PASS, 0 FAIL
+PASS controller present: controller
+PASS station n0006-trib-aec01-k24601 exists
+PASS station n0006-trib-aec01-k24601 IP 192.168.2.6 (read 192.168.2.6)
+PASS controller lists n0006-trib-aec01-k24601 at 192.168.2.6 (read 192.168.2.6)
+PASS station n0006-trib-aec01-k24601 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0006-trib-aec01-k24601 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
+PASS station n0006-trib-aec01-k24601 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
+PASS station n0006-trib-aec01-k24601 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
+PASS station n0006-trib-aec01-k24601 model 6ES7158-3AD10-0XA0 (the saved DAP 'DAP X2 V4.2' is order 6ES7 158-3AD10-0XA0)
+PASS station n0007-trib-aec01-k24602 exists
+PASS station n0007-trib-aec01-k24602 IP 192.168.2.7 (read 192.168.2.7)
+PASS controller lists n0007-trib-aec01-k24602 at 192.168.2.7 (read 192.168.2.7)
+PASS station n0007-trib-aec01-k24602 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0007-trib-aec01-k24602 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
+PASS station n0007-trib-aec01-k24602 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
+PASS station n0007-trib-aec01-k24602 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
+PASS station n0007-trib-aec01-k24602 model 6ES7158-3AD10-0XA0 (the saved DAP 'DAP X2 V4.2' is order 6ES7 158-3AD10-0XA0)
+PASS station n0010-trib-aec01-k26601 exists
+PASS station n0010-trib-aec01-k26601 IP 192.168.2.10 (read 192.168.2.10)
+PASS controller lists n0010-trib-aec01-k26601 at 192.168.2.10 (read 192.168.2.10)
+PASS station n0010-trib-aec01-k26601 GSDML GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml (read GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml)
+PASS station n0010-trib-aec01-k26601 type 'SCALANCE XC216-4C V4.4' (read 'SCALANCE XC216-4C V4.4')
+PASS station n0010-trib-aec01-k26601 model 6GK5216-4BS00-2AC2 (the saved DAP 'DAP 79' is order 6GK5 216-4BS00-2AC2)
+PASS station n0010-trib-aec01-k26601 slot 0 sub 32769: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0010-trib-aec01-k26601 slot 0 sub 32770: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0010-trib-aec01-k26601 slot 0 sub 32771: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0010-trib-aec01-k26601 slot 0 sub 32772: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0010-trib-aec01-k26601 slot 0 sub 32768 record 3: 00 03 00 06 01 00 00 00 00 00 (table 00 03 00 06 01 00 00 00 00 00)
+PASS station n0010-trib-aec01-k26601 slot 0 sub 32768 record 12309: 30 19 00 08 01 01 00 01 01 00 00 02 (table 30 19 00 08 01 01 00 01 01 00 00 02)
+PASS station n0010-trib-aec01-k26601 slot 0 sub 32768 record 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 (table 30 1c 00 08 01 01 00 00 00 01 00 00)
+PASS station n0005-trib-aep01-k40001 exists
+PASS station n0005-trib-aep01-k40001 IP 192.168.2.5 (read 192.168.2.5)
+PASS controller lists n0005-trib-aep01-k40001 at 192.168.2.5 (read 192.168.2.5)
+PASS station n0005-trib-aep01-k40001 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0005-trib-aep01-k40001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.35-Siemens-ET200SP-20210401.xml)
+PASS station n0005-trib-aep01-k40001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
+PASS station n0005-trib-aep01-k40001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
+PASS station n0005-trib-aep01-k40001: 2 modules plugged (table 2)
+PASS station n0005-trib-aep01-k40001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k40001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0005-trib-aep01-k40001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0015-lb-ae01-k26501 exists
+PASS station n0015-lb-ae01-k26501 IP 192.168.2.15 (read 192.168.2.15)
+PASS controller lists n0015-lb-ae01-k26501 at 192.168.2.15 (read 192.168.2.15)
+PASS station n0015-lb-ae01-k26501 GSDML GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml (read GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml)
+PASS station n0015-lb-ae01-k26501 type 'SCALANCE XC216-4C V4.4' (read 'SCALANCE XC216-4C V4.4')
+PASS station n0015-lb-ae01-k26501 model 6GK5216-4BS00-2AC2 (the saved DAP 'DAP 79' is order 6GK5 216-4BS00-2AC2)
+PASS station n0015-lb-ae01-k26501 slot 0 sub 32769: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0015-lb-ae01-k26501 slot 0 sub 32770: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0015-lb-ae01-k26501 slot 0 sub 32771: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0015-lb-ae01-k26501 slot 0 sub 32772: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0015-lb-ae01-k26501 slot 0 sub 32768 record 3: 00 03 00 06 01 00 00 00 00 00 (table 00 03 00 06 01 00 00 00 00 00)
+PASS station n0015-lb-ae01-k26501 slot 0 sub 32768 record 12309: 30 19 00 08 01 01 00 01 01 00 00 02 (table 30 19 00 08 01 01 00 01 01 00 00 02)
+PASS station n0015-lb-ae01-k26501 slot 0 sub 32768 record 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 (table 30 1c 00 08 01 01 00 00 00 01 00 00)
+PASS station n0016-lb-ae01-k26601 exists
+PASS station n0016-lb-ae01-k26601 IP 192.168.2.16 (read 192.168.2.16)
+PASS controller lists n0016-lb-ae01-k26601 at 192.168.2.16 (read 192.168.2.16)
+PASS station n0016-lb-ae01-k26601 GSDML GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml (read GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml)
+PASS station n0016-lb-ae01-k26601 type 'SCALANCE XC208 V4.4' (read 'SCALANCE XC208 V4.4')
+PASS station n0016-lb-ae01-k26601 model 6GK5208-0BA00-2AC2 (the saved DAP 'DAP 6D' is order 6GK5 208-0BA00-2AC2)
+PASS station n0016-lb-ae01-k26601 slot 0 sub 32768 record 3: 00 03 00 06 01 00 00 00 00 00 (table 00 03 00 06 01 00 00 00 00 00)
+PASS station n0016-lb-ae01-k26601 slot 0 sub 32768 record 12309: 30 19 00 08 01 01 00 01 01 00 00 02 (table 30 19 00 08 01 01 00 01 01 00 00 02)
+PASS station n0016-lb-ae01-k26601 slot 0 sub 32768 record 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 (table 30 1c 00 08 01 01 00 00 00 01 00 00)
+PASS station n0020-lb-ae01-k35001 exists
+PASS station n0020-lb-ae01-k35001 IP 192.168.2.20 (read 192.168.2.20)
+PASS controller lists n0020-lb-ae01-k35001 at 192.168.2.20 (read 192.168.2.20)
+PASS station n0020-lb-ae01-k35001 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0020-lb-ae01-k35001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.35-Siemens-ET200SP-20210401.xml)
+PASS station n0020-lb-ae01-k35001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
+PASS station n0020-lb-ae01-k35001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
+PASS station n0020-lb-ae01-k35001: 5 modules plugged (table 5)
+PASS station n0020-lb-ae01-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0020-lb-ae01-k35001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0020-lb-ae01-k35001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0020-lb-ae01-k35001 slot 3: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0020-lb-ae01-k35001 slot 4: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0020-lb-ae01-k35001 slot 5: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0020-lb-ae01-k35001 slot 5 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0036-lb01-k1 exists
+PASS station n0036-lb01-k1 IP 192.168.2.36 (read 192.168.2.36)
+PASS controller lists n0036-lb01-k1 at 192.168.2.36 (read 192.168.2.36)
+PASS station n0036-lb01-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0036-lb01-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0036-lb01-k1 type 'AL1202' (read 'AL1202')
+PASS station n0036-lb01-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0036-lb01-k1 slot 1 sub 3: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0036-lb01-k1 slot 1 sub 4: 'IO-Link In/Out  2/ 2 Byte + PQI' (table 'IO-Link In/Out  2/ 2 Byte + PQI')
+PASS station n0036-lb01-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0036-lb01-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0036-lb01-k1 slot 1 sub 7: 'Digital Output + PQI' (table 'Digital Output + PQI')
+PASS station n0036-lb01-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0036-lb01-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0044-lab01-q25-3-k1 exists
+PASS station n0044-lab01-q25-3-k1 IP 192.168.2.44 (read 192.168.2.44)
+PASS controller lists n0044-lab01-q25-3-k1 at 192.168.2.44 (read 192.168.2.44)
+PASS station n0044-lab01-q25-3-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0044-lab01-q25-3-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0044-lab01-q25-3-k1 type 'AL1202' (read 'AL1202')
+PASS station n0044-lab01-q25-3-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0044-lab01-q25-3-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0044-lab01-q25-3-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0044-lab01-q25-3-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0044-lab01-q25-3-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0044-lab01-q25-3-k1 slot 1 sub 7: 'Digital Output + PQI' (table 'Digital Output + PQI')
+PASS station n0044-lab01-q25-3-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0044-lab01-q25-3-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0050-enc06-aec1-k11 exists
+PASS station n0050-enc06-aec1-k11 IP 192.168.2.50 (read 192.168.2.50)
+PASS controller lists n0050-enc06-aec1-k11 at 192.168.2.50 (read 192.168.2.50)
+PASS station n0050-enc06-aec1-k11 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0050-enc06-aec1-k11 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
+PASS station n0050-enc06-aec1-k11 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
+PASS station n0050-enc06-aec1-k11 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
+PASS station n0050-enc06-aec1-k11 model 6ES7158-3AD10-0XA0 (the saved DAP 'DAP X2 V4.2' is order 6ES7 158-3AD10-0XA0)
+PASS station n0051-lab01-q26-4-k1 exists
+PASS station n0051-lab01-q26-4-k1 IP 192.168.2.51 (read 192.168.2.51)
+PASS controller lists n0051-lab01-q26-4-k1 at 192.168.2.51 (read 192.168.2.51)
+PASS station n0051-lab01-q26-4-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0051-lab01-q26-4-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0051-lab01-q26-4-k1 type 'AL1202' (read 'AL1202')
+PASS station n0051-lab01-q26-4-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0051-lab01-q26-4-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0051-lab01-q26-4-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0051-lab01-q26-4-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0051-lab01-q26-4-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0051-lab01-q26-4-k1 slot 1 sub 7: 'Digital Output + PQI' (table 'Digital Output + PQI')
+PASS station n0051-lab01-q26-4-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0051-lab01-q26-4-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0055-enc04-aec1-k11 exists
+PASS station n0055-enc04-aec1-k11 IP 192.168.2.55 (read 192.168.2.55)
+PASS controller lists n0055-enc04-aec1-k11 at 192.168.2.55 (read 192.168.2.55)
+PASS station n0055-enc04-aec1-k11 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0055-enc04-aec1-k11 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
+PASS station n0055-enc04-aec1-k11 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
+PASS station n0055-enc04-aec1-k11 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
+PASS station n0055-enc04-aec1-k11 model 6ES7158-3AD10-0XA0 (the saved DAP 'DAP X2 V4.2' is order 6ES7 158-3AD10-0XA0)
+PASS station n0095-lxb01-1-k1 exists
+PASS station n0095-lxb01-1-k1 IP 192.168.2.95 (read 192.168.2.95)
+PASS controller lists n0095-lxb01-1-k1 at 192.168.2.95 (read 192.168.2.95)
+PASS station n0095-lxb01-1-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0095-lxb01-1-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0095-lxb01-1-k1 type 'AL1202' (read 'AL1202')
+PASS station n0095-lxb01-1-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0095-lxb01-1-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0095-lxb01-1-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0095-lxb01-1-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0095-lxb01-1-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0095-lxb01-1-k1 slot 1 sub 7: 'Disabled' (table 'Disabled')
+PASS station n0095-lxb01-1-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0095-lxb01-1-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0102-lxb01-1-1-k1 exists
+PASS station n0102-lxb01-1-1-k1 IP 192.168.2.102 (read 192.168.2.102)
+PASS controller lists n0102-lxb01-1-1-k1 at 192.168.2.102 (read 192.168.2.102)
+PASS station n0102-lxb01-1-1-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0102-lxb01-1-1-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0102-lxb01-1-1-k1 type 'AL1202' (read 'AL1202')
+PASS station n0102-lxb01-1-1-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0102-lxb01-1-1-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0102-lxb01-1-1-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0102-lxb01-1-1-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0102-lxb01-1-1-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0102-lxb01-1-1-k1 slot 1 sub 7: 'Disabled' (table 'Disabled')
+PASS station n0102-lxb01-1-1-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0102-lxb01-1-1-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0104-lxb01-1-2-k1 exists
+PASS station n0104-lxb01-1-2-k1 IP 192.168.2.104 (read 192.168.2.104)
+PASS controller lists n0104-lxb01-1-2-k1 at 192.168.2.104 (read 192.168.2.104)
+PASS station n0104-lxb01-1-2-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0104-lxb01-1-2-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0104-lxb01-1-2-k1 type 'AL1202' (read 'AL1202')
+PASS station n0104-lxb01-1-2-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0104-lxb01-1-2-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0104-lxb01-1-2-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0104-lxb01-1-2-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0104-lxb01-1-2-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0104-lxb01-1-2-k1 slot 1 sub 7: 'Disabled' (table 'Disabled')
+PASS station n0104-lxb01-1-2-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0104-lxb01-1-2-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0106-lxb01-1-3-k1 exists
+PASS station n0106-lxb01-1-3-k1 IP 192.168.2.106 (read 192.168.2.106)
+PASS controller lists n0106-lxb01-1-3-k1 at 192.168.2.106 (read 192.168.2.106)
+PASS station n0106-lxb01-1-3-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0106-lxb01-1-3-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0106-lxb01-1-3-k1 type 'AL1202' (read 'AL1202')
+PASS station n0106-lxb01-1-3-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0106-lxb01-1-3-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0106-lxb01-1-3-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0106-lxb01-1-3-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0106-lxb01-1-3-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0106-lxb01-1-3-k1 slot 1 sub 7: 'Disabled' (table 'Disabled')
+PASS station n0106-lxb01-1-3-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0106-lxb01-1-3-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0108-lxb01-2-k1 exists
+PASS station n0108-lxb01-2-k1 IP 192.168.2.108 (read 192.168.2.108)
+PASS controller lists n0108-lxb01-2-k1 at 192.168.2.108 (read 192.168.2.108)
+PASS station n0108-lxb01-2-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0108-lxb01-2-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0108-lxb01-2-k1 type 'AL1202' (read 'AL1202')
+PASS station n0108-lxb01-2-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0108-lxb01-2-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0108-lxb01-2-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0108-lxb01-2-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0108-lxb01-2-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0108-lxb01-2-k1 slot 1 sub 7: 'Disabled' (table 'Disabled')
+PASS station n0108-lxb01-2-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0108-lxb01-2-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0066-lb02-k1 exists
+PASS station n0066-lb02-k1 IP 192.168.2.66 (read 192.168.2.66)
+PASS controller lists n0066-lb02-k1 at 192.168.2.66 (read 192.168.2.66)
+PASS station n0066-lb02-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0066-lb02-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0066-lb02-k1 type 'AL1202' (read 'AL1202')
+PASS station n0066-lb02-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0066-lb02-k1 slot 1 sub 3: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0066-lb02-k1 slot 1 sub 4: 'IO-Link In/Out  2/ 2 Byte + PQI' (table 'IO-Link In/Out  2/ 2 Byte + PQI')
+PASS station n0066-lb02-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0066-lb02-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0066-lb02-k1 slot 1 sub 7: 'Digital Output + PQI' (table 'Digital Output + PQI')
+PASS station n0066-lb02-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0066-lb02-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0072-lab02-q27-1-k1 exists
+PASS station n0072-lab02-q27-1-k1 IP 192.168.2.72 (read 192.168.2.72)
+PASS controller lists n0072-lab02-q27-1-k1 at 192.168.2.72 (read 192.168.2.72)
+PASS station n0072-lab02-q27-1-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0072-lab02-q27-1-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0072-lab02-q27-1-k1 type 'AL1202' (read 'AL1202')
+PASS station n0072-lab02-q27-1-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0072-lab02-q27-1-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0072-lab02-q27-1-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0072-lab02-q27-1-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0072-lab02-q27-1-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0072-lab02-q27-1-k1 slot 1 sub 7: 'Digital Output + PQI' (table 'Digital Output + PQI')
+PASS station n0072-lab02-q27-1-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0072-lab02-q27-1-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0078-enc06-aec1-k11 exists
+PASS station n0078-enc06-aec1-k11 IP 192.168.2.78 (read 192.168.2.78)
+PASS controller lists n0078-enc06-aec1-k11 at 192.168.2.78 (read 192.168.2.78)
+PASS station n0078-enc06-aec1-k11 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0078-enc06-aec1-k11 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
+PASS station n0078-enc06-aec1-k11 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
+PASS station n0078-enc06-aec1-k11 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
+PASS station n0078-enc06-aec1-k11 model 6ES7158-3AD10-0XA0 (the saved DAP 'DAP X2 V4.2' is order 6ES7 158-3AD10-0XA0)
+PASS station n0081-lab02-q28-2-k1 exists
+PASS station n0081-lab02-q28-2-k1 IP 192.168.2.81 (read 192.168.2.81)
+PASS controller lists n0081-lab02-q28-2-k1 at 192.168.2.81 (read 192.168.2.81)
+PASS station n0081-lab02-q28-2-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0081-lab02-q28-2-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0081-lab02-q28-2-k1 type 'AL1202' (read 'AL1202')
+PASS station n0081-lab02-q28-2-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0081-lab02-q28-2-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0081-lab02-q28-2-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0081-lab02-q28-2-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0081-lab02-q28-2-k1 slot 1 sub 6: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0081-lab02-q28-2-k1 slot 1 sub 7: 'Digital Output + PQI' (table 'Digital Output + PQI')
+PASS station n0081-lab02-q28-2-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0081-lab02-q28-2-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0085-enc04-aec1-k11 exists
+PASS station n0085-enc04-aec1-k11 IP 192.168.2.85 (read 192.168.2.85)
+PASS controller lists n0085-enc04-aec1-k11 at 192.168.2.85 (read 192.168.2.85)
+PASS station n0085-enc04-aec1-k11 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0085-enc04-aec1-k11 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
+PASS station n0085-enc04-aec1-k11 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
+PASS station n0085-enc04-aec1-k11 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
+PASS station n0085-enc04-aec1-k11 model 6ES7158-3AD10-0XA0 (the saved DAP 'DAP X2 V4.2' is order 6ES7 158-3AD10-0XA0)
+PASS no station outside the table (extra: [])
+
+C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Upstream_ConveyorsLower\Upstream_ConveyorsLower\_S129\SYCON_net.xml
+  controller (controller) symbolic=CIFX_RE_PNM type='' ip= mask= gsdml= dap='' order=''
+    network: n0006-trib-aec01-k24601 192.168.2.6 (update 8 ms, watchdog 24 ms)
+    network: n0007-trib-aec01-k24602 192.168.2.7 (update 8 ms, watchdog 24 ms)
+    network: n0010-trib-aec01-k26601 192.168.2.10 (update 128 ms, watchdog 384 ms)
+    network: n0005-trib-aep01-k40001 192.168.2.5 (update 8 ms, watchdog 24 ms)
+    network: n0015-lb-ae01-k26501 192.168.2.15 (update 128 ms, watchdog 384 ms)
+    network: n0016-lb-ae01-k26601 192.168.2.16 (update 128 ms, watchdog 384 ms)
+    network: n0020-lb-ae01-k35001 192.168.2.20 (update 8 ms, watchdog 24 ms)
+    network: n0036-lb01-k1 192.168.2.36 (update 8 ms, watchdog 24 ms)
+    network: n0044-lab01-q25-3-k1 192.168.2.44 (update 8 ms, watchdog 24 ms)
+    network: n0050-enc06-aec1-k11 192.168.2.50 (update 8 ms, watchdog 24 ms)
+    network: n0051-lab01-q26-4-k1 192.168.2.51 (update 8 ms, watchdog 24 ms)
+    network: n0055-enc04-aec1-k11 192.168.2.55 (update 8 ms, watchdog 24 ms)
+    network: n0095-lxb01-1-k1 192.168.2.95 (update 8 ms, watchdog 24 ms)
+    network: n0102-lxb01-1-1-k1 192.168.2.102 (update 8 ms, watchdog 24 ms)
+    network: n0104-lxb01-1-2-k1 192.168.2.104 (update 8 ms, watchdog 24 ms)
+    network: n0106-lxb01-1-3-k1 192.168.2.106 (update 8 ms, watchdog 24 ms)
+    network: n0108-lxb01-2-k1 192.168.2.108 (update 8 ms, watchdog 24 ms)
+    network: n0066-lb02-k1 192.168.2.66 (update 8 ms, watchdog 24 ms)
+    network: n0072-lab02-q27-1-k1 192.168.2.72 (update 8 ms, watchdog 24 ms)
+    network: n0078-enc06-aec1-k11 192.168.2.78 (update 8 ms, watchdog 24 ms)
+    network: n0081-lab02-q28-2-k1 192.168.2.81 (update 8 ms, watchdog 24 ms)
+    network: n0085-enc04-aec1-k11 192.168.2.85 (update 8 ms, watchdog 24 ms)
+  n0006-trib-aec01-k24601 symbolic=PN_PN_Coupler_X2 type='PN/PN Coupler X2' ip=192.168.2.6 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0'
+    slot 0: PN/PN Coupler X2
+      sub 1: PN/PN Coupler X2
+    record slot 0 sub 1 index 1: 00 0e 00 02 00 00
+  n0007-trib-aec01-k24602 symbolic=PN_PN_Coupler_X2 type='PN/PN Coupler X2' ip=192.168.2.7 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0'
+    slot 0: PN/PN Coupler X2
+      sub 1: PN/PN Coupler X2
+    record slot 0 sub 1 index 1: 00 0e 00 02 00 00
+  n0010-trib-aec01-k26601 symbolic=SCALANCE_XC216-4C_V4.4 type='SCALANCE XC216-4C V4.4' ip=192.168.2.10 mask=255.255.255.0 gsdml=GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml dap='DAP 79' order='6GK5 216-4BS00-2AC2'
+    slot 0: SCALANCE XC216-4C V4.4
+      sub 1: SCALANCE XC216-4C
+    record slot 0 sub 1 index 33: 70 01 00 06 01 01 ff 00 00 00 00 00
+    record slot 0 sub 32768 index 3: 00 03 00 06 01 00 00 00 00 00 00 00
+    record slot 0 sub 32768 index 12309: 30 19 00 08 01 01 00 01 01 00 00 02 00 00
+    record slot 0 sub 32768 index 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 00 00
+    record slot 0 sub 32769 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32769 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32769 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32770 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32770 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32770 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32771 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32771 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32771 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32772 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32772 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32772 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32773 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32773 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32773 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32774 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32774 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32774 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32775 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32775 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32775 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32776 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32776 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32776 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32777 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32777 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32777 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32778 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32778 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32778 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32779 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32779 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32779 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32780 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32780 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32780 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32781 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32781 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32781 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32782 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32782 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32782 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32783 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32783 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32783 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32784 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32784 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32784 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+  n0005-trib-aep01-k40001 symbolic=IM_155-6_PN_ST_V4.2 type='IM 155-6 PN ST V4.2' ip=192.168.2.5 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml dap='DIM ST V4.2' order='6ES7 155-6AU01-0BN0'
+    slot 0: IM 155-6 PN ST V4.2
+      sub 1: IM 155-6 PN ST V4.2
+    slot 1: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 2: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 1 sub 1 index 243: 01 00 00 00 00 00
+    record slot 2 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 2 sub 1 index 243: 00 00 00 00 00 00
+  n0015-lb-ae01-k26501 symbolic=SCALANCE_XC216-4C_V4.4 type='SCALANCE XC216-4C V4.4' ip=192.168.2.15 mask=255.255.255.0 gsdml=GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml dap='DAP 79' order='6GK5 216-4BS00-2AC2'
+    slot 0: SCALANCE XC216-4C V4.4
+      sub 1: SCALANCE XC216-4C
+    record slot 0 sub 1 index 33: 70 01 00 06 01 01 ff 00 00 00 00 00
+    record slot 0 sub 32768 index 3: 00 03 00 06 01 00 00 00 00 00 00 00
+    record slot 0 sub 32768 index 12309: 30 19 00 08 01 01 00 01 01 00 00 02 00 00
+    record slot 0 sub 32768 index 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 00 00
+    record slot 0 sub 32769 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32769 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32769 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32770 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32770 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32770 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32771 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32771 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32771 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32772 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32772 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32772 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32773 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32773 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32773 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32774 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32774 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32774 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32775 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32775 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32775 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32776 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32776 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32776 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32777 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32777 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32777 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32778 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32778 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32778 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32779 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32779 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32779 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32780 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32780 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32780 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32781 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32781 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32781 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32782 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32782 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32782 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32783 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32783 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32783 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32784 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32784 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32784 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+  n0016-lb-ae01-k26601 symbolic=SCALANCE_XC208_V4.4 type='SCALANCE XC208 V4.4' ip=192.168.2.16 mask=255.255.255.0 gsdml=GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml dap='DAP 6D' order='6GK5 208-0BA00-2AC2'
+    slot 0: SCALANCE XC208 V4.4
+      sub 1: SCALANCE XC208
+    record slot 0 sub 1 index 33: 70 01 00 06 01 01 ff 00 00 00 00 00
+    record slot 0 sub 32768 index 3: 00 03 00 06 01 00 00 00 00 00 00 00
+    record slot 0 sub 32768 index 12309: 30 19 00 08 01 01 00 01 01 00 00 02 00 00
+    record slot 0 sub 32768 index 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 00 00
+    record slot 0 sub 32769 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32769 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32769 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32770 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32770 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32770 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32771 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32771 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32771 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32772 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32772 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32772 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32773 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32773 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32773 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32774 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32774 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32774 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32775 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32775 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32775 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32776 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32776 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32776 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+  n0020-lb-ae01-k35001 symbolic=IM_155-6_PN_ST_V4.2 type='IM 155-6 PN ST V4.2' ip=192.168.2.20 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml dap='DIM ST V4.2' order='6ES7 155-6AU01-0BN0'
+    slot 0: IM 155-6 PN ST V4.2
+      sub 1: IM 155-6 PN ST V4.2
+    slot 1: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 2: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 3: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 4: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 5: DQ 16x24VDC/0.5A ST V0.0
+      sub 1: DQ 16x24VDC/0.5A ST V0.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 1 sub 1 index 243: 01 00 00 00 00 00
+    record slot 2 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 2 sub 1 index 243: 00 00 00 00 00 00
+    record slot 3 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 3 sub 1 index 243: 00 00 00 00 00 00
+    record slot 4 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 4 sub 1 index 243: 00 00 00 00 00 00
+    record slot 5 sub 1 index 128: 00 02 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 00
+    record slot 5 sub 1 index 243: 01 00 00 00 00 00
+  n0036-lb01-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.36 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: IO-Link In  2 Byte + PQI
+      sub 4: IO-Link In/Out  2/ 2 Byte + PQI
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Digital Output + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 02 00 00
+    record slot 1 sub 7 index 45312: 00 01 04 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0044-lab01-q25-3-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.44 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Digital Output + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 02 00 00
+    record slot 1 sub 7 index 45312: 00 01 04 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0050-enc06-aec1-k11 symbolic=PN_PN_Coupler_X2 type='PN/PN Coupler X2' ip=192.168.2.50 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0'
+    slot 0: PN/PN Coupler X2
+      sub 1: PN/PN Coupler X2
+    record slot 0 sub 1 index 1: 00 0e 00 02 00 00
+  n0051-lab01-q26-4-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.51 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Digital Output + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 02 00 00
+    record slot 1 sub 7 index 45312: 00 01 04 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0055-enc04-aec1-k11 symbolic=PN_PN_Coupler_X2 type='PN/PN Coupler X2' ip=192.168.2.55 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0'
+    slot 0: PN/PN Coupler X2
+      sub 1: PN/PN Coupler X2
+    record slot 0 sub 1 index 1: 00 0e 00 02 00 00
+  n0095-lxb01-1-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.95 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Disabled
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0102-lxb01-1-1-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.102 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Disabled
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0104-lxb01-1-2-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.104 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Disabled
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0106-lxb01-1-3-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.106 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Disabled
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0108-lxb01-2-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.108 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Disabled
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0066-lb02-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.66 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: IO-Link In  2 Byte + PQI
+      sub 4: IO-Link In/Out  2/ 2 Byte + PQI
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Digital Output + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 02 00 00
+    record slot 1 sub 7 index 45312: 00 01 04 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0072-lab02-q27-1-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.72 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Digital Output + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 02 00 00
+    record slot 1 sub 7 index 45312: 00 01 04 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0078-enc06-aec1-k11 symbolic=PN_PN_Coupler_X2 type='PN/PN Coupler X2' ip=192.168.2.78 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0'
+    slot 0: PN/PN Coupler X2
+      sub 1: PN/PN Coupler X2
+    record slot 0 sub 1 index 1: 00 0e 00 02 00 00
+  n0081-lab02-q28-2-k1 symbolic=AL1202 type='AL1202' ip=192.168.2.81 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order=''
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link Out  2 Byte + PQI
+      sub 7: Digital Output + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 02 00 00
+    record slot 1 sub 7 index 45312: 00 01 04 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0085-enc04-aec1-k11 symbolic=PN_PN_Coupler_X2 type='PN/PN Coupler X2' ip=192.168.2.85 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0'
+    slot 0: PN/PN Coupler X2
+      sub 1: PN/PN Coupler X2
+    record slot 0 sub 1 index 1: 00 0e 00 02 00 00

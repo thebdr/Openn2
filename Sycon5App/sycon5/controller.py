@@ -168,6 +168,7 @@ class ControllerDialog(ConfigDialog):
         """mapping: {current name of station: (new name, ip)}. One pass down the Device Table (the names are
         read on every row, so a row is identified before it is edited), then one pass down the IP Address Table
         by the same row positions. Returns the names it could not find."""
+        self.phase = "names"        # the caller's failure policy: the names pass is all-or-nothing, the IP pass keeps
         self.select_page(DEVICE_TABLE_PAGE)
         r = self._grid(DEVICE_TABLE_ID)
         visible = self._rows_visible(r)
@@ -175,27 +176,33 @@ class ControllerDialog(ConfigDialog):
         scrolled = 0
         pending = dict(mapping)
         px_per_notch = None
-        while True:
+        def sweep(at_end):
+            """Visit the rows shown (read the name, rename the wanted ones); -1 when a click opens no editor.
+            At the table's END the last row's centre may sit inside the bottom margin (2026-10-24: station 60
+            of 60 of the sorter build was never visited): the margin shrinks from 10 px to 3, the click capped."""
             first_abs = -(-scrolled // ROW_H)                       # the first fully visible absolute row
             page_rows = 0
-            for k in range(visible + 1):
+            for k in range(visible + 2):
                 abs_row = first_abs + k
                 y = ROW_Y0 + ROW_H * abs_row - scrolled
-                if y < ROW_Y0 - 4 or y > r.height() - 10:
+                if y < ROW_Y0 - 4 or y > r.height() - (3 if at_end else 10):
                     continue
                 if any(a == abs_row for a, _ in order):
                     continue
+                y = min(y, r.height() - 4)
                 mouse.click(coords=(r.left + self.cx(NAME_X), r.top + y))
                 time.sleep(0.7)
                 eds = self.controls(("Edit",), cid=NAME_EDIT_ID)
                 if not eds:
-                    page_rows = -1
-                    break
+                    return -1
                 name = eds[0].window_text()
                 order.append((abs_row, name))
                 page_rows += 1
                 if name in pending:
                     new, _ip = pending.pop(name)
+                    if new.lower() == name.lower():                 # an IP-only row (a resume re-addressing it)
+                        log("  row %d: %s keeps its name" % (abs_row, name))
+                        continue
                     eds[0].select()
                     time.sleep(0.2)
                     keyboard.send_keys(new, with_spaces=True)
@@ -210,11 +217,16 @@ class ControllerDialog(ConfigDialog):
                     if value.lower() != new.lower():          # SYCON.net lower-cases a name of station
                         raise SyconError("row %d: name reads %r after writing %r" % (abs_row, value, new))
                     log("  row %d: %s -> %s" % (abs_row, name, new))
+            return page_rows
+
+        while True:
+            page_rows = sweep(False)
             if page_rows < 0 or not pending:
                 break
             notches = 3 if px_per_notch is None else max(1, int((visible - 2) * ROW_H / px_per_notch))
             shift = self._scroll(r, notches)
             if shift <= 0:
+                sweep(True)                                         # the table's end: its bottom row
                 break
             if px_per_notch is None:
                 px_per_notch = shift / notches
@@ -226,6 +238,7 @@ class ControllerDialog(ConfigDialog):
         # the IPs, by the same absolute rows - in TWO passes, because a target IP may still be held by another
         # row's auto-assigned address: first every row to a parking address, then the targets. Each row's current
         # IP is checked against the expected one before it is written (the row identity on this page).
+        self.phase = "ips"
         self.select_page(IP_TABLE_PAGE)
         r = self._grid(IP_TABLE_ID)
         rows = [(abs_row, name) for abs_row, name in order if name in mapping]
@@ -239,10 +252,11 @@ class ControllerDialog(ConfigDialog):
             targets = dict(targets)
             scrolled = 0
             px_per_notch = None
+            margin = 10                 # the bottom margin; 3 at the table's end (its last row's centre may sit in it)
             while targets:
-                page = sorted(a for a in targets if ROW_Y0 - 4 <= ROW_Y0 + ROW_H * a - scrolled <= r.height() - 10)
+                page = sorted(a for a in targets if ROW_Y0 - 4 <= ROW_Y0 + ROW_H * a - scrolled <= r.height() - margin)
                 for abs_row in page:
-                    y = ROW_Y0 + ROW_H * abs_row - scrolled
+                    y = min(ROW_Y0 + ROW_H * abs_row - scrolled, r.height() - 4)
                     new, ip = targets.pop(abs_row)
                     before = self._set_ip_at(r, y, ip, "%s row %d (%s)" % (phase_name, abs_row, new), expect=expected.get(abs_row))
                     expected[abs_row] = ip
@@ -250,10 +264,13 @@ class ControllerDialog(ConfigDialog):
                         log("  row %d auto IP was %s" % (abs_row, before))
                 if not targets:
                     break
+                if margin == 3:
+                    raise SyconError("the IP Address Table did not scroll; rows left: %r" % sorted(targets))
                 notches = 3 if px_per_notch is None else max(1, int((visible - 2) * ROW_H / px_per_notch))
                 shift = self._scroll(r, notches)
                 if shift <= 0:
-                    raise SyconError("the IP Address Table did not scroll; rows left: %r" % sorted(targets))
+                    margin = 3
+                    continue
                 if px_per_notch is None:
                     px_per_notch = shift / notches
                 scrolled += shift
@@ -263,23 +280,29 @@ class ControllerDialog(ConfigDialog):
 
     expected_ips = None       # {absolute row: the IP the row must show before it is written} - set by the caller
 
+    def _open_ip_editor(self, r, y, label):
+        """Click the IP cell until its in-place SysIPAddress32 editor is there (2026-10-24 04:48: one verify click
+        of 120 opened none within 0.8 s and the whole pass was lost) - three attempts, each waiting longer."""
+        for attempt in range(3):
+            mouse.click(coords=(r.left + self.cx(IP_X), r.top + y))
+            time.sleep(0.8 + 0.7 * attempt)
+            ipc = self.controls(("SysIPAddress32",))
+            if ipc:
+                return ipc[0]
+            log("  no IP editor at %s (attempt %d)" % (label, attempt + 1))
+        raise SyconError("no IP editor at %s" % label)
+
     def _set_ip_at(self, r, y, ip, label, expect=None):
-        mouse.click(coords=(r.left + self.cx(IP_X), r.top + y))
-        time.sleep(0.8)
-        ipc = self.controls(("SysIPAddress32",))
-        if not ipc:
-            raise SyconError("no IP editor at %s" % label)
-        before = ".".join(f.window_text() for f in sorted(ipc[0].children(), key=lambda c: c.rectangle().left))
+        ipc = self._open_ip_editor(r, y, label)
+        before = ".".join(f.window_text() for f in sorted(ipc.children(), key=lambda c: c.rectangle().left))
         if expect and before != expect:
             mouse.click(coords=(r.left + self.cx(IP_COMMIT_X), r.top + y))
             raise SyconError("%s shows IP %s, expected %s - row mismatch, nothing written" % (label, before, expect))
-        _set_ip_control(ipc[0], ip)
+        _set_ip_control(ipc, ip)
         mouse.click(coords=(r.left + self.cx(IP_COMMIT_X), r.top + y))
         time.sleep(0.8)
-        mouse.click(coords=(r.left + self.cx(IP_X), r.top + y))
-        time.sleep(0.8)
-        ipc = self.controls(("SysIPAddress32",))
-        after = ".".join(f.window_text() for f in sorted(ipc[0].children(), key=lambda c: c.rectangle().left)) if ipc else ""
+        ipc = self._open_ip_editor(r, y, label + " (verify)")
+        after = ".".join(f.window_text() for f in sorted(ipc.children(), key=lambda c: c.rectangle().left))
         mouse.click(coords=(r.left + self.cx(IP_COMMIT_X), r.top + y))
         time.sleep(0.4)
         log("  IP at %s: %s -> %s" % (label, before, after))

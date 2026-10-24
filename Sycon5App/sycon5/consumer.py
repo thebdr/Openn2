@@ -45,6 +45,14 @@ class Verification:
 same_text = Session.same_text
 
 
+def order_is_pattern(order):
+    """A GSDML DAP whose OrderNumber is not a literal: a wildcard pattern (`13xx.xx7x.xxxx.x`, the LTi ServoOne
+    Junior) or a placeholder token (`T_ID_DAP_DESCRIPTION`, the Anybus Communicator) - 2026-10-24, the sorter's
+    27 false FAILs; the type and the DAP are still compared, the order number noted."""
+    o = str(order or "").strip()
+    return o.startswith("T_ID_") or "x" in o
+
+
 def verify(handoff, project, plugged, timing_set=None):
     """Compare the read-back with the handoff tables; `plugged` = {station: [module texts the driver chose]},
     `timing_set` = {station: the updating time (ms) the driver could set when the table's was not offered}."""
@@ -80,8 +88,11 @@ def verify(handoff, project, plugged, timing_set=None):
         if variant:
             v.check(same_text(d.dap, variant), "station %s DAP %s (read %r)" % (name, variant, d.dap))
         if d.order_no and s.get("model_id"):          # the DAP's order number = the I/O List's Part No.
-            v.check(d.order_no.replace(" ", "").upper() == s["model_id"].replace(" ", "").upper(),
-                    "station %s model %s (the saved DAP %r is order %s)" % (name, s["model_id"], d.dap, d.order_no))
+            if order_is_pattern(d.order_no):
+                v.note("station %s model %s: the GSDML's order number is the pattern %r - not compared" % (name, s["model_id"], d.order_no))
+            else:
+                v.check(d.order_no.replace(" ", "").upper() == s["model_id"].replace(" ", "").upper(),
+                        "station %s model %s (the saved DAP %r is order %s)" % (name, s["model_id"], d.dap, d.order_no))
         rows = handoff.plug_rows(s["station_name"])
         if rows:
             slots = {k: v_ for k, v_ in d.slots.items() if k != 0}
@@ -131,10 +142,11 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     d = driver or SyconDriver()
     plugged = {}
     xml = out_spj[:-4] + "\\_S129\\SYCON_net.xml"
-    done_names = set()
+    done_names, saved_devices = set(), {}
     if resume and os.path.exists(xml):
         p = read_project(xml)
-        done_names = {dev.device_no.lower() for dev in p.devices if not dev.is_controller}
+        saved_devices = {dev.device_no.lower(): dev for dev in p.devices if not dev.is_controller}
+        done_names = set(saved_devices)
         log("resume:", len(done_names), "stations already in the saved project")
         d.open(out_spj)
     else:
@@ -188,9 +200,21 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
             checkpoint()
     if added:
         checkpoint()
+    # a resume: the named stations whose saved IP is not the table's (an IP pass that failed midway kept its names
+    # and the IPs written so far, parking addresses included) are re-addressed, their names unchanged
+    for s in h.stations:
+        dev = saved_devices.get(s["station_name"].lower())
+        if dev is not None and s["ip_address"] and dev.ip != s["ip_address"]:
+            mapping[dev.device_no] = (s["station_name"], s["ip_address"])
+            log("resume: %s keeps its name, IP %s -> %s" % (dev.device_no, dev.ip, s["ip_address"]))
     if mapping:
-        # 2. names and IPs in one controller dialog pass
-        d.rename_stations(mapping)
+        # 2. names and IPs in one controller dialog pass - saved even when the pass fails after its OK (the names
+        # it did write stay; a resume pairs the rest), so a failure costs the pass, not the whole project state
+        try:
+            d.rename_stations(mapping)
+        except SyconError:
+            checkpoint()
+            raise
         checkpoint()
     # 2b. the stations' updating times (one Stations Timing pass; on a resume only the ones the saved project shows wrong)
     wanted = {s["station_name"]: float(s["update_time_ms"]) for s in h.stations if s.get("update_time_ms")}

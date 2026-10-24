@@ -1,0 +1,88 @@
+21:12:03 Sorter_Lower: export
+SYCON handoff: 61 stations (controller 'n0001-trib-aec01-K22101.1') + 199 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Sorter_Lower\SyconNetProjectInterface
+21:12:09 Sorter_Lower: build
+21:27:35 Sorter_Lower: build exit 1 - 
+21:27:35 Induction_LowerGR1: export
+SYCON handoff: 10 stations (controller 'n0001-trib-aec01-K22301.1') + 40 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Induction_LowerGR1\SyconNetProjectInterface
+21:27:37 Induction_LowerGR1: build
+21:36:34 Induction_LowerGR1: build exit 1 - 
+21:36:35 Upstream_ConveyorsLower: export
+SYCON handoff: 41 stations (controller 'n0001-trib-aec01-K22102.1') + 190 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Upstream_ConveyorsLower\SyconNetProjectInterface
+21:36:42 Upstream_ConveyorsLower: build
+21:49:12 Upstream_ConveyorsLower: build exit 1 - 
+21:49:14 Chutes_Card1: export
+SYCON handoff: 47 stations (controller 'n0001-tric-aec01-K22101.1') + 196 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Chutes_Card1\SyconNetProjectInterface
+21:49:30 Chutes_Card1: build
+21:51:10 Chutes_Card1: build exit 1 - 
+batch exit 2
+01:55:24 ---- resume run
+01:55:24 Induction_LowerGR1: export
+SYCON handoff: 10 stations (controller 'n0001-trib-aec01-K22301.1') + 40 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Induction_LowerGR1\SyconNetProjectInterface
+01:55:26 Induction_LowerGR1: build --resume
+01:57:40 Induction_LowerGR1: build exit 1 - 
+01:57:40 Upstream_ConveyorsLower: export
+SYCON handoff: 41 stations (controller 'n0001-trib-aec01-K22102.1') + 190 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Upstream_ConveyorsLower\SyconNetProjectInterface
+01:57:46 Upstream_ConveyorsLower: build --resume
+01:59:25 Upstream_ConveyorsLower: build exit 1 - 
+01:59:25 Sorter_Lower: export
+SYCON handoff: 61 stations (controller 'n0001-trib-aec01-K22101.1') + 199 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Sorter_Lower\SyconNetProjectInterface
+01:59:28 Sorter_Lower: build --resume
+02:01:08 Sorter_Lower: build exit 1 - 
+02:01:08 done
+02:01:08 Chutes_Card1: export
+SYCON handoff: 47 stations (controller 'n0001-tric-aec01-K22101.1') + 196 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Chutes_Card1\SyconNetProjectInterface
+02:01:22 Chutes_Card1: build 
+02:29:08 Chutes_Card1: build exit 1 - 
+02:29:09 done
+resume batch exit 0
+02:30:38 ---- resume run 2
+02:30:38 Induction_LowerGR1: export
+SYCON handoff: 10 stations (controller 'n0001-trib-aec01-K22301.1') + 40 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Induction_LowerGR1\SyconNetProjectInterface
+02:30:39 Induction_LowerGR1: build --resume
+02:40:08 Induction_LowerGR1: build exit 0 - verification: 107 PASS, 0 FAIL
+02:40:08 Chutes_Card1: export
+SYCON handoff: 47 stations (controller 'n0001-tric-aec01-K22101.1') + 196 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Chutes_Card1\SyconNetProjectInterface
+02:40:24 Chutes_Card1: build --resume
+03:30:51 Chutes_Card1: build exit 0 - verification: 528 PASS, 0 FAIL
+03:30:52 Upstream_ConveyorsLower: export
+SYCON handoff: 41 stations (controller 'n0001-trib-aec01-K22102.1') + 190 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Upstream_ConveyorsLower\SyconNetProjectInterface
+03:30:59 Upstream_ConveyorsLower: build --resume
+03:37:40 Upstream_ConveyorsLower: build exit 1 - 
+03:37:40 Sorter_Lower: export
+SYCON handoff: 61 stations (controller 'n0001-trib-aec01-K22101.1') + 199 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Sorter_Lower\SyconNetProjectInterface
+03:37:43 Sorter_Lower: build --resume
+04:00:01 Sorter_Lower: build exit 1 - 
+04:00:01 done
+resume batch 2 exit 0
+04:04:08 ---- resume run 3
+04:04:09 Upstream_ConveyorsLower: export
+SYCON handoff: 41 stations (controller 'n0001-trib-aec01-K22102.1') + 190 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Upstream_ConveyorsLower\SyconNetProjectInterface
+04:04:15 Upstream_ConveyorsLower: build --resume
+04:20:12 Upstream_ConveyorsLower: build exit 1 - 
+04:20:12 Sorter_Lower: export
+SYCON handoff: 61 stations (controller 'n0001-trib-aec01-K22101.1') + 199 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Sorter_Lower\SyconNetProjectInterface
+04:20:15 Sorter_Lower: build --resume
+04:35:05 Sorter_Lower: build exit 1 - 
+04:35:05 done
+resume batch 3 exit 0
+04:41:06 ---- resume run 4 (last-row fix)
+04:41:07 Sorter_Lower: export
+SYCON handoff: 61 stations (controller 'n0001-trib-aec01-K22101.1') + 199 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Sorter_Lower\SyconNetProjectInterface
+04:41:13 Sorter_Lower: build --resume
+04:48:52 Sorter_Lower: build exit 1 - 
+04:48:54 done
+resume batch 4 exit 0
+04:52:17 ---- resume run 5 (IP editor retries, resumable IP pass) + upstream fresh (one network)
+04:52:18 Sorter_Lower: export
+SYCON handoff: 61 stations (controller 'n0001-trib-aec01-K22101.1') + 199 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Sorter_Lower\SyconNetProjectInterface
+04:52:24 Sorter_Lower: build --resume
+05:59:43 Sorter_Lower: build exit 1 - verification: 601 PASS, 27 FAIL
+05:59:43 done
+resume batch 5 exit 0
+05:59:44 Upstream_ConveyorsLower: export
+SYCON handoff: 23 stations (controller 'n0001-trib-aec01-K22102.1') + 106 module rows -> C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\FVT_Upstream_ConveyorsLower\SyconNetProjectInterface
+05:59:52 Upstream_ConveyorsLower: build 
+06:38:00 Upstream_ConveyorsLower: build exit 0 - verification: 265 PASS, 0 FAIL
+06:38:01 done
+upstream fresh exit 0
+06:41:03 ---- all four verified: Sorter_Lower 601 PASS / 0 FAIL (re-verified by scripts/verify_saved.py after order_is_pattern; 27 notes), Induction_LowerGR1 107/0, Upstream_ConveyorsLower (first network, 23 stations) 265/0, Chutes_Card1 528/0
