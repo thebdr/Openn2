@@ -154,6 +154,43 @@ def test_scalance_pnio_row():
         ("0", str(32768 + n), "6GK5991-1AD00-8GA0", "SFP 991-1 A") for n in (1, 2, 3, 4)]
 
 
+def test_duplicate_name_or_ip_is_a_fail_and_the_second_is_left_out():
+    rows = [
+        _head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+        _head("n0055-enc04-aec1-k11", "192.168.1.55", "6ES7158-3AD10-0XA0", "-K11", "55"),
+        _head("n0055-enc04-aec1-k11", "192.168.1.56", "6ES7158-3AD10-0XA0", "-K11", "56"),     # the name again
+        _head("n0057-lb01-K1", "192.168.1.55", "AL1202", "-K1", "57"),                           # the IP again
+    ]
+    dtd = dict(DTD, **{"6ES7158-3AD10-0XA0": {"model_id": "6ES7158-3AD10-0XA0", "role": "slave", "catalog_item": "PN/PN Coupler X2",
+                                               "modules": "default", "gsdml": "", "comment": ""}})
+    stations, _m, findings = sycon.build(rows, dtd)
+    assert [s["station_name"] for s in stations] == ["n0001-trib-aec01-K22101.1", "n0055-enc04-aec1-k11"]
+    assert sorted((f.type, f.severity) for f in findings) == [("sycon_duplicate_ip", "FAIL"), ("sycon_duplicate_name", "FAIL")]
+
+
+def test_another_network_is_another_project():
+    """2026-10-24: the conveyor list's two cabinet sheets are two PROFINET networks with their own cifX cards; the
+    second repeats the first's station names. One project = the controller's network: the other network's
+    controller and stations are INFO findings, left out (no duplicate FAIL for them); a second card on the
+    controller's own network is the redundant one, as before."""
+    coupler = {"6ES7158-3AD10-0XA0": {"model_id": "6ES7158-3AD10-0XA0", "role": "slave", "catalog_item": "PN/PN Coupler X2",
+                                      "modules": "default", "gsdml": "", "comment": ""}}
+    rows = [
+        _head("n0001-trib-aec01-K22102.1", "192.168.2.1", "CIFX 80-RE/ML", "-K22102.1", "1"),
+        _head("n0001-trib-aec01-K22202.1", "192.168.2.1", "CIFX 80-RE/ML", "-K22202.1", "1"),      # the redundant card
+        _head("n0055-enc04-aec1-k11", "192.168.2.55", "6ES7158-3AD10-0XA0", "-K11", "55"),
+        _head("n0001-trib-aec01-K22102.2", "192.168.3.1", "CIFX 80-RE/ML", "-K22102.2", "1"),      # the second network
+        _head("n0055-enc04-aec1-k11", "192.168.3.55", "6ES7158-3AD10-0XA0", "-K11", "55"),         # its coupler, same name
+    ]
+    stations, _m, findings = sycon.build(rows, dict(DTD, **coupler))
+    assert [(s["station_name"], s["ip_address"]) for s in stations] == [("n0001-trib-aec01-K22102.1", "192.168.2.1"),
+                                                                       ("n0055-enc04-aec1-k11", "192.168.2.55")]
+    kinds = [(f.type, f.severity) for f in findings]
+    assert kinds == [("sycon_second_controller", "INFO"), ("sycon_second_controller", "INFO"), ("sycon_other_network", "INFO")]
+    assert "second card on its network" in findings[0].detail and "another PROFINET network" in findings[1].detail
+    assert sycon.network_of("192.168.3.55") == (192, 168, 3, 0) and sycon.network_of("n/a") is None
+
+
 def test_unknown_modules_policy_is_refused():
     with tempfile.TemporaryDirectory() as d:
         dtd = os.path.join(d, "SyconDeviceTypesDatabase.csv")

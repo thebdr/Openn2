@@ -44,8 +44,18 @@ def _row_info(v, col, r) -> InfoBlock:
                      desc_l1b=v.text(r, col["desc_l1b"]), drawing=v.text(r, col["drawing"]), type_index=ti)
 
 
-def run_iolist(params: dict) -> list:
-    """Validate the I/O List of `params['iolist_path']`. Returns a list of phase-110 Findings."""
+def mandatory_for(system, colmap) -> list:
+    """The column-map rows a PROFINET node row must fill for `system` (`mandatory_in` names system ids or
+    taxonomy words; `*` = every system); none without a system."""
+    if system is None:
+        return []
+    words = {str(system.id).lower()} | {str(t).lower() for t in (getattr(system, "taxonomy", ()) or ())}
+    return [m for m in colmap if any(t.lower() in words or t == "*" for t in m.get("mandatory_in", ()))]
+
+
+def run_iolist(params: dict, system=None) -> list:
+    """Validate the I/O List of `params['iolist_path']`. Returns a list of phase-110 Findings. `system` (the
+    active System, when the caller has one) selects the `mandatory_in` columns of its project type."""
     out = []
     io_path = params.get("iolist_path") or ""
     doc = os.path.basename(io_path)
@@ -54,6 +64,7 @@ def run_iolist(params: dict) -> list:
 
     colmap = config.load_column_map("IoList")
     col = {m["canonical"]: m["column"] for m in colmap}
+    mandatory = mandatory_for(system, colmap)
     check_cols = [m for m in colmap if not m["preliminary_check_exclude"]]
     mapped_idx = {_ci(m["column"]) for m in colmap}
     expected_norm = {_norm(m["expected_header"]).lower() for m in colmap if m["expected_header"]}
@@ -77,7 +88,7 @@ def run_iolist(params: dict) -> list:
     for n in all_names:
         out.append(vm.entry("INFO", 110, "proc_sheet" if n in matched else "skip_sheet", sheet=n))
 
-    seen_ip, seen_fld, total_nodes = {}, {}, 0
+    seen_ip, seen_fld, seen_pname, total_nodes = {}, {}, {}, 0
     for v in views:
         # --- header check (mapped, non-excluded columns) --- #
         for m in check_cols:
@@ -154,6 +165,20 @@ def run_iolist(params: dict) -> list:
                     out.append(vm.entry("FAIL", 110, "ip_missing", location=v.location(r, col["profinet_ip"]), doc=doc, info=info))
                 if (not pname.startswith("n")) or any(ch in pname for ch in _BAD_PNAME):
                     out.append(vm.entry("FAIL", 110, "pname_wrong", location=v.location(r, col["profinet_name"]), doc=doc, info=info))
+                # the columns this project type requires on a node row (column_map `mandatory_in`)
+                for m in mandatory:
+                    if v.text(r, m["column"]) == "":
+                        out.append(vm.entry("FAIL", 110, "mandatory_missing", name=m["expected_header"] or m["canonical"],
+                                            location=v.location(r, m["column"]), doc=doc, info=info))
+            # a PROFINET name twice = two nodes with one identity (2026-10-24: three doubled couplers in a conveyor
+            # list blocked the SYCON.net controller dialog)
+            if pname and (thw in ("PA", "PW") or ip_t):
+                key = pname.lower()
+                if key in seen_pname:
+                    out.append(vm.entry("FAIL", 110, "pname_duplicated", name=pname, first=seen_pname[key],
+                                        location=v.location(r, col["profinet_name"]), doc=doc, info=info))
+                else:
+                    seen_pname[key] = v.location(r, col["profinet_name"])
 
             # the row raised no finding -> a PASS line for the full report (dropped from errors-only)
             if len(out) == before:

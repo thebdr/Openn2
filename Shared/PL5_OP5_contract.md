@@ -62,6 +62,11 @@ change — a trailing added column (the 9th `Connector`, the 10th `Topology` - 2
 Reserved, not implemented: `sw/technology-object`, `sw/watch-table`, `sw/software-unit` (the remaining VCI
 folders `Technology objects`, `Watch and force tables`, `Software units`, `External source files`).
 
+Not OP5's: the `hw/sycon-device-types`, `hw/sycon-stations` and `hw/sycon-modules` kinds carry the same header
+(`target: SyconNetProjectInterface`) and are PL5's handoff to Sycon5App for a Hilscher SYCON.net project (the
+IPC-based types; one project per PROFINET network, the controller's) - see `Sycon5App/README.md`; OP5 lists a
+folder of them as `doc/other` at most.
+
 The same kinds describe OP5's **exports** (TIA → PL5 coverage report), with `producer: Openn5 …`.
 
 ### 2.1 Model ids in `hw/device-types` (DeviceTypesDatabase.csv)

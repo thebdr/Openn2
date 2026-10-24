@@ -185,6 +185,17 @@ def port_submodule(size_in, size_out, do) -> str:
     return ""
 
 
+def network_of(ip: str, mask: str = DEFAULT_MASK):
+    """The network address of `ip` under `mask`, as a tuple of four ints; None for a malformed address."""
+    try:
+        a, m = [int(x) for x in str(ip).split(".")], [int(x) for x in str(mask).split(".")]
+    except ValueError:
+        return None
+    if len(a) != 4 or len(m) != 4:
+        return None
+    return tuple(x & y for x, y in zip(a, m))
+
+
 def _f(type_, severity, detail, location=""):
     return Finding(phase=PHASE, type=type_, severity=severity, detail=detail, location=location)
 
@@ -236,7 +247,8 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
     every station gets `update_time_ms` as its PROFINET updating time."""
     stations, modules, findings = [], [], []
     cur = None
-    controller = None
+    controller, controller_net = None, None
+    seen_names, seen_ips = {}, {}
 
     def finalize():
         if cur is None:
@@ -322,12 +334,37 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
         if rec["role"] == "ignore":
             findings.append(_f("sycon_model_ignored", "INFO", "station %r (%s): %s" % (name, model, rec["comment"]), where))
             continue
+        net = network_of(ip)
         if rec["role"] == "controller":
             if controller is not None:
-                findings.append(_f("sycon_second_controller", "INFO", "station %r (%s, %s) skipped: the controller is %r"
-                                   % (name, model, ip, controller), where))
+                same = net is not None and net == controller_net
+                findings.append(_f("sycon_second_controller", "INFO", "station %r (%s, %s) skipped: the controller is %r%s"
+                                   % (name, model, ip, controller, " (a second card on its network)" if same else
+                                      " - another PROFINET network: its stations are left out, one project per network"), where))
                 continue
-            controller = name
+            controller, controller_net = name, net
+        # one project = one PROFINET network, the controller's (2026-10-24: the conveyor list's two cabinet sheets are two
+        # networks, 192.168.2.x and 192.168.3.x, each with its own cifX card, and the second repeats the first's station
+        # names - merged into one project they blocked the SYCON.net controller dialog): a station on another network
+        # than the controller belongs to that network's project (--sheet selects it) - an INFO, left out
+        elif controller_net is not None and net is not None and net != controller_net:
+            findings.append(_f("sycon_other_network", "INFO", "station %r (%s, %s) is on another PROFINET network than the "
+                               "controller %r - left for that network's project" % (name, model, ip, controller), where))
+            continue
+        # a duplicate name of station or IP among the slaves of one network is a document error: SYCON.net refuses the
+        # second - a FAIL, the second station left out so the rest of the project can still be built
+        elif name.lower() in seen_names:
+            findings.append(_f("sycon_duplicate_name", "FAIL", "station %r (%s) is a second node with that PROFINET "
+                               "name (the first: %s) - not exported" % (name, model, seen_names[name.lower()]), where))
+            continue
+        elif ip and ip in seen_ips:
+            findings.append(_f("sycon_duplicate_ip", "FAIL", "station %r (%s) repeats the IP %s of %r - not exported"
+                               % (name, model, ip, seen_ips[ip]), where))
+            continue
+        if rec["role"] != "controller":
+            seen_names[name.lower()] = where or name
+            if ip:
+                seen_ips[ip] = name
         # a switch's updating time is left to the device (SYCON.net offers a SCALANCE 128 / 256 / 512 ms only,
         # 2026-10-23 21:36): the column stays empty for the controller and the `scalance-pnio` stations
         no_timing = rec["role"] == "controller" or rec["modules"] == "scalance-pnio"

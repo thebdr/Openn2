@@ -66,7 +66,7 @@ def _iorow(**canon):
     return {_IOCOL[k]: v for k, v in canon.items()}
 
 
-def _run_iolist(views, params=None, available=None):
+def _run_iolist(views, params=None, available=None, system=None):
     """Run run_iolist with the workbook openers monkeypatched to return `views`."""
     p = {"iolist_path": "X.xlsx", "iolist_params": {"sheets": "IO", "header_row": 1},
          "validation_params": {"global": {"strike_handling": "ignore"},
@@ -78,7 +78,7 @@ def _run_iolist(views, params=None, available=None):
         iolist.os.path.exists = lambda _p, _o=orig_os: True if _p == "X.xlsx" else _o(_p)
         iolist.wbk.open_sheets = lambda *a, **k: list(views)
         iolist.wbk.available_sheets = lambda _p: available if available is not None else [v.name for v in views]
-        return iolist.run_iolist(p)
+        return iolist.run_iolist(p, system=system)
     finally:
         iolist.os.path.exists, iolist.wbk.open_sheets, iolist.wbk.available_sheets = orig_os, orig_ss, orig_as
 
@@ -119,6 +119,45 @@ def test_iolist_dup_ip_and_fld():
     found = _types(_run_iolist([v]))
     ok(("ip_duplicated", "FAIL") in found, "same non-.1 IP twice -> ip_duplicated")
     ok(("dup_fld", "FAIL") in found, "same FU+LOC+DEV twice -> dup_fld")
+
+
+def test_iolist_dup_profinet_name():
+    """Two PROFINET node rows with one name of station -> pname_duplicated (2026-10-24: the doubled encoder
+    couplers of a conveyor list blocked the SYCON.net controller dialog)."""
+    cm = config.load_column_map("IoList")
+    v = StubView("IO", cm, {
+        2: _iorow(functional_unit="=S1", location="+L1", device="-D1", type_hw="PA", ts_ref="TS_001",
+                  profinet_ip="10.0.0.2", profinet_name="n0055-enc04-aec1-k11", part_no="6ES7158-3AD10-0XA0"),
+        3: _iorow(functional_unit="=S1", location="+L2", device="-D2", type_hw="PA", ts_ref="TS_001",
+                  profinet_ip="10.0.0.3", profinet_name="n0055-enc04-aec1-k11", part_no="6ES7158-3AD10-0XA0"),
+    })
+    found = _types(_run_iolist([v]))
+    ok(("pname_duplicated", "FAIL") in found, "the same PROFINET name on two node rows -> pname_duplicated")
+    ok(("ip_duplicated", "FAIL") not in found, "distinct IPs")
+
+
+class _StubSystem:
+    def __init__(self, id_, taxonomy):
+        self.id, self.taxonomy = id_, taxonomy
+
+
+def test_iolist_mandatory_columns_of_the_project_type():
+    """column_map `mandatory_in`: a node row (PA/PW) of a listed project type must fill the column; a system
+    not listed and a non-node row are not judged."""
+    cm = config.load_column_map("IoList")
+    mand = iolist.mandatory_for(_StubSystem("siemens_tia_generic_hw", ("PLC_Based", "SiemensS7", "GenericHardware")), cm)
+    eq(sorted(m["canonical"] for m in mand), ["part_no", "profinet_ip", "profinet_name"], "name, model, IP are mandatory")
+    eq(iolist.mandatory_for(_StubSystem("siemens_s7_safety", ("PLC_Based",)), cm), [], "the safety type lists none")
+    eq(iolist.mandatory_for(None, cm), [], "no system: no mandatory columns")
+    v = StubView("IO", cm, {
+        2: _iorow(functional_unit="=S1", location="+L1", device="-D1", type_hw="PA", ts_ref="TS_001",
+                  profinet_ip="10.0.0.2", profinet_name="n0005-x"),                       # no Part No. on a node row
+        3: _iorow(functional_unit="=S1", location="+L1", device="-D2", type_hw="KI", bit="I0.0"),   # a signal row
+    })
+    hw = _StubSystem("hilscher_syconnet_generic_hw", ("IPC_Based", "HilscherSYCONnet", "GenericHardware"))
+    found = _types(_run_iolist([v], system=hw))
+    eq(found.count(("mandatory_missing", "FAIL")), 1, "the node row's empty Part No. once; the signal row not judged")
+    ok(("mandatory_missing", "FAIL") not in _types(_run_iolist([v])), "no system: the check is off")
 
 
 def test_iolist_permanent_part_and_ts():
@@ -226,6 +265,8 @@ if __name__ == "__main__":
         ("iolist_clean_row_passes", test_iolist_clean_row_passes),
         ("iolist_addr_format_and_fg", test_iolist_addr_format_and_fg),
         ("iolist_dup_ip_and_fld", test_iolist_dup_ip_and_fld),
+        ("iolist_dup_profinet_name", test_iolist_dup_profinet_name),
+        ("iolist_mandatory_columns_of_the_project_type", test_iolist_mandatory_columns_of_the_project_type),
         ("iolist_permanent_part_and_ts", test_iolist_permanent_part_and_ts),
         ("iolist_col_wrong_header", test_iolist_col_wrong_header),
         ("ce_absent_skips", test_ce_absent_skips),

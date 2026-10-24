@@ -53,9 +53,13 @@ def test_system_is_frozen():
 def test_catalog_rows_reflect_registration():
     """Since step 3, siemens_s7_safety is REGISTERED (available); the RTX rows stay greyed PLANNED."""
     rows = catalog.catalog()
-    eq(len(rows), len(catalog.PLANNED), "1 registered supersedes its PLANNED row; 3 stay planned")
+    registered = {s.id for s in catalog.ALL_SYSTEMS}
+    planned_only = [p for p, _k in catalog.PLANNED if p not in registered]
+    eq(len(rows), len(registered) + len(planned_only), "every registered system + the PLANNED rows not yet registered")
     by = {r[0]: r[2] for r in rows}
     eq(by.get("siemens_s7_safety"), True, "the Siemens system is available")
+    eq(by.get("siemens_tia_generic_hw"), True, "the TIA generic-hardware type is available")
+    eq(by.get("hilscher_syconnet_generic_hw"), True, "the SYCON.net generic-hardware type is available")
     eq(by.get("intervalzero_rtx_sorter"), False, "RTX sorter still greyed")
     eq(by.get("intervalzero_rtx_induction"), False, "RTX induction still greyed")
     eq(by.get("intervalzero_rtx_plant"), False, "RTX plant still greyed")

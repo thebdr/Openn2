@@ -127,6 +127,10 @@ STRINGS: dict = {
     "np_type":      {"en": "Project type", "it": "Tipo di progetto"},
     # the system display names (the catalog's name_key; rows derive from registry membership - C-021)
     "sys_siemens_s7_safety":        {"en": "Siemens S7 · Safety", "it": "Siemens S7 · Safety"},
+    "sys_siemens_tia_generic_hw":   {"en": "Siemens TIA Portal · Generic hardware", "it": "Siemens TIA Portal · Hardware generico"},
+    "sys_hilscher_syconnet_generic_hw": {"en": "Hilscher SYCON.net · Generic hardware", "it": "Hilscher SYCON.net · Hardware generico"},
+    "ph_hardware_sycon": {"en": "SYCON.net Hardware", "it": "Hardware SYCON.net"},
+    "pb_open_sycon_handoff": {"en": "Open SYCON.net Handoff Folder", "it": "Apri cartella handoff SYCON.net"},
     "sys_intervalzero_rtx_sorter":  {"en": "IntervalZero RTX · Sorter", "it": "IntervalZero RTX · Sorter"},
     "sys_intervalzero_rtx_induction": {"en": "IntervalZero RTX · Induction", "it": "IntervalZero RTX · Induction"},
     "sys_intervalzero_rtx_plant":   {"en": "IntervalZero RTX · Plant", "it": "IntervalZero RTX · Plant"},

@@ -7,7 +7,7 @@ from pipeline5.findings.factory import entry
 
 
 def test_messages_bilingual():
-    eq(len(messages.MESSAGES), 56, "all 56 phase-100 slugs present (+ the 6 step-4 diagnosis slugs)")
+    eq(len(messages.MESSAGES), 58, "all 58 phase-100 slugs present (+ the 6 step-4 diagnosis slugs, + the 2 node-row checks of 2026-10-24)")
     for slug, e in messages.MESSAGES.items():
         ok(e.get("en"), f"{slug} has EN")
         ok(e.get("it"), f"{slug} has IT")

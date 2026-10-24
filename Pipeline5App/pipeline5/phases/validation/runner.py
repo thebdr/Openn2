@@ -61,7 +61,15 @@ def run_validation(database=None, params: dict | None = None, out_dir: str | Non
         findings += crosscheck.run_xcheck_cem_iol(database, params)  # 3. cross-checks (130 CEM -> IOL)
         findings += crosscheck.run_xcheck_iol_cem(database, params)  #    + 140 (IOL -> CEM)
         findings += diagcheck.run_diag_checks(database, params)    # 4. diagnosis (150; SKIPs on a virgin doc)
+    return report_findings(findings, database, out_dir, lang)
 
+
+def report_findings(findings, database=None, out_dir: str | None = None, lang: str = "en") -> dict:
+    """The second half of `run_validation`, for any set of phase-100 findings (the generic-hardware types
+    run the 110 checks only): record the issues into `validation_issues` (a database of its own when the
+    caller staged none), apply the treatment registry, write the four reports. Same return shape."""
+    if database is None:
+        database = Database([])
     # record only the ISSUES (FAIL/ERROR/WARN) into validation_issues - PASS/INFO/SKIP are report-only noise.
     record(database, [f for f in findings if f.severity in _TREATABLE])
     # save ONLY the validator's own output: the staged signals it judged are the DOCUMENTS' - re-saving them

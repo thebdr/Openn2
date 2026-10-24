@@ -10,9 +10,13 @@ GUI/project layers. The grep-gate test enforces the direction.
 """
 from __future__ import annotations
 
+from pipeline5.systems.ipc_based.hilscher_syconnet.generic_hw.system import SYSTEM as HILSCHER_SYCONNET_GENERIC_HW
+from pipeline5.systems.plc_based.siemens_s7.generic_hw.system import SYSTEM as SIEMENS_TIA_GENERIC_HW
 from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM as SIEMENS_S7_SAFETY
 
-ALL_SYSTEMS: tuple = (SIEMENS_S7_SAFETY,)
+# the generic-hardware types (user 2026-10-24: "generic hardware (Siemens Tia Portal), generic hardware (Hilscher
+# Sycon.Net) (only validation + hardware generation enabled)") - validation (110) and the hardware handoff, no program
+ALL_SYSTEMS: tuple = (SIEMENS_S7_SAFETY, SIEMENS_TIA_GENERIC_HW, HILSCHER_SYCONNET_GENERIC_HW)
 
 # Roadmap rows (id, i18n name key) - shown greyed until their system.py is registered above.
 PLANNED: tuple = (

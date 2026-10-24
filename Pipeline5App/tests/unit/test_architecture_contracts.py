@@ -135,7 +135,8 @@ def test_ratchet_entries_still_real():
     eq(stale, [], "ratchet entries must match real edges - delete paid-off ones")
 
 
-_SYSTEM_ID_LITERALS = ("siemens_s7_safety", "intervalzero_rtx_", "siemens_plc_safety", "rtx_cpci_")
+_SYSTEM_ID_LITERALS = ("siemens_s7_safety", "intervalzero_rtx_", "siemens_plc_safety", "rtx_cpci_",
+                       "siemens_tia_generic_hw", "hilscher_syconnet_generic_hw")
 _L5_ALLOWED_PARTS = ("systems", "workbench", "app")   # the registry, the (transitional) GUI wiring, the root
 _L5_ALLOWED_MODULES = {"language.i18n"}               # the DISPLAY-NAME catalog (sys_* keys) - data, not branching
 

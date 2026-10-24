@@ -57,14 +57,17 @@ def read_config_csv(path: str, json_columns=()) -> list:
 
 def load_column_map(document: str) -> list:
     """Column-map rows for one document (IoList / CE): {column, canonical, expected_header, required,
-    preliminary_check_exclude}. `preliminary_check_exclude` marks the pipeline-written columns (AA-AG)
-    that the phase-100 standalone validation ignores."""
+    preliminary_check_exclude, mandatory_in}. `preliminary_check_exclude` marks the pipeline-written columns
+    (AA-AG) that the phase-100 standalone validation ignores. `mandatory_in` lists the project types (system
+    ids or taxonomy words, `|`-separated) in which a PROFINET node row must fill the column - the phase-110
+    `mandatory_missing` check (user 2026-10-24: name, model and IP for the generic-hardware types)."""
     return [{
         "column": (r.get("column") or "").strip(),
         "canonical": (r.get("canonical") or "").strip(),
         "expected_header": (r.get("expected_header") or "").strip(),
         "required": _as_bool(r.get("required")),
         "preliminary_check_exclude": _as_bool(r.get("preliminary_check_exclude")),
+        "mandatory_in": tuple(t.strip() for t in (r.get("mandatory_in") or "").split("|") if t.strip()),
     } for r in read_config_csv(find("documents/column_map.csv"))
         if (r.get("document") or "").strip() == document]
 
