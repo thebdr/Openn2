@@ -332,8 +332,25 @@ VM (the user's SYCON.net was open); LOWER SORTER: 5 switches (n0010, n0015, n004
 the transceiver is always the SFP991-1 (100 Mbit/s multimode, LC). In the official XC-200 GSDML
 (`GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml`, the user's download) the XC216-4C's combo ports 1-4
 are PLUGGABLE port submodules (subslots 32769-32772): `RJ45 1 GBit`, `SFP 991-1 A`, `SFP 991-1 LD A`,
-`SFP 992-1`, ... - the project must say which; the XC208's 8 ports and the XC206-2's 6 RJ45 + 2 FO ports are
-fixed. The 2021 file's XC216-4C DAPs (V4.1-V4.3) have the same pluggable ports.
+`SFP 992-1`, ... - the project must say which; the XC208's 8 ports are fixed, the XC206-2 SFP's ports 7-8 are
+pluggable like the combo ports. User: "Configure all four combo ports of every XC216-4C as SFP 991-1 A" - PL5
+writes one row per such port (Slot 0, Subslot 32768 + port, Module Id the SFP's order number, Module Text
+`SFP 991-1 A`; `SCALANCE_COMBO_PORTS`), the consumer's `set_dap_submodules` chooses them, `verify` compares.
+**Probed 21:10** (`scripts/probe_switch.py`, a new project, the switch dragged from the single catalog entry of
+the official 2026 file - SYCON.net 1.500 takes that V2.45 GSDML): the DAP row expanded lists its submodules in
+subslot order - row 2 the device, row 3 `PN-IO` (32768), rows 4-7 the combo ports (default `RJ45 1 GBit`, the
+in-place combo 1904 offering the 16 port submodules), rows 8-19 the fixed ports 5-16; the PN-IO row enables the
+Dataset combo and its Parameter grid shows 8 rows at 16 px (record, Not by STEP7, record, Interface Mode,
+record, Mirroring Mode, Monitor Barrier, Monitor Port). The SUM_BOM workbooks name the switches and their
+C-PLUGs only; the SFPs are in the cabinet drawings' parts lists (pypdf, `scratchpad/pdf_sfp.py`).
+
+**The four FVT test projects** (user 2026-10-23 evening, going to dinner: "do a sycon project for us to test
+for each machine type: 1 sorter, 1 induction lines, 1 upstream, 1 chutes (1 card only); vitronic i will provide
+later"): `scripts/build_fvt_tests.sh` exports and builds, in sequence, `FVT_Sorter_Lower` (IO0010),
+`FVT_Induction_LowerGR1` (IO0011), `FVT_Upstream_ConveyorsLower` (IO0013) and `FVT_Chutes_Card1` (IO0030,
+sheet R5.S1.C1 only - the list has one cabinet sheet per cifX card, `--sheet`) into `spike/scratch/`; the models
+without a GSDML yet (KEBA, NORD, SEW, Interroll, Inovance, Vitronic, Balluff) are skipped with the exporter's
+`sycon_model_not_in_dtd` WARN. Summary in `spike/scratch/dinner_builds.log`.
 
 **Maximized dialogs, geometry** (user: "you could maximize the configuration windows ... some systems may
 have 100+ nodes"): every configuration dialog is maximized when it opens (`ConfigDialog.maximize`, SW_MAXIMIZE)

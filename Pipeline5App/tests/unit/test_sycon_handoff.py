@@ -147,6 +147,7 @@ def test_scalance_pnio_row():
             _head("n0010-trib-aec01-K26501", "192.168.1.10", "6GK5216-4BS00-2AC2", "-K26501", "10")]
     stations, modules, _f = sycon.build(rows, dtd)
     assert [s["station_name"] for s in stations] == ["n0001-trib-aec01-K22101.1", "n0010-trib-aec01-K26501"]
+    assert stations[1]["update_time_ms"] == ""          # a switch's updating time is the device's own (128 ms and up)
     assert len(modules) == 5 and modules[0]["slot"] == "0" and modules[0]["subslot"] == "32768" and modules[0]["module_text"] == "PN-IO"
     assert modules[0]["parameters"].startswith("2=Off | 4=Off | record:3=00 03 00 06") and "record:12312=30 1C" in modules[0]["parameters"]
     assert [(m["slot"], m["subslot"], m["module_id"], m["module_text"]) for m in modules[1:]] == [

@@ -45,9 +45,11 @@ class Verification:
 same_text = Session.same_text
 
 
-def verify(handoff, project, plugged):
-    """Compare the read-back with the handoff tables; `plugged` = {station: [module texts the driver chose]}."""
+def verify(handoff, project, plugged, timing_set=None):
+    """Compare the read-back with the handoff tables; `plugged` = {station: [module texts the driver chose]},
+    `timing_set` = {station: the updating time (ms) the driver could set when the table's was not offered}."""
     v = Verification()
+    timing_set = {k.lower(): v_ for k, v_ in (timing_set or {}).items()}
     by_name = {d.device_no.lower(): d for d in project.devices}
     ctrl = project.controller
     v.check(ctrl is not None, "controller present: %s" % (ctrl.device_no if ctrl else None))
@@ -63,8 +65,11 @@ def verify(handoff, project, plugged):
         v.check(network.get(name) == ip, "controller lists %s at %s (read %s)" % (name, ip, network.get(name)))
         if s.get("update_time_ms"):
             t = timing.get(name)
-            v.check(t is not None and abs(t[0] - float(s["update_time_ms"])) < 1e-6,
-                    "station %s update time %s ms (read %s)" % (name, s["update_time_ms"], "%g ms, watchdog %g ms" % t if t else None))
+            want = float(timing_set.get(name, s["update_time_ms"]))
+            if abs(want - float(s["update_time_ms"])) > 1e-6:
+                v.note("station %s: the table's %s ms is not offered by the device, %g ms set" % (name, s["update_time_ms"], want))
+            v.check(t is not None and abs(t[0] - want) < 1e-6,
+                    "station %s update time %g ms (read %s)" % (name, want, "%g ms, watchdog %g ms" % t if t else None))
         if s.get("gsdml"):
             v.check(d.gsdml.lower() == s["gsdml"].lower(),
                     "station %s GSDML %s (read %s)" % (name, s["gsdml"], d.gsdml))
@@ -149,16 +154,26 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
 
     # 1. the stations, named by SYCON for now
     mapping = {}
-    todo = [s for s in h.stations if s["station_name"].lower() not in done_names]
-    if resume:                       # auto-named nodes an earlier run added but never renamed: pair them in order
-        wanted = {s["station_name"].lower() for s in h.stations}
-        leftovers = [n["station"] for n in d.stations() if n["station"].lower() not in wanted and not n["suffix"].startswith("(#")]
-        for auto, s in zip(leftovers, todo):
-            mapping[auto] = (s["station_name"], s["ip_address"])
-            log("resume: %s -> will be %s" % (auto, s["station_name"]))
-        todo = todo[len(leftovers):]
-    added = 0
     first_of = {}                    # (kind, catalog item, GSDML) -> the auto name of its first station (the clone source)
+    todo = [s for s in h.stations if s["station_name"].lower() not in done_names]
+    if resume:                       # auto-named nodes an earlier run added but never renamed: pair them with the
+        wanted = {s["station_name"].lower() for s in h.stations}      # table's stations of the SAME type, in order
+        leftovers = [n for n in d.stations() if n["station"].lower() not in wanted and not n["suffix"].startswith("(#")]
+        remaining = []
+        for s in todo:
+            type_name = split_item(s["catalog_item"])[0]
+            match = next((n for n in leftovers if same_text(n["type"], type_name)), None)
+            if match is None:
+                remaining.append(s)
+                continue
+            leftovers.remove(match)
+            mapping[match["station"]] = (s["station_name"], s["ip_address"])
+            first_of.setdefault((s["catalog_kind"] or "slave", s["catalog_item"], (s.get("gsdml") or "").lower()), match["station"])
+            log("resume: %s -> will be %s" % (match["station"], s["station_name"]))
+        if leftovers:
+            raise SyconError("saved nodes no table station of their type is left for: %r" % [n["station"] for n in leftovers])
+        todo = remaining
+    added = 0
     for i, s in enumerate(todo, start=1):
         added += 1
         key = (s["catalog_kind"] or "slave", s["catalog_item"], (s.get("gsdml") or "").lower())
@@ -182,8 +197,10 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     if wanted and resume and os.path.exists(xml):
         have = {k.lower(): v for k, v in read_project(xml).controller.timing.items()}
         wanted = {st: ms for st, ms in wanted.items() if not have.get(st.lower()) or abs(have[st.lower()][0] - ms) > 1e-6}
+    timing_set = {}
     if wanted:
-        d.set_stations_timing(wanted)
+        shown = d.set_stations_timing(wanted)
+        timing_set = {st: float(upd) for st, (upd, _wd) in shown.items() if upd.replace(".", "", 1).isdigit()}
         checkpoint()
     # 3. the modules and the submodules (an AL1202's ports)
     for s in h.stations:
@@ -229,5 +246,5 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
         checkpoint()
     time.sleep(2.0)
     project = read_project(xml)
-    v = verify(h, project, plugged)
+    v = verify(h, project, plugged, timing_set)
     return v, xml, plugged, d

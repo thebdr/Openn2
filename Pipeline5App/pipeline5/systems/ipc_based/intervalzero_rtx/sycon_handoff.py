@@ -242,7 +242,7 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
         if cur is None:
             return
         rec = cur["rec"]
-        if rec["role"] != "controller" and station_is_fast(cur["signals"]):
+        if cur["station"]["update_time_ms"] and station_is_fast(cur["signals"]):
             cur["station"]["update_time_ms"] = str(FAST_UPDATE_TIME_MS)
             cur["station"]["comment"] = (cur["station"]["comment"] + " | fast: " + ", ".join(
                 sorted({k for s in cur["signals"] for k in FAST_SIGNAL_KEYWORDS if k in signal_text(s)}))).strip(" |")
@@ -328,10 +328,13 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
                                    % (name, model, ip, controller), where))
                 continue
             controller = name
+        # a switch's updating time is left to the device (SYCON.net offers a SCALANCE 128 / 256 / 512 ms only,
+        # 2026-10-23 21:36): the column stays empty for the controller and the `scalance-pnio` stations
+        no_timing = rec["role"] == "controller" or rec["modules"] == "scalance-pnio"
         station = {"role": rec["role"], "station_name": name, "catalog_kind": ROLES[rec["role"]],
                    "catalog_item": rec["catalog_item"], "model_id": model, "gsdml": rec["gsdml"], "ip_address": ip,
                    "subnet_mask": DEFAULT_MASK, "gateway": "",
-                   "update_time_ms": "" if rec["role"] == "controller" else str(update_time_ms),
+                   "update_time_ms": "" if no_timing else str(update_time_ms),
                    "device_number": str(row.get("id_node") or "").strip(),
                    "description": " ".join(str(row.get("description_module") or "").split()),
                    "comment": " ".join(str(row.get("manufacturer") or "").split())}

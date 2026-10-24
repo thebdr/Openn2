@@ -474,15 +474,16 @@ class DeviceDialog(ConfigDialog):
         visual row 0, parameter i is visual row i + 1 before scrolling; rows beyond the 4 visible ones are reached
         by wheel scrolling with the pixel shift measured each time."""
         r = self.param_grid()
+        visible = max(1, (r.height() - PARAM_ROW_Y0 - 4) // PARAM_ROW_H)     # 4 at the reference size, ~17 maximized
         scrolled_px = 0
         for index in sorted(values):
             target_px = PARAM_ROW_H * (index + 1)              # top of the wanted row, unscrolled
-            while target_px - scrolled_px > PARAM_ROW_H * (PARAM_VISIBLE_ROWS - 1):
+            while target_px - scrolled_px > PARAM_ROW_H * (visible - 1):
                 shift = self._scroll_pixels(r, 1)
                 if shift <= 0:
-                    raise SyconError("the parameter grid did not scroll")
+                    break                                      # nothing to scroll: every row is on show
                 scrolled_px += shift
             visual = round((target_px - scrolled_px) / PARAM_ROW_H)
-            if visual < 0 or visual >= PARAM_VISIBLE_ROWS + 1:
-                raise SyconError("parameter %d not reachable (visual row %d)" % (index, visual))
+            if visual < 0 or visual > visible:
+                raise SyconError("parameter %d not reachable (visual row %d of %d)" % (index, visual, visible))
             self.set_param_visual(visual, values[index], r)

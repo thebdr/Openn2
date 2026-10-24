@@ -30,7 +30,9 @@ class SyconDriver:
         if self.session.attach_if_running():
             log("attached to the running SYCON.net:", self.session.title())
             return self
-        self.session.launch(project).login()
+        # a saved project loads one DTM per station: 40-60 stations took longer than a minute (02:00, "the main
+        # window did not appear") - the main window is awaited for up to 15 minutes
+        self.session.launch(project).login(timeout=900.0)
         log("opened:", self.session.title())
         return self
 
@@ -138,22 +140,19 @@ class SyconDriver:
         s = self.session
         s.close_menus()
         s.bring_front()
+        source_type = catalog.parse_node(s.station_item(source).window_text())["type"]
         new_nodes = []
         for _ in range(count):
             before = s.nodes()
             node = None
             for way in ("keys", "command"):
-                item = s.station_item(source)
-                s.safe_click(item)
-                time.sleep(0.4)
+                item = self._select_station(source)
                 if way == "command":
                     s.post_command_id(CONTEXT_COPY, "Copy")
                 else:
                     keyboard.send_keys("^c")
                 time.sleep(0.8)
-                item = s.station_item(source)
-                s.safe_click(item)
-                time.sleep(0.4)
+                item = self._select_station(source)
                 if way == "command":
                     s.post_command_id(CONTEXT_PASTE, "Paste")
                 else:
@@ -174,10 +173,30 @@ class SyconDriver:
                 log("  paste by %s produced no node" % way)
             if node is None:
                 raise SyconError("no node appeared after pasting %s" % source)
+            if node["type"] != source_type or len(new) != 1:
+                # 21:26: after a catalog drop the tree had lost the focus, Ctrl+C copied nothing and Ctrl+V pasted
+                # the clipboard's earlier node - a station of the wrong type that the build then mis-named
+                raise SyconError("pasting %s (%s) produced %r - the clipboard held another node" % (source, source_type, new))
             self.model.setdefault(node["station"], {"slots": {}})
             new_nodes.append(node)
             log("cloned %s -> %s" % (source, node["station"]))
         return new_nodes
+
+    def _select_station(self, station, attempts=3):
+        """Click the station's node in the netProject tree until the tree reports it selected (the first click
+        after a catalog drag-drop only moves the focus back from the catalog, 2026-10-23 21:26)."""
+        s = self.session
+        for attempt in range(attempts):
+            item = s.station_item(station)
+            s.safe_click(item)
+            time.sleep(0.4)
+            try:
+                if item.is_selected():
+                    return item
+            except Exception:  # noqa: BLE001
+                return item
+            log("  node <%s> not selected after click %d" % (station, attempt + 1))
+        raise SyconError("the node <%s> does not get selected" % station)
 
     def controller_station(self):
         for n in self.stations():

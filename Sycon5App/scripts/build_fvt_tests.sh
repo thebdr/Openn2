@@ -4,6 +4,7 @@
 # 1 chutes (1 card only)"). Each: the PL5 export of the I/O List (one cabinet sheet for a multi-card list), then
 # build_from_handoff. Logs: spike/scratch/FVT_<name>/export.log, build.log; the summary in dinner_builds.log.
 # Usage (Git Bash):  bash scripts/build_fvt_tests.sh [name ...]      (default: all four)
+#                    RESUME=1 bash scripts/build_fvt_tests.sh [name ...]   (re-export, then build --resume)
 PY=/c/Source/Repos/_Openn5/.venv/Scripts/python.exe
 APP=/c/Source/Repos/_Openn5/Sycon5App
 PL5=/c/Source/Repos/_Openn5/Pipeline5App
@@ -22,8 +23,10 @@ build() {
     (cd "$PL5" && "$PY" -W ignore -m pipeline5.systems.ipc_based.intervalzero_rtx.sycon_handoff --iolist "$LISTS\\$list" --out "$win\\SyconNetProjectInterface") > "$out/export.log" 2>&1
   fi
   tail -1 "$out/export.log" >> "$SUMMARY"
-  echo "$(date +%H:%M:%S) $name: build" >> "$SUMMARY"
-  (cd "$APP" && "$PY" -I scripts/build_from_handoff.py --handoff "spike/scratch/FVT_$name/SyconNetProjectInterface" --out "$win\\$name.spj") > "$out/build.log" 2>&1
+  local flag=""
+  [ -n "$RESUME" ] && flag="--resume"
+  echo "$(date +%H:%M:%S) $name: build $flag" >> "$SUMMARY"
+  (cd "$APP" && "$PY" -I scripts/build_from_handoff.py --handoff "spike/scratch/FVT_$name/SyconNetProjectInterface" --out "$win\\$name.spj" $flag) > "$out/build${RESUME:+_resume}.log" 2>&1
   local rc=$?
   echo "$(date +%H:%M:%S) $name: build exit $rc - $(head -1 "$out/$name.verification.txt" 2>/dev/null)" >> "$SUMMARY"
 }

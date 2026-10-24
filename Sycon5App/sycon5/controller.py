@@ -71,11 +71,18 @@ class ControllerDialog(ConfigDialog):
             time.sleep(0.8)
             upd = self.combo(TIMING_UPDATE_COMBO_ID)
             want = str(int(ms)) if float(ms).is_integer() else str(ms)
+            offered = upd.item_texts()
+            if want not in offered:
+                # the device's own range (a SCALANCE: 128 / 256 / 512 ms, 2026-10-23 21:36): the smallest offered
+                # at or above the wanted value, else the largest
+                nums = sorted((float(x), x) for x in offered if x.replace(".", "", 1).isdigit())
+                if not nums:
+                    raise SyconError("updating time %r not offered for %s: %r" % (want, st, offered))
+                pick = next((x for v, x in nums if v >= float(ms)), nums[-1][1])
+                log("  timing %s: %s ms not offered (%r) - %s ms taken" % (st, want, offered, pick))
+                want = pick
             if upd.selected_text() != want:
-                try:
-                    upd.select(want)
-                except (IndexError, ValueError) as ex:
-                    raise SyconError("updating time %r not offered for %s: %r (%s)" % (want, st, upd.item_texts(), ex))
+                upd.select(want)
                 time.sleep(0.8)
             wd = [c for c in self.w32.descendants(class_name="Edit") if c.control_id() == TIMING_WATCHDOG_EDIT_ID and c.is_visible()]
             shown[st] = (self.combo(TIMING_UPDATE_COMBO_ID).selected_text(), wd[0].window_text() if wd else "")

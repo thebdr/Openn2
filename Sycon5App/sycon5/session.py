@@ -19,6 +19,7 @@ from pywinauto import Desktop, keyboard
 
 EXE = r"C:\Program Files (x86)\Hilscher GmbH\SYCONnet\Syconu.exe"
 WM_COMMAND = 0x0111
+BM_CLICK = 0x00F5
 COMMANDS = {"new": 57600, "open": 57601, "close": 57602, "save": 57603, "save_as": 57604, "exit": 57665}
 BUTTON_IDS = {"OK": 1, "Cancel": 2, "Yes": 6, "No": 7, "Help": 9}
 SKIP_CLASSES = ("tooltips_class32", "MSCTFIME UI", "IME", "ComboLBox")
@@ -109,7 +110,8 @@ class Session:
                         login = c
         if login is None:
             raise SyconError("no login dialog")
-        [b for b in login.descendants(control_type="Button") if b.window_text() == "OK"][0].click_input()
+        ok = [b for b in login.descendants(control_type="Button") if b.window_text() == "OK"][0]
+        ok.click_input()
         t0 = time.time()
         while time.time() - t0 < timeout:
             time.sleep(2.0)
@@ -117,6 +119,16 @@ class Session:
                 if w.window_text().startswith("SYCON.net") and w.process_id() == self.pid and w.descendants(control_type="Tree"):
                     time.sleep(3.0)
                     return w
+            # the OK click did not land once (02:48, the login dialog still up 8 minutes later): press it again
+            # through the button's own message while the dialog is there
+            for w in uia().windows():
+                if w.window_text() == "SYCON.net User Login" or any(c.window_text() == "SYCON.net User Login" for c in w.children()):
+                    try:
+                        user32.SendMessageW(ok.handle, BM_CLICK, 0, 0)
+                        log("  login: OK pressed again")
+                    except Exception:  # noqa: BLE001
+                        pass
+                    break
         raise SyconError("the main window did not appear")
 
     def close(self, timeout=30.0):
@@ -323,6 +335,11 @@ class Session:
         want = "<%s>" % station.lower()                  # SYCON.net lower-cases a name of station
         for i in self._iter_items(self.project_tree()):
             if want in i.window_text().lower():
+                try:                                      # 40+ nodes: the tree scrolls, a node off the pane cannot
+                    i.ensure_visible()                    # be clicked (21:49: the wrong context menu came up)
+                    time.sleep(0.3)
+                except Exception:  # noqa: BLE001
+                    pass
                 return i
         raise SyconError("station <%s> not in the netProject tree" % station)
 
