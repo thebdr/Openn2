@@ -8,7 +8,7 @@ no blocks, no C&E. Two phases, both runnable headless through the PhaseContext s
                     the duplicate PROFINET name / IP checks; the report written like the Siemens 100
   700 Hardware    - TIA:   the siemens_s7 hardware build + the hw/* BuilderData export (the OP5 workspace);
                     SYCON: the hw/sycon-* handoff (`sycon_handoff.project`) into `<output root>/
-                    SyconNetProjectInterface` (what Sycon5App consumes)
+                    PRODUCTION/HilscherIOCard<n>/SyconNetProjectInterface` (what Sycon5App consumes)
 
 Both systems import this module (systems may import systems - law L3 binds the kernel, not the plugins).
 """
@@ -96,13 +96,14 @@ def run_hardware_tia(ctx, only=None):
 
 
 class SyconOutputLayout(OutputLayout):
-    """The SYCON.net handoff folder under the project's output root (`SyconNetProjectInterface/`, the
-    folder Sycon5App consumes) - the `hardware` key the 740 open button and the writer share."""
+    """The SYCON.net handoff under the project's output root: `PRODUCTION/` laid out as the sorter PC's production
+    folder - `HilscherIOCard<n>/SyconNetProjectInterface/` per cifX card (what Sycon5App consumes, building
+    `HilscherPnCard_<n>.spj` beside it) - the `hardware` key the 740 open button and the writer share."""
 
     def handoff_dir(self) -> str:
         from pipeline5 import config
         from pipeline5.systems.ipc_based.intervalzero_rtx import sycon_handoff
-        return os.path.join(config.output_root(), sycon_handoff.FOLDER)
+        return os.path.join(config.output_root(), sycon_handoff.PRODUCTION_FOLDER)
 
     def dirs(self) -> dict:
         from pipeline5 import config
@@ -144,5 +145,6 @@ def run_hardware_sycon(ctx, only=None):
     if run.has_blocking(res["findings"]):
         ctx.halt()
         ctx.emit("FAIL", "  700: FAIL findings in the handoff - fix the I/O List or the device-types database")
-    ctx.emit("RSLT", f"  700: {res['stations']} stations (controller {res['controller'] or '-'}) + {res['modules']} "
-                     f"module rows + {os.path.basename(res['device_types_db'])} -> {out_dir}")
+    cards = ", ".join(f"card {c['card']} {c['stations']} stations (controller {c['controller'] or '-'}) + "
+                      f"{c['modules']} module rows" for c in res["cards"])
+    ctx.emit("RSLT", f"  700: {len(res['cards'])} cifX card(s): {cards} -> {out_dir}")

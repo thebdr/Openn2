@@ -187,8 +187,128 @@ def test_another_network_is_another_project():
                                                                        ("n0055-enc04-aec1-k11", "192.168.2.55")]
     kinds = [(f.type, f.severity) for f in findings]
     assert kinds == [("sycon_second_controller", "INFO"), ("sycon_second_controller", "INFO"), ("sycon_other_network", "INFO")]
-    assert "second card on its network" in findings[0].detail and "another PROFINET network" in findings[1].detail
+    assert "second card on its network" in findings[0].detail and "card 2's controller" in findings[1].detail
+    assert "card 2's project" in findings[2].detail
+    assert [(c["card"], c["name"], c["net"]) for c in sycon.cards_of(rows, dict(DTD, **coupler))] == [
+        (1, "n0001-trib-aec01-K22102.1", (192, 168, 2, 0)), (2, "n0001-trib-aec01-K22102.2", (192, 168, 3, 0))]
+    stations2, _m, findings2 = sycon.build(rows, dict(DTD, **coupler), card=2)
+    assert [s["station_name"] for s in stations2] == ["n0001-trib-aec01-K22102.2", "n0055-enc04-aec1-k11"]
+    assert [f.type for f in findings2] == ["sycon_second_controller", "sycon_second_controller", "sycon_other_network"]
+    _s, _m, findings3 = sycon.build(rows, dict(DTD, **coupler), card=3)
+    assert [f.type for f in findings3] == ["sycon_no_card"]
     assert sycon.network_of("192.168.3.55") == (192, 168, 3, 0) and sycon.network_of("n/a") is None
+
+
+def test_two_cards_two_folders():
+    """A list with two cifX cards (two networks) gives two card folders, each with its own controller and stations."""
+    coupler = {"6ES7158-3AD10-0XA0": {"model_id": "6ES7158-3AD10-0XA0", "role": "slave", "catalog_item": "PN/PN Coupler X2",
+                                      "modules": "default", "gsdml": "", "comment": "", "symbolic": "variable", "fixed_modules": []}}
+    rows = [
+        _head("n0001-trib-aec01-K22102.1", "192.168.2.1", "CIFX 80-RE/ML", "-K22102.1", "1"),
+        dict(_head("n0055-enc04-aec1-k11", "192.168.2.55", "6ES7158-3AD10-0XA0", "-K11", "55"), desc_l1b="SORTER (=TRIB) / UPSTREAM"),
+        _head("n0001-trib-aec01-K22102.2", "192.168.3.1", "CIFX 80-RE/ML", "-K22102.2", "1"),
+        _head("n0055-enc04-aec1-k11", "192.168.3.55", "6ES7158-3AD10-0XA0", "-K11", "55"),
+    ]
+    with tempfile.TemporaryDirectory() as d:
+        dtd = os.path.join(d, "SyconDeviceTypesDatabase.csv")
+        with open(dtd, "w", encoding="utf-8", newline="") as f:
+            f.write("CIFX 80-RE/ML,controller,CIFX RE/PNM,default,,\r\n"
+                    "6ES7158-3AD10-0XA0,slave,PN/PN Coupler X2,default,,,variable\r\n")
+        res = sycon.project(rows, os.path.join(d, "PRODUCTION"), dtd)
+        assert [(c["card"], c["project"], c["controller"], c["stations"]) for c in res["cards"]] == [
+            (1, "HilscherPnCard_1", "n0001-trib-aec01-K22102.1", 2), (2, "HilscherPnCard_2", "n0001-trib-aec01-K22102.2", 2)]
+        assert res["stations"] == 4
+        for c in res["cards"]:
+            assert os.path.isfile(os.path.join(d, "PRODUCTION", "HilscherIOCard%d" % c["card"], "SyconNetProjectInterface", "SyconStations.csv"))
+        card1 = open(res["cards"][0]["stations_path"], encoding="utf-8").read().splitlines()
+        assert card1[-1].endswith(",SORTER (=TRIB) / UPSTREAM,=TRIB-AEC01-K11") or card1[-1].endswith(",SORTER (=TRIB) / UPSTREAM,"), card1[-1]
+        assert "Symbolic Name" in card1[-3] and "FLD" in card1[-3]
+        # one project per card: the findings of all cards, each once
+        kinds = sorted(f.type for f in res["findings"])
+        assert kinds == ["sycon_other_network", "sycon_other_network", "sycon_second_controller", "sycon_second_controller"]
+        one = sycon.project(rows, os.path.join(d, "ONE"), dtd, card=2)
+        assert [c["card"] for c in one["cards"]] == [2] and one["controller"] == "n0001-trib-aec01-K22102.2"
+
+
+def test_fixed_modules_symbolic_rules_and_the_manufacturer_key():
+    """The Anybus Communicators (user 2026-10-24): the cell test antenna's ABC3013-A plugs IN 0016 + OUT 0012, the
+    Vitronic camera head has no Part No. and is keyed by its Manufacturer, plugging IN 0064 + OUT 0064; the
+    symbolic names by rule: fld (ET200SP), variable (coupler), description (Anybus), default (the rest)."""
+    with tempfile.TemporaryDirectory() as d:
+        dtd = os.path.join(d, "SyconDeviceTypesDatabase.csv")
+        with open(dtd, "w", encoding="utf-8", newline="") as f:
+            f.write("CIFX 80-RE/ML,controller,CIFX RE/PNM,default,,\r\n"
+                    "6ES7155-6AU01-0BN0,slave,IM 155-6 PN ST V4.2,iolist,,,fld\r\n"
+                    "ABC3013-A,slave,Anybus Communicator,fixed,GSDML-V2.41-HMS.xml,cell test,description,IN 0016 | OUT 0012\r\n"
+                    "VITRONIC,slave,Anybus Communicator,fixed,GSDML-V2.41-HMS.xml,camera,description,IN 0064 | OUT 0064\r\n")
+        db = sycon.load_dtd(dtd)
+        assert db["ABC3013-A"]["fixed_modules"] == ["IN 0016", "OUT 0012"] and db["ABC3013-A"]["symbolic"] == "description"
+        assert db["6ES7155-6AU01-0BN0"]["symbolic"] == "fld" and db["CIFX80-RE/ML"]["symbolic"] == "default"
+    rows = [
+        _head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+        _head("n0005-trib-aep01-K35001", "192.168.1.5", "6ES7155-6AU01-0BN0", "-K35001", "5"),
+        _head("n0002-trib-ct01-aec1-A1", "192.168.1.2", "ABC3013-A", "-A1", "2", desc="ANTENNA CELL TEST"),
+        {"profinet_name": "n0088-trib-ca01-aec1-T3", "profinet_ip": "192.168.1.88", "part_no": "", "manufacturer": "VITRONIC",
+         "description_module": "PROFINET CONTROLLER", "slot": "-T3", "id_node": "88", "functional_unit": "=TRIB",
+         "location": "-CA01-AEC1", "device": "-T3", "combined_FLD": "=TRIB-CA01-AEC1-T3"},
+        {"profinet_name": "n0099-x", "profinet_ip": "192.168.1.99", "part_no": "", "manufacturer": "NOBODY", "slot": "-X"},
+    ]
+    for r in rows[:3]:
+        r.update({"functional_unit": "=TRIB", "location": "-AEP01" if "aep01" in r["profinet_name"] else "-AEC01"})
+    stations, modules, findings = sycon.build(rows, db)
+    assert [(s["station_name"], s["symbolic_name"]) for s in stations] == [
+        ("n0001-trib-aec01-K22101.1", ""), ("n0005-trib-aep01-K35001", "=TRIB-AEP01"),
+        ("n0002-trib-ct01-aec1-A1", "ANTENNA CELL TEST"), ("n0088-trib-ca01-aec1-T3", "PROFINET CONTROLLER")]
+    assert stations[3]["fld"] == "=TRIB-CA01-AEC1-T3" and stations[3]["model_id"] == "VITRONIC"
+    assert [(m["station_name"], m["slot"], m["module_text"]) for m in modules] == [
+        ("n0002-trib-ct01-aec1-A1", "1", "IN 0016"), ("n0002-trib-ct01-aec1-A1", "2", "OUT 0012"),
+        ("n0088-trib-ca01-aec1-T3", "1", "IN 0064"), ("n0088-trib-ca01-aec1-T3", "2", "OUT 0064")]
+    assert [(f.type, f.severity) for f in findings] == [("sycon_model_by_manufacturer", "INFO"), ("sycon_head_without_model", "WARN")]
+    try:
+        sycon.load_dtd.__wrapped__  # noqa: B018 - no wrapper: the refusals below go through the loader itself
+    except AttributeError:
+        pass
+    with tempfile.TemporaryDirectory() as d:
+        bad = os.path.join(d, "SyconDeviceTypesDatabase.csv")
+        with open(bad, "w", encoding="utf-8", newline="") as f:
+            f.write("ABC3013-A,slave,Anybus Communicator,fixed,,,description,\r\n")
+        try:
+            sycon.load_dtd(bad)
+        except ValueError as ex:
+            assert "policy fixed without Fixed Modules" in str(ex)
+        else:
+            raise AssertionError("a fixed policy without modules was accepted")
+        with open(bad, "w", encoding="utf-8", newline="") as f:
+            f.write("ABC3013-A,slave,Anybus Communicator,default,,,label\r\n")
+        try:
+            sycon.load_dtd(bad)
+        except ValueError as ex:
+            assert "symbolic-name rule" in str(ex)
+        else:
+            raise AssertionError("an unknown symbolic-name rule was accepted")
+
+
+def test_coupler_modules_mirrored_by_connector():
+    """User 2026-10-24: a PN/PN coupler plugs *OUT 128 Byte + *IN 128 Byte on its X2 side and the mirror on X1; the
+    head row's Connector column picks the list; a connector without a list is a WARN, nothing plugged."""
+    assert sycon.fixed_modules("X2: *OUT 128 Byte | *IN 128 Byte; X1: *IN 128 Byte | *OUT 128 Byte") == {
+        "X2": ["*OUT 128 Byte", "*IN 128 Byte"], "X1": ["*IN 128 Byte", "*OUT 128 Byte"]}
+    assert sycon.fixed_modules("IN 0016 | OUT 0012") == ["IN 0016", "OUT 0012"] and sycon.fixed_modules("") == []
+    dtd = dict(DTD, **{"6ES7158-3AD10-0XA0": {"model_id": "6ES7158-3AD10-0XA0", "role": "slave", "catalog_item": "PN/PN Coupler X2",
+                                               "modules": "fixed", "gsdml": "", "comment": "", "symbolic": "variable",
+                                               "fixed_modules": sycon.fixed_modules("X2: *OUT 128 Byte | *IN 128 Byte; X1: *IN 128 Byte | *OUT 128 Byte")}})
+    rows = [
+        _head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+        dict(_head("n0006-trib-aec01-K24501", "192.168.1.6", "6ES7158-3AD10-0XA0", "-K24501", "6"), connector="X2"),
+        dict(_head("n0007-trib-aec01-K24502", "192.168.1.7", "6ES7158-3AD10-0XA0", "-K24502", "7"), connector="x1"),
+        dict(_head("n0008-trib-aec01-K24503", "192.168.1.8", "6ES7158-3AD10-0XA0", "-K24503", "8"), connector=""),
+    ]
+    stations, modules, findings = sycon.build(rows, dtd)
+    assert [(m["station_name"], m["slot"], m["module_text"]) for m in modules] == [
+        ("n0006-trib-aec01-K24501", "1", "*OUT 128 Byte"), ("n0006-trib-aec01-K24501", "2", "*IN 128 Byte"),
+        ("n0007-trib-aec01-K24502", "1", "*IN 128 Byte"), ("n0007-trib-aec01-K24502", "2", "*OUT 128 Byte")]
+    assert [(f.type, f.severity) for f in findings] == [("sycon_connector_unknown", "WARN")]
+    assert "n0008-trib-aec01-K24503" in findings[0].detail and len(stations) == 4
 
 
 def test_unknown_modules_policy_is_refused():
@@ -218,9 +338,11 @@ def test_project_writes_headed_files():
                     "CIFX 80-RE/ML,controller,CIFX RE/PNM,default,,\r\n"
                     "6ES7155-6AU01-0BN0,slave,IM 155-6 PN ST V4.2,iolist,GSDML-V2.43-Siemens-ET200SP-20240425.xml,\r\n"
                     "AL1202,slave,AL1202,default,,\r\n6GK5216-4BS00-2AC2,ignore,,,,switch\r\n")
-        out = os.path.join(d, "SyconNetProjectInterface")
+        out = os.path.join(d, "PRODUCTION")
         res = sycon.project(ROWS, out, dtd, source_label="test.xlsx")
         assert res["stations"] == 3 and res["modules"] == 2 and res["controller"] == "n0001-trib-aec01-K22101.1"
+        assert [c["card"] for c in res["cards"]] == [1] and res["cards"][0]["project"] == "HilscherPnCard_1"
+        assert res["cards"][0]["dir"] == os.path.join(out, "HilscherIOCard1", "SyconNetProjectInterface")
         for path, kind in ((res["stations_path"], "hw/sycon-stations"), (res["modules_path"], "hw/sycon-modules"),
                            (res["device_types_db"], "hw/sycon-device-types")):
             text = open(path, encoding="utf-8", newline="").read()

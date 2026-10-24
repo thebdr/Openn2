@@ -108,9 +108,10 @@ def test_sycon_generic_hw_run_plan(out_dir):
     hosts = _run_plan(SYCON)
     eq(hosts[100].halted, False, "the fixture passes the 110 checks with the SYCON type's mandatory columns")
     hw = SYCON.output_layout.dirs()["hardware"]
-    ok(hw.startswith(out_dir), "the handoff folder lies under the sandboxed output root")
+    ok(hw.startswith(out_dir), "the production folder lies under the sandboxed output root")
+    card = os.path.join(hw, "HilscherIOCard1", "SyconNetProjectInterface")
     for name in ("SyconStations.csv", "SyconModules.csv", "SyconDeviceTypesDatabase.csv"):
-        ok(os.path.isfile(os.path.join(hw, name)), f"{name} written")
+        ok(os.path.isfile(os.path.join(card, name)), f"HilscherIOCard1/SyconNetProjectInterface/{name} written")
     rslt = [m for lvl, m in hosts[700].lines if lvl == "RSLT"]
     ok(rslt and "stations" in rslt[-1], rslt)
 

@@ -52,7 +52,7 @@ def test_handlers_are_the_shared_chapters():
 
 def test_sycon_layout_points_at_the_handoff_folder():
     dirs = SYCON.output_layout.dirs()
-    ok(dirs["hardware"].replace("/", "\\").endswith("\\SyconNetProjectInterface"), dirs["hardware"])
+    ok(dirs["hardware"].replace("/", "\\").endswith("\\PRODUCTION"), dirs["hardware"])
     eq(SYCON.output_layout.delivery_dirs(None), dirs)
 
 

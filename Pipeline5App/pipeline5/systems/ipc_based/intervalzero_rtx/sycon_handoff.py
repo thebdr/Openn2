@@ -47,13 +47,20 @@ PHASE = 730
 FOLDER = "SyconNetProjectInterface"
 DTD_FILE = "SyconDeviceTypesDatabase.csv"
 STATIONS_FILE, MODULES_FILE = "SyconStations.csv", "SyconModules.csv"
+# the production folder of the sorter PC (user 2026-10-24, the FVZ reference `PRODUCTION/`): one folder per cifX card,
+# `HilscherIOCard<n>/`, holding that card's SYCON.net project `HilscherPnCard_<n>.spj` (Sycon5App builds it beside
+# this handoff's `SyconNetProjectInterface/`), and `IODriver/BusField.csv` for every card
+PRODUCTION_FOLDER, CARD_FOLDER, PROJECT_NAME = "PRODUCTION", "HilscherIOCard%d", "HilscherPnCard_%d"
 KIND_DTD, KIND_STATIONS, KIND_MODULES = "hw/sycon-device-types", "hw/sycon-stations", "hw/sycon-modules"
 ROLES = {"controller": "master", "slave": "slave", "gateway": "gateway", "ignore": ""}
 STATIONS_KEYS = ["role", "station_name", "catalog_kind", "catalog_item", "model_id", "gsdml", "ip_address",
-                 "subnet_mask", "gateway", "update_time_ms", "device_number", "description", "comment"]
+                 "subnet_mask", "gateway", "update_time_ms", "device_number", "description", "comment",
+                 "symbolic_name", "fld"]
 STATIONS_HDR = ("# Role,Station Name,Catalog Kind,Catalog Item,Model Id,GSDML (the file of the catalog entry to take),"
                 "IP Address,Subnet Mask,Gateway,Update Time (ms - the controller's Stations Timing; empty for the "
-                "controller),Device Number,Description,Comment")
+                "controller),Device Number,Description,Comment,Symbolic Name (the netDevice label; empty = SYCON.net's "
+                "default),FLD (the I/O List's full tag)")
+SYMBOLIC_RULES = ("default", "fld", "variable", "description")
 DEFAULT_UPDATE_TIME_MS = 8            # user 2026-10-23: "station timing 8ms for all nodes"
 # ... except the nodes that acquire fast signals (user 2026-10-23: "control zones, check position photocells of
 # sorter; load accuracy, check position, synchronism on induction lines -> Station Timing = 2ms"; then the
@@ -65,7 +72,7 @@ MODULES_KEYS = ["station_name", "slot", "subslot", "module_id", "module_text", "
 MODULES_HDR = ("# Station Name,Slot (plug order),Subslot (empty = a module row; a submodule's subslot),Module Id,"
                "Module Text,Parameters (name=value | ...: a parameter index in the first record or potential_group = the "
                "last parameter row),Comment")
-MODULE_POLICIES = ("default", "iolist", "iolink-ports", "scalance-pnio")
+MODULE_POLICIES = ("default", "iolist", "iolink-ports", "scalance-pnio", "fixed")
 # SCALANCE XC200 switches (policy `scalance-pnio`, user 2026-10-23 "let's also add the scalance switches, with the
 # following parameters"): the DAP's PN-IO interface submodule (slot 0, subslot 32768) takes Loop Detection
 # `Interface Mode` = Off and Port Mirroring `Mirroring Mode` = Off (the GSDML defaults are 'Local configuration');
@@ -219,15 +226,16 @@ def card_model(row) -> str:
 
 # --- the database -------------------------------------------------------------------------------- #
 def load_dtd(path: str | None = None) -> dict:
-    """{MODEL ID upper: {role, catalog_item, modules, gsdml, comment}} from the hand-maintained csv (comment and
-    header lines skipped; ',' or ';' delimited)."""
+    """{MODEL ID upper: {role, catalog_item, modules, gsdml, comment, symbolic, fixed_modules}} from the
+    hand-maintained csv (comment and header lines skipped; ',' or ';' delimited). Columns 7 and 8 (2026-10-24):
+    the symbolic-name rule and the module texts of the `fixed` policy."""
     path = path or SYCON_DTD_DEFAULT
     with open(path, encoding="utf-8-sig") as f:
         lines = [ln for ln in f.read().splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
     delimiter = ";" if lines and lines[0].count(";") > lines[0].count(",") else ","
     out = {}
     for row in csv.reader(lines, delimiter=delimiter):
-        row = [c.strip() for c in row] + [""] * 6
+        row = [c.strip() for c in row] + [""] * 8
         if not row[0]:
             continue
         role = row[1].lower()
@@ -236,19 +244,95 @@ def load_dtd(path: str | None = None) -> dict:
         policy = row[3].lower() or "default"
         if policy not in MODULE_POLICIES:
             raise ValueError("SyconDeviceTypesDatabase: unknown modules policy %r for %r" % (row[3], row[0]))
+        symbolic = row[6].lower() or "default"
+        if symbolic not in SYMBOLIC_RULES:
+            raise ValueError("SyconDeviceTypesDatabase: unknown symbolic-name rule %r for %r" % (row[6], row[0]))
+        fixed = fixed_modules(row[7])
+        if policy == "fixed" and not fixed:
+            raise ValueError("SyconDeviceTypesDatabase: policy fixed without Fixed Modules for %r" % row[0])
         out[model_id(row[0]).upper()] = {"model_id": model_id(row[0]), "role": role, "catalog_item": row[2],
-                                         "modules": policy, "gsdml": row[4], "comment": row[5]}
+                                         "modules": policy, "gsdml": row[4], "comment": row[5],
+                                         "symbolic": symbolic, "fixed_modules": fixed}
     return out
 
 
+CONNECTOR_LIST = re.compile(r"^\s*(X\d+)\s*:\s*(.*)$", re.I)
+
+
+def fixed_modules(text):
+    """The Fixed Modules column: module texts `|` separated, in slot order - or, `;` separated, one such list per
+    connector (`X2: *OUT 128 Byte | *IN 128 Byte; X1: *IN 128 Byte | *OUT 128 Byte` - user 2026-10-24: a PN/PN
+    coupler's X1 side has the module positions of the X2 side mirrored; the I/O List names the side in its
+    Connector column). A list, or {CONNECTOR: list}."""
+    pieces = [piece for piece in str(text or "").split(";") if piece.strip()]
+    if pieces and all(CONNECTOR_LIST.match(piece) for piece in pieces):
+        out = {}
+        for piece in pieces:
+            m = CONNECTOR_LIST.match(piece)
+            out[m.group(1).upper()] = [t.strip() for t in m.group(2).split("|") if t.strip()]
+        return out
+    return [t.strip() for t in str(text or "").split("|") if t.strip()]
+
+
 # --- the build ------------------------------------------------------------------------------------ #
-def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
-    """(stations, modules, findings) from staged I/O List rows (dicts with the canonical columns), in order;
-    every station gets `update_time_ms` as its PROFINET updating time."""
+def head_model(row, dtd) -> tuple:
+    """(model id, keyed by the manufacturer?) of a head row: its Part No.; without one, its Manufacturer when the
+    database carries that as a model (the Vitronic camera heads of the FVT lists, 2026-10-24)."""
+    model = model_id(row.get("part_no"))
+    if model:
+        return model, False
+    alt = model_id(row.get("manufacturer"))
+    if alt and alt.upper() in dtd:
+        return alt, True
+    return "", False
+
+
+def cards_of(rows, dtd: dict) -> list:
+    """The cifX cards of the list, one per PROFINET network in document order: [{card, name, ip, net, sheet}]. A
+    second controller head on a network already listed is the redundant card, not a card of its own."""
+    cards = []
+    for row in rows:
+        name = str(row.get("profinet_name") or "").strip()
+        if not name:
+            continue
+        model, _by = head_model(row, dtd)
+        rec = dtd.get(model.upper()) if model else None
+        if rec is None or rec["role"] != "controller":
+            continue
+        ip = str(row.get("profinet_ip") or "").strip()
+        net = network_of(ip)
+        if any(c["net"] == net for c in cards):
+            continue
+        cards.append({"card": len(cards) + 1, "name": name, "ip": ip, "net": net,
+                      "sheet": str(row.get("source_sheet") or "").strip()})
+    return cards
+
+
+def symbolic_name(rule, row) -> str:
+    """The netDevice label of a station by the database's rule (user 2026-10-24, the edited sorter project)."""
+    if rule == "fld":                 # the functional unit + the location's FIRST segment (=TRIB-MA01 of -MA01-AEC1)
+        head = str(row.get("location") or "").strip().strip("-").split("-")[0]
+        return str(row.get("functional_unit") or "").strip() + ("-" + head if head else "")
+    if rule == "variable":
+        return " ".join(str(row.get("desc_l1b") or "").split())
+    if rule == "description":
+        return " ".join(str(row.get("description_module") or "").split())
+    return ""
+
+
+def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1) -> tuple:
+    """(stations, modules, findings) from staged I/O List rows (dicts with the canonical columns), in order, for
+    the cifX card `card` (1-based, `cards_of`): its controller and the stations on its PROFINET network; every
+    station gets `update_time_ms` as its PROFINET updating time."""
     stations, modules, findings = [], [], []
     cur = None
     controller, controller_net = None, None
     seen_names, seen_ips = {}, {}
+    cards = cards_of(rows, dtd)
+    chosen = cards[card - 1] if 0 < card <= len(cards) else None
+    if cards and chosen is None:
+        findings.append(_f("sycon_no_card", "FAIL", "the I/O List has %d cifX card(s) - no card %d" % (len(cards), card)))
+        return stations, modules, findings
 
     def finalize():
         if cur is None:
@@ -258,6 +342,19 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
             cur["station"]["update_time_ms"] = str(FAST_UPDATE_TIME_MS)
             cur["station"]["comment"] = (cur["station"]["comment"] + " | fast: " + ", ".join(
                 sorted({k for s in cur["signals"] for k in FAST_SIGNAL_KEYWORDS if k in signal_text(s)}))).strip(" |")
+        if rec["modules"] == "fixed":                      # the database's module texts, in slot order
+            fixed = rec.get("fixed_modules") or []
+            if isinstance(fixed, dict):                    # per connector: the head row's Connector column picks
+                connector = str(cur["row"].get("connector") or "").strip().upper()
+                if connector not in fixed:
+                    findings.append(_f("sycon_connector_unknown", "WARN", "station %r: connector %r has no fixed modules "
+                                       "(%s) - none plugged" % (cur["name"], connector, " / ".join(sorted(fixed))), cur["where"]))
+                    return
+                fixed = fixed[connector]
+            for n, text in enumerate(fixed, start=1):
+                modules.append({"station_name": cur["name"], "slot": str(n), "subslot": "", "module_id": "",
+                                "module_text": text, "parameters": "", "comment": "fixed module of %s" % rec["model_id"]})
+            return
         if rec["modules"] == "scalance-pnio":
             modules.append({"station_name": cur["name"], "slot": "0", "subslot": "32768", "module_id": "",
                             "module_text": "PN-IO", "parameters": SCALANCE_PNIO_PARAMS,
@@ -321,7 +418,7 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
         finalize()
         cur = None
         where = str(row.get("source_cell") or row.get("location") or "")
-        model = model_id(row.get("part_no"))
+        model, by_manufacturer = head_model(row, dtd)
         ip = str(row.get("profinet_ip") or "").strip()
         if not model:
             findings.append(_f("sycon_head_without_model", "WARN", "station %r has no Part No. - skipped" % name, where))
@@ -334,22 +431,33 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
         if rec["role"] == "ignore":
             findings.append(_f("sycon_model_ignored", "INFO", "station %r (%s): %s" % (name, model, rec["comment"]), where))
             continue
+        if by_manufacturer:
+            findings.append(_f("sycon_model_by_manufacturer", "INFO", "station %r has no Part No.: keyed by its manufacturer "
+                               "%r (%s)" % (name, model, rec["catalog_item"]), where))
         net = network_of(ip)
+        # one project = one cifX card = one PROFINET network, the card's controller's (2026-10-24: the conveyor list's
+        # two cabinet sheets are two networks, 192.168.2.x and 192.168.3.x, each with its own cifX card, and the
+        # second repeats the first's station names - merged into one project they blocked the SYCON.net controller
+        # dialog): the other cards' controllers and stations are INFO findings here, built by their own card
         if rec["role"] == "controller":
-            if controller is not None:
-                same = net is not None and net == controller_net
+            if chosen is not None and controller is None and name.lower() == chosen["name"].lower():
+                controller, controller_net = name, net
+            else:
+                other = next((c for c in cards if net is not None and c["net"] == net), None)
+                if chosen is not None and net == chosen["net"]:
+                    why = " (a second card on its network)"
+                elif other is not None:
+                    why = " - card %d's controller, its own project" % other["card"]
+                else:
+                    why = " - another PROFINET network"
                 findings.append(_f("sycon_second_controller", "INFO", "station %r (%s, %s) skipped: the controller is %r%s"
-                                   % (name, model, ip, controller, " (a second card on its network)" if same else
-                                      " - another PROFINET network: its stations are left out, one project per network"), where))
+                                   % (name, model, ip, chosen["name"] if chosen else controller, why), where))
                 continue
-            controller, controller_net = name, net
-        # one project = one PROFINET network, the controller's (2026-10-24: the conveyor list's two cabinet sheets are two
-        # networks, 192.168.2.x and 192.168.3.x, each with its own cifX card, and the second repeats the first's station
-        # names - merged into one project they blocked the SYCON.net controller dialog): a station on another network
-        # than the controller belongs to that network's project (--sheet selects it) - an INFO, left out
-        elif controller_net is not None and net is not None and net != controller_net:
+        elif chosen is not None and net is not None and net != chosen["net"]:
+            other = next((c for c in cards if c["net"] == net), None)
             findings.append(_f("sycon_other_network", "INFO", "station %r (%s, %s) is on another PROFINET network than the "
-                               "controller %r - left for that network's project" % (name, model, ip, controller), where))
+                               "controller %r - %s" % (name, model, ip, chosen["name"],
+                                                      "card %d's project" % other["card"] if other else "no card's network"), where))
             continue
         # a duplicate name of station or IP among the slaves of one network is a document error: SYCON.net refuses the
         # second - a FAIL, the second station left out so the rest of the project can still be built
@@ -374,10 +482,13 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS) -> tuple:
                    "update_time_ms": "" if no_timing else str(update_time_ms),
                    "device_number": str(row.get("id_node") or "").strip(),
                    "description": " ".join(str(row.get("description_module") or "").split()),
-                   "comment": " ".join(str(row.get("manufacturer") or "").split())}
+                   "comment": " ".join(str(row.get("manufacturer") or "").split()),
+                   "symbolic_name": symbolic_name(rec.get("symbolic", "default"), row),
+                   "fld": str(row.get("combined_FLD") or row.get("iol_FLD") or "").strip() or
+                          (str(row.get("functional_unit") or "") + str(row.get("location") or "") + str(row.get("device") or "")).strip()}
         stations.append(station)
         cur = {"name": name, "rec": rec, "head_tag": str(row.get("slot") or "").strip(), "signals": [], "where": where,
-               "station": station}
+               "station": station, "row": row}
     finalize()
     if controller is None:
         findings.append(_f("sycon_no_controller", "FAIL", "no controller head in the I/O List (a model with role "
@@ -424,17 +535,37 @@ def _strip(text: str) -> str:
 
 
 def project(rows, out_dir: str, dtd_path: str | None = None, source_label: str = "signals",
-            update_time_ms=DEFAULT_UPDATE_TIME_MS) -> dict:
-    """Build from staged rows and write the three files into `out_dir`. Returns the counts, paths and findings."""
+            update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 0) -> dict:
+    """Build and write the handoff of every cifX card of the list (of `card` alone when given), one folder per
+    card as the production folder of the sorter PC has it: `<out_dir>/HilscherIOCard<n>/SyconNetProjectInterface/`
+    holds the three files of card n (Sycon5App builds `HilscherIOCard<n>/HilscherPnCard_<n>.spj` beside them).
+    Returns {'dir', 'cards': [{card, project, dir, stations, modules, controller, paths..., findings}], the totals
+    'stations' / 'modules', the findings of all cards (deduplicated), and card 1's paths and controller under the
+    flat keys of the single-card days}."""
     dtd_path = dtd_path or SYCON_DTD_DEFAULT
     dtd = load_dtd(dtd_path)
-    stations, modules, findings = build(rows, dtd, update_time_ms)
-    spath = _write(out_dir, STATIONS_FILE, _csv(KIND_STATIONS, STATIONS_HDR, stations, STATIONS_KEYS, source_label))
-    mpath = _write(out_dir, MODULES_FILE, _csv(KIND_MODULES, MODULES_HDR, modules, MODULES_KEYS, source_label))
-    dpath = _ship_dtd(out_dir, dtd_path)
-    return {"dir": out_dir, "stations": len(stations), "modules": len(modules), "stations_path": spath,
-            "modules_path": mpath, "device_types_db": dpath, "findings": findings,
-            "controller": next((s["station_name"] for s in stations if s["role"] == "controller"), "")}
+    numbers = [card] if card else ([c["card"] for c in cards_of(rows, dtd)] or [1])
+    cards, findings, seen = [], [], set()
+    for n in numbers:
+        stations, modules, card_findings = build(rows, dtd, update_time_ms, card=n)
+        folder = os.path.join(out_dir, CARD_FOLDER % n, FOLDER)
+        spath = _write(folder, STATIONS_FILE, _csv(KIND_STATIONS, STATIONS_HDR, stations, STATIONS_KEYS, source_label))
+        mpath = _write(folder, MODULES_FILE, _csv(KIND_MODULES, MODULES_HDR, modules, MODULES_KEYS, source_label))
+        dpath = _ship_dtd(folder, dtd_path)
+        for f in card_findings:
+            key = (f.type, f.detail, f.location)
+            if key not in seen:
+                seen.add(key)
+                findings.append(f)
+        cards.append({"card": n, "project": PROJECT_NAME % n, "dir": folder, "stations": len(stations),
+                      "modules": len(modules), "stations_path": spath, "modules_path": mpath, "device_types_db": dpath,
+                      "findings": card_findings,
+                      "controller": next((s["station_name"] for s in stations if s["role"] == "controller"), "")})
+    first = cards[0]
+    return {"dir": out_dir, "cards": cards, "stations": sum(c["stations"] for c in cards),
+            "modules": sum(c["modules"] for c in cards), "stations_path": first["stations_path"],
+            "modules_path": first["modules_path"], "device_types_db": first["device_types_db"], "findings": findings,
+            "controller": first["controller"]}
 
 
 def stage_rows(iolist_path: str, sheet: str = "") -> tuple:
@@ -458,14 +589,17 @@ def main(argv=None) -> int:
     p.add_argument("--out", required=True, help="the SyconNetProjectInterface folder to write")
     p.add_argument("--dtd", default="", help="the SYCON device-types database (default: Shared/HardwareConfigBuilderData)")
     p.add_argument("--update-time-ms", type=int, default=DEFAULT_UPDATE_TIME_MS, help="every station's PROFINET updating time")
-    p.add_argument("--sheet", default="", help="one source sheet only (one cifX card of a multi-card list, e.g. R5.S1.C1)")
+    p.add_argument("--sheet", default="", help="one source sheet only (the rows of one cabinet sheet)")
+    p.add_argument("--card", type=int, default=0, help="one cifX card only (1-based, in document order); default: every card")
     a = p.parse_args(argv)
     rows, findings = stage_rows(a.iolist, a.sheet)
     label = os.path.basename(a.iolist) + (" [%s]" % a.sheet if a.sheet else "")
-    res = project(rows, a.out, a.dtd or None, source_label=label, update_time_ms=a.update_time_ms)
+    res = project(rows, a.out, a.dtd or None, source_label=label, update_time_ms=a.update_time_ms, card=a.card)
     for f in findings + res["findings"]:
         print("[%s] %s - %s  @ %s" % (f.severity, f.type, f.detail, f.location))
-    print("SYCON handoff: %d stations (controller %r) + %d module rows -> %s" % (res["stations"], res["controller"], res["modules"], res["dir"]))
+    for c in res["cards"]:
+        print("SYCON handoff card %d (%s): %d stations (controller %r) + %d module rows -> %s" % (
+            c["card"], c["project"], c["stations"], c["controller"], c["modules"], c["dir"]))
     return 1 if any(f.severity == "FAIL" for f in res["findings"]) else 0
 
 
