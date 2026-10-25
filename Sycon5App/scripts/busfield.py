@@ -3,15 +3,17 @@
 Physical Node Address = the IP's last octet, Node Type = 0x<VendorID><DeviceID> of the device's GSDML identity as
 the saved project records it (`fdt:manufacturerId` / `fdt:deviceTypeId` - the ET200SP's 42 / 787 = 0x002A0313,
 the cifX master's 286 / 515 = 0x011E0203), the description `[station] DESCRIPTION (MANUFACTURER) FLD (ip)`.
-A row starts with `@` (the IO driver polls the node) or `#` (listed, not polled: the master's own station and
-the switches). Usage (from Sycon5App, the repo venv):
+A row starts with `@` (the node is in the configuration) or `#` (commented out: the master's own station under
+the master row - user 2026-10-25: the FVZ reference's `#` switches were switches NOT in that configuration; ours
+are configured, so they are `@`). The file opens with the PL5 `#!openn` header (csv form; the IO driver reads `#`
+lines as comments). Usage (from Sycon5App, the repo venv):
     python -I scripts\\busfield.py --production <folder>
 with `<folder>\\HilscherIOCard<n>\\HilscherPnCard_<n>.spj` and its `SyconNetProjectInterface\\` per card."""
 import argparse
-import csv
 import os
 import re
 import sys
+import time
 
 APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP)
@@ -22,21 +24,15 @@ from sycon5.readback import read_project                # noqa: E402
 HEADER = ("#;Board Number;Physical Node Address;Node Type;1 = Warning on fault;Linked Node Address;Linked Master ID;"
           "Linked Slave ID;Reference Index;DB Class ID;Element;Bit;#;# Description")
 CARD_RE = re.compile(r"^HilscherIOCard(\d+)$", re.I)
-NOT_POLLED = ("scalance-pnio",)                          # the policies of the nodes the IO driver does not poll
+KIND, SCHEMA = "hw/iodriver-busfield", 1
 
 
-def policies(handoff_folder) -> dict:
-    """{MODEL ID upper: modules policy} from the shipped device-types database (column 4)."""
-    path = os.path.join(handoff_folder, "SyconDeviceTypesDatabase.csv")
-    out = {}
-    if not os.path.exists(path):
-        return out
-    with open(path, encoding="utf-8-sig") as f:
-        lines = [ln for ln in f.read().splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
-    for row in csv.reader(lines):
-        if row and row[0].strip():
-            out[row[0].replace(" ", "").strip().upper()] = (row[3].strip().lower() if len(row) > 3 else "") or "default"
-    return out
+def header_lines(source) -> list:
+    """The PL5 header in csv form (user 2026-10-25: "set the PL5 header here too")."""
+    return ["#!openn", "#! kind: %s" % KIND, "#! schema: %d" % SCHEMA,
+            "#! producer: Sycon5App busfield.py (the saved SYCON.net projects + their handoffs)",
+            "#! generated: %s" % time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "#! target: IODriver", "#! source: %s" % source, "#!end"]
 
 
 def last_octet(ip) -> str:
@@ -52,7 +48,6 @@ def describe(s) -> str:
 def card_rows(card, handoff, project) -> list:
     ctrl = project.controller
     by_name = {d.device_no.lower(): d for d in project.devices}
-    pol = policies(handoff.folder)
     rows = ["@;%d;0;%s;0;0;0;0;0;0;0;0;#;Hilscher Master Profinet Card %d" % (card, ctrl.node_type, card),
             "#;%d;%s;%s;0;0;0;0;0;0;0;0;#;%s" % (card, last_octet(handoff.controller["ip_address"]), ctrl.node_type,
                                                    describe(handoff.controller))]
@@ -61,8 +56,7 @@ def card_rows(card, handoff, project) -> list:
         if d is None:
             rows.append("#;%d;%s;0x00000000;0;0;0;0;0;0;0;0;#;%s - NOT IN THE PROJECT" % (card, last_octet(s["ip_address"]), describe(s)))
             continue
-        flag = "#" if pol.get(str(s.get("model_id", "")).upper()) in NOT_POLLED else "@"
-        rows.append("%s;%d;%s;%s;0;0;0;0;0;0;0;0;#;%s" % (flag, card, last_octet(s["ip_address"]), d.node_type, describe(s)))
+        rows.append("@;%d;%s;%s;0;0;0;0;0;0;0;0;#;%s" % (card, last_octet(s["ip_address"]), d.node_type, describe(s)))
     return rows
 
 
@@ -81,8 +75,9 @@ def cards_of(production) -> list:
 
 
 def write_busfield(production) -> str:
-    rows = [HEADER]
-    for n, handoff_dir, spj in cards_of(production):
+    cards = cards_of(production)
+    rows = header_lines(", ".join("HilscherIOCard%d/HilscherPnCard_%d" % (n, n) for n, _h, _s in cards)) + [HEADER]
+    for n, handoff_dir, spj in cards:
         if not os.path.exists(spj):
             print("card %d: no project %s - skipped" % (n, spj))
             continue

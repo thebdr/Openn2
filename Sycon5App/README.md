@@ -494,8 +494,11 @@ identity as the saved project records it (`fdt:manufacturerId` / `fdt:deviceType
 the ET200SP 42 / 787 = 0x002A0313, the cifX master 286 / 515 = 0x011E0203, the PN/PN coupler 0x002A0604, the
 SCALANCE 0x002A0A0B, the AL1202 0x0136AC55, the ServoOne 0x017C4E21, the Anybus Communicator 0x010C0020 - user:
 "Node Type eg 0x011E0203 is 0xVendorIDDeviceID", the GSDML Viewer's DeviceIdentity), the description `[station]
-DESCRIPTION (MANUFACTURER) FLD (ip)`. `@` = polled; `#` = listed, not polled: the master's own station and the
-switches (policy `scalance-pnio`); a station missing from the project gets `#` and 0x00000000.
+DESCRIPTION (MANUFACTURER) FLD (ip)`. `@` = the node is in the configuration; `#` = commented out: the master's
+own station under the master row (user 2026-10-25: the FVZ reference's `#` switches were switches not in that
+configuration - ours are configured, so they are `@`); a station missing from the project gets `#` and
+0x00000000. The file opens with the PL5 `#!openn` header in csv form (kind `hw/iodriver-busfield`; the IO driver
+reads `#` lines as comments).
 
 **The Anybus Communicators and the couplers' modules** (device-types database, policy `fixed` + the `Fixed Modules`
 column): the cell test antenna's ABC3013-A plugs `IN 0016` + `OUT 0012` (user's screenshot 2026-10-24), the
