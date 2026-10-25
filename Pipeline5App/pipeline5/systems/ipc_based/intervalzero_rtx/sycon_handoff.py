@@ -58,8 +58,9 @@ STATIONS_KEYS = ["role", "station_name", "catalog_kind", "catalog_item", "model_
                  "symbolic_name", "fld"]
 STATIONS_HDR = ("# Role,Station Name,Catalog Kind,Catalog Item,Model Id,GSDML (the file of the catalog entry to take),"
                 "IP Address,Subnet Mask,Gateway,Update Time (ms - the controller's Stations Timing; empty for the "
-                "controller),Device Number,Description,Comment,Symbolic Name (the netDevice label; empty = SYCON.net's "
-                "default),FLD (the I/O List's full tag)")
+                "controller),Device Number,Description,Comment,Symbolic Name (the netDevice label nnn[_Custom Description] - "
+                "the node number = the IP's last octet + the device-types rule's text; empty for the controller),FLD (the I/O "
+                "List's full tag)")
 SYMBOLIC_RULES = ("default", "fld", "variable", "description")
 DEFAULT_UPDATE_TIME_MS = 8            # user 2026-10-23: "station timing 8ms for all nodes"
 # ... except the nodes that acquire fast signals (user 2026-10-23: "control zones, check position photocells of
@@ -308,8 +309,9 @@ def cards_of(rows, dtd: dict) -> list:
     return cards
 
 
-def symbolic_name(rule, row) -> str:
-    """The netDevice label of a station by the database's rule (user 2026-10-24, the edited sorter project)."""
+def symbolic_text(rule, row) -> str:
+    """The description part of a station's netDevice label by the database's rule (user 2026-10-24, the edited
+    sorter project); empty for `default`."""
     if rule == "fld":                 # the functional unit + the location's FIRST segment (=TRIB-MA01 of -MA01-AEC1)
         head = str(row.get("location") or "").strip().strip("-").split("-")[0]
         return str(row.get("functional_unit") or "").strip() + ("-" + head if head else "")
@@ -318,6 +320,18 @@ def symbolic_name(rule, row) -> str:
     if rule == "description":
         return " ".join(str(row.get("description_module") or "").split())
     return ""
+
+
+def symbolic_name(rule, row, ip="") -> str:
+    """The netDevice label of a slave station: `nnn[_Custom Description]` - nnn the node number (the IP's last
+    octet, three digits) and, when the rule gives one, `_` + its text (user 2026-10-25: `088_=TRIB-CA01`, `087`).
+    Without an IP the text alone."""
+    text = symbolic_text(rule, row)
+    parts = str(ip or "").strip().split(".")
+    node = parts[-1] if len(parts) == 4 and parts[-1].isdigit() else ""
+    if not node:
+        return text
+    return "%03d" % int(node) + ("_" + text if text else "")
 
 
 def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1) -> tuple:
@@ -483,7 +497,7 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
                    "device_number": str(row.get("id_node") or "").strip(),
                    "description": " ".join(str(row.get("description_module") or "").split()),
                    "comment": " ".join(str(row.get("manufacturer") or "").split()),
-                   "symbolic_name": symbolic_name(rec.get("symbolic", "default"), row),
+                   "symbolic_name": "" if rec["role"] == "controller" else symbolic_name(rec.get("symbolic", "default"), row, ip),
                    "fld": str(row.get("combined_FLD") or row.get("iol_FLD") or "").strip() or
                           (str(row.get("functional_unit") or "") + str(row.get("location") or "") + str(row.get("device") or "")).strip()}
         stations.append(station)

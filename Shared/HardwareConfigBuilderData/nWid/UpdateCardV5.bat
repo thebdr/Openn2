@@ -1,8 +1,16 @@
+::#!openn
+::#! kind: tool/nwid-update-card
+::#! schema: 1
+::#! producer: hand-maintained (Shared/HardwareConfigBuilderData/nWid)
+::#! generated: 2026-10-25T09:30:00Z
+::#! source: FVZ_MSC_20261020_1731/PRODUCTION/HilscherIOCard1/nWid/UpdateCardV4.bat (V4) + the remembered card (V5)
+::#! comment: copies this folder's config.nxd and nwid.nxd into the Hilscher card's Channel0; the card chosen is remembered in card.txt
+::#!end
 @echo off
 setlocal enabledelayedexpansion
 
-:: UpdateCardV4.bat - copy this folder's config.nxd and nwid.nxd into the Hilscher card's Channel0 folder.
-:: Shipped by PL5 / Sycon5App into <production>\HilscherIOCard<n>\nWid\ (the FVZ reference's file with one change,
+:: UpdateCardV5.bat - copy this folder's config.nxd and nwid.nxd into the Hilscher card's Channel0 folder.
+:: Shipped by PL5 / Sycon5App into <production>\HilscherIOCard<n>\nWid\ (the FVZ reference's V4 with one change,
 :: user 2026-10-24: the chosen card - the serial number that names its folder - is remembered in card.txt beside
 :: this file; a later run reports the remembered card and uses it when it is present, otherwise the normal
 :: workflow runs: none found / one found / several to choose from, and the choice is remembered again).

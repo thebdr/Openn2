@@ -221,7 +221,7 @@ def test_two_cards_two_folders():
         for c in res["cards"]:
             assert os.path.isfile(os.path.join(d, "PRODUCTION", "HilscherIOCard%d" % c["card"], "SyconNetProjectInterface", "SyconStations.csv"))
         card1 = open(res["cards"][0]["stations_path"], encoding="utf-8").read().splitlines()
-        assert card1[-1].endswith(",SORTER (=TRIB) / UPSTREAM,=TRIB-AEC01-K11") or card1[-1].endswith(",SORTER (=TRIB) / UPSTREAM,"), card1[-1]
+        assert card1[-1].endswith(",055_SORTER (=TRIB) / UPSTREAM,=TRIB-AEC01-K11") or card1[-1].endswith(",055_SORTER (=TRIB) / UPSTREAM,"), card1[-1]
         assert "Symbolic Name" in card1[-3] and "FLD" in card1[-3]
         # one project per card: the findings of all cards, each once
         kinds = sorted(f.type for f in res["findings"])
@@ -257,8 +257,13 @@ def test_fixed_modules_symbolic_rules_and_the_manufacturer_key():
         r.update({"functional_unit": "=TRIB", "location": "-AEP01" if "aep01" in r["profinet_name"] else "-AEC01"})
     stations, modules, findings = sycon.build(rows, db)
     assert [(s["station_name"], s["symbolic_name"]) for s in stations] == [
-        ("n0001-trib-aec01-K22101.1", ""), ("n0005-trib-aep01-K35001", "=TRIB-AEP01"),
-        ("n0002-trib-ct01-aec1-A1", "ANTENNA CELL TEST"), ("n0088-trib-ca01-aec1-T3", "PROFINET CONTROLLER")]
+        ("n0001-trib-aec01-K22101.1", ""), ("n0005-trib-aep01-K35001", "005_=TRIB-AEP01"),
+        ("n0002-trib-ct01-aec1-A1", "002_ANTENNA CELL TEST"), ("n0088-trib-ca01-aec1-T3", "088_PROFINET CONTROLLER")]
+    # the label rule: nnn[_Custom Description] (user 2026-10-25: '088_=TRIB-CA01' and '087' set by hand)
+    assert sycon.symbolic_name("default", {}, "192.168.1.87") == "087"
+    assert sycon.symbolic_name("fld", {"functional_unit": "=TRIB", "location": "-CA01-AEC1"}, "192.168.1.88") == "088_=TRIB-CA01"
+    assert sycon.symbolic_name("fld", {"functional_unit": "=TRIB", "location": "-CA01-AEC1"}, "") == "=TRIB-CA01"
+    assert sycon.symbolic_name("default", {}, "") == ""
     assert stations[3]["fld"] == "=TRIB-CA01-AEC1-T3" and stations[3]["model_id"] == "VITRONIC"
     assert [(m["station_name"], m["slot"], m["module_text"]) for m in modules] == [
         ("n0002-trib-ct01-aec1-A1", "1", "IN 0016"), ("n0002-trib-ct01-aec1-A1", "2", "OUT 0012"),
