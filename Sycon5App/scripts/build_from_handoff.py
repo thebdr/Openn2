@@ -6,6 +6,7 @@ Writes <project>.spj (+ its folder) and <project>.verification.txt beside it. Ex
 """
 import argparse
 import os
+import signal
 import sys
 import time
 
@@ -23,6 +24,9 @@ p.add_argument("--base", default=os.path.join(APP, "spike", "scratch", "Automate
 p.add_argument("--resume", action="store_true")
 p.add_argument("--report", default="", help="the verification report path (default: <project>.verification.txt beside it)")
 a = p.parse_args()
+# the GUI's Stop sends a CTRL_BREAK (sycon5.gui.Runner.stop): a KeyboardInterrupt here, so the `finally` below
+# still closes SYCON.net instead of leaving it open with the half-built project
+signal.signal(signal.SIGBREAK, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
 t0 = time.time()
 driver = SyconDriver()
 code = 1

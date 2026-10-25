@@ -628,6 +628,50 @@ run attached to the user's own instance (the fast sorter project open in it), op
 dialog there and closed it (the files were untouched: nothing was saved). A running instance is the user's: `open`
 now refuses it unless `open(attach=True)` says so on purpose.
 
+## The users' GUI (2026-10-25 evening)
+
+User: "sycon5app needs a basic gui for the users. buttons to retrieve the workspace data and a log viewer." One tkinter
+window, PL5's dark palette (`Pipeline5App/pipeline5/workbench/theme.py`) so the two apps look alike:
+
+```
+C:\Source\Repos\_Openn5\.venv\Scripts\python.exe launch_gui.py [<PRODUCTION folder>]
+```
+
+- `sycon5/workspace.py` — **the workspace data, no tkinter**: `scan(root)` reads a PRODUCTION folder as PL5 writes it
+  (`HilscherIOCard<n>/SyconNetProjectInterface/` per card) and Sycon5App fills it: per card the handoff's `#!openn`
+  header (generated, source), its station / module rows and controller, the project (`HilscherPnCard_<n>.spj`, saved
+  time), the verification report (`_PL_Logs/<name>.verification.txt`: PASS / FAIL / NOTE counts), the four exports
+  (`HilscherIO.xml`, `nWid/config.nxd`, `nWid/config_nwid.nxd`, `nWid/UpdateCardV5.bat`), the card's `_PL_Logs` files;
+  the root's `IODriver/BusField.csv` and `_PL_Logs`. `Card.status()` says what the card still needs (`no handoff`,
+  `not built`, `built, not verified`, `1 FAIL`, `verified before the last save`, `exports 3/4`) or `complete`. The
+  `*_command` builders give the command lines of the steps — the same scripts `scripts/build_production.sh` runs,
+  the same `_PL_Logs` files — for the GUI's runner; `note_summary` appends the bash script's time-stamped lines to
+  the root `_PL_Logs/build.log`. `level_of(line)` colours a log line (PASS / FAIL / NOTE of a report, the verdicts
+  RSLT, tracebacks ERRR, warnings, INFO). Tests: `tests/test_workspace.py` on a fake production folder.
+- `sycon5/gui.py` — **the window**: the workspace row (`Open...` remembers the last folder in
+  `%APPDATA%\Sycon5App\gui.json`, `Reload`, `Explorer`, `I/O List > handoff...` = PL5's `sycon_handoff` into the
+  workspace); the cards table (green = built, verified after the save, 0 FAIL, exports 4/4; red = a FAIL or a
+  handoff problem; yellow = something to do; double-click opens the card folder); the step buttons of the selected
+  card — `Build card` (`build_from_handoff.py`, SYCON.net driven), `Resume build` (`--resume`), `Verify card`
+  (`verify_saved.py`: the saved project against its handoff without SYCON.net — it REWRITES the report with fewer
+  checks, the module texts chosen in the GUI and the device-limited update times are not known any more), `Card
+  folder`; `Build all cards + BusField` (every card with a handoff, then `busfield.py`), `BusField`, `Stop`; the log
+  viewer: `run output` (the running step live) or any log / report of the workspace from the dropdown, re-read with
+  `Reload`, PASS / NOTE / INFO hideable (`Show`), `Follow` keeps the end in view.
+- **A step is a subprocess**, never run in the GUI's process: SYCON.net is driven from the script, and while it runs
+  the desktop must be left alone — the yellow banner says so and the buttons are disabled until it ends. The
+  output streams into the viewer and into the step's log file (`build.log` / `build_resume.log` / `verify.log` in
+  the card's `_PL_Logs`, `export.log` / `busfield.log` in the root's), the table reloads after every step.
+- **Stop**: the step is sent a CTRL_BREAK (`build_from_handoff.py` turns it into a KeyboardInterrupt, its `finally`
+  closes SYCON.net without saving); a terminate follows after 120 s, or at once when the signal cannot arrive —
+  probed 2026-10-25: it reaches a child of a console parent (`python.exe launch_gui.py`), never one spawned
+  without a console (`pythonw.exe`: the child gets its own hidden console). So launch with `python.exe`; after a
+  terminate, close SYCON.net by hand without saving.
+- Tests: `tests/test_gui.py` (the window withdrawn, a fake workspace): the table, the buttons' enabling, the viewer's
+  levels and filter, a real step through the runner and its log file, a batch, a stop. Tried on the VM on
+  `spike/scratch/PROD_Sorter_Lower_fast`: `Verify card` ran `verify_saved.py` (758 PASS, 0 FAIL — the saved-project
+  subset of the build's 823), streamed and coloured, the table refreshed.
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run
