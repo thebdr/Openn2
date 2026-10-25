@@ -8,7 +8,7 @@ name edits. maybe this can be done on the .xml"). The rules come from the user's
   part for a coupler, the description for an Anybus, SYCON.net's default for drives and IO-Link masters);
 - the controller sits at the top-left corner; the devices are rows per GROUP (ET200SP, couplers, gateways,
   IO-Link masters, switches, drives - top to bottom), each row a gentle stair of up to 8 devices (the next one
-  ~60 px right and ~22 px down, so the long labels stay readable), the next row of the same group ~200 px lower,
+  70 px right (90 for the 70 px wide switch and gateway boxes) and 22 px down, so the long labels stay readable), the next row of the same group ~200 px lower,
   the next group below the last row;
 - the bus is VERTICAL (the user's second edit, 2026-10-25 08:59): a Device-less BusLine at x 8..12 from y 72 down
   past the last device, inside the controller's channel BusLines; the channel's own line is a stub from x 8 to
@@ -30,11 +30,11 @@ from .session import log
 GROUPS = (("et200sp", ("IM 15",)), ("coupler", ("PN/PN",)), ("gateway", ("Anybus",)), ("iolink", ("AL1",)),
           ("switch", ("SCALANCE",)), ("drive", ("ServoOne", "Drive")))
 CONTROLLER_RECT = (21, 34, 53, 66)
-FIRST_ROW_TOP, X0, DX, DY, PER_ROW = 83, 60, 60, 22, 8
+FIRST_ROW_TOP, X0, DX, DY, PER_ROW = 83, 60, 70, 22, 8   # 70: a 32 px icon and air before the next label (user 2026-10-25)
 ROW_PITCH, GROUP_GAP = 200, 36
 BUS_LEFT, BUS_RIGHT, BUS_TOP, BUS_MARGIN = 8, 12, 72, 60   # the vertical bus line; its bottom = the last device + margin
 SIZE = {"switch": (40, 70), "gateway": (40, 70)}  # (height, width): the tall icons; the rest 32 x 32
-STEP = {"switch": (80, 26)}                       # (dx, dy) of the wide switch box; a gateway keeps the stair
+STEP = {"switch": (90, 26), "gateway": (90, 26)}  # (dx, dy) of a 70 px box: the next label clear of the icon
 
 DEVICE_TAG = re.compile(r"<Device\b[^>]*>")
 RECT_TAG = re.compile(r'<PositionRect top="\d+" left="\d+" bottom="\d+" right="\d+"/>')

@@ -48,9 +48,9 @@ def test_layout_rows_per_group_as_stairs():
     assert coupler[0] == 83 + 32 + 36 and coupler[1] == 60              # the next group below the last row
     assert switch[2] - switch[0] == 40 and switch[3] - switch[1] == 70  # a switch box
     drives = [rects["drive%02d" % i] for i in range(10)]
-    assert drives[1][0] == drives[0][0] + 22 and drives[1][1] == drives[0][1] + 60   # a stair
+    assert drives[1][0] == drives[0][0] + 22 and drives[1][1] == drives[0][1] + 70   # a stair
     assert drives[8][0] == drives[0][0] + 200 and drives[8][1] == 60    # the second row of the group
-    assert drives[7][1] == 60 + 7 * 60
+    assert drives[7][1] == 60 + 7 * 70
     assert canvas.group_of("Anybus Communicator") == "gateway" and canvas.group_of("Whatever") == "other"
     # the rows run in FLD order, not in table or name order
     by_fld = [{"station_name": "n0090-x", "catalog_item": "AL1202", "fld": "=TRIB-SM071-K1"},

@@ -436,7 +436,7 @@ for the handoff alone):
     HilscherPnCard_1.verification.txt   the read-back verification
     build.log
     HilscherIO.xml                      the process-data export (the IO driver's input)
-    nWid/config.nxd + UpdateCardV4.bat  the configuration export and the card-update batch (Shared/HardwareConfigBuilderData/nWid)
+    nWid/config.nxd + UpdateCardV5.bat  the configuration export and the card-update batch (Shared/HardwareConfigBuilderData/nWid)
   HilscherIOCard2/ ...                  one per card (one per PROFINET network of the list)
   IODriver/BusField.csv                 every card's nodes
     _PL_Logs/                           build[_resume].log, HilscherPnCard_<n>.verification.txt (user: "keep the
@@ -444,7 +444,9 @@ for the handoff alone):
   _PL_Logs/                             export.log, build.log (the list)
 ```
 
-`UpdateCardV4.bat` is the FVZ reference's with one change (user 2026-10-24): the card chosen - the serial number
+`UpdateCardV5.bat` is the FVZ reference's `UpdateCardV4.bat` with one change, hence V5 (user 2026-10-25: "this is V5 now
+since it was edited. The header should follow PL5 format (hand maintained script)" - the `#!openn` header in the
+batch's own comment syntax, each directive line prefixed `::`, kind `tool/nwid-update-card`): the card chosen - the serial number
 that names its folder under `C:\Program Files\cifX Device Driver
 80100_*` - is remembered in `card.txt` beside
 the batch; a later run reports the remembered card and uses it when present, else the normal workflow (none /
@@ -469,9 +471,12 @@ name (the label before `[type]<station>`) follows the device type, now a column 
 (`Symbolic Name`: `fld` = functional unit + the location's first segment, `=TRIB-AEP01`, for ET200SP and SCALANCE;
 `variable` = the description's variable part, `SORTER (=TRIB) / INDUCTION LINES GR1 (=TRIB-AEC01)`, for a coupler;
 `description` = the Description Module, `ANTENNA CELL TEST`, for an Anybus; `default` for drives, AL1202 and the
-controller) - PL5 writes it into the stations table (`Symbolic Name` column, with `FLD`), and the canvas: the
+controller) - and, since the user's edit of 2026-10-25 (`088_=TRIB-CA01`, `087`), the label is `nnn[_Custom
+Description]`: nnn the node number (the IP's last octet, three digits), then `_` and the rule's text when it gives
+one (`sycon_handoff.symbolic_name`; the controller keeps SYCON.net's). PL5 writes it into the stations table
+(`Symbolic Name` column, with `FLD`), and the canvas: the
 controller top-left, rows per group (ET200SP, couplers, gateways, IO-Link masters, switches, drives) in FLD order
-(user: "the canvas rows should sort by FLD"; the project's own order is by PROFINET name), each row a stair of up to 8 (60 px right, 22 px down - the long labels stay readable), the next row of a group 200 px lower,
+(user: "the canvas rows should sort by FLD"; the project's own order is by PROFINET name), each row a stair of up to 8 (70 px right - 90 for the 70 px wide switch and gateway boxes, user 2026-10-25: "a few pixels further apart horizontally so the text does not get covered" - and 22 px down), the next row of a group 200 px lower,
 the next group below. The bus is VERTICAL (the user's second edit, 2026-10-25 08:59, `PROD_Sorter_Lower_fresh -
 Modified added vertical busline`, an XML edit: a Device-less `<BusLine>` at x 8..12 from y 72 down past the last
 device as the channel's last BusLine, the channel's own line a stub from x 8 to the controller's left edge, every
@@ -541,7 +546,7 @@ device, watchdog 1000 ms, process image big endian, module alignment byte bounda
 
 Run on the sorter (2026-10-24 19:40-20:03, the desktop left alone, 1387 s): the resume re-confirmed the ET200SP
 parameters and the ports, found Auto addressing already on, exported HilscherIO.xml (657 KB, UTF-16, every one of
-the 62 stations listed) and nWid/config.nxd + config_nwid.nxd, shipped UpdateCardV4.bat, wrote 17 symbolic names
+the 62 stations listed) and nWid/config.nxd + config_nwid.nxd, shipped the card-update batch, wrote 17 symbolic names
 and 63 positions, regenerated BusField.csv (the Vitronic and cell-test nodes 0x010C0020): verification 775 PASS /
 0 FAIL, 29 notes (`spike/references/FVT_tests/HilscherPnCard_1.verification.txt`; the recording's log in
 `spike/references/recordings/process_data_export/events.log`).

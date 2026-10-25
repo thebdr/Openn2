@@ -1,4 +1,4 @@
-"""The shipped nWid\\UpdateCardV4.bat (the FVZ reference's, with the remembered card): run twice against a fake
+"""The shipped nWid\\UpdateCardV5.bat (the FVZ reference's, with the remembered card): run twice against a fake
 driver folder - the first run finds the one card, copies the two nxd files into its Channel0 and remembers the
 card in card.txt; the second run reports the remembered card and copies again; a remembered card that is gone
 falls back to the normal workflow. `pause` reads nothing (stdin is NUL) and goes on."""
@@ -9,12 +9,12 @@ import tempfile
 import shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BAT = os.path.join(os.path.dirname(os.path.dirname(HERE)), "Shared", "HardwareConfigBuilderData", "nWid", "UpdateCardV4.bat")
+BAT = os.path.join(os.path.dirname(os.path.dirname(HERE)), "Shared", "HardwareConfigBuilderData", "nWid", "UpdateCardV5.bat")
 
 
 def _run(nwid, driver):
     env = dict(os.environ, CIFX_DRIVER_PATH=driver)
-    r = subprocess.run(["cmd", "/c", os.path.join(nwid, "UpdateCardV4.bat")], cwd=nwid, env=env, stdin=subprocess.DEVNULL,
+    r = subprocess.run(["cmd", "/c", os.path.join(nwid, "UpdateCardV5.bat")], cwd=nwid, env=env, stdin=subprocess.DEVNULL,
                        capture_output=True, text=True, timeout=60)
     return r.returncode, r.stdout
 
@@ -34,7 +34,7 @@ def test_remembered_card():
         os.makedirs(os.path.join(card, "Channel0"))
         nwid = os.path.join(d, "nWid")
         os.makedirs(nwid)
-        shutil.copy2(BAT, os.path.join(nwid, "UpdateCardV4.bat"))
+        shutil.copy2(BAT, os.path.join(nwid, "UpdateCardV5.bat"))
         _prepare(nwid)
         rc, out = _run(nwid, driver)
         assert "One Hilscher Card folder" in out and "COPY SUCCESSFUL" in out, out

@@ -21,7 +21,7 @@ from .session import Session, SyconError, log
 
 CHECKPOINT_EVERY = 12
 # the files shipped into the project's nWid\ folder beside config.nxd (user 2026-10-24: the FVZ reference's
-# UpdateCardV4.bat, with the chosen card remembered in card.txt) - hand-maintained in Shared
+# UpdateCardV4.bat as UpdateCardV5.bat, with the chosen card remembered in card.txt) - hand-maintained in Shared
 NWID_ASSETS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Shared",
                                             "HardwareConfigBuilderData", "nWid"))
 POTENTIAL_GROUP_RECORD = 243          # an ET200SP module's `Potential group` record (its first byte 01 = a new group)
@@ -321,7 +321,7 @@ def verify_exports(v, handoff, process_xml, config_nxd):
     for s in handoff.stations:
         v.check(s["station_name"].lower() in listed, "process data export lists %s" % s["station_name"])
     # the DBM/nxd export writes TWO files (user 2026-10-24: "the sycon export DBM/NXD function exports 2 files. i name
-    # them config or c, one has to be renamed"): config.nxd and config_nwid.nxd - UpdateCardV4.bat renames the second
+    # them config or c, one has to be renamed"): config.nxd and config_nwid.nxd - UpdateCardV5.bat renames the second
     # to nwid.nxd when it copies them into the card
     for path in (config_nxd, config_nxd[:-4] + "_nwid.nxd"):
         v.check(os.path.exists(path) and os.path.getsize(path) > 0,

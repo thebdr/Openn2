@@ -65,7 +65,8 @@ folders `Technology objects`, `Watch and force tables`, `Software units`, `Exter
 Not OP5's: the `hw/sycon-device-types`, `hw/sycon-stations` and `hw/sycon-modules` kinds carry the same header
 (`target: SyconNetProjectInterface`) and are PL5's handoff to Sycon5App for a Hilscher SYCON.net project (the
 IPC-based types; one project per PROFINET network, the controller's) - see `Sycon5App/README.md`; OP5 lists a
-folder of them as `doc/other` at most.
+folder of them as `doc/other` at most. Likewise `tool/nwid-update-card`: the hand-maintained card-update batch
+shipped beside the SYCON.net project (`nWid/UpdateCardV5.bat`), its header in the batch's comment syntax (`::#!openn`).
 
 The same kinds describe OP5's **exports** (TIA → PL5 coverage report), with `producer: Openn5 …`.
 
