@@ -9,7 +9,6 @@
 @echo off
 setlocal enabledelayedexpansion
 
-
 set currentDir=%~dp0
 set cifX_Device_Driver_Path=C:\Program Files\cifX Device Driver
 if defined CIFX_DRIVER_PATH set "cifX_Device_Driver_Path=%CIFX_DRIVER_PATH%"
