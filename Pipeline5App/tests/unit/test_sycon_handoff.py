@@ -293,6 +293,23 @@ def test_fixed_modules_symbolic_rules_and_the_manufacturer_key():
             raise AssertionError("an unknown symbolic-name rule was accepted")
 
 
+def test_dap_parameters_row():
+    """Column 9 of the database: the device's own submodule parameters as a slot 0 / subslot 1 row before the modules
+    (user 2026-10-25: the couplers' Diagnostics data validity = 0, index 4 of the General head parameters record)."""
+    with tempfile.TemporaryDirectory() as d:
+        dtd = os.path.join(d, "SyconDeviceTypesDatabase.csv")
+        with open(dtd, "w", encoding="utf-8", newline="") as f:
+            f.write("CIFX 80-RE/ML,controller,CIFX RE/PNM,default,,\r\n"
+                    "6ES7158-3AD10-0XA0,slave,PN/PN Coupler X2,fixed,,,variable,X2: *OUT 128 Byte | *IN 128 Byte,4=0 | record:1=00 0C 00 02 00 00\r\n")
+        db = sycon.load_dtd(dtd)
+    assert db["6ES7158-3AD10-0XA0"]["dap_parameters"] == "4=0 | record:1=00 0C 00 02 00 00" and db["CIFX80-RE/ML"]["dap_parameters"] == ""
+    rows = [_head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+            dict(_head("n0006-trib-aec01-K24501", "192.168.1.6", "6ES7158-3AD10-0XA0", "-K24501", "6"), connector="X2")]
+    _s, modules, _f = sycon.build(rows, db)
+    assert [(m["slot"], m["subslot"], m["module_text"], m["parameters"]) for m in modules] == [
+        ("0", "1", "", "4=0 | record:1=00 0C 00 02 00 00"), ("1", "", "*OUT 128 Byte", ""), ("2", "", "*IN 128 Byte", "")]
+
+
 def test_coupler_modules_mirrored_by_connector():
     """User 2026-10-24: a PN/PN coupler plugs *OUT 128 Byte + *IN 128 Byte on its X2 side and the mirror on X1; the
     head row's Connector column picks the list; a connector without a list is a WARN, nothing plugged."""

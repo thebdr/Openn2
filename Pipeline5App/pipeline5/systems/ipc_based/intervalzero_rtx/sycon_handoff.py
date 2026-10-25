@@ -229,14 +229,15 @@ def card_model(row) -> str:
 def load_dtd(path: str | None = None) -> dict:
     """{MODEL ID upper: {role, catalog_item, modules, gsdml, comment, symbolic, fixed_modules}} from the
     hand-maintained csv (comment and header lines skipped; ',' or ';' delimited). Columns 7 and 8 (2026-10-24):
-    the symbolic-name rule and the module texts of the `fixed` policy."""
+    the symbolic-name rule and the module texts of the `fixed` policy; column 9 (2026-10-25): the DAP parameters
+    (slot 0 subslot 1: `index=value | record:<idx>=<bytes>`)."""
     path = path or SYCON_DTD_DEFAULT
     with open(path, encoding="utf-8-sig") as f:
         lines = [ln for ln in f.read().splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
     delimiter = ";" if lines and lines[0].count(";") > lines[0].count(",") else ","
     out = {}
     for row in csv.reader(lines, delimiter=delimiter):
-        row = [c.strip() for c in row] + [""] * 8
+        row = [c.strip() for c in row] + [""] * 9
         if not row[0]:
             continue
         role = row[1].lower()
@@ -253,7 +254,7 @@ def load_dtd(path: str | None = None) -> dict:
             raise ValueError("SyconDeviceTypesDatabase: policy fixed without Fixed Modules for %r" % row[0])
         out[model_id(row[0]).upper()] = {"model_id": model_id(row[0]), "role": role, "catalog_item": row[2],
                                          "modules": policy, "gsdml": row[4], "comment": row[5],
-                                         "symbolic": symbolic, "fixed_modules": fixed}
+                                         "symbolic": symbolic, "fixed_modules": fixed, "dap_parameters": row[8]}
     return out
 
 
@@ -356,6 +357,10 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
             cur["station"]["update_time_ms"] = str(FAST_UPDATE_TIME_MS)
             cur["station"]["comment"] = (cur["station"]["comment"] + " | fast: " + ", ".join(
                 sorted({k for s in cur["signals"] for k in FAST_SIGNAL_KEYWORDS if k in signal_text(s)}))).strip(" |")
+        if rec.get("dap_parameters"):                      # the device's own submodule (slot 0, subslot 1)
+            modules.append({"station_name": cur["name"], "slot": "0", "subslot": "1", "module_id": "",
+                            "module_text": "", "parameters": rec["dap_parameters"],
+                            "comment": "DAP parameters of %s" % rec["model_id"]})
         if rec["modules"] == "fixed":                      # the database's module texts, in slot order
             fixed = rec.get("fixed_modules") or []
             if isinstance(fixed, dict):                    # per connector: the head row's Connector column picks
