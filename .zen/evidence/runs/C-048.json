@@ -1,0 +1,30 @@
+{
+  "clause": "C-048",
+  "command": "bash Sycon5App/scripts/verify_c048.sh",
+  "commandArgv": [
+    "bash",
+    "Sycon5App/scripts/verify_c048.sh"
+  ],
+  "exitCode": 0,
+  "outputSha": "c356eafbf65977199ed70984da461e590fda849af350e2afa22dad5422d4ba41",
+  "outputTail": ".......                                                                  [100%]\n7 passed in 0.75s",
+  "ranAt": "2026-10-25T23:20:08.026Z",
+  "headCommit": "53491654192d9040a5963839d5967b1c60ff5da0",
+  "tests": [
+    {
+      "name": "Sycon5App/tests/test_exports.py",
+      "file": "Sycon5App/tests/test_exports.py",
+      "fileSha": "7c76513f44acdffb52a56d174165a78489913e75c1d6605ddf602b458eec0be1"
+    },
+    {
+      "name": "Sycon5App/tests/test_update_card_bat.py",
+      "file": "Sycon5App/tests/test_update_card_bat.py",
+      "fileSha": "f97790d4243bc5a63f52508876dc3376cd41a4e326e4f0100ebe15444c95b343"
+    },
+    {
+      "name": "Sycon5App/tests/test_refute_c048.py",
+      "file": "Sycon5App/tests/test_refute_c048.py",
+      "fileSha": "b5fe7c68c068c4f142edd003a54dcb0fa57b405c2cfb51d2ede3e0cf7252aa11"
+    }
+  ]
+}

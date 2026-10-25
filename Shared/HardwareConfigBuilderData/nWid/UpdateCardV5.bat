@@ -2,7 +2,7 @@
 ::#! kind: tool/nwid-update-card
 ::#! schema: 1
 ::#! producer: hand-maintained (Shared/HardwareConfigBuilderData/nWid)
-::#! generated: 2026-10-25T09:30:00Z
+::#! generated: 2026-10-26T00:20:00Z
 ::#! source: FVZ_MSC_20261020_1731/PRODUCTION/HilscherIOCard1/nWid/UpdateCardV4.bat (V4) + the remembered card (V5)
 ::#! comment: copies this folder's config.nxd and nwid.nxd into the Hilscher card's Channel0; the card chosen is remembered in card.txt
 ::#!end
@@ -68,7 +68,12 @@ if !count! GTR 1 (
 
 	echo.
 	:INVALID_CHOICE
+	set "choice="
 	set /p choice="Which one do you want to select? Insert choice:  "
+	if "!choice!"=="" (
+		echo No choice entered - nothing copied
+		exit /b 1
+	)
 
 	if !choice! GTR !count! (goto :INVALID_CHOICE)
 	if !choice! LSS 1 (goto :INVALID_CHOICE)

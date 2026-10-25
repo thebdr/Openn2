@@ -67,6 +67,8 @@ def verify(handoff, project, plugged, timing_set=None):
     by_name = {d.device_no.lower(): d for d in project.devices}
     ctrl = project.controller
     v.check(ctrl is not None, "controller present: %s" % (ctrl.device_no if ctrl else None))
+    twice = sorted({d.device_no.lower() for d in project.devices if [x.device_no.lower() for x in project.devices].count(d.device_no.lower()) > 1})
+    v.check(not twice, "no station name twice in the project (twice: %r)" % twice)   # C-047 refute round 1
     network = {k.lower(): v for k, v in ctrl.network} if ctrl else {}
     timing = {k.lower(): v for k, v in ctrl.timing.items()} if ctrl else {}
     for s in handoff.stations:

@@ -24,7 +24,7 @@ from __future__ import annotations
 import re
 
 from .handoff import natural_key
-from .session import log
+from .log import log
 
 # the groups, top to bottom, by words of the catalog item; the rest below them
 GROUPS = (("et200sp", ("IM 15",)), ("coupler", ("PN/PN",)), ("gateway", ("Anybus",)), ("iolink", ("AL1",)),

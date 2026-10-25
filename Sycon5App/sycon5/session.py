@@ -30,8 +30,7 @@ class SyconError(RuntimeError):
     pass
 
 
-def log(*parts):
-    print(time.strftime("%H:%M:%S"), *parts, flush=True)
+from .log import log  # noqa: E402,F401 - re-exported: every driver module logs through `session.log`
 
 
 def sycon_pids():

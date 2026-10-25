@@ -18,10 +18,15 @@ from sycon5 import gui  # noqa: E402
 
 @pytest.fixture
 def app(tmp_path):
-    try:
-        root = tk.Tk()
-    except tk.TclError as ex:
-        pytest.skip("no display: %s" % ex)
+    root = None
+    for attempt in range(3):                  # Tk's start-up failed once in three under load ("Can't find a usable tk.tcl"):
+        try:                                  # a transient, seen 2026-10-25 twice in the full suite, never alone
+            root = tk.Tk()
+            break
+        except tk.TclError as ex:
+            if attempt == 2:
+                pytest.skip("no display: %s" % ex)
+            time.sleep(0.5)
     root.withdraw()
     a = gui.App(root, fake_production(str(tmp_path / "PRODUCTION")), settings_path=str(tmp_path / "gui.json"))
     yield a

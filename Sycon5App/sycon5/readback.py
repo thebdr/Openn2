@@ -68,7 +68,10 @@ class Project:
 
     @property
     def controller(self):
-        return [d for d in self.devices if d.is_controller][0]
+        """The controller device, None when the project has none (C-047 refute round 1: `verify` crashed on such a
+        project instead of failing its first check)."""
+        found = [d for d in self.devices if d.is_controller]
+        return found[0] if found else None
 
 
 def _strings(data):
@@ -94,9 +97,24 @@ def _record_bytes(data):
     return data[pos + 6:pos + 6 + length]
 
 
+class ReadbackError(ValueError):
+    """A saved project the read-back cannot trust - the oracle refuses rather than reads a part (C-046 refute round 1:
+    a DTM blob cut in half read as a device without modules)."""
+
+
 def _parse_blob(dev, hexdata):
-    raw = bytes.fromhex(hexdata.strip())
-    ole = olefile.OleFileIO(io.BytesIO(raw[4:]))
+    try:
+        raw = bytes.fromhex(hexdata.strip())
+    except ValueError as ex:
+        raise ReadbackError("device %s: BinData is not hex (%s)" % (dev.device_no, ex)) from ex
+    length = int.from_bytes(raw[:4], "little") if len(raw) >= 4 else -1
+    if length != len(raw) - 4:
+        raise ReadbackError("device %s: BinData holds %d bytes but its length prefix says %d - truncated or corrupt"
+                            % (dev.device_no, max(len(raw) - 4, 0), length))
+    try:
+        ole = olefile.OleFileIO(io.BytesIO(raw[4:]))
+    except Exception as ex:  # noqa: BLE001 - olefile's own hierarchy (NotOleFileError, OSError, ...)
+        raise ReadbackError("device %s: BinData is not an OLE compound document (%s)" % (dev.device_no, ex)) from ex
     try:
         for parts in ole.listdir():
             path = "/".join(parts)

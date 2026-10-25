@@ -1,0 +1,14 @@
+{
+  "clause": "C-047",
+  "verdict": "held",
+  "ranAt": "2026-10-25T23:20:06.994Z",
+  "headCommit": "53491654192d9040a5963839d5967b1c60ff5da0",
+  "tests": [
+    {
+      "name": "Sycon5App/tests/test_refute_c047.py",
+      "file": "Sycon5App/tests/test_refute_c047.py",
+      "symbolSha": "1025178a7ded7aebda0cca2294e1044359aa7e33db31197a274cabdf5740fbd3"
+    }
+  ],
+  "round": 2
+}

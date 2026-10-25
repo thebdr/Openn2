@@ -1,0 +1,35 @@
+{
+  "clause": "C-047",
+  "command": "bash Sycon5App/scripts/verify_c047.sh",
+  "commandArgv": [
+    "bash",
+    "Sycon5App/scripts/verify_c047.sh"
+  ],
+  "exitCode": 0,
+  "outputSha": "028288d4dd98aa626b0a3ac84f8d120e95260be0ff37abecf07c903a52a81026",
+  "outputTail": "..........................                                               [100%]\n26 passed in 0.51s\n..............                                                           [100%]\n14 passed in 1.26s",
+  "ranAt": "2026-10-25T23:20:04.029Z",
+  "headCommit": "53491654192d9040a5963839d5967b1c60ff5da0",
+  "tests": [
+    {
+      "name": "Sycon5App/tests/test_handoff.py",
+      "file": "Sycon5App/tests/test_handoff.py",
+      "fileSha": "5f9255b2549e12d97026630a41061b4ca4d178d2fb2e62c3c4f1b309bd35fcdc"
+    },
+    {
+      "name": "Sycon5App/tests/test_build_plan.py",
+      "file": "Sycon5App/tests/test_build_plan.py",
+      "fileSha": "cfc8beacb5c1a2f95e9aafa69e5165c5add399a750694497dc563fbfaebe7198"
+    },
+    {
+      "name": "Sycon5App/tests/test_canvas.py",
+      "file": "Sycon5App/tests/test_canvas.py",
+      "fileSha": "5dc98297b36178da926581350e3f3c9879ba8fd4ef02424bb90bed98aff2af5f"
+    },
+    {
+      "name": "Sycon5App/tests/test_refute_c047.py",
+      "file": "Sycon5App/tests/test_refute_c047.py",
+      "fileSha": "c9a3ecd345f20378495673684a3593a9188c2d09ef6ae688c853e4f54bd1a5c3"
+    }
+  ]
+}

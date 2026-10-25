@@ -73,7 +73,10 @@ def read_headed_csv(path):
             head.setdefault("columns", ln.lstrip().lstrip("#").strip())
             continue
         body.append(ln)
-    delimiter = ";" if body and body[0].count(";") > body[0].count(",") else ","
+    if in_header:
+        raise HandoffError("%s: the #!openn header is never closed (no #!end line)" % path)
+    unquoted = re.sub(r'"[^"]*"', "", body[0]) if body else ""    # C-047 refute round 1: a quoted field full of commas
+    delimiter = ";" if unquoted.count(";") > unquoted.count(",") else ","
     rows = [[c.strip() for c in r] for r in csv.reader(body, delimiter=delimiter)]
     return head, rows
 
@@ -117,6 +120,19 @@ def load_handoff(folder):
     controllers = [s for s in stations if s["role"] == "controller"]
     if len(controllers) != 1:
         raise HandoffError("%d controller rows in %s (one expected)" % (len(controllers), spath))
+    # C-047 refute round 1: a name twice (SYCON.net's names are case-insensitive - the verification would see one
+    # device for two rows) or an IP twice (SYCON.net refuses it only at the dialog's OK, an hour into a build)
+    seen_names, seen_ips = {}, {}
+    for s in stations:
+        key = s["station_name"].lower()
+        if key in seen_names:
+            raise HandoffError("station name %r twice in %s (%r and %r)" % (key, spath, seen_names[key], s["station_name"]))
+        seen_names[key] = s["station_name"]
+        ip = s.get("ip_address", "")
+        if ip and ip in seen_ips:
+            raise HandoffError("IP address %s twice in %s (%s and %s)" % (ip, spath, seen_ips[ip], s["station_name"]))
+        if ip:
+            seen_ips[ip] = s["station_name"]
     modules, mh = {}, {}
     if os.path.exists(mpath):
         mh, mrows = read_headed_csv(mpath)
@@ -130,6 +146,9 @@ def load_handoff(folder):
             for k in OPTIONAL_MODULE_KEYS:
                 m.setdefault(k, "")
             modules.setdefault(m["station_name"], []).append(m)
+        unknown = sorted(n for n in modules if n.lower() not in seen_names)
+        if unknown:                                   # C-047 refute round 1: rows no station would ever get
+            raise HandoffError("module rows of stations not in %s: %s" % (STATIONS_FILE, unknown))
     return Handoff(folder=folder, controller=controllers[0],
                    stations=[s for s in stations if s["role"] != "controller"], modules=modules,
                    headers={"stations": sh, "modules": mh})

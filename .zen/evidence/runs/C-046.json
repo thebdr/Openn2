@@ -1,0 +1,35 @@
+{
+  "clause": "C-046",
+  "command": "bash Sycon5App/scripts/verify_c046.sh",
+  "commandArgv": [
+    "bash",
+    "Sycon5App/scripts/verify_c046.sh"
+  ],
+  "exitCode": 0,
+  "outputSha": "e0a9f778cfda12804ba650714b4ce44630dee259433ee8720410b1eaa575d7f7",
+  "outputTail": "..........................                                               [100%]\n26 passed in 2.19s",
+  "ranAt": "2026-10-25T23:20:00.318Z",
+  "headCommit": "53491654192d9040a5963839d5967b1c60ff5da0",
+  "tests": [
+    {
+      "name": "Sycon5App/tests/test_readback.py",
+      "file": "Sycon5App/tests/test_readback.py",
+      "fileSha": "271dd42dcb650117e68f919cf0d327025e6740010124e37114b5909c30d1d1a9"
+    },
+    {
+      "name": "Sycon5App/tests/test_architecture_contracts.py",
+      "file": "Sycon5App/tests/test_architecture_contracts.py",
+      "fileSha": "69dc96def2b8b6ec5ffa5b66030029afbe1d3201e07329e6deee4f8741e40146"
+    },
+    {
+      "name": "Sycon5App/tests/test_package_import.py",
+      "file": "Sycon5App/tests/test_package_import.py",
+      "fileSha": "7332233a0a53dc9c7bea00941b840025fcf6f93ec2798367ce00812f50527c1b"
+    },
+    {
+      "name": "Sycon5App/tests/test_refute_c046.py",
+      "file": "Sycon5App/tests/test_refute_c046.py",
+      "fileSha": "32727a68254039fbe28b4256c6ddeab940fc825f334f4f0ba9ab0dcada79f7a8"
+    }
+  ]
+}

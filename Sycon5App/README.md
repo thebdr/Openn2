@@ -3,8 +3,10 @@
 Layout of this folder:
 
 - `README.md` — this brief (the handoff for the next session)
-- `sycon5/` — **the driver package** (see "The driver" below): `session`, `drawing`, `catalog`, `dialog`,
-  `controller`, `device`, `readback`, `driver` (the `SyconDriver` facade)
+- `sycon5/` — **the driver package** (see "The driver" below), its modules in dependency order (law L1 of
+  `tests/test_architecture_contracts.py`): `log` < `handoff`, `readback` (the PL5 tables, the read-back oracle)
+  < `canvas`, `workspace` (the XML / folder side) < `session`, `drawing` < `catalog`, `dialog`, `exports` <
+  `controller`, `device` < `driver` (the `SyconDriver` facade) < `consumer` (the build) < `gui` (the users' window)
 - `tests/test_readback.py` — the read-back on the two fixtures (no GUI); `scripts/e2e_driver_round3.py` — the
   driver end to end on the VM (writes one project into `spike/scratch`)
 - `spike/scripts/` — the pywinauto probe scripts (read-only on the project: nothing is ever saved), listed below
@@ -676,6 +678,42 @@ with the venv's python, and a startup error is shown in a message box).
   levels and filter, a real step through the runner and its log file, a batch, a stop. Tried on the VM on
   `spike/scratch/PROD_Sorter_Lower_fast`: `Verify card` ran `verify_saved.py` (758 PASS, 0 FAIL — the saved-project
   subset of the build's 823), streamed and coloured, the table refreshed.
+
+## The Zen contract (2026-10-25 night)
+
+User: "we did not use the zen contract for the sycon5app, I'm afraid. Is it too late to implement it?" then
+"implement the zen method to align with the repo rules". Sycon5App now follows `.zen/contract.md` the way PL5 does:
+
+- **The clauses.** P-019 (the delta the app lived under since 2026-10-23) is promoted into three `C-` clauses,
+  each with its oracle: **C-046** the driver, its read-back oracle and the structure laws; **C-047** the PL5
+  handoff built into a project and verified by read-back (the FVT numbers); **C-048** the user's functions
+  recorded and replayed (auto addressing, the two exports). C-043 (the generic-hardware types), C-044 (the
+  production folder, the canvas, BusField, the speed-ups) and C-045 (the users' GUI) were already clauses. The
+  scope line of the contract names Sycon5App.
+- **The oracle scripts.** `scripts/verify_c046.sh`, `verify_c047.sh`, `verify_c048.sh` - exit code = verdict, run
+  from Git Bash with the repo venv (`PY=` overrides the interpreter). They run the automated oracles only: the
+  driver itself is verified on the VM by the FVT builds, whose reports are kept under
+  `spike/references/FVT_tests/`.
+- **The recorded runs.** `scripts/zen_record.py --clause C-046 -- bash Sycon5App/scripts/verify_c046.sh` runs
+  the oracle and writes `.zen/evidence/runs/C-046.json` in the repo's shape (the command, its exit code, the
+  sha256 and tail of its output, the commit, the test files with their sha256). The repo had no in-tree
+  recorder; this one is generic (any clause, any command).
+- **The evidence notes.** `.zen/evidence/C-046.md` (the oracle, the laws and what taught them, the P-019 log as
+  it stood when promoted), `C-047.md` (the builds' table, the timed fast build, the XML-clone probe declined, the
+  table rules), `C-048.md` (the recordings, the replays, the fixture).
+- **The structure laws** (`tests/test_architecture_contracts.py`, the shape of PL5's): L1 one dependency
+  direction (`log < handoff, readback < canvas, workspace < session, drawing < catalog, dialog, exports <
+  controller, device < driver < consumer < gui`); L2 the oracle apart (`readback`, `handoff`, `log` import
+  nothing of the package; the XML / folder side never imports pywinauto, pywin32 or comtypes, directly or through
+  the package - `log` became its own module for this, re-exported by `session`); L3 the GUI sealed (tkinter only
+  in `gui`, which imports `workspace` alone); L4 one facade (`Session`, `attach_if_running` and the dialogs only
+  behind `driver`, `SyconDriver` constructed only by `consumer`); L5 the tests never drive SYCON.net. A ratchet
+  (empty) quarantines known violations - adding an entry is an architecture decision.
+- **Status.** The three clauses are `verified` (2026-10-26): the recorded runs under `.zen/evidence/runs/`, the
+  refute round under `.zen/evidence/refutes/` - round 1 (`tests/test_refute_c046.py` .. `c048.py`) refuted all
+  three and was fixed (a blob cut in half read as a device, the loader's gates, the bat's endless prompt - the
+  evidence notes list every finding), round 2 held. `zen_record.py --refute held --round 2 -- <command>` records a
+  round (the tests with the sha256 of the test names they define).
 
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
