@@ -97,6 +97,7 @@ def test_the_commands_of_the_steps(tmp_path):
     w = workspace.scan(root)
     c1 = w.card(1)
     b = workspace.build_command(c1)
+    assert b.argv[0] == (workspace.VENV_PYTHON if os.path.exists(workspace.VENV_PYTHON) else sys.executable)
     assert b.drives_sycon and b.cwd == workspace.APP and b.argv[1] == "-I" and b.argv[2].endswith("build_from_handoff.py")
     assert b.argv[b.argv.index("--handoff") + 1] == c1.handoff and b.argv[b.argv.index("--out") + 1] == c1.project_path
     assert b.argv[b.argv.index("--report") + 1] == c1.report_path and "--resume" not in b.argv

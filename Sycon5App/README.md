@@ -637,6 +637,11 @@ window, PL5's dark palette (`Pipeline5App/pipeline5/workbench/theme.py`) so the 
 C:\Source\Repos\_Openn5\.venv\Scripts\python.exe launch_gui.py [<PRODUCTION folder>]
 ```
 
+A double-click on `launch_gui.py` works too: started with any other Python the launcher re-launches itself with the
+repo venv (user 2026-10-25: "launch_gui.py opens nothing" — the system Python had no pywinauto and the console closed
+on the traceback; now `sycon5/__init__.py` loads the driver lazily, the GUI needs no pywinauto, the steps always run
+with the venv's python, and a startup error is shown in a message box).
+
 - `sycon5/workspace.py` — **the workspace data, no tkinter**: `scan(root)` reads a PRODUCTION folder as PL5 writes it
   (`HilscherIOCard<n>/SyconNetProjectInterface/` per card) and Sycon5App fills it: per card the handoff's `#!openn`
   header (generated, source), its station / module rows and controller, the project (`HilscherPnCard_<n>.spj`, saved

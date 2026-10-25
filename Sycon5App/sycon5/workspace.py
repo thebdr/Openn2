@@ -216,8 +216,12 @@ class Command:
     summary_logs: list = field(default_factory=list)   # the root build.log lines (time-stamped) at start / end
 
 
+VENV_PYTHON = os.path.join(os.path.dirname(APP), ".venv", "Scripts", "python.exe")
+
+
 def python():
-    return sys.executable
+    """The interpreter of the steps: the repo venv (pywinauto, PL5's packages), whatever Python runs the GUI."""
+    return VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
 
 
 def build_command(card, resume=False):
