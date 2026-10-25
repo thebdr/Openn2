@@ -25,9 +25,15 @@ class SyconDriver:
         self.model = {}            # station name -> {"slots": {slot: module}} as this driver plugged them
 
     # ---- session --------------------------------------------------------------------------------------------
-    def open(self, project=None):
-        """Launch SYCON.net (on a project when given) and log in; attach when it already runs."""
+    def open(self, project=None, attach=False):
+        """Launch SYCON.net (on a project when given) and log in. A SYCON.net already running is the USER's (2026-10-25
+        22:56: a probe attached to the user's instance, opened a dialog in it and closed it): it is never touched
+        unless `attach=True` says so on purpose - the build and the probes stop instead."""
         if self.session.attach_if_running():
+            if not attach:
+                self.session.pid = None
+                raise SyconError("SYCON.net is already running (%s) - the user's instance? Close it, or open(attach=True) "
+                                 "to drive it on purpose" % self.session.title())
             log("attached to the running SYCON.net:", self.session.title())
             return self
         # a saved project loads one DTM per station: 40-60 stations took longer than a minute (02:00, "the main

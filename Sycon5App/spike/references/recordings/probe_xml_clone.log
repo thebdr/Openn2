@@ -1,0 +1,20 @@
+23:03:56 source blob: 16388 bytes, name x1, ip x1, ascii GUIDs [], utf16 GUIDs ['300ead69-d5a4-455d-b32d-2569d751d483', '397eabf3-b602-454d-8d3f-9989c6082ec7', '54c35e99-0859-493a-b815-12825cad9b21', '58a4154a-495a-4498-a144-7338b598b30e', 'a5aec451-4a49-44c5-b00c-3a430039fc9b', 'c40c3c6c-e8c5-4d0c-97b3-186904d9115e']
+23:03:56 controller blob before: 2 DTMProxy streams
+23:03:56 read-back before SYCON.net: devices ['controller', 'al1202', 'al1202-001', 'al1202-002']; controller lists [('al1202', '192.168.0.2'), ('al1202-001', '192.168.0.3')]
+23:04:11 opened: SYCON.net - [Probe.spj]
+23:04:13 tree: ['CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)', 'AL1202[AL1202]<al1202>', 'AL1202[AL1202]<al1202-001>', 'AL1202[AL1202]<al1202-002>']
+23:04:27 dialog: netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)
+23:04:27   dialog maximized: 1934x1020
+23:04:36 Device Table rows: [(1, 'al1202'), (2, 'al1202-001'), (3, 'al1202-001'), (4, 'al1202-001'), (5, 'al1202-001'), (6, 'al1202-001')]
+23:04:38 dialog closed after Cancel
+23:04:55 dialog: netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)
+23:04:55   dialog maximized: 1934x1020
+23:05:00 dialog closed after OK
+23:05:16 dialog: netProject - Configuration CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)
+23:05:16   dialog maximized: 1934x1020
+23:05:26 Device Table rows after an OK: [(1, 'al1202'), (2, 'al1202-001'), (3, 'al1202-001'), (4, 'al1202-001'), (5, 'al1202-001'), (6, 'al1202-001')]
+23:05:28 dialog closed after Cancel
+23:06:02 save: C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\_probe_xmlclone\Probe\_S129\SYCON_net.xml unchanged after 30 s (nothing to save?) - going on
+23:06:06 close: closed
+23:06:06 controller blob after the save: 2 DTMProxy streams
+23:06:06 read-back after SYCON.net: devices ['controller', 'al1202', 'al1202-001', 'al1202-002']; controller lists [('al1202', '192.168.0.2'), ('al1202-001', '192.168.0.3')]

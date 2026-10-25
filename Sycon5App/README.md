@@ -605,6 +605,29 @@ instead of 56 (the 12 AL1202 re-typings in ~30 s each instead of 8 Add Submodule
 and Anybus skipped by the read-back). What is left: the six ET200SPs (two dialogs each, ~15 min) and the two
 controller passes (names ~5 min, IPs ~6 min).
 
+## Cloning in the XML: no (probed 2026-10-25 23:00)
+
+User: "we can maybe go even further by adding one station per type, saving and closing sycon; doing the cloning +
+other parameters assignment (i see profinet name) in the .xml". What the saved project says (`scripts/probe_xml_clone.py`,
+its log in `spike/references/recordings/probe_xml_clone.log`): a station's DTM blob is an OLE compound document (a
+4-byte length, then `d0cf11e0...`; `olefile` reads it, pywin32's structured storage could rewrite its streams) and two
+identical drives differ in 168 of 13 828 bytes only - the name of station (three UTF-16 occurrences), the IP, one
+GUID in `DeviceType` and a repeated 3-byte value - so copying the element and patching those is mechanical. But the
+CONTROLLER's blob (2.5 MB, 2985 streams for 62 stations) holds, per child, a `SlaveDTMsGetParameters/DTMProxyNNN`
+stream of 17-23 KB and a `pn:DeviceList` entry (name, IP, mask) with the child's GUID, and SYCON.net does NOT rebuild
+them from the device elements: a station cloned in the XML of a throwaway project (the name, IP and GUIDs patched,
+the controller untouched) shows in the netProject tree, but the controller's Device Table keeps its two rows, an OK
+on the controller dialog changes nothing, the project saves as unmodified, the blob keeps its two proxies. A clone
+made in the file is a device without a controller - not addressed, not in the process-data export. Making it one
+would mean fabricating the DTM's own proxy stream and list entry per clone, with no oracle short of a card: not done.
+The names and IPs alone would be rewritable (the device blob and the controller's DeviceList, by structured storage)
+but the GUI pass writes both consistently in ~11 minutes per 62 stations - not worth the risk either.
+
+Learnt the hard way the same evening: `SyconDriver.open` used to ATTACH to a SYCON.net already running - the first probe
+run attached to the user's own instance (the fast sorter project open in it), opened and cancelled the controller
+dialog there and closed it (the files were untouched: nothing was saved). A running instance is the user's: `open`
+now refuses it unless `open(attach=True)` says so on purpose.
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run
