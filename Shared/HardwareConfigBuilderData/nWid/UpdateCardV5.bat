@@ -9,12 +9,6 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: UpdateCardV5.bat - copy this folder's config.nxd and nwid.nxd into the Hilscher card's Channel0 folder.
-:: Shipped by PL5 / Sycon5App into <production>\HilscherIOCard<n>\nWid\ (the FVZ reference's V4 with one change,
-:: user 2026-10-24: the chosen card - the serial number that names its folder - is remembered in card.txt beside
-:: this file; a later run reports the remembered card and uses it when it is present, otherwise the normal
-:: workflow runs: none found / one found / several to choose from, and the choice is remembered again).
-:: CIFX_DRIVER_PATH, when set, overrides the driver folder (the tests use it).
 
 set currentDir=%~dp0
 set cifX_Device_Driver_Path=C:\Program Files\cifX Device Driver
