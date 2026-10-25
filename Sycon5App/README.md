@@ -507,7 +507,13 @@ List head has no Part No., so the database row `VITRONIC` is keyed by the head's
 `sycon_model_by_manufacturer`); a PN/PN coupler plugs `*OUT 128 Byte` + `*IN 128 Byte` on its X2 side and the mirror
 on X1 (user: "couplers have no defined I/O modules, let's default to 128Byte IN + OUT; X1 will need to have the
 module positions mirrored") - the Fixed Modules column holds one list per connector (`X2: ... ; X1: ...`), the
-head row's Connector column picks it (a connector without a list: WARN `sycon_connector_unknown`).
+head row's Connector column picks it (a connector without a list: WARN `sycon_connector_unknown`). The database's
+column 9, `DAP Parameters` (2026-10-25), sets the device's own submodule (slot 0, subslot 1) through its Parameter
+dataset like a module's: the coupler's `4=0 | record:1=00 0C 00 02 00 00` - user: "on the PNPN couplers: Diagnostics
+data validity = 0", the 5th bit parameter of the General head parameters record (GSDML DDV, byte 1 bit 1, default
+1), the record's bytes `00 0C 00 02 00 00` afterwards the read-back oracle (`00 0E ...` before). A built project
+takes a database change of this column without a full build: `scripts/apply_dap_params.py --handoff <folder>
+--out <project.spj>` (one device dialog per station with DAP rows, save, read back).
 
 ## Recording the user's actions, and the exports they taught (2026-10-24 evening)
 
