@@ -9,7 +9,11 @@ name edits. maybe this can be done on the .xml"). The rules come from the user's
 - the controller sits at the top-left corner; the devices are rows per GROUP (ET200SP, couplers, gateways,
   IO-Link masters, switches, drives - top to bottom), each row a gentle stair of up to 8 devices (the next one
   ~60 px right and ~22 px down, so the long labels stay readable), the next row of the same group ~200 px lower,
-  the next group below the last row; a device's drop line runs from y 36 down to its top at x left + 15.
+  the next group below the last row;
+- the bus is VERTICAL (the user's second edit, 2026-10-25 08:59): a Device-less BusLine at x 8..12 from y 72 down
+  past the last device, inside the controller's channel BusLines; the channel's own line is a stub from x 8 to
+  the controller's left edge at y 72..76; every device's drop line is a horizontal branch from x 8 to its left
+  edge at its vertical centre.
 
 A device element: `<Device syc:deviceName=".." syc:symbolicName=".." ... deviceNo="n0005-...">` with its
 `<PositionRect top left bottom right/>` right after it, inside a `<BusLine>` whose own first `<PositionRect/>` is
@@ -27,14 +31,16 @@ GROUPS = (("et200sp", ("IM 15",)), ("coupler", ("PN/PN",)), ("gateway", ("Anybus
           ("switch", ("SCALANCE",)), ("drive", ("ServoOne", "Drive")))
 CONTROLLER_RECT = (21, 34, 53, 66)
 FIRST_ROW_TOP, X0, DX, DY, PER_ROW = 83, 60, 60, 22, 8
-ROW_PITCH, GROUP_GAP, LINE_TOP = 200, 36, 36
-SIZE = {"switch": (40, 70)}                       # (height, width) - the rest 32 x 32
-STEP = {"switch": (80, 26)}                       # (dx, dy) of a bigger box
+ROW_PITCH, GROUP_GAP = 200, 36
+BUS_LEFT, BUS_RIGHT, BUS_TOP, BUS_MARGIN = 8, 12, 72, 60   # the vertical bus line; its bottom = the last device + margin
+SIZE = {"switch": (40, 70), "gateway": (40, 70)}  # (height, width): the tall icons; the rest 32 x 32
+STEP = {"switch": (80, 26)}                       # (dx, dy) of the wide switch box; a gateway keeps the stair
 
 DEVICE_TAG = re.compile(r"<Device\b[^>]*>")
 RECT_TAG = re.compile(r'<PositionRect top="\d+" left="\d+" bottom="\d+" right="\d+"/>')
 SYMBOLIC_ATTR = re.compile(r'(syc:symbolicName=")([^"]*)(")')
 DEVICE_NO = re.compile(r'\bdeviceNo="([^"]*)"')
+VERTICAL_BUS = re.compile(r'<BusLine>\s*<PositionRect top="\d+" left="%d" bottom="\d+" right="%d"/>\s*</BusLine>' % (BUS_LEFT, BUS_RIGHT))
 
 
 def group_of(catalog_item) -> str:
@@ -90,6 +96,7 @@ def apply(xml_path, symbolics, rects, controller_rect=CONTROLLER_RECT):
     symbolics = {k.lower(): v for k, v in symbolics.items()}
     rects = {k.lower(): v for k, v in rects.items()}
     edits, n_sym, n_rect = [], 0, 0
+    controller_end, max_bottom = None, 0
     for m in DEVICE_TAG.finditer(text):
         tag = m.group(0)
         no = DEVICE_NO.search(tag)
@@ -107,6 +114,10 @@ def apply(xml_path, symbolics, rects, controller_rect=CONTROLLER_RECT):
         if rect is None:
             continue
         top, left, bottom, right = rect
+        if is_controller:
+            controller_end = m.end()
+        else:
+            max_bottom = max(max_bottom, bottom)
         own = RECT_TAG.search(text, m.end(), m.end() + 600)
         if own:
             edits.append((own.start(), own.end(), _rect(top, left, bottom, right)))
@@ -117,8 +128,27 @@ def apply(xml_path, symbolics, rects, controller_rect=CONTROLLER_RECT):
             if line:
                 if is_controller:
                     edits.append((line.start(), line.end(), _rect(bottom - 1, left + 15, bottom, left + 17)))
-                else:
-                    edits.append((line.start(), line.end(), _rect(LINE_TOP, left + 14, top, left + 16)))
+                else:                                           # the branch from the vertical bus to the device
+                    mid = top + (bottom - top) // 2
+                    edits.append((line.start(), line.end(), _rect(mid - 1, BUS_LEFT, mid + 1, left)))
+    if controller_end is not None:
+        # the controller's channel: its own line a stub from the bus to the controller, and the vertical bus line
+        # (a Device-less BusLine) as the channel's last BusLine - updated when already there
+        ctop, cleft, cbottom, _cright = controller_rect
+        channel = text.find("<BusLines", controller_end)
+        if channel >= 0:
+            first_line = text.find("<BusLine>", channel)        # after the block's Color / MBusCat preamble
+            first = RECT_TAG.search(text, first_line, first_line + 200) if first_line >= 0 else None
+            if first:
+                edits.append((first.start(), first.end(), _rect(cbottom + 19, BUS_LEFT, cbottom + 23, cleft)))
+            bus_line = '<BusLine>\n<PositionRect top="%d" left="%d" bottom="%d" right="%d"/>\n</BusLine>\n' % (
+                BUS_TOP, BUS_LEFT, max(max_bottom, BUS_TOP) + BUS_MARGIN, BUS_RIGHT)
+            existing = VERTICAL_BUS.search(text, channel)
+            closer = text.find("</BusLines>", channel)
+            if existing and (closer < 0 or existing.start() < closer):
+                edits.append((existing.start(), existing.end(), bus_line.rstrip("\n")))
+            elif closer >= 0:
+                edits.append((closer, closer, bus_line))
     for start, end, new in sorted(edits, key=lambda e: e[0], reverse=True):
         text = text[:start] + new + text[end:]
     open(xml_path, "wb").write(text.encode("utf-8"))

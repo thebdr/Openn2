@@ -472,7 +472,11 @@ name (the label before `[type]<station>`) follows the device type, now a column 
 controller) - PL5 writes it into the stations table (`Symbolic Name` column, with `FLD`), and the canvas: the
 controller top-left, rows per group (ET200SP, couplers, gateways, IO-Link masters, switches, drives) in FLD order
 (user: "the canvas rows should sort by FLD"; the project's own order is by PROFINET name), each row a stair of up to 8 (60 px right, 22 px down - the long labels stay readable), the next row of a group 200 px lower,
-the next group below. Written into `SYCON_net.xml` with the project CLOSED (`canvas.apply`: the `syc:symbolicName`
+the next group below. The bus is VERTICAL (the user's second edit, 2026-10-25 08:59, `PROD_Sorter_Lower_fresh -
+Modified added vertical busline`, an XML edit: a Device-less `<BusLine>` at x 8..12 from y 72 down past the last
+device as the channel's last BusLine, the channel's own line a stub from x 8 to the controller's left edge, every
+device's drop line a horizontal branch from x 8 to its left edge at its vertical centre; SYCON.net keeps a gateway's
+box 40 x 70 like a switch's). Written into `SYCON_net.xml` with the project CLOSED (`canvas.apply`: the `syc:symbolicName`
 attribute and the device's `PositionRect` + its BusLine's drop line, edited in place by regex - no
 re-serialisation), after the last save of the build; read back (`Device.symbolic`, `rect`, `line_rect`) and
 verified. Dry run on a copy of the sorter: 60 of 61 labels equal to the user's (the 61st was the location's full

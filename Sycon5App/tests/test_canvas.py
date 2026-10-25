@@ -18,7 +18,8 @@ XML = ('<?xml version="1.0" encoding="UTF-8"?>\n'
        '\t\t\t<Device syc:deviceName="CIFX RE/PNM" syc:symbolicName="CIFX_RE_PNM" syc:progId="Hilscher.PNIOControllerDTM2.1" '
        'syc:devicekind="HIL_MASTER" fdt:manufacturerId="286" fdt:deviceTypeId="515" deviceNo="controller" fdt:deviceTypeInformation="">\n'
        '\t\t\t\t<PositionRect top="72" left="400" bottom="104" right="432"/>\n'
-       '\t\t\t\t<BusLines channelPath="/Root/PROFINET">\n'
+       '\t\t\t\t<BusLines channelPath="/PROFINET_IO">\n'
+       '\t\t\t\t\t<BusLine>\n\t\t\t\t\t\t<PositionRect top="72" left="432" bottom="76" right="950"/>\n\t\t\t\t\t</BusLine>\n'
        '\t\t\t\t\t<BusLine>\n\t\t\t\t\t\t<PositionRect top="72" left="546" bottom="92" right="548"/>\n'
        '\t\t\t\t\t\t<Device syc:deviceName="IM 155-6 PN ST V4.2" syc:symbolicName="IM_155-6_PN_ST_V4.2" syc:progId="Hilscher.PNIOGenDevDTM2.1" '
        'syc:devicekind="HIL_SLAVE" fdt:manufacturerId="42" fdt:deviceTypeId="787" deviceNo="n0005-trib-aep01-k35001" '
@@ -73,15 +74,25 @@ def test_apply_writes_labels_and_boxes_in_place():
         assert ctrl.rect == canvas.CONTROLLER_RECT and ctrl.line_rect == (52, 49, 53, 51) and ctrl.symbolic == "CIFX_RE_PNM"
         assert ctrl.node_type == "0x011E0203"
         et = p.device("n0005-trib-aep01-k35001")
-        assert et.symbolic == "=TRIB-AEP01" and et.rect == (83, 60, 115, 92) and et.line_rect == (36, 74, 83, 76)
+        assert et.symbolic == "=TRIB-AEP01" and et.rect == (83, 60, 115, 92) and et.line_rect == (98, 8, 100, 60)
         assert et.node_type == "0x002A0313" and et.gsdml == "GSDML-V2.35-Siemens-ET200SP-20210401.xml"
         coupler = p.device("n0006-trib-aec01-k24501")
         assert coupler.symbolic == 'SORTER (=TRIB) / INDUCTION <GR1> & "2"' and coupler.node_type == "0x002A0604"
         text = open(path, encoding="utf-8").read()
         assert 'syc:symbolicName="SORTER (=TRIB) / INDUCTION &lt;GR1&gt; &amp; &quot;2&quot;"' in text
-        assert text.count("<PositionRect") == XML.count("<PositionRect") and "channelPath" in text
-        # idempotent
+        assert "channelPath" in text
+        # the channel's stub from the bus to the controller, and the vertical bus line past the lowest device
+        assert '<PositionRect top="72" left="8" bottom="76" right="34"/>' in text
+        lowest = max(rects[k][2] for k in ("n0005-trib-aep01-K35001", "n0006-trib-aec01-K24501"))   # the devices the XML has
+        assert text.count("<PositionRect") == XML.count("<PositionRect") + 1
+        assert '<PositionRect top="72" left="8" bottom="%d" right="12"/>' % (lowest + canvas.BUS_MARGIN) in text
+        assert text.index('right="12"/>') < text.rindex("</BusLines>") and text.index('right="12"/>') > text.index("/PROFINET_IO")
+        # idempotent: the vertical bus line is updated, not added again
         assert canvas.apply(path, symbolics, rects) == (0, 3)
+        text2 = open(path, encoding="utf-8").read()
+        assert text2.count("<PositionRect") == text.count("<PositionRect") and text2.count('right="12"/>') == 1
+        p2 = read_project(path)
+        assert p2.device("n0006-trib-aec01-k24501").line_rect[1] == 8
 
 
 if __name__ == "__main__":
