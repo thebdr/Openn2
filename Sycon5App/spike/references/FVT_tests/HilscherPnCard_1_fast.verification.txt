@@ -1,0 +1,1967 @@
+verification: 823 PASS, 0 FAIL
+PASS controller present: controller
+PASS station n0006-trib-aec01-k24501 exists
+PASS station n0006-trib-aec01-k24501 IP 192.168.1.6 (read 192.168.1.6)
+PASS controller lists n0006-trib-aec01-k24501 at 192.168.1.6 (read 192.168.1.6)
+PASS station n0006-trib-aec01-k24501 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0006-trib-aec01-k24501 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
+PASS station n0006-trib-aec01-k24501 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
+PASS station n0006-trib-aec01-k24501 symbolic name '006_SORTER (=TRIB) / INDUCTION LINES GR1 (=TRIB-AEC01)' (read '006_SORTER (=TRIB) / INDUCTION LINES GR1 (=TRIB-AEC01)')
+PASS station n0006-trib-aec01-k24501 node type 0x002A0604
+PASS station n0006-trib-aec01-k24501 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
+PASS station n0006-trib-aec01-k24501 model 6ES7158-3AD10-0XA0 (the saved DAP 'DAP X2 V4.2' is order 6ES7 158-3AD10-0XA0)
+PASS station n0006-trib-aec01-k24501: 2 modules plugged (table 2)
+PASS station n0006-trib-aec01-k24501 slot 1: '*OUT 128 Byte' (chosen '*OUT 128 Byte', table )
+PASS station n0006-trib-aec01-k24501 slot 2: '*IN 128 Byte' (chosen '*IN 128 Byte', table )
+PASS station n0006-trib-aec01-k24501 slot 0 sub 1 record 1: 00 0c 00 02 00 00 (table 00 0c 00 02 00 00)
+PASS station n0007-trib-aec01-k24502 exists
+PASS station n0007-trib-aec01-k24502 IP 192.168.1.7 (read 192.168.1.7)
+PASS controller lists n0007-trib-aec01-k24502 at 192.168.1.7 (read 192.168.1.7)
+PASS station n0007-trib-aec01-k24502 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0007-trib-aec01-k24502 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
+PASS station n0007-trib-aec01-k24502 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
+PASS station n0007-trib-aec01-k24502 symbolic name '007_SORTER (=TRIB) / INDUCTION LINES GR2 (=TRIB-AEC01)' (read '007_SORTER (=TRIB) / INDUCTION LINES GR2 (=TRIB-AEC01)')
+PASS station n0007-trib-aec01-k24502 node type 0x002A0604
+PASS station n0007-trib-aec01-k24502 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
+PASS station n0007-trib-aec01-k24502 model 6ES7158-3AD10-0XA0 (the saved DAP 'DAP X2 V4.2' is order 6ES7 158-3AD10-0XA0)
+PASS station n0007-trib-aec01-k24502: 2 modules plugged (table 2)
+PASS station n0007-trib-aec01-k24502 slot 1: '*OUT 128 Byte' (chosen '', table )
+PASS station n0007-trib-aec01-k24502 slot 2: '*IN 128 Byte' (chosen '', table )
+PASS station n0007-trib-aec01-k24502 slot 0 sub 1 record 1: 00 0c 00 02 00 00 (table 00 0c 00 02 00 00)
+PASS station n0009-tric-aec01-k24601 exists
+PASS station n0009-tric-aec01-k24601 IP 192.168.1.9 (read 192.168.1.9)
+PASS controller lists n0009-tric-aec01-k24601 at 192.168.1.9 (read 192.168.1.9)
+PASS station n0009-tric-aec01-k24601 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0009-tric-aec01-k24601 GSDML GSDML-V2.35-Siemens-PNPNIOC-20200924.xml (read GSDML-V2.35-Siemens-PNPNIOC-20200924.xml)
+PASS station n0009-tric-aec01-k24601 type 'PN/PN Coupler X2' (read 'PN/PN Coupler X2')
+PASS station n0009-tric-aec01-k24601 symbolic name '009_SORTER (=TRIB) / SORTER (=TRIH)' (read '009_SORTER (=TRIB) / SORTER (=TRIH)')
+PASS station n0009-tric-aec01-k24601 node type 0x002A0604
+PASS station n0009-tric-aec01-k24601 DAP DAP X2 V4.2 (read 'DAP X2 V4.2')
+PASS station n0009-tric-aec01-k24601 model 6ES7158-3AD10-0XA0 (the saved DAP 'DAP X2 V4.2' is order 6ES7 158-3AD10-0XA0)
+PASS station n0009-tric-aec01-k24601: 2 modules plugged (table 2)
+PASS station n0009-tric-aec01-k24601 slot 1: '*OUT 128 Byte' (chosen '', table )
+PASS station n0009-tric-aec01-k24601 slot 2: '*IN 128 Byte' (chosen '', table )
+PASS station n0009-tric-aec01-k24601 slot 0 sub 1 record 1: 00 0c 00 02 00 00 (table 00 0c 00 02 00 00)
+PASS station n0010-trib-aec01-k26501 exists
+PASS station n0010-trib-aec01-k26501 IP 192.168.1.10 (read 192.168.1.10)
+PASS controller lists n0010-trib-aec01-k26501 at 192.168.1.10 (read 192.168.1.10)
+PASS station n0010-trib-aec01-k26501 GSDML GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml (read GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml)
+PASS station n0010-trib-aec01-k26501 type 'SCALANCE XC216-4C V4.4' (read 'SCALANCE XC216-4C V4.4')
+PASS station n0010-trib-aec01-k26501 symbolic name '010_=TRIB-AEC01' (read '010_=TRIB-AEC01')
+PASS station n0010-trib-aec01-k26501 node type 0x002A0A0B
+PASS station n0010-trib-aec01-k26501 model 6GK5216-4BS00-2AC2 (the saved DAP 'DAP 79' is order 6GK5 216-4BS00-2AC2)
+PASS station n0010-trib-aec01-k26501 slot 0 sub 32769: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0010-trib-aec01-k26501 slot 0 sub 32770: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0010-trib-aec01-k26501 slot 0 sub 32771: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0010-trib-aec01-k26501 slot 0 sub 32772: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0010-trib-aec01-k26501 slot 0 sub 32768 record 3: 00 03 00 06 01 00 00 00 00 00 (table 00 03 00 06 01 00 00 00 00 00)
+PASS station n0010-trib-aec01-k26501 slot 0 sub 32768 record 12309: 30 19 00 08 01 01 00 01 01 00 00 02 (table 30 19 00 08 01 01 00 01 01 00 00 02)
+PASS station n0010-trib-aec01-k26501 slot 0 sub 32768 record 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 (table 30 1c 00 08 01 01 00 00 00 01 00 00)
+PASS station n0005-trib-aep01-k35001 exists
+PASS station n0005-trib-aep01-k35001 IP 192.168.1.5 (read 192.168.1.5)
+PASS controller lists n0005-trib-aep01-k35001 at 192.168.1.5 (read 192.168.1.5)
+PASS station n0005-trib-aep01-k35001 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0005-trib-aep01-k35001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.35-Siemens-ET200SP-20210401.xml)
+PASS station n0005-trib-aep01-k35001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
+PASS station n0005-trib-aep01-k35001 symbolic name '005_=TRIB-AEP01' (read '005_=TRIB-AEP01')
+PASS station n0005-trib-aep01-k35001 node type 0x002A0313
+PASS station n0005-trib-aep01-k35001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
+PASS station n0005-trib-aep01-k35001: 7 modules plugged (table 7)
+PASS station n0005-trib-aep01-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0005-trib-aep01-k35001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 3: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 4: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 5: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 6: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 7: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0005-trib-aep01-k35001 slot 7 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0015-trib-ae01-k26501 exists
+PASS station n0015-trib-ae01-k26501 IP 192.168.1.15 (read 192.168.1.15)
+PASS controller lists n0015-trib-ae01-k26501 at 192.168.1.15 (read 192.168.1.15)
+PASS station n0015-trib-ae01-k26501 GSDML GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml (read GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml)
+PASS station n0015-trib-ae01-k26501 type 'SCALANCE XC216-4C V4.4' (read 'SCALANCE XC216-4C V4.4')
+PASS station n0015-trib-ae01-k26501 symbolic name '015_=TRIB-AE01' (read '015_=TRIB-AE01')
+PASS station n0015-trib-ae01-k26501 node type 0x002A0A0B
+PASS station n0015-trib-ae01-k26501 model 6GK5216-4BS00-2AC2 (the saved DAP 'DAP 79' is order 6GK5 216-4BS00-2AC2)
+PASS station n0015-trib-ae01-k26501 slot 0 sub 32769: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0015-trib-ae01-k26501 slot 0 sub 32770: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0015-trib-ae01-k26501 slot 0 sub 32771: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0015-trib-ae01-k26501 slot 0 sub 32772: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0015-trib-ae01-k26501 slot 0 sub 32768 record 3: 00 03 00 06 01 00 00 00 00 00 (table 00 03 00 06 01 00 00 00 00 00)
+PASS station n0015-trib-ae01-k26501 slot 0 sub 32768 record 12309: 30 19 00 08 01 01 00 01 01 00 00 02 (table 30 19 00 08 01 01 00 01 01 00 00 02)
+PASS station n0015-trib-ae01-k26501 slot 0 sub 32768 record 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 (table 30 1c 00 08 01 01 00 00 00 01 00 00)
+PASS station n0020-trib-ae01-k35001 exists
+PASS station n0020-trib-ae01-k35001 IP 192.168.1.20 (read 192.168.1.20)
+PASS controller lists n0020-trib-ae01-k35001 at 192.168.1.20 (read 192.168.1.20)
+PASS station n0020-trib-ae01-k35001 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0020-trib-ae01-k35001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.35-Siemens-ET200SP-20210401.xml)
+PASS station n0020-trib-ae01-k35001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
+PASS station n0020-trib-ae01-k35001 symbolic name '020_=TRIB-AE01' (read '020_=TRIB-AE01')
+PASS station n0020-trib-ae01-k35001 node type 0x002A0313
+PASS station n0020-trib-ae01-k35001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
+PASS station n0020-trib-ae01-k35001: 3 modules plugged (table 3)
+PASS station n0020-trib-ae01-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0020-trib-ae01-k35001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0020-trib-ae01-k35001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0020-trib-ae01-k35001 slot 3: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0020-trib-ae01-k35001 slot 3 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0025-trib-du01-aec1-t57101 exists
+PASS station n0025-trib-du01-aec1-t57101 IP 192.168.1.25 (read 192.168.1.25)
+PASS controller lists n0025-trib-du01-aec1-t57101 at 192.168.1.25 (read 192.168.1.25)
+PASS station n0025-trib-du01-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0025-trib-du01-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0025-trib-du01-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0025-trib-du01-aec1-t57101 symbolic name '025' (read '025')
+PASS station n0025-trib-du01-aec1-t57101 node type 0x017C4E21
+NOTE station n0025-trib-du01-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0026-trib-du01-aec1-t57201 exists
+PASS station n0026-trib-du01-aec1-t57201 IP 192.168.1.26 (read 192.168.1.26)
+PASS controller lists n0026-trib-du01-aec1-t57201 at 192.168.1.26 (read 192.168.1.26)
+PASS station n0026-trib-du01-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0026-trib-du01-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0026-trib-du01-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0026-trib-du01-aec1-t57201 symbolic name '026' (read '026')
+PASS station n0026-trib-du01-aec1-t57201 node type 0x017C4E21
+NOTE station n0026-trib-du01-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0027-trib-du02-aec1-t57101 exists
+PASS station n0027-trib-du02-aec1-t57101 IP 192.168.1.27 (read 192.168.1.27)
+PASS controller lists n0027-trib-du02-aec1-t57101 at 192.168.1.27 (read 192.168.1.27)
+PASS station n0027-trib-du02-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0027-trib-du02-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0027-trib-du02-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0027-trib-du02-aec1-t57101 symbolic name '027' (read '027')
+PASS station n0027-trib-du02-aec1-t57101 node type 0x017C4E21
+NOTE station n0027-trib-du02-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0028-trib-du02-aec1-t57201 exists
+PASS station n0028-trib-du02-aec1-t57201 IP 192.168.1.28 (read 192.168.1.28)
+PASS controller lists n0028-trib-du02-aec1-t57201 at 192.168.1.28 (read 192.168.1.28)
+PASS station n0028-trib-du02-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0028-trib-du02-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0028-trib-du02-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0028-trib-du02-aec1-t57201 symbolic name '028' (read '028')
+PASS station n0028-trib-du02-aec1-t57201 node type 0x017C4E21
+NOTE station n0028-trib-du02-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0029-trib-du03-aec1-t57101 exists
+PASS station n0029-trib-du03-aec1-t57101 IP 192.168.1.29 (read 192.168.1.29)
+PASS controller lists n0029-trib-du03-aec1-t57101 at 192.168.1.29 (read 192.168.1.29)
+PASS station n0029-trib-du03-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0029-trib-du03-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0029-trib-du03-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0029-trib-du03-aec1-t57101 symbolic name '029' (read '029')
+PASS station n0029-trib-du03-aec1-t57101 node type 0x017C4E21
+NOTE station n0029-trib-du03-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0030-trib-du03-aec1-t57201 exists
+PASS station n0030-trib-du03-aec1-t57201 IP 192.168.1.30 (read 192.168.1.30)
+PASS controller lists n0030-trib-du03-aec1-t57201 at 192.168.1.30 (read 192.168.1.30)
+PASS station n0030-trib-du03-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0030-trib-du03-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0030-trib-du03-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0030-trib-du03-aec1-t57201 symbolic name '030' (read '030')
+PASS station n0030-trib-du03-aec1-t57201 node type 0x017C4E21
+NOTE station n0030-trib-du03-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0031-trib-du04-aec1-t57101 exists
+PASS station n0031-trib-du04-aec1-t57101 IP 192.168.1.31 (read 192.168.1.31)
+PASS controller lists n0031-trib-du04-aec1-t57101 at 192.168.1.31 (read 192.168.1.31)
+PASS station n0031-trib-du04-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0031-trib-du04-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0031-trib-du04-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0031-trib-du04-aec1-t57101 symbolic name '031' (read '031')
+PASS station n0031-trib-du04-aec1-t57101 node type 0x017C4E21
+NOTE station n0031-trib-du04-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0033-trib-du04-aec1-t57201 exists
+PASS station n0033-trib-du04-aec1-t57201 IP 192.168.1.33 (read 192.168.1.33)
+PASS controller lists n0033-trib-du04-aec1-t57201 at 192.168.1.33 (read 192.168.1.33)
+PASS station n0033-trib-du04-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0033-trib-du04-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0033-trib-du04-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0033-trib-du04-aec1-t57201 symbolic name '033' (read '033')
+PASS station n0033-trib-du04-aec1-t57201 node type 0x017C4E21
+NOTE station n0033-trib-du04-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0035-trib-sm006-k1 exists
+PASS station n0035-trib-sm006-k1 IP 192.168.1.35 (read 192.168.1.35)
+PASS controller lists n0035-trib-sm006-k1 at 192.168.1.35 (read 192.168.1.35)
+PASS station n0035-trib-sm006-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0035-trib-sm006-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0035-trib-sm006-k1 type 'AL1202' (read 'AL1202')
+PASS station n0035-trib-sm006-k1 symbolic name '035' (read '035')
+PASS station n0035-trib-sm006-k1 node type 0x0136AC55
+PASS station n0035-trib-sm006-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0035-trib-sm006-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0035-trib-sm006-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0035-trib-sm006-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0035-trib-sm006-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0035-trib-sm006-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0035-trib-sm006-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0035-trib-sm006-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0034-trib-sm011-k1 exists
+PASS station n0034-trib-sm011-k1 IP 192.168.1.34 (read 192.168.1.34)
+PASS controller lists n0034-trib-sm011-k1 at 192.168.1.34 (read 192.168.1.34)
+PASS station n0034-trib-sm011-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0034-trib-sm011-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0034-trib-sm011-k1 type 'AL1202' (read 'AL1202')
+PASS station n0034-trib-sm011-k1 symbolic name '034' (read '034')
+PASS station n0034-trib-sm011-k1 node type 0x0136AC55
+PASS station n0034-trib-sm011-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0034-trib-sm011-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0034-trib-sm011-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0034-trib-sm011-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0034-trib-sm011-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0034-trib-sm011-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0034-trib-sm011-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0034-trib-sm011-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0036-trib-sm016-k1 exists
+PASS station n0036-trib-sm016-k1 IP 192.168.1.36 (read 192.168.1.36)
+PASS controller lists n0036-trib-sm016-k1 at 192.168.1.36 (read 192.168.1.36)
+PASS station n0036-trib-sm016-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0036-trib-sm016-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0036-trib-sm016-k1 type 'AL1202' (read 'AL1202')
+PASS station n0036-trib-sm016-k1 symbolic name '036' (read '036')
+PASS station n0036-trib-sm016-k1 node type 0x0136AC55
+PASS station n0036-trib-sm016-k1 slot 1 sub 2: 'Disabled' (table 'Disabled')
+PASS station n0036-trib-sm016-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0036-trib-sm016-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0036-trib-sm016-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0036-trib-sm016-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0036-trib-sm016-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0036-trib-sm016-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0036-trib-sm016-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0037-trib-sm020-k1 exists
+PASS station n0037-trib-sm020-k1 IP 192.168.1.37 (read 192.168.1.37)
+PASS controller lists n0037-trib-sm020-k1 at 192.168.1.37 (read 192.168.1.37)
+PASS station n0037-trib-sm020-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0037-trib-sm020-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0037-trib-sm020-k1 type 'AL1202' (read 'AL1202')
+PASS station n0037-trib-sm020-k1 symbolic name '037' (read '037')
+PASS station n0037-trib-sm020-k1 node type 0x0136AC55
+PASS station n0037-trib-sm020-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0037-trib-sm020-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0037-trib-sm020-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0037-trib-sm020-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0037-trib-sm020-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0037-trib-sm020-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0037-trib-sm020-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0037-trib-sm020-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0040-trib-ae02-k26501 exists
+PASS station n0040-trib-ae02-k26501 IP 192.168.1.40 (read 192.168.1.40)
+PASS controller lists n0040-trib-ae02-k26501 at 192.168.1.40 (read 192.168.1.40)
+PASS station n0040-trib-ae02-k26501 GSDML GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml (read GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml)
+PASS station n0040-trib-ae02-k26501 type 'SCALANCE XC216-4C V4.4' (read 'SCALANCE XC216-4C V4.4')
+PASS station n0040-trib-ae02-k26501 symbolic name '040_=TRIB-AE02' (read '040_=TRIB-AE02')
+PASS station n0040-trib-ae02-k26501 node type 0x002A0A0B
+PASS station n0040-trib-ae02-k26501 model 6GK5216-4BS00-2AC2 (the saved DAP 'DAP 79' is order 6GK5 216-4BS00-2AC2)
+PASS station n0040-trib-ae02-k26501 slot 0 sub 32769: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0040-trib-ae02-k26501 slot 0 sub 32770: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0040-trib-ae02-k26501 slot 0 sub 32771: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0040-trib-ae02-k26501 slot 0 sub 32772: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0040-trib-ae02-k26501 slot 0 sub 32768 record 3: 00 03 00 06 01 00 00 00 00 00 (table 00 03 00 06 01 00 00 00 00 00)
+PASS station n0040-trib-ae02-k26501 slot 0 sub 32768 record 12309: 30 19 00 08 01 01 00 01 01 00 00 02 (table 30 19 00 08 01 01 00 01 01 00 00 02)
+PASS station n0040-trib-ae02-k26501 slot 0 sub 32768 record 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 (table 30 1c 00 08 01 01 00 00 00 01 00 00)
+PASS station n0045-trib-ae02-k35001 exists
+PASS station n0045-trib-ae02-k35001 IP 192.168.1.45 (read 192.168.1.45)
+PASS controller lists n0045-trib-ae02-k35001 at 192.168.1.45 (read 192.168.1.45)
+PASS station n0045-trib-ae02-k35001 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0045-trib-ae02-k35001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.35-Siemens-ET200SP-20210401.xml)
+PASS station n0045-trib-ae02-k35001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
+PASS station n0045-trib-ae02-k35001 symbolic name '045_=TRIB-AE02' (read '045_=TRIB-AE02')
+PASS station n0045-trib-ae02-k35001 node type 0x002A0313
+PASS station n0045-trib-ae02-k35001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
+PASS station n0045-trib-ae02-k35001: 3 modules plugged (table 3)
+PASS station n0045-trib-ae02-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0045-trib-ae02-k35001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0045-trib-ae02-k35001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0045-trib-ae02-k35001 slot 3: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0045-trib-ae02-k35001 slot 3 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0050-trib-du05-aec1-t57101 exists
+PASS station n0050-trib-du05-aec1-t57101 IP 192.168.1.50 (read 192.168.1.50)
+PASS controller lists n0050-trib-du05-aec1-t57101 at 192.168.1.50 (read 192.168.1.50)
+PASS station n0050-trib-du05-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0050-trib-du05-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0050-trib-du05-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0050-trib-du05-aec1-t57101 symbolic name '050' (read '050')
+PASS station n0050-trib-du05-aec1-t57101 node type 0x017C4E21
+NOTE station n0050-trib-du05-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0051-trib-du05-aec1-t57201 exists
+PASS station n0051-trib-du05-aec1-t57201 IP 192.168.1.51 (read 192.168.1.51)
+PASS controller lists n0051-trib-du05-aec1-t57201 at 192.168.1.51 (read 192.168.1.51)
+PASS station n0051-trib-du05-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0051-trib-du05-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0051-trib-du05-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0051-trib-du05-aec1-t57201 symbolic name '051' (read '051')
+PASS station n0051-trib-du05-aec1-t57201 node type 0x017C4E21
+NOTE station n0051-trib-du05-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0052-trib-du06-aec1-t57101 exists
+PASS station n0052-trib-du06-aec1-t57101 IP 192.168.1.52 (read 192.168.1.52)
+PASS controller lists n0052-trib-du06-aec1-t57101 at 192.168.1.52 (read 192.168.1.52)
+PASS station n0052-trib-du06-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0052-trib-du06-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0052-trib-du06-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0052-trib-du06-aec1-t57101 symbolic name '052' (read '052')
+PASS station n0052-trib-du06-aec1-t57101 node type 0x017C4E21
+NOTE station n0052-trib-du06-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0053-trib-du06-aec1-t57201 exists
+PASS station n0053-trib-du06-aec1-t57201 IP 192.168.1.53 (read 192.168.1.53)
+PASS controller lists n0053-trib-du06-aec1-t57201 at 192.168.1.53 (read 192.168.1.53)
+PASS station n0053-trib-du06-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0053-trib-du06-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0053-trib-du06-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0053-trib-du06-aec1-t57201 symbolic name '053' (read '053')
+PASS station n0053-trib-du06-aec1-t57201 node type 0x017C4E21
+NOTE station n0053-trib-du06-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0054-trib-du07-aec1-t57101 exists
+PASS station n0054-trib-du07-aec1-t57101 IP 192.168.1.54 (read 192.168.1.54)
+PASS controller lists n0054-trib-du07-aec1-t57101 at 192.168.1.54 (read 192.168.1.54)
+PASS station n0054-trib-du07-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0054-trib-du07-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0054-trib-du07-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0054-trib-du07-aec1-t57101 symbolic name '054' (read '054')
+PASS station n0054-trib-du07-aec1-t57101 node type 0x017C4E21
+NOTE station n0054-trib-du07-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0055-trib-du07-aec1-t57201 exists
+PASS station n0055-trib-du07-aec1-t57201 IP 192.168.1.55 (read 192.168.1.55)
+PASS controller lists n0055-trib-du07-aec1-t57201 at 192.168.1.55 (read 192.168.1.55)
+PASS station n0055-trib-du07-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0055-trib-du07-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0055-trib-du07-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0055-trib-du07-aec1-t57201 symbolic name '055' (read '055')
+PASS station n0055-trib-du07-aec1-t57201 node type 0x017C4E21
+NOTE station n0055-trib-du07-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0057-trib-sm033-k1 exists
+PASS station n0057-trib-sm033-k1 IP 192.168.1.57 (read 192.168.1.57)
+PASS controller lists n0057-trib-sm033-k1 at 192.168.1.57 (read 192.168.1.57)
+PASS station n0057-trib-sm033-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0057-trib-sm033-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0057-trib-sm033-k1 type 'AL1202' (read 'AL1202')
+PASS station n0057-trib-sm033-k1 symbolic name '057' (read '057')
+PASS station n0057-trib-sm033-k1 node type 0x0136AC55
+PASS station n0057-trib-sm033-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0057-trib-sm033-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0057-trib-sm033-k1 slot 1 sub 4: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0057-trib-sm033-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0057-trib-sm033-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0057-trib-sm033-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0057-trib-sm033-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0057-trib-sm033-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0056-trib-sm038-k1 exists
+PASS station n0056-trib-sm038-k1 IP 192.168.1.56 (read 192.168.1.56)
+PASS controller lists n0056-trib-sm038-k1 at 192.168.1.56 (read 192.168.1.56)
+PASS station n0056-trib-sm038-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0056-trib-sm038-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0056-trib-sm038-k1 type 'AL1202' (read 'AL1202')
+PASS station n0056-trib-sm038-k1 symbolic name '056' (read '056')
+PASS station n0056-trib-sm038-k1 node type 0x0136AC55
+PASS station n0056-trib-sm038-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0056-trib-sm038-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0056-trib-sm038-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0056-trib-sm038-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0056-trib-sm038-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0056-trib-sm038-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0056-trib-sm038-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0056-trib-sm038-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0058-trib-sm043-k1 exists
+PASS station n0058-trib-sm043-k1 IP 192.168.1.58 (read 192.168.1.58)
+PASS controller lists n0058-trib-sm043-k1 at 192.168.1.58 (read 192.168.1.58)
+PASS station n0058-trib-sm043-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0058-trib-sm043-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0058-trib-sm043-k1 type 'AL1202' (read 'AL1202')
+PASS station n0058-trib-sm043-k1 symbolic name '058' (read '058')
+PASS station n0058-trib-sm043-k1 node type 0x0136AC55
+PASS station n0058-trib-sm043-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0058-trib-sm043-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0058-trib-sm043-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0058-trib-sm043-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0058-trib-sm043-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0058-trib-sm043-k1 slot 1 sub 7: 'Digital Output + PQI' (table 'Digital Output + PQI')
+PASS station n0058-trib-sm043-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0058-trib-sm043-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0059-trib-sm047-k1 exists
+PASS station n0059-trib-sm047-k1 IP 192.168.1.59 (read 192.168.1.59)
+PASS controller lists n0059-trib-sm047-k1 at 192.168.1.59 (read 192.168.1.59)
+PASS station n0059-trib-sm047-k1 update time 2 ms (read 2 ms, watchdog 6 ms)
+PASS station n0059-trib-sm047-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0059-trib-sm047-k1 type 'AL1202' (read 'AL1202')
+PASS station n0059-trib-sm047-k1 symbolic name '059' (read '059')
+PASS station n0059-trib-sm047-k1 node type 0x0136AC55
+PASS station n0059-trib-sm047-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0059-trib-sm047-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0059-trib-sm047-k1 slot 1 sub 4: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0059-trib-sm047-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0059-trib-sm047-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0059-trib-sm047-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0059-trib-sm047-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0059-trib-sm047-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0070-trib-ae03-k26501 exists
+PASS station n0070-trib-ae03-k26501 IP 192.168.1.70 (read 192.168.1.70)
+PASS controller lists n0070-trib-ae03-k26501 at 192.168.1.70 (read 192.168.1.70)
+PASS station n0070-trib-ae03-k26501 GSDML GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml (read GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml)
+PASS station n0070-trib-ae03-k26501 type 'SCALANCE XC216-4C V4.4' (read 'SCALANCE XC216-4C V4.4')
+PASS station n0070-trib-ae03-k26501 symbolic name '070_=TRIB-AE03' (read '070_=TRIB-AE03')
+PASS station n0070-trib-ae03-k26501 node type 0x002A0A0B
+PASS station n0070-trib-ae03-k26501 model 6GK5216-4BS00-2AC2 (the saved DAP 'DAP 79' is order 6GK5 216-4BS00-2AC2)
+PASS station n0070-trib-ae03-k26501 slot 0 sub 32769: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0070-trib-ae03-k26501 slot 0 sub 32770: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0070-trib-ae03-k26501 slot 0 sub 32771: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0070-trib-ae03-k26501 slot 0 sub 32772: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0070-trib-ae03-k26501 slot 0 sub 32768 record 3: 00 03 00 06 01 00 00 00 00 00 (table 00 03 00 06 01 00 00 00 00 00)
+PASS station n0070-trib-ae03-k26501 slot 0 sub 32768 record 12309: 30 19 00 08 01 01 00 01 01 00 00 02 (table 30 19 00 08 01 01 00 01 01 00 00 02)
+PASS station n0070-trib-ae03-k26501 slot 0 sub 32768 record 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 (table 30 1c 00 08 01 01 00 00 00 01 00 00)
+PASS station n0075-trib-ae03-k35001 exists
+PASS station n0075-trib-ae03-k35001 IP 192.168.1.75 (read 192.168.1.75)
+PASS controller lists n0075-trib-ae03-k35001 at 192.168.1.75 (read 192.168.1.75)
+PASS station n0075-trib-ae03-k35001 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0075-trib-ae03-k35001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.35-Siemens-ET200SP-20210401.xml)
+PASS station n0075-trib-ae03-k35001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
+PASS station n0075-trib-ae03-k35001 symbolic name '075_=TRIB-AE03' (read '075_=TRIB-AE03')
+PASS station n0075-trib-ae03-k35001 node type 0x002A0313
+PASS station n0075-trib-ae03-k35001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
+PASS station n0075-trib-ae03-k35001: 3 modules plugged (table 3)
+PASS station n0075-trib-ae03-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0075-trib-ae03-k35001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0075-trib-ae03-k35001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0075-trib-ae03-k35001 slot 3: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0075-trib-ae03-k35001 slot 3 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0080-trib-du08-aec1-t57101 exists
+PASS station n0080-trib-du08-aec1-t57101 IP 192.168.1.80 (read 192.168.1.80)
+PASS controller lists n0080-trib-du08-aec1-t57101 at 192.168.1.80 (read 192.168.1.80)
+PASS station n0080-trib-du08-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0080-trib-du08-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0080-trib-du08-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0080-trib-du08-aec1-t57101 symbolic name '080' (read '080')
+PASS station n0080-trib-du08-aec1-t57101 node type 0x017C4E21
+NOTE station n0080-trib-du08-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0081-trib-du08-aec1-t57201 exists
+PASS station n0081-trib-du08-aec1-t57201 IP 192.168.1.81 (read 192.168.1.81)
+PASS controller lists n0081-trib-du08-aec1-t57201 at 192.168.1.81 (read 192.168.1.81)
+PASS station n0081-trib-du08-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0081-trib-du08-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0081-trib-du08-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0081-trib-du08-aec1-t57201 symbolic name '081' (read '081')
+PASS station n0081-trib-du08-aec1-t57201 node type 0x017C4E21
+NOTE station n0081-trib-du08-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0082-trib-du09-aec1-t57101 exists
+PASS station n0082-trib-du09-aec1-t57101 IP 192.168.1.82 (read 192.168.1.82)
+PASS controller lists n0082-trib-du09-aec1-t57101 at 192.168.1.82 (read 192.168.1.82)
+PASS station n0082-trib-du09-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0082-trib-du09-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0082-trib-du09-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0082-trib-du09-aec1-t57101 symbolic name '082' (read '082')
+PASS station n0082-trib-du09-aec1-t57101 node type 0x017C4E21
+NOTE station n0082-trib-du09-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0083-trib-du09-aec1-t57201 exists
+PASS station n0083-trib-du09-aec1-t57201 IP 192.168.1.83 (read 192.168.1.83)
+PASS controller lists n0083-trib-du09-aec1-t57201 at 192.168.1.83 (read 192.168.1.83)
+PASS station n0083-trib-du09-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0083-trib-du09-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0083-trib-du09-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0083-trib-du09-aec1-t57201 symbolic name '083' (read '083')
+PASS station n0083-trib-du09-aec1-t57201 node type 0x017C4E21
+NOTE station n0083-trib-du09-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0084-trib-du10-aec1-t57101 exists
+PASS station n0084-trib-du10-aec1-t57101 IP 192.168.1.84 (read 192.168.1.84)
+PASS controller lists n0084-trib-du10-aec1-t57101 at 192.168.1.84 (read 192.168.1.84)
+PASS station n0084-trib-du10-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0084-trib-du10-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0084-trib-du10-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0084-trib-du10-aec1-t57101 symbolic name '084' (read '084')
+PASS station n0084-trib-du10-aec1-t57101 node type 0x017C4E21
+NOTE station n0084-trib-du10-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0085-trib-du10-aec1-t57201 exists
+PASS station n0085-trib-du10-aec1-t57201 IP 192.168.1.85 (read 192.168.1.85)
+PASS controller lists n0085-trib-du10-aec1-t57201 at 192.168.1.85 (read 192.168.1.85)
+PASS station n0085-trib-du10-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0085-trib-du10-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0085-trib-du10-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0085-trib-du10-aec1-t57201 symbolic name '085' (read '085')
+PASS station n0085-trib-du10-aec1-t57201 node type 0x017C4E21
+NOTE station n0085-trib-du10-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0086-trib-sm061-k1 exists
+PASS station n0086-trib-sm061-k1 IP 192.168.1.86 (read 192.168.1.86)
+PASS controller lists n0086-trib-sm061-k1 at 192.168.1.86 (read 192.168.1.86)
+PASS station n0086-trib-sm061-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0086-trib-sm061-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0086-trib-sm061-k1 type 'AL1202' (read 'AL1202')
+PASS station n0086-trib-sm061-k1 symbolic name '086' (read '086')
+PASS station n0086-trib-sm061-k1 node type 0x0136AC55
+PASS station n0086-trib-sm061-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0086-trib-sm061-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0086-trib-sm061-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0086-trib-sm061-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0086-trib-sm061-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0086-trib-sm061-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0086-trib-sm061-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0086-trib-sm061-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0087-trib-rc01-k1 exists
+PASS station n0087-trib-rc01-k1 IP 192.168.1.87 (read 192.168.1.87)
+PASS controller lists n0087-trib-rc01-k1 at 192.168.1.87 (read 192.168.1.87)
+PASS station n0087-trib-rc01-k1 update time 2 ms (read 2 ms, watchdog 6 ms)
+PASS station n0087-trib-rc01-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0087-trib-rc01-k1 type 'AL1202' (read 'AL1202')
+PASS station n0087-trib-rc01-k1 symbolic name '087' (read '087')
+PASS station n0087-trib-rc01-k1 node type 0x0136AC55
+PASS station n0087-trib-rc01-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0087-trib-rc01-k1 slot 1 sub 3: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0087-trib-rc01-k1 slot 1 sub 4: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0087-trib-rc01-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0087-trib-rc01-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0087-trib-rc01-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0087-trib-rc01-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0087-trib-rc01-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0088-trib-ca01-aec1-t3 exists
+PASS station n0088-trib-ca01-aec1-t3 IP 192.168.1.88 (read 192.168.1.88)
+PASS controller lists n0088-trib-ca01-aec1-t3 at 192.168.1.88 (read 192.168.1.88)
+PASS station n0088-trib-ca01-aec1-t3 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0088-trib-ca01-aec1-t3 GSDML GSDML-V2.41-HMS-Anybus-Communicator-20220817.xml (read GSDML-V2.41-HMS-Anybus-Communicator-20220817.xml)
+PASS station n0088-trib-ca01-aec1-t3 type 'Anybus Communicator' (read 'Anybus Communicator')
+PASS station n0088-trib-ca01-aec1-t3 symbolic name '088_=TRIB-CA01' (read '088_=TRIB-CA01')
+PASS station n0088-trib-ca01-aec1-t3 node type 0x010C0020
+NOTE station n0088-trib-ca01-aec1-t3 model VITRONIC: the GSDML's order number is the pattern 'T_ID_DAP_DESCRIPTION' - not compared
+PASS station n0088-trib-ca01-aec1-t3: 2 modules plugged (table 2)
+PASS station n0088-trib-ca01-aec1-t3 slot 1: 'IN 0064' (chosen 'IN 0064', table )
+PASS station n0088-trib-ca01-aec1-t3 slot 2: 'OUT 0064' (chosen 'OUT 0064', table )
+PASS station n0089-trib-sm066-k1 exists
+PASS station n0089-trib-sm066-k1 IP 192.168.1.89 (read 192.168.1.89)
+PASS controller lists n0089-trib-sm066-k1 at 192.168.1.89 (read 192.168.1.89)
+PASS station n0089-trib-sm066-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0089-trib-sm066-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0089-trib-sm066-k1 type 'AL1202' (read 'AL1202')
+PASS station n0089-trib-sm066-k1 symbolic name '089' (read '089')
+PASS station n0089-trib-sm066-k1 node type 0x0136AC55
+PASS station n0089-trib-sm066-k1 slot 1 sub 2: 'Disabled' (table 'Disabled')
+PASS station n0089-trib-sm066-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0089-trib-sm066-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0089-trib-sm066-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0089-trib-sm066-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0089-trib-sm066-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0089-trib-sm066-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0089-trib-sm066-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0090-trib-sm071-k1 exists
+PASS station n0090-trib-sm071-k1 IP 192.168.1.90 (read 192.168.1.90)
+PASS controller lists n0090-trib-sm071-k1 at 192.168.1.90 (read 192.168.1.90)
+PASS station n0090-trib-sm071-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0090-trib-sm071-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0090-trib-sm071-k1 type 'AL1202' (read 'AL1202')
+PASS station n0090-trib-sm071-k1 symbolic name '090' (read '090')
+PASS station n0090-trib-sm071-k1 node type 0x0136AC55
+PASS station n0090-trib-sm071-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0090-trib-sm071-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0090-trib-sm071-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0090-trib-sm071-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0090-trib-sm071-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0090-trib-sm071-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0090-trib-sm071-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0090-trib-sm071-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0091-trib-rc02-k1 exists
+PASS station n0091-trib-rc02-k1 IP 192.168.1.91 (read 192.168.1.91)
+PASS controller lists n0091-trib-rc02-k1 at 192.168.1.91 (read 192.168.1.91)
+PASS station n0091-trib-rc02-k1 update time 2 ms (read 2 ms, watchdog 6 ms)
+PASS station n0091-trib-rc02-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0091-trib-rc02-k1 type 'AL1202' (read 'AL1202')
+PASS station n0091-trib-rc02-k1 symbolic name '091' (read '091')
+PASS station n0091-trib-rc02-k1 node type 0x0136AC55
+PASS station n0091-trib-rc02-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0091-trib-rc02-k1 slot 1 sub 3: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0091-trib-rc02-k1 slot 1 sub 4: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0091-trib-rc02-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0091-trib-rc02-k1 slot 1 sub 6: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0091-trib-rc02-k1 slot 1 sub 7: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0091-trib-rc02-k1 slot 1 sub 8: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0091-trib-rc02-k1 slot 1 sub 9: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0002-trib-ct01-aec1-a1 exists
+PASS station n0002-trib-ct01-aec1-a1 IP 192.168.1.2 (read 192.168.1.2)
+PASS controller lists n0002-trib-ct01-aec1-a1 at 192.168.1.2 (read 192.168.1.2)
+PASS station n0002-trib-ct01-aec1-a1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0002-trib-ct01-aec1-a1 GSDML GSDML-V2.41-HMS-Anybus-Communicator-20220817.xml (read GSDML-V2.41-HMS-Anybus-Communicator-20220817.xml)
+PASS station n0002-trib-ct01-aec1-a1 type 'Anybus Communicator' (read 'Anybus Communicator')
+PASS station n0002-trib-ct01-aec1-a1 symbolic name '002_ANTENNA CELL TEST' (read '002_ANTENNA CELL TEST')
+PASS station n0002-trib-ct01-aec1-a1 node type 0x010C0020
+NOTE station n0002-trib-ct01-aec1-a1 model ABC3013-A: the GSDML's order number is the pattern 'T_ID_DAP_DESCRIPTION' - not compared
+PASS station n0002-trib-ct01-aec1-a1: 2 modules plugged (table 2)
+PASS station n0002-trib-ct01-aec1-a1 slot 1: 'IN 0016' (chosen 'IN 0016', table )
+PASS station n0002-trib-ct01-aec1-a1 slot 2: 'OUT 0012' (chosen 'OUT 0012', table )
+PASS station n0100-trib-ae04-k26501 exists
+PASS station n0100-trib-ae04-k26501 IP 192.168.1.100 (read 192.168.1.100)
+PASS controller lists n0100-trib-ae04-k26501 at 192.168.1.100 (read 192.168.1.100)
+PASS station n0100-trib-ae04-k26501 GSDML GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml (read GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml)
+PASS station n0100-trib-ae04-k26501 type 'SCALANCE XC216-4C V4.4' (read 'SCALANCE XC216-4C V4.4')
+PASS station n0100-trib-ae04-k26501 symbolic name '100_=TRIB-AE04' (read '100_=TRIB-AE04')
+PASS station n0100-trib-ae04-k26501 node type 0x002A0A0B
+PASS station n0100-trib-ae04-k26501 model 6GK5216-4BS00-2AC2 (the saved DAP 'DAP 79' is order 6GK5 216-4BS00-2AC2)
+PASS station n0100-trib-ae04-k26501 slot 0 sub 32769: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0100-trib-ae04-k26501 slot 0 sub 32770: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0100-trib-ae04-k26501 slot 0 sub 32771: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0100-trib-ae04-k26501 slot 0 sub 32772: 'SFP 991-1 A' (table 'SFP 991-1 A')
+PASS station n0100-trib-ae04-k26501 slot 0 sub 32768 record 3: 00 03 00 06 01 00 00 00 00 00 (table 00 03 00 06 01 00 00 00 00 00)
+PASS station n0100-trib-ae04-k26501 slot 0 sub 32768 record 12309: 30 19 00 08 01 01 00 01 01 00 00 02 (table 30 19 00 08 01 01 00 01 01 00 00 02)
+PASS station n0100-trib-ae04-k26501 slot 0 sub 32768 record 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 (table 30 1c 00 08 01 01 00 00 00 01 00 00)
+PASS station n0105-trib-ae04-k35001 exists
+PASS station n0105-trib-ae04-k35001 IP 192.168.1.105 (read 192.168.1.105)
+PASS controller lists n0105-trib-ae04-k35001 at 192.168.1.105 (read 192.168.1.105)
+PASS station n0105-trib-ae04-k35001 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0105-trib-ae04-k35001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.35-Siemens-ET200SP-20210401.xml)
+PASS station n0105-trib-ae04-k35001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
+PASS station n0105-trib-ae04-k35001 symbolic name '105_=TRIB-AE04' (read '105_=TRIB-AE04')
+PASS station n0105-trib-ae04-k35001 node type 0x002A0313
+PASS station n0105-trib-ae04-k35001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
+PASS station n0105-trib-ae04-k35001: 4 modules plugged (table 4)
+PASS station n0105-trib-ae04-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0105-trib-ae04-k35001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0105-trib-ae04-k35001 slot 2: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0105-trib-ae04-k35001 slot 3: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0105-trib-ae04-k35001 slot 4: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0105-trib-ae04-k35001 slot 4 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0110-trib-du11-aec1-t57101 exists
+PASS station n0110-trib-du11-aec1-t57101 IP 192.168.1.110 (read 192.168.1.110)
+PASS controller lists n0110-trib-du11-aec1-t57101 at 192.168.1.110 (read 192.168.1.110)
+PASS station n0110-trib-du11-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0110-trib-du11-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0110-trib-du11-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0110-trib-du11-aec1-t57101 symbolic name '110' (read '110')
+PASS station n0110-trib-du11-aec1-t57101 node type 0x017C4E21
+NOTE station n0110-trib-du11-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0111-trib-du11-aec1-t57201 exists
+PASS station n0111-trib-du11-aec1-t57201 IP 192.168.1.111 (read 192.168.1.111)
+PASS controller lists n0111-trib-du11-aec1-t57201 at 192.168.1.111 (read 192.168.1.111)
+PASS station n0111-trib-du11-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0111-trib-du11-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0111-trib-du11-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0111-trib-du11-aec1-t57201 symbolic name '111' (read '111')
+PASS station n0111-trib-du11-aec1-t57201 node type 0x017C4E21
+NOTE station n0111-trib-du11-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0112-trib-du12-aec1-t57101 exists
+PASS station n0112-trib-du12-aec1-t57101 IP 192.168.1.112 (read 192.168.1.112)
+PASS controller lists n0112-trib-du12-aec1-t57101 at 192.168.1.112 (read 192.168.1.112)
+PASS station n0112-trib-du12-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0112-trib-du12-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0112-trib-du12-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0112-trib-du12-aec1-t57101 symbolic name '112' (read '112')
+PASS station n0112-trib-du12-aec1-t57101 node type 0x017C4E21
+NOTE station n0112-trib-du12-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0113-trib-du12-aec1-t57201 exists
+PASS station n0113-trib-du12-aec1-t57201 IP 192.168.1.113 (read 192.168.1.113)
+PASS controller lists n0113-trib-du12-aec1-t57201 at 192.168.1.113 (read 192.168.1.113)
+PASS station n0113-trib-du12-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0113-trib-du12-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0113-trib-du12-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0113-trib-du12-aec1-t57201 symbolic name '113' (read '113')
+PASS station n0113-trib-du12-aec1-t57201 node type 0x017C4E21
+NOTE station n0113-trib-du12-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0114-trib-du13-aec1-t57101 exists
+PASS station n0114-trib-du13-aec1-t57101 IP 192.168.1.114 (read 192.168.1.114)
+PASS controller lists n0114-trib-du13-aec1-t57101 at 192.168.1.114 (read 192.168.1.114)
+PASS station n0114-trib-du13-aec1-t57101 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0114-trib-du13-aec1-t57101 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0114-trib-du13-aec1-t57101 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0114-trib-du13-aec1-t57101 symbolic name '114' (read '114')
+PASS station n0114-trib-du13-aec1-t57101 node type 0x017C4E21
+NOTE station n0114-trib-du13-aec1-t57101 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0115-trib-du13-aec1-t57201 exists
+PASS station n0115-trib-du13-aec1-t57201 IP 192.168.1.115 (read 192.168.1.115)
+PASS controller lists n0115-trib-du13-aec1-t57201 at 192.168.1.115 (read 192.168.1.115)
+PASS station n0115-trib-du13-aec1-t57201 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0115-trib-du13-aec1-t57201 GSDML GSDML-V2.3-LT-i-ServoOne-20130515.xml (read GSDML-V2.3-LT-i-ServoOne-20130515.xml)
+PASS station n0115-trib-du13-aec1-t57201 type 'ServoOne Junior' (read 'ServoOne Junior')
+PASS station n0115-trib-du13-aec1-t57201 symbolic name '115' (read '115')
+PASS station n0115-trib-du13-aec1-t57201 node type 0x017C4E21
+NOTE station n0115-trib-du13-aec1-t57201 model SO24.004.007D.0101.x: the GSDML's order number is the pattern '13xx.xx7x.xxxx.x' - not compared
+PASS station n0117-trib-sm086-k1 exists
+PASS station n0117-trib-sm086-k1 IP 192.168.1.117 (read 192.168.1.117)
+PASS controller lists n0117-trib-sm086-k1 at 192.168.1.117 (read 192.168.1.117)
+PASS station n0117-trib-sm086-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0117-trib-sm086-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0117-trib-sm086-k1 type 'AL1202' (read 'AL1202')
+PASS station n0117-trib-sm086-k1 symbolic name '117' (read '117')
+PASS station n0117-trib-sm086-k1 node type 0x0136AC55
+PASS station n0117-trib-sm086-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0117-trib-sm086-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0117-trib-sm086-k1 slot 1 sub 4: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0117-trib-sm086-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0117-trib-sm086-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0117-trib-sm086-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0117-trib-sm086-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0117-trib-sm086-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0116-trib-sm091-k1 exists
+PASS station n0116-trib-sm091-k1 IP 192.168.1.116 (read 192.168.1.116)
+PASS controller lists n0116-trib-sm091-k1 at 192.168.1.116 (read 192.168.1.116)
+PASS station n0116-trib-sm091-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0116-trib-sm091-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0116-trib-sm091-k1 type 'AL1202' (read 'AL1202')
+PASS station n0116-trib-sm091-k1 symbolic name '116' (read '116')
+PASS station n0116-trib-sm091-k1 node type 0x0136AC55
+PASS station n0116-trib-sm091-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0116-trib-sm091-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0116-trib-sm091-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0116-trib-sm091-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0116-trib-sm091-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0116-trib-sm091-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0116-trib-sm091-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0116-trib-sm091-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0118-trib-sm096-k1 exists
+PASS station n0118-trib-sm096-k1 IP 192.168.1.118 (read 192.168.1.118)
+PASS controller lists n0118-trib-sm096-k1 at 192.168.1.118 (read 192.168.1.118)
+PASS station n0118-trib-sm096-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0118-trib-sm096-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0118-trib-sm096-k1 type 'AL1202' (read 'AL1202')
+PASS station n0118-trib-sm096-k1 symbolic name '118' (read '118')
+PASS station n0118-trib-sm096-k1 node type 0x0136AC55
+PASS station n0118-trib-sm096-k1 slot 1 sub 2: 'Disabled' (table 'Disabled')
+PASS station n0118-trib-sm096-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0118-trib-sm096-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0118-trib-sm096-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0118-trib-sm096-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0118-trib-sm096-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0118-trib-sm096-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0118-trib-sm096-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0119-trib-sm098-k1 exists
+PASS station n0119-trib-sm098-k1 IP 192.168.1.119 (read 192.168.1.119)
+PASS controller lists n0119-trib-sm098-k1 at 192.168.1.119 (read 192.168.1.119)
+PASS station n0119-trib-sm098-k1 update time 2 ms (read 2 ms, watchdog 6 ms)
+PASS station n0119-trib-sm098-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0119-trib-sm098-k1 type 'AL1202' (read 'AL1202')
+PASS station n0119-trib-sm098-k1 symbolic name '119' (read '119')
+PASS station n0119-trib-sm098-k1 node type 0x0136AC55
+PASS station n0119-trib-sm098-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0119-trib-sm098-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0119-trib-sm098-k1 slot 1 sub 4: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0119-trib-sm098-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0119-trib-sm098-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0119-trib-sm098-k1 slot 1 sub 7: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0119-trib-sm098-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0119-trib-sm098-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0120-trib-rc03-k1 exists
+PASS station n0120-trib-rc03-k1 IP 192.168.1.120 (read 192.168.1.120)
+PASS controller lists n0120-trib-rc03-k1 at 192.168.1.120 (read 192.168.1.120)
+PASS station n0120-trib-rc03-k1 update time 2 ms (read 2 ms, watchdog 6 ms)
+PASS station n0120-trib-rc03-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0120-trib-rc03-k1 type 'AL1202' (read 'AL1202')
+PASS station n0120-trib-rc03-k1 symbolic name '120' (read '120')
+PASS station n0120-trib-rc03-k1 node type 0x0136AC55
+PASS station n0120-trib-rc03-k1 slot 1 sub 2: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0120-trib-rc03-k1 slot 1 sub 3: 'IO-Link In  2 Byte + PQI' (table 'IO-Link In 2 Byte + PQI')
+PASS station n0120-trib-rc03-k1 slot 1 sub 4: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0120-trib-rc03-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0120-trib-rc03-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0120-trib-rc03-k1 slot 1 sub 7: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0120-trib-rc03-k1 slot 1 sub 8: 'Disabled' (table 'Disabled')
+PASS station n0120-trib-rc03-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0121-trib-sm104-k1 exists
+PASS station n0121-trib-sm104-k1 IP 192.168.1.121 (read 192.168.1.121)
+PASS controller lists n0121-trib-sm104-k1 at 192.168.1.121 (read 192.168.1.121)
+PASS station n0121-trib-sm104-k1 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0121-trib-sm104-k1 GSDML GSDML-V2.34-ifm-AL1202-20181105.xml (read GSDML-V2.34-ifm-AL1202-20181105.xml)
+PASS station n0121-trib-sm104-k1 type 'AL1202' (read 'AL1202')
+PASS station n0121-trib-sm104-k1 symbolic name '121' (read '121')
+PASS station n0121-trib-sm104-k1 node type 0x0136AC55
+PASS station n0121-trib-sm104-k1 slot 1 sub 2: 'Digital Input + PQI' (table 'Digital Input + PQI')
+PASS station n0121-trib-sm104-k1 slot 1 sub 3: 'Disabled' (table 'Disabled')
+PASS station n0121-trib-sm104-k1 slot 1 sub 4: 'Disabled' (table 'Disabled')
+PASS station n0121-trib-sm104-k1 slot 1 sub 5: 'Disabled' (table 'Disabled')
+PASS station n0121-trib-sm104-k1 slot 1 sub 6: 'IO-Link In/Out 32/32 Byte + PQI' (table 'IO-Link In/Out 32/32 Byte + PQI')
+PASS station n0121-trib-sm104-k1 slot 1 sub 7: 'Disabled' (table 'Disabled')
+PASS station n0121-trib-sm104-k1 slot 1 sub 8: 'IO-Link Out  2 Byte + PQI' (table 'IO-Link Out  2 Byte + PQI')
+PASS station n0121-trib-sm104-k1 slot 1 sub 9: 'Disabled' (table 'Disabled')
+PASS station n0122-trib-ca02-aec1-t3 exists
+PASS station n0122-trib-ca02-aec1-t3 IP 192.168.1.122 (read 192.168.1.122)
+PASS controller lists n0122-trib-ca02-aec1-t3 at 192.168.1.122 (read 192.168.1.122)
+PASS station n0122-trib-ca02-aec1-t3 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0122-trib-ca02-aec1-t3 GSDML GSDML-V2.41-HMS-Anybus-Communicator-20220817.xml (read GSDML-V2.41-HMS-Anybus-Communicator-20220817.xml)
+PASS station n0122-trib-ca02-aec1-t3 type 'Anybus Communicator' (read 'Anybus Communicator')
+PASS station n0122-trib-ca02-aec1-t3 symbolic name '122_=TRIB-CA02' (read '122_=TRIB-CA02')
+PASS station n0122-trib-ca02-aec1-t3 node type 0x010C0020
+NOTE station n0122-trib-ca02-aec1-t3 model VITRONIC: the GSDML's order number is the pattern 'T_ID_DAP_DESCRIPTION' - not compared
+PASS station n0122-trib-ca02-aec1-t3: 2 modules plugged (table 2)
+PASS station n0122-trib-ca02-aec1-t3 slot 1: 'IN 0064' (chosen '', table )
+PASS station n0122-trib-ca02-aec1-t3 slot 2: 'OUT 0064' (chosen '', table )
+PASS station n0032-trib-ma01-aec1-k35001 exists
+PASS station n0032-trib-ma01-aec1-k35001 IP 192.168.1.32 (read 192.168.1.32)
+PASS controller lists n0032-trib-ma01-aec1-k35001 at 192.168.1.32 (read 192.168.1.32)
+PASS station n0032-trib-ma01-aec1-k35001 update time 8 ms (read 8 ms, watchdog 24 ms)
+PASS station n0032-trib-ma01-aec1-k35001 GSDML GSDML-V2.35-Siemens-ET200SP-20210401.xml (read GSDML-V2.35-Siemens-ET200SP-20210401.xml)
+PASS station n0032-trib-ma01-aec1-k35001 type 'IM 155-6 PN ST V4.2' (read 'IM 155-6 PN ST V4.2')
+PASS station n0032-trib-ma01-aec1-k35001 symbolic name '032_=TRIB-MA01' (read '032_=TRIB-MA01')
+PASS station n0032-trib-ma01-aec1-k35001 node type 0x002A0313
+PASS station n0032-trib-ma01-aec1-k35001 model 6ES7155-6AU01-0BN0 (the saved DAP 'DIM ST V4.2' is order 6ES7 155-6AU01-0BN0)
+PASS station n0032-trib-ma01-aec1-k35001: 2 modules plugged (table 2)
+PASS station n0032-trib-ma01-aec1-k35001 slot 1: 'DI 16x24VDC ST V0.0' (chosen 'DI 16x24VDC ST V0.0  [6ES7 131-6BH01-0BA0]', table 6ES7131-6BH01-0BA0)
+PASS station n0032-trib-ma01-aec1-k35001 slot 1 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS station n0032-trib-ma01-aec1-k35001 slot 2: 'DQ 16x24VDC/0.5A ST V0.0' (chosen 'DQ 16x24VDC/0.5A ST V0.0  [6ES7 132-6BH01-0BA0]', table 6ES7132-6BH01-0BA0)
+PASS station n0032-trib-ma01-aec1-k35001 slot 2 potential group 'Enable new potential group (light BaseUnit)' (record 243 reads 01 00 00 00 00 00)
+PASS no station outside the table (extra: [])
+PASS process data export: controller 'CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)'
+PASS process data export lists n0006-trib-aec01-K24501
+PASS process data export lists n0007-trib-aec01-K24502
+PASS process data export lists n0009-tric-aec01-K24601
+PASS process data export lists n0010-trib-aec01-K26501
+PASS process data export lists n0005-trib-aep01-K35001
+PASS process data export lists n0015-trib-ae01-K26501
+PASS process data export lists n0020-trib-ae01-K35001
+PASS process data export lists n0025-trib-du01-aec1-T57101
+PASS process data export lists n0026-trib-du01-aec1-T57201
+PASS process data export lists n0027-trib-du02-aec1-T57101
+PASS process data export lists n0028-trib-du02-aec1-T57201
+PASS process data export lists n0029-trib-du03-aec1-T57101
+PASS process data export lists n0030-trib-du03-aec1-T57201
+PASS process data export lists n0031-trib-du04-aec1-T57101
+PASS process data export lists n0033-trib-du04-aec1-T57201
+PASS process data export lists n0035-trib-sm006-K1
+PASS process data export lists n0034-trib-sm011-K1
+PASS process data export lists n0036-trib-sm016-K1
+PASS process data export lists n0037-trib-sm020-K1
+PASS process data export lists n0040-trib-ae02-K26501
+PASS process data export lists n0045-trib-ae02-K35001
+PASS process data export lists n0050-trib-du05-aec1-T57101
+PASS process data export lists n0051-trib-du05-aec1-T57201
+PASS process data export lists n0052-trib-du06-aec1-T57101
+PASS process data export lists n0053-trib-du06-aec1-T57201
+PASS process data export lists n0054-trib-du07-aec1-T57101
+PASS process data export lists n0055-trib-du07-aec1-T57201
+PASS process data export lists n0057-trib-sm033-K1
+PASS process data export lists n0056-trib-sm038-K1
+PASS process data export lists n0058-trib-sm043-K1
+PASS process data export lists n0059-trib-sm047-K1
+PASS process data export lists n0070-trib-ae03-K26501
+PASS process data export lists n0075-trib-ae03-K35001
+PASS process data export lists n0080-trib-du08-aec1-T57101
+PASS process data export lists n0081-trib-du08-aec1-T57201
+PASS process data export lists n0082-trib-du09-aec1-T57101
+PASS process data export lists n0083-trib-du09-aec1-T57201
+PASS process data export lists n0084-trib-du10-aec1-T57101
+PASS process data export lists n0085-trib-du10-aec1-T57201
+PASS process data export lists n0086-trib-sm061-K1
+PASS process data export lists n0087-trib-rc01-K1
+PASS process data export lists n0088-trib-ca01-aec1-T3
+PASS process data export lists n0089-trib-sm066-K1
+PASS process data export lists n0090-trib-sm071-K1
+PASS process data export lists n0091-trib-rc02-K1
+PASS process data export lists n0002-trib-ct01-aec1-A1
+PASS process data export lists n0100-trib-ae04-K26501
+PASS process data export lists n0105-trib-ae04-K35001
+PASS process data export lists n0110-trib-du11-aec1-T57101
+PASS process data export lists n0111-trib-du11-aec1-T57201
+PASS process data export lists n0112-trib-du12-aec1-T57101
+PASS process data export lists n0113-trib-du12-aec1-T57201
+PASS process data export lists n0114-trib-du13-aec1-T57101
+PASS process data export lists n0115-trib-du13-aec1-T57201
+PASS process data export lists n0117-trib-sm086-K1
+PASS process data export lists n0116-trib-sm091-K1
+PASS process data export lists n0118-trib-sm096-K1
+PASS process data export lists n0119-trib-sm098-K1
+PASS process data export lists n0120-trib-rc03-K1
+PASS process data export lists n0121-trib-sm104-K1
+PASS process data export lists n0122-trib-ca02-aec1-T3
+PASS process data export lists n0032-trib-ma01-aec1-K35001
+PASS configuration export config.nxd (294208 bytes)
+PASS configuration export config_nwid.nxd (1200 bytes)
+
+C:\Source\Repos\_Openn5\Sycon5App\spike\scratch\PROD_Sorter_Lower_fast\HilscherIOCard1\HilscherPnCard_1\_S129\SYCON_net.xml
+  controller (controller) symbolic=CIFX_RE_PNM type='' ip= mask= gsdml= dap='' order='' node=0x011E0203 rect=(21, 34, 53, 66)
+    network: n0002-trib-ct01-aec1-a1 192.168.1.2 (update 8 ms, watchdog 24 ms)
+    network: n0088-trib-ca01-aec1-t3 192.168.1.88 (update 8 ms, watchdog 24 ms)
+    network: n0122-trib-ca02-aec1-t3 192.168.1.122 (update 8 ms, watchdog 24 ms)
+    network: n0005-trib-aep01-k35001 192.168.1.5 (update 8 ms, watchdog 24 ms)
+    network: n0020-trib-ae01-k35001 192.168.1.20 (update 8 ms, watchdog 24 ms)
+    network: n0032-trib-ma01-aec1-k35001 192.168.1.32 (update 8 ms, watchdog 24 ms)
+    network: n0045-trib-ae02-k35001 192.168.1.45 (update 8 ms, watchdog 24 ms)
+    network: n0075-trib-ae03-k35001 192.168.1.75 (update 8 ms, watchdog 24 ms)
+    network: n0105-trib-ae04-k35001 192.168.1.105 (update 8 ms, watchdog 24 ms)
+    network: n0006-trib-aec01-k24501 192.168.1.6 (update 8 ms, watchdog 24 ms)
+    network: n0007-trib-aec01-k24502 192.168.1.7 (update 8 ms, watchdog 24 ms)
+    network: n0009-tric-aec01-k24601 192.168.1.9 (update 8 ms, watchdog 24 ms)
+    network: n0010-trib-aec01-k26501 192.168.1.10 (update 128 ms, watchdog 384 ms)
+    network: n0015-trib-ae01-k26501 192.168.1.15 (update 128 ms, watchdog 384 ms)
+    network: n0040-trib-ae02-k26501 192.168.1.40 (update 128 ms, watchdog 384 ms)
+    network: n0070-trib-ae03-k26501 192.168.1.70 (update 128 ms, watchdog 384 ms)
+    network: n0100-trib-ae04-k26501 192.168.1.100 (update 128 ms, watchdog 384 ms)
+    network: n0025-trib-du01-aec1-t57101 192.168.1.25 (update 8 ms, watchdog 24 ms)
+    network: n0026-trib-du01-aec1-t57201 192.168.1.26 (update 8 ms, watchdog 24 ms)
+    network: n0027-trib-du02-aec1-t57101 192.168.1.27 (update 8 ms, watchdog 24 ms)
+    network: n0028-trib-du02-aec1-t57201 192.168.1.28 (update 8 ms, watchdog 24 ms)
+    network: n0029-trib-du03-aec1-t57101 192.168.1.29 (update 8 ms, watchdog 24 ms)
+    network: n0030-trib-du03-aec1-t57201 192.168.1.30 (update 8 ms, watchdog 24 ms)
+    network: n0031-trib-du04-aec1-t57101 192.168.1.31 (update 8 ms, watchdog 24 ms)
+    network: n0033-trib-du04-aec1-t57201 192.168.1.33 (update 8 ms, watchdog 24 ms)
+    network: n0050-trib-du05-aec1-t57101 192.168.1.50 (update 8 ms, watchdog 24 ms)
+    network: n0051-trib-du05-aec1-t57201 192.168.1.51 (update 8 ms, watchdog 24 ms)
+    network: n0052-trib-du06-aec1-t57101 192.168.1.52 (update 8 ms, watchdog 24 ms)
+    network: n0053-trib-du06-aec1-t57201 192.168.1.53 (update 8 ms, watchdog 24 ms)
+    network: n0054-trib-du07-aec1-t57101 192.168.1.54 (update 8 ms, watchdog 24 ms)
+    network: n0055-trib-du07-aec1-t57201 192.168.1.55 (update 8 ms, watchdog 24 ms)
+    network: n0080-trib-du08-aec1-t57101 192.168.1.80 (update 8 ms, watchdog 24 ms)
+    network: n0081-trib-du08-aec1-t57201 192.168.1.81 (update 8 ms, watchdog 24 ms)
+    network: n0082-trib-du09-aec1-t57101 192.168.1.82 (update 8 ms, watchdog 24 ms)
+    network: n0083-trib-du09-aec1-t57201 192.168.1.83 (update 8 ms, watchdog 24 ms)
+    network: n0084-trib-du10-aec1-t57101 192.168.1.84 (update 8 ms, watchdog 24 ms)
+    network: n0085-trib-du10-aec1-t57201 192.168.1.85 (update 8 ms, watchdog 24 ms)
+    network: n0110-trib-du11-aec1-t57101 192.168.1.110 (update 8 ms, watchdog 24 ms)
+    network: n0111-trib-du11-aec1-t57201 192.168.1.111 (update 8 ms, watchdog 24 ms)
+    network: n0112-trib-du12-aec1-t57101 192.168.1.112 (update 8 ms, watchdog 24 ms)
+    network: n0113-trib-du12-aec1-t57201 192.168.1.113 (update 8 ms, watchdog 24 ms)
+    network: n0114-trib-du13-aec1-t57101 192.168.1.114 (update 8 ms, watchdog 24 ms)
+    network: n0115-trib-du13-aec1-t57201 192.168.1.115 (update 8 ms, watchdog 24 ms)
+    network: n0034-trib-sm011-k1 192.168.1.34 (update 8 ms, watchdog 24 ms)
+    network: n0035-trib-sm006-k1 192.168.1.35 (update 8 ms, watchdog 24 ms)
+    network: n0036-trib-sm016-k1 192.168.1.36 (update 8 ms, watchdog 24 ms)
+    network: n0037-trib-sm020-k1 192.168.1.37 (update 8 ms, watchdog 24 ms)
+    network: n0056-trib-sm038-k1 192.168.1.56 (update 8 ms, watchdog 24 ms)
+    network: n0057-trib-sm033-k1 192.168.1.57 (update 8 ms, watchdog 24 ms)
+    network: n0058-trib-sm043-k1 192.168.1.58 (update 8 ms, watchdog 24 ms)
+    network: n0059-trib-sm047-k1 192.168.1.59 (update 2 ms, watchdog 6 ms)
+    network: n0086-trib-sm061-k1 192.168.1.86 (update 8 ms, watchdog 24 ms)
+    network: n0087-trib-rc01-k1 192.168.1.87 (update 2 ms, watchdog 6 ms)
+    network: n0089-trib-sm066-k1 192.168.1.89 (update 8 ms, watchdog 24 ms)
+    network: n0090-trib-sm071-k1 192.168.1.90 (update 8 ms, watchdog 24 ms)
+    network: n0091-trib-rc02-k1 192.168.1.91 (update 2 ms, watchdog 6 ms)
+    network: n0116-trib-sm091-k1 192.168.1.116 (update 8 ms, watchdog 24 ms)
+    network: n0117-trib-sm086-k1 192.168.1.117 (update 8 ms, watchdog 24 ms)
+    network: n0118-trib-sm096-k1 192.168.1.118 (update 8 ms, watchdog 24 ms)
+    network: n0119-trib-sm098-k1 192.168.1.119 (update 2 ms, watchdog 6 ms)
+    network: n0120-trib-rc03-k1 192.168.1.120 (update 2 ms, watchdog 6 ms)
+    network: n0121-trib-sm104-k1 192.168.1.121 (update 8 ms, watchdog 24 ms)
+  n0002-trib-ct01-aec1-a1 symbolic=002_ANTENNA CELL TEST type='Anybus Communicator' ip=192.168.1.2 mask=255.255.255.0 gsdml=GSDML-V2.41-HMS-Anybus-Communicator-20220817.xml dap='DAP' order='T_ID_DAP_DESCRIPTION' node=0x010C0020 rect=(425, 240, 465, 310)
+    slot 0: Anybus Communicator
+      sub 1: Anybus Communicator
+    slot 1: IN 0016
+      sub 1: Submodule
+    slot 2: OUT 0012
+      sub 1: Submodule
+  n0088-trib-ca01-aec1-t3 symbolic=088_=TRIB-CA01 type='Anybus Communicator' ip=192.168.1.88 mask=255.255.255.0 gsdml=GSDML-V2.41-HMS-Anybus-Communicator-20220817.xml dap='DAP' order='T_ID_DAP_DESCRIPTION' node=0x010C0020 rect=(373, 60, 413, 130)
+    slot 0: Anybus Communicator
+      sub 1: Anybus Communicator
+    slot 1: IN 0064
+      sub 1: Submodule
+    slot 2: OUT 0064
+      sub 1: Submodule
+  n0122-trib-ca02-aec1-t3 symbolic=122_=TRIB-CA02 type='Anybus Communicator' ip=192.168.1.122 mask=255.255.255.0 gsdml=GSDML-V2.41-HMS-Anybus-Communicator-20220817.xml dap='DAP' order='T_ID_DAP_DESCRIPTION' node=0x010C0020 rect=(399, 150, 439, 220)
+    slot 0: Anybus Communicator
+      sub 1: Anybus Communicator
+    slot 1: IN 0064
+      sub 1: Submodule
+    slot 2: OUT 0064
+      sub 1: Submodule
+  n0005-trib-aep01-k35001 symbolic=005_=TRIB-AEP01 type='IM 155-6 PN ST V4.2' ip=192.168.1.5 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml dap='DIM ST V4.2' order='6ES7 155-6AU01-0BN0' node=0x002A0313 rect=(171, 340, 203, 372)
+    slot 0: IM 155-6 PN ST V4.2
+      sub 1: IM 155-6 PN ST V4.2
+    slot 1: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 2: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 3: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 4: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 5: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 6: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 7: DQ 16x24VDC/0.5A ST V0.0
+      sub 1: DQ 16x24VDC/0.5A ST V0.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 1 sub 1 index 243: 01 00 00 00 00 00
+    record slot 2 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 2 sub 1 index 243: 00 00 00 00 00 00
+    record slot 3 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 3 sub 1 index 243: 00 00 00 00 00 00
+    record slot 4 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 4 sub 1 index 243: 00 00 00 00 00 00
+    record slot 5 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 5 sub 1 index 243: 00 00 00 00 00 00
+    record slot 6 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 6 sub 1 index 243: 00 00 00 00 00 00
+    record slot 7 sub 1 index 128: 00 02 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 00
+    record slot 7 sub 1 index 243: 01 00 00 00 00 00
+  n0020-trib-ae01-k35001 symbolic=020_=TRIB-AE01 type='IM 155-6 PN ST V4.2' ip=192.168.1.20 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml dap='DIM ST V4.2' order='6ES7 155-6AU01-0BN0' node=0x002A0313 rect=(83, 60, 115, 92)
+    slot 0: IM 155-6 PN ST V4.2
+      sub 1: IM 155-6 PN ST V4.2
+    slot 1: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 2: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 3: DQ 16x24VDC/0.5A ST V0.0
+      sub 1: DQ 16x24VDC/0.5A ST V0.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 1 sub 1 index 243: 01 00 00 00 00 00
+    record slot 2 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 2 sub 1 index 243: 00 00 00 00 00 00
+    record slot 3 sub 1 index 128: 00 02 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 00
+    record slot 3 sub 1 index 243: 01 00 00 00 00 00
+  n0032-trib-ma01-aec1-k35001 symbolic=032_=TRIB-MA01 type='IM 155-6 PN ST V4.2' ip=192.168.1.32 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml dap='DIM ST V4.2' order='6ES7 155-6AU01-0BN0' node=0x002A0313 rect=(193, 410, 225, 442)
+    slot 0: IM 155-6 PN ST V4.2
+      sub 1: IM 155-6 PN ST V4.2
+    slot 1: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 2: DQ 16x24VDC/0.5A ST V0.0
+      sub 1: DQ 16x24VDC/0.5A ST V0.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 1 sub 1 index 243: 01 00 00 00 00 00
+    record slot 2 sub 1 index 128: 00 02 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 00
+    record slot 2 sub 1 index 243: 01 00 00 00 00 00
+  n0045-trib-ae02-k35001 symbolic=045_=TRIB-AE02 type='IM 155-6 PN ST V4.2' ip=192.168.1.45 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml dap='DIM ST V4.2' order='6ES7 155-6AU01-0BN0' node=0x002A0313 rect=(105, 130, 137, 162)
+    slot 0: IM 155-6 PN ST V4.2
+      sub 1: IM 155-6 PN ST V4.2
+    slot 1: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 2: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 3: DQ 16x24VDC/0.5A ST V0.0
+      sub 1: DQ 16x24VDC/0.5A ST V0.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 1 sub 1 index 243: 01 00 00 00 00 00
+    record slot 2 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 2 sub 1 index 243: 00 00 00 00 00 00
+    record slot 3 sub 1 index 128: 00 02 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 00
+    record slot 3 sub 1 index 243: 01 00 00 00 00 00
+  n0075-trib-ae03-k35001 symbolic=075_=TRIB-AE03 type='IM 155-6 PN ST V4.2' ip=192.168.1.75 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml dap='DIM ST V4.2' order='6ES7 155-6AU01-0BN0' node=0x002A0313 rect=(127, 200, 159, 232)
+    slot 0: IM 155-6 PN ST V4.2
+      sub 1: IM 155-6 PN ST V4.2
+    slot 1: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 2: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 3: DQ 16x24VDC/0.5A ST V0.0
+      sub 1: DQ 16x24VDC/0.5A ST V0.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 1 sub 1 index 243: 01 00 00 00 00 00
+    record slot 2 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 2 sub 1 index 243: 00 00 00 00 00 00
+    record slot 3 sub 1 index 128: 00 02 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 00
+    record slot 3 sub 1 index 243: 01 00 00 00 00 00
+  n0105-trib-ae04-k35001 symbolic=105_=TRIB-AE04 type='IM 155-6 PN ST V4.2' ip=192.168.1.105 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-ET200SP-20210401.xml dap='DIM ST V4.2' order='6ES7 155-6AU01-0BN0' node=0x002A0313 rect=(149, 270, 181, 302)
+    slot 0: IM 155-6 PN ST V4.2
+      sub 1: IM 155-6 PN ST V4.2
+    slot 1: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 2: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 3: DI 16x24VDC ST V0.0
+      sub 1: DI 16x24VDC ST V0.0
+    slot 4: DQ 16x24VDC/0.5A ST V0.0
+      sub 1: DQ 16x24VDC/0.5A ST V0.0
+    record slot 0 sub 1 index 2: 08 01 00 00 00 00 00 00 00 00
+    record slot 1 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 1 sub 1 index 243: 01 00 00 00 00 00
+    record slot 2 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 2 sub 1 index 243: 00 00 00 00 00 00
+    record slot 3 sub 1 index 128: 00 02 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 86 00 00
+    record slot 3 sub 1 index 243: 00 00 00 00 00 00
+    record slot 4 sub 1 index 128: 00 02 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 01 00 00
+    record slot 4 sub 1 index 243: 01 00 00 00 00 00
+  n0006-trib-aec01-k24501 symbolic=006_SORTER (=TRIB) / INDUCTION LINES GR1 (=TRIB-AEC01) type='PN/PN Coupler X2' ip=192.168.1.6 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0' node=0x002A0604 rect=(261, 60, 293, 92)
+    slot 0: PN/PN Coupler X2
+      sub 1: PN/PN Coupler X2
+    slot 1: *OUT 128 Byte
+      sub 1: *OUT 128 Byte
+    slot 2: *IN 128 Byte
+      sub 1: *IN 128 Byte
+    record slot 0 sub 1 index 1: 00 0c 00 02 00 00
+  n0007-trib-aec01-k24502 symbolic=007_SORTER (=TRIB) / INDUCTION LINES GR2 (=TRIB-AEC01) type='PN/PN Coupler X2' ip=192.168.1.7 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0' node=0x002A0604 rect=(283, 130, 315, 162)
+    slot 0: PN/PN Coupler X2
+      sub 1: PN/PN Coupler X2
+    slot 1: *OUT 128 Byte
+      sub 1: *OUT 128 Byte
+    slot 2: *IN 128 Byte
+      sub 1: *IN 128 Byte
+    record slot 0 sub 1 index 1: 00 0c 00 02 00 00
+  n0009-tric-aec01-k24601 symbolic=009_SORTER (=TRIB) / SORTER (=TRIH) type='PN/PN Coupler X2' ip=192.168.1.9 mask=255.255.255.0 gsdml=GSDML-V2.35-Siemens-PNPNIOC-20200924.xml dap='DAP X2 V4.2' order='6ES7 158-3AD10-0XA0' node=0x002A0604 rect=(305, 200, 337, 232)
+    slot 0: PN/PN Coupler X2
+      sub 1: PN/PN Coupler X2
+    slot 1: *OUT 128 Byte
+      sub 1: *OUT 128 Byte
+    slot 2: *IN 128 Byte
+      sub 1: *IN 128 Byte
+    record slot 0 sub 1 index 1: 00 0c 00 02 00 00
+  n0010-trib-aec01-k26501 symbolic=010_=TRIB-AEC01 type='SCALANCE XC216-4C V4.4' ip=192.168.1.10 mask=255.255.255.0 gsdml=GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml dap='DAP 79' order='6GK5 216-4BS00-2AC2' node=0x002A0A0B rect=(1117, 420, 1157, 490)
+    slot 0: SCALANCE XC216-4C V4.4
+      sub 1: SCALANCE XC216-4C
+    record slot 0 sub 1 index 33: 70 01 00 06 01 01 ff 00 00 00 00 00
+    record slot 0 sub 32768 index 3: 00 03 00 06 01 00 00 00 00 00 00 00
+    record slot 0 sub 32768 index 12309: 30 19 00 08 01 01 00 01 01 00 00 02 00 00
+    record slot 0 sub 32768 index 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 00 00
+    record slot 0 sub 32769 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32769 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32769 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32770 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32770 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32770 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32771 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32771 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32771 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32772 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32772 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32772 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32773 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32773 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32773 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32774 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32774 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32774 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32775 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32775 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32775 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32776 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32776 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32776 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32777 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32777 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32777 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32778 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32778 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32778 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32779 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32779 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32779 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32780 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32780 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32780 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32781 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32781 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32781 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32782 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32782 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32782 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32783 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32783 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32783 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32784 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32784 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32784 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+  n0015-trib-ae01-k26501 symbolic=015_=TRIB-AE01 type='SCALANCE XC216-4C V4.4' ip=192.168.1.15 mask=255.255.255.0 gsdml=GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml dap='DAP 79' order='6GK5 216-4BS00-2AC2' node=0x002A0A0B rect=(1013, 60, 1053, 130)
+    slot 0: SCALANCE XC216-4C V4.4
+      sub 1: SCALANCE XC216-4C
+    record slot 0 sub 1 index 33: 70 01 00 06 01 01 ff 00 00 00 00 00
+    record slot 0 sub 32768 index 3: 00 03 00 06 01 00 00 00 00 00 00 00
+    record slot 0 sub 32768 index 12309: 30 19 00 08 01 01 00 01 01 00 00 02 00 00
+    record slot 0 sub 32768 index 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 00 00
+    record slot 0 sub 32769 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32769 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32769 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32770 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32770 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32770 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32771 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32771 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32771 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32772 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32772 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32772 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32773 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32773 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32773 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32774 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32774 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32774 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32775 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32775 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32775 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32776 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32776 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32776 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32777 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32777 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32777 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32778 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32778 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32778 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32779 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32779 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32779 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32780 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32780 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32780 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32781 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32781 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32781 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32782 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32782 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32782 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32783 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32783 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32783 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32784 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32784 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32784 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+  n0040-trib-ae02-k26501 symbolic=040_=TRIB-AE02 type='SCALANCE XC216-4C V4.4' ip=192.168.1.40 mask=255.255.255.0 gsdml=GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml dap='DAP 79' order='6GK5 216-4BS00-2AC2' node=0x002A0A0B rect=(1039, 150, 1079, 220)
+    slot 0: SCALANCE XC216-4C V4.4
+      sub 1: SCALANCE XC216-4C
+    record slot 0 sub 1 index 33: 70 01 00 06 01 01 ff 00 00 00 00 00
+    record slot 0 sub 32768 index 3: 00 03 00 06 01 00 00 00 00 00 00 00
+    record slot 0 sub 32768 index 12309: 30 19 00 08 01 01 00 01 01 00 00 02 00 00
+    record slot 0 sub 32768 index 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 00 00
+    record slot 0 sub 32769 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32769 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32769 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32770 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32770 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32770 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32771 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32771 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32771 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32772 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32772 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32772 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32773 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32773 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32773 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32774 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32774 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32774 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32775 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32775 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32775 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32776 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32776 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32776 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32777 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32777 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32777 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32778 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32778 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32778 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32779 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32779 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32779 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32780 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32780 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32780 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32781 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32781 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32781 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32782 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32782 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32782 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32783 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32783 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32783 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32784 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32784 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32784 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+  n0070-trib-ae03-k26501 symbolic=070_=TRIB-AE03 type='SCALANCE XC216-4C V4.4' ip=192.168.1.70 mask=255.255.255.0 gsdml=GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml dap='DAP 79' order='6GK5 216-4BS00-2AC2' node=0x002A0A0B rect=(1065, 240, 1105, 310)
+    slot 0: SCALANCE XC216-4C V4.4
+      sub 1: SCALANCE XC216-4C
+    record slot 0 sub 1 index 33: 70 01 00 06 01 01 ff 00 00 00 00 00
+    record slot 0 sub 32768 index 3: 00 03 00 06 01 00 00 00 00 00 00 00
+    record slot 0 sub 32768 index 12309: 30 19 00 08 01 01 00 01 01 00 00 02 00 00
+    record slot 0 sub 32768 index 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 00 00
+    record slot 0 sub 32769 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32769 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32769 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32770 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32770 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32770 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32771 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32771 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32771 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32772 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32772 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32772 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32773 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32773 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32773 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32774 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32774 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32774 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32775 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32775 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32775 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32776 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32776 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32776 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32777 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32777 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32777 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32778 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32778 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32778 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32779 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32779 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32779 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32780 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32780 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32780 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32781 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32781 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32781 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32782 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32782 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32782 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32783 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32783 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32783 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32784 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32784 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32784 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+  n0100-trib-ae04-k26501 symbolic=100_=TRIB-AE04 type='SCALANCE XC216-4C V4.4' ip=192.168.1.100 mask=255.255.255.0 gsdml=GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml dap='DAP 79' order='6GK5 216-4BS00-2AC2' node=0x002A0A0B rect=(1091, 330, 1131, 400)
+    slot 0: SCALANCE XC216-4C V4.4
+      sub 1: SCALANCE XC216-4C
+    record slot 0 sub 1 index 33: 70 01 00 06 01 01 ff 00 00 00 00 00
+    record slot 0 sub 32768 index 3: 00 03 00 06 01 00 00 00 00 00 00 00
+    record slot 0 sub 32768 index 12309: 30 19 00 08 01 01 00 01 01 00 00 02 00 00
+    record slot 0 sub 32768 index 12312: 30 1c 00 08 01 01 00 00 00 01 00 00 00 00
+    record slot 0 sub 32769 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32769 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32769 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32770 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32770 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32770 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32771 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32771 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32771 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32772 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32772 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32772 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32773 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32773 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32773 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32774 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32774 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32774 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32775 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32775 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32775 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32776 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32776 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32776 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32777 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32777 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32777 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32778 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32778 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32778 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32779 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32779 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32779 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32780 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32780 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32780 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32781 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32781 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32781 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32782 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32782 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32782 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32783 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32783 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32783 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+    record slot 0 sub 32784 index 32: 70 00 00 06 01 02 ff 00 00 00 00 00
+    record slot 0 sub 32784 index 12310: 30 1a 00 08 01 01 02 02 02 00 00 02 00 00
+    record slot 0 sub 32784 index 12313: 30 1d 00 04 01 01 00 00 00 00 00 00
+  n0025-trib-du01-aec1-t57101 symbolic=025 type='ServoOne Junior' ip=192.168.1.25 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1193, 60, 1225, 92)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0026-trib-du01-aec1-t57201 symbolic=026 type='ServoOne Junior' ip=192.168.1.26 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1215, 130, 1247, 162)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0027-trib-du02-aec1-t57101 symbolic=027 type='ServoOne Junior' ip=192.168.1.27 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1237, 200, 1269, 232)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0028-trib-du02-aec1-t57201 symbolic=028 type='ServoOne Junior' ip=192.168.1.28 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1259, 270, 1291, 302)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0029-trib-du03-aec1-t57101 symbolic=029 type='ServoOne Junior' ip=192.168.1.29 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1281, 340, 1313, 372)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0030-trib-du03-aec1-t57201 symbolic=030 type='ServoOne Junior' ip=192.168.1.30 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1303, 410, 1335, 442)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0031-trib-du04-aec1-t57101 symbolic=031 type='ServoOne Junior' ip=192.168.1.31 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1325, 480, 1357, 512)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0033-trib-du04-aec1-t57201 symbolic=033 type='ServoOne Junior' ip=192.168.1.33 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1347, 550, 1379, 582)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0050-trib-du05-aec1-t57101 symbolic=050 type='ServoOne Junior' ip=192.168.1.50 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1393, 60, 1425, 92)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0051-trib-du05-aec1-t57201 symbolic=051 type='ServoOne Junior' ip=192.168.1.51 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1415, 130, 1447, 162)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0052-trib-du06-aec1-t57101 symbolic=052 type='ServoOne Junior' ip=192.168.1.52 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1437, 200, 1469, 232)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0053-trib-du06-aec1-t57201 symbolic=053 type='ServoOne Junior' ip=192.168.1.53 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1459, 270, 1491, 302)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0054-trib-du07-aec1-t57101 symbolic=054 type='ServoOne Junior' ip=192.168.1.54 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1481, 340, 1513, 372)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0055-trib-du07-aec1-t57201 symbolic=055 type='ServoOne Junior' ip=192.168.1.55 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1503, 410, 1535, 442)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0080-trib-du08-aec1-t57101 symbolic=080 type='ServoOne Junior' ip=192.168.1.80 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1525, 480, 1557, 512)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0081-trib-du08-aec1-t57201 symbolic=081 type='ServoOne Junior' ip=192.168.1.81 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1547, 550, 1579, 582)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0082-trib-du09-aec1-t57101 symbolic=082 type='ServoOne Junior' ip=192.168.1.82 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1593, 60, 1625, 92)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0083-trib-du09-aec1-t57201 symbolic=083 type='ServoOne Junior' ip=192.168.1.83 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1615, 130, 1647, 162)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0084-trib-du10-aec1-t57101 symbolic=084 type='ServoOne Junior' ip=192.168.1.84 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1637, 200, 1669, 232)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0085-trib-du10-aec1-t57201 symbolic=085 type='ServoOne Junior' ip=192.168.1.85 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1659, 270, 1691, 302)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0110-trib-du11-aec1-t57101 symbolic=110 type='ServoOne Junior' ip=192.168.1.110 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1681, 340, 1713, 372)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0111-trib-du11-aec1-t57201 symbolic=111 type='ServoOne Junior' ip=192.168.1.111 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1703, 410, 1735, 442)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0112-trib-du12-aec1-t57101 symbolic=112 type='ServoOne Junior' ip=192.168.1.112 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1725, 480, 1757, 512)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0113-trib-du12-aec1-t57201 symbolic=113 type='ServoOne Junior' ip=192.168.1.113 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1747, 550, 1779, 582)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0114-trib-du13-aec1-t57101 symbolic=114 type='ServoOne Junior' ip=192.168.1.114 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1793, 60, 1825, 92)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0115-trib-du13-aec1-t57201 symbolic=115 type='ServoOne Junior' ip=192.168.1.115 mask=255.255.255.0 gsdml=GSDML-V2.3-LT-i-ServoOne-20130515.xml dap='DAP 2' order='13xx.xx7x.xxxx.x' node=0x017C4E21 rect=(1815, 130, 1847, 162)
+    slot 0: ServoOne Junior
+      sub 1: ServoOne Junior
+  n0034-trib-sm011-k1 symbolic=034 type='AL1202' ip=192.168.1.34 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(589, 340, 621, 372)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0035-trib-sm006-k1 symbolic=035 type='AL1202' ip=192.168.1.35 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(567, 270, 599, 302)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0036-trib-sm016-k1 symbolic=036 type='AL1202' ip=192.168.1.36 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(611, 410, 643, 442)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Disabled
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 300: 00 00 00
+    record slot 1 sub 2 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0037-trib-sm020-k1 symbolic=037 type='AL1202' ip=192.168.1.37 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(633, 480, 665, 512)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0056-trib-sm038-k1 symbolic=056 type='AL1202' ip=192.168.1.56 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(701, 60, 733, 92)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0057-trib-sm033-k1 symbolic=057 type='AL1202' ip=192.168.1.57 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(655, 550, 687, 582)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Digital Input + PQI
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0058-trib-sm043-k1 symbolic=058 type='AL1202' ip=192.168.1.58 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(723, 130, 755, 162)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: Digital Output + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 02 00 00
+    record slot 1 sub 7 index 45312: 00 01 04 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0059-trib-sm047-k1 symbolic=059 type='AL1202' ip=192.168.1.59 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(745, 200, 777, 232)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Digital Input + PQI
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0086-trib-sm061-k1 symbolic=086 type='AL1202' ip=192.168.1.86 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(767, 270, 799, 302)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0087-trib-rc01-k1 symbolic=087 type='AL1202' ip=192.168.1.87 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(501, 60, 533, 92)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: IO-Link In  2 Byte + PQI
+      sub 4: Digital Input + PQI
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0089-trib-sm066-k1 symbolic=089 type='AL1202' ip=192.168.1.89 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(789, 340, 821, 372)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Disabled
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 300: 00 00 00
+    record slot 1 sub 2 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0090-trib-sm071-k1 symbolic=090 type='AL1202' ip=192.168.1.90 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(811, 410, 843, 442)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0091-trib-rc02-k1 symbolic=091 type='AL1202' ip=192.168.1.91 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(523, 130, 555, 162)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: IO-Link In  2 Byte + PQI
+      sub 4: Digital Input + PQI
+      sub 5: Disabled
+      sub 6: IO-Link In  2 Byte + PQI
+      sub 7: IO-Link In  2 Byte + PQI
+      sub 8: IO-Link In  2 Byte + PQI
+      sub 9: IO-Link In  2 Byte + PQI
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+  n0116-trib-sm091-k1 symbolic=116 type='AL1202' ip=192.168.1.116 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(855, 550, 887, 582)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0117-trib-sm086-k1 symbolic=117 type='AL1202' ip=192.168.1.117 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(833, 480, 865, 512)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Digital Input + PQI
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0118-trib-sm096-k1 symbolic=118 type='AL1202' ip=192.168.1.118 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(901, 60, 933, 92)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Disabled
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 300: 00 00 00
+    record slot 1 sub 2 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0119-trib-sm098-k1 symbolic=119 type='AL1202' ip=192.168.1.119 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(923, 130, 955, 162)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Digital Input + PQI
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: IO-Link In/Out 32/32 Byte + PQI
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0120-trib-rc03-k1 symbolic=120 type='AL1202' ip=192.168.1.120 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(545, 200, 577, 232)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: IO-Link In  2 Byte + PQI
+      sub 3: IO-Link In  2 Byte + PQI
+      sub 4: Digital Input + PQI
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: Digital Input + PQI
+      sub 8: Disabled
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+  n0121-trib-sm104-k1 symbolic=121 type='AL1202' ip=192.168.1.121 mask=255.255.255.0 gsdml=GSDML-V2.34-ifm-AL1202-20181105.xml dap='DIM 1' order='' node=0x0136AC55 rect=(945, 200, 977, 232)
+    slot 0: AL1202
+      sub 1: AL1202
+    slot 1: 8 Ports
+      sub 1: IO-Link Master
+      sub 2: Digital Input + PQI
+      sub 3: Disabled
+      sub 4: Disabled
+      sub 5: Disabled
+      sub 6: IO-Link In/Out 32/32 Byte + PQI
+      sub 7: Disabled
+      sub 8: IO-Link Out  2 Byte + PQI
+      sub 9: Disabled
+    record slot 1 sub 1 index 301: ff 00 00
+    record slot 1 sub 2 index 45312: 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 3 index 300: 00 00 00
+    record slot 1 sub 3 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 4 index 300: 00 00 00
+    record slot 1 sub 4 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 5 index 300: 00 00 00
+    record slot 1 sub 5 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 6 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 7 index 300: 00 00 00
+    record slot 1 sub 7 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 8 index 45312: 00 01 0b 00 00 00 00 00 00 00 00 00 00 00
+    record slot 1 sub 9 index 300: 00 00 00
+    record slot 1 sub 9 index 45312: 00 01 01 00 00 00 00 00 00 00 00 00 00 00

@@ -252,7 +252,7 @@ class ControllerDialog(ConfigDialog):
                     time.sleep(0.3)
                     mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + y))
                     time.sleep(0.7)
-                    mouse.click(coords=(r.left + self.cx(NAME_X), r.top + y))
+                    mouse.click(coords=(r.left + self.cx(NAME_X), r.top + y))      # read back: the row holds it
                     time.sleep(0.7)
                     value = self.controls(("Edit",), cid=NAME_EDIT_ID)[0].window_text()
                     mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + y))
@@ -293,22 +293,50 @@ class ControllerDialog(ConfigDialog):
         # knows (a resume), else an auto-assigned one - the IPs of the scan no known station holds, ascending, given
         # to the new stations in Device Table order (SYCON.net assigns the next free address at every add / paste).
         # Every write reads the row's IP first and refuses a row that does not show the expected one.
-        ip_rows = self._scan_ips(r, visible)
-        self._scroll(r, -200)                                 # the scan ends at the bottom: back to the top
         known = {n: ip for n, ip in current_ips.items() if ip}
-        unclaimed = sorted((ip for ip in ip_rows if ip not in set(known.values())), key=_ip_key)
+        # a new station's auto-assigned IP: the next free address of the controller's network at its add, so the
+        # new stations hold the free addresses ascending in Device Table order (user 2026-10-25: no scan of the
+        # whole table first) - two sentinel rows are read before anything is written, the scan is the fallback
+        net = ".".join(next(iter(mapping.values()))[1].split(".")[:3]) if mapping else ""
+        taken = {_ip_key(ip) for ip in known.values()} | {_ip_key(net + ".1"), _ip_key(net + ".0")}
+        octet = 1
         for _abs_row, name in order:
-            if name not in known and unclaimed:
-                known[name] = unclaimed.pop(0)
-        rows = []
-        for name in mapping:
-            if name not in known or known[name] not in ip_rows:
-                raise SyconError("station %r: its current IP %r is not in the IP Address Table (%d rows)"
-                                 % (name, known.get(name), len(ip_rows)))
-            rows.append((ip_rows.index(known[name]), name))
-        rows.sort()
-        log("  IP Address Table: %d rows scanned; the %d stations to address sit at rows %s" % (
-            len(ip_rows), len(rows), [a for a, _n in rows]))
+            if name not in known:
+                while _ip_key("%s.%d" % (net, octet)) in taken:
+                    octet += 1
+                known[name] = "%s.%d" % (net, octet)
+                taken.add(_ip_key(known[name]))
+        ip_rows = sorted(known.values(), key=_ip_key)      # the table lists the stations sorted by IP
+        rows = sorted((ip_rows.index(known[name]), name) for name in mapping if name in known)
+        if len(rows) != len(mapping):
+            raise SyconError("stations with no current IP: %r" % sorted(set(mapping) - set(known)))
+        trusted = True
+        for abs_row, name in rows[:2]:                      # the sentinels: the first two rows to write
+            y = ROW_Y0 + ROW_H * abs_row
+            if y > r.height() - 10:
+                break
+            seen = self._read_ip_at(r, y)
+            if seen != known[name]:
+                log("  IP Address Table: row %d shows %s, %s expected for %s - scanning the table" % (abs_row, seen, known[name], name))
+                trusted = False
+                break
+        if not trusted:
+            ip_rows = self._scan_ips(r, visible)
+            self._scroll(r, -200)                             # the scan ends at the bottom: back to the top
+            unclaimed = sorted((ip for ip in ip_rows if ip not in set(current_ips.values())), key=_ip_key)
+            known = {n: ip for n, ip in current_ips.items() if ip}
+            for _abs_row, name in order:
+                if name not in known and unclaimed:
+                    known[name] = unclaimed.pop(0)
+            rows = []
+            for name in mapping:
+                if name not in known or known[name] not in ip_rows:
+                    raise SyconError("station %r: its current IP %r is not in the IP Address Table (%d rows)"
+                                     % (name, known.get(name), len(ip_rows)))
+                rows.append((ip_rows.index(known[name]), name))
+            rows.sort()
+        log("  IP Address Table: the %d stations to address sit at rows %s%s" % (
+            len(rows), [a for a, _n in rows][:12], "..." if len(rows) > 12 else ""))
         # ONE pass down the table, every row straight to its target (user 2026-10-24: "duplicate ip addresses raise
         # an error only on save, i think we can drop the n.n.n.200+ pre-filling if we do the ip address fill in one
         # run" - a target still held by another row is fine until OK, by when that row has its own)

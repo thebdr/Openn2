@@ -567,6 +567,44 @@ ServoOne, 19 AL1202 - the clones added twelve at a time); the IP Address Table s
 0..61 and one pass addressed them all. The first attempt died in the names pass on the resync anchor: after a
 scroll the pass looked for the last row by the name it had just REPLACED - it now uses the name the row shows.
 
+## Faster, same output (2026-10-25, the user's four observations)
+
+User: "now, we can reduce the time without impacting the output" - four observations on the 89-minute fresh build of
+the sorter (22 min adding 62 stations, 5 names, 2 + 4 IPs, 2 timing, 52 module dialogs, 2 exports):
+
+1. **Cloning by doubling** - "i usually double the existing stations (1->2->4->8->...) by selecting and copy-pasting
+   more than one station at a time". The netProject tree extends its selection with Shift+Down from the keyboard
+   (not with Shift+click or Ctrl+click: `scripts/probe_multiselect_clone.py` found those select one node; the user's
+   way recorded in `spike/references/recordings/clone_multiselect_events.log`). `SyconDriver.clone_station(source,
+   count, after_batch)`: the first clone from the source, then the clones made so far - contiguous at the end of the
+   tree - selected from the first one with Shift+Down, Ctrl+C, a click on the source, Ctrl+V: 1, 2, 4, 8 ..., the last
+   batch the remainder, a checkpoint every 8 or so. The 25 drive clones in 97 s (six pastes), the 18 AL1202 in 111 s.
+2. **"The profinet name assignment was done twice"** - the first fresh build's names pass died after 47 rows (the resync
+   anchor) and, all-or-nothing, the resume named all 62 again. A failed pass now keeps what it wrote (Cancel, the
+   data kept); a resume pairs only the still auto-named nodes, in the order the pass renames. The per-row read-back
+   of every name stays (user: "readback is important").
+3. **No IP table scan** - "a remaining from when the addresses were being set to 200+": the IP pass orders the rows from
+   the IPs it knows (a resumed station's saved IP; a new station's auto-assigned one = the next free address at its
+   add, ascending in Device Table order), reads two sentinel rows before writing, checks every row's current IP as it
+   writes, and keeps the full scan as the fallback when a sentinel disagrees.
+4. **Type-common setup before cloning** - "stations that share parameters or number of modules/submodules may be set
+   up before cloning (eg: on the AL1202 all the 8 submodules could be created with default values on first station,
+   then the final run would only set the specific types)". The stations are added by type and, within a type, by
+   MODEL; the first station of each model is configured with what all its stations share before it is cloned (the
+   couplers' two modules and head parameter, the switches' SFP ports and PN-IO parameters, each Anybus model's two
+   modules, the AL1202's eight ports with that station's types - `consumer.clone_safe`: every station of the model
+   has the head's structure; the ET200SPs differ in their cards and stay per station); step 3 reads the saved
+   project ONCE and opens a dialog only for what is missing or differs: a clone's port whose type differs is re-typed
+   in place (`SyconDriver.set_submodules`, no Add Submodule), a parameter only when its record oracle is not met
+   (`consumer.params_satisfied`: the potential group's record 243, the `record:<idx>` entries), modules already there
+   are left alone. `tests/test_build_plan.py` pins the planning against fake read-backs.
+
+The timed fresh build with all four (`PROD_Sorter_Lower_fast`, 10:57-11:55): 823 PASS / 0 FAIL in 3446 s - 57
+minutes against 89 - the same project order (the types once each, the names natural within each), 41 device dialogs
+instead of 56 (the 12 AL1202 re-typings in ~30 s each instead of 8 Add Submodules in ~80 s; the switches, couplers
+and Anybus skipped by the read-back). What is left: the six ET200SPs (two dialogs each, ~15 min) and the two
+controller passes (names ~5 min, IPs ~6 min).
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run

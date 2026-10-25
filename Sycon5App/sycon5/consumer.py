@@ -143,6 +143,88 @@ def verify(handoff, project, plugged, timing_set=None):
     return v
 
 
+def type_key(s):
+    return (s["catalog_kind"] or "slave", s["catalog_item"], (s.get("gsdml") or "").lower())
+
+
+def structure(h, station):
+    """What a clone carries from its source: the modules (slot, text or order number, parameters), the submodule
+    subslots per slot (their types may differ - they are re-typed in place) and the device's own rows."""
+    rows, subs, daps = h.plug_rows(station), h.submodule_rows(station), h.dap_rows(station)
+    return (tuple((m["slot"], m["module_text"] or ("order:" + m["module_id"]), m["parameters"]) for m in rows),
+            tuple(sorted((m["slot"], m["subslot"]) for m in subs)),
+            tuple((m["subslot"], m["module_text"], m["parameters"]) for m in daps))
+
+
+def clone_safe(h, stations):
+    """Every station of the model shares the structure: the first configured, then cloned, serves them all."""
+    return len({structure(h, st["station_name"]) for st in stations}) == 1
+
+
+def params_satisfied(dev, slot, subslot, parameters):
+    """True when the read-back already shows every oracle of a parameter row (the potential group's record, the
+    record:<idx> entries); a row with plain index=value entries and no oracle is never known satisfied."""
+    params = parse_parameters(parameters)
+    if not params:
+        return True
+    oracles = 0
+    for name, value in params:
+        if name == "potential_group":
+            rec = dev.records.get((slot, subslot, POTENTIAL_GROUP_RECORD), b"")
+            if rec[:1] != (b"\x01" if value.lower().startswith("enable new") else b"\x00"):
+                return False
+            oracles += 1
+        elif str(name).startswith("record:"):
+            rec = dev.records.get((slot, subslot, int(str(name)[7:])), b"")
+            want = bytes.fromhex(value.replace(" ", ""))
+            if rec[:len(want)] != want:
+                return False
+            oracles += 1
+    return oracles > 0
+
+
+def apply_station(d, h, station, dev, plugged, node=None):
+    """The table's rows of `station` applied to the node `node` (its auto name before the rename; the station's
+    own name afterwards), given the read-back `dev` of that node (None = nothing known: everything is done).
+    Returns True when a dialog changed something."""
+    node = node or station
+    rows, subs, daps = h.plug_rows(station), h.submodule_rows(station), h.dap_rows(station)
+    if not rows and not subs and not daps:
+        return False
+    changed = False
+    ports = sorted((int(m["subslot"]), m["module_text"]) for m in daps if m["module_text"] and int(m["subslot"]) > 0x8000)
+    if ports and (dev is None or any(not same_text(dev.submodules.get((0, sub), ""), text) for sub, text in ports)):
+        d.set_dap_submodules(node, ports)
+        changed = True
+    for m in daps:
+        if m["parameters"] and (dev is None or not params_satisfied(dev, 0, int(m["subslot"]), m["parameters"])):
+            d.set_module_parameters(node, 0, parse_parameters(m["parameters"]), subslot=int(m["subslot"]))
+            changed = True
+    have = {k for k in (dev.slots if dev is not None else {}) if k != 0}
+    if rows and not all(int(m["slot"]) in have for m in rows):
+        chosen = d.plug_modules(node, [m["module_text"] or ("order:" + m["module_id"]) for m in rows])
+        plugged[station] = {m["slot"]: chosen[i] for i, m in enumerate(rows)}
+        changed, dev = True, None                                 # the read-back is stale from here
+    for m in rows:
+        if m["parameters"] and (dev is None or not params_satisfied(dev, int(m["slot"]), 1, m["parameters"])):
+            d.set_module_parameters(node, int(m["slot"]), parse_parameters(m["parameters"]))
+            changed = True
+    by_slot = {}
+    for m in subs:
+        by_slot.setdefault(int(m["slot"]), []).append((int(m["subslot"]), m["module_text"]))
+    for slot, wanted in sorted(by_slot.items()):
+        wanted = sorted(wanted)
+        if dev is None or not all(dev.submodules.get((slot, sub)) for sub, _t in wanted):
+            d.plug_submodules(node, slot, wanted)
+            changed = True
+        else:
+            differing = [(sub, text) for sub, text in wanted if not same_text(dev.submodules.get((slot, sub), ""), text)]
+            if differing:
+                d.set_submodules(node, slot, differing)
+                changed = True
+    return changed
+
+
 def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     """The whole build. Returns (verification, the xml path, plugged, the driver)."""
     h = load_handoff(handoff_dir)
@@ -173,16 +255,27 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
             d.save_as(out_spj)
             saved = True
 
-    # 1. the stations, named by SYCON for now
+    # 1. the stations, named by SYCON for now. The table's stations are added by TYPE (kind, catalog item, GSDML) and,
+    # within a type, by MODEL (the types in the order of their first name, the models likewise, the names in natural
+    # order within a model - user 2026-10-24: "since devices of the same type are cloned, i would expect them to be
+    # consecutive in the sycon project", "sorted naturally by profinet name"). The first station of each model is
+    # configured with what all its stations share BEFORE it is cloned - its modules, its own submodules' ports and
+    # parameters, an AL1202's eight ports with that station's types - so the clones carry it and step 3 only changes
+    # what differs (user 2026-10-25). A model whose stations differ in structure (an ET200SP with other cards) is
+    # cloned unconfigured and configured station by station.
     mapping = {}
-    first_of = {}                    # (kind, catalog item, GSDML) -> the auto name of its first station (the clone source)
+    first_of = {}                    # (type key, model) -> the auto name of a node of that model (the clone source)
     todo = [s for s in h.stations if s["station_name"].lower() not in done_names]
-    todo.sort(key=lambda s: natural_key(s["station_name"]))      # user 2026-10-24: "sorted naturally by profinet name"
+    todo.sort(key=lambda s: natural_key(s["station_name"]))
+    groups = {}
+    for s in todo:
+        groups.setdefault(type_key(s), {}).setdefault(s["model_id"].upper(), []).append(s)
+    ordered = [s for by_model in groups.values() for members in by_model.values() for s in members]
     if resume:                       # auto-named nodes an earlier run added but never renamed: pair them with the
         wanted = {s["station_name"].lower() for s in h.stations}      # table's stations of the SAME type, in order
         leftovers = [n for n in d.stations() if n["station"].lower() not in wanted and not n["suffix"].startswith("(#")]
         remaining = []
-        for s in todo:
+        for s in ordered:
             type_name = split_item(s["catalog_item"])[0]
             match = next((n for n in leftovers if same_text(n["type"], type_name)), None)
             if match is None:
@@ -190,49 +283,69 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
                 continue
             leftovers.remove(match)
             mapping[match["station"]] = (s["station_name"], s["ip_address"])
-            first_of.setdefault((s["catalog_kind"] or "slave", s["catalog_item"], (s.get("gsdml") or "").lower()), match["station"])
+            first_of.setdefault((type_key(s), s["model_id"].upper()), match["station"])
             log("resume: %s -> will be %s" % (match["station"], s["station_name"]))
         if leftovers:
             raise SyconError("saved nodes no table station of their type is left for: %r" % [n["station"] for n in leftovers])
-        todo = remaining
-    # the stations by TYPE (kind, catalog item, GSDML), the types in the order they first appear in the table: the
-    # first of a type from the catalog, the rest its clones in one go - the devices of a type are CONSECUTIVE in the
-    # project (user 2026-10-24: "since devices of the same type are cloned, i would expect them to be consecutive in
-    # the sycon project"); the types in the order of their first name, within a type the names in natural order
-    # (the `todo` sort above), a checkpoint every CHECKPOINT_EVERY clones
-    groups = {}
-    for s in todo:
-        key = (s["catalog_kind"] or "slave", s["catalog_item"], (s.get("gsdml") or "").lower())
-        groups.setdefault(key, []).append(s)
-    added, i = 0, 0
-    for key, members in groups.items():
-        pending = list(members)
-        if key not in first_of:
-            s = pending.pop(0)
-            node = d.add_station(s["catalog_item"], kind=s["catalog_kind"] or "slave", gsdml=s.get("gsdml"))
-            first_of[key] = node["station"]
-            mapping[node["station"]] = (s["station_name"], s["ip_address"])
-            added, i = added + 1, i + 1
-            log("[%d/%d] %s -> will be %s @ %s" % (i, len(todo), node["station"], s["station_name"], s["ip_address"]))
-        while pending:
-            batch, pending = pending[:CHECKPOINT_EVERY], pending[CHECKPOINT_EVERY:]
-            for node, s in zip(d.clone_station(first_of[key], len(batch)), batch):
-                mapping[node["station"]] = (s["station_name"], s["ip_address"])
-                added, i = added + 1, i + 1
-                log("[%d/%d] %s -> will be %s @ %s" % (i, len(todo), node["station"], s["station_name"], s["ip_address"]))
+        keep = {s["station_name"] for s in remaining}
+        groups = {}
+        for s in [s for s in ordered if s["station_name"] in keep]:
+            groups.setdefault(type_key(s), {}).setdefault(s["model_id"].upper(), []).append(s)
+    added, i, total = 0, 0, sum(len(m) for by_model in groups.values() for m in by_model.values())
+
+    def assign(node, s):
+        nonlocal added, i
+        mapping[node["station"]] = (s["station_name"], s["ip_address"])
+        added, i = added + 1, i + 1
+        log("[%d/%d] %s -> will be %s @ %s" % (i, total, node["station"], s["station_name"], s["ip_address"]))
+
+    for key, by_model in groups.items():
+        # (a) a node per model: the first from the catalog (or the type's leftover of the resume), the other models'
+        # heads cloned from it while it is still unconfigured - else from the catalog
+        heads, fresh_head = {}, None
+        for model, members in by_model.items():
+            if (key, model) in first_of:
+                continue                                        # a resume: a node of the model exists
+            s0 = members[0]
+            if fresh_head is None:
+                node = d.add_station(s0["catalog_item"], kind=s0["catalog_kind"] or "slave", gsdml=s0.get("gsdml"))
+                fresh_head = node["station"]
+            else:
+                node = d.clone_station(fresh_head, 1)[0]
+            first_of[(key, model)] = node["station"]
+            heads[model] = (node["station"], s0)
+            assign(node, s0)
+            by_model[model] = members[1:]
+        # (b) the heads configured with their model's common configuration, when every station of the model
+        # shares the head's structure
+        for model, (node_name, s0) in heads.items():
+            all_of_model = [st for st in h.stations if st["model_id"].upper() == model and type_key(st) == key]
+            if clone_safe(h, all_of_model):
+                if apply_station(d, h, s0["station_name"], None, plugged, node=node_name):
+                    log("  %s configured before cloning (%s)" % (node_name, s0["station_name"]))
+            else:
+                log("  %s not configured before cloning: the %s stations differ in structure" % (node_name, model))
+        if heads:
+            checkpoint()
+        # (c) the clones of each model, from its head - by doubling, a checkpoint every 8 or so
+        for model, members in by_model.items():
+            if not members:
+                continue
+            for node, s in zip(d.clone_station(first_of[(key, model)], len(members), after_batch=checkpoint), members):
+                assign(node, s)
             checkpoint()
     if added:
         checkpoint()
     # a resume: the named stations whose saved IP is not the table's (an IP pass that failed midway kept its names
-    # and the IPs written so far, parking addresses included) are re-addressed, their names unchanged
+    # and the IPs written so far) are re-addressed, their names unchanged
     for s in h.stations:
         dev = saved_devices.get(s["station_name"].lower())
         if dev is not None and s["ip_address"] and dev.ip != s["ip_address"]:
             mapping[dev.device_no] = (s["station_name"], s["ip_address"])
             log("resume: %s keeps its name, IP %s -> %s" % (dev.device_no, dev.ip, s["ip_address"]))
     if mapping:
-        # 2. names and IPs in one controller dialog pass - saved even when the pass fails after its OK (the names
-        # it did write stay; a resume pairs the rest), so a failure costs the pass, not the whole project state
+        # 2. names and IPs in one controller dialog pass - saved even when the pass fails (the names and IPs it did
+        # write stay; a resume pairs and re-addresses the rest), so a failure costs the pass, not the project state
         current = {dev.device_no: dev.ip for dev in saved_devices.values() if dev.ip}   # a resume knows them
         try:
             d.rename_stations(mapping, current_ips=current)
@@ -250,48 +363,16 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
         shown = d.set_stations_timing(wanted)
         timing_set = {st: float(upd) for st, (upd, _wd) in shown.items() if upd.replace(".", "", 1).isdigit()}
         checkpoint()
-    # 3. the modules and the submodules (an AL1202's ports)
-    for s in h.stations:
-        station = s["station_name"]
-        rows, subs, daps = h.plug_rows(station), h.submodule_rows(station), h.dap_rows(station)
-        if not rows and not subs and not daps:
-            continue
-        # the device's own submodules: the pluggable ports chosen (a switch's combo ports), the parameters set
-        # (idempotent, on a resume too)
-        ports = [(int(m["subslot"]), m["module_text"]) for m in daps if m["module_text"] and int(m["subslot"]) > 0x8000]
-        if ports:
-            d.set_dap_submodules(station, sorted(ports))
-        for m in daps:
-            d.set_module_parameters(station, 0, parse_parameters(m["parameters"]), subslot=int(m["subslot"]))
-        if not rows and not subs:
-            checkpoint()
-            continue
-        plug_needed = True
-        if resume and station.lower() in done_names:
-            p = read_project(xml)
-            dev = next(dv for dv in p.devices if dv.device_no.lower() == station.lower())
-            if len([k for k in dev.slots if k != 0]) >= len(rows) and all(
-                    dev.submodules.get((int(m["slot"]), int(m["subslot"]))) for m in subs):
-                if not any(m["parameters"] for m in rows):
-                    continue
-                plug_needed = False          # the modules are there; their parameters are set again (idempotent)
-        if rows and plug_needed:
-            chosen = d.plug_modules(station, [m["module_text"] or ("order:" + m["module_id"]) for m in rows])
-            plugged[station] = {m["slot"]: chosen[i] for i, m in enumerate(rows)}
-        for m in rows:
-            if m["parameters"]:
-                d.set_module_parameters(station, int(m["slot"]), parse_parameters(m["parameters"]))
-        if not plug_needed:
-            checkpoint()
-            continue
-        by_slot = {}
-        for m in subs:
-            by_slot.setdefault(int(m["slot"]), []).append((int(m["subslot"]), m["module_text"]))
-        for slot, wanted in sorted(by_slot.items()):
-            d.plug_submodules(station, slot, sorted(wanted))
-        checkpoint()
+    # 3. the modules and the submodules, station by station, against ONE read-back of the saved project: what a
+    # clone inherited or an earlier run set is left alone (the modules there, the port types equal, the parameter
+    # records equal to their oracles); only the rest opens a dialog
     if not saved:
         checkpoint()
+    saved_now = {dev.device_no.lower(): dev for dev in read_project(xml).devices}
+    for s in h.stations:
+        station = s["station_name"]
+        if apply_station(d, h, station, saved_now.get(station.lower()), plugged):
+            checkpoint()
     # 4. the controller's Auto addressing and the two exports beside the project, as the user does them (recorded
     # 2026-10-24 19:11): HilscherIO.xml (the process data, the IO driver's input) in the project's folder and
     # nWid\config.nxd (the configuration database) - the production folder's layout

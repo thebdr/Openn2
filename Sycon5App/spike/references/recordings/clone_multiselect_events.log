@@ -1,0 +1,71 @@
+10:52:46.029 recorder started; 7 visible windows; the SYCON.net ones: []
+10:52:56.476 keys: S Y C O Enter | focus: Edit "Password:" [1009] (Edit) < Window "SYCON.net User Login" (#32770) < Pane "SYCON.net" (Afx:00400000:0:00010003:00000000:00000000) value='Password:'
+10:52:56.480 window opened: "SYCON.net User Login" (#32770, pid 3868)
+10:52:56.480 window opened: "SYCON.net" (Afx:00400000:0:00010003:00000000:00000000, pid 3868)
+10:52:57.605 window opened: "SYCON.net" (Afx:00400000:8:00010003:00000000:071A0397, pid 3868)
+10:52:57.606 window closed: "SYCON.net User Login" (#32770)
+10:53:07.223 keys: Enter | focus: Pane "Workspace" [59648] (MDIClient) < Window "SYCON.net - [Untitled.spj]" (Afx:00400000:8:00010003:00000000:071A0397) < Pane "Desktop 1" (#32769) value='Workspace'
+10:53:07.244 window closed: "SYCON.net" (Afx:00400000:0:00010003:00000000:00000000)
+10:53:12.588 click L (1241,400) win="SYCON.net - [Untitled.spj]" at TreeItem "PROFINET IO" < Tree "" [40000] (SysTreeView32) < Pane "" [131] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59649] (AfxMDIFrame70su) < Pane "" [59648] (AfxMDIFrame70su)
+10:53:13.495   screenshot 0001_click.png of "SYCON.net - [Untitled.spj]"
+10:53:13.765 click L (1262,424) win="SYCON.net - [Untitled.spj]" at TreeItem "COMX 100XX-RE/PNS V3.5.18 - V3.5.34" < TreeItem "Gateway / Stand-Alone Slave" < TreeItem "PROFINET IO" < Tree "" [40000] (SysTreeView32) < Pane "" [131] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su)
+10:53:14.645   screenshot 0002_click.png of "SYCON.net - [Untitled.spj]"
+10:53:15.952 click L (1297,131) win="SYCON.net - [Untitled.spj]" at TreeItem "Gateway / Stand-Alone Slave" < TreeItem "PROFINET IO" < Tree "" [40000] (SysTreeView32) < Pane "" [131] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59649] (AfxMDIFrame70su)
+10:53:16.845   screenshot 0003_click.png of "SYCON.net - [Untitled.spj]"
+10:53:17.006 click L (1263,405) win="SYCON.net - [Untitled.spj]" at TreeItem "Master" < TreeItem "PROFINET IO" < Tree "" [40000] (SysTreeView32) < Pane "" [131] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59649] (AfxMDIFrame70su)
+10:53:17.897   screenshot 0004_click.png of "SYCON.net - [Untitled.spj]"
+10:53:18.127 click L (1290,195) win="SYCON.net - [Untitled.spj]" at TreeItem "PROFIBUS MPI" < Tree "" [40000] (SysTreeView32) < Pane "" [131] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59649] (AfxMDIFrame70su) < Pane "" [59648] (AfxMDIFrame70su)
+10:53:19.027   screenshot 0005_click.png of "SYCON.net - [Untitled.spj]"
+10:53:19.221 click L (814,170) win="SYCON.net - [Untitled.spj]" at Pane "" [3000] (AfxFrameOrView70su) < Pane "" [234] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59648] (AfxMDIFrame70su) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+10:53:20.167   screenshot 0006_click.png of "SYCON.net - [Untitled.spj]"
+10:53:22.491 click L (1257,416) win="SYCON.net - [Untitled.spj]" at TreeItem "Slave" < TreeItem "PROFINET IO" < Tree "" [40000] (SysTreeView32) < Pane "" [131] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su) < Pane "" [59649] (AfxMDIFrame70su)
+10:53:23.383   screenshot 0007_click.png of "SYCON.net - [Untitled.spj]"
+10:53:23.640 click L (1296,369) win="SYCON.net - [Untitled.spj]" at TreeItem "Anybus Communicator" < TreeItem "Slave" < TreeItem "PROFINET IO" < Tree "" [40000] (SysTreeView32) < Pane "" [131] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su)
+10:53:24.515   screenshot 0008_click.png of "SYCON.net - [Untitled.spj]"
+10:53:24.724 click L (1287,315) win="SYCON.net - [Untitled.spj]" at TreeItem "AL1202" < TreeItem "Slave" < TreeItem "PROFINET IO" < Tree "" [40000] (SysTreeView32) < Pane "" [131] (AfxWnd70su) < Pane "" [59648] (AfxFrameOrView70su)
+10:53:25.616   screenshot 0009_click.png of "SYCON.net - [Untitled.spj]"
+10:53:28.677 click L (168,148) win="SYCON.net - [Untitled.spj]" at TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+10:53:29.555   screenshot 0010_click.png of "SYCON.net - [Untitled.spj]"
+10:53:31.025 keys: Ctrl+C | focus: TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202>'
+10:53:31.060 window opened: "netDevice" (#32770, pid 3868)
+10:53:31.983 window closed: "netDevice" (#32770)
+10:53:33.416 click L (179,146) win="SYCON.net - [Untitled.spj]" at TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+10:53:34.257   screenshot 0011_click.png of "SYCON.net - [Untitled.spj]"
+10:53:36.060 keys: Ctrl+V | focus: TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202>'
+10:53:36.090 window opened: "netDevice" (#32770, pid 3868)
+10:53:36.709 window closed: "netDevice" (#32770)
+10:53:38.237 click L (179,146) win="SYCON.net - [Untitled.spj]" at TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+10:53:39.124   screenshot 0012_click.png of "SYCON.net - [Untitled.spj]"
+10:53:39.188 keys: Shift+Down | focus: TreeItem "AL1202[AL1202]<al1202-001>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202-001>'
+10:53:41.090 keys: Ctrl+C | focus: TreeItem "AL1202[AL1202]<al1202-001>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202-001>'
+10:53:41.137 window opened: "netDevice" (#32770, pid 3868)
+10:53:41.736 window closed: "netDevice" (#32770)
+10:53:42.917 click L (179,145) win="SYCON.net - [Untitled.spj]" at TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+10:53:43.905   screenshot 0013_click.png of "SYCON.net - [Untitled.spj]"
+10:53:44.392 keys: V | focus: TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202>'
+10:53:44.392 window opened: "netDevice" (#32770, pid 3868)
+10:53:45.337 window closed: "netDevice" (#32770)
+10:53:46.656 click L (179,145) win="SYCON.net - [Untitled.spj]" at TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+10:53:47.554   screenshot 0014_click.png of "SYCON.net - [Untitled.spj]"
+10:53:48.746 keys: Shift+Down Shift+Down Shift+Down | focus: TreeItem "AL1202[AL1202]<al1202-002>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202-002>'
+10:53:50.071 keys: Ctrl+C | focus: TreeItem "AL1202[AL1202]<al1202-002>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202-002>'
+10:53:50.101 window opened: "netDevice" (#32770, pid 3868)
+10:53:51.061 window closed: "netDevice" (#32770)
+10:53:52.143 click L (179,145) win="SYCON.net - [Untitled.spj]" at TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+10:53:53.017   screenshot 0015_click.png of "SYCON.net - [Untitled.spj]"
+10:53:54.116 keys: Ctrl+V | focus: TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202>'
+10:53:54.144 window opened: "netDevice" (#32770, pid 3868)
+10:53:55.090 window closed: "netDevice" (#32770)
+10:53:57.362 click L (179,145) win="SYCON.net - [Untitled.spj]" at TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+10:53:58.272   screenshot 0016_click.png of "SYCON.net - [Untitled.spj]"
+10:53:58.335 keys: Shift+Down | focus: TreeItem "AL1202[AL1202]<al1202-002>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202-002>'
+10:54:01.194 keys: Shift+Down Shift+Down Shift+Down Shift+Down Ctrl+C | focus: TreeItem "AL1202[AL1202]<al1202-003>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202-003>'
+10:54:01.213 window opened: "netDevice" (#32770, pid 3868)
+10:54:02.187 window closed: "netDevice" (#32770)
+10:54:03.713 click L (191,144) win="SYCON.net - [Untitled.spj]" at TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" < Tree "" [158] (SysTreeView32) < Pane "" (AfxFrameOrView70su) < Pane "" (AfxOleControl70su)
+10:54:04.594   screenshot 0017_click.png of "SYCON.net - [Untitled.spj]"
+10:54:05.875 keys: Ctrl+V | focus: TreeItem "AL1202[AL1202]<al1202>" < TreeItem "CIFX_RE_PNM[CIFX RE/PNM]<controller>(#1)" < TreeItem "Project: Untitled" value='AL1202[AL1202]<al1202>'
+10:54:05.903 window opened: "netDevice" (#32770, pid 3868)
+10:54:08.081 window closed: "netDevice" (#32770)
+10:54:13.718 keys: D O N E Enter | focus: Edit "Prompt" (tiptap ProseMirror ProseMirror-focused) < Group "" (w-full max-h-96 min-h-[var(--cmp-row-h)] overflow-y-auto break-words [--cmp-type-size:max(var(--cds-font-size-text-entry-floor,0px),var(--cmp-font-size,var(--cds-font-size-prose)))] [--cmp-leading:round(var(--cmp-line-height,var(--cmp-type-size)*1.4),1px)] [--cmp-row-py:max(0px,(var(--cds-h-control)-var(--cmp-leading))/2)] [--cmp-row-h:calc(var(--cmp-leading)+2*var(--cmp-row-py))] py-[var(--cmp-row-py)] text-[length:var(--cmp-type-size)] leading-[var(--cmp-leading)] font-normal transition-opacity duration-200 motion-safe:transition-[opacity,padding-left,padding-right] motion-safe:duration-200 [&_.ProseMirror]:![font-feature-settings:inherit] [&_.ProseMirror]:![font-variant-ligatures:inherit] [&_.ProseMirror]:![-webkit-font-variant-ligatures:inherit] [&_.ProseMirror:focus]:outline-none [&_img.ProseMirror-separator]:inline [&_img.ProseMirror-separator]:m-0 [&_img.ProseMirror-separator]:size-0 [&_img.ProseMirror-separator]:border-none [&_.is-editor-empty]:before:!content-[''] [&_ul]:[list-style-type:unset] [&_ul]:ps-8 [&_ol]:[list-style-type:decimal] [&_ol]:ps-8 [&_a]:cursor-pointer [&_a]:font-medium [&_a]:[font-variation-settings:inherit] [&_a]:text-[hsl(214_72%_34%)] dark:[&_a]:text-[hsl(213_80%_79%)] [&_a:hover]:text-[hsl(213_68%_45%)] dark:[&_a:hover]:text-[hsl(212_75%_62%)] [&_.ProseMirror>p>code]:border-[0.5px] [&_.ProseMirror>p>code]:border-solid [&_.ProseMirror>p>code]:border-[hsl(60_2%_12%/0.25)] dark:[&_.ProseMirror>p>code]:border-[hsl(53_12%_87%/0.25)] [&_.ProseMirror>p>code]:bg-[hsl(60_3%_21%/0.05)] dark:[&_.ProseMirror>p>code]:bg-[hsl(55_9%_74%/0.05)] [&_.ProseMirror>p>code]:text-[0.9rem] [&_.ProseMirror>p>code]:text-[hsl(0_58%_35%)] dark:[&_.ProseMirror>p>code]:text-[hsl(0_77%_81%)] [&_.ProseMirror>p>code]:px-[4px] [&_.ProseMirror>p>code]:py-[1px] [&_.ProseMirror>p>code]:rounded-[0.3rem] [&_.ProseMirror>p>code]:whitespace-pre-wrap epitaxy-prompt-input) < Group "" value='\n'
+10:54:25.205 recorder stopped (STOP file)

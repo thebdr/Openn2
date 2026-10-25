@@ -132,54 +132,57 @@ class SyconDriver:
         log("station added:", node)
         return node
 
-    def clone_station(self, source, count=1):
-        """Copy the source node in the netProject tree and paste it `count` times - SYCON.net names a clone
-        `<source>-001`, `-002`, ... and gives it the next free IP (the AutoHotkey way: click, Ctrl+C, click,
-        Ctrl+V - verified 2026-10-23; the context menu's Copy / Paste command ids posted to the main window
-        produce nothing and stay as the fallback). Returns the new nodes."""
+    def clone_station(self, source, count=1, after_batch=None):
+        """Clone the source station `count` times by DOUBLING, the user's way (recorded 2026-10-25 10:53: the
+        netProject tree extends its selection with Shift+Down; Ctrl+C, a click on the source, Ctrl+V pastes every
+        selected station - "i usually double the existing stations (1->2->4->8->...) by selecting and copy-pasting
+        more than one station at a time"): the first clone from the source; then the clones made so far - they sit
+        contiguous at the end of the tree - selected from the first one with Shift+Down, copied and pasted again,
+        the last batch sized to the remainder. SYCON.net names a clone `<source>-001`, `-002`, ... and gives it the
+        next free IP. `after_batch()` is called once at least 8 new clones wait to be saved (the caller's checkpoint).
+        Returns the new nodes in tree order."""
         s = self.session
         s.close_menus()
         s.bring_front()
         source_type = catalog.parse_node(s.station_item(source).window_text())["type"]
-        new_nodes = []
-        for _ in range(count):
+        new_nodes, unsaved = [], 0
+        while len(new_nodes) < count:
+            k = 1 if not new_nodes else min(len(new_nodes), count - len(new_nodes))
+            first = source if not new_nodes else new_nodes[0]["station"]
             before = s.nodes()
-            node = None
-            for way in ("keys", "command"):
-                item = self._select_station(source)
-                if way == "command":
-                    s.post_command_id(CONTEXT_COPY, "Copy")
-                else:
-                    keyboard.send_keys("^c")
-                time.sleep(0.8)
-                item = self._select_station(source)
-                if way == "command":
-                    s.post_command_id(CONTEXT_PASTE, "Paste")
-                else:
-                    keyboard.send_keys("^v")
-                t0 = time.time()
-                while time.time() - t0 < (10 if way == "command" else 30):
-                    time.sleep(1.0)
-                    errs = s.dismiss_errors()
-                    s.ensure_alive("the paste of %s" % source)
-                    if errs:
-                        raise SyconError("errors after pasting %s: %r" % (source, errs))
+            self._select_station(first)
+            if k > 1:
+                keyboard.send_keys("+{DOWN %d}" % (k - 1))      # the block of clones below the first one
+                time.sleep(0.5)
+            keyboard.send_keys("^c")
+            time.sleep(0.8)
+            self._select_station(source)                        # the paste target, as the user clicks it
+            keyboard.send_keys("^v")
+            t0, new = time.time(), []
+            while time.time() - t0 < 30 + 5 * k:
+                time.sleep(1.0)
+                errs = s.dismiss_errors()
+                s.ensure_alive("the paste of %d x %s" % (k, source))
+                if errs:
+                    raise SyconError("errors after pasting %s: %r" % (source, errs))
+                new = [n for n in s.nodes() if n not in before]
+                if len(new) >= k:
+                    time.sleep(1.0)                             # the tree settles
                     new = [n for n in s.nodes() if n not in before]
-                    if new:
-                        node = catalog.parse_node(new[0])
-                        break
-                if node:
                     break
-                log("  paste by %s produced no node" % way)
-            if node is None:
-                raise SyconError("no node appeared after pasting %s" % source)
-            if node["type"] != source_type or len(new) != 1:
-                # 21:26: after a catalog drop the tree had lost the focus, Ctrl+C copied nothing and Ctrl+V pasted
-                # the clipboard's earlier node - a station of the wrong type that the build then mis-named
-                raise SyconError("pasting %s (%s) produced %r - the clipboard held another node" % (source, source_type, new))
-            self.model.setdefault(node["station"], {"slots": {}})
-            new_nodes.append(node)
-            log("cloned %s -> %s" % (source, node["station"]))
+            nodes = [catalog.parse_node(n) for n in new]
+            if len(nodes) != k or any(n is None or n["type"] != source_type for n in nodes):
+                # 2026-10-23 21:26: after a catalog drop the tree had lost the focus, Ctrl+C copied nothing and
+                # Ctrl+V pasted the clipboard's earlier node - a station of the wrong type that the build mis-named
+                raise SyconError("pasting %d x %s (%s) produced %r" % (k, source, source_type, new))
+            for node in nodes:
+                self.model.setdefault(node["station"], {"slots": {}})
+            new_nodes += nodes
+            unsaved += k
+            log("cloned %d x %s -> %s (%d of %d)" % (k, source, [n["station"] for n in nodes], len(new_nodes), count))
+            if after_batch is not None and unsaved >= 8 and len(new_nodes) < count:
+                after_batch()
+                unsaved = 0
         return new_nodes
 
     def _select_station(self, station, attempts=3):
@@ -243,10 +246,12 @@ class SyconDriver:
             dlg.ok()
         except SyconError:
             if dlg.is_open():
-                # the names pass is all-or-nothing (Cancel, the data discarded); a failure in the IP pass keeps the
-                # names and the IPs written so far (Cancel, the data kept) - a resume re-addresses the stations
-                # whose saved IP differs from the table (2026-10-24: a 60-station pass lost to one slow editor)
-                dlg.close(keep=getattr(dlg, "phase", "") == "ips")
+                # a failure keeps what the pass wrote so far (Cancel, the data kept): the names already written are
+                # done for a resume (it pairs the still auto-named nodes with the table's stations of their type in
+                # order - the pass renames in that same order), the IPs written stay and a resume re-addresses the
+                # stations whose saved IP differs from the table (2026-10-25: the first fresh sorter build lost a
+                # 47-row names pass to the resync and the resume named all 62 again)
+                dlg.close(keep=True)
             raise
         if missing:
             raise SyconError("stations not found in the Device Table: %r" % missing)
@@ -370,6 +375,33 @@ class SyconDriver:
         for (subslot, _text), text in zip(wanted, chosen):
             subs[(slot, subslot)] = text
         log("submodules plugged on %s slot %d: %r" % (station, slot, chosen))
+        return chosen
+
+    def set_submodules(self, station, slot, wanted):
+        """Re-type EXISTING submodule rows under the module in `slot`: wanted = [(subslot, text)]; subslot k sits on
+        row 1 + slot + k (sub 1 right under the module row, an AL1202's ports from 2). A clone carries its source's
+        ports: only the types that differ are chosen here, in place (user 2026-10-25)."""
+        dlg = DeviceDialog(self.session, station)
+        chosen = []
+        try:
+            dlg.modules_page()
+            row = 1 + slot
+            dlg.collapse_all()
+            dlg.ensure_expanded(row)
+            for subslot, text in wanted:
+                chosen.append(dlg.set_submodule(row + subslot, text))
+            errs = dlg.apply()
+            if errs:
+                raise SyconError("Apply refused: %r" % errs)
+            dlg.close(keep=True)
+        except SyconError:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            raise
+        subs = self.model.setdefault(station, {"slots": {}}).setdefault("submodules", {})
+        for (subslot, _text), text in zip(wanted, chosen):
+            subs[(slot, subslot)] = text
+        log("submodules re-typed on %s slot %d: %s" % (station, slot, chosen))
         return chosen
 
     def set_dap_submodules(self, station, wanted):
