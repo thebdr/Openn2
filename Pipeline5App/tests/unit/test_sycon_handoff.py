@@ -154,6 +154,15 @@ def test_scalance_pnio_row():
         ("0", str(32768 + n), "6GK5991-1AD00-8GA0", "SFP 991-1 A") for n in (1, 2, 3, 4)]
 
 
+def test_scalance_pnio_row_v43_has_no_media_redundancy_record():
+    dtd = dict(DTD, **{"6GK5208-0BA00-2AC2": {"model_id": "6GK5208-0BA00-2AC2", "role": "slave", "catalog_item": "SCALANCE XC208 V4.3",
+                                              "modules": "scalance-pnio", "gsdml": "GSDML-X.xml", "comment": ""}})
+    rows = [_head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+            _head("n0015-trib-aep01-K26501", "192.168.1.15", "6GK5208-0BA00-2AC2", "-K26501", "15")]
+    _s, modules, _f = sycon.build(rows, dtd)
+    assert modules[0]["parameters"].startswith("0=Off | 2=Off | record:12309=30 19") and "record:3=" not in modules[0]["parameters"]
+
+
 def test_duplicate_name_or_ip_is_a_fail_and_the_second_is_left_out():
     rows = [
         _head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
