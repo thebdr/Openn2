@@ -15,6 +15,7 @@ NETWORK_PAGE = "Controller Network Settings"
 DEVICE_TABLE_PAGE, DEVICE_TABLE_ID = "Device Table", "210"
 IP_TABLE_PAGE, IP_TABLE_ID = "IP Address Table", "212"
 NET_IP_ID, NET_MASK_ID, NET_GATEWAY_ID = 213, 214, 215
+NET_NAME_ID = 211                    # the page's `Name of station:` edit - the controller's own PROFINET name (user 2026-10-26)
 TIMING_PAGE = "Stations Timing"
 ADDRESS_TABLE_PAGE, AUTO_ADDRESSING_ID = "Address Table", 201     # the page's `Auto addressing` check box
 TIMING_NAME_COMBO_ID, TIMING_UPDATE_COMBO_ID, TIMING_WATCHDOG_EDIT_ID = 220, 223, 224
@@ -44,7 +45,10 @@ def _set_ip_control(ipc, ip):
 
 class ControllerDialog(ConfigDialog):
     # ---- Controller Network Settings ----------------------------------------------------------------------
-    def set_network(self, ip, mask=None, gateway=None):
+    def set_network(self, ip, mask=None, gateway=None, name=None):
+        """The Controller Network Settings page: the IP, mask and gateway controls given (None = left as it is) and,
+        when given, the controller's own `Name of station` (user 2026-10-26: "no pn name was set for the controller" -
+        the process-data export showed `<controller>` where the FVZ reference shows the controller's PROFINET name)."""
         self.select_page(NETWORK_PAGE)
         for cid, value in ((NET_IP_ID, ip), (NET_MASK_ID, mask), (NET_GATEWAY_ID, gateway)):
             if value is None:
@@ -56,6 +60,16 @@ class ControllerDialog(ConfigDialog):
             log("  network control %d -> %s" % (cid, after))
             if after != value:
                 raise SyconError("IP control %d shows %s after writing %s" % (cid, after, value))
+        if name is not None:
+            eds = self.controls(("Edit",), cid=NET_NAME_ID)
+            if not eds:
+                raise SyconError("name of station edit %d not found on %r" % (NET_NAME_ID, NETWORK_PAGE))
+            eds[0].set_edit_text(name)
+            time.sleep(0.4)
+            shown = eds[0].window_text()
+            log("  name of station -> %r" % shown)
+            if shown != name:
+                raise SyconError("name of station reads %r after writing %r" % (shown, name))
         warning = self.session.answer_box("Warning", "Yes")      # 'Changing subnet will automatically modify ...'
         if warning:
             log("  Warning answered Yes:", warning[:80])

@@ -96,7 +96,7 @@ def apply(xml_path, symbolics, rects, controller_rect=CONTROLLER_RECT):
     symbolics = {k.lower(): v for k, v in symbolics.items()}
     rects = {k.lower(): v for k, v in rects.items()}
     edits, n_sym, n_rect = [], 0, 0
-    controller_end, max_bottom = None, 0
+    controller_end, ctrl_rect, max_bottom = None, None, 0
     for m in DEVICE_TAG.finditer(text):
         tag = m.group(0)
         no = DEVICE_NO.search(tag)
@@ -110,15 +110,19 @@ def apply(xml_path, symbolics, rects, controller_rect=CONTROLLER_RECT):
             if n and new_tag != tag:
                 edits.append((m.start(), m.end(), new_tag))
                 n_sym += 1
+        own = RECT_TAG.search(text, m.end(), m.end() + 600)
+        own_rect = tuple(int(x) for x in re.findall(r'"(\d+)"', own.group(0))) if own else None
         rect = controller_rect if is_controller else rects.get(key)
-        if rect is None:
-            continue
-        top, left, bottom, right = rect
         if is_controller:
             controller_end = m.end()
-        else:
+            ctrl_rect = rect or own_rect
+        if rect is None:
+            if own_rect and not is_controller:
+                max_bottom = max(max_bottom, own_rect[2])   # a device left where it is (an update) still bounds the bus
+            continue
+        top, left, bottom, right = rect
+        if not is_controller:
             max_bottom = max(max_bottom, bottom)
-        own = RECT_TAG.search(text, m.end(), m.end() + 600)
         if own:
             edits.append((own.start(), own.end(), _rect(top, left, bottom, right)))
             n_rect += 1
@@ -131,10 +135,10 @@ def apply(xml_path, symbolics, rects, controller_rect=CONTROLLER_RECT):
                 else:                                           # the branch from the vertical bus to the device
                     mid = top + (bottom - top) // 2
                     edits.append((line.start(), line.end(), _rect(mid - 1, BUS_LEFT, mid + 1, left)))
-    if controller_end is not None:
+    if controller_end is not None and ctrl_rect:
         # the controller's channel: its own line a stub from the bus to the controller, and the vertical bus line
         # (a Device-less BusLine) as the channel's last BusLine - updated when already there
-        ctop, cleft, cbottom, _cright = controller_rect
+        ctop, cleft, cbottom, _cright = ctrl_rect
         channel = text.find("<BusLines", controller_end)
         if channel >= 0:
             first_line = text.find("<BusLine>", channel)        # after the block's Color / MBusCat preamble
@@ -155,9 +159,14 @@ def apply(xml_path, symbolics, rects, controller_rect=CONTROLLER_RECT):
     return n_sym, n_rect
 
 
-def apply_layout(xml_path, handoff):
-    """The handoff's symbolic names and the rule layout of its stations, into the saved project."""
-    symbolics = {s["station_name"]: s["symbolic_name"] for s in handoff.stations if s.get("symbolic_name")}
-    n_sym, n_rect = apply(xml_path, symbolics, layout(handoff.stations))
-    log("canvas: %d symbolic names, %d positions written to %s" % (n_sym, n_rect, xml_path))
+def apply_layout(xml_path, handoff, only=None):
+    """The handoff's symbolic names and the rule layout of its stations, into the saved project. `only` (an update):
+    the names of the stations to write - the others, the controller's box and its line stay where the user left
+    them; the vertical bus still reaches the lowest device, written or not."""
+    names = None if only is None else {n.lower() for n in only}
+    symbolics = {s["station_name"]: s["symbolic_name"] for s in handoff.stations
+                 if s.get("symbolic_name") and (names is None or s["station_name"].lower() in names)}
+    rects = {st: r for st, r in layout(handoff.stations).items() if names is None or st.lower() in names}
+    n_sym, n_rect = apply(xml_path, symbolics, rects, controller_rect=CONTROLLER_RECT if names is None else None)
+    log("canvas: %d symbolic names, %d positions written to %s%s" % (n_sym, n_rect, xml_path, " (the new stations)" if names is not None else ""))
     return n_sym, n_rect

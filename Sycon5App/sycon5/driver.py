@@ -213,10 +213,11 @@ class SyconDriver:
                 return n["station"]
         raise SyconError("no controller in the project")
 
-    def set_controller_network(self, ip, mask=None, gateway=None):
+    def set_controller_network(self, ip, mask=None, gateway=None, name=None):
+        """The controller's IP / mask / gateway (None = untouched) and, when given, its own name of station."""
         dlg = ControllerDialog(self.session, self.controller_station())
         try:
-            dlg.set_network(ip, mask, gateway)
+            dlg.set_network(ip, mask, gateway, name=name)
             dlg.ok()
         except SyconError:
             if dlg.is_open():

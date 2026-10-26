@@ -128,6 +128,14 @@ def _parse_blob(dev, hexdata):
                 xmls = [s for s in strs if s.lower().endswith(".xml")]
                 if xmls and not dev.gsdml:
                     dev.gsdml = xmls[0]
+            elif path.endswith("CachedController/PNIOControllerDataModelBasic"):
+                # the controller's own name of station, IP and mask (`controller` until the name is set - user
+                # 2026-10-26: the export showed `<controller>`; the Network Settings page's edit sets it)
+                strs = _strings(data)
+                ips = [s for s in strs if IPV4.match(s)]
+                names = [s for s in strs if not IPV4.match(s)]
+                dev.name = names[0] if names else ""
+                dev.ip, dev.mask, dev.gateway = (ips + ["", "", ""])[:3]
             elif path.endswith("/PNIOModuleBasic") and path.startswith("STLModuleMap/"):
                 slot = int(path.split("/")[1])
                 strs = _strings(data)

@@ -21,7 +21,9 @@ p.add_argument("--handoff", required=True)
 p.add_argument("--out", required=True)
 p.add_argument("--base", default=os.path.join(APP, "spike", "scratch", "AutomateSyconProj_BaseProj.spj"),
                help="a project to launch SYCON.net on before File > New (default: the scratch base project)")
-p.add_argument("--resume", action="store_true")
+p.add_argument("--resume", action="store_true", help="an interrupted build of this handoff goes on in its saved project")
+p.add_argument("--update", action="store_true", help="bring the existing project up to the table (OP5's rule): a station the "
+               "project has by PROFINET name is skipped whole, its other nodes are kept, the new stations are added")
 p.add_argument("--report", default="", help="the verification report path (default: <project>.verification.txt beside it)")
 a = p.parse_args()
 # the GUI's Stop sends a CTRL_BREAK (sycon5.gui.Runner.stop): a KeyboardInterrupt here, so the `finally` below
@@ -31,7 +33,7 @@ t0 = time.time()
 driver = SyconDriver()
 code = 1
 try:
-    v, xml, plugged, driver = consumer.build(a.handoff, a.out, a.base, resume=a.resume, driver=driver)
+    v, xml, plugged, driver = consumer.build(a.handoff, a.out, a.base, resume=a.resume, driver=driver, update=a.update)
     report = v.report() + "\n\n" + describe(read_project(xml))
     rpath = a.report or (a.out[:-4] + ".verification.txt")
     os.makedirs(os.path.dirname(os.path.abspath(rpath)), exist_ok=True)

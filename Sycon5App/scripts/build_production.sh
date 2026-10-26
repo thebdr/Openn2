@@ -23,13 +23,13 @@ echo "$(date +%H:%M:%S) export $LISTWIN -> $WIN" >> "$LOGS/build.log"
 grep "^SYCON handoff" "$LOGS/export.log" | tee -a "$LOGS/build.log"
 [ -n "$EXPORT_ONLY" ] && exit 0
 if [ $# -gt 0 ]; then cards="$@"; else cards=$(ls -d "$OUT"/HilscherIOCard* 2>/dev/null | sed 's/.*HilscherIOCard//' | sort -n); fi
-flag=""; [ -n "$RESUME" ] && flag="--resume"
+flag=""; [ -n "$RESUME" ] && flag="--resume"; [ -n "$UPDATE" ] && flag="--update"     # UPDATE=1: the existing project brought up to the table
 for n in $cards; do
   card="$OUT/HilscherIOCard$n"; name="HilscherPnCard_$n"
   mkdir -p "$card/_PL_Logs"
   report="$card/_PL_Logs/$name.verification.txt"
   echo "$(date +%H:%M:%S) card $n: build $flag" >> "$LOGS/build.log"
-  (cd "$APP" && "$PY" -I scripts/build_from_handoff.py --handoff "$(cygpath -w "$card/SyconNetProjectInterface")" --out "$(cygpath -w "$card")\\$name.spj" --report "$(cygpath -w "$report")" $flag) > "$card/_PL_Logs/build${RESUME:+_resume}.log" 2>&1
+  (cd "$APP" && "$PY" -I scripts/build_from_handoff.py --handoff "$(cygpath -w "$card/SyconNetProjectInterface")" --out "$(cygpath -w "$card")\\$name.spj" --report "$(cygpath -w "$report")" $flag) > "$card/_PL_Logs/build${RESUME:+_resume}${UPDATE:+_update}.log" 2>&1
   rc=$?
   echo "$(date +%H:%M:%S) card $n: exit $rc - $(head -1 "$report" 2>/dev/null)" >> "$LOGS/build.log"
 done

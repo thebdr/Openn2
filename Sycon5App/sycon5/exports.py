@@ -8,6 +8,7 @@ XML, its device list are the oracle here."""
 from __future__ import annotations
 
 import os
+import re
 import time
 import xml.etree.ElementTree as ET
 
@@ -113,8 +114,13 @@ def process_data_devices(xml_path):
     return controller, devices
 
 
+NODE_SUFFIX = re.compile(r"\(#\d+\)\s*$")
+
+
 def station_of(display_name):
-    """The name of station inside a process-data display name: `label[type]<station>`."""
-    if "<" in display_name and display_name.endswith(">"):
-        return display_name[display_name.rfind("<") + 1:-1]
+    """The name of station inside a process-data display name: `label[type]<station>` - the controller's carries
+    a node suffix after it, `CIFX_RE_PNM[CIFX RE/PNM]<n0001-...>(#1)` (2026-10-26)."""
+    text = NODE_SUFFIX.sub("", display_name).strip()
+    if "<" in text and text.endswith(">"):
+        return text[text.rfind("<") + 1:-1]
     return display_name

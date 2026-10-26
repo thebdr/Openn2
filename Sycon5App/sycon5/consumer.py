@@ -59,9 +59,12 @@ def order_is_pattern(order):
     return o.startswith("T_ID_") or "x" in o
 
 
-def verify(handoff, project, plugged, timing_set=None):
+def verify(handoff, project, plugged, timing_set=None, skipped=None, keep_extras=False):
     """Compare the read-back with the handoff tables; `plugged` = {station: [module texts the driver chose]},
-    `timing_set` = {station: the updating time (ms) the driver could set when the table's was not offered}."""
+    `timing_set` = {station: the updating time (ms) the driver could set when the table's was not offered}. An
+    update (`skipped` = the lower-case names the project already had, `keep_extras`): a skipped station is a NOTE,
+    not compared; a node the table does not name is a NOTE, not a FAIL; a controller that keeps its own name or
+    address is a NOTE."""
     v = Verification()
     timing_set = {k.lower(): v_ for k, v_ in (timing_set or {}).items()}
     by_name = {d.device_no.lower(): d for d in project.devices}
@@ -69,10 +72,23 @@ def verify(handoff, project, plugged, timing_set=None):
     v.check(ctrl is not None, "controller present: %s" % (ctrl.device_no if ctrl else None))
     twice = sorted({d.device_no.lower() for d in project.devices if [x.device_no.lower() for x in project.devices].count(d.device_no.lower()) > 1})
     v.check(not twice, "no station name twice in the project (twice: %r)" % twice)   # C-047 refute round 1
+    if ctrl is not None:              # the controller's own name of station and address (user 2026-10-26)
+        want_name, want_ip = handoff.controller["station_name"], handoff.controller.get("ip_address", "")
+        if skipped is not None and not controller_is_unnamed(ctrl.name) and ctrl.name.lower() != want_name.lower():
+            v.note("controller name of station %r kept (table %s) - an update leaves a named controller as it is" % (ctrl.name, want_name))
+        else:
+            v.check(ctrl.name.lower() == want_name.lower(), "controller name of station %s (read %r)" % (want_name, ctrl.name))
+        if skipped is not None and ctrl.ip != want_ip:
+            v.note("controller IP %s kept (table %s) - an update leaves the controller's address" % (ctrl.ip, want_ip))
+        else:
+            v.check(ctrl.ip == want_ip, "controller IP %s (read %s)" % (want_ip, ctrl.ip))
     network = {k.lower(): v for k, v in ctrl.network} if ctrl else {}
     timing = {k.lower(): v for k, v in ctrl.timing.items()} if ctrl else {}
     for s in handoff.stations:
         name, ip = s["station_name"].lower(), s["ip_address"]
+        if skipped and name in skipped:
+            v.note("station %s exists in the project - skipped, not compared (update)" % name)
+            continue
         d = by_name.get(name)
         v.check(d is not None, "station %s exists" % name)
         if d is None:
@@ -141,7 +157,11 @@ def verify(handoff, project, plugged, timing_set=None):
                     v.check(rec[:len(want)] == want, "station %s slot %s sub %s record %d: %s (table %s)" % (
                         name, m["slot"], m["subslot"], idx, rec[:len(want)].hex(" ") or "nothing", want.hex(" ")))
     extra = [n for n in by_name if n != (ctrl.device_no.lower() if ctrl else "") and n not in {s["station_name"].lower() for s in handoff.stations}]
-    v.check(not extra, "no station outside the table (extra: %r)" % extra)
+    if keep_extras:
+        for n in extra:
+            v.note("node %s in the project is not in the table - kept (update)" % n)
+    else:
+        v.check(not extra, "no station outside the table (extra: %r)" % extra)
     return v
 
 
@@ -227,27 +247,42 @@ def apply_station(d, h, station, dev, plugged, node=None):
     return changed
 
 
-def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
-    """The whole build. Returns (verification, the xml path, plugged, the driver)."""
+def controller_is_unnamed(name):
+    """A controller still called by SYCON.net's default (`controller`) or nothing - its name of station never set."""
+    return str(name or "").strip().lower() in ("", "controller")
+
+
+def build(handoff_dir, out_spj, base_project, resume=False, driver=None, update=False):
+    """The whole build. `resume`: an interrupted build of this handoff goes on in its saved project. `update` (user
+    2026-10-26: "update an already existing sycon project, like OP5 did by skipping existing nodes with matching pn
+    name"): the saved project is brought up to the table - a station whose PROFINET name the project already has is
+    skipped whole, never completed or compared (OP5's rule), the project's other nodes are kept and noted, the new
+    stations are added, named, addressed, configured and laid out around what is there; the controller's own name
+    of station is set when it is still the default, else kept and noted. Returns (verification, the xml path,
+    plugged, the driver)."""
     h = load_handoff(handoff_dir)
     log("handoff:", len(h.stations), "stations, controller", h.controller["station_name"], "@", h.controller["ip_address"],
         "| modules for", sorted(h.modules))
     d = driver or SyconDriver()
     plugged = {}
     xml = out_spj[:-4] + "\\_S129\\SYCON_net.xml"
-    done_names, saved_devices = set(), {}
-    if resume and os.path.exists(xml):
+    done_names, saved_devices, extras, saved_controller = set(), {}, [], None
+    if update and not os.path.exists(xml):
+        raise SyconError("nothing to update: no saved project at %s" % xml)
+    if (resume or update) and os.path.exists(xml):
         p = read_project(xml)
         saved_devices = {dev.device_no.lower(): dev for dev in p.devices if not dev.is_controller}
+        saved_controller = p.controller
         done_names = set(saved_devices)
-        log("resume:", len(done_names), "stations already in the saved project")
+        log("update:" if update else "resume:", len(done_names), "stations already in the saved project")
         d.open(out_spj)
     else:
         d.open(base_project)
         d.new_project()
         d.add_controller(h.controller["catalog_item"], h.controller.get("gsdml"))
-        d.set_controller_network(h.controller["ip_address"], h.controller["subnet_mask"] or None)
-    saved = resume and os.path.exists(xml)
+        d.set_controller_network(h.controller["ip_address"], h.controller["subnet_mask"] or None,
+                                 name=h.controller["station_name"])
+    saved = (resume or update) and os.path.exists(xml)
 
     def checkpoint():
         nonlocal saved
@@ -256,6 +291,16 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
         else:
             d.save_as(out_spj)
             saved = True
+
+    controller_kept = False
+    if update and saved_controller is not None:
+        if controller_is_unnamed(saved_controller.name):
+            d.set_controller_network(None, None, None, name=h.controller["station_name"])
+            log("update: the controller named %s (it was %r)" % (h.controller["station_name"], saved_controller.name))
+            checkpoint()
+        elif saved_controller.name.lower() != h.controller["station_name"].lower():
+            controller_kept = True
+            log("update: the controller keeps its name %r (the table says %s)" % (saved_controller.name, h.controller["station_name"]))
 
     # 1. the stations, named by SYCON for now. The table's stations are added by TYPE (kind, catalog item, GSDML) and,
     # within a type, by MODEL (the types in the order of their first name, the models likewise, the names in natural
@@ -273,7 +318,12 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     for s in todo:
         groups.setdefault(type_key(s), {}).setdefault(s["model_id"].upper(), []).append(s)
     ordered = [s for by_model in groups.values() for members in by_model.values() for s in members]
-    if resume:                       # auto-named nodes an earlier run added but never renamed: pair them with the
+    if update:                       # the project's nodes the table does not name are kept, never paired or renamed
+        wanted = {s["station_name"].lower() for s in h.stations}
+        extras = [n["station"] for n in d.stations() if n["station"].lower() not in wanted and not n["suffix"].startswith("(#")]
+        for extra in extras:
+            log("update: node %s is not in the table - kept" % extra)
+    if resume and not update:        # auto-named nodes an earlier run added but never renamed: pair them with the
         wanted = {s["station_name"].lower() for s in h.stations}      # table's stations of the SAME type, in order
         leftovers = [n for n in d.stations() if n["station"].lower() not in wanted and not n["suffix"].startswith("(#")]
         remaining = []
@@ -339,8 +389,8 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     if added:
         checkpoint()
     # a resume: the named stations whose saved IP is not the table's (an IP pass that failed midway kept its names
-    # and the IPs written so far) are re-addressed, their names unchanged
-    for s in h.stations:
+    # and the IPs written so far) are re-addressed, their names unchanged (an update never touches a matched station)
+    for s in ([] if update else h.stations):
         dev = saved_devices.get(s["station_name"].lower())
         if dev is not None and s["ip_address"] and dev.ip != s["ip_address"]:
             mapping[dev.device_no] = (s["station_name"], s["ip_address"])
@@ -357,7 +407,9 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
         checkpoint()
     # 2b. the stations' updating times (one Stations Timing pass; on a resume only the ones the saved project shows wrong)
     wanted = {s["station_name"]: float(s["update_time_ms"]) for s in h.stations if s.get("update_time_ms")}
-    if wanted and resume and os.path.exists(xml):
+    if update:
+        wanted = {st: ms for st, ms in wanted.items() if st.lower() not in done_names}      # the new stations alone
+    if wanted and resume and not update and os.path.exists(xml):
         have = {k.lower(): v for k, v in read_project(xml).controller.timing.items()}
         wanted = {st: ms for st, ms in wanted.items() if not have.get(st.lower()) or abs(have[st.lower()][0] - ms) > 1e-6}
     timing_set = {}
@@ -371,7 +423,7 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     if not saved:
         checkpoint()
     saved_now = {dev.device_no.lower(): dev for dev in read_project(xml).devices}
-    for s in h.stations:
+    for s in (todo if update else h.stations):
         station = s["station_name"]
         if apply_station(d, h, station, saved_now.get(station.lower()), plugged):
             checkpoint()
@@ -389,17 +441,23 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None):
     time.sleep(2.0)
     # the canvas (symbolic names, positions) is written into the XML with the project CLOSED, then read back
     log("close:", d.close())
-    canvas.apply_layout(xml, h)
+    canvas.apply_layout(xml, h, only={s["station_name"] for s in todo} if update else None)
     project = read_project(xml)
-    v = verify(h, project, plugged, timing_set)
-    verify_exports(v, h, process_xml, config_nxd)
+    v = verify(h, project, plugged, timing_set, skipped=done_names if update else None, keep_extras=update)
+    verify_exports(v, h, process_xml, config_nxd, controller_kept=controller_kept)
     return v, xml, plugged, d
 
 
-def verify_exports(v, handoff, process_xml, config_nxd):
-    """The process-data export lists every station of the table (by name of station), the nxd exists."""
+def verify_exports(v, handoff, process_xml, config_nxd, controller_kept=False):
+    """The process-data export lists the controller under the table's name of station (`controller_kept`: under
+    any name - an update left it as it was) and every station of the table (by name of station); the nxd exists."""
     ctrl, devices = exports.process_data_devices(process_xml)
-    v.check(bool(ctrl), "process data export: controller %r" % ctrl)
+    want = handoff.controller["station_name"]
+    if controller_kept:
+        v.check(bool(ctrl), "process data export: controller %r" % ctrl)
+    else:
+        v.check(bool(ctrl) and exports.station_of(ctrl).lower() == want.lower(),
+                "process data export: controller named %s (read %r)" % (want, exports.station_of(ctrl)))
     listed = {exports.station_of(name).lower() for name in devices}
     for s in handoff.stations:
         v.check(s["station_name"].lower() in listed, "process data export lists %s" % s["station_name"])

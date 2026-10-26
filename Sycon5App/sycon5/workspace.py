@@ -245,13 +245,16 @@ def python():
     return VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
 
 
-def build_command(card, resume=False):
-    """build_from_handoff.py of a card - SYCON.net driven; its log `build.log` / `build_resume.log` in the card's _PL_Logs."""
-    flag = ["--resume"] if resume else []
+def build_command(card, resume=False, update=False):
+    """build_from_handoff.py of a card - SYCON.net driven; its log `build.log` / `build_resume.log` / `build_update.log`
+    in the card's _PL_Logs. `update`: the existing project brought up to the table (a station the project has by
+    PROFINET name is skipped whole, its other nodes kept, the new ones added - user 2026-10-26, OP5's rule)."""
+    flag = ["--update"] if update else (["--resume"] if resume else [])
     argv = [python(), "-I", os.path.join(APP, "scripts", "build_from_handoff.py"), "--handoff", card.handoff,
             "--out", card.project_path, "--report", card.report_path, "--base", BASE_PROJECT] + flag
-    return Command("build card %d%s" % (card.number, " (resume)" if resume else ""), argv, APP,
-                   os.path.join(card.logs_dir, "build_resume.log" if resume else "build.log"), drives_sycon=True)
+    label = "update card %d" % card.number if update else "build card %d%s" % (card.number, " (resume)" if resume else "")
+    log = "build_update.log" if update else ("build_resume.log" if resume else "build.log")
+    return Command(label, argv, APP, os.path.join(card.logs_dir, log), drives_sycon=True)
 
 
 def verify_command(card):

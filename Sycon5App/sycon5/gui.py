@@ -253,9 +253,10 @@ class App:
         act.grid(row=2, column=0, sticky="ew")
         self.b_build = ttk.Button(act, text="Build card", style="Run.TButton", command=lambda: self.build_selected(False))
         self.b_resume = ttk.Button(act, text="Resume build", command=lambda: self.build_selected(True))
+        self.b_update = ttk.Button(act, text="Update card", command=lambda: self.build_selected(update=True))
         self.b_verify = ttk.Button(act, text="Verify card", command=self.verify_selected)
         self.b_folder = ttk.Button(act, text="Card folder", command=lambda: self.open_folder(self.selected_card() and self.selected_card().folder))
-        for b in (self.b_build, self.b_resume, self.b_verify, self.b_folder):
+        for b in (self.b_build, self.b_resume, self.b_update, self.b_verify, self.b_folder):
             b.pack(side="left", padx=(0, 4))
         ttk.Separator(act, orient="vertical").pack(side="left", fill="y", padx=6)
         self.b_all = ttk.Button(act, text="Build all cards + BusField", style="Run.TButton", command=self.build_all)
@@ -393,10 +394,10 @@ class App:
         if path:
             self.run(ws.export_command(os.path.normpath(path), self.workspace.root))
 
-    def build_selected(self, resume):
+    def build_selected(self, resume=False, update=False):
         c = self.selected_card()
         if c and c.handoff:
-            self.run(ws.build_command(c, resume=resume))
+            self.run(ws.build_command(c, resume=resume, update=update))
 
     def verify_selected(self):
         c = self.selected_card()
@@ -497,7 +498,7 @@ class App:
         built = idle and c is not None and bool(c.handoff and c.project) and c.project_dir_ok
         any_handoff = idle and any(x.handoff and not x.problems for x in self.workspace.cards)
         for b, ok in ((self.b_open, not running), (self.b_reload, idle), (self.b_explorer, idle), (self.b_export, idle),
-                      (self.b_build, buildable), (self.b_resume, built), (self.b_verify, built), (self.b_folder, c is not None),
+                      (self.b_build, buildable), (self.b_resume, built), (self.b_update, built), (self.b_verify, built), (self.b_folder, c is not None),
                       (self.b_all, any_handoff), (self.b_busfield, idle), (self.b_stop, running)):
             b.state(["!disabled"] if ok else ["disabled"])
 

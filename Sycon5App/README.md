@@ -745,6 +745,31 @@ is to be set verbatim); | is the separator".
 - Not done on the VM yet: a build with eight coupler modules and the V4.3 switches - the next production build
   verifies them by read-back (the switch PN-IO records of the V4.3 DAP may differ: the verification says).
 
+## Update mode and the controller's name of station (2026-10-26)
+
+User: "is it possible to update an already existing sycon project, like OP5 did by skipping existing nodes with
+matching pn name. also, no pn name was set for the controller".
+
+- **The controller's name.** The controller dialog's `Controller Network Settings` page has a `Name of station`
+  edit (control 211) beside the IP controls; `set_network` filled the IP, mask and gateway and never the name, so
+  every project's controller stayed `controller` and the process-data export showed `<controller>` where the FVZ
+  reference shows `<n0001-mc1-cc1-a1001>`. `ControllerDialog.set_network(ip, mask, gateway, name=...)` fills it
+  (`SyconDriver.set_controller_network(..., name=)`); a fresh build names the controller as the table does. The
+  read-back parses the controller's own stream (`CachedController/PNIOControllerDataModelBasic`: name, IP, mask)
+  and `verify` checks the controller's name of station and IP; `verify_exports` checks the export's controller
+  display name. The projects built before 2026-10-26 fail that check until updated.
+- **Update mode** (`build_from_handoff.py --update`, `UPDATE=1 build_production.sh`, the GUI's `Update card`):
+  OP5's rule - a station whose PROFINET name the project already has is skipped whole, never completed or
+  compared (a NOTE each in the report); the project's other nodes are kept and noted; the new stations are added
+  by type, cloned, named, addressed, configured and laid out by the rule on the canvas while every other box, the
+  controller's and the user's hand-placed ones, stays where it is (the vertical bus still reaches the lowest
+  device); the controller's name of station is set when it is still the default, else kept with a NOTE (its IP
+  likewise); the exports and BusField run as always over the whole project. `--resume` keeps its own meaning (an
+  interrupted build of the same handoff: the auto-named nodes paired and renamed, wrong IPs re-addressed).
+- Tests: `tests/test_update_mode.py` (the checks, the NOTEs, the canvas of an update, the command and the
+  button), `tests/test_readback.py` (the controller's stream). Not done on the VM yet: a fresh build (the name
+  edit filled and read back) and an update of the fast sorter project with a station added to the list.
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run

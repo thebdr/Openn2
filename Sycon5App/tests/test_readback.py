@@ -19,6 +19,7 @@ def test_round1_devices():
     assert [d.device_no for d in p.devices] == ["controller", "n0005-ms1-k2501", "sk-cu4-eth"]
     c = p.controller
     assert c.is_controller and c.prog_id == "Hilscher.PNIOControllerDTM2.1"
+    assert (c.name, c.ip, c.mask) == ("controller", "192.168.2.1", "255.255.255.0"), "the controller's own stream (2026-10-26)"
     assert sorted(c.network) == [("n0005-ms1-k2501", "192.168.2.5"), ("sk-cu4-eth", "192.168.2.2")]
     et = p.device("n0005-ms1-k2501")
     assert et.name == "n0005-ms1-k2501" and et.ip == "192.168.2.5" and et.mask == "255.255.255.0"
