@@ -110,6 +110,20 @@ def test_iolist_addr_format_and_fg():
     ok(("addr_format", "FAIL") in found and ("fg_exclusion", "FAIL") in found)
 
 
+def test_iolist_node_qualified_addresses():
+    """A node-qualified address `<I|Q|O>.<node>.<byte>.<bit>` (the SYCON / generic-hardware documents) is
+    well formed under the TIA default; a letter alone before two numbers, or four, stays an addr_format FAIL."""
+    good = {2: _iorow(functional_unit="=S1", bit="I.35.0.0", type_hw="KI"),
+            3: _iorow(functional_unit="=S2", bit="Q.35.1.0", type_hw="KQ"),
+            4: _iorow(functional_unit="=S3", bit="O.0.0.0", type_hw="KQ")}
+    found = _types(_run_iolist([StubView("IO", config.load_column_map("IoList"), good)]))
+    ok(("addr_format", "FAIL") not in found, "I. / Q. / O.<node>.<byte>.<bit>: well formed")
+    for bad in ("I.35.0", "I.35.0.0.1", "I.35.x.0"):
+        rows = {2: _iorow(functional_unit="=S1", bit=bad, type_hw="KI")}
+        found = _types(_run_iolist([StubView("IO", config.load_column_map("IoList"), rows)]))
+        ok(("addr_format", "FAIL") in found, f"{bad}: malformed")
+
+
 def test_iolist_dup_ip_and_fld():
     cm = config.load_column_map("IoList")
     v = StubView("IO", cm, {
@@ -264,6 +278,7 @@ if __name__ == "__main__":
         ("iolist_missing", test_iolist_missing),
         ("iolist_clean_row_passes", test_iolist_clean_row_passes),
         ("iolist_addr_format_and_fg", test_iolist_addr_format_and_fg),
+        ("iolist_node_qualified_addresses", test_iolist_node_qualified_addresses),
         ("iolist_dup_ip_and_fld", test_iolist_dup_ip_and_fld),
         ("iolist_dup_profinet_name", test_iolist_dup_profinet_name),
         ("iolist_mandatory_columns_of_the_project_type", test_iolist_mandatory_columns_of_the_project_type),
