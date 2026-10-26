@@ -714,6 +714,12 @@ User: "we did not use the zen contract for the sycon5app, I'm afraid. Is it too 
   three and was fixed (a blob cut in half read as a device, the loader's gates, the bat's endless prompt - the
   evidence notes list every finding), round 2 held. `zen_record.py --refute held --round 2 -- <command>` records a
   round (the tests with the sha256 of the test names they define).
+- **C-043, C-044, C-045 followed on 2026-10-26** (`verify_c043.sh` .. `verify_c045.sh`, the runs and refutes
+  recorded): round 1 refuted all three - eleven gaps fixed, among them a controller IP that emptied the handoff
+  as INFO, a `;` in a description shifting BusField's columns, a device without identity written as node type
+  0x00000000, two card folders numbered alike, a report that is no verdict shown as "not verified" - round 2
+  held; C-044's wording about `#` switches corrected to the user's rule. Every Sycon5App-related clause is
+  `verified`; the evidence notes list every attack, what fell and what held.
 
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 

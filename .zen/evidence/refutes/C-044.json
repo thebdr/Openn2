@@ -1,0 +1,19 @@
+{
+  "clause": "C-044",
+  "verdict": "held",
+  "ranAt": "2026-10-26T06:42:17.439Z",
+  "headCommit": "b1fdd8a445da404b8e14b72f3a82b8e453624579",
+  "tests": [
+    {
+      "name": "Sycon5App/tests/test_refute_c044.py",
+      "file": "Sycon5App/tests/test_refute_c044.py",
+      "symbolSha": "727c98985c347d4ed25f9d700aaa7974e1447569c14f8e80fe022e4cc6aea517"
+    },
+    {
+      "name": "Pipeline5App/tests/unit/test_refute_c044.py",
+      "file": "Pipeline5App/tests/unit/test_refute_c044.py",
+      "symbolSha": "c67224bc6cd4e14c36ef317524fbfebe244ff09df78dcb103fbacf049c24e4dd"
+    }
+  ],
+  "round": 2
+}

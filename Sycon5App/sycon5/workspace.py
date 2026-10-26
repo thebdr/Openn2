@@ -15,7 +15,8 @@ APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PL5 = os.path.join(os.path.dirname(APP), "Pipeline5App")
 HANDOFF_FOLDER, LOGS_FOLDER, IODRIVER_FOLDER = "SyconNetProjectInterface", "_PL_Logs", "IODriver"
 CARD_FOLDER, PROJECT_NAME = "HilscherIOCard%d", "HilscherPnCard_%d"
-CARD_RE = re.compile(r"^HilscherIOCard(\d+)$")
+CARD_RE = re.compile(r"^HilscherIOCard(\d+)$", re.I)         # Windows folders are case-insensitive (C-045 refute round 1)
+CARD_LIKE = re.compile(r"^HilscherIOCard", re.I)
 EXPORTS = ("HilscherIO.xml", os.path.join("nWid", "config.nxd"), os.path.join("nWid", "config_nwid.nxd"),
            os.path.join("nWid", "UpdateCardV5.bat"))
 REPORT_RE = re.compile(r"^verification: (\d+) PASS, (\d+) FAIL")
@@ -41,6 +42,8 @@ class Card:
     exports: dict = field(default_factory=dict)      # relative path -> mtime (0.0 when missing)
     logs: list = field(default_factory=list)         # the files of the card's _PL_Logs
     problems: list = field(default_factory=list)
+    report_ok: bool = True              # False: a report is there but its first line is not a verdict (C-045 refute round 1)
+    project_dir_ok: bool = True         # False: the .spj is there but not its folder's _S129/SYCON_net.xml
 
     @property
     def name(self):
@@ -81,6 +84,10 @@ class Card:
             return "handoff: " + self.problems[0]
         if not self.project:
             return "not built"
+        if not self.project_dir_ok:
+            return "project folder missing (no _S129/SYCON_net.xml beside the .spj)"
+        if self.report and not self.report_ok:
+            return "verification report unreadable"
         if self.passed < 0:
             return "built, not verified"
         todo = []
@@ -174,10 +181,12 @@ def scan_card(folder, number):
     if os.path.exists(c.project_path):
         c.project = c.project_path
         c.project_time = max(_mtime(c.project_path), _mtime(c.xml))
+        c.project_dir_ok = os.path.exists(c.xml)
     if os.path.exists(c.report_path):
         c.report = c.report_path
         c.report_time = _mtime(c.report_path)
         c.passed, c.failed, c.notes = read_report(c.report_path)
+        c.report_ok = c.passed >= 0
     c.exports = {rel: _mtime(os.path.join(folder, rel)) for rel in EXPORTS}
     c.logs = _log_files(c.logs_dir)
     return c
@@ -189,13 +198,25 @@ def scan(root):
     if not os.path.isdir(root):
         w.problems.append("not a folder: %s" % root)
         return w
-    found = []
-    for name in os.listdir(root):
+    candidates = {}
+    for name in sorted(os.listdir(root)):
+        if not os.path.isdir(os.path.join(root, name)):
+            continue
         m = CARD_RE.match(name)
-        if m and os.path.isdir(os.path.join(root, name)):
-            found.append((int(m.group(1)), os.path.join(root, name)))
-    for number, folder in sorted(found):
-        w.cards.append(scan_card(folder, number))
+        if not m:
+            if CARD_LIKE.match(name):
+                w.problems.append("folder %s ignored: not HilscherIOCard<n>" % name)
+            continue
+        candidates.setdefault(int(m.group(1)), []).append(name)
+    for number, names in sorted(candidates.items()):
+        # HilscherIOCard1 and HilscherIOCard01 would be two cards numbered 1 (C-045 refute round 1): one card, the
+        # folder spelled as PL5 writes it when there is one, else the first; the others reported
+        canonical = CARD_FOLDER % number
+        chosen = canonical if canonical in names else names[0]
+        for other in names:
+            if other != chosen:
+                w.problems.append("two folders for card %d: %s and %s - %s ignored" % (number, chosen, other, other))
+        w.cards.append(scan_card(os.path.join(root, chosen), number))
     if not w.cards:
         w.problems.append("no HilscherIOCard<n> folder in %s" % root)
     busfield = os.path.join(root, IODRIVER_FOLDER, "BusField.csv")

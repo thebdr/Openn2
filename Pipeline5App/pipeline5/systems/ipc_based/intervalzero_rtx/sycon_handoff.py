@@ -303,8 +303,8 @@ def cards_of(rows, dtd: dict) -> list:
             continue
         ip = str(row.get("profinet_ip") or "").strip()
         net = network_of(ip)
-        if any(c["net"] == net for c in cards):
-            continue
+        if net is not None and any(c["net"] == net for c in cards):
+            continue                                   # a head without a usable IP is never "the redundant card" of another such head (C-043 refute round 1)
         cards.append({"card": len(cards) + 1, "name": name, "ip": ip, "net": net,
                       "sheet": str(row.get("source_sheet") or "").strip()})
     return cards
@@ -348,6 +348,11 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
     if cards and chosen is None:
         findings.append(_f("sycon_no_card", "FAIL", "the I/O List has %d cifX card(s) - no card %d" % (len(cards), card)))
         return stations, modules, findings
+    if chosen is not None and chosen["net"] is None:
+        # C-043 refute round 1: a controller IP the 110 check lets through (`1.2.3`) gave a card without a network -
+        # every station with a real IP was dropped as "another network", an INFO each, no FAIL
+        findings.append(_f("sycon_controller_ip", "FAIL", "the controller %r has no usable IP (%r): the card's PROFINET "
+                           "network cannot be told - the stations are exported unfiltered" % (chosen["name"], chosen["ip"])))
 
     def finalize():
         if cur is None:
@@ -472,7 +477,7 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
                 findings.append(_f("sycon_second_controller", "INFO", "station %r (%s, %s) skipped: the controller is %r%s"
                                    % (name, model, ip, chosen["name"] if chosen else controller, why), where))
                 continue
-        elif chosen is not None and net is not None and net != chosen["net"]:
+        elif chosen is not None and net is not None and chosen["net"] is not None and net != chosen["net"]:
             other = next((c for c in cards if c["net"] == net), None)
             findings.append(_f("sycon_other_network", "INFO", "station %r (%s, %s) is on another PROFINET network than the "
                                "controller %r - %s" % (name, model, ip, chosen["name"],
@@ -567,6 +572,15 @@ def project(rows, out_dir: str, dtd_path: str | None = None, source_label: str =
     cards, findings, seen = [], [], set()
     for n in numbers:
         stations, modules, card_findings = build(rows, dtd, update_time_ms, card=n)
+        if any(f.type == "sycon_no_card" for f in card_findings):
+            # C-044 refute round 1: a card the list does not have got a folder with an empty table - a stray
+            # HilscherIOCard<n> the GUI then showed as a broken card; the FAIL alone now, nothing written
+            findings += [f for f in card_findings if (f.type, f.detail, f.location) not in seen]
+            seen |= {(f.type, f.detail, f.location) for f in card_findings}
+            cards.append({"card": n, "project": PROJECT_NAME % n, "dir": "", "stations": 0, "modules": 0,
+                          "stations_path": "", "modules_path": "", "device_types_db": "", "findings": card_findings,
+                          "controller": ""})
+            continue
         folder = os.path.join(out_dir, CARD_FOLDER % n, FOLDER)
         spath = _write(folder, STATIONS_FILE, _csv(KIND_STATIONS, STATIONS_HDR, stations, STATIONS_KEYS, source_label))
         mpath = _write(folder, MODULES_FILE, _csv(KIND_MODULES, MODULES_HDR, modules, MODULES_KEYS, source_label))

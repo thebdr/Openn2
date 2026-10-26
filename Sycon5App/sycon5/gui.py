@@ -326,9 +326,9 @@ class App:
         """The table row of a card and its colour tag: green when built, verified after the save, 0 FAIL and every
         export there; red on a FAIL or a handoff problem; yellow for the rest (something still to do)."""
         tag = "todo"
-        if c.failed == 0 and c.exports_present == len(ws.EXPORTS) and c.report_time >= c.project_time - 1:
+        if c.failed == 0 and c.exports_present == len(ws.EXPORTS) and c.report_time >= c.project_time - 1 and c.project_dir_ok:
             tag = "ok"
-        elif c.failed > 0 or c.problems:
+        elif c.failed > 0 or c.problems or not c.report_ok or not c.project_dir_ok:
             tag = "bad"
         values = (c.number, c.name if c.project else "", c.controller, c.stations or "", c.modules or "",
                   c.headers.get("generated", "").replace("T", " ").rstrip("Z"), when(c.project_time), c.verdict,
@@ -494,7 +494,7 @@ class App:
         c = self.selected_card()
         idle = self.workspace is not None and not running
         buildable = idle and c is not None and bool(c.handoff) and not c.problems
-        built = idle and c is not None and bool(c.handoff and c.project)
+        built = idle and c is not None and bool(c.handoff and c.project) and c.project_dir_ok
         any_handoff = idle and any(x.handoff and not x.problems for x in self.workspace.cards)
         for b, ok in ((self.b_open, not running), (self.b_reload, idle), (self.b_explorer, idle), (self.b_export, idle),
                       (self.b_build, buildable), (self.b_resume, built), (self.b_verify, built), (self.b_folder, c is not None),

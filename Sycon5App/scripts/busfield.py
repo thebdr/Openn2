@@ -41,11 +41,16 @@ def last_octet(ip) -> str:
 
 
 def describe(s) -> str:
-    return "[%s] %s (%s) %s (%s)" % (s["station_name"], s.get("description", ""), s.get("comment", ""),
+    """The description column; a `;` inside it would shift the IO driver's columns (C-044 refute round 1)."""
+    text = "[%s] %s (%s) %s (%s)" % (s["station_name"], s.get("description", ""), s.get("comment", ""),
                                      s.get("fld", ""), s.get("ip_address", ""))
+    return " ".join(text.replace(";", ",").split())
 
 
 def card_rows(card, handoff, project) -> list:
+    """The rows of one card: the master, the master's own station (`#`), every station of the table - `@` when the
+    project has it with its GSDML identity, `#` when the project lacks it or records no identity (the IO driver must
+    never get a node of type 0x00000000 - C-044 refute round 1)."""
     ctrl = project.controller
     by_name = {d.device_no.lower(): d for d in project.devices}
     rows = ["@;%d;0;%s;0;0;0;0;0;0;0;0;#;Hilscher Master Profinet Card %d" % (card, ctrl.node_type, card),
@@ -55,8 +60,10 @@ def card_rows(card, handoff, project) -> list:
         d = by_name.get(s["station_name"].lower())
         if d is None:
             rows.append("#;%d;%s;0x00000000;0;0;0;0;0;0;0;0;#;%s - NOT IN THE PROJECT" % (card, last_octet(s["ip_address"]), describe(s)))
-            continue
-        rows.append("@;%d;%s;%s;0;0;0;0;0;0;0;0;#;%s" % (card, last_octet(s["ip_address"]), d.node_type, describe(s)))
+        elif not (d.manufacturer_id and d.device_type_id):
+            rows.append("#;%d;%s;%s;0;0;0;0;0;0;0;0;#;%s - NO DEVICE IDENTITY IN THE PROJECT" % (card, last_octet(s["ip_address"]), d.node_type, describe(s)))
+        else:
+            rows.append("@;%d;%s;%s;0;0;0;0;0;0;0;0;#;%s" % (card, last_octet(s["ip_address"]), d.node_type, describe(s)))
     return rows
 
 
@@ -75,16 +82,20 @@ def cards_of(production) -> list:
 
 
 def write_busfield(production) -> str:
-    cards = cards_of(production)
-    rows = header_lines(", ".join("HilscherIOCard%d/HilscherPnCard_%d" % (n, n) for n, _h, _s in cards)) + [HEADER]
-    for n, handoff_dir, spj in cards:
+    body, sources = [], []
+    for n, handoff_dir, spj in cards_of(production):
         if not os.path.exists(spj):
             print("card %d: no project %s - skipped" % (n, spj))
             continue
         h = load_handoff(handoff_dir)
         p = read_project(spj)
-        rows += card_rows(n, h, p)
+        if p.controller is None:
+            print("card %d: no controller in %s - skipped" % (n, spj))
+            continue
+        body += card_rows(n, h, p)
+        sources.append("HilscherIOCard%d/HilscherPnCard_%d" % (n, n))
         print("card %d: %d nodes" % (n, len(h.stations)))
+    rows = header_lines(", ".join(sources)) + [HEADER] + body        # the header names the cards written, no other
     out_dir = os.path.join(production, "IODriver")
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, "BusField.csv")

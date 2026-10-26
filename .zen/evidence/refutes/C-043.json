@@ -1,0 +1,14 @@
+{
+  "clause": "C-043",
+  "verdict": "held",
+  "ranAt": "2026-10-26T06:41:27.891Z",
+  "headCommit": "b1fdd8a445da404b8e14b72f3a82b8e453624579",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_refute_c043.py",
+      "file": "Pipeline5App/tests/unit/test_refute_c043.py",
+      "symbolSha": "e47b4320d7b97f7c06a811770cedc4f8ba76f62679c5627d6a8cd965d199b6aa"
+    }
+  ],
+  "round": 2
+}

@@ -1,0 +1,35 @@
+{
+  "clause": "C-045",
+  "command": "bash Sycon5App/scripts/verify_c045.sh",
+  "commandArgv": [
+    "bash",
+    "Sycon5App/scripts/verify_c045.sh"
+  ],
+  "exitCode": 0,
+  "outputSha": "1f1f6155c7f54fe8a4169f85485724c4eae720175db8fa86463fd0415a45b7b2",
+  "outputTail": "....................                                                     [100%]\n20 passed in 4.10s",
+  "ranAt": "2026-10-26T06:41:23.042Z",
+  "headCommit": "b1fdd8a445da404b8e14b72f3a82b8e453624579",
+  "tests": [
+    {
+      "name": "Sycon5App/tests/test_refute_c045.py",
+      "file": "Sycon5App/tests/test_refute_c045.py",
+      "fileSha": "c6d320b9747e62a40b9cb37ae4c23cf8d46671c0388c67361d3e6e5772a289bd"
+    },
+    {
+      "name": "Sycon5App/tests/test_workspace.py",
+      "file": "Sycon5App/tests/test_workspace.py",
+      "fileSha": "9d53e4a41966a5975985af2b9d4f5e9f6fa4eb522af0df057e22aea7c1b6bb7f"
+    },
+    {
+      "name": "Sycon5App/tests/test_gui.py",
+      "file": "Sycon5App/tests/test_gui.py",
+      "fileSha": "a47273ed30227cad3d4804786677026dd2765ead9040ce65beae2e070ca83496"
+    },
+    {
+      "name": "Sycon5App/tests/test_package_import.py",
+      "file": "Sycon5App/tests/test_package_import.py",
+      "fileSha": "7332233a0a53dc9c7bea00941b840025fcf6f93ec2798367ce00812f50527c1b"
+    }
+  ]
+}

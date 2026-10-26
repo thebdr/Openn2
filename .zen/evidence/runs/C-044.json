@@ -1,0 +1,45 @@
+{
+  "clause": "C-044",
+  "command": "bash Sycon5App/scripts/verify_c044.sh",
+  "commandArgv": [
+    "bash",
+    "Sycon5App/scripts/verify_c044.sh"
+  ],
+  "exitCode": 0,
+  "outputSha": "0ed45cfcdf58f07ca67e654cf59531335df349b5ac13a82d602952aa004fb499",
+  "outputTail": "..................                                                       [100%]\n18 passed in 1.24s\n...................                                                      [100%]\n19 passed in 0.82s\n== generic_hw_handlers ==\n  PASS  tia_generic_hw_run_plan\n  PASS  sycon_generic_hw_run_plan\n  PASS  generic_validation_sub_110_logs_only\n  -> 3/3 passed",
+  "ranAt": "2026-10-26T06:41:17.599Z",
+  "headCommit": "b1fdd8a445da404b8e14b72f3a82b8e453624579",
+  "tests": [
+    {
+      "name": "Sycon5App/tests/test_refute_c044.py",
+      "file": "Sycon5App/tests/test_refute_c044.py",
+      "fileSha": "4e5f58049df153db0e17d6041ec36fa155d4e229fd4a80208fe08004a0aaa6d4"
+    },
+    {
+      "name": "Sycon5App/tests/test_handoff.py",
+      "file": "Sycon5App/tests/test_handoff.py",
+      "fileSha": "5f9255b2549e12d97026630a41061b4ca4d178d2fb2e62c3c4f1b309bd35fcdc"
+    },
+    {
+      "name": "Sycon5App/tests/test_readback.py",
+      "file": "Sycon5App/tests/test_readback.py",
+      "fileSha": "271dd42dcb650117e68f919cf0d327025e6740010124e37114b5909c30d1d1a9"
+    },
+    {
+      "name": "Sycon5App/tests/test_canvas.py",
+      "file": "Sycon5App/tests/test_canvas.py",
+      "fileSha": "5dc98297b36178da926581350e3f3c9879ba8fd4ef02424bb90bed98aff2af5f"
+    },
+    {
+      "name": "Sycon5App/tests/test_exports.py",
+      "file": "Sycon5App/tests/test_exports.py",
+      "fileSha": "7c76513f44acdffb52a56d174165a78489913e75c1d6605ddf602b458eec0be1"
+    },
+    {
+      "name": "Sycon5App/tests/test_update_card_bat.py",
+      "file": "Sycon5App/tests/test_update_card_bat.py",
+      "fileSha": "f97790d4243bc5a63f52508876dc3376cd41a4e326e4f0100ebe15444c95b343"
+    }
+  ]
+}
