@@ -15,4 +15,4 @@ cd "$(dirname "$0")/.."
 PY="${PY:-../.venv/Scripts/python.exe}"
 PY="$(cd "$(dirname "$PY")" && pwd)/$(basename "$PY")"
 "$PY" -m pytest -q tests/test_handoff.py tests/test_readback.py tests/test_canvas.py tests/test_exports.py tests/test_update_card_bat.py tests/test_refute_c044.py
-(cd ../Pipeline5App && "$PY" -m pytest -q tests/unit/test_sycon_handoff.py tests/unit/test_generic_hw_systems.py && "$PY" tests/unit/test_generic_hw_handlers.py)
+(cd ../Pipeline5App && "$PY" -m pytest -q tests/unit/test_sycon_handoff.py tests/unit/test_sycon_fixed_multiplier.py tests/unit/test_refute_c044.py tests/unit/test_generic_hw_systems.py && "$PY" tests/unit/test_generic_hw_handlers.py)

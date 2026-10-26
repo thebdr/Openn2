@@ -721,6 +721,30 @@ User: "we did not use the zen contract for the sycon5app, I'm afraid. Is it too 
   held; C-044's wording about `#` switches corrected to the user's rule. Every Sycon5App-related clause is
   `verified`; the evidence notes list every attack, what fell and what held.
 
+## Couplers 4 x 128 bytes a side, the X1 entry, SCALANCE V4.3 (2026-10-26)
+
+User: "scalance v4.3 instead of 4.4" (the VM's catalog: `SCALANCE XC216-4C V4.3`, firmware V4.3 [DAP 5C] of the same
+`GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml`) and "pnpn couplers updated: added missing ones, added new
+custom modules management: 4[*OUT 128 Byte] | 4[*IN 128 Byte] - 4 is a multiplier (4 modules of the [] type, which
+is to be set verbatim); | is the separator".
+
+- `Shared/HardwareConfigBuilderData/SyconDeviceTypesDatabase.csv`: the three switch rows name the catalog's V4.3
+  entries; the coupler row's Fixed Modules are `X2: 4[*OUT 128 Byte] | 4[*IN 128 Byte]; X1: 4[*IN 128 Byte] |
+  4[*OUT 128 Byte]` (512 bytes each way, slots 1-8) and its Catalog Item names one entry per side, `X2: PN/PN
+  Coupler X2 [DAP X2 V4.2]; X1: PN/PN Coupler X1 [DAP X1 V4.2]` - the "missing one" read as the X1 side: an I/O
+  List row whose Connector is X1 takes the catalog's X1 entry (the X1 DAP's name is by symmetry with X2, not yet
+  dragged on the VM; the driver refuses an entry whose info pane does not cite the DAP, so a wrong name fails
+  loudly). The older coupler generations (6ES7 158-3AD00 / -3AD01) are not rows: no FVT list names them.
+- PL5 `sycon_handoff.module_items` expands `N[text]` (N >= 1, the text verbatim) in a plain or a per-connector
+  Fixed Modules cell; `by_connector` reads the `X2: ...; X1: ...` form of either column; `catalog_item_for` picks
+  the head row's entry by its Connector (none named: the first - X2 - with the WARN `sycon_connector_unknown`, as
+  the modules do). The stations table carries the resolved item, so the consumer and its clone grouping
+  (`type_key` holds the catalog item) see X1 and X2 couplers as two types. Tests:
+  `Pipeline5App/tests/unit/test_sycon_fixed_multiplier.py`; the sorter list re-exported: its three couplers eight
+  module rows each, the switches at V4.3.
+- Not done on the VM yet: a build with eight coupler modules and the V4.3 switches - the next production build
+  verifies them by read-back (the switch PN-IO records of the V4.3 DAP may differ: the verification says).
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run

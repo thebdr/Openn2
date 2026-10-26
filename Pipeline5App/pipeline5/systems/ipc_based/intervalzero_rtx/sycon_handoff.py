@@ -261,19 +261,63 @@ def load_dtd(path: str | None = None) -> dict:
 CONNECTOR_LIST = re.compile(r"^\s*(X\d+)\s*:\s*(.*)$", re.I)
 
 
-def fixed_modules(text):
-    """The Fixed Modules column: module texts `|` separated, in slot order - or, `;` separated, one such list per
-    connector (`X2: *OUT 128 Byte | *IN 128 Byte; X1: *IN 128 Byte | *OUT 128 Byte` - user 2026-10-24: a PN/PN
-    coupler's X1 side has the module positions of the X2 side mirrored; the I/O List names the side in its
-    Connector column). A list, or {CONNECTOR: list}."""
+MULTIPLIED = re.compile(r"^\s*(\d+)\s*\[(.*)\]\s*$", re.S)
+
+
+def by_connector(text):
+    """{CONNECTOR: text} when a cell holds one entry per connector of the I/O List's Connector column, `;` separated
+    (`X2: ...; X1: ...`); None for a plain cell. The Fixed Modules and the Catalog Item columns both take the form
+    (a PN/PN coupler is one part number with two sides: the X2 entry and modules for the sorter's side, the X1
+    entry and the mirrored modules for the other PLC's - user 2026-10-24 / 2026-10-26)."""
     pieces = [piece for piece in str(text or "").split(";") if piece.strip()]
     if pieces and all(CONNECTOR_LIST.match(piece) for piece in pieces):
         out = {}
         for piece in pieces:
             m = CONNECTOR_LIST.match(piece)
-            out[m.group(1).upper()] = [t.strip() for t in m.group(2).split("|") if t.strip()]
+            out[m.group(1).upper()] = m.group(2).strip()
         return out
-    return [t.strip() for t in str(text or "").split("|") if t.strip()]
+    return None
+
+
+def module_items(text):
+    """`a | b | 4[c]` -> [a, b, c, c, c, c]: the module texts of one list, `|` separated, in slot order; `N[text]` is
+    N modules of the bracketed text, verbatim (user 2026-10-26: `4[*OUT 128 Byte] | 4[*IN 128 Byte]` - "4 is a
+    multiplier (4 modules of the [] type, which is to be set verbatim); | is the separator")."""
+    out = []
+    for item in str(text or "").split("|"):
+        m = MULTIPLIED.match(item)
+        if m:
+            n = int(m.group(1))
+            if n < 1:
+                raise ValueError("Fixed Modules: a multiplier must be 1 or more, not %r" % item.strip())
+            out += [m.group(2)] * n
+        elif item.strip():
+            out.append(item.strip())
+    return out
+
+
+def fixed_modules(text):
+    """The Fixed Modules column: a list of module texts in slot order (`module_items`) - or, per connector
+    (`by_connector`), {CONNECTOR: list}."""
+    per = by_connector(text)
+    if per is not None:
+        return {connector: module_items(items) for connector, items in per.items()}
+    return module_items(text)
+
+
+def catalog_item_for(rec, row, findings, name, where):
+    """The catalog item of a head row: the record's, or - when the Catalog Item cell names one per connector - the
+    entry of the row's Connector; a connector the cell does not name takes the first entry with a WARN."""
+    per = by_connector(rec["catalog_item"])
+    if per is None:
+        return rec["catalog_item"]
+    connector = str(row.get("connector") or "").strip().upper()
+    if connector in per:
+        return per[connector]
+    first = next(iter(per.values()))
+    findings.append(_f("sycon_connector_unknown", "WARN", "station %r: connector %r names no catalog entry (%s) - %r taken"
+                       % (name, connector, " / ".join(sorted(per)), first), where))
+    return first
 
 
 # --- the build ------------------------------------------------------------------------------------ #
@@ -501,7 +545,7 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
         # 2026-10-23 21:36): the column stays empty for the controller and the `scalance-pnio` stations
         no_timing = rec["role"] == "controller" or rec["modules"] == "scalance-pnio"
         station = {"role": rec["role"], "station_name": name, "catalog_kind": ROLES[rec["role"]],
-                   "catalog_item": rec["catalog_item"], "model_id": model, "gsdml": rec["gsdml"], "ip_address": ip,
+                   "catalog_item": catalog_item_for(rec, row, findings, name, where), "model_id": model, "gsdml": rec["gsdml"], "ip_address": ip,
                    "subnet_mask": DEFAULT_MASK, "gateway": "",
                    "update_time_ms": "" if no_timing else str(update_time_ms),
                    "device_number": str(row.get("id_node") or "").strip(),
