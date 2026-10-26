@@ -19,6 +19,10 @@ def test_address_format_and_kind():
     ok(not address.format_ok("I:0.0"), "Rockwell colon rejected")
     ok(not address.format_ok("X1.0"), "bad leading letter")
     ok(not address.format_ok("I1.2.3"), "3-part dot-count rejected")
+    ok(address.format_ok("I.0.0.0") and address.format_ok("Q.0.0.0") and address.format_ok("O.0.0.0")
+       and address.format_ok("i. 35.0.7"), "node-qualified <letter>.<node>.<byte>.<bit>")
+    ok(not any(address.format_ok(a) for a in ("I.0.0", "I.0.0.0.0", "I.0.x.0", "I..0.0", "X.0.0.0", "I:0.0.0")),
+       "node-qualified: exactly three numbers after an I / Q / O letter")
     ok(address.format_ok("") and address.format_ok("ABC") and address.format_ok("2.0"),
        "empty / non-dotted / bare-number are not address attempts")
     ok(address.is_input("I3.0") and address.is_output("Q1.0") and address.is_output("O5.2"))

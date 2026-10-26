@@ -1,8 +1,9 @@
 """Address parsing/format for phase-100 validation. Verbatim clean-room port of PL3's
 `domain/validation/address.py` (pure, data-independent).
 
-PLC addresses are dotted I/Q/O addresses: 2-part `<letter><byte>.<bit>` (e.g. I20.0, Q0.1) or 4-part
-`<letter><byte>.<n>.<n>.<n>`. Rockwell colon addresses (`I:0.0`) are NOT supported. A bare number
+PLC addresses are dotted I/Q/O addresses: 2-part `<letter><byte>.<bit>` (e.g. I20.0, Q0.1), 4-part
+`<letter><byte>.<n>.<n>.<n>`, or node-qualified `<letter>.<node>.<byte>.<bit>` (e.g. I.35.0.0 - the
+SYCON / generic-hardware documents). Rockwell colon addresses (`I:0.0`) are NOT supported. A bare number
 ("2", "2.0") is a value, not an address attempt, and is not flagged.
 """
 from __future__ import annotations
@@ -34,9 +35,11 @@ def is_output(value) -> bool:
 def format_ok(value) -> bool:
     """True when `value` is an acceptable address (or not an address attempt at all). False only for a
     malformed dotted/colon address: a Rockwell colon, a bad leading letter, a non-numeric byte/segment,
-    or a dot-count other than 2 or 4. Judged on the CANONICAL spelling ([[C-022]]): an address written in
-    the active notation (a project's `I.645.1`) is a well-formed address; under the TIA default the
-    canonical spelling is the value itself, so the verdict is unchanged."""
+    or a dot-count other than 2 or 4. A letter alone before the first dot is the node-qualified form
+    `I.<node>.<byte>.<bit>` - exactly three numbers (`I.35.0.0`; `I.645.1` stays malformed unless the
+    notation spells it). Judged on the CANONICAL spelling ([[C-022]]): an address written in the active
+    notation (a project's `I.645.1`) is a well-formed address; under the TIA default the canonical
+    spelling is the value itself, so the verdict is unchanged."""
     a = norm(canonical(value))
     if not a:
         return True                       # empty: nothing to validate
@@ -48,6 +51,8 @@ def format_ok(value) -> bool:
         return True                       # a bare number (e.g. "2.0"), not an address attempt
     parts = a.split(".")
     head = parts[0]
+    if head in ("I", "Q", "O"):           # node-qualified: I.<node>.<byte>.<bit>
+        return len(parts) == 4 and all(p.isdigit() for p in parts[1:])
     if head[:1] not in ("I", "Q", "O") or not head[1:].isdigit():
         return False
     if len(parts) == 2:
