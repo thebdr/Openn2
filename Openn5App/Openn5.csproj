@@ -115,6 +115,7 @@
     <Compile Include="00_Contract\OpennHeader.cs" />
     <Compile Include="00_Contract\TiaVersionCheck.cs" />
     <Compile Include="00_Contract\WorkspaceCatalog.cs" />
+    <Compile Include="00_Contract\WebAppManifest.cs" />
     <Compile Include="00_Contract\WorkspaceImportSettings.cs" />
     <Compile Include="01_Constructor\CustomParameterParser.cs" />
     <Compile Include="01_Constructor\HardwareConfigDocument.cs" />

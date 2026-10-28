@@ -147,6 +147,11 @@ namespace Openn._03_ApiManager
         {
             abort = false;
 
+            if (item.KindInfo != null && item.KindInfo.Route == ImportRoute.UploadWebApp)
+            {
+                Log("SKIPPED " + item.RelativePath + " - a web application is uploaded to the CPU's web server, never imported into TIA");
+                return new WorkspaceImportResult(item, WorkspaceImportOutcome.Skipped, "web application - uploaded to the CPU, not imported into TIA");
+            }
             if (!item.Importable)
             {
                 string why = "[" + item.Status + "] " + (item.KindInfo != null ? item.KindInfo.Id : "unknown kind") +

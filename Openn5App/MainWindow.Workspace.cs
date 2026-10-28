@@ -220,6 +220,8 @@ namespace Openn
         {
             if (item.KindInfo == null) return item.Status == ItemStatus.Ignored ? "-" : "not imported";
             string route = RouteLabel(item.KindInfo.Route);
+            if (item.KindInfo.Route == ImportRoute.UploadWebApp)
+                return item.Uploadable ? route : "not uploadable (" + route + ")";
             return item.Importable || item.KindInfo.Route == ImportRoute.Template || item.KindInfo.Route == ImportRoute.None
                 ? route
                 : "not imported (" + route + ")";
@@ -238,6 +240,7 @@ namespace Openn
                 case ImportRoute.CreateInstanceDbs: return "create instance DBs";
                 case ImportRoute.GenerateFromSource: return "compile source";
                 case ImportRoute.Template: return "template (never imported)";
+                case ImportRoute.UploadWebApp: return "upload to the CPU (never imported)";
                 default: return "listed only";
             }
         }
@@ -255,6 +258,7 @@ namespace Openn
                 case ImportRoute.CreateInstanceDbs: return "CreateInstanceDB per csv row (Folder column relative to the file's folder); name clashes prompt Retry/Abort/Ignore";
                 case ImportRoute.GenerateFromSource: return "ExternalSources.CreateFromFile + GenerateBlocksFromSource - blocks land in the Program blocks root";
                 case ImportRoute.Template: return "referenced by block-gen csvs through template=, never imported by itself";
+                case ImportRoute.UploadWebApp: return "a CPU web application: its manifest and resources are uploaded to the CPU's web server through the Web API (WebApp.*), never imported into TIA";
                 default: return "documentation - listed, never imported";
             }
         }

@@ -67,7 +67,10 @@ SCHEMAS = {
     "sw/udt": 1, "sw/tag-table": 1, "sw/data-block": 1, "sw/instance-db": 1, "sw/block-gen": 1,
     "sw/code-block": 1, "sw/source": 1, "sw/block-template": 1,
     "doc/plc-tags-workbook": 1, "doc/other": 1,
+    "web/app": 1,                     # a CPU web application's manifest (C-050) - uploaded by OP5, never imported
 }
+WEB_APPS = "Web applications"         # <PLC>/Web applications/<app>/: the manifest + its header-free resources
+WEBAPP_MANIFEST = "webapp.manifest.csv"
 REQUIRED = ("kind", "schema", "producer", "generated")
 WORKSPACE_REQUIRED = ("contract", "producer", "generated")
 KNOWN_KEYS = ("kind", "schema", "producer", "generated", "run", "project", "plc", "target", "name",

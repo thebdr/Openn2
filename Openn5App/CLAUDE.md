@@ -79,8 +79,12 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   project in TIA without saving.
 - **Contract layer (OP5)** (`00_Contract/`, Siemens-free): `InputKind` = the taxonomy of everything OpennN
   manages (`hw/device-types`, `hw/stations`, `hw/modules`, `sw/udt`, `sw/tag-table`, `sw/data-block`,
-  `sw/instance-db`, `sw/block-gen`, `sw/code-block`, `sw/source`, `sw/block-template`, `doc/*`), each with its
-  TIA folder, import route, import order and supported schema; `OpennHeader` = the `#!openn ... #!end` header
+  `sw/instance-db`, `sw/block-gen`, `sw/code-block`, `sw/source`, `sw/block-template`, `web/app`, `doc/*`), each
+  with its TIA folder, import route, import order and supported schema; `web/app` (C-050, 2026-10-28) is a CPU web
+  application, `<PLC>\Web applications\<app>\webapp.manifest.csv` (`WebAppManifest.cs`: one row per header-free
+  resource beside it, bound by size + SHA-256) - its resources are listed Ignored, a missing or changed one makes the
+  manifest Invalid (`CheckWebApps`), and it is never imported (`Importable` false, `Uploadable` when Ready; the Web API
+  upload is C-050 M4); `OpennHeader` = the `#!openn ... #!end` header
   every handoff file opens with (`kind`, `schema`, `producer`, `generated` required; `run`, `plc`, `target`, ...
   optional; csv lines / XML first comment / `//` source lines / `<file>.openn` sidecar; Excel padding tolerated;
   a bare `#!format=N` = `Legacy`); `WorkspaceCatalog.Scan(root)` = classifies every file of a workspace
