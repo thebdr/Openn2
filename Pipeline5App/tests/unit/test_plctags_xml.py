@@ -14,6 +14,7 @@ from _harness import run, eq, ok, raises
 from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
 from pipeline5.systems.plc_based.siemens_s7 import plctags_xlsx_writer as io_tags
 from pipeline5.systems.plc_based.siemens_s7 import plctags_xml_emitter as tag_xml
+from pipeline5.systems.plc_based.siemens_s7 import tia_version
 from pipeline5.truth.database import Database
 from pipeline5.truth.table import Table
 
@@ -60,7 +61,7 @@ def test_one_document_per_table_mirroring_the_workbook():
         for path in paths:
             root = _parse(path)
             eq(root.tag, "Document")
-            eq(root.find("Engineering").get("version"), "V18")
+            eq(root.find("Engineering").get("version"), tia_version.active(), "the project's TIA version (C-049)")
             table_el = root.find("SW.Tags.PlcTagTable")
             eq(table_el.get("ID"), "0")
             table = table_el.findtext("AttributeList/Name")
@@ -96,7 +97,9 @@ def test_ids_unique_and_hex_bytes_bom_crlf():
     eq(len(ids), len(set(ids)), "ids unique within the document")
     eq(ids[:4], ["0", "1", "2", "3"], "the table is 0, then tag / comment / item")
     ok("A" in ids and "B" in ids and "10" in ids, f"hex, as TIA writes them: {ids[8:14]}")
-    ok(text.startswith('<?xml version="1.0" encoding="utf-8"?>\r\n<Document>\r\n  <Engineering version="V18" />\r\n'))
+    ok(text.startswith('<?xml version="1.0" encoding="utf-8"?>\r\n<Document>\r\n'
+                       f'  <Engineering version="{tia_version.active()}" />\r\n'), "the project's TIA version (C-049)")
+    ok('  <Engineering version="V19" />\r\n' in tag_xml.tag_table_xml("BIG", many, "V19"), "an explicit version wins")
     ok("\n" not in text.replace("\r\n", ""), "CRLF only")
     ok(text.endswith("</Document>") and "<ObjectList>" in text, "no trailing newline")
     empty = tag_xml.tag_table_xml("EMPTY", [])

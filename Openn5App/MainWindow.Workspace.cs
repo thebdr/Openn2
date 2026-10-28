@@ -505,6 +505,18 @@ namespace Openn
                 AddSummaryChip(text, tip, ok ? WorkspaceColors.Green : WorkspaceColors.Red, ok ? WorkspaceColors.GreenTint : WorkspaceColors.RedTint);
             }
 
+            //the workspace's TIA version against the Portal this Openn5 runs with (an import refuses a newer workspace)
+            TiaVersionCheck tia = TiaVersionCheck.Compare(cfg, OpennessSetup.SelectedInstallation.PortalVersion.Major);
+            string tiaText = tia.Verdict == TiaVersionVerdict.Unreadable
+                ? "TIA: unreadable"
+                : "TIA V" + tia.WorkspaceMajor + (tia.Assumed ? " (assumed)" : string.Empty) + " - Portal V" + tia.PortalMajor;
+            if (tia.Verdict == TiaVersionVerdict.Match)
+                AddSummaryChip(tiaText, tia.Message, WorkspaceColors.Green, WorkspaceColors.GreenTint);
+            else if (tia.Verdict == TiaVersionVerdict.OlderWorkspace)
+                AddSummaryChip(tiaText, tia.Message, WorkspaceColors.Amber, WorkspaceColors.AmberTint);
+            else
+                AddSummaryChip(tiaText + " - not importable", tia.Message, WorkspaceColors.Red, WorkspaceColors.RedTint, true);
+
             int disabledByUser = workspaceRows.Count(r => r.ImportDisabled);
             AddSummaryChip(Totals(catalog).Split(';')[0] + "; " + catalog.InImportOrder().Count() + " importable" + (disabledByUser > 0 ? " (" + disabledByUser + " unticked)" : string.Empty),
                 "classified = a kind was recognized (header or legacy markers); importable = Ready (valid #!openn header, consistent placement, current run) with an import route; unticked = importable but kept out by you (Import box)",

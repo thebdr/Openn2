@@ -9,7 +9,10 @@ header that names its kind and the generation that wrote it (`Shared/PL5_OP5_con
 
 ## A typical session
 
-- Pick or create a project via **Project ▾** (the title bar shows the active one).
+- Pick or create a project via **Project ▾** (the title bar shows the active one). A Siemens project asks
+  for its **TIA Portal version** (V18 / V19 / V20): every SimaticML file is stamped for it and OP5 refuses
+  to import a workspace newer than the Portal it is attached to. Change it later with `tia_version` in
+  `config_project/shared/project_params.yaml` (blank = the builtin V20) and regenerate.
 - Set the input documents on the **Documents** tab.
 - Click a phase button to run one phase, or **Run Pipeline** for the whole chain.
 - Read the **Log** tab; `Sheet!Cell` references are clickable and open Excel at the cell.

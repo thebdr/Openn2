@@ -339,10 +339,12 @@ def _begin_generation(ctx, database) -> dict:
     run id (the host's `ctx.run` - one per button press; Run-all shares it across its phases) and
     `.openn/workspace.openn.config`, written once per run - the log says where the workspace is the first
     time. Returns the generation's delivery dirs (`delivery_dirs` - the PLC folder from the staged facts)."""
+    from pipeline5.systems.plc_based.siemens_s7 import tia_version
     from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
     run, written = LAYOUT.begin_generation(database, ctx.run)
     if written:
-        ctx.emit("INFO", f"  OP5 workspace {LAYOUT.workspace_root()}  (run {run} - files of older runs are stale)")
+        ctx.emit("INFO", f"  OP5 workspace {LAYOUT.workspace_root()}  (run {run} - files of older runs are stale;"
+                         f" TIA Portal {tia_version.active()})")
     return LAYOUT.delivery_dirs(database)
 
 

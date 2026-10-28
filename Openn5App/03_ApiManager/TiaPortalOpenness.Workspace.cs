@@ -86,6 +86,16 @@ namespace Openn._03_ApiManager
                 return results;
             }
 
+            //the workspace's TIA version vs this Portal (contract §7): newer = refused before the first item, older = a warning
+            TiaVersionCheck tia = TiaVersionCheck.Compare(catalog.Config, OpennessSetup.SelectedInstallation.PortalVersion.Major);
+            Log(tia.Message);
+            if (tia.Blocks)
+            {
+                foreach (WorkspaceItem item in WorkspaceCatalog.OrderForImport(items))
+                    results.Add(new WorkspaceImportResult(item, WorkspaceImportOutcome.Skipped, tia.Message));
+                return results;
+            }
+
             List<WorkspaceItem> ordered = WorkspaceCatalog.OrderForImport(items).ToList();
             Log("=== Workspace import: " + ordered.Count + " item(s), " + ordered.Count(i => i.Importable) + " importable, from " + catalog.Root +
                 " - I/O controllers: " + (createNewIoControllers ? "create new" : "use existing") + " ===");

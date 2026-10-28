@@ -33,6 +33,7 @@ import os
 from pipeline5 import config
 from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
 from pipeline5.systems.plc_based.siemens_s7 import profinet_hardware as hardware
+from pipeline5.systems.plc_based.siemens_s7 import tia_version
 from pipeline5.systems.system_contract import OutputLayout
 
 WORKSPACE_PARTS = ("TiaPortalProjectInterface", "BuilderData")
@@ -131,7 +132,8 @@ class TiaOutputLayout(OutputLayout):
         if key in self._begun:
             return run, False
         plcs = [self.plc_folder(database)]
-        header.write_workspace_config(self.config_path(), header.workspace_fields(run=run, plcs=plcs))
+        header.write_workspace_config(self.config_path(), header.workspace_fields(run=run, plcs=plcs,
+                                                                                tia=tia_version.active()))
         self._begun.add(key)
         return run, True
 
