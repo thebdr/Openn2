@@ -32,9 +32,9 @@ import os
 
 from pipeline5.phases.io_tags.collector import HMI_DEFAULTS
 from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+from pipeline5.systems.plc_based.siemens_s7 import tia_version
 
 PHASE = 510
-ENGINEERING_VERSION = "V18"
 # Path.GetInvalidFileNameChars() on Windows: the nine punctuation characters + the control range.
 _INVALID_FILE_CHARS = frozenset('"<>|:*?\\/') | frozenset(chr(c) for c in range(32))
 
@@ -56,9 +56,10 @@ def group_tables(tags) -> dict:
     return out
 
 
-def tag_table_xml(table: str, tags) -> str:
+def tag_table_xml(table: str, tags, tia: str | None = None) -> str:
     """ONE tag table as `SW.Tags.PlcTagTable` XML (no BOM, CRLF, no trailing newline - the writer adds the BOM
-    and the header). IDs: the table is 0, every tag / comment / comment item takes the next hex id."""
+    and the header). IDs: the table is 0, every tag / comment / comment item takes the next hex id. `tia` = the
+    TIA Portal version stamped (None = the project's `tia_version`, [[C-049]])."""
     counter = [0]
 
     def next_id() -> str:
@@ -68,7 +69,7 @@ def tag_table_xml(table: str, tags) -> str:
     visible, accessible, writable = ("true" if f else "false" for f in HMI_DEFAULTS)
     lines = ['<?xml version="1.0" encoding="utf-8"?>',
              "<Document>",
-             f'  <Engineering version="{ENGINEERING_VERSION}" />',
+             tia_version.engineering_line(tia),
              '  <SW.Tags.PlcTagTable ID="0">',
              "    <AttributeList>",
              f"      <Name>{_text(table)}</Name>",
@@ -129,12 +130,13 @@ def write_tag_tables(tags, out_dir: str, plc: str | None = None) -> list:
     tables = group_tables(tags)
     files = tag_table_files(tags)
     os.makedirs(out_dir, exist_ok=True)
+    tia = tia_version.active()                 # the project's TIA Portal version, once per run (C-049)
     paths = []
     for table in sorted(tables):
         stamp = header.fields("sw/tag-table", PHASE, plc=plc, target=header.PLC_TAGS, name=table,
                               source="signals + interface_elements")
         path = os.path.join(out_dir, files[table])
         with open(path, "w", encoding="utf-8-sig", newline="") as handle:    # single BOM; our CRLF kept
-            handle.write(header.stamp_xml(tag_table_xml(table, tables[table]), stamp))
+            handle.write(header.stamp_xml(tag_table_xml(table, tables[table], tia), stamp))
         paths.append(path)
     return paths

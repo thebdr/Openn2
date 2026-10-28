@@ -2,7 +2,9 @@
 pipelines exist), the Multi-System Controller toggle (allows selecting more than one type), the name,
 the base folder - the project lands at `<base>/<name>/<name>` (the DOUBLE nesting is deliberate: the
 outer folder is the project's own root where the per-phase timestamped backups live beside the live
-copy) - and the € knob 'backups kept' (editable later in project_params.yaml -> project.backups_kept).
+copy) - the € knob 'backups kept' (editable later in project_params.yaml -> project.backups_kept) - and one
+dropdown per project option the selected types declare (`System.project_options`: a Siemens type's TIA Portal
+version - C-049; editable later as the top-level key in project_params.yaml).
 
 The create logic is `project.create_project` (Tk-free, tested); this is the Tk shell.
 """
@@ -84,15 +86,21 @@ class NewProjectDialog(tk.Toplevel):
                          foreground=theme.color("disabled_fg"), wraplength=420, justify="left")
         hint.grid(row=6, column=1, columnspan=2, sticky="w", pady=(0, 8))
 
-        # --- error line + buttons ------------------------------------------------------------- #
+        # --- the selected types' project options (rows 7..; rebuilt on every type change) --------- #
+        self._option_rows: list = []
+        self._option_values: dict = {}
+
+        # --- error line + buttons (rows 30+: after any number of option rows) ------------------- #
         self._error = ttk.Label(body, text="", foreground="#ff6b6b")
-        self._error.grid(row=7, column=0, columnspan=3, sticky="w")
+        self._error.grid(row=30, column=0, columnspan=3, sticky="w")
         buttons = ttk.Frame(body)
-        buttons.grid(row=8, column=0, columnspan=3, sticky="e", pady=(8, 0))
+        buttons.grid(row=31, column=0, columnspan=3, sticky="e", pady=(8, 0))
         ttk.Button(buttons, text=i18n.tr("np_create", lang), command=self._create).pack(side="left")
         ttk.Button(buttons, text=i18n.tr("np_cancel", lang),
                    command=self.destroy).pack(side="left", padx=(8, 0))
 
+        self._body = body
+        self._refresh_options()
         self._refresh_preview()
         self._name.focus_set()
         self.bind("<Return>", lambda _e: self._create())
@@ -109,6 +117,7 @@ class NewProjectDialog(tk.Toplevel):
         if not self._multi.get() and len(chosen) > 1:
             for index in chosen[1:]:
                 self._types.selection_clear(index)
+        self._refresh_options()
 
     def _on_multi(self) -> None:
         self._types.configure(selectmode="extended" if self._multi.get() else "browse")
@@ -133,6 +142,30 @@ class NewProjectDialog(tk.Toplevel):
         problem = project.validate_name(name) if name else ""
         self._error.configure(text=problem)
 
+    def _refresh_options(self) -> None:
+        """One label + read-only dropdown per project option of the selected types (`project.project_options`);
+        a value the user already picked survives a type change, a new option starts at the builtin value."""
+        if not hasattr(self, "_body"):
+            return
+        for widget in self._option_rows:
+            widget.destroy()
+        self._option_rows = []
+        for offset, option in enumerate(project.project_options(self._selected_types())):
+            var = self._option_values.get(option.key)
+            if var is None or var.get() not in option.choices:
+                var = tk.StringVar(value=project.option_default(option))
+                self._option_values[option.key] = var
+            label = ttk.Label(self._body, text=i18n.tr(option.label_key, self.lang))
+            label.grid(row=7 + offset, column=0, sticky="w")
+            box = ttk.Combobox(self._body, textvariable=var, values=list(option.choices), state="readonly", width=8)
+            box.grid(row=7 + offset, column=1, sticky="w", pady=2)
+            self._option_rows += [label, box]
+
+    def _chosen_options(self) -> dict:
+        """{key: chosen value} for the options the selected types declare."""
+        return {option.key: self._option_values[option.key].get()
+                for option in project.project_options(self._selected_types()) if option.key in self._option_values}
+
     def _selected_types(self) -> list:
         return [self._type_rows[i][0] for i in self._types.curselection()
                 if self._type_rows[i][2]]
@@ -155,7 +188,7 @@ class NewProjectDialog(tk.Toplevel):
         except (TypeError, ValueError):
             backups = project.BACKUPS_KEPT_DEFAULT
         try:
-            root = project.create_project(base, name, types, self._multi.get(), backups)
+            root = project.create_project(base, name, types, self._multi.get(), backups, self._chosen_options())
         except (ValueError, FileExistsError, OSError, project.ProjectConfigError) as error:
             self._error.configure(text=str(error))
             return

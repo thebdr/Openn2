@@ -7,6 +7,7 @@ from _harness import run, eq, ok
 from pipeline5.truth.database import Database
 from pipeline5.phases.datablocks import generator as datablocks
 from pipeline5.systems.plc_based.siemens_s7 import globaldb_xml_emitter as datablock_xml
+from pipeline5.systems.plc_based.siemens_s7 import tia_version
 from pipeline5.truth.datablocks import db_blocks_table, db_members_table, instance_dbs_table
 
 
@@ -211,6 +212,8 @@ def test_db_xml_f_db_opc_lock_and_member():
     db = {"prog_lang": "f_db", "opc_ua": True, "memory_layout": "Optimized",  # opc_ua True is IGNORED for F_DB
           "members": [{"member": "Door [ X ]", "datatype": "Bool", "retain": False, "comment": "", "start_value": ""}]}
     xml = datablock_xml.db_xml("07_DOOR", db, 1)
+    ok(f'<Document>\r\n  <Engineering version="{tia_version.active()}" />\r\n' in xml, "the project's TIA version (C-049)")
+    ok('<Engineering version="V19" />' in datablock_xml.db_xml("07_DOOR", db, 1, "V19"), "an explicit version wins")
     ok("<DBAccessibleFromOPCUA>false</DBAccessibleFromOPCUA>" in xml, "an F_DB is code-locked OPC-off")
     ok("<ProgrammingLanguage>F_DB</ProgrammingLanguage>" in xml, "f_db canonicalized to F_DB")
     ok('<Member Name="Door [ X ]" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">' in xml)

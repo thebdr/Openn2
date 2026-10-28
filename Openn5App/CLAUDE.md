@@ -47,6 +47,13 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
   `AppDomain.AssemblyResolve` hook loads that version's assemblies. No Siemens type
   may be touched before the hook is registered; once loaded, the version is fixed
   until restart.
+- **Workspace TIA version (OP5, C-049, 2026-10-27)**: PL5 stamps every SimaticML document for the project's
+  `tia_version` and writes it as `tia: V20` into `.openn\workspace.openn.config` (absent = a pre-C-049 workspace,
+  stamped V18). `00_Contract/TiaVersionCheck.cs` (Siemens-free) compares it with the selected Portal's major:
+  equal = import, workspace older = WARNING and import (TIA upgrades older SimaticML), workspace newer or `tia`
+  unreadable = `ImportWorkspaceItems` refuses before the first item (every item `Skipped` with the reason). The
+  Workspace tab shows a `TIA V.. - Portal V..` chip (green / amber / red "not importable"); an export writes the
+  attached Portal's version as its `tia`.
 - **TIA facade** (`03_ApiManager/TiaPortalOpenness*.cs`): one partial class split by
   feature area — `TiaPortalOpenness.cs` (portal/project lifecycle),
   `.Blocks.cs` (block listing/export/import), `.Hardware.cs` (hardware generation),
@@ -490,3 +497,8 @@ they are (no existence tolerance; "Use existing I/O controllers" mode).
    PROFINET ports", generate: the log shows `Port link wired: …`, the topology view shows the line between the two
    ports; generate again: `already connected`; a malformed cell fails the load with file/line; unticked with links
    present logs `Topology links in Stations.csv NOT wired`.
+18. **TIA version** (C-049): a PL5 workspace with `tia: V20` scanned under a V20 Portal shows a green `TIA V20 -
+   Portal V20` chip and imports; the same workspace under V18 (or V19) shows a red `... - not importable` chip and
+   "Import Workspace" logs `TIA version: workspace V20, attached Portal V18 - ... import refused`, every row Skipped,
+   nothing touched in TIA; a workspace without `tia` under V20 shows an amber `TIA V18 (assumed)` chip, logs the
+   WARNING and imports. An export's `workspace.openn.config` carries `tia: V<attached Portal>`.

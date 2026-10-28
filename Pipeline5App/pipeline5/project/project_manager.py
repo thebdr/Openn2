@@ -224,19 +224,66 @@ def load_project_meta(root: str) -> dict:
     return dict(meta) if isinstance(meta, dict) else {}
 
 
-def create_project(base_folder: str, name: str, types, multi_system: bool, backups_kept: int) -> str:
+def create_project(base_folder: str, name: str, types, multi_system: bool, backups_kept: int,
+                   options: dict | None = None) -> str:
     """The New-project dialog's create: scaffold at `<base_folder>/<name>/<name>` (the DOUBLE nesting
     is deliberate - the outer folder is the project's own root where the timestamped backups live
-    beside the live copy), write the `project:` meta, open it, return the root."""
+    beside the live copy), write the `project:` meta and the selected types' project options
+    (`options` = {key: value}, each checked against its ProjectOption's choices - an unknown key or an
+    unoffered value raises ValueError before anything is created), open it, return the root."""
     problem = validate_name(name)
     if problem:
         raise ValueError(problem)
+    offered = {option.key: option for option in project_options(types)}
+    for key, value in (options or {}).items():
+        if key not in offered:
+            raise ValueError(f"project option {key!r} is not offered by {', '.join(types)}")
+        if value not in offered[key].choices:
+            raise ValueError(f"project option {key} = {value!r}: choose one of {', '.join(offered[key].choices)}")
     name = str(name).strip()
     root = new_project(os.path.join(base_folder, name), name)
     write_project_meta(root, name, types, multi_system, backups_kept)
     scaffold_system_tiers(root)             # copy each selected system's builtin config tier
+    if options:
+        write_params(root, options)         # the New-project dialog's per-system settings (C-049)
     assert_config_complete(root)            # now WITH the system tiers - fail loud on scaffold drift
     return root
+
+
+def project_options(types) -> list:
+    """The ProjectOption rows the selected system types ask for at creation, in type order, one per key
+    (the first type naming a key wins) - the New-project dialog renders one dropdown each (C-049)."""
+    from pipeline5.systems import catalog
+    out, seen = [], set()
+    for sid in types or []:
+        system = catalog.by_id(sid)
+        for option in getattr(system, "project_options", ()) or ():
+            if option.key not in seen:
+                seen.add(option.key)
+                out.append(option)
+    return out
+
+
+def option_default(option) -> str:
+    """The value the dialog preselects: the BUILTIN project_params.yaml's `option.key` (config, never an
+    in-code default) when it is one of the choices, else the first choice."""
+    path = os.path.join(config.builtin_shared_config_dir(), "project_params.yaml")
+    value = str(config.load_params(path).get(option.key) or "").strip()
+    return value if value in option.choices else option.choices[0]
+
+
+def write_params(root: str, values: dict) -> None:
+    """Set top-level keys of `<root>/config_project/shared/project_params.yaml` (ruamel round-trip - the
+    template's comments and the key's place survive; a key the file lacks is appended)."""
+    from ruamel.yaml import YAML
+    yaml = YAML()
+    path = os.path.join(root, _PARAMS_REL)
+    with open(path, encoding="utf-8") as handle:
+        data = yaml.load(handle) or {}
+    for key, value in values.items():
+        data[key] = value
+    with open(path, "w", encoding="utf-8") as handle:
+        yaml.dump(data, handle)
 
 
 def scaffold_system_tiers(root: str) -> None:

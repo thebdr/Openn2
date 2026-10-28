@@ -179,12 +179,18 @@ The XML header does **not** use the strings `<!--Begin Template-->` / `<!--End T
 #! run: 20261007-180000-7f3a
 #! plcs: n0001-mc1-cc1-k65501
 #! templates: Templates
+#! tia: V20
 #!end
 ```
 
 Required: `contract`, `producer`, `generated`. `run` enables stale detection. `plcs` lists the PLC folders.
 PL5 writes it at the start of every generation, before the first BuilderData write (`output_layout.begin_generation`);
 `plcs` = the `Plc` station name(s) of Stations.csv.
+
+`tia` (since 2026-10-27, [[C-049]]) = the TIA Portal version every SimaticML document of the workspace is stamped
+for (`<Engineering version="V20" />`): PL5's project setting `tia_version` (project_params.yaml, blank = the builtin
+value; `siemens_s7/tia_version.py`), OP5's export the attached Portal's version. A workspace without it predates the
+key - every document of it was stamped V18. OP5 compares it with the Portal it attaches to (§7).
 
 ---
 
@@ -284,8 +290,8 @@ BuilderData/                                   ← the workspace (name kept; PL5
 ## 6. Producer obligations (PL5)
 
 1. Write the header (§3) on **every** BuilderData file, in the file type's wrapping; the sidecar for `PLCTags.xlsx`.
-2. Write `.openn/workspace.openn.config` with a fresh `run` id per generation, and stamp the same `run` into every
-   file written in that run. Files not rewritten in a run keep their old `run` and OP5 reports them stale —
+2. Write `.openn/workspace.openn.config` with a fresh `run` id per generation and the project's `tia` version, and
+   stamp the same `run` into every file written in that run (and that version into every SimaticML document). Files not rewritten in a run keep their old `run` and OP5 reports them stale —
    this replaces the missing sweep (today the builtin tree still holds PL3-era `.db` files and absolute
    template paths).
 3. Emit into the VCI shape (§4): PLC folder = the `Plc` station name from Stations.csv; `Templates/` at the
@@ -342,7 +348,11 @@ well-formedness) as a sanctioned new surface.
 6. A template copy in `Templates/` opens with its `sw/block-template` header comment; `BlockXmlGenerator` copies the
    template head verbatim, so a generated block XML would inherit that comment — OP5 must drop it (or re-stamp the
    generated XML `sw/code-block`, producer Openn5) before `Blocks.Import`. Same gate as step 1 of §8.
-7. A `web/app` manifest (C-050): accept `<PLC>/Web applications/<app>/` as a placement, list its resources `Ignored`,
+7. Compare the workspace's `tia` (§3.4; absent = V18) with the attached Portal before the first import
+   (`00_Contract/TiaVersionCheck.cs`): equal = import; workspace older = import with a WARNING (TIA upgrades older
+   SimaticML); workspace newer, or `tia` not a version = refuse the whole import - every item Skipped with the reason.
+   The Workspace tab shows it as a `TIA V.. - Portal V..` chip (green / amber / red).
+8. A `web/app` manifest (C-050): accept `<PLC>/Web applications/<app>/` as a placement, list its resources `Ignored`,
    verify every listed resource's size and SHA-256 at the scan (a missing or changed one = the manifest `Invalid`), never
    route it through Import Workspace (`Importable` is false, `Uploadable` true when Ready); a Stale manifest is not
    uploaded either.
