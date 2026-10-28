@@ -56,6 +56,7 @@ change — a trailing added column (the 9th `Connector`, the 10th `Topology` - 2
 | `sw/code-block` | one OB / FB / FC | `<Name>.xml` (`SW.Blocks.OB|FB|FC`) | `<PLC>/Program blocks/<group>/…` | `Blocks.Import` | 61 | 1 | PL5 phase 820 (`fc_xml`) |
 | `sw/source` | text source compiled by TIA (SCL / STL / DB / UDT) | `.scl .awl .db .udt .st` | `<PLC>/Program blocks/<group>/…` | external source → `GenerateBlocksFromSource` (blocks land in the Program blocks **root** — TIA limitation) | 62 | 1 | PL5 phases 400/620/820 |
 | `sw/block-template` | template export referenced by `sw/block-gen` csvs (`TEMPLATE--vX.Y--Name`) | `.xml .scl .db` | `Templates/` (workspace root) or `Shared/Templates/Tia Portal Software Blocks` | never imported by itself | 90 | 1 | hand-maintained (PL5 ships copies) |
+| `web/app` | the manifest of one CPU web application (Web API, FW >= 2.9): one row per resource beside it - `name, media_type, size, sha256, visibility, default_page` | `webapp.manifest.csv` | `<PLC>/Web applications/<app>/` (not a TIA folder) | **uploaded** to the CPU's web server through the Web API (`WebApp.*`), never imported into TIA | 95 | 1 | PL5 phase 650 (C-050) |
 | `doc/plc-tags-workbook` | TIA "PLC Tags" workbook for manual GUI import | `PLCTags.xlsx` (+ sidecar) | `<PLC>/PLC tags/` | none (listed) | 100 | 1 | PL5 phase 510 |
 | `doc/other` | anything for humans (reports, builder workbooks, readme) | any | anywhere | none (listed) | 101 | 1 | any |
 
@@ -156,6 +157,12 @@ A block of `#!` directive lines — the `#!format=2` idea, made complete:
 | sources (`.scl .awl .db .udt .st`) | each line prefixed `//` | `//#!openn` ⏎ `//#! kind: sw/source` ⏎ … ⏎ `//#!end` |
 | binary / foreign (`.xlsx .xlsm .pdf …`) | sidecar text file `<file>.openn` with the csv form | `PLCTags.xlsx.openn` |
 
+**Web application resources** (`web/app`, C-050) are the one exception to "every file carries a header": the files a
+CPU serves to browsers (`index.html`, `app.js`, `app.css`, `plant.json`, an image, ...) stay **byte for byte header-free**.
+The app's `webapp.manifest.csv` carries the header instead and binds each resource by its `size` and `sha256`; OP5
+lists the resources `Ignored` ("uploaded with its manifest") and marks the manifest `Invalid` when a listed resource is
+missing or differs. A file in the app folder the manifest does not list is never uploaded.
+
 An in-file header wins over a sidecar. XML comments cannot contain `--` (OP5's writer replaces it by `- -`).
 The XML header does **not** use the strings `<!--Begin Template-->` / `<!--End Template-->` (template markers).
 
@@ -199,12 +206,21 @@ BuilderData/                                   ← the workspace (name kept; PL5
     PLC data types/<UDT>.xml                   sw/udt
     PLC tags/<Table>.xml                       sw/tag-table
     PLC tags/PLCTags.xlsx (+ .openn sidecar)   doc/plc-tags-workbook
+    Web applications/<app>/webapp.manifest.csv web/app (C-050; not a TIA folder)
+    Web applications/<app>/<resource>          its resources - header-free, bound by the manifest's sha256 (§3.3)
 ```
 
 - Exactly the shape TIA's VCI writes (`Openn3App/TiaProjects/Openn2_Playground_VCI` is a real export:
   `<PLC>/PLC data types`, `PLC tags`, `Program blocks/<group>/…`). A workspace in this shape can be added
   to TIA as a VCI workspace *and* imported by OP5.
 - Groups are folders. A file at the category root lands in the root group (today's flat `ImportReady/`).
+- `Web applications` (C-050, 2026-10-28) is the one per-PLC folder that is not a TIA folder: `<PLC>/Web applications/<app>/`
+  holds one CPU web application - the folder name is the Web API application name (`[A-Za-z0-9_-]+`), the manifest's
+  header repeats it as `name` (and `target: Web applications/<app>`, `plc`). The manifest's rows: `name` = the
+  resource path relative to the app folder (`/` separated, no `..`), `media_type`, `size` (bytes), `sha256` (lower-case
+  hex), `visibility` (`public` = served without a login / `protected`), `default_page` (`yes` on exactly one row). The
+  app is served at `https://<cpu>/~<app>/` (M0 on the 1518F FW V2.9.4: 4 apps per CPU, 200 resources per app). Import
+  Workspace never touches it; OP5 uploads it from the manifest (C-050 M4).
 - Reserved root folders: `.openn`, `.vci`, `Devices & networks`, `Templates`. Every other root folder is a PLC.
 - `.openn/import.openn5.config` (optional, **OP5-owned**, since 2026-10-09): the files whose Import box the user unticked in
   OP5's Workspace tab - `#` comments, then one `disabled: <relative path>` line per file (`/` separated, as the catalog
@@ -282,6 +298,9 @@ BuilderData/                                   ← the workspace (name kept; PL5
    Either skip `#` rows in the grid or accept the cosmetic effect.
 7. Templates (`Shared/Templates/Tia Portal Software Blocks`, hand-maintained) and `DeviceTypesDatabase.csv` get a
    header when next edited (PL5's loaders already skip `#` lines).
+8. A web application (`web/app`, C-050): write the resources byte for byte and the manifest last, with the same run
+   as the generation, each resource's exact `size` and `sha256`; never sweep the app folder (a file left there is listed
+   as "not in the manifest", never uploaded).
 
 **PL5 status (2026-10-08):** 1–5 done — `pipeline5/systems/plc_based/siemens_s7/openn_header.py` renders the header
 in its three wrappings + the sidecar, holds the run id and writes the workspace config; `output_layout.py` is the
@@ -319,10 +338,14 @@ well-formedness) as a sanctioned new surface.
    workspace root → `Shared/Templates/Tia Portal Software Blocks`.
 4. Keep the hardware existence policy (skip existing stations with modules); keep I/O controllers as they are.
 5. Reflect every contract change in `Openn5App/00_Contract/` (`InputKind.cs` = §2, `OpennHeader.cs` = §3,
-   `WorkspaceCatalog.cs` = §4-5) and in this document, in the same commit.
+   `WorkspaceCatalog.cs` = §4-5, `WebAppManifest.cs` = the `web/app` manifest) and in this document, in the same commit.
 6. A template copy in `Templates/` opens with its `sw/block-template` header comment; `BlockXmlGenerator` copies the
    template head verbatim, so a generated block XML would inherit that comment — OP5 must drop it (or re-stamp the
    generated XML `sw/code-block`, producer Openn5) before `Blocks.Import`. Same gate as step 1 of §8.
+7. A `web/app` manifest (C-050): accept `<PLC>/Web applications/<app>/` as a placement, list its resources `Ignored`,
+   verify every listed resource's size and SHA-256 at the scan (a missing or changed one = the manifest `Invalid`), never
+   route it through Import Workspace (`Importable` is false, `Uploadable` true when Ready); a Stale manifest is not
+   uploaded either.
 
 ---
 
@@ -390,7 +413,10 @@ leftovers plus the two `.scl`), layout "legacy BuilderData folders", workspace c
 - `Openn5App/00_Contract/InputKind.cs` — the taxonomy (§2), one `InputKindInfo` per kind.
 - `Openn5App/00_Contract/OpennHeader.cs` — parser + writer (§3): `OpennHeader.Read(path)`,
   `OpennHeader.Create(kind, producer, utcNow).Render(HeaderSyntax.Csv|Xml|Source)`.
-- `Openn5App/00_Contract/WorkspaceCatalog.cs` — scan + classification + consistency + stale detection (§4-5).
+- `Openn5App/00_Contract/WorkspaceCatalog.cs` — scan + classification + consistency + stale detection (§4-5), the
+  web-app check (`CheckWebApps`).
+- `Openn5App/00_Contract/WebAppManifest.cs` — the `web/app` manifest: `WebAppManifest.Read(path)`, `VerifyResources()`
+  (size + SHA-256 of every listed resource), `UnlistedFiles()`.
 - No Siemens dependency: the three classes load from `Openn5.exe` by reflection without TIA, so PL5 can be checked
   against the real parser from a script (see the OP5 `CLAUDE.md`, "Contract layer").
 - PL5 side: `Pipeline5App/pipeline5/systems/plc_based/siemens_s7/openn_header.py` (§3: the three wrappings, the

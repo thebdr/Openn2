@@ -11,6 +11,8 @@ namespace Openn._00_Contract
         Hardware,
         /// <summary>Per-PLC software: the VCI folders under the PLC.</summary>
         Software,
+        /// <summary>Per-PLC, for the CPU's web server: "&lt;PLC&gt;\Web applications" (not a TIA folder - uploaded through the Web API).</summary>
+        Web,
         /// <summary>Carried for humans, never imported.</summary>
         Documentation
     }
@@ -37,7 +39,9 @@ namespace Openn._00_Contract
         /// <summary>ExternalSources.CreateFromFile + GenerateBlocksFromSource.</summary>
         GenerateFromSource,
         /// <summary>Referenced by sw/block-gen csvs; never imported by itself.</summary>
-        Template
+        Template,
+        /// <summary>Uploaded to the CPU's web server through the Web API (WebApp.*) from its manifest; never imported into TIA.</summary>
+        UploadWebApp
     }
 
     /// <summary>
@@ -65,6 +69,9 @@ namespace Openn._00_Contract
         SwUdt,
         SwTagTable,
         SwBlockTemplate,
+
+        //--- the CPU's web server (per PLC, uploaded - never imported) ---
+        WebApp,
 
         //--- documentation (never imported) ---
         DocPlcTagsWorkbook,
@@ -139,6 +146,10 @@ namespace Openn._00_Contract
             new InputKindInfo(InputKind.SwBlockTemplate, "sw/block-template", "Block template", InputArea.Software, null,
                 new[] { ".xml", ".scl", ".db" }, ImportRoute.Template, 90, 1,
                 "Template export referenced by sw/block-gen csvs (TEMPLATE--vX.Y--Name). Hand-maintained; never imported by itself."),
+
+            new InputKindInfo(InputKind.WebApp, "web/app", "Web application", InputArea.Web, WorkspaceLayout.WebApplications,
+                new[] { ".csv" }, ImportRoute.UploadWebApp, 95, 1,
+                "Manifest of a CPU web application (webapp.manifest.csv: name, media type, size, SHA-256 of each header-free resource beside it). Uploaded to the CPU's web server through the Web API; never imported into TIA."),
 
             new InputKindInfo(InputKind.DocPlcTagsWorkbook, "doc/plc-tags-workbook", "PLC tags workbook", InputArea.Documentation, WorkspaceLayout.PlcTags,
                 new[] { ".xlsx" }, ImportRoute.None, 100, 1,

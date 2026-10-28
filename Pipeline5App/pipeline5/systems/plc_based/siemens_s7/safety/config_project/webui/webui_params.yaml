@@ -1,0 +1,40 @@
+# The web diagnosis app (sub-phase 650, C-050): a read-only page served by the CPU's web server as a Web API
+# web application. PL5 writes it per project into <PLC>/Web applications/<app>/; OP5 uploads it. Every key is
+# required (the loader names a missing one) - config is config, never an in-code default.
+
+app:
+  name: safety                 # the Web API application name: the page is served at https://<cpu>/~safety/
+  title: Safety diagnosis
+  default_page: index.html
+  visibility: public           # the resources' Web API visibility (public = served without a login)
+
+polling:
+  interval_ms: 1000            # one poll cycle; one request in flight at a time
+  chunk: 50                    # variables per PlcProgram.Read batch (M0: 50 DB members ~30 ms on the 1518F)
+  timeout_ms: 5000
+  detail_interval_ms: 1000     # a device's own members, read only while its detail panel is open
+  backoff_ms: [2000, 5000, 10000]   # after a lost connection
+
+login:
+  # The Web API has no rights without a token on FW V2.9.4 (M0 2026-10-28): the page logs in as the CPU's
+  # built-in anonymous user (empty password, nothing secret) - "Everybody" before FW V3.1, "Anonymous" after.
+  users: [Everybody, Anonymous]
+
+diag:
+  # The cabinet diagnosis words' bit polarity (DiagnosticTags ALARM1/2, WARNING1/2): 1 = a set bit means
+  # active, 0 = a cleared bit means active, null = unknown until the M0 polarity watch (bits shown neutral).
+  alarm_bit: null
+  warning_bit: null
+
+layout:
+  drawing: webui/webui_plant   # the optional plant drawing, looked up as .svg / .png / .jpg in the config tiers
+  positions: webui/webui_positions.csv
+  group_by: [functional_unit, location]
+
+custom_data:
+  enabled: true
+  db: PL5_CustomData           # a standard DB the users build in TIA; the page discovers its structure live
+  max_depth: 6
+  max_cells: 200
+  page_rows: 50
+  interval_ms: 1000
