@@ -75,6 +75,8 @@ STRINGS: dict = {
     "pb_gen_diag_swblocks": {"en": "Generate Diag Software Blocks", "it": "Genera Diag Software Blocks"},
     "pb_open_diag_data":    {"en": "Open Diag Data Folder", "it": "Apri Cartella Diag Data"},
     "pb_open_diag_config":  {"en": "Open Diag Config .csv Folder", "it": "Apri Cartella Diag Config .csv"},
+    "pb_gen_webapp":        {"en": "Generate Web Application", "it": "Genera Applicazione Web"},
+    "pb_open_webapp":       {"en": "Open Web Application Folder", "it": "Apri Cartella Applicazione Web"},
 
     # --- 700 Hardware Generation ---------------------------------------------------------- #
     "pb_gen_stations":  {"en": "Generate Stations", "it": "Genera Stations"},
