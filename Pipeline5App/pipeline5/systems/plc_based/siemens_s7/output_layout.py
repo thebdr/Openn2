@@ -10,6 +10,8 @@ BuilderData`) is shaped like a TIA Version Control Interface (VCI) workspace (co
       <PLC>/Program blocks/              data-block + code-block XML, block-gen csvs, InstanceDBs.csv, sources
       <PLC>/PLC tags/                    PLCTags.xlsx (+ its .openn sidecar)
       <PLC>/PLC data types/              (sw/udt - not emitted yet)
+      <PLC>/Web applications/<app>/      web/app: webapp.manifest.csv + its resources (C-050; not a TIA folder -
+                                         OP5 uploads it to the CPU's web server)
 
 Location says where a file lands in TIA: the PLC folder IS the Plc station's name (what Stations.csv
 calls it), the folder under it is the TIA tree folder's name. Reserved root folders: `.openn`, `.vci`,
@@ -69,6 +71,14 @@ class TiaOutputLayout(OutputLayout):
     def plc_data_types_dir(self, plc: str) -> str:
         return os.path.join(self.plc_dir(plc), header.PLC_DATA_TYPES)
 
+    def web_apps_dir(self, plc: str) -> str:
+        """`<PLC>/Web applications` - one folder per CPU web application (C-050), not a TIA folder: OP5
+        uploads it to the CPU's web server."""
+        return os.path.join(self.plc_dir(plc), header.WEB_APPS)
+
+    def web_app_dir(self, plc: str, app: str) -> str:
+        return os.path.join(self.web_apps_dir(plc), app)
+
     # --- the PLC --------------------------------------------------------------------------------- #
     @staticmethod
     def plc_folder(database, required: bool = True):
@@ -101,23 +111,31 @@ class TiaOutputLayout(OutputLayout):
     def delivery_dirs(self, database) -> dict:
         """The folders ONE generation writes into, from the staged facts (the PLC folder): `hardware`,
         `templates`, `blocks_import` + `blocks_creation` (both `<PLC>/Program blocks` - the VCI shape has
-        one program-blocks folder), `io_tags` (`<PLC>/PLC tags`), `workspace`, and the `plc` name."""
+        one program-blocks folder), `io_tags` (`<PLC>/PLC tags`), `web_apps` (`<PLC>/Web applications`),
+        `workspace`, and the `plc` name."""
         plc = self.plc_folder(database)
         blocks = self.program_blocks_dir(plc)
         return {"plc": plc, "workspace": self.workspace_root(), "hardware": self.hardware_dir(),
                 "templates": self.templates_dir(), "blocks_import": blocks, "blocks_creation": blocks,
-                "io_tags": self.plc_tags_dir(plc)}
+                "io_tags": self.plc_tags_dir(plc), "web_apps": self.web_apps_dir(plc)}
 
     def dirs(self) -> dict:
         """The GUI's open targets, from what is ON DISK: the first PLC folder's `Program blocks` /
-        `PLC tags` (the workspace root until a generation created one), the hardware folder, the
-        workspace itself."""
+        `PLC tags` (the workspace root until a generation created one), its first web application's folder
+        (`web_app`: else `Web applications`, else the PLC folder), the hardware folder, the workspace itself."""
         root = self.workspace_root()
         plcs = self.plc_folders_on_disk()
         plc = plcs[0] if plcs else None
         blocks = self.program_blocks_dir(plc) if plc else root
+        web_app = root
+        if plc:
+            apps_dir = self.web_apps_dir(plc)
+            apps = sorted(d for d in os.listdir(apps_dir)
+                          if os.path.isdir(os.path.join(apps_dir, d))) if os.path.isdir(apps_dir) else []
+            web_app = (os.path.join(apps_dir, apps[0]) if apps else
+                       apps_dir if os.path.isdir(apps_dir) else self.plc_dir(plc))
         return {"blocks_import": blocks, "blocks_creation": blocks,
-                "io_tags": self.plc_tags_dir(plc) if plc else root,
+                "io_tags": self.plc_tags_dir(plc) if plc else root, "web_app": web_app,
                 "hardware": self.hardware_dir(), "workspace": root}
 
     # --- the generation -------------------------------------------------------------------------- #
