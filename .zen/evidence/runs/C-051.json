@@ -1,0 +1,20 @@
+{
+  "clause": "C-051",
+  "command": "bash Pipeline5App/scripts/verify_c051.sh",
+  "commandArgv": [
+    "bash",
+    "Pipeline5App/scripts/verify_c051.sh"
+  ],
+  "exitCode": 0,
+  "outputSha": "d01fcac2826d4cee9d4c1f2d8f54761b72603692dbd5a1a256a1c79fdd71eacf",
+  "outputTail": "  PASS  create_project_double_nested_with_meta\n  PASS  backup_rotation_and_zip\n  PASS  archive_and_import_documents\n  PASS  inside_project\n  PASS  import_documents_from_another_drive\n  PASS  stale_import_detection_and_refresh\n  PASS  open_rejects_unknown_and_pl4_system_ids\n  PASS  multi_system_projects_namespace_database_and_output\n  PASS  restore_backup_and_save_as\n  -> 17/17 passed\n\nrunning PL5 (against the frozen PL4 reference)...\n\ncompared 14 SSOT files + 39 output files (+ 10 sanctioned tag-table XML: header + well-formedness checked)\nPARITY OK - 0 diffs (PL4 -> PL5 byte-identical modulo the sanctioned normalizations; 8 PL5-only transfer-area rows, 2 interface descriptions + 2 SCL region comments, 1 shipped DeviceTypesDatabase checked against its original, 1 signal-paths page checked against the coverage rows, 1 areas table checked against the signals' areas, 64 renamed name(s) read in their new spelling, 36 05_EM_STATE comments not compared, 1 v1.3 02 template checked against Shared, 8 padded 02 rows read as v1.3 variants, 16 DR channel parameter(s) of the new DTD rule; C-042: 1 v1.2 00 template checked against Shared, 19 00 rows read in the v1.2 form, 1 99_Commissioning checked against the reference's nodes, 9 of its table rows + 15 coverage mention(s) dropped, 3 DB number(s) shifted)",
+  "ranAt": "2026-10-28T07:40:19.283Z",
+  "headCommit": "e9f1a8ebc27d721fb348d996f3a4b8b427cb17da",
+  "tests": [
+    {
+      "name": "Pipeline5App/tests/unit/test_project_manager.py",
+      "file": "Pipeline5App/tests/unit/test_project_manager.py",
+      "fileSha": "54e267ec269d2ac48fe78bab0b4648f91d7b6988021a7471d1fa4eca946f1155"
+    }
+  ]
+}
