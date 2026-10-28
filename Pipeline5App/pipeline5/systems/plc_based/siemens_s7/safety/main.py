@@ -72,8 +72,10 @@ PHASES = PhaseSet(
         Phase(600, "ph_diagnosis", handler="diagnosis", requires=(300, 520), subs=(
             Sub(610, "pb_gen_diag_list"),
             Sub(620, "pb_gen_diag_swblocks"),
+            Sub(650, "pb_gen_webapp"),                                       # the CPU web diagnosis app (C-050)
             Sub(630, "pb_open_diag_data", kind="open", opens="diaglist"),
             Sub(640, "pb_open_diag_config", kind="open", opens="diag_config"),
+            Sub(660, "pb_open_webapp", kind="open", opens="web_app"),
         )),
         Phase(700, "ph_hardware", handler="hardware", requires=(300,), subs=(
             Sub(710, "pb_gen_stations"),
@@ -506,9 +508,10 @@ def run_interfaces(ctx, only=None):
 
 
 def run_diagnosis(ctx, only=None):
-    """Phase 600: stage -> 520 build -> diagnosis.build, then project 610 DiagList_IO/Logic.csv and/or
-    620 the OPC SCL. only=610/620 projects just that surface; None does both. (Both need diagnosis.build,
-    so it always runs.)"""
+    """Phase 600: stage -> 520 build -> diagnosis.build, then project 610 DiagList_IO/Logic.csv, 620 the OPC SCL
+    and 650 the CPU web diagnosis app ([[C-050]]: the interfaces built too, then `<PLC>/Web applications/<app>/`).
+    only=610/620/650 projects just that surface; None does all three. (All need diagnosis.build, so it always
+    runs.)"""
     from pipeline5 import config
     from pipeline5.findings import gate as run
     from pipeline5.phases.staging import iolist as staging
@@ -516,8 +519,9 @@ def run_diagnosis(ctx, only=None):
     from pipeline5.phases.diagnosis import builder as diagnosis
     from pipeline5.phases.diagnosis import diaglist as diaglist_csv
     from pipeline5.systems.plc_based.siemens_s7.safety import opc_diagnosis_scl as diagnosis_scl
-    label = {610: "610 Generate Diag List", 620: "620 Generate Diag Software Blocks"}.get(
-        only, "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL)")
+    label = {610: "610 Generate Diag List", 620: "620 Generate Diag Software Blocks",
+             650: "650 Generate Web Application"}.get(
+        only, "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL + 650 Web Application)")
     ctx.emit("PHASE", label)
     ctx.status("diagnosis…")
     findings = []
@@ -530,17 +534,29 @@ def run_diagnosis(ctx, only=None):
         ctx.emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
         return
     database, diag_findings = diagnosis.build(database)
-    rendered, res, scl = list(diag_findings), None, None
+    rendered, res, scl, web = list(diag_findings), None, None, None
     if only in (None, 610):
         res = diaglist_csv.project(database); rendered += res["findings"]
     if only in (None, 620):
         _begin_generation(ctx, database)
         scl = diagnosis_scl.project(database); rendered += scl["findings"]
+    if only in (None, 650):
+        from pipeline5.phases.interfaces import builder as interfaces
+        from pipeline5.systems.plc_based.siemens_s7.safety import webui_project
+        ctx.status("web application…")
+        database, iface_findings = interfaces.build_interfaces(database)   # the page lists the machine interfaces
+        _begin_generation(ctx, database)
+        web = webui_project.project(database); rendered += iface_findings + web["findings"]
     ctx.render(rendered, label="600 diagnosis")
     if res is not None:
         ctx.emit("RSLT", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> {config.diaglist_dir()}")
     if scl is not None and scl["path"]:
         ctx.emit("RSLT", f"  620 OPC SCL: {scl['entries']} entries across {scl['cabinets']} cabinets -> {scl['path']}")
+    if web is not None and web["dir"]:
+        kinds = ", ".join(f"{n} {kind}" for kind, n in web["counts"]["kinds"].items())
+        ctx.emit("RSLT", f"  650 web application: {kinds}; {web['counts']['cabinets']} cabinets, "
+                         f"{web['counts']['areas']} areas, {web['counts']['poll']} variables per refresh; "
+                         f"{len(web['resources'])} resources, {web['bytes']} bytes -> {web['dir']}")
 
 
 def run_hardware(ctx, only=None):

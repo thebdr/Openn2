@@ -25,6 +25,10 @@ diag:
   # active, 0 = a cleared bit means active, null = unknown until the M0 polarity watch (bits shown neutral).
   alarm_bit: null
   warning_bit: null
+  # the cabinet's STATE word (the CabState FB of the 620 OPC SCL): the bit set while any alarm / any warning of
+  # the cabinet is active
+  state_alarm_bit: 12
+  state_warning_bit: 13
 
 layout:
   drawing: webui/webui_plant   # the optional plant drawing, looked up as .svg / .png / .jpg in the config tiers

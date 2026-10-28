@@ -60,7 +60,7 @@ def test_subs_match_oracle():
         300: [310, 320, 330],
         400: [410, 420, 430],
         500: [510, 520, 530, 540],
-        600: [610, 620, 630, 640],
+        600: [610, 620, 650, 630, 640, 660],   # 650/660 = the CPU web diagnosis app (C-050)
         700: [710, 720, 730],
         800: [810, 820, 830, 840, 850],
         900: [910, 920, 940, 930],   # 940 = the PL4 before/after report (moved from 145 - it is a REPORT)
@@ -72,7 +72,7 @@ def test_subs_match_oracle():
 def test_kinds_and_enablement():
     # open buttons carry an `opens` key; the deferred/unported ones are greyed (enabled=False).
     opens = {s.number for p in phases for s in p.subs if s.kind == "open"}
-    eq(opens, {160, 170, 180, 190, 250, 330, 420, 530, 540, 630, 640, 730, 840, 850, 930}, "the open buttons")
+    eq(opens, {160, 170, 180, 190, 250, 330, 420, 530, 540, 630, 640, 660, 730, 840, 850, 930}, "the open buttons")
     disabled = {s.number for p in phases for s in p.subs if not s.enabled}
     eq(disabled, {155, 156, 430, 810, 840, 920},
        "the deferred/unported (greyed) buttons")

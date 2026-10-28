@@ -469,7 +469,7 @@ WEBUI_PARAM_KEYS = {
     "app": ("name", "title", "default_page", "visibility"),
     "polling": ("interval_ms", "chunk", "timeout_ms", "detail_interval_ms", "backoff_ms"),
     "login": ("users",),
-    "diag": ("alarm_bit", "warning_bit"),
+    "diag": ("alarm_bit", "warning_bit", "state_alarm_bit", "state_warning_bit"),
     "layout": ("drawing", "positions", "group_by"),
     "custom_data": ("enabled", "db", "max_depth", "max_cells", "page_rows", "interval_ms"),
 }
@@ -575,7 +575,7 @@ def load_webui_params(path: str | None = None) -> dict:
     """webui/webui_params.yaml - the app's name, title, polling, login users, diagnosis-bit polarity, layout and
     custom-data limits. STRICT: every section of WEBUI_PARAM_KEYS and every key in it must be present (the error
     names the first missing one); the app name must be a Web API-safe [A-Za-z0-9_-]+; the polarities are 1, 0 or
-    null (unknown)."""
+    null (unknown); the STATE word's any-alarm / any-warning bits are 0-31."""
     from pipeline5.config.params import _load_yaml
     from pipeline5.config.resolver import resolve
     rel = WEBUI_PARAMS_REL
@@ -606,6 +606,10 @@ def load_webui_params(path: str | None = None) -> dict:
         value = data["diag"][key]
         if isinstance(value, bool) or value not in (0, 1, None):
             raise ValueError(f"{rel}: diag.{key} must be 1, 0 or null (unknown), got {value!r}")
+    for key in ("state_alarm_bit", "state_warning_bit"):
+        value = data["diag"][key]
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 31:
+            raise ValueError(f"{rel}: diag.{key} must be a bit number 0-31 of the cabinet's STATE word, got {value!r}")
     custom = data["custom_data"]
     if not isinstance(custom["enabled"], bool):
         raise ValueError(f"{rel}: custom_data.enabled must be true or false, got {custom['enabled']!r}")
