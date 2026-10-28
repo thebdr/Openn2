@@ -375,6 +375,16 @@ def stale_imports(root: str) -> list:
     return out
 
 
+def _inside(root: str, path: str) -> bool:
+    """True when the absolute `path` lies under the absolute `root`. A path on another drive (or another UNC
+    share) is OUTSIDE - Windows' commonpath raises on it instead of answering (issue #2: an I/O List on E:
+    with the project on C: failed the import with 'Paths don't have the same drive')."""
+    try:
+        return os.path.commonpath([root]) == os.path.commonpath([root, path])
+    except ValueError:                        # another drive on Windows
+        return False
+
+
 def import_documents(root: str) -> list:
     """Copy every configured input document that lives OUTSIDE the project into
     `<root>/input_documents/current|previous/` and rewrite its path in project_params.yaml RELATIVE
@@ -399,9 +409,7 @@ def import_documents(root: str) -> list:
         if not configured:
             continue
         configured = os.path.abspath(configured)
-        inside = os.path.commonpath([os.path.abspath(root)]) == \
-            os.path.commonpath([os.path.abspath(root), configured])
-        if inside:
+        if _inside(os.path.abspath(root), configured):
             target = configured
             action = "up-to-date"
             source, recorded = _remembered_source(remembered.get(key))

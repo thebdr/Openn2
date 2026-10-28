@@ -23,6 +23,7 @@ TEMPLATES_DIR = os.path.join(SHARED, "Templates")
 INTERFACE_TEMPLATE = os.path.join(TEMPLATES_DIR, "MachineInterfaces", "TEMPLATE_INTERFACES_v0.0.xlsx")
 BLOCK_TEMPLATES_DIR = os.path.join(TEMPLATES_DIR, "Tia Portal Software Blocks")   # ph800 block .xml templates
 DIAG_SCL_TEMPLATE = os.path.join(BLOCK_TEMPLATES_DIR, "TEMPLATE--v1.0--06_Diagnostic for OPC.scl")
+WEBAPP_TEMPLATE_DIR = os.path.join(TEMPLATES_DIR, "WebServer", "SafetyDiagnosis")   # ph650: the fixed web app
 _BUILTIN_CONFIG_PROJECT = os.path.join(APP_ROOT, "config_project")
 _BUILTIN_DATABASE = os.path.join(SHARED, "Database")        # the SSOT folder (DESIGN 10.3)
 _BUILTIN_OUTPUT = os.path.join(SHARED, "OutputTree")        # the OPn BuilderData export surface

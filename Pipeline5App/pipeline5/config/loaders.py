@@ -451,3 +451,192 @@ def load_reaction_templates() -> dict:
     if not isinstance(data, dict):
         raise ValueError(TEMPLATES_NOT_A_MAPPING)
     return data
+
+
+# --- the web diagnosis app (sub-phase 650, C-050) - the system tier's webui/ files ---------------- #
+WEBUI_KINDS_REL = "webui/device_kinds.csv"
+WEBUI_MEMBER_STATES_REL = "webui/member_states.csv"
+WEBUI_PARAMS_REL = "webui/webui_params.yaml"
+WEBUI_KIND_COLUMNS = ("kind", "label", "plural", "icon", "order", "family", "types", "anchor_types", "state",
+                      "group_by", "enabled", "comment")
+WEBUI_MEMBER_COLUMNS = ("scope", "db_name", "member", "label", "healthy", "severity", "role", "order", "comment")
+WEBUI_POSITION_COLUMNS = ("kind", "fld", "x", "y")
+WEBUI_STATES = ("diag", "node")                      # how a kind's state is read: its cabinet bits, its node alarm
+WEBUI_SCOPES = ("area", "sorter", "node", "device")
+WEBUI_SEVERITIES = ("alarm", "warning", "info")
+WEBUI_ROLES = ("state", "cause", "reset", "detail")
+WEBUI_PARAM_KEYS = {
+    "app": ("name", "title", "default_page", "visibility"),
+    "polling": ("interval_ms", "chunk", "timeout_ms", "detail_interval_ms", "backoff_ms"),
+    "login": ("users",),
+    "diag": ("alarm_bit", "warning_bit"),
+    "layout": ("drawing", "positions", "group_by"),
+    "custom_data": ("enabled", "db", "max_depth", "max_cells", "page_rows", "interval_ms"),
+}
+WEBUI_DRAWING_EXTENSIONS = (".svg", ".png", ".jpg", ".jpeg")
+_WEBAPP_NAME_RX = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _webui_rows(rel: str, columns: tuple, path: str | None) -> list:
+    """The rows of a STRICT webui csv: the file must exist in a tier (resolve - config is config) and its header
+    must name every column; a missing one is an error naming it and the file."""
+    from pipeline5.config.resolver import resolve
+    path = path or resolve(rel)
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        header = [cell.strip() for cell in (_config_header(handle) or [])]
+    missing = [c for c in columns if c not in header]
+    if missing:
+        raise ValueError(f"{rel}: the header lacks the column(s) {', '.join(missing)} ({path})")
+    return read_config_csv(path)
+
+
+def _cell(row: dict, key: str) -> str:
+    return str(row.get(key) or "").strip()
+
+
+def _int_cell(row: dict, key: str, where: str) -> int:
+    try:
+        return int(_cell(row, key))
+    except ValueError:
+        raise ValueError(f"{where}: {key} must be a whole number, got {_cell(row, key)!r}") from None
+
+
+def _choice(row: dict, key: str, allowed: tuple, where: str) -> str:
+    value = _cell(row, key).lower()
+    if value not in allowed:
+        raise ValueError(f"{where}: {key} must be one of {', '.join(allowed)}, got {_cell(row, key)!r}")
+    return value
+
+
+def _bars(value) -> list:
+    return [part.strip() for part in str(value or "").split("|") if part.strip()]
+
+
+def load_webui_kinds(path: str | None = None) -> list:
+    """webui/device_kinds.csv - the device kinds the page shows, one row each (a new kind is one row, no code):
+    {kind, label, plural, icon, order, family, types, anchor_types, state, group_by, enabled, comment}, sorted by
+    order. `family` names a classification/object_families.csv family ('' = none, e.g. the PROFINET nodes);
+    `types` / `anchor_types` narrow it ([] = the family's own); `state` is diag | node. STRICT: a missing file or
+    column, a duplicate kind or a bad cell is an error naming the row."""
+    rel = WEBUI_KINDS_REL
+    out, seen = [], set()
+    for number, row in enumerate(_webui_rows(rel, WEBUI_KIND_COLUMNS, path), 1):
+        where = f"{rel} row {number}"
+        kind = _cell(row, "kind")
+        if not kind:
+            raise ValueError(f"{where}: kind is empty")
+        if kind in seen:
+            raise ValueError(f"{where}: kind {kind!r} appears twice")
+        seen.add(kind)
+        enabled = _cell(row, "enabled").lower()
+        if enabled not in ("yes", "no", "true", "false", "1", "0"):
+            raise ValueError(f"{where}: enabled must be yes or no, got {_cell(row, 'enabled')!r}")
+        out.append({"kind": kind, "label": _cell(row, "label") or kind, "plural": _cell(row, "plural") or kind,
+                    "icon": _cell(row, "icon"), "order": _int_cell(row, "order", where),
+                    "family": _cell(row, "family"), "types": _bars(row.get("types")),
+                    "anchor_types": _bars(row.get("anchor_types")),
+                    "state": _choice(row, "state", WEBUI_STATES, where),
+                    "group_by": _bars(row.get("group_by")), "enabled": _as_bool(enabled),
+                    "comment": _cell(row, "comment")})
+    return sorted(out, key=lambda k: (k["order"], k["kind"]))
+
+
+def load_webui_member_states(path: str | None = None) -> list:
+    """webui/member_states.csv - the area / sorter / node / device members the page reads, with their polarity
+    as data: {scope, db_name, member, label, healthy, severity, role, order, comment}. `member` is a name pattern
+    ({area} {index} {node} {fld} {n} placeholders, matched against the project's db_members - a row no member
+    matches is simply unused); `healthy` is True / False, or None = unknown (shown neutral). STRICT like the
+    kinds."""
+    rel = WEBUI_MEMBER_STATES_REL
+    out = []
+    for number, row in enumerate(_webui_rows(rel, WEBUI_MEMBER_COLUMNS, path), 1):
+        where = f"{rel} row {number}"
+        for key in ("db_name", "member"):
+            if not _cell(row, key):
+                raise ValueError(f"{where}: {key} is empty")
+        healthy = _cell(row, "healthy").lower()
+        if healthy not in ("", "true", "false", "1", "0"):
+            raise ValueError(f"{where}: healthy must be true, false or blank (unknown), "
+                             f"got {_cell(row, 'healthy')!r}")
+        out.append({"scope": _choice(row, "scope", WEBUI_SCOPES, where), "db_name": _cell(row, "db_name"),
+                    "member": _cell(row, "member"), "label": _cell(row, "label") or _cell(row, "member"),
+                    "healthy": None if healthy == "" else healthy in ("true", "1"),
+                    "severity": _choice(row, "severity", WEBUI_SEVERITIES, where),
+                    "role": _choice(row, "role", WEBUI_ROLES, where), "order": _int_cell(row, "order", where),
+                    "comment": _cell(row, "comment")})
+    return out
+
+
+def _positive_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def load_webui_params(path: str | None = None) -> dict:
+    """webui/webui_params.yaml - the app's name, title, polling, login users, diagnosis-bit polarity, layout and
+    custom-data limits. STRICT: every section of WEBUI_PARAM_KEYS and every key in it must be present (the error
+    names the first missing one); the app name must be a Web API-safe [A-Za-z0-9_-]+; the polarities are 1, 0 or
+    null (unknown)."""
+    from pipeline5.config.params import _load_yaml
+    from pipeline5.config.resolver import resolve
+    rel = WEBUI_PARAMS_REL
+    path = path or resolve(rel)
+    _present, data = _load_yaml(path)
+    if not isinstance(data, dict):
+        raise ValueError(f"{rel}: the top level must be a mapping ({path})")
+    for section, keys in WEBUI_PARAM_KEYS.items():
+        block = data.get(section)
+        if not isinstance(block, dict):
+            raise ValueError(f"{rel}: the section {section!r} is missing ({path})")
+        for key in keys:
+            if key not in block:
+                raise ValueError(f"{rel}: {section}.{key} is missing ({path})")
+    name = str(data["app"]["name"] or "")
+    if not _WEBAPP_NAME_RX.match(name):
+        raise ValueError(f"{rel}: app.name must be letters, digits, '_' or '-', got {name!r}")
+    for key in ("interval_ms", "chunk", "timeout_ms", "detail_interval_ms"):
+        if not _positive_int(data["polling"][key]):
+            raise ValueError(f"{rel}: polling.{key} must be a positive whole number, got {data['polling'][key]!r}")
+    backoff = data["polling"]["backoff_ms"]
+    if not isinstance(backoff, list) or not backoff or not all(_positive_int(v) for v in backoff):
+        raise ValueError(f"{rel}: polling.backoff_ms must be a list of positive whole numbers, got {backoff!r}")
+    users = data["login"]["users"]
+    if not isinstance(users, list) or not users or not all(isinstance(u, str) and u.strip() for u in users):
+        raise ValueError(f"{rel}: login.users must be a list of user names, got {users!r}")
+    for key in ("alarm_bit", "warning_bit"):
+        value = data["diag"][key]
+        if isinstance(value, bool) or value not in (0, 1, None):
+            raise ValueError(f"{rel}: diag.{key} must be 1, 0 or null (unknown), got {value!r}")
+    custom = data["custom_data"]
+    if not isinstance(custom["enabled"], bool):
+        raise ValueError(f"{rel}: custom_data.enabled must be true or false, got {custom['enabled']!r}")
+    for key in ("max_depth", "max_cells", "page_rows", "interval_ms"):
+        if not _positive_int(custom[key]):
+            raise ValueError(f"{rel}: custom_data.{key} must be a positive whole number, got {custom[key]!r}")
+    return data
+
+
+def load_webui_positions(rel: str, path: str | None = None) -> list:
+    """The plant drawing's icon positions (`layout.positions`, header kind,fld,x,y - what the page's edit mode
+    exports): [{kind, fld, x, y}] with float x / y. STRICT on the file, the header and the numbers; a row with a
+    blank kind or fld is skipped."""
+    out = []
+    for number, row in enumerate(_webui_rows(rel, WEBUI_POSITION_COLUMNS, path), 1):
+        if not (_cell(row, "kind") and _cell(row, "fld")):
+            continue
+        try:
+            x, y = float(_cell(row, "x")), float(_cell(row, "y"))
+        except ValueError:
+            raise ValueError(f"{rel} row {number}: x and y must be numbers, got {_cell(row, 'x')!r}, "
+                             f"{_cell(row, 'y')!r}") from None
+        out.append({"kind": _cell(row, "kind"), "fld": _cell(row, "fld"), "x": x, "y": y})
+    return out
+
+
+def find_webui_drawing(stem: str):
+    """The optional plant drawing (`layout.drawing` = a tier-relative stem): the first of .svg / .png / .jpg /
+    .jpeg the config tiers hold, or None - a project without a drawing gets the auto schematic only."""
+    for extension in WEBUI_DRAWING_EXTENSIONS:
+        path = find(stem + extension)
+        if path:
+            return path
+    return None

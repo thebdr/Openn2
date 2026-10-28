@@ -1,0 +1,8 @@
+kind,label,plural,icon,order,family,types,anchor_types,state,group_by,enabled,comment
+estop,E-stop,E-stops,estop,10,emergency_pb,,,diag,functional_unit|location,yes,emergency push buttons; types / anchor_types blank = the family's own (classification/object_families.csv)
+breaker,Safety breaker,Safety breakers,breaker,20,breaker,,,diag,functional_unit|location,yes,
+door,Door,Doors,door,30,door,,,diag,functional_unit|location,yes,
+contactor,Contactor,Contactors,contactor,40,contactor,,,diag,functional_unit|location,yes,
+encoder,Encoder,Encoders,encoder,50,encoder,,,diag,functional_unit|location,yes,
+pn_node,PROFINET node,PROFINET nodes,node,60,,,,node,location,yes,no device family: one per hardware station; state = its PROFINET_NODES_ALARM member
+fire_alarm,Fire alarm,Fire alarms,fire,70,fire_alarm,,,diag,functional_unit|location,no,a new kind is one row - enable it on a project that has fire alarms (family fire_alarm)
