@@ -49,6 +49,9 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
       * the coupler transfer areas (C-031, contract §2.1): the `TransferArea-*` rows of `hardware_modules.csv`
         and `Modules.csv` are PL5-only (PL4 never emitted them) - dropped from the PL5 side only, counted in the
         verdict; a reference row of that model would still be a difference
+      * the TIA Portal version (C-049, 2026-10-27, user: "we should be able to set the tia version in PL5"): every
+        SimaticML document PL5 writes is stamped with the project's `tia_version` (the builtin V20 here), the
+        reference's with V18 - a PL5 stamp equal to the setting is read as V18, counted; any other stamp differs
 The verdict is the EXIT CODE (0 = parity): the policy lives in the command, not in log prose.
 
 Run:         <python> scripts/parity_vs_pl4.py
@@ -191,8 +194,25 @@ _CM_TEMPLATE = ("TEMPLATE--v1.1--00_Only for Commissioning", "TEMPLATE--v1.2--00
 _RENAMED = _TEMPLATE_RENAMES + _MEMBER_RENAMES + (_PB_TEMPLATE, _CM_TEMPLATE)
 
 
+_ENGINEERING_RX = re.compile(r'<Engineering version="(V\d+)"')
+
+
+def _norm_tia(text: str) -> str:
+    """C-049: a stamp equal to PL5's configured TIA version read as the reference's V18 (counted)."""
+    from pipeline5.systems.plc_based.siemens_s7 import tia_version
+    target = tia_version.active()
+
+    def read_as_reference(m):
+        if m.group(1) == target and target != "V18":
+            SANCTIONED["tia_version"] += 1
+            return '<Engineering version="V18"'
+        return m.group(0)
+    return _ENGINEERING_RX.sub(read_as_reference, text)
+
+
 def _norm_str(text: str) -> str:
     text, _headered = _strip_header(text)
+    text = _norm_tia(text)
     for form in _repo_forms():
         text = text.replace(form, "<REPO>")
     for old, new in _RENAMED:                      # sanctioned + counted: the reference spells them the old way
@@ -230,7 +250,7 @@ _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
 SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
               "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0, "renamed_tags": 0, "em_state_comments": 0,
               "pb_template": 0, "pb_rows": 0, "dr_channel_params": 0, "cm_template": 0, "cm_rows": 0, "cm_db": 0, "cm_db_rows": 0,
-              "cm_db_numbers": 0, "cm_coverage": 0, "web_app_files": 0}
+              "cm_db_numbers": 0, "cm_coverage": 0, "tia_version": 0, "web_app_files": 0}
 _SIGNAL_PATHS = "ProjectDocumentation/Reports/io_signal_paths.html"
 _DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
 _SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
@@ -893,7 +913,8 @@ def main() -> int:
               f"{SANCTIONED['cm_template']} v1.2 00 template checked against Shared, {SANCTIONED['cm_rows']} 00 rows "
               f"read in the v1.2 form, {SANCTIONED['cm_db']} 99_Commissioning checked against the reference's nodes, "
               f"{SANCTIONED['cm_db_rows']} of its table rows + {SANCTIONED['cm_coverage']} coverage mention(s) "
-              f"dropped, {SANCTIONED['cm_db_numbers']} DB number(s) shifted; C-050: {SANCTIONED['web_app_files']} "
+              f"dropped, {SANCTIONED['cm_db_numbers']} DB number(s) shifted; C-049: {SANCTIONED['tia_version']} "
+              f"SimaticML stamp(s) of the tia_version setting read as V18; C-050: {SANCTIONED['web_app_files']} "
               f"web application file(s) checked against their manifest)")
         return 0
 

@@ -234,6 +234,58 @@ def test_archive_and_import_documents():
     _with_temp_localappdata(body)
 
 
+def _other_drive(path):
+    """A drive letter other than `path`'s that this machine doesn't have - a document there is unreachable."""
+    own = os.path.splitdrive(os.path.abspath(path))[0].upper()
+    return next(f"{letter}:" for letter in "QRSTUVWXY"
+                if f"{letter}:" != own and not os.path.exists(f"{letter}:\\"))
+
+
+def test_inside_project():
+    """The import's inside-the-project test: a path on another drive or UNC share is OUTSIDE, never a raise."""
+    with tempfile.TemporaryDirectory() as d:
+        root = os.path.abspath(os.path.join(d, "Proj"))
+        ok(project._inside(root, os.path.join(root, "input_documents", "current", "io.xlsx")), "a file inside")
+        ok(project._inside(root, root), "the root itself")
+        ok(not project._inside(root, os.path.join(d, "Proj2", "io.xlsx")), "a sibling sharing the name's prefix")
+        ok(not project._inside(root, os.path.join(d, "io.xlsx")), "the parent folder")
+        if os.name == "nt":
+            ok(not project._inside(root, _other_drive(d) + "\\BFVT_I-O LIST\\io.xlsx"), "another drive (issue #2)")
+            ok(not project._inside(root, "\\\\server\\share\\io.xlsx"), "a UNC share")
+            ok(project._inside(root, root.swapcase()), "the drive and folders in another case")
+
+
+def test_import_documents_from_another_drive():
+    """Issue #2: a document on another drive than the project is imported - copied in when it exists, reported
+    missing when it doesn't - instead of failing the whole import with 'Paths don't have the same drive'."""
+    if os.name != "nt":
+        return
+    def body(d):
+        config.use_builtin()
+        root = project.create_project(d, "Drives", ["siemens_s7_safety"], False, 5)
+        unreachable = _other_drive(d) + "\\BFVT_I-O LIST\\io.xlsx"
+        config.save_document_path("iolist_path", unreachable)
+        actions = {k: (a, v) for k, a, v in project.import_documents(root)}
+        eq(actions["iolist_path"], ("missing", unreachable), "a file on a drive this machine lacks is missing")
+        eq(config.load_document_paths()["iolist_path"], unreachable, "a missing document's path stays as set")
+        src = os.path.join(os.path.realpath(d), "ext"); os.makedirs(src)
+        prev = os.path.join(src, "io_prev.xlsx")
+        with open(prev, "wb") as h:
+            h.write(b"PREV")
+        # the same file under another drive spelling (`\\?\C:\...` - Windows' commonpath sees a different
+        # drive): a real second drive can't be counted on, this reaches the copy branch on any machine
+        extended = "\\\\?\\" + prev
+        config.save_document_path("iolist_previous_path", extended)
+        actions = {k: (a, v) for k, a, v in project.import_documents(root)}
+        eq(actions["iolist_previous_path"], ("imported", "../../input_documents/previous/io_prev.xlsx"),
+           "copied into the project + rewritten relative to config_project")
+        with open(config.load_params()["iolist_previous_path"], "rb") as h:
+            eq(h.read(), b"PREV", "the relative path resolves to the copy")
+        rec = project.load_project_meta(root).get("imported", {}).get("iolist_previous_path", {})
+        eq(rec.get("source"), extended, "the import remembers the other-drive source")
+    _with_temp_localappdata(body)
+
+
 def test_stale_import_detection_and_refresh():
     """The stale-import cycle: import records {source, mtime}; editing the ORIGINAL flags the key in
     stale_imports (the GUI open-time WARN); the next Import REFRESHES the project copy from it."""
@@ -379,6 +431,8 @@ if __name__ == "__main__":
         ("create_project_double_nested_with_meta", test_create_project_double_nested_with_meta),
         ("backup_rotation_and_zip", test_backup_rotation_and_zip),
         ("archive_and_import_documents", test_archive_and_import_documents),
+        ("inside_project", test_inside_project),
+        ("import_documents_from_another_drive", test_import_documents_from_another_drive),
         ("stale_import_detection_and_refresh", test_stale_import_detection_and_refresh),
         ("open_rejects_unknown_and_pl4_system_ids", test_open_rejects_unknown_and_pl4_system_ids),
         ("multi_system_projects_namespace_database_and_output", test_multi_system_projects_namespace_database_and_output),

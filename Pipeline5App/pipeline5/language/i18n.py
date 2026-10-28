@@ -142,6 +142,7 @@ STRINGS: dict = {
     "np_base":      {"en": "Base folder", "it": "Cartella base"},
     "np_path":      {"en": "Project path", "it": "Percorso progetto"},
     "np_backups":   {"en": "Backups kept (0-20)", "it": "Backup conservati (0-20)"},
+    "np_tia_version": {"en": "TIA Portal version", "it": "Versione TIA Portal"},
     "np_backups_hint": {"en": "each phase run backs the full project up beside it; "
                               "editable later in project_params.yaml (project.backups_kept)",
                         "it": "ogni fase esegue un backup completo del progetto accanto ad esso; "

@@ -76,7 +76,7 @@ WORKSPACE_REQUIRED = ("contract", "producer", "generated")
 KNOWN_KEYS = ("kind", "schema", "producer", "generated", "run", "project", "plc", "target", "name",
               "source", "id", "depends", "comment", "contract", "plcs", "templates")
 # the key order a rendered header uses (file keys first, then the workspace-config keys)
-KEY_ORDER = ("kind", "contract", "schema", "producer", "generated", "run", "project", "plcs", "templates",
+KEY_ORDER = ("kind", "contract", "schema", "producer", "generated", "run", "project", "plcs", "templates", "tia",
              "plc", "target", "name", "source", "id", "depends", "comment")
 _KEY_RX = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _EOL = "\r\n"
@@ -144,12 +144,12 @@ def fields(kind: str, phase: int | None = None, *, run: str | None = None, proje
 
 
 def workspace_fields(*, run: str | None = None, project: str | None = None, plcs=(),
-                     templates: str = TEMPLATES_FOLDER, generated: str | None = None) -> dict:
+                     templates: str = TEMPLATES_FOLDER, generated: str | None = None, tia: str | None = None) -> dict:
     """The workspace config header (§3.4): the contract version, the project, the producer, the run, the
-    PLC folders and the templates folder."""
+    PLC folders, the templates folder and the TIA Portal version the SimaticML targets ([[C-049]])."""
     out = {"contract": str(CONTRACT), "project": project if project is not None else project_code(),
            "producer": producer(), "generated": generated or generated_now(), "run": run or current_run(),
-           "plcs": ", ".join(p for p in plcs if p), "templates": templates}
+           "plcs": ", ".join(p for p in plcs if p), "templates": templates, "tia": tia}
     return {k: str(v) for k, v in out.items() if v is not None and str(v) != ""}
 
 

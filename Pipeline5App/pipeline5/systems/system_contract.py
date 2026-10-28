@@ -107,6 +107,17 @@ class SystemCapabilities:
     needs_diagnosis_blocks: bool = False   # gates the DiagnosisBlocks sheet staging + its checks
 
 
+@dataclass(frozen=True)
+class ProjectOption:
+    """One per-project setting a system asks for at creation: the New-project dialog renders a dropdown per
+    option of the selected types (deduplicated by key) and `project_manager.create_project` writes the choice
+    as the top-level `key` of the project's project_params.yaml. The preselected value is the BUILTIN
+    project_params.yaml's - config, never an in-code default ([[C-049]]: Siemens' `tia_version`)."""
+    key: str                               # the top-level project_params.yaml key
+    label_key: str                         # i18n key of the dialog label
+    choices: tuple                         # the accepted values, in display order
+
+
 class SymbolFormatter:
     """How this system spells a symbol reference (PL4 coupling #1: the TIA-quoted plc_binding).
 
@@ -242,6 +253,7 @@ class System:
                                          # which spawns reach generation and which only the saved Database
     template_language: str = ""          # the langs.json key of the language this system's TEXT templates
                                          # generate - the template builder's base highlight ("" = none)
+    project_options: tuple = ()          # ProjectOption rows the New-project dialog asks for (C-049)
 
     def __post_init__(self):
         if not self.id or not str(self.id).strip():
