@@ -1,5 +1,6 @@
-// Overview: the area and cabinet strips, one summary card per device kind, then the auto schematic - every
-// device and PROFINET node as a tile, grouped by plant.layout.group_by (functional unit, then location).
+// Overview: the area and cabinet strips, one summary card per device kind, then the plant - the drawing with its
+// icons (55_drawing.js) when the project has one, and the auto schematic: every device and PROFINET node as a
+// tile, grouped by plant.layout.group_by (functional unit, then location).
 (function (SD) {
   "use strict";
   SD.view("overview", { label: "Overview", icon: "overview", order: 10, nav: true, render: function (ctx) {
@@ -68,14 +69,32 @@
       toggle.setAttribute("aria-pressed", String(onlyBad));
       if (ctx.ev) { update(ctx.ev); }
     });
+    var drawing = plant.layout.image ? SD.drawing(ctx) : null, plantHead = null;
+    if (drawing) {
+      var tabDrawing = SD.el("a", { href: "#", cls: "on", text: "Drawing" });
+      var tabSchematic = SD.el("a", { href: "#", text: "Schematic (" + levels.join(", then ").replace(/_/g, " ") + ")" });
+      var showDrawing = function (yes) {
+        tabDrawing.className = yes ? "on" : "";
+        tabSchematic.className = yes ? "" : "on";
+        drawing.node.hidden = !yes;
+        schematic.hidden = yes;
+        if (yes) { drawing.fit(); }
+      };
+      tabDrawing.addEventListener("click", function (e) { e.preventDefault(); showDrawing(true); });
+      tabSchematic.addEventListener("click", function (e) { e.preventDefault(); showDrawing(false); });
+      plantHead = SD.el("div", { cls: "tabs" }, [tabDrawing, tabSchematic]);
+      schematic.hidden = true;
+    }
     SD.add(node, [
       SD.el("div", { cls: "head" }, [SD.el("h2", { text: "Overview" }), toggle]),
       SD.el("h3", { cls: "section", text: "Areas" }), areaStrip,
       SD.el("h3", { cls: "section", text: "Diagnosis cabinets" }), cabStrip,
       SD.el("h3", { cls: "section", text: "Devices" }), summary,
-      SD.el("h3", { cls: "section", text: "Plant (" + levels.join(", then ").replace(/_/g, " ") + ")" }), schematic]);
+      SD.el("h3", { cls: "section", text: drawing ? "Plant" : "Plant (" + levels.join(", then ").replace(/_/g, " ") + ")" }),
+      plantHead, drawing ? drawing.node : null, schematic]);
 
     function update(ev) {
+      if (drawing) { drawing.update(ev, onlyBad); }
       plant.areas.forEach(function (a) { SD.setState(areaChips[a.id], ev.area[a.id].state); });
       plant.cabinets.forEach(function (c) { SD.setState(cabChips[c.id], ev.cabinet[c.id].summary.state); });
       model.kinds.forEach(function (k) {
@@ -101,6 +120,6 @@
         box.hidden = !any;
       });
     }
-    return { node: node, update: update };
+    return { node: node, update: update, leave: function () { if (drawing) { drawing.leave(); } } };
   } });
 })(SD);

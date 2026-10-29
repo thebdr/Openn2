@@ -1,8 +1,8 @@
 """The shipped web diagnosis page (C-050 M3, Shared/Templates/WebServer/SafetyDiagnosis) as phase 650 bundles it:
 the files it ships, no external URL (the CPU serves everything), the Web API methods it can send (read-only: the
 anonymous login, PlcProgram.Read / Browse - never a write), every text set as text (no HTML sink), the size budget,
-the mock simulator loaded only on a local host, and the plant.json keys it reads all present in build_plant's
-output. The page's behaviour itself is checked in a browser against the mock (evidence C-050 M3)."""
+the mock simulator loaded only on a local host, the plant.json keys it reads all present in build_plant's
+output, and the drawing's positions export read back by the loader (M5). The page's behaviour itself is checked in a browser against the mock (evidence C-050 M3)."""
 import json
 import os
 import re
@@ -116,6 +116,30 @@ def test_the_plant_keys_it_reads_exist():
            f"icons.svg has the {kind['kind']} icon {kind['icon']!r}")
 
 
+def test_the_positions_round_trip():
+    """[[C-050]] M5: the drawing's edit mode exports webui_positions.csv (SD.positionsCsv) - its header is the
+    loader's columns, CRLF, csv quoting - and such a file loads back through config.load_webui_positions exactly.
+    The browser side (the export of the unedited positions byte-identical to the file 650 read) is evidence."""
+    import tempfile
+    from pipeline5.config import loaders
+    js = _part(_text(_files(), "app.js"), "js/55_drawing.js")
+    head = re.search(r'var rows = \[\[([^\]]*)\]\];', js)
+    ok(head, "the exporter's header row")
+    eq(tuple(re.findall(r'"([a-z]+)"', head.group(1))), loaders.WEBUI_POSITION_COLUMNS, "the loader's columns")
+    ok('.join("\\r\\n")' in js and "toFixed(1)" in js, "CRLF rows, one decimal")
+    text = ('kind,fld,x,y\r\ncontactor,=LB-AE01-Q32001/Q32002,1205.6,405.2\r\n'
+            'estop,"=ES-0040, moved",1080.4,2280.4\r\n')
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "webui_positions.csv")
+        open(path, "w", newline="", encoding="utf-8").write(text)
+        rows = config.load_webui_positions("webui/webui_positions.csv", path=path)
+    eq(rows, [{"kind": "contactor", "fld": "=LB-AE01-Q32001/Q32002", "x": 1205.6, "y": 405.2},
+              {"kind": "estop", "fld": "=ES-0040, moved", "x": 1080.4, "y": 2280.4}], "read back as written")
+    image = set(re.findall(r"\bimage\.([a-z_]+)\b", js))
+    ok(image, "the drawing reads plant.layout.image")
+    eq(sorted(image - {"file", "width", "height", "view_box"}), [], "only what 650 measures (webui_project.measure)")
+
+
 def test_every_kind_icon_is_drawn():
     svg = _text(_files(), "icons.svg")
     for kind in config.load_webui_kinds():
@@ -132,5 +156,6 @@ if __name__ == "__main__":
         ("size_budget", test_size_budget),
         ("the_mock_only_on_a_local_host", test_the_mock_only_on_a_local_host),
         ("the_plant_keys_it_reads_exist", test_the_plant_keys_it_reads_exist),
+        ("the_positions_round_trip", test_the_positions_round_trip),
         ("every_kind_icon_is_drawn", test_every_kind_icon_is_drawn),
     ]))

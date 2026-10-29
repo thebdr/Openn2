@@ -47,6 +47,20 @@ and is not a safety function.
 - **Configuration problems** lists the variables of `plant.json` the CPU does not know: the CPU runs
   another program than the one PL5 generated the page from. Run 650 again and upload.
 
+## The plant drawing
+
+- A project can give the page a drawing of the plant: `webui_plant.svg`, `.png` or `.jpg` in the project's
+  webui config (`config_project/systems/siemens_s7_safety/webui/`). The icon positions are
+  `webui_positions.csv` beside it (`kind,fld,x,y`, in the drawing's own units).
+- The overview then shows the drawing with one live icon per device. Drag to pan; zoom with the wheel, two
+  fingers or the buttons; click an icon for its details. **Schematic** shows the automatic grouping instead.
+- **Edit positions** moves icons: drag one, or pick a device under **Not placed** and tap the drawing. **Unplace
+  selected** takes an icon off, **Discard changes** goes back. **Download webui_positions.csv** gives the file;
+  save it over the project's `webui_positions.csv`, run **650** again and upload the application. The page
+  itself changes nothing on the CPU.
+- Phase 650 warns about a position that names no device of the plant, and notes the devices without a position
+  (the edit mode lists them).
+
 ## Local preview
 
 The page runs against a simulator, without a CPU. In the app folder:
