@@ -56,6 +56,9 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
       * the coupler transfer areas (C-031, contract §2.1): the `TransferArea-*` rows of `hardware_modules.csv`
         and `Modules.csv` are PL5-only (PL4 never emitted them) - dropped from the PL5 side only, counted in the
         verdict; a reference row of that model would still be a difference
+      * the TIA Portal version (C-049, 2026-10-27, user: "we should be able to set the tia version in PL5"): every
+        SimaticML document PL5 writes is stamped with the project's `tia_version` (the builtin V20 here), the
+        reference's with V18 - a PL5 stamp equal to the setting is read as V18, counted; any other stamp differs
 The verdict is the EXIT CODE (0 = parity): the policy lives in the command, not in log prose.
 
 Run:         <python> scripts/parity_vs_pl4.py
@@ -147,6 +150,8 @@ def run_pl5(db_dir: str, out_dir: str) -> None:
     from pipeline5.phases.coverage import signal_paths       # PL5-only (C-038): checked, never compared
     from pipeline5.systems.plc_based.siemens_s7.safety.main import _ready_block_xml
     signal_paths.project(db, ready=_ready_block_xml(db, SYSTEM))
+    from pipeline5.systems.plc_based.siemens_s7.safety import webui_project   # PL5-only (C-050): checked, never compared
+    webui_project.project(db)
 
 
 def _tree(root: str) -> dict:
@@ -196,8 +201,25 @@ _CM_TEMPLATE = ("TEMPLATE--v1.1--00_Only for Commissioning", "TEMPLATE--v1.2--00
 _RENAMED = _TEMPLATE_RENAMES + _MEMBER_RENAMES + (_PB_TEMPLATE, _CM_TEMPLATE)
 
 
+_ENGINEERING_RX = re.compile(r'<Engineering version="(V\d+)"')
+
+
+def _norm_tia(text: str) -> str:
+    """C-049: a stamp equal to PL5's configured TIA version read as the reference's V18 (counted)."""
+    from pipeline5.systems.plc_based.siemens_s7 import tia_version
+    target = tia_version.active()
+
+    def read_as_reference(m):
+        if m.group(1) == target and target != "V18":
+            SANCTIONED["tia_version"] += 1
+            return '<Engineering version="V18"'
+        return m.group(0)
+    return _ENGINEERING_RX.sub(read_as_reference, text)
+
+
 def _norm_str(text: str) -> str:
     text, _headered = _strip_header(text)
+    text = _norm_tia(text)
     for form in _repo_forms():
         text = text.replace(form, "<REPO>")
     for old, new in _RENAMED:                      # sanctioned + counted: the reference spells them the old way
@@ -235,7 +257,8 @@ _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
 SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
               "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0, "renamed_tags": 0, "em_state_comments": 0,
               "pb_template": 0, "pb_rows": 0, "dr_channel_params": 0, "cm_template": 0, "cm_rows": 0, "cm_db": 0, "cm_db_rows": 0,
-              "cm_db_numbers": 0, "cm_coverage": 0, "encoder_members": 0, "pw_bypass": 0}
+              "cm_db_numbers": 0, "cm_coverage": 0, "tia_version": 0, "web_app_files": 0, "encoder_members": 0,
+              "pw_bypass": 0}
 _SIGNAL_PATHS = "ProjectDocumentation/Reports/io_signal_paths.html"
 _DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
 _SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
@@ -781,6 +804,26 @@ def _check_areas_table(path: str, ref_signals: str, label: str) -> list:
     return problems
 
 
+def _check_web_app(app_dir: str, label: str) -> list:
+    """C-050: the web application folder is PL5-only (no PL4 counterpart): its manifest carries a valid web/app
+    header, every resource is the manifest's (size + SHA-256) and plant.json parses as schema 1."""
+    import json
+    from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+    from pipeline5.systems.plc_based.siemens_s7 import webapp_folder
+    problems = []
+    h = header.read_header(os.path.join(app_dir, header.WEBAPP_MANIFEST))
+    if h.status != "ok" or h.get("kind") != "web/app":
+        problems.append(f"{label}: web app manifest header {h.status} {h.get('kind')}: {h.problems}")
+    problems += [f"{label}: web app {os.path.basename(app_dir)}: {p}" for p in webapp_folder.verify(app_dir)]
+    try:
+        plant = json.load(open(os.path.join(app_dir, "plant.json"), encoding="utf-8"))
+        if plant.get("schema") != 1 or not plant.get("poll"):
+            problems.append(f"{label}: plant.json is no schema-1 plant with a poll set")
+    except (OSError, ValueError) as error:
+        problems.append(f"{label}: plant.json does not load: {error}")
+    return problems
+
+
 def _legacy_rel(rel: str):
     """A PL5 output path -> the frozen reference's path: the VCI-shaped workspace (contract §4) onto the
     legacy BuilderData folders (§4.1, inverted). None = a PL5-only file by design (the workspace config,
@@ -833,6 +876,11 @@ def compare(a_root: str, b_root: str, label: str) -> list:
         if rel == _PB_SHIPPED:                         # the v1.3 02 template: checked against Shared's
             diffs += _check_pb_template(path, label)
             SANCTIONED["pb_template"] += 1
+            continue
+        if rel.startswith(_WORKSPACE) and "/Web applications/" in rel:   # C-050: PL5-only, checked
+            if rel.endswith("/webapp.manifest.csv"):
+                diffs += _check_web_app(os.path.dirname(path), label)
+            SANCTIONED["web_app_files"] += 1
             continue
         if rel == _SIGNAL_PATHS:                       # the signal-paths page: its data checked, never compared
             diffs += _check_signal_paths(path, os.path.join(a_root, "ProjectDocumentation", "Reports",
@@ -937,7 +985,9 @@ def main() -> int:
               f"{SANCTIONED['cm_template']} v1.2 00 template checked against Shared, {SANCTIONED['cm_rows']} 00 rows "
               f"read in the v1.2 form, {SANCTIONED['cm_db']} 99_Commissioning checked against the reference's nodes, "
               f"{SANCTIONED['cm_db_rows']} of its table rows + {SANCTIONED['cm_coverage']} coverage mention(s) "
-              f"dropped, {SANCTIONED['cm_db_numbers']} DB number(s) shifted; C-053: "
+              f"dropped, {SANCTIONED['cm_db_numbers']} DB number(s) shifted; C-049: {SANCTIONED['tia_version']} "
+              f"SimaticML stamp(s) of the tia_version setting read as V18; C-050: {SANCTIONED['web_app_files']} "
+              f"web application file(s) checked against their manifest; C-053: "
               f"{SANCTIONED['encoder_members']} encoder slot(s) read as the declared member, "
               f"{SANCTIONED['pw_bypass']} PW-node bypass mention(s) dropped)")
         return 0

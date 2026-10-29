@@ -11,6 +11,7 @@ from pipeline5.systems.plc_based.siemens_s7 import creation_info_csv as creation
 from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
 from pipeline5.systems.plc_based.siemens_s7 import scl_emitter as scl_emit
 from pipeline5.systems.plc_based.siemens_s7 import fc_xml_emitter as xml_emit
+from pipeline5.systems.plc_based.siemens_s7 import tia_version
 from pipeline5.phases.software_blocks.signals_view import Database
 from pipeline5.phases.software_blocks.block_table import Table
 from pipeline5.systems.plc_based.siemens_s7.safety import block_builders as builders
@@ -451,6 +452,9 @@ def test_write_fc_xml_bom_and_path():
            "a single UTF-8 BOM, the declaration, then the contract-v1 header as the first comment")
         ok(b"#! target: Program blocks\r\n" in raw and b"#!end\r\n-->\r\n<Document>" in raw, "...closing right before the Document")
         ok(b"\r\n" in raw, "CRLF line endings")
+        version = tia_version.active().encode()
+        ok(b'<Engineering version="' + version + b'" />' in raw and b'"V18"' not in raw,
+           "the template's V18 stamp replaced by the project's TIA version (C-049)")
         eq(xml_emit.write_fc_xml("00_Only for Commissioning", t, tpl, out, "csv"), "", "a non-fc kind -> '' (no XML)")
 
 

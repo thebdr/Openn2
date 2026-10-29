@@ -1017,6 +1017,39 @@ def test_sub_phase_dispatch():
     ok("RSLT" in host2.levels(), "the 110 validator reports a RSLT")
 
 
+def test_a_lone_650_writes_the_web_application():
+    """[[C-050]] M2: the 650 dropdown action alone (no 300 before it in this host) stages, builds and writes
+    `<PLC>/Web applications/safety/` - the manifest with the lone run, every resource bound by its hash, a
+    plant.json of the fixture's kinds with its exact poll set - and its RSLT line; a second 650 rewrites the same
+    folder (same resources, nothing left over)."""
+    import json
+    from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+    from pipeline5.systems.plc_based.siemens_s7 import webapp_folder
+    host = _Host(run="lone-650")
+    SYSTEM.handlers[SYSTEM.phases.phase_of_sub(650).handler](host.ctx(), only=650)
+    eq(host.halted, False, "the clean fixture does not halt")
+    ok(any(lvl == "RSLT" and msg.startswith("  650 web application:") for lvl, msg in host.lines), host.lines)
+    ok(not any(msg.startswith("  610") or msg.startswith("  620") for _lvl, msg in host.lines), "only the 650 leg")
+    app = os.path.join(config.output_root(), "TiaPortalProjectInterface", "BuilderData", "n0001-mc1-cc1-k65501",
+                       "Web applications", "safety")
+    h = header.read_header(os.path.join(app, "webapp.manifest.csv"))
+    eq((h.status, h.get("kind"), h.get("run"), h.get("target"), h.get("name")),
+       ("ok", "web/app", "lone-650", "Web applications/safety", "safety"), h.problems)
+    eq(webapp_folder.verify(app), [], "the folder is what its manifest says")
+    rows = webapp_folder.read_manifest(os.path.join(app, "webapp.manifest.csv"))
+    eq([r["name"] for r in rows], ["index.html", "app.css", "app.js", "plant.json"], "the default page first")
+    plant = json.load(open(os.path.join(app, "plant.json"), encoding="utf-8"))
+    eq((plant["schema"], plant["meta"]["run"], plant["plc"]["station"]), (1, "lone-650", "n0001-mc1-cc1-k65501"))
+    ok(plant["counts"]["kinds"]["estop"] > 0 and plant["counts"]["kinds"]["pn_node"] > 0, plant["counts"])
+    ok(plant["poll"] and all(v.startswith('"') and v.endswith('"') for v in plant["poll"]), "quoted variable names")
+    ok(len(plant["poll"]) == len(set(plant["poll"])), "each variable once")
+    host2 = _Host(run="lone-650-again")
+    SYSTEM.handlers["diagnosis"](host2.ctx(), only=650)
+    eq(sorted(os.listdir(app)), ["app.css", "app.js", "index.html", "plant.json", "webapp.manifest.csv"],
+       "a rerun rewrites the same files")
+    eq(header.read_header(os.path.join(app, "webapp.manifest.csv")).get("run"), "lone-650-again")
+
+
 def _qbad_project(project, params):
     """A PROJECT whose after_300 rule spawns, for every contactor output, its QBAD signal at the input of the
     same offset, named as the 05 Output Feedback block references it (the FVT convention, [[C-030]])."""
@@ -1150,7 +1183,23 @@ def _builder_data(out_root):
                 wb.close()
             else:
                 tree[rel] = _unstamped(open(path, "rb").read())
+                if name in ("plant.json", "webapp.manifest.csv"):
+                    tree[rel] = _web_app_unstamped(name, tree[rel])
     return tree
+
+
+def _web_app_unstamped(name: str, raw: bytes) -> bytes:
+    """The web app's in-band header ([[C-050]]): plant.json's `meta.run` / `meta.generated` differ per generation
+    like a header's, and so do the manifest's size + SHA-256 of plant.json - everything else must not."""
+    import json
+    if name == "plant.json":
+        plant = json.loads(raw.decode("utf-8"))
+        plant["meta"].pop("run", None)
+        plant["meta"].pop("generated", None)
+        return json.dumps(plant, sort_keys=True).encode("utf-8")
+    lines = raw.decode("utf-8").splitlines()
+    return "\n".join(",".join(line.split(",")[:2]) if line.startswith("plant.json,") else line
+                     for line in lines).encode("utf-8")
 
 
 def _unstamped(raw: bytes) -> bytes:
@@ -1193,10 +1242,15 @@ def test_run_all_writes_a_ready_op5_workspace():
     ok(any(f.startswith("Templates/TEMPLATE--") for f in files), files)
     ok(not any(f.startswith(("HardwareConfiguration/", "SoftwareBlocks/", "PlcTags/")) for f in files),
        "the legacy layout is not written any more")
+    web_app = f"{plc}/Web applications/safety/"
+    ok(f"{web_app}webapp.manifest.csv" in files and f"{web_app}plant.json" in files and f"{web_app}index.html" in files,
+       "650: the web application folder with its manifest ([[C-050]])")
     bad = []
     for rel in files:
         if rel.startswith(".openn/") or rel.endswith(".openn"):
             continue
+        if rel.startswith(web_app) and rel != f"{web_app}webapp.manifest.csv":
+            continue                     # a web app resource: header-free by design, bound by the manifest's hash
         h = header.read_header(os.path.join(root, rel))
         top = rel.split("/")[0]
         if h.status != "ok" or h.get("run") != "run-all-1":
@@ -1205,7 +1259,8 @@ def test_run_all_writes_a_ready_op5_workspace():
             bad.append((rel, "hardware placement", h.get("plc"), h.get("target")))
         elif top == "Templates" and h.get("kind") != "sw/block-template":
             bad.append((rel, "template kind", h.get("kind")))
-        elif top == plc and (h.get("plc") != plc or h.get("target") != rel.split("/")[1]):
+        elif top == plc and (h.get("plc") != plc or h.get("target") != "/".join(rel.split("/")[1:-1] if
+                                                                                 rel.startswith(web_app) else rel.split("/")[1:2])):
             bad.append((rel, "plc/target vs location", h.get("plc"), h.get("target")))
     eq(bad, [], "every file: a valid header, the chain's run, plc/target agreeing with its location")
     kinds = {rel: header.read_header(os.path.join(root, rel)).get("kind") for rel in files if not rel.endswith(".openn")}
@@ -1217,6 +1272,11 @@ def test_run_all_writes_a_ready_op5_workspace():
     eq(kinds[f"{plc}/Program blocks/03_Zone Cumulative.xml"], "sw/code-block")
     eq(kinds[f"{plc}/Program blocks/04_ESTOP.csv"], "sw/block-gen")
     eq(kinds[f"{plc}/Program blocks/Diagnostic_for_OPC.scl"], "sw/source")
+    eq(kinds[f"{web_app}webapp.manifest.csv"], "web/app")
+    from pipeline5.systems.plc_based.siemens_s7 import webapp_folder
+    eq(webapp_folder.verify(os.path.join(root, *web_app.split("/"))), [], "every resource = its manifest row")
+    ok(all(b"#!openn" not in open(os.path.join(root, rel), "rb").read() for rel in files
+           if rel.startswith(web_app) and not rel.endswith(".csv")), "the resources carry no header")
     eq(header.read_header(os.path.join(root, plc, "Program blocks", "Diagnostic_for_OPC.scl")).get("name"),
        "06_Diagnostic for OPC", "the FUNCTION's name, which differs from the file's")
     # a lone phase button afterwards: ITS run - the others' files are stale for OP5, nothing is deleted
@@ -1525,6 +1585,7 @@ if __name__ == "__main__":
          _sandboxed(test_310_leg_appends_reaction_findings_to_the_existing_record)),
         ("sub_phase_dispatch", _sandboxed(test_sub_phase_dispatch)),
         ("run_all_writes_a_ready_op5_workspace", _sandboxed(test_run_all_writes_a_ready_op5_workspace)),
+        ("a_lone_650_writes_the_web_application", _sandboxed(test_a_lone_650_writes_the_web_application)),
         ("a_transfer_area_fail_halts_the_interface_outputs",
          _sandboxed(test_a_transfer_area_fail_halts_the_interface_outputs)),
         ("the_interface_description_reaches_the_scl", _sandboxed(test_the_interface_description_reaches_the_scl)),

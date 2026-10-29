@@ -30,6 +30,7 @@ from __future__ import annotations
 import os
 
 from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+from pipeline5.systems.plc_based.siemens_s7 import tia_version
 from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
 
 PHASE = 520
@@ -75,12 +76,13 @@ def _member_lines(m, indent: str, nested: bool = False, close: bool = True) -> l
     return lines
 
 
-def db_xml(name, db, number) -> str:
+def db_xml(name, db, number, tia: str | None = None) -> str:
     """ONE Global DB as the SW.Blocks.GlobalDB XML string (no BOM - the writer adds it). `db` = the
     db_blocks attributes + `members` (db_members rows: member/datatype/retain/start_value/comment/ext_*/
     setpoint/struct). An absent/blank attribute reproduces the historical default EXACTLY (byte parity). The
     members of a Struct (`struct`) sit inside it, the Struct where its first member stands; the Struct takes
-    that member's remanence + access attributes ([[C-042]])."""
+    that member's remanence + access attributes ([[C-042]]). `tia` = the TIA Portal version stamped
+    (None = the project's `tia_version`, [[C-049]])."""
     prog_lang = (db.get("prog_lang") or "DB").strip()
     if prog_lang.upper() == "F_DB":
         prog_lang = "F_DB"                                   # canonicalize the fail-safe marker
@@ -90,7 +92,7 @@ def db_xml(name, db, number) -> str:
     lines = [
         '<?xml version="1.0" encoding="utf-8"?>',
         '<Document>',
-        '  <Engineering version="V18" />',
+        tia_version.engineering_line(tia),
         '  <SW.Blocks.GlobalDB ID="0">',
         '    <AttributeList>',
         '      <AutoNumber>true</AutoNumber>',
@@ -181,6 +183,7 @@ def project(database, output_dir: str | None = None) -> int:
         members_by_db.setdefault(m["db_name"], []).append(m)
 
     os.makedirs(output_dir, exist_ok=True)
+    tia = tia_version.active()                 # the project's TIA Portal version, once per run (C-049)
     count = 0
     for number, db_name in enumerate(sorted(blocks), start=1):
         attrs = blocks[db_name]
@@ -191,6 +194,6 @@ def project(database, output_dir: str | None = None) -> int:
         stamp = header.fields("sw/data-block", PHASE, plc=plc, target=header.PROGRAM_BLOCKS,
                               source="db_blocks + db_members")
         with open(os.path.join(output_dir, f"{db_name}.xml"), "w", encoding="utf-8-sig", newline="") as handle:
-            handle.write(header.stamp_xml(db_xml(db_name, db, number), stamp))
+            handle.write(header.stamp_xml(db_xml(db_name, db, number, tia), stamp))
         count += 1
     return count

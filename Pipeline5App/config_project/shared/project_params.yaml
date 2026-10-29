@@ -94,3 +94,4 @@ validation_params:
 output_dir: ''            # default: project ? <project>/Output : Shared/OutputTree
 device_types_db: ''       # default: Shared/HardwareConfigBuilderData/DeviceTypesDatabase.csv
 interface_template: ''    # default: Shared/Templates/MachineInterfaces/
+tia_version: V20          # the TIA Portal the SimaticML targets (V18 | V19 | V20); a project's blank -> this value
