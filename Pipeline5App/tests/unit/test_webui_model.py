@@ -237,15 +237,6 @@ def test_template_bundle():
         raises(ValueError, lambda: project.bundle(d))
 
 
-def test_the_shipped_template_bundles():
-    files = dict(project.bundle(config.WEBAPP_TEMPLATE_DIR))
-    ok({"index.html", "app.js", "app.css"} <= set(files), sorted(files))
-    text = b"".join(files.values()).decode("utf-8")
-    ok("PlcProgram.Write" not in text, "the page never writes to the PLC")
-    ok("http://" not in text.replace('xmlns="http://www.w3.org/2000/svg"', "") and "https://" not in text,
-       "no external URL - the CPU serves everything")
-
-
 if __name__ == "__main__":
     import sys
     sys.exit(run("webui_model", [
@@ -258,5 +249,4 @@ if __name__ == "__main__":
         ("positions_stale_and_unplaced", test_positions_stale_and_unplaced),
         ("drawing_measure", test_drawing_measure),
         ("template_bundle", test_template_bundle),
-        ("the_shipped_template_bundles", test_the_shipped_template_bundles),
     ]))

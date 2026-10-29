@@ -1037,7 +1037,8 @@ def test_a_lone_650_writes_the_web_application():
        ("ok", "web/app", "lone-650", "Web applications/safety", "safety"), h.problems)
     eq(webapp_folder.verify(app), [], "the folder is what its manifest says")
     rows = webapp_folder.read_manifest(os.path.join(app, "webapp.manifest.csv"))
-    eq([r["name"] for r in rows], ["index.html", "app.css", "app.js", "plant.json"], "the default page first")
+    eq([r["name"] for r in rows], ["index.html", "icons.svg", "mock.js", "app.css", "app.js", "plant.json"],
+       "the default page first")
     plant = json.load(open(os.path.join(app, "plant.json"), encoding="utf-8"))
     eq((plant["schema"], plant["meta"]["run"], plant["plc"]["station"]), (1, "lone-650", "n0001-mc1-cc1-k65501"))
     ok(plant["counts"]["kinds"]["estop"] > 0 and plant["counts"]["kinds"]["pn_node"] > 0, plant["counts"])
@@ -1045,7 +1046,8 @@ def test_a_lone_650_writes_the_web_application():
     ok(len(plant["poll"]) == len(set(plant["poll"])), "each variable once")
     host2 = _Host(run="lone-650-again")
     SYSTEM.handlers["diagnosis"](host2.ctx(), only=650)
-    eq(sorted(os.listdir(app)), ["app.css", "app.js", "index.html", "plant.json", "webapp.manifest.csv"],
+    eq(sorted(os.listdir(app)), ["app.css", "app.js", "icons.svg", "index.html", "mock.js", "plant.json",
+                                 "webapp.manifest.csv"],
        "a rerun rewrites the same files")
     eq(header.read_header(os.path.join(app, "webapp.manifest.csv")).get("run"), "lone-650-again")
 
