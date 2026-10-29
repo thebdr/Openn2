@@ -475,8 +475,10 @@ def build_06_feedback_error(db: Database) -> Table:
 @builds("07_Speed Control")
 def build_07_speed_control(db: Database) -> Table:
     """One 01_Speed_Control_SLS FB instance per safety-encoder pair (N1/2 + N2/2 grouped by numeric index =
-    the sorter number nn). The 04_SPEED outputs are the sensors' healthy members + the 'Safety Encoder
-    Failure [ <FLD> ]' member; SPEED_ZERO -> SPEED_STATE_REC.SORTER_{nn}_STOPPED."""
+    the sorter number nn). The 04_SPEED outputs are the sensors' healthy members + the encoder's own: the N1/2
+    row's second 04_SPEED member (`Safety Encoder <n> Healthy [ <FLD> ]`, the one the diagnosis rule and the sorter
+    interface bind - `Safety Encoder Failure [ <FLD> ]` until 2026-10-28, a member no DB declared: [[C-053]], user);
+    SPEED_ZERO -> SPEED_STATE_REC.SORTER_{nn}_STOPPED."""
     enc1_by_idx, enc2_by_idx, order = {}, {}, []
     for r in db.rows:
         st = str(r.get("script_type", "")).upper()
@@ -493,6 +495,7 @@ def build_07_speed_control(db: Database) -> Table:
     for idx in order:
         enc1 = enc1_by_idx[idx]
         enc2 = enc2_by_idx.get(idx)
+        enc_members = db.members_of(enc1, "04_SPEED")
         nn = f"{int(idx):02d}"
         t.add(
             template_type="01",
@@ -502,7 +505,7 @@ def build_07_speed_control(db: Database) -> Table:
             **{"tagName:SorterRunningIOC": _sorter_running(nn)},
             **{"04_SPEED.{db_element:ENC1/2}": enc1.get("name_in_db", "")},
             **{"04_SPEED.{db_element:ENC2/2}": enc2.get("name_in_db", "") if enc2 else ""},
-            **{"04_SPEED.{db_element:ENC}": f"Safety Encoder Failure [ {enc1.get('iol_FLD', '')} ]"},
+            **{"04_SPEED.{db_element:ENC}": enc_members[1] if len(enc_members) > 1 else ""},
             **{"SPEED_STATE_REC.SORTER_{index}_STOPPED": f"SORTER_{nn}_STOPPED"},
             NetworkComment=f"SORTER {nn} SPEED CONTROL",
         )

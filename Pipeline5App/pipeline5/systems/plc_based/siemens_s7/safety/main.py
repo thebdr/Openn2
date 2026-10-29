@@ -592,14 +592,15 @@ def run_hardware(ctx, only=None):
 
 
 def run_software(ctx, only=None):
-    """Phase 800: stage -> 520 -> engine.build. only=820 projects the CreationInfo CSVs + the 03 FC
-    XML; only=830 writes InstanceDBs.csv; None does both. (engine.build always runs - both surfaces
-    project from it. 02_COM/05_EM_STATE are ordinary 520 config DBs - the 500 leg projects them.)"""
+    """Phase 800: stage -> 520 -> engine.build -> the undeclared-member check ([[C-053]]). only=820 projects the
+    CreationInfo CSVs + the 03 FC XML; only=830 writes InstanceDBs.csv; None does both. (engine.build always runs -
+    both surfaces project from it. 02_COM/05_EM_STATE are ordinary 520 config DBs - the 500 leg projects them.)"""
     from pipeline5 import config
     from pipeline5.findings import gate as run
     from pipeline5.phases.staging import iolist as staging
     from pipeline5.phases.datablocks import generator as datablocks
     from pipeline5.phases.software_blocks import build_engine as engine
+    from pipeline5.phases.coverage import member_references
     label = {820: "820 Generate Blocks", 830: "830 Generate Instances"}.get(
         only, "800 Software Generation  (820 Blocks + 830 Instances + 03 FC XML)")
     ctx.emit("PHASE", label)
@@ -614,6 +615,14 @@ def run_software(ctx, only=None):
         ctx.emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
         return
     database, blk_findings = engine.build(database, system=ctx.system)
+    # [[C-053]]: a block reading a member its generated DB does not declare (a project config older than a builder's
+    # rename) - TIA would only reject it at compile time
+    undeclared = member_references.check(database, ready_xml=_ready_block_xml(database, ctx.system),
+                                         ready_scl=_ready_block_scl(database, ctx.system),
+                                         find_bindings=ctx.system.symbols.find_bindings)
+    if undeclared:
+        database.save(config.database_dir())             # engine.build saved before they were recorded
+    blk_findings += undeclared
     # a builder's own blocking finding halts BEFORE any block is written ([[C-040]]: a sorter area whose TT06
     # network cannot be built - a CSV with an empty symbol slot would only fail at the block generation)
     if not ctx.gate(blk_findings, label="800 software blocks"):
@@ -702,6 +711,17 @@ def _ready_block_xml(database, system) -> dict:
         if emit is not None and ref and os.path.isfile(ref):
             out[block["name"]] = emit(tables[block["name"]], ref, block["name"])
     return out
+
+
+def _ready_block_scl(database, system) -> dict:
+    """{block name -> the SCL source PL5 renders for it} for every block that ships READY as SCL (emit scl - 03_Diagnostic
+    Nodes), without its `#!openn` header. In memory - no file written."""
+    from pipeline5.phases.software_blocks import build_engine as engine
+    from pipeline5.systems.plc_based.siemens_s7 import scl_emitter
+    tables = engine.block_tables(database)
+    return {b["name"]: scl_emitter.SCL_RENDERERS[b["name"]](tables[b["name"]], b["name"])
+            for b in (database["software_blocks"] if "software_blocks" in database else [])
+            if system.builders.emit_kind(b["name"]) == "scl" and b["name"] in scl_emitter.SCL_RENDERERS}
 
 
 # The dispatch table System.handlers carries - Phase.handler / a special Sub.opens key -> handler.

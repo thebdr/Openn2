@@ -1513,6 +1513,41 @@ def test_an_incomplete_sorter_area_halts_800():
        "no block written at all")
 
 
+def test_a_member_rule_older_than_its_builder_halts_800():
+    """C-053 through the REAL 800 handler on the fixture: the project's datablock_members.csv still names the zone
+    push-button cumulative the way an older builder did (here `{$area} PUSHBUTTONS`), while the builders write
+    `<area> PB` - every 03 network that writes one and every 04_ESTOP row that reads one is a blocking
+    `blk_undeclared_member` FAIL naming the symbol, recorded, and phase 800 writes no block. The clean fixture (every
+    other test here) raises none: the shipped rules declare all the builders reference."""
+    import glob
+    from pipeline5.config import paths
+    from pipeline5.findings.finding import validation_issues_table
+    from pipeline5.truth.database import Database
+    shipped = config.load_db_elements
+
+    def an_older_rule():
+        return [dict(e, member="{$area} PUSHBUTTONS") if (e["db_name"], e["member"]) == ("02_COM", "{$area} PB") else e
+                for e in shipped()]
+    config.load_db_elements = an_older_rule
+    try:
+        host = _Host()
+        SYSTEM.handlers["software"](host.ctx())
+    finally:
+        config.load_db_elements = shipped
+    eq(host.halted, True, "800 halts")
+    found = sorted({(f.location.split(" / ")[0], f.detail.split(",")[0]) for batch in host.rendered for f in batch
+                    if f.type == "blk_undeclared_member"})
+    areas = sorted({f.detail.split('"."')[1].rsplit(" PB", 1)[0] for batch in host.rendered for f in batch
+                    if f.type == "blk_undeclared_member"})
+    ok(areas, "some area's cumulative is named")
+    eq(found, sorted({(block, f'references "02_COM"."{area} PB"') for area in areas
+                      for block in ("03_Zone Cumulative", "04_ESTOP")}), "both blocks, every area, nothing else")
+    record = Database([validation_issues_table()]).load(paths._BUILTIN_DATABASE)
+    eq(sorted({(r["phase"], r["severity"]) for r in record["validation_issues"] if r["type"] == "blk_undeclared_member"}),
+       [("800", "FAIL")], "recorded as the 800 FAILs")
+    eq(glob.glob(os.path.join(p5paths._BUILTIN_OUTPUT, "**", "Program blocks", "*.*"), recursive=True), [],
+       "no block written at all")
+
 if __name__ == "__main__":
     import sys
     sys.exit(run("siemens_main_handlers", [
@@ -1556,4 +1591,6 @@ if __name__ == "__main__":
         ("the_interface_description_reaches_the_scl", _sandboxed(test_the_interface_description_reaches_the_scl)),
         ("reporting_writes_the_signal_paths_page", _sandboxed(test_reporting_writes_the_signal_paths_page)),
         ("an_incomplete_sorter_area_halts_800", _sandboxed(test_an_incomplete_sorter_area_halts_800)),
+        ("a_member_rule_older_than_its_builder_halts_800",
+         _sandboxed(test_a_member_rule_older_than_its_builder_halts_800)),
     ]))

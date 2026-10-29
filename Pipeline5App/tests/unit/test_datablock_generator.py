@@ -298,8 +298,9 @@ def test_generate_struct_column_reaches_db_members():
 
 def test_shipped_99_commissioning():
     """C-042: the SHIPPED registry makes 99_Commissioning a standard DB (OPC UA off, web server on, no seeds):
-    RESET_VIA_TIA, then the Struct NodesNotInstalled - one member per PA node (a node's PW row adds none), named as
-    its 00_Commissioning member; it attributes to no signal (the PA rows keep their DBs); the XML nests them."""
+    RESET_VIA_TIA, then the Struct NodesNotInstalled - one member per node with a PA or a PW row ([[C-053]], user
+    2026-10-28: 00_Only for Commissioning bypasses both; PA only until then), named as its 00_Commissioning member; it
+    attributes to no signal (the PA rows keep their DBs); the XML nests them."""
     from pipeline5.config import paths, loaders
     from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
     paths.use_system(SYSTEM)
@@ -309,26 +310,32 @@ def test_shipped_99_commissioning():
     rows = [{"uid": "u1", "script_type": "PA", "profinet_name": "n0001-a", "profinet_ip": "192.168.20.1"},
             {"uid": "u2", "script_type": "PW", "profinet_name": "n0001-a", "profinet_ip": "192.168.20.1"},
             {"uid": "u3", "script_type": "PA", "profinet_name": "n0006-b", "profinet_ip": "192.168.20.6"},
-            {"uid": "u4", "script_type": "DI", "profinet_name": "n0006-b", "profinet_ip": "192.168.20.6"}]
+            {"uid": "u4", "script_type": "DI", "profinet_name": "n0006-b", "profinet_ip": "192.168.20.6"},
+            {"uid": "u5", "script_type": "PW", "profinet_name": "n0010-sw", "profinet_ip": "192.168.50.10"}]
     g, _inst, findings = datablocks.generate(rows, defs, els, loaders.load_db_types())
     ok(_no_fail(findings), "the shipped rows are clean")
+    eq([(f.type, f.detail) for f in findings if f.severity == "WARN"],
+       [("db_member_duplicate", "member 'n0001-a 192.168.20.1' produced more than once - kept 1")],
+       "a node with a PA and a PW row: one 00_Commissioning member")
     db = g["99_Commissioning"]
     eq({k: db[k] for k in ("prog_lang", "opc_ua", "webserver", "memory_layout")},
        {"prog_lang": "DB", "opc_ua": False, "webserver": True, "memory_layout": "Optimized"})
-    nodes = ["n0001-a 192.168.20.1", "n0006-b 192.168.20.6"]
+    nodes = ["n0001-a 192.168.20.1", "n0006-b 192.168.20.6", "n0010-sw 192.168.50.10"]
     eq([(x["name"], x["struct"], x["comment"]) for x in db["members"]],
        [("RESET_VIA_TIA", "", "Used for emergency reset during commissioning")]
        + [(n, "NodesNotInstalled", "") for n in nodes], "no comment on a node flag (as the export)")
     eq([x["name"] for x in g["00_Commissioning"]["members"]][3:], nodes, "the same names as 00_Commissioning's")
     datablocks.write_back(rows, g)
     eq(rows[0]["datablocks"], ["PROFINET_NODES_ALARM", "00_Commissioning"], "the PA row keeps its DBs")
+    eq(rows[4]["datablocks"], ["PROFINET_NODES_WARNING", "00_Commissioning"], "a PW node's row: its bypass member too")
     static = _static(datablock_xml.db_xml("99_Commissioning", {"prog_lang": db["prog_lang"], "opc_ua": db["opc_ua"],
                                                                "members": [dict(x, member=x["name"])
                                                                            for x in db["members"]]}, 1))
     eq([line.strip() for line in static if line.strip().startswith("<Member")],
        ['<Member Name="RESET_VIA_TIA" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">',
         '<Member Name="NodesNotInstalled" Datatype="Struct" Remanence="NonRetain" Accessibility="Public">',
-        '<Member Name="n0001-a 192.168.20.1" Datatype="Bool">', '<Member Name="n0006-b 192.168.20.6" Datatype="Bool">'])
+        '<Member Name="n0001-a 192.168.20.1" Datatype="Bool">', '<Member Name="n0006-b 192.168.20.6" Datatype="Bool">',
+        '<Member Name="n0010-sw 192.168.50.10" Datatype="Bool">'])
 
 
 def test_project_writes_only_its_own_dbs():
