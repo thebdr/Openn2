@@ -61,14 +61,14 @@ class ControllerDialog(ConfigDialog):
             if after != value:
                 raise SyconError("IP control %d shows %s after writing %s" % (cid, after, value))
         if name is not None:
-            eds = self.controls(("Edit",), cid=NET_NAME_ID)
+            eds = self.controls(("Edit",), min_id=0, cid=NET_NAME_ID)     # a page control, below the in-place editors' 1900+
             if not eds:
                 raise SyconError("name of station edit %d not found on %r" % (NET_NAME_ID, NETWORK_PAGE))
             eds[0].set_edit_text(name)
             time.sleep(0.4)
             shown = eds[0].window_text()
             log("  name of station -> %r" % shown)
-            if shown != name:
+            if shown.lower() != name.lower():                  # SYCON.net lower-cases every name of station
                 raise SyconError("name of station reads %r after writing %r" % (shown, name))
         warning = self.session.answer_box("Warning", "Yes")      # 'Changing subnet will automatically modify ...'
         if warning:

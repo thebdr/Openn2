@@ -84,6 +84,20 @@ SCALANCE_PNIO_PARAMS = ("2=Off | 4=Off"
                         " | record:3=00 03 00 06 01 00 00 00 00 00"
                         " | record:12309=30 19 00 08 01 01 00 01 01 00 00 02"
                         " | record:12312=30 1C 00 08 01 01 00 00 00 01 00 00")
+# The V4.3 DAPs (the catalog's V4.3 entries, GSDML-V2.45-...-20260302: DAP 50 XC208, DAP 5C XC216-4C) have no Media
+# redundancy record 3: the grid rows are 1 Interface Mode, 3 Mirroring Mode, 4 Monitor Barrier, 5 Monitor Port -
+# the same two parameters at indexes 0 / 2, the same 12309 / 12312 bytes (2026-10-26: `2=Off | 4=Off` on a V4.3
+# set Mirroring Mode at row 3 and found no editor on row 5).
+SCALANCE_PNIO_PARAMS_V43 = ("0=Off | 2=Off"
+                            " | record:12309=30 19 00 08 01 01 00 01 01 00 00 02"
+                            " | record:12312=30 1C 00 08 01 01 00 00 00 01 00 00")
+
+
+def scalance_pnio_params(catalog_item):
+    """The PN-IO parameters of a SCALANCE catalog entry: the V4.3 grid for a `... V4.3` entry, else the V4.4 one."""
+    return SCALANCE_PNIO_PARAMS_V43 if catalog_item.strip().upper().endswith("V4.3") else SCALANCE_PNIO_PARAMS
+
+
 # The XC216-4C's four combo ports (1-4, subslots 32769-32772) and the XC206-2 SFP's two fibre ports (7-8) are
 # pluggable port submodules; the project's SFP is the SFP991-1 everywhere (the cabinet drawings' parts lists:
 # 6GK5991-1AD00-8GA0 / -8AA0) and every such port takes it (user 2026-10-23: "Configure all four combo ports of
@@ -425,7 +439,7 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
             return
         if rec["modules"] == "scalance-pnio":
             modules.append({"station_name": cur["name"], "slot": "0", "subslot": "32768", "module_id": "",
-                            "module_text": "PN-IO", "parameters": SCALANCE_PNIO_PARAMS,
+                            "module_text": "PN-IO", "parameters": scalance_pnio_params(rec["catalog_item"]),
                             "comment": "PN-IO: Loop Detection Interface Mode Off, Port Mirroring Mode Off"})
             port_numbers, text, sfp = SCALANCE_COMBO_PORTS.get(rec["model_id"].upper(), ((), "", ""))
             for n in port_numbers:
