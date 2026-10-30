@@ -798,6 +798,19 @@ User: "the servo one junior were missing their module on the sorter. Davi1 shoul
   included). Found 2026-10-30: its saved XML was rewritten on 2026-10-26 13:27 outside the build and holds 55 devices
   - no PN/PN coupler, no SCALANCE switch; a resume on a re-exported handoff re-adds those eight (4 x 128-byte
   modules a coupler side, the V4.3 switches), plugs the ServoOne modules, names the controller.
+- **A catalog drop on a laid-out project** (2026-10-30, the first resume of the repair copy): the driver found the
+  controller's green line by colour and took the most common horizontal row - on a project `canvas.apply_layout` laid
+  out that is a device's branch (y 670, x 8..548), not the bus; six coupler drops attached nothing. A probe on a
+  never-saved copy (`scripts/probe_drop_laid_out.py`) dropped on the vertical bus (x 8..12) and the node appeared at
+  once. `drawing.pick_green` prefers a green column 200 px or longer (only a laid-out bus is one; SYCON.net's default
+  layout keeps its horizontal line), `slave_points` keeps the points 4 px off the rows a branch crosses. `--update`
+  needs this too: it adds stations to a laid-out project. Tests: `tests/test_drawing_lines.py`.
+- **The sorter repaired on a copy** (`spike/scratch/PROD_Sorter_Lower_repair`, 2026-10-30 08:07-08:28, 21 min): the
+  handoff re-exported with the fixed database, then `--resume` - the controller named, the 3 couplers dropped on the
+  vertical bus with 4 x 128-byte modules a side and cloned, the 5 SCALANCE V4.3 switches added and cloned, the 26
+  ServoOne given `PPO 3, 4 bytes IO`; **910 PASS / 0 FAIL** (the controller's name and IP, the export's controller
+  name, 26 ServoOne `1 modules plugged (table 1)`, 19 GSDML module checks); BusField 63 `@` rows, the master's own
+  station `#`, no node type 0x00000000. The original `PROD_Sorter_Lower_fast` is left as it was found.
 - Tests: `tests/test_module_expectation.py`, `Pipeline5App/tests/unit/test_sycon_fixed_multiplier.py`
   (`test_the_servoone_plugs_its_ppo3_module`), Davi1's `test_scalance_pnio_row_v43_has_no_media_redundancy_record`.
 

@@ -6,10 +6,10 @@
     "Sycon5App/scripts/verify_c046.sh"
   ],
   "exitCode": 0,
-  "outputSha": "031e9f95110f30201b8848955b3ad3e81dccb07890aa960034848dcf90e51897",
-  "outputTail": "..........................                                               [100%]\n26 passed in 3.12s",
-  "ranAt": "2026-10-30T06:53:39.774Z",
-  "headCommit": "765e1aff8b044575097fc14f4bae2f41c64a4609",
+  "outputSha": "ea8060d9e50cf6f93a20881ab972646a5c7ff287ac239adfc7ef51cac320e460",
+  "outputTail": "..............................                                           [100%]\n30 passed in 1.85s",
+  "ranAt": "2026-10-30T07:29:54.856Z",
+  "headCommit": "157a16b5497e68ef1ceaf88f35475942e18d84f1",
   "tests": [
     {
       "name": "Sycon5App/tests/test_readback.py",
@@ -30,6 +30,11 @@
       "name": "Sycon5App/tests/test_refute_c046.py",
       "file": "Sycon5App/tests/test_refute_c046.py",
       "fileSha": "b1a151d44f8f4460f58076764f086040c8087f69a5bfc05902f38a81726b65d2"
+    },
+    {
+      "name": "Sycon5App/tests/test_drawing_lines.py",
+      "file": "Sycon5App/tests/test_drawing_lines.py",
+      "fileSha": "5260ce74db5eb050ebc088d927355b36e8d3bf11db73c901f1d804255dd3d8e2"
     }
   ]
 }
