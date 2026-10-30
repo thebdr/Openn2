@@ -6,15 +6,15 @@
     "Sycon5App/scripts/verify_c044.sh"
   ],
   "exitCode": 0,
-  "outputSha": "fb3298bfe6687a4dfe292e7cc99e0ab9b933a2d67f926dd1d50b783ec10bb20a",
-  "outputTail": "..................                                                       [100%]\n18 passed in 1.17s\n..........................                                               [100%]\n26 passed in 0.77s\n== generic_hw_handlers ==\n  PASS  tia_generic_hw_run_plan\n  PASS  sycon_generic_hw_run_plan\n  PASS  generic_validation_sub_110_logs_only\n  -> 3/3 passed",
-  "ranAt": "2026-10-26T11:19:49.765Z",
-  "headCommit": "b6f6cee0e9d13e926b32698f348b713dca6fed70",
+  "outputSha": "0a3e264b47800d4626d449247681e42ef0b6f293f3b0155f14fb44770fd3374b",
+  "outputTail": "..................                                                       [100%]\n18 passed in 1.79s\n............................                                             [100%]\n28 passed in 1.56s\n== generic_hw_handlers ==\n  PASS  tia_generic_hw_run_plan\n  PASS  sycon_generic_hw_run_plan\n  PASS  generic_validation_sub_110_logs_only\n  -> 3/3 passed",
+  "ranAt": "2026-10-30T06:53:32.365Z",
+  "headCommit": "765e1aff8b044575097fc14f4bae2f41c64a4609",
   "tests": [
     {
       "name": "Sycon5App/tests/test_refute_c044.py",
       "file": "Sycon5App/tests/test_refute_c044.py",
-      "fileSha": "4e5f58049df153db0e17d6041ec36fa155d4e229fd4a80208fe08004a0aaa6d4"
+      "fileSha": "e9f4b9916b98095934ff9899be143d145e395cacf9689827cca84366a8442e60"
     },
     {
       "name": "Sycon5App/tests/test_handoff.py",
@@ -24,7 +24,7 @@
     {
       "name": "Sycon5App/tests/test_readback.py",
       "file": "Sycon5App/tests/test_readback.py",
-      "fileSha": "271dd42dcb650117e68f919cf0d327025e6740010124e37114b5909c30d1d1a9"
+      "fileSha": "09006fde1cdd6aa4da4d6dad870f4f00a558a51bf3bd467410192376569bc78d"
     },
     {
       "name": "Sycon5App/tests/test_canvas.py",

@@ -6,7 +6,7 @@ refute round can attack them on synthetic sources (tests/test_refute_c046.py).
 
 THE LAWS
   L1 LAYERS      one dependency direction:
-                 log < handoff, readback < canvas, workspace < session, drawing < catalog, dialog, exports
+                 log < handoff, readback, gsdml < canvas, workspace < session, drawing < catalog, dialog, exports
                  < controller, device < driver < consumer < gui. An import may only point DOWN - sideways is
                  up. Dynamic imports (`importlib.import_module`, `__import__`) only in the package's `__init__`
                  (the lazy driver), so the ast sees every edge.
@@ -37,10 +37,10 @@ APP = os.path.dirname(HERE)
 PKG = os.path.join(APP, "sycon5")
 PACKAGE = "sycon5"
 
-LAYERS = [("log",), ("handoff", "readback"), ("canvas", "workspace"), ("session", "drawing"),
+LAYERS = [("log",), ("handoff", "readback", "gsdml"), ("canvas", "workspace"), ("session", "drawing"),
           ("catalog", "dialog", "exports"), ("controller", "device"), ("driver",), ("consumer",), ("gui",)]
 RANK = {m: i for i, group in enumerate(LAYERS) for m in group}
-HEADLESS = {"log", "handoff", "readback", "canvas", "workspace", "gui"}
+HEADLESS = {"log", "handoff", "readback", "gsdml", "canvas", "workspace", "gui"}
 DRIVER_PACKAGES = ("pywinauto", "win32gui", "win32con", "win32ui", "win32api", "win32process", "win32clipboard",
                    "pywintypes", "comtypes")
 DYNAMIC_IMPORT = re.compile(r"\bimportlib\.import_module\(|\b__import__\(")
@@ -150,7 +150,7 @@ def test_l1_layers_one_direction():
 
 def test_l2_the_oracle_apart():
     inner = {mod: {t for m, t in package_edges() if m == mod} for mod in modules()}
-    for mod in ("log", "handoff", "readback"):
+    for mod in ("log", "handoff", "readback", "gsdml"):
         assert not inner[mod], "%s imports the package: %s" % (mod, sorted(inner[mod]))
     for mod in sorted(HEADLESS):
         direct = external_imports(mod) & set(DRIVER_PACKAGES)

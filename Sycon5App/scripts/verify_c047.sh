@@ -13,5 +13,5 @@ set -e
 cd "$(dirname "$0")/.."
 PY="${PY:-../.venv/Scripts/python.exe}"
 PY="$(cd "$(dirname "$PY")" && pwd)/$(basename "$PY")"
-"$PY" -m pytest -q tests/test_handoff.py tests/test_build_plan.py tests/test_canvas.py tests/test_refute_c047.py tests/test_update_mode.py
+"$PY" -m pytest -q tests/test_handoff.py tests/test_build_plan.py tests/test_canvas.py tests/test_refute_c047.py tests/test_update_mode.py tests/test_module_expectation.py
 (cd ../Pipeline5App && "$PY" -m pytest -q tests/unit/test_sycon_handoff.py)

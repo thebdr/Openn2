@@ -770,6 +770,37 @@ matching pn name. also, no pn name was set for the controller".
   button), `tests/test_readback.py` (the controller's stream). Not done on the VM yet: a fresh build (the name
   edit filled and read back) and an update of the fast sorter project with a station added to the list.
 
+## The ServoOne's module, a station left without one, Davi1's fixes (2026-10-29/30)
+
+User: "the servo one junior were missing their module on the sorter. Davi1 should have committed the update".
+
+- **Why.** The ServoOne Junior's DAP (`DAP 2` of `GSDML-V2.3-LT-i-ServoOne-20130515.xml`) takes one module in slot 1
+  and fixes none, so a catalog drop plugs nothing; its database row said `default`, the handoff had no module rows
+  for it, and the verification - which compared only the modules the table names - had nothing to compare: the
+  sorter's 26 ServoOne verified clean with their DAP alone.
+- **Davi1's update** (f7f26fc, IO0011 LOWER GR1) sat on the branch `sycon/io0011-lower-gr1-fixes`, never merged; merged
+  2026-10-30 with: the controller's `Name of station` edit looked up as a page control (`min_id=0` - the lookup's
+  default skips ids below the in-place editors' 1900, so a fresh build on main stopped right after the controller)
+  and read back case-insensitively (SYCON.net lower-cases names); the SCALANCE V4.3 DAPs' PN-IO grid (no record 3:
+  `0=Off | 2=Off`, `scalance_pnio_params`); the KEBA D3-DU 330 row (its DAP fixes its module: `default` is right);
+  the ServoOne's module text `PPO 3, 4 bytes IO` - in the Fixed Modules column while the policy stayed `default`,
+  which never plugs it. The row's policy is `fixed` now: every ServoOne gets slot 1 `PPO 3, 4 bytes IO` (the sorter
+  list re-exported: 26 rows, the ServoOne clone-safe - the first configured, the clones inherit).
+- **The oracle.** `sycon5/gsdml.py` reads a DAP's module slots from its GSDML (SYCON.net's catalog folder
+  `C:\ProgramData\SYCONnet\PROFINET\GSDML`): `verify` checks every station the table gives no module rows - when
+  its DAP takes modules (`AllowedInSlots` / `FixedInSlots` / `UsedInSlots` >= 1) one must be plugged. A SCALANCE DAP
+  lists none (not checked), the AL1202 and the KEBA fix theirs (checked, plugged by the catalog), a GSDML or DAP not
+  found is a NOTE. On the saved fast sorter project the check fails exactly the 26 ServoOne.
+- **Resume names the controller** (`controller_action`): a saved project's unnamed controller is named by a resume
+  as by an update; a resume also writes the table's name over another one (this handoff's own build), an update
+  keeps a named controller (OP5's rule).
+- **The fast sorter project needs a resume, not an update** (an update skips existing stations whole, the ServoOne
+  included). Found 2026-10-30: its saved XML was rewritten on 2026-10-26 13:27 outside the build and holds 55 devices
+  - no PN/PN coupler, no SCALANCE switch; a resume on a re-exported handoff re-adds those eight (4 x 128-byte
+  modules a coupler side, the V4.3 switches), plugs the ServoOne modules, names the controller.
+- Tests: `tests/test_module_expectation.py`, `Pipeline5App/tests/unit/test_sycon_fixed_multiplier.py`
+  (`test_the_servoone_plugs_its_ppo3_module`), Davi1's `test_scalance_pnio_row_v43_has_no_media_redundancy_record`.
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run

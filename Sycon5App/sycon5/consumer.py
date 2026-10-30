@@ -12,7 +12,7 @@ import os
 import shutil
 import time
 
-from . import canvas, exports
+from . import canvas, exports, gsdml
 from .catalog import split_item
 from .driver import SyconDriver
 from .handoff import load_handoff, natural_key, parse_parameters
@@ -59,9 +59,11 @@ def order_is_pattern(order):
     return o.startswith("T_ID_") or "x" in o
 
 
-def verify(handoff, project, plugged, timing_set=None, skipped=None, keep_extras=False):
+def verify(handoff, project, plugged, timing_set=None, skipped=None, keep_extras=False, gsdml_dir=None):
     """Compare the read-back with the handoff tables; `plugged` = {station: [module texts the driver chose]},
-    `timing_set` = {station: the updating time (ms) the driver could set when the table's was not offered}. An
+    `timing_set` = {station: the updating time (ms) the driver could set when the table's was not offered}. A station
+    the table gives no module rows is checked against its GSDML (`gsdml_dir`, default SYCON.net's catalog folder):
+    when its DAP takes modules, one must be plugged (2026-10-29: the sorter's ServoOne verified clean with none). An
     update (`skipped` = the lower-case names the project already had, `keep_extras`): a skipped station is a NOTE,
     not compared; a node the table does not name is a NOTE, not a FAIL; a controller that keeps its own name or
     address is a NOTE."""
@@ -121,6 +123,17 @@ def verify(handoff, project, plugged, timing_set=None, skipped=None, keep_extras
                 v.check(d.order_no.replace(" ", "").upper() == s["model_id"].replace(" ", "").upper(),
                         "station %s model %s (the saved DAP %r is order %s)" % (name, s["model_id"], d.dap, d.order_no))
         rows = handoff.plug_rows(s["station_name"])
+        if not rows:
+            # no module rows: the device's own defaults are all it gets - enough only when its DAP takes no module or
+            # fixes its own (the AL1202, the KEBA drive); a DAP that allows modules and fixes none (the ServoOne) is
+            # left without I/O, and the database row needs a modules policy
+            takes = gsdml.module_slots(d.gsdml, d.dap, gsdml_dir)
+            if takes is None and d.gsdml:
+                v.note("station %s: GSDML %s / DAP %r not found - its modules not checked" % (name, d.gsdml, d.dap))
+            elif takes:
+                v.check(any(k > 0 for k in d.slots), "station %s: a module plugged (its DAP %s takes modules in slot %s; "
+                        "the table names none - read %s)" % (name, d.dap, _slots_text(takes),
+                                                            ", ".join("%d %s" % kv for kv in sorted(d.slots.items())) or "nothing"))
         if rows:
             slots = {k: v_ for k, v_ in d.slots.items() if k != 0}
             v.check(len(slots) == len(rows), "station %s: %d modules plugged (table %d)" % (name, len(slots), len(rows)))
@@ -252,6 +265,33 @@ def controller_is_unnamed(name):
     return str(name or "").strip().lower() in ("", "controller")
 
 
+def controller_action(mode, saved_name, table_name):
+    """What a build on a saved project does with the controller's name of station: "name" (write the table's), "keep"
+    (leave it, a NOTE) or None (it is right). Unnamed: named in both modes. Named otherwise: a `resume` (this
+    handoff's own build going on) writes the table's; an `update` (someone's project brought up to the table) keeps
+    it - OP5's rule, an existing node is never changed (2026-10-29: resume names an unnamed controller too)."""
+    if controller_is_unnamed(saved_name):
+        return "name"
+    if str(saved_name).strip().lower() == str(table_name).strip().lower():
+        return None
+    return "keep" if mode == "update" else "name"
+
+
+def _slots_text(slots):
+    """{1} -> '1', {1, 2, 3, 7} -> '1..3, 7'."""
+    out, run = [], []
+    for s in sorted(slots):
+        if run and s == run[-1] + 1:
+            run.append(s)
+            continue
+        if run:
+            out.append(str(run[0]) if len(run) == 1 else "%d..%d" % (run[0], run[-1]))
+        run = [s]
+    if run:
+        out.append(str(run[0]) if len(run) == 1 else "%d..%d" % (run[0], run[-1]))
+    return ", ".join(out)
+
+
 def build(handoff_dir, out_spj, base_project, resume=False, driver=None, update=False):
     """The whole build. `resume`: an interrupted build of this handoff goes on in its saved project. `update` (user
     2026-10-26: "update an already existing sycon project, like OP5 did by skipping existing nodes with matching pn
@@ -293,12 +333,14 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None, update=
             saved = True
 
     controller_kept = False
-    if update and saved_controller is not None:
-        if controller_is_unnamed(saved_controller.name):
+    if saved_controller is not None:
+        mode = "update" if update else "resume"
+        action = controller_action(mode, saved_controller.name, h.controller["station_name"])
+        if action == "name":
             d.set_controller_network(None, None, None, name=h.controller["station_name"])
-            log("update: the controller named %s (it was %r)" % (h.controller["station_name"], saved_controller.name))
+            log("%s: the controller named %s (it was %r)" % (mode, h.controller["station_name"], saved_controller.name))
             checkpoint()
-        elif saved_controller.name.lower() != h.controller["station_name"].lower():
+        elif action == "keep":
             controller_kept = True
             log("update: the controller keeps its name %r (the table says %s)" % (saved_controller.name, h.controller["station_name"]))
 
