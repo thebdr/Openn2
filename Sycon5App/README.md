@@ -814,6 +814,26 @@ User: "the servo one junior were missing their module on the sorter. Davi1 shoul
 - Tests: `tests/test_module_expectation.py`, `Pipeline5App/tests/unit/test_sycon_fixed_multiplier.py`
   (`test_the_servoone_plugs_its_ppo3_module`), Davi1's `test_scalance_pnio_row_v43_has_no_media_redundancy_record`.
 
+## A station's module list in the I/O List (2026-10-30)
+
+User: "maybe the information got lost somewhere, but the couplers got a new submodule management" - the LOWER
+SORTER R1.4 (2026-10-26) puts a coupler's modules on the row under its head, in Column I (staged `desc_l1`), in the
+multiplier syntax of 2026-10-26: `2[*IN 128 Byte] | 2[*OUT 128 Byte]` under the X1 couplers n0006 / n0007,
+`4[*OUT 128 Byte] | 4[*IN 128 Byte]` under the X2 coupler n0008. The message of 2026-10-26 ("pnpn couplers updated:
+added missing ones, added new custom modules management") meant this list and the two couplers R1.4 added (n0004,
+n0008); it was read then as a database cell and as the coupler's X1 catalog side - the database's per-connector
+list stays as the default of a coupler without a row (n0004 X2, n0009 X1), the per-connector catalog item stays
+(an X1 row takes `PN/PN Coupler X1 [DAP X1 V4.2]` - not yet dragged on the VM).
+
+- PL5 `sycon_handoff`: `is_module_list` - every `|` item `N[text]` (strict, so a signal's description is never read
+  as one; a single module is `1[text]`); the first such row among a head's rows replaces the database's list for a
+  `fixed`-policy station (INFO `sycon_modules_from_iolist`, the module rows' comment names the I/O List cell); a
+  second list is a WARN (`sycon_module_list_twice`), a list under another policy is ignored with a WARN
+  (`sycon_module_list_ignored`). R1.4 in memory: n0006 / n0007 4 modules, n0008 8 from its row, n0004 / n0009 8
+  from the database, the 26 ServoOne `PPO 3`. Tests: `Pipeline5App/tests/unit/test_sycon_module_list_row.py`.
+- The repaired copy (`PROD_Sorter_Lower_repair`) is R1.2's: R1.4 adds two couplers, moves three to their X1 side and
+  changes their modules - an update would skip those three whole; R1.4 needs a fresh build.
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run

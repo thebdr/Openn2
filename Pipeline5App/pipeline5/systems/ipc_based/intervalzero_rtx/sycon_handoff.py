@@ -310,6 +310,17 @@ def module_items(text):
     return out
 
 
+MODULE_LIST_COLUMN = "desc_l1"         # the I/O List's Column I: under a head, a row holding only its module list
+MODULE_LIST = re.compile(r"^\s*\d+\s*\[[^\[\]]*\]\s*(\|\s*\d+\s*\[[^\[\]]*\]\s*)*$")
+
+
+def is_module_list(text):
+    """True for a station's own module list in the I/O List (2026-10-30, the LOWER SORTER R1.4's couplers: the row
+    under the head carries `2[*IN 128 Byte] | 2[*OUT 128 Byte]` in Column I): every `|` item is `N[text]` - a strict
+    form, so a signal's description is never read as one (a single module is `1[text]`)."""
+    return bool(MODULE_LIST.match(str(text or "")))
+
+
 def fixed_modules(text):
     """The Fixed Modules column: a list of module texts in slot order (`module_items`) - or, per connector
     (`by_connector`), {CONNECTOR: list}."""
@@ -424,6 +435,33 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
             modules.append({"station_name": cur["name"], "slot": "0", "subslot": "1", "module_id": "",
                             "module_text": "", "parameters": rec["dap_parameters"],
                             "comment": "DAP parameters of %s" % rec["model_id"]})
+        listed, list_row = None, None
+        for s in cur["signals"]:                           # the station's own module list, the row under its head
+            text = str(s.get(MODULE_LIST_COLUMN) or "").strip()
+            if is_module_list(text):
+                if listed is None:
+                    listed, list_row = module_items(text), s
+                else:
+                    findings.append(_f("sycon_module_list_twice", "WARN", "station %r: a second module list %r (%s) - "
+                                       "the first, %s, taken" % (cur["name"], text, s.get("source_cell") or "",
+                                                                list_row.get("source_cell") or ""), cur["where"]))
+        if listed is not None and rec["modules"] != "fixed":
+            findings.append(_f("sycon_module_list_ignored", "WARN", "station %r: the I/O List's module list %r (%s) is "
+                               "ignored - its model's modules policy is %r, not fixed" % (
+                                   cur["name"], list_row.get(MODULE_LIST_COLUMN), list_row.get("source_cell") or "",
+                                   rec["modules"]), cur["where"]))
+        if rec["modules"] == "fixed" and listed is not None:
+            # the I/O List names this station's modules (user 2026-10-26: "added new custom modules management:
+            # 4[*OUT 128 Byte] | 4[*IN 128 Byte]"; 2026-10-30: "the couplers got a new submodule management" - a row
+            # under the coupler's head, Column I) - they replace the database's list for this station
+            findings.append(_f("sycon_modules_from_iolist", "INFO", "station %r: %d module(s) from the I/O List row %s "
+                               "(%s) instead of the database's" % (cur["name"], len(listed), list_row.get("source_cell") or "",
+                                                                   list_row.get(MODULE_LIST_COLUMN)), cur["where"]))
+            for n, text in enumerate(listed, start=1):
+                modules.append({"station_name": cur["name"], "slot": str(n), "subslot": "", "module_id": "",
+                                "module_text": text, "parameters": "",
+                                "comment": "module of %s from the I/O List row %s" % (rec["model_id"], list_row.get("source_cell") or "")})
+            return
         if rec["modules"] == "fixed":                      # the database's module texts, in slot order
             fixed = rec.get("fixed_modules") or []
             if isinstance(fixed, dict):                    # per connector: the head row's Connector column picks
