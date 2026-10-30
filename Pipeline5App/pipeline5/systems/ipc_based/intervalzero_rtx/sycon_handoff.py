@@ -330,6 +330,19 @@ def fixed_modules(text):
     return module_items(text)
 
 
+def for_connector(cell, row):
+    """A database cell's value for a head row: the plain cell, or - per connector (`X2: ...; X1: ...`) - the row's
+    Connector's entry, the first when the row names none of them (`catalog_item_for` WARNs that case). The DAP
+    Parameters take the form (2026-10-30: a PN/PN coupler's record 1 ends with its GEO ID, 1 on X1 and 2 on X2 - the
+    X1 couplers read `00 0C 00 01 00 00` where the X2 oracle wanted `... 00 02 ...`, their Diagnostics data validity 0
+    all the same)."""
+    per = by_connector(cell)
+    if per is None:
+        return cell
+    connector = str(row.get("connector") or "").strip().upper()
+    return per.get(connector, next(iter(per.values())))
+
+
 def catalog_item_for(rec, row, findings, name, where):
     """The catalog item of a head row: the record's, or - when the Catalog Item cell names one per connector - the
     entry of the row's Connector; a connector the cell does not name takes the first entry with a WARN."""
@@ -432,6 +445,7 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
             cur["station"]["comment"] = (cur["station"]["comment"] + " | fast: " + ", ".join(
                 sorted({k for s in cur["signals"] for k in FAST_SIGNAL_KEYWORDS if k in signal_text(s)}))).strip(" |")
         if rec.get("dap_parameters"):                      # the device's own submodule (slot 0, subslot 1)
+            rec = dict(rec, dap_parameters=for_connector(rec["dap_parameters"], cur["row"]))
             modules.append({"station_name": cur["name"], "slot": "0", "subslot": "1", "module_id": "",
                             "module_text": "", "parameters": rec["dap_parameters"],
                             "comment": "DAP parameters of %s" % rec["model_id"]})

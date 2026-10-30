@@ -32,6 +32,13 @@ def _ip_key(ip):
         return (999, 999, 999, 999)
 
 
+def bottom_row(scrolled, height, margin=10):
+    """(abs row, y) of the lowest grid row whose centre is in view: centre y = ROW_Y0 + ROW_H * abs - scrolled, kept
+    `margin` px above the grid's bottom; (-1, y) when no row is."""
+    a = (scrolled + height - margin - ROW_Y0) // ROW_H
+    return a, ROW_Y0 + ROW_H * a - scrolled
+
+
 def _set_ip_control(ipc, ip):
     fields = sorted(ipc.children(), key=lambda c: c.rectangle().left)
     parts = ip.split(".")
@@ -374,6 +381,15 @@ class ControllerDialog(ConfigDialog):
                 break
             if margin == 3:
                 raise SyconError("the IP Address Table did not scroll; rows left: %r" % sorted(targets))
+            # the resync anchor: the lowest row in view, read now - it stays in view after a half-view scroll. The last
+            # row written may sit at the top of the page (2026-10-30: a resume wrote rows 1-6 and its next targets
+            # were rows 48 and 61; after the scroll row 6 was out of view and the resync raised "scroll lost")
+            anchor = last
+            a_row, a_y = bottom_row(scrolled, r.height(), margin)
+            if a_row >= 0 and (last is None or a_row > last[0]):
+                seen = self._read_ip_at(r, a_y)
+                if seen:
+                    anchor = (a_row, seen)
             notches = 3 if px_per_notch is None else max(1, int((visible // 2) * ROW_H / px_per_notch))
             shift = self._scroll(r, notches)
             if shift <= 0:
@@ -382,8 +398,8 @@ class ControllerDialog(ConfigDialog):
             if px_per_notch is None:
                 px_per_notch = shift / notches
             scrolled += shift
-            if last is not None:
-                scrolled = self._resync(r, scrolled, last[0], last[1], self._read_ip_at)
+            if anchor is not None:
+                scrolled = self._resync(r, scrolled, anchor[0], anchor[1], self._read_ip_at)
         return sorted(pending)
 
     def _scan_ips(self, r, visible):

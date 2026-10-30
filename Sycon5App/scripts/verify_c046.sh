@@ -11,4 +11,4 @@
 set -e
 cd "$(dirname "$0")/.."
 PY="${PY:-../.venv/Scripts/python.exe}"
-"$PY" -m pytest -q tests/test_readback.py tests/test_architecture_contracts.py tests/test_package_import.py tests/test_refute_c046.py tests/test_drawing_lines.py
+"$PY" -m pytest -q tests/test_readback.py tests/test_architecture_contracts.py tests/test_package_import.py tests/test_refute_c046.py tests/test_drawing_lines.py tests/test_grid_anchor.py

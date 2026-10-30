@@ -79,6 +79,23 @@ def test_a_list_under_another_policy_and_a_second_list_are_warned():
     eq(_modules(modules, "n0006-trib-aec01-K24501"), ["*IN 128 Byte"] * 2 + ["*OUT 128 Byte"] * 2, "the first list")
 
 
+def test_the_dap_record_oracle_follows_the_side():
+    """2026-10-30: the coupler's record 1 ends with its GEO ID (1 on X1, 2 on X2): the shipped database names one
+    oracle per side; the plain form still works."""
+    db = sycon.load_dtd()
+    eq(sycon.by_connector(db[COUPLER]["dap_parameters"]),
+       {"X2": "4=0 | record:1=00 0C 00 02 00 00", "X1": "4=0 | record:1=00 0C 00 01 00 00"})
+    rows = [_head("n0001-ctrl", "192.168.1.1", "CIFX 80-RE/ML", "-K1", "1"),
+            _head("n0006-x1", "192.168.1.6", COUPLER, "-K24501", "6", connector="X1"),
+            _head("n0008-x2", "192.168.1.8", COUPLER, "-K24502", "8", connector="x2"),
+            _head("n0009-none", "192.168.1.9", COUPLER, "-K24601", "9")]
+    _s, modules, _f = sycon.build(rows, db)
+    dap = {m["station_name"]: m["parameters"] for m in modules if m["slot"] == "0" and m["subslot"] == "1"}
+    eq(dap, {"n0006-x1": "4=0 | record:1=00 0C 00 01 00 00", "n0008-x2": "4=0 | record:1=00 0C 00 02 00 00",
+             "n0009-none": "4=0 | record:1=00 0C 00 02 00 00"})
+    eq(sycon.for_connector("4=0", {"connector": "X1"}), "4=0", "a plain cell for every side")
+
+
 def test_an_ordinary_signal_row_is_not_a_list():
     rows = [_head("n0001-ctrl", "192.168.1.1", "CIFX 80-RE/ML", "-K1", "1"),
             _head("n0006-trib-aec01-K24501", "192.168.1.6", COUPLER, "-K24501", "6", connector="X2"),

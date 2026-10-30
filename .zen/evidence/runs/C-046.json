@@ -6,10 +6,10 @@
     "Sycon5App/scripts/verify_c046.sh"
   ],
   "exitCode": 0,
-  "outputSha": "ea8060d9e50cf6f93a20881ab972646a5c7ff287ac239adfc7ef51cac320e460",
-  "outputTail": "..............................                                           [100%]\n30 passed in 1.85s",
-  "ranAt": "2026-10-30T07:29:54.856Z",
-  "headCommit": "157a16b5497e68ef1ceaf88f35475942e18d84f1",
+  "outputSha": "827199ece6f0298b22114496de9f3c447f58fbcc9db398c025b4269030ff9db2",
+  "outputTail": ".................................                                        [100%]\n33 passed in 2.00s",
+  "ranAt": "2026-10-30T08:20:46.436Z",
+  "headCommit": "805a044e7c1ae54d16a3009029b18cf17908bdb9",
   "tests": [
     {
       "name": "Sycon5App/tests/test_readback.py",
@@ -35,6 +35,11 @@
       "name": "Sycon5App/tests/test_drawing_lines.py",
       "file": "Sycon5App/tests/test_drawing_lines.py",
       "fileSha": "5260ce74db5eb050ebc088d927355b36e8d3bf11db73c901f1d804255dd3d8e2"
+    },
+    {
+      "name": "Sycon5App/tests/test_grid_anchor.py",
+      "file": "Sycon5App/tests/test_grid_anchor.py",
+      "fileSha": "7c14ff56090d298ddf1fdd24ffd3d592b6e140d447ebaef3a17cd91a3232e5b4"
     }
   ]
 }

@@ -831,6 +831,22 @@ list stays as the default of a coupler without a row (n0004 X2, n0009 X1), the p
   second list is a WARN (`sycon_module_list_twice`), a list under another policy is ignored with a WARN
   (`sycon_module_list_ignored`). R1.4 in memory: n0006 / n0007 4 modules, n0008 8 from its row, n0004 / n0009 8
   from the database, the 26 ServoOne `PPO 3`. Tests: `Pipeline5App/tests/unit/test_sycon_module_list_row.py`.
+- **The repair on R1.4** (2026-10-30, the user: "repair the project in ...PROD_Sorter_Lower_repair - i already deleted
+  the couplers"; backup `PROD_Sorter_Lower_repair_backup_20261030_0905`): R1.4's handoff exported into the folder, then
+  `--resume`. The two AL1202 R1.4 renamed (n0091 rc02 -> cz03, n0120 rc03 -> rc02, same IPs) paired in node order and
+  renamed; the five couplers added - the X2 ones from `PN/PN Coupler X2 [DAP X2 V4.2]` cloned configured, the X1 ones
+  from `PN/PN Coupler X1 [DAP X1 V4.2]` (the first X1 drag on the VM: the info pane cited `DAP X1 V4.2`) cloned and
+  configured one by one (4 modules from their rows, 8 from the database); n0058's port 7 re-typed to IO-Link 32/32.
+  Two fixes on the way: (1) **the IP pass's resync anchor** - the pass wrote rows 1-6 and its next targets were rows 48
+  and 61; after a half-view scroll the anchor (the last row written) was out of view: "scroll lost". The anchor is now
+  the lowest row in view, read before the scroll (`controller.bottom_row`; `tests/test_grid_anchor.py`) - a sparse
+  pass, every update's, needs it. (2) **the coupler's record oracle per side** - record 1 ends with the GEO ID, 1 on X1
+  and 2 on X2: the X1 couplers read `00 0c 00 01 00 00` (Diagnostics data validity 0 as wanted) against the X2 oracle;
+  the DAP Parameters cell takes the per-connector form (`for_connector`). Result: **939 PASS / 5 FAIL** - the 5 FAILs
+  are the switches' GSDML file: SYCON.net bound them, on the project's reload, to `GSDML-V2.4-...-SCALANCE_XC200-
+  20210310.xml` (same device identity 0x002A/0x0A0B, DAP 5C in both files; every other switch check passes) - the
+  2021 file sits beside the 2026 one in `C:\ProgramData\SYCONnet\PROFINET\GSDML`, the user's call. BusField 65 `@`,
+  the master's own station `#`.
 - The repaired copy (`PROD_Sorter_Lower_repair`) is R1.2's: R1.4 adds two couplers, moves three to their X1 side and
   changes their modules - an update would skip those three whole; R1.4 needs a fresh build.
 
