@@ -263,13 +263,44 @@ def load_dtd(path: str | None = None) -> dict:
         symbolic = row[6].lower() or "default"
         if symbolic not in SYMBOLIC_RULES:
             raise ValueError("SyconDeviceTypesDatabase: unknown symbolic-name rule %r for %r" % (row[6], row[0]))
-        fixed = fixed_modules(row[7])
+        # a `scalance-pnio` row's column 8 names its configurable ports' submodules (2026-11-02), not modules
+        fixed = fixed_modules(row[7]) if policy != "scalance-pnio" else []
         if policy == "fixed" and not fixed:
             raise ValueError("SyconDeviceTypesDatabase: policy fixed without Fixed Modules for %r" % row[0])
+        ports = row[7] if policy == "scalance-pnio" else ""
+        if ports:
+            per = by_node(ports)
+            for text in (per.values() if per is not None else [ports]):
+                if not is_module_list(text):
+                    raise ValueError("SyconDeviceTypesDatabase: the ports of %r are not N[text] items: %r" % (row[0], text))
         out[model_id(row[0]).upper()] = {"model_id": model_id(row[0]), "role": role, "catalog_item": row[2],
                                          "modules": policy, "gsdml": row[4], "comment": row[5],
-                                         "symbolic": symbolic, "fixed_modules": fixed, "dap_parameters": row[8]}
+                                         "symbolic": symbolic, "fixed_modules": fixed, "dap_parameters": row[8],
+                                         "ports": ports}
     return out
+
+
+NODE_KEY = re.compile(r"^\s*(n\d+|\*)\s*:\s*(.*)$", re.I)
+
+
+def by_node(cell):
+    """{key: text} when a cell names one entry per station node (`n0010: ...; *: ...` - the key the PROFINET name's
+    first part, `*` every other station); None for a plain cell. A SCALANCE row's ports take the form (user
+    2026-11-02: "192.168.1.10: all 4 ports SFP; all the others: 1st port SFP, the others RJ45" - the main cabinet's
+    switch is node 10 in both sorters, 192.168.1.10 lower and 192.168.6.10 upper)."""
+    pieces = [piece for piece in str(cell or "").split(";") if piece.strip()]
+    if pieces and all(NODE_KEY.match(piece) for piece in pieces):
+        return {NODE_KEY.match(p).group(1).lower(): NODE_KEY.match(p).group(2).strip() for p in pieces}
+    return None
+
+
+def for_node(cell, station_name):
+    """A cell's value for a station: the plain cell, or - per node - its node's entry, else the `*` entry, else ""."""
+    per = by_node(cell)
+    if per is None:
+        return str(cell or "")
+    node = str(station_name or "").split("-")[0].strip().lower()
+    return per.get(node, per.get("*", ""))
 
 
 CONNECTOR_LIST = re.compile(r"^\s*(X\d+)\s*:\s*(.*)$", re.I)
@@ -459,7 +490,7 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
                     findings.append(_f("sycon_module_list_twice", "WARN", "station %r: a second module list %r (%s) - "
                                        "the first, %s, taken" % (cur["name"], text, s.get("source_cell") or "",
                                                                 list_row.get("source_cell") or ""), cur["where"]))
-        if listed is not None and rec["modules"] != "fixed":
+        if listed is not None and rec["modules"] not in ("fixed", "scalance-pnio"):
             findings.append(_f("sycon_module_list_ignored", "WARN", "station %r: the I/O List's module list %r (%s) is "
                                "ignored - its model's modules policy is %r, not fixed" % (
                                    cur["name"], list_row.get(MODULE_LIST_COLUMN), list_row.get("source_cell") or "",
@@ -494,9 +525,24 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
                             "module_text": "PN-IO", "parameters": scalance_pnio_params(rec["catalog_item"]),
                             "comment": "PN-IO: Loop Detection Interface Mode Off, Port Mirroring Mode Off"})
             port_numbers, text, sfp = SCALANCE_COMBO_PORTS.get(rec["model_id"].upper(), ((), "", ""))
-            for n in port_numbers:
-                modules.append({"station_name": cur["name"], "slot": "0", "subslot": str(0x8000 + n), "module_id": sfp,
-                                "module_text": text, "parameters": "", "comment": "port %d: SFP991-1" % n})
+            # the configurable ports' submodules: the I/O List row under the switch, else the database's (per node:
+            # `n0010: 4[SFP 991-1 A]; *: 1[SFP 991-1 A] | 3[RJ45 1 GBit]`, user 2026-11-02), else every port the SFP
+            texts, source = [text] * len(port_numbers), "SFP991-1"
+            if listed is not None:
+                texts, source = listed, "the I/O List row %s" % (list_row.get("source_cell") or "")
+            elif rec.get("ports") and port_numbers:
+                cell = for_node(rec["ports"], cur["name"])
+                if cell:
+                    texts, source = module_items(cell), "the database"
+            if port_numbers and len(texts) != len(port_numbers):
+                findings.append(_f("sycon_port_list_length", "WARN", "station %r: %d port submodule(s) from %s for its %d "
+                                   "configurable ports %s - the first %d set" % (cur["name"], len(texts), source, len(port_numbers),
+                                                                                list(port_numbers), min(len(texts), len(port_numbers))),
+                                   cur["where"]))
+            for n, port_text in zip(port_numbers, texts):
+                modules.append({"station_name": cur["name"], "slot": "0", "subslot": str(0x8000 + n),
+                                "module_id": sfp if port_text.strip().lower() == text.lower() else "",
+                                "module_text": port_text, "parameters": "", "comment": "port %d: %s (%s)" % (n, port_text, source)})
             return
         if rec["modules"] == "iolink-ports":
             ports = port_rows(cur["signals"])

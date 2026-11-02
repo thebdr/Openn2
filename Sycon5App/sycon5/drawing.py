@@ -58,23 +58,29 @@ def drawing_pane(main):
     return panes[0]
 
 
-LONG_VERTICAL_PX = 200          # a green column this long is the laid-out bus (canvas.apply_layout), never a drop line
+LONG_VERTICAL_PX = 200          # a green column this long ...
+BUS_EDGE_PX = 20                # ... at the pane's left edge is the laid-out bus (canvas.apply_layout puts it at x 8..12);
+                                # SYCON.net's default layout stacks drop lines into long columns too, never at the edge
 
 
 def pick_green(cols, rows, count, step=2):
     """The controller's green line from a colour scan: ('h', dy, x0, x1) or ('v', dx, y0, y1), pane-relative; None.
     A long vertical green line wins (2026-10-30: on a project `canvas.apply_layout` laid out, the bus is vertical at x
     8..12 and the devices hang on horizontal branches - the most common green row was a device's branch, y 670 x
-    8..548, and six drops there attached nothing; a drop on the vertical bus attached at once). Else, as before, the
-    most common horizontal row (a SYCON.net default layout: the controller's horizontal line), else a vertical one."""
+    8..548, and six drops there attached nothing; a drop on the vertical bus attached at once) - when it sits at the
+    pane's left edge, where the layout puts the bus (2026-11-02: a fresh build's 15th drop took a column of stacked
+    drop lines at x 532, in SYCON.net's default layout, for the bus - four drops, no node). Else, as before, the most
+    common horizontal row (a SYCON.net default layout: the controller's horizontal line), else a vertical one."""
     for key, n in count.most_common(10):
         R, G, B = key
         if not (G > R + 40 and G > B and n > 50):
             continue
         rw, c = rows[key], cols[key]
         dx, vhits = c.most_common(1)[0]
-        if vhits * step >= LONG_VERTICAL_PX:
-            strong = sorted(x for x, k in c.items() if k >= vhits * 0.8)
+        edge = {x: k for x, k in c.items() if x <= BUS_EDGE_PX}
+        if edge and max(edge.values()) * step >= LONG_VERTICAL_PX:
+            top = max(edge.values())
+            strong = sorted(x for x, k in edge.items() if k >= top * 0.8)
             ys = sorted(rw)
             return ("v", (strong[0] + strong[-1]) // 2, ys[0], ys[-1])
         dy, hits = rw.most_common(1)[0]

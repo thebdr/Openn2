@@ -88,8 +88,10 @@ def test_the_servoone_plugs_its_ppo3_module():
 def test_the_shipped_database_reads_as_the_user_set_it():
     db = sycon.load_dtd()
     coupler = db[COUPLER]
-    eq(coupler["fixed_modules"]["X2"], ["*OUT 128 Byte"] * 4 + ["*IN 128 Byte"] * 4)
-    eq(coupler["fixed_modules"]["X1"], ["*IN 128 Byte"] * 4 + ["*OUT 128 Byte"] * 4)
+    # user 2026-11-02: "couplers without explicit modules configuration in the iolist get 4*128 in+out, while the
+    # default should be 128+128" - one module each way, X1 mirrored; an I/O List row names more
+    eq(coupler["fixed_modules"]["X2"], ["*OUT 128 Byte", "*IN 128 Byte"])
+    eq(coupler["fixed_modules"]["X1"], ["*IN 128 Byte", "*OUT 128 Byte"])
     eq(sycon.by_connector(coupler["catalog_item"]), {"X2": "PN/PN Coupler X2 [DAP X2 V4.2]", "X1": "PN/PN Coupler X1 [DAP X1 V4.2]"})
     for model, item in (("6GK5208-0BA00-2AC2", "SCALANCE XC208 V4.3"), ("6GK5206-2BS00-2AC2", "SCALANCE XC206-2 SFP V4.3"),
                         ("6GK5216-4BS00-2AC2", "SCALANCE XC216-4C V4.3")):

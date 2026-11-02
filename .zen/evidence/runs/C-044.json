@@ -6,10 +6,10 @@
     "Sycon5App/scripts/verify_c044.sh"
   ],
   "exitCode": 0,
-  "outputSha": "3eb5169eb828dd915a42b1de18bea67ded1689a3ec46f607f101a8946576d770",
-  "outputTail": "..................                                                       [100%]\n18 passed in 0.95s\n.................................                                        [100%]\n33 passed in 0.65s\n== generic_hw_handlers ==\n  PASS  tia_generic_hw_run_plan\n  PASS  sycon_generic_hw_run_plan\n  PASS  generic_validation_sub_110_logs_only\n  -> 3/3 passed",
-  "ranAt": "2026-10-30T08:20:42.422Z",
-  "headCommit": "805a044e7c1ae54d16a3009029b18cf17908bdb9",
+  "outputSha": "b6e632591bff81b6f5a3c594a8dc189817ff3b5385d72ec1ca238118e2d66710",
+  "outputTail": "..................                                                       [100%]\n18 passed in 1.00s\n.....................................                                    [100%]\n37 passed in 0.78s\n== generic_hw_handlers ==\n  PASS  tia_generic_hw_run_plan\n  PASS  sycon_generic_hw_run_plan\n  PASS  generic_validation_sub_110_logs_only\n  -> 3/3 passed",
+  "ranAt": "2026-11-02T12:45:17.632Z",
+  "headCommit": "1b4900233f9bf892cabdcd5cbecd76aa203c8248",
   "tests": [
     {
       "name": "Sycon5App/tests/test_refute_c044.py",

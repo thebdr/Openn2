@@ -46,6 +46,15 @@ def test_a_default_layout_keeps_the_horizontal_line():
     assert drawing.slave_points(green)[0] == (210, 300), "the proven-first point of a horizontal line, unchanged"
 
 
+def test_a_long_column_of_drop_lines_away_from_the_edge_is_not_the_bus():
+    """2026-11-02: the fresh upper sorter build, 14 stations in SYCON.net's default layout - the controller's line at
+    y 72 (x 420..908) and a column of stacked drop lines at x 532 from y 72 to 484; the line is the horizontal one."""
+    segs = [("h", 72, 420, 908), ("v", 532, 72, 484)] + [("v", x, 72, 100) for x in range(600, 900, 70)]
+    cols, rows, count = scan(segs)
+    green = drawing.pick_green(cols, rows, count)
+    assert green[0] == "h" and green[1] == 72, green
+
+
 def test_drop_points_keep_off_the_branch_rows():
     cols, rows, count = scan(laid_out() + [("h", y, 8, 300) for y in (150, 151, 152)])
     green = drawing.pick_green(cols, rows, count)

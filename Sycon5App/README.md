@@ -850,6 +850,27 @@ list stays as the default of a coupler without a row (n0004 X2, n0009 X1), the p
 - The repaired copy (`PROD_Sorter_Lower_repair`) is R1.2's: R1.4 adds two couplers, moves three to their X1 side and
   changes their modules - an update would skip those three whole; R1.4 needs a fresh build.
 
+## The upper sorter, the coupler default, the switch ports (2026-11-02)
+
+User: "time to generate the upper sorter sycon project - notice that there is a new v1.4 io list; couplers without
+explicit modules configuration in the iolist get 4*128 in+out, while the default should be 128+128; the scalance
+switches configurable ports: 192.168.1.10: all 4 ports SFP, all the others: 1st port SFP, the others RJ45".
+
+- **The coupler default** is one module each way again (`X2: *OUT 128 Byte | *IN 128 Byte; X1: *IN 128 Byte | *OUT 128
+  Byte`); a coupler with a module-list row in the I/O List keeps its row's modules.
+- **The XC216-4C's combo ports** (subslots 32769-32772; the GSDML's `RJ45 1 GBit` by default, `SFP 991-1 A` pluggable):
+  the database row's column 8 names them per node - `n0010: 4[SFP 991-1 A]; *: 1[SFP 991-1 A] | 3[RJ45 1 GBit]`
+  (`by_node` / `for_node`: the PROFINET name's first part, `*` every other). The main cabinet's switch is node 10 in
+  both sorters - 192.168.1.10 lower, 192.168.6.10 upper - so the rule is keyed on the node, not the address. An I/O
+  List module-list row under a switch overrides the database (`2[SFP 991-1 A] | 2[RJ45 1 GBit]`); a list of the
+  wrong length is a WARN (`sycon_port_list_length`); a ports cell that is not `N[text]` items is refused by the
+  loader. The driver re-types only a port that differs (a field switch: port 1). Tests:
+  `Pipeline5App/tests/unit/test_sycon_switch_ports.py`.
+- **The upper sorter** (`8FVT_IO0020 - Sorter I-O List - UPPER SORTER_R1.4.xlsx`, network 192.168.6.x): 64 stations
+  (the controller, 5 couplers - n0006 / n0007 X1 4 modules from their rows, n0008 X2 8 from its row, n0004 / n0009 X2
+  the 128 + 128 default - 5 XC216-4C, 5 ET200SP, 26 ServoOne, 19 AL1202, 3 Anybus), 253 module rows; built fresh
+  in `spike/scratch/PROD_Sorter_Upper` (9 + 51 min): **911 PASS / 5 FAIL - the five the switches' GSDML file, which SYCON.net re-binds to the 2021 XC200 file when a project is reopened (the resume after the first run's stop); the hub n0010 4 x SFP 991-1 A and the field switches SFP + 3 x RJ45 1 GBit read back, the 26 ServoOne 1 module each, the couplers 4 / 4 / 2 / 8 / 2 modules, the controller named; BusField 64 @. The fresh run stopped at its 15th drop (the first ServoOne): a column of stacked drop lines at x 532 in SYCON.net's default layout was taken for the laid-out bus - the vertical-bus preference now holds only at the pane's left edge (drawing.BUS_EDGE_PX), and the resume finished it**.
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run
