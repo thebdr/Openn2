@@ -6,7 +6,10 @@
 // a sample DB with every shape the custom view renders.
 // Options: &polarity=plant keeps the plant's unconfirmed polarity (the page as the CPU shows it before the M0
 // watch); &unknown=1 makes one area member unknown to the CPU; &fail=lost drops the link from 6 s to 16 s;
-// &fail=rights refuses every read.
+// &fail=rights refuses every read. The node diagnostics: by default the CPU is at firmware V4.1 (Modules.Browse /
+// ReadStatus, Alarms.Browse, Project.ReadLanguages: the failed node unreachable, one node with a module's wire
+// break, one needing maintenance, the not-installed ones deactivated); &fw=3.1 has Alarms.Browse only; &fw=2.9
+// none of them, like the 1518F.
 (function (SD) {
   "use strict";
   var started = Date.now(), tokens = {}, nextToken = 0, stats = { requests: 0, logins: 0, reads: 0 };
@@ -208,7 +211,9 @@
     });
     plant.devices.concat(plant.nodes).forEach(function (e) {
       (e.members || []).forEach(function (m) {
-        values[m.var] = function () { return /NodesNotInstalled|00_Commissioning/.test(m.var) ? false : memberValue(m, on(e.id)); };
+        values[m.var] = function () {     // one node in five flagged not installed (TRUE), to show the violet border
+          return /NodesNotInstalled/.test(m.var) ? hash(m.var) % 5 === 0 : /00_Commissioning/.test(m.var) ? false : memberValue(m, on(e.id));
+        };
       });
       (e.tags || []).forEach(function (t) {
         values[t.var] = function () { return /^[IE]/.test(t.address) ? !on(e.id) : (hash(t.var) % 2 === 0); };
@@ -222,8 +227,72 @@
     var unknownVar = params.get("unknown") === "1" && plant.areas[0] && plant.areas[0].members[plant.areas[0].members.length - 1];
     if (unknownVar) { delete values[unknownVar.var]; }
 
+    // --- the hardware configuration and the CPU's diagnostics (S7-1500 FW V3.1 / V4.1 methods) ---------- //
+    var fw = parseFloat(params.get("fw") || "4.1"), methods = ["Api.Browse", "Api.Login", "Api.Logout", "PlcProgram.Browse", "PlcProgram.Read"];
+    if (fw >= 3.1) { methods.push("Alarms.Browse", "Project.ReadLanguages"); }
+    if (fw >= 4.1) { methods.push("Modules.Browse", "Modules.ReadStatus"); }
+    var hw = {}, devId = {}, cpu = plant.nodes.filter(function (n) { return n.ip === plant.plc.ip; })[0];
+    function notInstalled(n) { return (n.members || []).some(function (m) { return m.role === "not_installed" && hash(m.var) % 5 === 0; }); }
+    plant.nodes.forEach(function (n, i) {
+      var id = devId[n.id] = 300 + i * 10;
+      hw[id] = { node: n, name: n.name, cls: n === cpu ? "CPU 1518F-4 PN/DP" : "IM 155-6 PN HF", type: n === cpu ? "module" : "device" };
+      [["DI 8x24VDC", "F-DI 8x24VDC HF"], ["DQ 4x24VDC", "F-DQ 4x24VDC/2A PM HF"], ["Server module", "Server module"]].forEach(function (m, k) {
+        hw[id + k + 1] = { node: n, parent: id, name: m[0], cls: m[1], type: "module", slot: k };
+      });
+    });
+    var healthy = plant.nodes.filter(function (n) { return n !== cpu && !active[n.id] && !notInstalled(n) && (byKind.estop || []).some(function (d) { return (d.nodes || []).indexOf(n.id) >= 0; }); });
+    var broken = healthy[2], worn = healthy[5];
+    function entry(id, kids) {
+      var h = hw[id], o = { hwid: +id, name: h.name, "class": h.cls, type: h.type };
+      if (h.type === "module" && !h.parent) { o.subtype = "cpu"; }
+      if (kids) { o.children = kids; } else { o.has_children = !h.parent; }
+      return o;
+    }
+    function kidsOf(id) { return Object.keys(hw).filter(function (k) { return hw[k].parent === +id; }).map(function (k) { return entry(k); }); }
+    function problem(h) {
+      var n = h.node, at = n.name + (h.parent ? " / " + h.name : "");
+      if (active[n.id]) { return ["not_reachable", "IO device failure - " + at]; }
+      if (notInstalled(n)) { return ["deactivated", "Hardware component deactivated - " + at]; }
+      if (n === broken && h.slot === 0) { return ["error", "Channel 3: wire break - " + at]; }
+      if (n === worn && !h.parent) { return ["maintenance_required", "Maintenance required: port 2, reduced transmission quality - " + at]; }
+      return null;
+    }
+    function readStatus(p) {
+      var h = hw[p.hwid];
+      if (!h) { return { error: { code: 1100, message: "Invalid hardware identifier" } }; }
+      var own = problem(h), kid = !h.parent && h.node === broken ? problem(hw[p.hwid + 1]) : null;   // the device: its module's break
+      return { result: { status: { own: own ? own[0] : "good", subordinate: kid ? "error" : "good" }, language: "en-US",
+        messages: [own, kid].filter(Boolean).map(function (x) { return { text: x[1] }; }) } };
+    }
+    var diagAnswers = {
+      "Project.ReadLanguages": function () { return { result: { languages: [{ language: "en-US", active: true, user_interface_languages: ["en"] }] } }; },
+      "Modules.Browse": function (p) {
+        if (p.hwid === undefined) {
+          return { result: { nodes: [{ hwid: 32, name: plant.plc.station, "class": "CPU 1518F-4 PN/DP", type: "device", subtype: "central_device",
+            children: cpu ? [entry(devId[cpu.id])] : [] }, { hwid: 265, name: "PROFINET IO-System_1", type: "iosystem", subtype: "profinet_iosystem",
+            children: plant.nodes.filter(function (n) { return n !== cpu; }).map(function (n) { return entry(devId[n.id]); }) }] } };
+        }
+        return hw[p.hwid] ? { result: { nodes: [entry(p.hwid, kidsOf(p.hwid))] } } : { error: { code: 1100, message: "Invalid hardware identifier" } };
+      },
+      "Modules.ReadStatus": readStatus,
+      "Alarms.Browse": function () {
+        var list = [];
+        Object.keys(hw).forEach(function (k) {
+          var own = problem(hw[k]);     // one alarm for a failed device, one for a module's own error
+          if (own && (own[0] === "error" || (!hw[k].parent && own[0] !== "deactivated"))) {
+            list.push({ id: String(9000 + list.length), alarm_number: 37, status: "incoming", timestamp: new Date(started).toISOString(),
+              producer: "system_diagnostics", hwid: +k, acknowledgement: { state: "not_acknowledged" }, alarm_text: own[1], info_text: "" });
+          }
+        });
+        list.push({ id: "9999", alarm_number: 5, status: "incoming", timestamp: new Date(started).toISOString(), producer: "program_alarm",
+          alarm_text: "Simulated program alarm", info_text: "" });
+        return { result: { entries: list, last_modified: new Date(started).toISOString(), count_current: list.length, count_max: 5000, language: "en-US" } };
+      }
+    };
+
     function answer(entry) {
       var method = entry.method, p = entry.params || {};
+      if (method === "Api.Browse") { return { result: methods.map(function (m) { return { name: m }; }) }; }
       if (method === "Api.Login") {
         if (["Everybody", "Anonymous"].indexOf(p.user) < 0 || p.password !== "") { return { error: { code: 100, message: "Login failed" } }; }
         stats.logins += 1;
@@ -252,6 +321,7 @@
             if (!out) {
               if (!valid || failMode === "rights") { out = { error: { code: 2, message: "Permission denied" } }; }
               else if (entry.method === "PlcProgram.Browse") { out = browse(entry.params && entry.params["var"]); }
+              else if (diagAnswers[entry.method] && methods.indexOf(entry.method) >= 0) { out = diagAnswers[entry.method](entry.params || {}); }
               else if (entry.method === "PlcProgram.Read") {
                 stats.reads += 1;
                 var name = entry.params["var"];

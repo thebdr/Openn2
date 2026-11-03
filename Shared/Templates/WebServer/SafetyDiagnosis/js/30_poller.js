@@ -45,6 +45,11 @@
     var self = this;
     vars.forEach(function (v) { delete self.errors[v]; delete self.values[v]; });
   };
+  // a set read in turn, polling.field_per_cycle names a cycle (the field I/O of not-installed devices)
+  Poller.prototype.rotate = function (vars) {
+    var key = vars.join("\n");
+    if (key !== this.rotateKey) { this.rotateKey = key; this.rotateVars = vars; this.rotateAt = 0; }
+  };
   Poller.prototype.problems = function () {
     var self = this;
     return Object.keys(this.errors).filter(function (v) { return !self.quiet[v]; })
@@ -81,7 +86,11 @@
       var w = self.watches[key];
       if (started - w.last >= w.interval - 50) { due.push(key); }
     });
-    this.base.concat.apply(this.base, due.map(function (k) { return self.watches[k].vars; })).forEach(function (v) {
+    var turn = (this.rotateVars || []).slice(this.rotateAt, this.rotateAt + this.cfg.field_per_cycle);
+    if (this.rotateVars && this.rotateVars.length) {
+      this.rotateAt = this.rotateAt + this.cfg.field_per_cycle >= this.rotateVars.length ? 0 : this.rotateAt + this.cfg.field_per_cycle;
+    }
+    this.base.concat.apply(this.base, due.map(function (k) { return self.watches[k].vars; }).concat([turn])).forEach(function (v) {
       if (!seen[v] && !self.errors[v]) { seen[v] = true; vars.push(v); }
     });
     this.rpc.read(vars, this.cfg.chunk).then(function (result) {

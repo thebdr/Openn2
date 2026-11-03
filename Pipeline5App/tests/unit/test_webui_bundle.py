@@ -1,6 +1,7 @@
 """The shipped web diagnosis page (C-050 M3, Shared/Templates/WebServer/SafetyDiagnosis) as phase 650 bundles it:
 the files it ships, no external URL (the CPU serves everything), the Web API methods it can send (read-only: the
-anonymous login, PlcProgram.Read / Browse - never a write), every text set as text (no HTML sink), the size budget,
+anonymous login, Api.Browse, PlcProgram.Read / Browse and the diagnostics reads of newer firmware - never a write or
+an acknowledgement), every text set as text (no HTML sink), the size budget,
 the mock simulator loaded only on a local host, the plant.json keys it reads all present in build_plant's
 output, and the drawing's positions export read back by the loader (M5). The page's behaviour itself is checked in a browser against the mock (evidence C-050 M3)."""
 import json
@@ -16,7 +17,9 @@ import test_webui_model as fixture
 PAGE = ("index.html", "app.js", "app.css", "icons.svg")
 PAGE_BUDGET = 120 * 1024          # the plan's budget for what every browser loads
 MOCK_BUDGET = 24 * 1024           # the dev preview's simulator, loaded only on a local host
-READ_ONLY = {"Api.Login", "Api.Logout", "PlcProgram.Read", "PlcProgram.Browse"}
+READ_ONLY = {"Api.Login", "Api.Logout", "Api.Browse", "PlcProgram.Read", "PlcProgram.Browse",
+             # a PROFINET node's diagnostics on newer firmware (js/71_nodediag.js) - reads that need read_diagnostics
+             "Project.ReadLanguages", "Modules.Browse", "Modules.ReadStatus", "Alarms.Browse"}
 NAMESPACES = {"http://www.w3.org/2000/svg"}
 
 
@@ -79,6 +82,21 @@ def test_size_budget():
     page = sum(len(files[name]) for name in PAGE)
     ok(page <= PAGE_BUDGET, f"the page is {page} bytes (budget {PAGE_BUDGET})")
     ok(len(files["mock.js"]) <= MOCK_BUDGET, f"mock.js is {len(files['mock.js'])} bytes (budget {MOCK_BUDGET})")
+
+
+def test_app_css_is_lean():
+    """app.css = the css/ files without their comments (webui_project._lean_css): only the file notes are left,
+    and every rule and declaration of the template is still there."""
+    css = _text(_files(), "app.css")
+    eq(re.findall(r"/\*.*?\*/", css, re.S), [f"/* --- {name} --- */" for name in sorted(
+        "css/" + n for n in os.listdir(os.path.join(config.WEBAPP_TEMPLATE_DIR, "css")) if n.endswith(".css"))],
+       "the file notes are the only comments")
+    raw = "".join(open(os.path.join(config.WEBAPP_TEMPLATE_DIR, "css", n), encoding="utf-8").read()
+                  for n in os.listdir(os.path.join(config.WEBAPP_TEMPLATE_DIR, "css")) if n.endswith(".css"))
+    eq([s for s in re.findall(r'"[^"\n]*"', raw) if "/*" in s or "*/" in s], [], "no CSS string holds a comment marker")
+    source = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
+    for mark in "{};":
+        eq(css.count(mark), source.count(mark), f"every {mark!r} of the template is kept")
 
 
 def test_the_mock_only_on_a_local_host():
@@ -154,6 +172,7 @@ if __name__ == "__main__":
         ("read_only_web_api_methods", test_read_only_web_api_methods),
         ("texts_are_text", test_texts_are_text),
         ("size_budget", test_size_budget),
+        ("app_css_is_lean", test_app_css_is_lean),
         ("the_mock_only_on_a_local_host", test_the_mock_only_on_a_local_host),
         ("the_plant_keys_it_reads_exist", test_the_plant_keys_it_reads_exist),
         ("the_positions_round_trip", test_the_positions_round_trip),

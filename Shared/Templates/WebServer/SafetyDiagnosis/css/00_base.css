@@ -6,6 +6,7 @@
   --accent: #1f5fae; --focus: #2b7de9;
   --ok: #1d7f45; --ok-bg: #e3f4ea; --warning: #9a6200; --warning-bg: #fdf1d8; --alarm: #b3261e; --alarm-bg: #fde4e2;
   --unknown: #5f6b78; --unknown-bg: #eceff2; --info: #1f5fae; --info-bg: #e3edfa; --stale: #8a949e;
+  --ni: #8b3fd9;
   --radius: 8px; --nav-w: 208px; --detail-w: 400px;
 }
 @media (prefers-color-scheme: dark) {
@@ -14,6 +15,7 @@
     --accent: #6ea8ef; --focus: #6ea8ef;
     --ok: #4cc47f; --ok-bg: #173523; --warning: #f0b445; --warning-bg: #3a2c10; --alarm: #ff6b61; --alarm-bg: #44191a;
     --unknown: #a2adb8; --unknown-bg: #262d35; --info: #6ea8ef; --info-bg: #172a42; --stale: #6c7681;
+    --ni: #b98af0;
   }
 }
 * { box-sizing: border-box; }
@@ -63,7 +65,8 @@ button { font: inherit; color: inherit; }
 .conn.lost, .conn.rights, .conn.login { background: var(--alarm-bg); color: var(--alarm); }
 
 @media (max-width: 1023px) {
-  .app, .app.has-detail { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "nav" "banners" "view" "foot"; }
+  .app, .app.has-detail { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto 1fr auto;
+    grid-template-areas: "top" "nav" "banners" "view" "foot"; }
   .nav { border-right: 0; border-bottom: 1px solid var(--line); display: flex; gap: 2px; overflow-x: auto; padding: 4px 8px;
     position: sticky; top: 53px; z-index: 4; scrollbar-width: none; }
   .nav a { flex: none; padding: 7px 10px; }

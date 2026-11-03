@@ -34,7 +34,7 @@
     if (SD.mockWanted()) { mock = SD.mock.install(plant, new URLSearchParams(location.search)); }
     var rpc = new SD.Rpc(plant.login, plant.polling);
     var poller = new SD.Poller(rpc, plant);
-    SD.shell({ plant: plant, model: new SD.Model(plant), rpc: rpc, poller: poller, mock: mock });
+    SD.shell({ plant: plant, model: new SD.Model(plant), rpc: rpc, poller: poller, mock: mock, notes: new SD.Notes(plant) });
     poller.start();
     window.addEventListener("pagehide", function () { rpc.logout(); });
   }

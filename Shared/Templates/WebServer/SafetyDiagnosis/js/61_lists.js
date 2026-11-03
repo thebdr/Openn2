@@ -13,9 +13,9 @@
     var pick = SD.el("select", { "aria-label": "State" }, [["all", "All states"], ["bad", "Not OK"], ["alarm", "Alarm"],
       ["warning", "Warning"], ["unknown", "Unknown"], ["ok", "OK"]].map(function (o) { return SD.el("option", { value: o[0], text: o[1] }); }));
     var count = SD.el("span", { cls: "muted" });
-    var head = isNode ? ["State", "PROFINET name", "IP", "FLD", "Description", "Diagnosis", "Devices"]
-      : ["State", "FLD", "Description", "Areas", "Diagnosis", "PROFINET node"];
-    var wide = isNode ? [false, false, false, true, true, true, true] : [false, false, false, true, true, true];
+    var head = isNode ? ["State", "Layout", "PROFINET name", "IP", "FLD", "Description", "Diagnosis", "Devices"]
+      : ["State", "Layout", "FLD", "Description", "Areas", "Diagnosis", "PROFINET node"];
+    var wide = isNode ? [false, false, false, false, true, true, true, true] : [false, false, false, false, true, true, true];
     var tbody = SD.el("tbody");
     var table = SD.el("table", { cls: "grid" }, [SD.el("thead", null, SD.el("tr", null, head.map(function (h, i) {
       return SD.el("th", { cls: wide[i] ? "wide" : "", text: h });
@@ -29,14 +29,18 @@
     }
     entities.forEach(function (e) {
       var chip = SD.chip("stale");
+      var locate = SD.el("button", { cls: "iconbtn", type: "button", title: "Show on layout",
+        "aria-label": "Show " + e.fld + " on the layout", on: {
+          click: function (ev) { ev.stopPropagation(); location.hash = SD.layoutHref(ctx, e); },
+          keydown: function (ev) { ev.stopPropagation(); } } }, SD.icon("locate"));
       var values = isNode
-        ? [chip, e.name, e.ip, e.fld, e.description, diagText(e), String((model.onNode[e.id] || []).length)]
-        : [chip, e.fld, e.description, (e.areas || []).join(", "), diagText(e), (e.nodes || []).map(function (n) {
+        ? [chip, locate, e.name, e.ip, e.fld, e.description, diagText(e), String((model.onNode[e.id] || []).length)]
+        : [chip, locate, e.fld, e.description, (e.areas || []).join(", "), diagText(e), (e.nodes || []).map(function (n) {
           return model.byId[n] ? model.byId[n].name : n; }).join(", ")];
       var tr = SD.el("tr", { cls: "click", tabindex: "0", on: {
         click: function () { SD.open(e.id); },
         keydown: function (ev) { if (ev.key === "Enter") { SD.open(e.id); } } } }, values.map(function (v, i) {
-        return SD.el("td", { cls: (wide[i] ? "wide " : "") + (i === 1 ? "mono" : "") }, v);
+        return SD.el("td", { cls: (wide[i] ? "wide " : "") + (i === 2 ? "mono" : "") }, v);
       }));
       e.search = [e.fld, e.name || "", e.ip || "", e.description || "", (e.areas || []).join(" ")];
       rows[e.id] = tr;
@@ -50,8 +54,9 @@
       var needle = search.value.trim(), want = pick.value, shown = 0;
       entities.forEach(function (e) {
         var state = ev.entity[e.id], chip = cells[e.id];
-        chip.textContent = SD.STATE_TEXT[state];
+        chip.textContent = SD.STATE_TEXT[state] + (ev.ni[e.id] ? " - not installed" : "");
         SD.setState(chip, state);
+        chip.classList.toggle("ni", !!ev.ni[e.id]);
         var visible = SD.matches(needle, e.search) && (want === "all" || (want === "bad" ? state !== "ok" : state === want
           || (want === "unknown" && (state === "node" || state === "stale"))));
         rows[e.id].hidden = !visible;

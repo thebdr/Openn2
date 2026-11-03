@@ -13,10 +13,6 @@
     Object.keys(attrs || {}).forEach(function (k) { node.setAttribute(k, attrs[k]); });
     return node;
   }
-  function cell(v) {
-    v = String(v);
-    return /[",\r\n]/.test(v) ? "\"" + v.replace(/"/g, "\"\"") + "\"" : v;
-  }
   // the positions file the loader reads (config.load_webui_positions): kind,fld,x,y - CRLF, csv quoting
   SD.positionsCsv = function (positions) {
     var rows = [["kind", "fld", "x", "y"]];
@@ -24,15 +20,19 @@
       var at = key.indexOf("|"), p = positions[key];
       rows.push([key.slice(0, at), key.slice(at + 1), (+p[0]).toFixed(1), (+p[1]).toFixed(1)]);
     });
-    return rows.map(function (r) { return r.map(cell).join(","); }).join("\r\n") + "\r\n";
+    return rows.map(SD.csvRow).join("\r\n") + "\r\n";
   };
 
-  SD.drawing = function (ctx) {
+  // show(e) = whether this drawing shows e's icon (an overview tab's devices and nodes); the positions file keeps
+  // every device and node
+  SD.drawing = function (ctx, show) {
     var model = ctx.model, image = ctx.plant.layout.image, v0 = image.view_box;
+    var entities = model.entities.filter(function (e) { return !show || show(e); });
     var saved = ctx.plant.layout.positions || {};
     var positions = draft ? draft.positions : JSON.parse(JSON.stringify(saved));
     var vb = { x: v0[0], y: v0[1], w: v0[2], h: v0[3] }, fitW = v0[2], pins = {}, pointers = {}, gesture = null;
-    var editing = false, armed = null, selected = null, frame = 0, lastEv = null, onlyBad = false;
+    var editing = false, armed = null, selected = null, frame = 0, lastEv = null, onlyBad = false, pass = null;
+    var started = false, want = null, finding = null, findTimer = 0;
     var keyOf = function (e) { return e.kind + "|" + e.fld; };
 
     var view = svg("svg", { class: "plantsvg", role: "group", "aria-label": "Plant drawing" });
@@ -44,7 +44,8 @@
     function makePin(e) {
       var kind = model.kind[e.kind] || { label: e.kind, icon: "device" };
       var g = svg("g", { class: "pin s-stale", tabindex: "0", role: "button" });
-      g.appendChild(svg("circle", { r: "1" }));
+      g.appendChild(kind.shape === "square" ? svg("rect", { x: "-0.95", y: "-0.95", width: "1.9", height: "1.9", rx: "0.3" })
+        : svg("circle", { r: "1" }));
       g.appendChild(svg("use", { href: "icons.svg#" + kind.icon, x: "-0.62", y: "-0.62", width: "1.24", height: "1.24" }));
       var title = svg("title");
       title.textContent = kind.label + " " + e.fld + (e.description ? " - " + e.description : "");
@@ -60,7 +61,7 @@
       pins[e.id] = { g: g, e: e, title: kind.label + " " + e.fld };
       layer.appendChild(g);
     }
-    model.entities.forEach(function (e) { if (positions[keyOf(e)]) { makePin(e); } });
+    entities.forEach(function (e) { if (positions[keyOf(e)]) { makePin(e); } });
 
     // --- the view ---------------------------------------------------------------------------------------- //
     function size() { return { w: box.clientWidth || 800, h: box.clientHeight || 500 }; }
@@ -171,7 +172,7 @@
         + "siemens_s7_safety/webui/), run 650 again and upload the application." }),
       SD.el("div", { cls: "section", text: "Not placed" }), tray]);
     var editBtn = SD.el("button", { cls: "btn", type: "button", text: "Edit positions", "aria-pressed": "false" });
-    var placedText = SD.el("span", { cls: "muted", text: Object.keys(pins).length + " of " + model.entities.length + " placed" });
+    var placedText = SD.el("span", { cls: "muted", text: Object.keys(pins).length + " of " + entities.length + " placed" });
 
     function startDrag(ev, e) {
       pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
@@ -188,7 +189,7 @@
     function changed() {
       draft = dirty() ? { positions: positions } : null;
       count.textContent = draft ? "Unsaved changes" : "No change";
-      placedText.textContent = Object.keys(pins).length + " of " + model.entities.length + " placed";
+      placedText.textContent = Object.keys(pins).length + " of " + entities.length + " placed";
       draw();
     }
     function place(e, cx, cy) {
@@ -202,7 +203,7 @@
     }
     function fillTray() {
       SD.clear(tray);
-      var left = model.entities.filter(function (e) { return !positions[keyOf(e)]; });
+      var left = entities.filter(function (e) { return !positions[keyOf(e)]; });
       if (!left.length) { tray.appendChild(SD.el("span", { cls: "muted", text: "Every device is placed." })); }
       left.forEach(function (e) {
         var kind = model.kind[e.kind] || { icon: "device" };
@@ -221,20 +222,13 @@
       armed = null;
       if (editing) { fillTray(); changed(); } else { select(null); }
     });
-    save.addEventListener("click", function () {
-      var url = URL.createObjectURL(new Blob([SD.positionsCsv(positions)], { type: "text/csv" }));
-      var link = SD.el("a", { href: url, download: "webui_positions.csv" });
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
-    });
+    save.addEventListener("click", function () { SD.download("webui_positions.csv", SD.positionsCsv(positions), "text/csv"); });
     discard.addEventListener("click", function () {
       positions = JSON.parse(JSON.stringify(saved));
       Object.keys(pins).forEach(function (id) {
         if (!positions[keyOf(pins[id].e)]) { layer.removeChild(pins[id].g); delete pins[id]; }
       });
-      model.entities.forEach(function (e) { if (positions[keyOf(e)] && !pins[e.id]) { makePin(e); } });
+      entities.forEach(function (e) { if (positions[keyOf(e)] && !pins[e.id]) { makePin(e); } });
       select(null);
       fillTray();
       changed();
@@ -270,16 +264,37 @@
     function refresh() {
       var ev = lastEv;
       Object.keys(pins).forEach(function (id) {
-        var state = ev ? ev.entity[id] : "stale", pin = pins[id];
-        var hide = onlyBad && state === "ok" && !editing;
-        pin.g.setAttribute("class", "pin s-" + state + (id === selected || id === ctx.route.detail ? " sel" : "") + (hide ? " off" : ""));
-        pin.g.setAttribute("aria-label", pin.title + ": " + SD.STATE_TEXT[state]);
+        var state = ev ? ev.entity[id] : "stale", pin = pins[id], sel = id === selected || id === ctx.route.detail;
+        var hide = !editing && !sel && ((onlyBad && state === "ok") || (pass && !pass[id]));   // the open one stays
+        var ni = ev && ev.ni[id];
+        pin.g.setAttribute("class", "pin s-" + state + (ni ? " ni" : "") + (sel ? " sel" : "") + (id === finding ? " find" : "")
+          + (hide ? " off" : ""));
+        pin.g.setAttribute("aria-label", pin.title + ": " + SD.STATE_TEXT[state] + (ni ? ", node not installed" : ""));
       });
     }
-    window.requestAnimationFrame(fit);
-    return { node: node, fit: fit, update: function (ev, bad) { lastEv = ev; onlyBad = !!bad; refresh(); }, leave: function () {
-      window.removeEventListener("beforeunload", guard);
-      if (watcher) { watcher.disconnect(); } else { window.removeEventListener("resize", resized); }
-    } };
+    // "Show on layout": centre the view on the icon, zoomed in, and make it pulse for a moment
+    function centre(id) {
+      var p = positions[keyOf(pins[id].e)], s = size(), w = Math.max(v0[2] / 60, fitW / 5);
+      vb = { x: p[0] - w / 2, w: w, h: w * s.h / s.w, y: 0 };
+      vb.y = p[1] - vb.h / 2;
+      draw();
+      finding = id;
+      clearTimeout(findTimer);
+      findTimer = setTimeout(function () { finding = null; refresh(); }, 2600);
+      refresh();
+    }
+    window.requestAnimationFrame(function () { fit(); started = true; if (want) { centre(want); } });
+    return { node: node, fit: fit, box: box,
+      update: function (ev, bad, passing) { lastEv = ev; onlyBad = !!bad; pass = passing || null; refresh(); },
+      has: function (id) { return !!pins[id] && !!positions[keyOf(pins[id].e)]; },   // its icon is on the drawing
+      show: function (id) {                            // go to its icon (once the drawing is laid out)
+        want = id;
+        if (started) { centre(id); }
+      },
+      leave: function () {
+        clearTimeout(findTimer);
+        window.removeEventListener("beforeunload", guard);
+        if (watcher) { watcher.disconnect(); } else { window.removeEventListener("resize", resized); }
+      } };
   };
 })(SD);

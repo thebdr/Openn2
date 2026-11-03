@@ -3,12 +3,14 @@
 // anonymous user - plant.login.users in order ("Everybody" before FW V3.1, "Anonymous" after), the empty
 // password, nothing secret - and sends X-Auth-Token. An expired token answers like no token (code 2
 // "Permission denied" on every call), so a batch refused whole with code 2 logs in again once and is retried.
-// Read-only by construction: only the methods in READ_ONLY can be sent.
+// Read-only by construction: only the methods in READ_ONLY can be sent - the login, the tag reads and browse, and
+// the diagnostics reads of newer firmware that 71_nodediag.js uses when Api.Browse lists them.
 (function (SD) {
   "use strict";
   var ENDPOINT = "/api/jsonrpc";
   SD.DENIED = 2;
-  var READ_ONLY = { "Api.Login": true, "Api.Logout": true, "PlcProgram.Read": true, "PlcProgram.Browse": true };
+  var READ_ONLY = { "Api.Login": true, "Api.Logout": true, "Api.Browse": true, "PlcProgram.Read": true, "PlcProgram.Browse": true,
+    "Project.ReadLanguages": true, "Modules.Browse": true, "Modules.ReadStatus": true, "Alarms.Browse": true };
 
   function failure(kind, message) {
     var error = new Error(message);
@@ -149,6 +151,19 @@
     return this.calls([{ method: "PlcProgram.Browse", params: params }]).then(function (entries) {
       return entries[0].error ? { error: entries[0].error } : (entries[0].result || []);
     });
+  };
+
+  // the CPU's Web API methods (Api.Browse) -> Promise {name: true}, asked once a page; a failed ask is asked again
+  Rpc.prototype.methods = function () {
+    var self = this;
+    this.known = this.known || this.calls([{ method: "Api.Browse" }]).then(function (entries) {
+      if (entries[0].error) { throw failure("http", entries[0].error.message || "Api.Browse failed"); }
+      var out = {};
+      (entries[0].result || []).forEach(function (m) { if (m && m.name) { out[m.name] = true; } });
+      return out;
+    });
+    this.known.catch(function () { self.known = null; });
+    return this.known;
   };
 
   // on pagehide: free the CPU's session now instead of after its ~2 min idle timeout

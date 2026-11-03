@@ -1,6 +1,6 @@
-// The detail panel of a device or PROFINET node (?d=<id> on any route): its state, its diagnosis channels, its
-// node (or, for a node, the devices on it), its areas, and its own members and PLC tags - read every
-// polling.detail_interval_ms only while the panel is open.
+// The detail panel of a device or PROFINET node (?d=<id> on any route): its state, its diagnosis channels, a
+// node's diagnostics from the CPU, its node (or, for a node, the devices on it), its areas, and its own members
+// and PLC tags - read every polling.detail_interval_ms only while the panel is open.
 (function (SD) {
   "use strict";
   function valueText(value) {
@@ -39,6 +39,9 @@
       });
       SD.add(body, [SD.el("h3", { cls: "section", text: "Diagnosis" }), SD.el("div", { cls: "scroll" }, SD.el("table", { cls: "grid" }, list))]);
     }
+    // a node's own diagnostics from the CPU, read once on opening (71_nodediag.js)
+    var cpuDiag = e.kind === "pn_node" ? SD.nodeDiag(ctx, e) : null;
+    if (cpuDiag) { body.appendChild(cpuDiag.node); }
 
     // the node, or the devices on the node
     var nodeChips = [];
@@ -62,6 +65,23 @@
       });
       SD.add(body, [SD.el("h3", { cls: "section", text: "PROFINET node" }), row]);
     }
+
+    // the device's note: kept in this browser as it is typed; shared through the Notes view's webui_notes.csv
+    var key = e.kind + "|" + e.fld, note = ctx.notes.get(key);
+    var text = SD.el("textarea", { cls: "notebox", rows: "3", maxlength: String(SD.Notes.MAX), "aria-label": "Note",
+      placeholder: "A note on this device" });
+    text.value = note.text;
+    var noteState = SD.el("p", { cls: "note" });
+    function showNote() {
+      var n = ctx.notes.get(key);
+      noteState.textContent = !n.text ? "" : (n.local ? "Saved in this browser" : "From the project") + (n.updated ? ", edited " + n.updated : "");
+    }
+    text.addEventListener("input", SD.debounce(function () {
+      if (!ctx.notes.set(key, text.value)) { noteState.textContent = "This browser cannot keep notes (storage blocked)."; return; }
+      showNote();
+    }, 400));
+    showNote();
+    SD.add(body, [SD.el("h3", { cls: "section" }, ["Note ", SD.el("a", { href: SD.href("notes"), text: "(all notes)" })]), text, noteState]);
 
     // own members + PLC tags, read while open
     var reads = [];
@@ -89,10 +109,12 @@
       ctx.poller.watch("detail", reads.map(function (r) { return r.var; }), plant.polling.detail_interval_ms);
     }
 
-    return { node: node, leave: function () { ctx.poller.unwatch("detail"); }, update: function (ev) {
+    return { node: node, leave: function () { ctx.poller.unwatch("detail"); if (cpuDiag) { cpuDiag.leave(); } }, update: function (ev) {
       var s = ev.entity[e.id];
-      state.textContent = SD.STATE_TEXT[s];
+      state.textContent = SD.STATE_TEXT[s] + (e.kind === "pn_node" ? (ev.ni[e.id] ? " - not installed" : "")
+        : ev.field[e.id] ? " - field I/O, node not installed" : ev.ni[e.id] ? " - node not installed" : "");
       SD.setState(state, s);
+      state.classList.toggle("ni", !!ev.ni[e.id]);
       channels.forEach(function (c) {
         var cab = ev.cabinet[c.d.cabinet], ch = cab && cab.channels[(c.d.warning ? "w" : "a") + c.d.bit];
         var st = ch ? ch.state : "unknown";
@@ -100,12 +122,14 @@
         SD.setState(c.chip, st);
       });
       nodeChips.forEach(function (c) { SD.setState(c.chip, ev.entity[c.id] || "unknown"); });
+      var simulated = e.kind !== "pn_node" && !!ev.ni[e.id];
       reads.forEach(function (r) {
         var err = ctx.poller.errors[r.var], value = ev.snap.v[r.var];
         if (err) { r.td.textContent = "not readable: " + err.message; return; }
         var text = valueText(value);
         if (r.member && r.member.healthy !== null && r.member.healthy !== undefined && typeof value === "boolean") {
-          text += value === r.member.healthy ? " (healthy)" : " (" + r.member.severity + ")";
+          // a device on a not-installed node: the node's flag forces its DB members, so their value says nothing
+          text += simulated ? " (simulated)" : value === r.member.healthy ? " (healthy)" : " (" + r.member.severity + ")";
         }
         r.td.textContent = text;
       });

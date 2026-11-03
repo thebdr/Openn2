@@ -1,5 +1,6 @@
-// The hash routes: #/<view>[/<arg>][?d=<entity id>] - e.g. #/list/estop?d=estop-0035. The detail panel rides
-// on any view, so a link to a device keeps the view it was opened from.
+// The hash routes: #/<view>[/<arg>][?d=<entity id>[&at=<entity id>]] - e.g. #/list/estop?d=estop-0035. The detail
+// panel rides on any view, so a link to a device keeps the view it was opened from; at = show that device on the
+// view (the overview's "Show on layout"), dropped by every link built here.
 (function (SD) {
   "use strict";
   SD.route = function () {
@@ -12,7 +13,7 @@
       var eq = pair.indexOf("="), key = eq < 0 ? pair : pair.slice(0, eq), value = eq < 0 ? "" : pair.slice(eq + 1);
       try { params[decodeURIComponent(key)] = decodeURIComponent(value); } catch (e) { params[key] = value; }
     });
-    return { view: segments[0] || "overview", arg: segments.slice(1).join("/"), detail: params.d || "" };
+    return { view: segments[0] || "overview", arg: segments.slice(1).join("/"), detail: params.d || "", focus: params.at || "" };
   };
   SD.href = function (view, arg, detail) {
     return "#/" + encodeURIComponent(view) + (arg ? "/" + encodeURIComponent(arg) : "")

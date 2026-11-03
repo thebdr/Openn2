@@ -6,7 +6,7 @@
   SD.views = {};
   SD.view = function (id, def) { def.id = id; SD.views[id] = def; };
 
-  var ctx, current = null, currentKey = "", panel = null, panelId = "", navLinks = {}, faultCount = null;
+  var ctx, current = null, currentKey = "", panel = null, panelId = "", navLinks = {}, faultCount = null, focused = "";
 
   function $(id) { return document.getElementById(id); }
 
@@ -49,6 +49,10 @@
       if (panelId) { panel = SD.detail(ctx, panelId); aside.appendChild(panel.node); }
       aside.hidden = !panel;
       $("app").classList.toggle("has-detail", !!panel);
+    }
+    if (route.focus !== focused) {                     // a "Show on layout" link: the view shows that device once
+      focused = route.focus;
+      if (focused && current && current.focus) { current.focus(focused); }
     }
     if (ctx.ev) { refresh(); }
   }
@@ -101,6 +105,7 @@
 
   function onPoll(poller) {
     ctx.ev = ctx.model.evaluate(poller.snap());
+    poller.rotate(ctx.model.fieldVars(ctx.ev));
     var conn = $("conn");
     conn.textContent = connText(poller.status, poller);
     conn.className = "conn " + poller.status.state;

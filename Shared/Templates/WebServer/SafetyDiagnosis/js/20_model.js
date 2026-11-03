@@ -8,6 +8,10 @@
 // - A cabinet's own summary is its STATE word: bit state_alarm_bit / state_warning_bit set = any alarm / warning.
 // - A device = the worst of its channels; while one of its PROFINET nodes is failed it is "node" (unknown - node
 //   failed), never OK. A member (area, sorter, device detail) compares its value with its `healthy` polarity.
+// - A node whose `not_installed` member is active is marked not installed (ev.ni), and so is every device on it.
+//   The bypass then simulates the device's DB member and channel, so such a device (its node not failed) takes its
+//   state from its field I/O instead (ev.field): its kind's `field` rule - {type, healthy} = that tag at that value,
+//   {a, b} = each a-tag differing from the b-tag of its channel (KI != KQ) - Unknown without a rule or a value.
 (function (SD) {
   "use strict";
 
@@ -104,9 +108,44 @@
     return states.length ? states.reduce(SD.worse, "ok") : none;
   }
 
+  // the field tags a kind's rule reads on a device: [[tag]] (one) or [[a, b]] (pairs by channel)
+  Model.prototype.fieldTags = function (d) {
+    var rule = (this.kind[d.kind] || {}).field, tags = d.tags || [];
+    if (!rule) { return []; }
+    if (rule.type) { return tags.filter(function (t) { return t.type === rule.type; }).map(function (t) { return [t]; }); }
+    return tags.filter(function (t) { return t.type.indexOf(rule.a) === 0; }).map(function (t) {
+      var partner = tags.filter(function (u) { return u.type === rule.b + t.type.slice(rule.a.length); })[0];
+      return partner ? [t, partner] : null;
+    }).filter(Boolean);
+  };
+  Model.prototype.fieldState = function (snap, d) {
+    var rule = (this.kind[d.kind] || {}).field, groups = this.fieldTags(d), state = groups.length ? "ok" : "unknown";
+    groups.forEach(function (g) {
+      var a = snap.v[g[0].var], b = g[1] ? snap.v[g[1].var] : undefined;
+      if (typeof a !== "boolean" || (g[1] && typeof b !== "boolean")) { state = SD.worse(state, "unknown"); return; }
+      if (g[1] ? a === b : a !== rule.healthy) { state = "alarm"; }
+    });
+    return state;
+  };
+  // the field tags to read now: those of the devices whose node is not installed (and not failed)
+  Model.prototype.fieldVars = function (ev) {
+    var self = this, out = [];
+    this.plant.devices.forEach(function (d) {
+      if (ev.field[d.id]) { self.fieldTags(d).forEach(function (g) { g.forEach(function (t) { out.push(t.var); }); }); }
+    });
+    return out;
+  };
+
+  // the states of some devices / nodes in one evaluation: {ok, warning, alarm, unknown, node, stale, ni}
+  Model.prototype.count = function (ev, entities) {
+    var counts = { ok: 0, warning: 0, alarm: 0, unknown: 0, node: 0, stale: 0, ni: 0 };
+    entities.forEach(function (e) { counts[ev.entity[e.id]] += 1; counts.ni += ev.ni[e.id] ? 1 : 0; });
+    return counts;
+  };
+
   // everything the views show for one snapshot
   Model.prototype.evaluate = function (snap) {
-    var self = this, ev = { snap: snap, entity: {}, cabinet: {}, area: {}, sorter: {}, faults: [], counts: {} };
+    var self = this, ev = { snap: snap, entity: {}, cabinet: {}, area: {}, sorter: {}, faults: [], ni: {}, field: {} };
     this.plant.cabinets.forEach(function (cab) {
       var channels = {};
       cab.bits.forEach(function (b) { channels[(b.warning ? "w" : "a") + b.bit] = self.channel(snap, cab, b.bit, b.warning); });
@@ -119,15 +158,17 @@
         return ch ? ch.state : snap.fresh ? "unknown" : "stale";
       }), snap.fresh ? "unknown" : "stale");
     }
-    this.plant.nodes.forEach(function (n) { ev.entity[n.id] = own(n); });
+    this.plant.nodes.forEach(function (n) {
+      ev.entity[n.id] = own(n);
+      ev.ni[n.id] = (n.members || []).some(function (m) {
+        return m.role === "not_installed" && ["ok", "unknown", "stale"].indexOf(self.member(snap, m).state) < 0;
+      });
+    });
     this.plant.devices.forEach(function (d) {
       var failed = (d.nodes || []).some(function (n) { return ev.entity[n] === "alarm"; });
-      ev.entity[d.id] = failed && snap.fresh ? "node" : own(d);
-    });
-    this.kinds.forEach(function (k) {
-      var counts = { ok: 0, warning: 0, alarm: 0, unknown: 0, node: 0, stale: 0 };
-      (self.byKind[k.kind] || []).forEach(function (e) { counts[ev.entity[e.id]] += 1; });
-      ev.counts[k.kind] = counts;
+      ev.ni[d.id] = (d.nodes || []).some(function (n) { return ev.ni[n]; });
+      ev.field[d.id] = ev.ni[d.id] && !failed;
+      ev.entity[d.id] = failed && snap.fresh ? "node" : !snap.fresh ? "stale" : ev.field[d.id] ? self.fieldState(snap, d) : own(d);
     });
     this.plant.areas.forEach(function (a) {
       var members = a.members.map(function (m) { return self.member(snap, m); });
@@ -158,6 +199,12 @@
         faults.push({ severity: c.summary.alarm ? "alarm" : "warning", group: 1, cabinet: cab.id, owner: null,
           text: "Cabinet " + cab.fld + " reports " + (c.summary.alarm ? "an alarm" : "a warning"),
           where: self.polarityKnown ? "no channel bit decoded" : "bit polarity not confirmed - see the cabinet's bits" });
+      }
+    });
+    this.plant.devices.forEach(function (d) {
+      if (ev.field[d.id] && ev.entity[d.id] === "alarm") {
+        faults.push({ severity: "alarm", group: 0, text: (self.kind[d.kind] || {}).label + " " + d.fld + ": field input",
+          where: "node not installed - read from the field I/O", owner: d.id });
       }
     });
     this.plant.areas.forEach(function (a) {

@@ -457,20 +457,24 @@ def load_reaction_templates() -> dict:
 WEBUI_KINDS_REL = "webui/device_kinds.csv"
 WEBUI_MEMBER_STATES_REL = "webui/member_states.csv"
 WEBUI_PARAMS_REL = "webui/webui_params.yaml"
-WEBUI_KIND_COLUMNS = ("kind", "label", "plural", "icon", "order", "family", "types", "anchor_types", "state",
-                      "group_by", "enabled", "comment")
+WEBUI_KIND_COLUMNS = ("kind", "label", "plural", "icon", "shape", "order", "family", "types", "anchor_types", "state",
+                      "field", "group_by", "enabled", "comment")
 WEBUI_MEMBER_COLUMNS = ("scope", "db_name", "member", "label", "healthy", "severity", "role", "order", "comment")
 WEBUI_POSITION_COLUMNS = ("kind", "fld", "x", "y")
+WEBUI_NOTE_COLUMNS = ("kind", "fld", "note", "updated")
 WEBUI_STATES = ("diag", "node")                      # how a kind's state is read: its cabinet bits, its node alarm
 WEBUI_SCOPES = ("area", "sorter", "node", "device")
 WEBUI_SEVERITIES = ("alarm", "warning", "info")
-WEBUI_ROLES = ("state", "cause", "reset", "detail")
+WEBUI_ROLES = ("state", "cause", "reset", "detail", "ignore", "not_installed")
+WEBUI_SHAPES = ("circle", "square")   # a kind's marker on the plant drawing
+WEBUI_TAB_NODES = ("all", "wired")    # an overview tab's PROFINET nodes: every one, or those its devices are wired to
 WEBUI_PARAM_KEYS = {
     "app": ("name", "title", "default_page", "visibility"),
-    "polling": ("interval_ms", "chunk", "timeout_ms", "detail_interval_ms", "backoff_ms"),
+    "polling": ("interval_ms", "chunk", "timeout_ms", "detail_interval_ms", "backoff_ms", "field_per_cycle"),
     "login": ("users",),
     "diag": ("alarm_bit", "warning_bit", "state_alarm_bit", "state_warning_bit"),
-    "layout": ("drawing", "positions", "group_by"),
+    "layout": ("drawing", "positions", "group_by", "overview_tabs"),
+    "notes": ("file",),
     "custom_data": ("enabled", "db", "max_depth", "max_cells", "page_rows", "interval_ms"),
 }
 WEBUI_DRAWING_EXTENSIONS = (".svg", ".png", ".jpg", ".jpeg")
@@ -508,14 +512,35 @@ def _choice(row: dict, key: str, allowed: tuple, where: str) -> str:
     return value
 
 
+_FIELD_RX = re.compile(r"^\s*(?P<a>[A-Za-z0-9/]+?)\s*(?:(?P<op>!=)\s*(?P<b>[A-Za-z0-9/]+)|=\s*(?P<v>true|false))\s*$",
+                       re.I)
+
+
+def _field_rule(row: dict, where: str):
+    """A kind's `field` cell -> None (blank: Unknown while the node is not installed), {"type", "healthy"} (`E=true`:
+    the tag of that type, healthy at that value) or {"a", "b"} (`KI!=KQ`: OK while each a-tag differs from the b-tag
+    of the same channel - KI1/2 with KQ1/2)."""
+    text = _cell(row, "field")
+    if not text:
+        return None
+    m = _FIELD_RX.match(text)
+    if not m:
+        raise ValueError(f"{where}: field must be blank, TYPE=true|false or TYPE!=TYPE, got {text!r}")
+    if m.group("op"):
+        return {"a": m.group("a"), "b": m.group("b")}
+    return {"type": m.group("a"), "healthy": m.group("v").lower() == "true"}
+
+
 def _bars(value) -> list:
     return [part.strip() for part in str(value or "").split("|") if part.strip()]
 
 
 def load_webui_kinds(path: str | None = None) -> list:
     """webui/device_kinds.csv - the device kinds the page shows, one row each (a new kind is one row, no code):
-    {kind, label, plural, icon, order, family, types, anchor_types, state, group_by, enabled, comment}, sorted by
-    order. `family` names a classification/object_families.csv family ('' = none, e.g. the PROFINET nodes);
+    {kind, label, plural, icon, shape, order, family, types, anchor_types, state, field, group_by, enabled,
+    comment}, sorted by order; `shape` is the kind's marker on the plant drawing (circle | square); `field` the
+    state from the field I/O while the device's node is flagged not installed (`_field_rule`). `family` names a
+    classification/object_families.csv family ('' = none, e.g. the PROFINET nodes);
     `types` / `anchor_types` narrow it ([] = the family's own); `state` is diag | node. STRICT: a missing file or
     column, a duplicate kind or a bad cell is an error naming the row."""
     rel = WEBUI_KINDS_REL
@@ -532,10 +557,11 @@ def load_webui_kinds(path: str | None = None) -> list:
         if enabled not in ("yes", "no", "true", "false", "1", "0"):
             raise ValueError(f"{where}: enabled must be yes or no, got {_cell(row, 'enabled')!r}")
         out.append({"kind": kind, "label": _cell(row, "label") or kind, "plural": _cell(row, "plural") or kind,
-                    "icon": _cell(row, "icon"), "order": _int_cell(row, "order", where),
+                    "icon": _cell(row, "icon"), "shape": _choice(row, "shape", WEBUI_SHAPES, where),
+                    "order": _int_cell(row, "order", where),
                     "family": _cell(row, "family"), "types": _bars(row.get("types")),
                     "anchor_types": _bars(row.get("anchor_types")),
-                    "state": _choice(row, "state", WEBUI_STATES, where),
+                    "state": _choice(row, "state", WEBUI_STATES, where), "field": _field_rule(row, where),
                     "group_by": _bars(row.get("group_by")), "enabled": _as_bool(enabled),
                     "comment": _cell(row, "comment")})
     return sorted(out, key=lambda k: (k["order"], k["kind"]))
@@ -545,8 +571,10 @@ def load_webui_member_states(path: str | None = None) -> list:
     """webui/member_states.csv - the area / sorter / node / device members the page reads, with their polarity
     as data: {scope, db_name, member, label, healthy, severity, role, order, comment}. `member` is a name pattern
     ({area} {index} {node} {fld} {n} placeholders, matched against the project's db_members - a row no member
-    matches is simply unused); `healthy` is True / False, or None = unknown (shown neutral). STRICT like the
-    kinds."""
+    matches is simply unused); `healthy` is True / False, or None = unknown (shown neutral); role `ignore` keeps
+    the members it matches off the page (not shown, not read - a command pulse, say); role `not_installed` (a node
+    member) is read every refresh, and while it is not `healthy` the node and the devices on it are marked not
+    installed. STRICT like the kinds."""
     rel = WEBUI_MEMBER_STATES_REL
     out = []
     for number, row in enumerate(_webui_rows(rel, WEBUI_MEMBER_COLUMNS, path), 1):
@@ -575,7 +603,8 @@ def load_webui_params(path: str | None = None) -> dict:
     """webui/webui_params.yaml - the app's name, title, polling, login users, diagnosis-bit polarity, layout and
     custom-data limits. STRICT: every section of WEBUI_PARAM_KEYS and every key in it must be present (the error
     names the first missing one); the app name must be a Web API-safe [A-Za-z0-9_-]+; the polarities are 1, 0 or
-    null (unknown); the STATE word's any-alarm / any-warning bits are 0-31."""
+    null (unknown); the STATE word's any-alarm / any-warning bits are 0-31; the overview tabs a list of {label,
+    kinds, nodes: all | wired} (which kinds exist is the model's check, webui_model.build_plant)."""
     from pipeline5.config.params import _load_yaml
     from pipeline5.config.resolver import resolve
     rel = WEBUI_PARAMS_REL
@@ -593,7 +622,7 @@ def load_webui_params(path: str | None = None) -> dict:
     name = str(data["app"]["name"] or "")
     if not _WEBAPP_NAME_RX.match(name):
         raise ValueError(f"{rel}: app.name must be letters, digits, '_' or '-', got {name!r}")
-    for key in ("interval_ms", "chunk", "timeout_ms", "detail_interval_ms"):
+    for key in ("interval_ms", "chunk", "timeout_ms", "detail_interval_ms", "field_per_cycle"):
         if not _positive_int(data["polling"][key]):
             raise ValueError(f"{rel}: polling.{key} must be a positive whole number, got {data['polling'][key]!r}")
     backoff = data["polling"]["backoff_ms"]
@@ -610,6 +639,14 @@ def load_webui_params(path: str | None = None) -> dict:
         value = data["diag"][key]
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 31:
             raise ValueError(f"{rel}: diag.{key} must be a bit number 0-31 of the cabinet's STATE word, got {value!r}")
+    tabs = data["layout"]["overview_tabs"]
+    if not isinstance(tabs, list) or not tabs or not all(
+            isinstance(t, dict) and isinstance(t.get("label"), str) and t["label"].strip()
+            and isinstance(t.get("kinds"), list) and all(isinstance(k, str) and k.strip() for k in t["kinds"])
+            and t.get("nodes") in WEBUI_TAB_NODES
+            for t in tabs):
+        raise ValueError(f"{rel}: layout.overview_tabs must be a list of {{label, kinds: [kind, ...], nodes: "
+                         f"{' | '.join(WEBUI_TAB_NODES)}}}, got {tabs!r}")
     custom = data["custom_data"]
     if not isinstance(custom["enabled"], bool):
         raise ValueError(f"{rel}: custom_data.enabled must be true or false, got {custom['enabled']!r}")
@@ -633,6 +670,18 @@ def load_webui_positions(rel: str, path: str | None = None) -> list:
             raise ValueError(f"{rel} row {number}: x and y must be numbers, got {_cell(row, 'x')!r}, "
                              f"{_cell(row, 'y')!r}") from None
         out.append({"kind": _cell(row, "kind"), "fld": _cell(row, "fld"), "x": x, "y": y})
+    return out
+
+
+def load_webui_notes(rel: str, path: str | None = None) -> list:
+    """The device notes (`notes.file`, header kind,fld,note,updated - what the page's Notes view exports):
+    [{kind, fld, note, updated}]. STRICT on the file and the header; a row with a blank kind, fld or note is
+    skipped; a note may span lines (csv quoting)."""
+    out = []
+    for row in _webui_rows(rel, WEBUI_NOTE_COLUMNS, path):
+        if _cell(row, "kind") and _cell(row, "fld") and _cell(row, "note"):
+            out.append({"kind": _cell(row, "kind"), "fld": _cell(row, "fld"), "note": _cell(row, "note"),
+                        "updated": _cell(row, "updated")})
     return out
 
 

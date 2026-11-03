@@ -92,10 +92,12 @@ def test_webui_builtin_files_load():
     states = config.load_webui_member_states()
     ok({s["scope"] for s in states} == {"area", "sorter", "node", "device"}, "every scope is used")
     q = next(s for s in states if s["member"] == "{area} Q")
-    eq((q["db_name"], q["healthy"], q["role"]), ("05_EM_STATE", None, "state"), "blank healthy = unknown polarity")
+    eq((q["db_name"], q["healthy"], q["role"]), ("05_EM_STATE", True, "state"), "TRUE = energized (user 2026-10-29)")
+    reset = next(s for s in states if s["member"] == "{area} RESET")
+    eq(reset["role"], "ignore", "the reset command pulse is left off the page")
     params = config.load_webui_params()
     eq((params["app"]["name"], params["polling"]["chunk"], params["login"]["users"]),
-       ("safety", 50, ["Everybody", "Anonymous"]))
+       ("pl5", 50, ["Everybody", "Anonymous"]))
     eq(params["custom_data"]["db"], "PL5_CustomData")
     eq(config.load_webui_positions(params["layout"]["positions"]), [], "the shipped positions file is header only")
     eq(config.find_webui_drawing(params["layout"]["drawing"]), None, "no drawing ships with the system")
@@ -104,17 +106,22 @@ def test_webui_builtin_files_load():
 def test_webui_files_are_strict():
     """Config is config: a missing column / key / file is an error naming it, never a default; a bad cell names
     its row; a new kind row loads with no code change."""
-    head = "kind,label,plural,icon,order,family,types,anchor_types,state,group_by,enabled,comment\r\n"
+    head = "kind,label,plural,icon,shape,order,family,types,anchor_types,state,field,group_by,enabled,comment\r\n"
     with tempfile.TemporaryDirectory() as d:
-        extra = _write(d, "k.csv", head + "estop,E-stop,E-stops,estop,10,emergency_pb,,,diag,location,yes,\r\n"
-                                          "fire_alarm,Fire alarm,Fire alarms,fire,5,fire_alarm,F1/2,F1/2,diag,,yes,\r\n")
+        extra = _write(d, "k.csv", head + "estop,E-stop,E-stops,estop,circle,10,emergency_pb,,,diag,E=true,location,yes,\r\n"
+                                          "fire_alarm,Fire alarm,Fire alarms,fire,square,5,fire_alarm,F1/2,F1/2,diag,KI1/2!=KQ1/2,,yes,\r\n")
         eq([k["kind"] for k in config.load_webui_kinds(extra)], ["fire_alarm", "estop"], "sorted by order")
-        eq(config.load_webui_kinds(extra)[0]["types"], ["F1/2"])
+        eq((config.load_webui_kinds(extra)[0]["types"], config.load_webui_kinds(extra)[0]["shape"]), (["F1/2"], "square"))
+        eq([k["field"] for k in config.load_webui_kinds(extra)], [{"a": "KI1/2", "b": "KQ1/2"}, {"type": "E", "healthy": True}],
+           "the field rules: a pair that must differ, a tag at its healthy value")
         for text, needle in ((head.replace("state,", ""), "state"),
-                             (head + "estop,,,,10,,,,diag,,yes,\r\nestop,,,,20,,,,diag,,yes,\r\n", "appears twice"),
-                             (head + "estop,,,,ten,,,,diag,,yes,\r\n", "order must be a whole number"),
-                             (head + "estop,,,,10,,,,bits,,yes,\r\n", "state must be one of"),
-                             (head + "estop,,,,10,,,,diag,,maybe,\r\n", "enabled must be yes or no")):
+                             (head.replace("shape,", ""), "shape"),
+                             (head + "estop,,,,circle,10,,,,diag,,,yes,\r\nestop,,,,circle,20,,,,diag,,,yes,\r\n", "appears twice"),
+                             (head + "estop,,,,circle,ten,,,,diag,,,yes,\r\n", "order must be a whole number"),
+                             (head + "estop,,,,circle,10,,,,bits,,,yes,\r\n", "state must be one of"),
+                             (head + "estop,,,,star,10,,,,diag,,,yes,\r\n", "shape must be one of"),
+                             (head + "estop,,,,circle,10,,,,diag,E=maybe,,yes,\r\n", "field must be blank"),
+                             (head + "estop,,,,circle,10,,,,diag,,,maybe,\r\n", "enabled must be yes or no")):
             path = _write(d, "bad.csv", text)
             try:
                 config.load_webui_kinds(path)
@@ -135,9 +142,13 @@ def test_webui_files_are_strict():
         shipped = open(config.resolver.resolve(config.WEBUI_PARAMS_REL), encoding="utf-8").read()
         for old, new, needle in (("  chunk: 50 ", "", "polling.chunk is missing"),
                                  ("custom_data:", "custom:", "the section 'custom_data' is missing"),
-                                 ("name: safety ", "name: my app ", "app.name must be"),
-                                 ("alarm_bit: null", "alarm_bit: 2", "diag.alarm_bit must be"),
-                                 ("users: [Everybody, Anonymous]", "users: []", "login.users must be")):
+                                 ("name: pl5 ", "name: my app ", "app.name must be"),
+                                 ("alarm_bit: 1", "alarm_bit: 2", "diag.alarm_bit must be"),
+                                 ("users: [Everybody, Anonymous]", "users: []", "login.users must be"),
+                                 ("{label: Other devices, kinds:", "{label: Other devices, types:",
+                                  "layout.overview_tabs must be"),
+                                 ("nodes: wired}", "nodes: some}", "nodes: all | wired"),
+                                 (", nodes: all}", "}", "layout.overview_tabs must be")):
             ok(old in shipped, f"the shipped params hold {old!r}")
             path = _write(d, "p.yaml", shipped.replace(old, new, 1))
             try:

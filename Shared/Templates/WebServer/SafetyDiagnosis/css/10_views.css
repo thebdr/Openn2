@@ -101,6 +101,26 @@ table.grid td.idx { width: 1%; white-space: nowrap; }
 .iconbtn { border: 0; background: transparent; padding: 4px; border-radius: 6px; cursor: pointer; color: var(--muted); }
 .iconbtn:hover { background: var(--hover); color: var(--fg); }
 .note { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; }
+.note.err { color: var(--alarm); }
+/* a node's CPU diagnostics: a section heading with its Refresh button, the CPU's message lines */
+.head.sub { margin: 18px 0 8px; } .head.sub .section { margin: 0 auto 0 0; } .head.sub .btn { padding: 3px 8px; font-size: 12.5px; }
+.msg { margin: 6px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+
+/* notes, the layout filter */
+.notebox, .filterbox { width: 100%; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--fg); resize: vertical; margin-top: 4px; }
+.filterbox { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; margin-bottom: 6px; }
+
+/* "Show on layout": the found icon / tile pulses a few times */
+.pin.find circle, .pin.find rect { animation: find-pin .6s ease-in-out 4 alternate; }
+.tile.find { animation: find-tile .6s ease-in-out 4 alternate; }
+@keyframes find-pin { from { stroke-width: 3.5px; } to { stroke-width: 9px; } }
+@keyframes find-tile { from { outline-offset: 1px; } to { outline-offset: 6px; } }
+@media (prefers-reduced-motion: reduce) { .pin.find circle, .pin.find rect, .tile.find { animation: none; } }
+td.notetext { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 160px; }
+.tile.noted { position: relative; }
+.tile.noted::after { content: ""; position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); }
 
 /* custom data */
 .cd details { margin: 6px 0; } .cd summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
@@ -116,13 +136,18 @@ table.grid td.idx { width: 1%; white-space: nowrap; }
 .plantsvg { display: block; width: 100%; height: 100%; cursor: grab; }
 .plantsvg.panning { cursor: grabbing; }
 .pin { color: var(--c); cursor: pointer; }
-.pin circle { fill: var(--cb); stroke: var(--c); stroke-width: 1.6px; vector-effect: non-scaling-stroke; }
-.pin.s-node circle, .pin.s-unknown circle { stroke-dasharray: 3 2; }
+.pin circle, .pin rect { fill: var(--cb); stroke: var(--c); stroke-width: 1.6px; vector-effect: non-scaling-stroke; }
+.pin.s-node circle, .pin.s-unknown circle, .pin.s-node rect, .pin.s-unknown rect { stroke-dasharray: 3 2; }
+/* a node flagged not installed, and the devices on it: a violet border over the state's colour */
+.pin.ni circle, .pin.ni rect { stroke: var(--ni); stroke-width: 2.6px; stroke-dasharray: none; }
+.tile.ni { border: 2px solid var(--ni); }
+.chip.ni { box-shadow: inset 0 0 0 1.5px var(--ni); color: var(--ni); }
+.chip.ni.s-ok, .chip.ni.s-alarm, .chip.ni.s-warning, .chip.ni.s-unknown, .chip.ni.s-node, .chip.ni.s-stale { color: var(--c); }
 .pin.s-stale { opacity: .6; }
-.pin.sel circle { stroke: var(--focus); stroke-width: 3.5px; }
+.pin.sel circle, .pin.sel rect { stroke: var(--focus); stroke-width: 3.5px; }
 .pin.off { display: none; }
 .pin:focus { outline: none; }
-.pin:focus-visible circle { stroke: var(--focus); stroke-width: 3.5px; }
+.pin:focus-visible circle, .pin:focus-visible rect { stroke: var(--focus); stroke-width: 3.5px; }
 .plantbox.editing .pin { cursor: move; }
 .plantbox.editing { border-color: var(--accent); }
 .plant > .toolbar { margin: 0 0 8px; }

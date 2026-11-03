@@ -1031,10 +1031,11 @@ def test_a_lone_650_writes_the_web_application():
     ok(any(lvl == "RSLT" and msg.startswith("  650 web application:") for lvl, msg in host.lines), host.lines)
     ok(not any(msg.startswith("  610") or msg.startswith("  620") for _lvl, msg in host.lines), "only the 650 leg")
     app = os.path.join(config.output_root(), "TiaPortalProjectInterface", "BuilderData", "n0001-mc1-cc1-k65501",
-                       "Web applications", "safety")
+                       "Web applications", config.load_webui_params()["app"]["name"])
     h = header.read_header(os.path.join(app, "webapp.manifest.csv"))
     eq((h.status, h.get("kind"), h.get("run"), h.get("target"), h.get("name")),
-       ("ok", "web/app", "lone-650", "Web applications/safety", "safety"), h.problems)
+       ("ok", "web/app", "lone-650", "Web applications/" + config.load_webui_params()["app"]["name"],
+        config.load_webui_params()["app"]["name"]), h.problems)
     eq(webapp_folder.verify(app), [], "the folder is what its manifest says")
     rows = webapp_folder.read_manifest(os.path.join(app, "webapp.manifest.csv"))
     eq([r["name"] for r in rows], ["index.html", "icons.svg", "mock.js", "app.css", "app.js", "plant.json"],
@@ -1244,7 +1245,7 @@ def test_run_all_writes_a_ready_op5_workspace():
     ok(any(f.startswith("Templates/TEMPLATE--") for f in files), files)
     ok(not any(f.startswith(("HardwareConfiguration/", "SoftwareBlocks/", "PlcTags/")) for f in files),
        "the legacy layout is not written any more")
-    web_app = f"{plc}/Web applications/safety/"
+    web_app = f"{plc}/Web applications/{config.load_webui_params()['app']['name']}/"
     ok(f"{web_app}webapp.manifest.csv" in files and f"{web_app}plant.json" in files and f"{web_app}index.html" in files,
        "650: the web application folder with its manifest ([[C-050]])")
     bad = []

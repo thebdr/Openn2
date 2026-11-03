@@ -66,8 +66,37 @@ var SD = window.SD = window.SD || {};
     var hay = fields.join(" ").toLowerCase();
     return needle.toLowerCase().split(/\s+/).every(function (word) { return hay.indexOf(word) >= 0; });
   };
+  // the layout filter: regular expressions, one per line (CRLF or LF), case-insensitive. A line that does not
+  // compile is reported, not applied; no pattern = everything passes.
+  SD.patterns = function (text) {
+    var out = { res: [], bad: [] };
+    String(text || "").split(/\r?\n/).forEach(function (line, i) {
+      var source = line.trim();
+      if (!source) { return; }
+      try { out.res.push(new RegExp(source, "i")); } catch (e) { out.bad.push("line " + (i + 1) + ": " + e.message); }
+    });
+    return out;
+  };
+  SD.matchesAny = function (res, fields) {
+    return !res.length || res.some(function (re) { return fields.some(function (f) { return !!f && re.test(f); }); });
+  };
   SD.clock = function (date) {
     return date ? date.toLocaleTimeString("en-GB", { hour12: false }) : "";
+  };
+  // one csv row (csv quoting where a cell needs it) and a file handed to the browser to save
+  SD.csvRow = function (cells) {
+    return cells.map(function (v) {
+      v = String(v);
+      return /[",\r\n]/.test(v) ? "\"" + v.replace(/"/g, "\"\"") + "\"" : v;
+    }).join(",");
+  };
+  SD.download = function (name, text, type) {
+    var url = URL.createObjectURL(new Blob([text], { type: type }));
+    var link = SD.el("a", { href: url, download: name });
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
   };
   SD.debounce = function (fn, ms) {
     var timer = null;

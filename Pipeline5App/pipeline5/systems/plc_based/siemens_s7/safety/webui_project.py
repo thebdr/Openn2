@@ -35,6 +35,7 @@ PLANT_FILE = "plant.json"
 APP_JS, APP_CSS = "app.js", "app.css"
 _SVG_ROOT = re.compile(rb"<svg\b[^>]*>", re.S)
 _ATTR = r'\b{}\s*=\s*["\']([^"\']*)["\']'
+_CSS_COMMENT = re.compile(r"/\*.*?\*/", re.S)
 
 
 def _f(type: str, severity: str, detail: str, location: str = "") -> Finding:
@@ -42,10 +43,26 @@ def _f(type: str, severity: str, detail: str, location: str = "") -> Finding:
 
 
 # --- the fixed app ------------------------------------------------------------------------------------------ #
+def _lean_js(text: str) -> str:
+    """A js/ file as app.js carries it: every line's indentation and every blank or comment-only (`//`) line
+    dropped - the CPU serves less (the page's budget), the template stays the readable source. Safe for the
+    template's style: no template literal, no string or block comment spanning lines (the bundle test checks)."""
+    lines = (line.strip() for line in text.splitlines())
+    return "\n".join(line for line in lines if line and not line.startswith("//"))
+
+
+def _lean_css(text: str) -> str:
+    """A css/ file as app.css carries it, lean like a js/ file: every `/* ... */` comment, indentation and blank
+    line dropped. Safe for the template's style: no `/*` inside a CSS string (the bundle test checks no rule is
+    lost)."""
+    lines = (line.strip() for line in _CSS_COMMENT.sub("", text).splitlines())
+    return "\n".join(line for line in lines if line)
+
+
 def bundle(template_dir: str) -> list:
     """The fixed app's resources [(name, bytes)]: every template file except js/ and css/ as it is (`*.md`
     and dot-files skipped), then `app.css` and `app.js` = the css/ and js/ files joined in path order, each
-    after a one-line comment naming it."""
+    after a one-line comment naming it (each lean: `_lean_js`, `_lean_css`)."""
     plain, joined = [], {"css": [], "js": []}
     for dirpath, dirs, files in os.walk(template_dir):
         dirs[:] = sorted(d for d in dirs if not d.startswith("."))
@@ -62,7 +79,8 @@ def bundle(template_dir: str) -> list:
     out = list(plain)
     for kind, target, note in (("css", APP_CSS, "/* --- {} --- */"), ("js", APP_JS, "// --- {} ---")):
         if joined[kind]:
-            parts = [note.format(rel) + "\n" + open(path, encoding="utf-8-sig").read().rstrip("\n") + "\n"
+            read = _lean_js if kind == "js" else _lean_css
+            parts = [note.format(rel) + "\n" + read(open(path, encoding="utf-8-sig").read()) + "\n"
                      for rel, path in sorted(joined[kind])]
             out.append((target, "\n".join(parts).encode("utf-8")))
     names = [name.lower() for name, _ in out]
@@ -146,6 +164,7 @@ def project(database, out_dir: str | None = None, template_dir: str | None = Non
         member_states = config.load_webui_member_states()
         params = config.load_webui_params()
         positions = config.load_webui_positions(params["layout"]["positions"])
+        notes = config.load_webui_notes(params["notes"]["file"])
     except (OSError, ValueError) as error:
         findings.append(_f("webui_config_invalid", "FAIL", f"the web app config does not load: {error}",
                            "webui/"))
@@ -180,7 +199,7 @@ def project(database, out_dir: str | None = None, template_dir: str | None = Non
     meta = {"run": header.current_run(), "producer": header.producer(PHASE), "project": header.project_code(),
             "generated": header.generated_now()}
     plant, model_findings = webui_model.build_plant(
-        database, kinds, member_states, params, positions=positions, drawing=drawing, meta=meta,
+        database, kinds, member_states, params, positions=positions, notes=notes, drawing=drawing, meta=meta,
         plc={"station": plc, "ip": _plc_ip(database, plc)})
     findings += model_findings
     files.append((PLANT_FILE, webui_model.to_json(plant)))
