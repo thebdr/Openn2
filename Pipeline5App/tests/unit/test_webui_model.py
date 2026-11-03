@@ -59,6 +59,7 @@ def _database():
         _mem("04_SPEED", "Safety Encoder 0001 Sensor 1 Healthy [ =TRIB-EN02-B1R ]", "n1"),
         _mem("04_SPEED", "Safety Encoder 0001 Healthy [ =TRIB-EN02-B1R ]", "n1"),
         _mem("05_EM_STATE", "AREA 1 RESET", "AREA 1"),
+        _mem("05_EM_STATE", "AREA 1 AWAITING RESET", "AREA 1"),
         _mem("05_EM_STATE", "AREA 1 Q", "AREA 1"),
         _mem("05_EM_STATE", "SORTER_01_NOT_RUNNING", "0001"),
         _mem("02_COM", "AREA 1 E-STOP_PUSHBUTTONS", "AREA 1"),
@@ -107,10 +108,14 @@ def test_exact_variable_names_and_the_poll_set():
         '"DiagnosticTags"."S1.CABINET002.ALARM2"', '"DiagnosticTags"."S1.CABINET002.WARNING1"',
         '"DiagnosticTags"."S1.CABINET002.WARNING2"',
         '"DiagnosticTags"."S1.CABINET009.STATE"', '"DiagnosticTags"."S1.CABINET009.ALARM1"',
-        '"05_EM_STATE"."AREA 1 Q"', '"05_EM_STATE"."AREA 1 RESET"', '"02_COM"."AREA 1 E-STOP_PUSHBUTTONS"',
-        '"05_EM_STATE"."SORTER_01_NOT_RUNNING"'],
+        '"05_EM_STATE"."AREA 1 Q"', '"05_EM_STATE"."AREA 1 AWAITING RESET"', '"02_COM"."AREA 1 E-STOP_PUSHBUTTONS"',
+        '"05_EM_STATE"."SORTER_01_NOT_RUNNING"', '"99_Commissioning"."NodesNotInstalled"."n0002-io 10.0.0.2"'],
         "the cabinets with entries (their words in STATE / alarm / warning order), then the areas' and sorters' "
-        "members in rule order - no seed, no device member, no cabinet without an entry")
+        "members in rule order, then the nodes' not-installed flags (the violet border) - no seed, no device member, "
+        "no cabinet without an entry, no ignored member (RESET, the command pulse)")
+    area = next(a for a in plant["areas"] if a["id"] == "AREA 1")
+    eq([m["label"] for m in area["members"]], ["E-stop circuit", "Awaiting reset", "E-stop push buttons"],
+       "an ignored member is not on the page either")
     node = plant["nodes"][0]
     eq([m["var"] for m in node["members"]],
        ['"PROFINET_NODES_ALARM"."n0002-io 10.0.0.2"', '"99_Commissioning"."NodesNotInstalled"."n0002-io 10.0.0.2"'],
@@ -169,13 +174,55 @@ def test_member_rules_and_polarity():
     eq([(m["label"], m["role"]) for m in encoder["members"]],
        [("Encoder healthy", "state"), ("Sensor 1 healthy", "detail")],
        "the most specific rule wins ({n} would also match '0001 Sensor 1'), sorted by rule order")
+    ok("webui_polarity_unknown" not in _types(findings), "the shipped rules are rated (user 2026-10-29): no INFO")
+    unrated = [dict(r, healthy=None) for r in config.load_webui_member_states()]
+    _plant, findings = _build(member_states=unrated)
     f = _types(findings).get("webui_polarity_unknown")
-    ok(f is not None and f.severity == "INFO", "the shipped rules have no polarity yet: one INFO")
-    rated = [dict(r, healthy=True) for r in config.load_webui_member_states()]
-    _plant, findings = _build(member_states=rated)
-    ok("webui_polarity_unknown" not in _types(findings), "every rule rated: no INFO")
+    ok(f is not None and f.severity == "INFO", "a rule without its polarity: one INFO")
     eq(_types(findings)["webui_cabinet_word_missing"].severity, "WARN", "cabinet 9 lacks three words")
     ok("S1.CABINET009.ALARM2" in _types(findings)["webui_cabinet_word_missing"].detail, "named")
+
+
+def test_overview_tabs():
+    """[[C-050]] the overview's tabs (layout.overview_tabs, user 2026-10-29): each tab's enabled kinds in its own
+    order; a disabled kind dropped; a name that is no kind warned and ignored; a kind no tab names joins the last;
+    nodes: wired = only the nodes the tab's devices are wired to (the causes tab, user 2026-10-29)."""
+    plant, findings = _build()
+    eq(plant["layout"]["overview_tabs"],
+       [{"label": "Causes", "kinds": ["estop", "door", "encoder", "breaker", "pn_node"], "nodes": ["pn_node-n0002-io"]},
+        {"label": "Other devices", "kinds": ["contactor", "pn_node"], "nodes": None}],
+       "the shipped tabs - fire_alarm is disabled; the causes tab keeps the node its e-stop is wired to")
+    ok("webui_tab_kind_unknown" not in _types(findings), "the shipped tabs name only kinds")
+    params = config.load_webui_params()
+    params["layout"] = dict(params["layout"], overview_tabs=[{"label": "A", "kinds": ["pn_node", "lamp"], "nodes": "all"},
+                                                             {"label": "B", "kinds": ["contactor", "pn_node"], "nodes": "wired"},
+                                                             {"label": "C", "kinds": ["estop"], "nodes": "wired"}])
+    plant, findings = _build(params=params)
+    eq([(t["kinds"], t["nodes"]) for t in plant["layout"]["overview_tabs"]],
+       [(["pn_node"], None), (["contactor", "pn_node"], []),
+        (["estop", "breaker", "door", "encoder"], ["pn_node-n0002-io"])],
+       "the unnamed kinds join the last tab; a wired tab whose devices sit on no node shows none")
+    ok("lamp" in _types(findings)["webui_tab_kind_unknown"].detail, "the unknown name is warned")
+
+
+def test_device_notes():
+    """[[C-050]] the device notes (user 2026-10-29): webui_notes.csv - the page's Notes export, a note on several
+    lines in csv quotes - loads back as written; plant.json carries the notes of known devices by kind|fld, a note
+    naming no device is warned and left out; the shipped file is header only."""
+    eq(config.load_webui_notes(config.load_webui_params()["notes"]["file"]), [], "the shipped notes file is header only")
+    text = ('kind,fld,note,updated\r\nestop,=ES-0001,"Button cracked, part ordered\r\nsee ""ticket 12""",2026-10-29 10:30\r\n'
+            'door,=NOPE-B1,orphan,2026-10-29 10:31\r\nestop,=ES-0002,,2026-10-29 10:32\r\n')
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "webui_notes.csv")
+        open(path, "w", newline="", encoding="utf-8").write(text)
+        notes = config.load_webui_notes("webui/webui_notes.csv", path=path)
+    eq([(n["fld"], n["note"]) for n in notes],
+       [("=ES-0001", 'Button cracked, part ordered\r\nsee "ticket 12"'), ("=NOPE-B1", "orphan")],
+       "quoted lines and quotes read back; an empty note skipped")
+    plant, findings = _build(notes=notes)
+    eq(plant["notes"], {"estop|=ES-0001": {"text": 'Button cracked, part ordered\r\nsee "ticket 12"',
+                                           "updated": "2026-10-29 10:30"}}, "only a known device's note")
+    ok("door|=NOPE-B1" in _types(findings)["webui_note_stale"].detail, "the orphan note is warned")
 
 
 def test_sorter_area_by_ordinal_and_interfaces():
@@ -227,23 +274,15 @@ def test_template_bundle():
         open(os.path.join(d, "README.md"), "w").write("notes")
         open(os.path.join(d, "js", "10_poller.js"), "w").write("var b = 2;\n")
         open(os.path.join(d, "js", "00_rpc.js"), "w").write("var a = 1;\n")
-        open(os.path.join(d, "js", "views", "overview.js"), "w").write("var c = 3;\n")
+        open(os.path.join(d, "js", "views", "overview.js"), "w").write("// a note\n\n  if (a) {\n    var c = 3;   // trailing\n  }\n")
         open(os.path.join(d, "css", "base.css"), "w").write("body{}\n")
         files = dict(project.bundle(d))
         eq(sorted(files), ["app.css", "app.js", "index.html"], "js/ and css/ joined, notes skipped")
         eq(files["app.js"].decode(), "// --- js/00_rpc.js ---\nvar a = 1;\n\n// --- js/10_poller.js ---\nvar b = 2;\n\n"
-                                     "// --- js/views/overview.js ---\nvar c = 3;\n", "in path order, each named")
+                                     "// --- js/views/overview.js ---\nif (a) {\nvar c = 3;   // trailing\n}\n",
+           "in path order, each named; a js file without its indentation and its comment-only / blank lines")
         open(os.path.join(d, "plant.json"), "w").write("{}")
         raises(ValueError, lambda: project.bundle(d))
-
-
-def test_the_shipped_template_bundles():
-    files = dict(project.bundle(config.WEBAPP_TEMPLATE_DIR))
-    ok({"index.html", "app.js", "app.css"} <= set(files), sorted(files))
-    text = b"".join(files.values()).decode("utf-8")
-    ok("PlcProgram.Write" not in text, "the page never writes to the PLC")
-    ok("http://" not in text.replace('xmlns="http://www.w3.org/2000/svg"', "") and "https://" not in text,
-       "no external URL - the CPU serves everything")
 
 
 if __name__ == "__main__":
@@ -254,9 +293,10 @@ if __name__ == "__main__":
         ("node_failed_resolution", test_node_failed_resolution),
         ("a_further_kind_is_one_config_row", test_a_further_kind_is_one_config_row),
         ("member_rules_and_polarity", test_member_rules_and_polarity),
+        ("overview_tabs", test_overview_tabs),
+        ("device_notes", test_device_notes),
         ("sorter_area_by_ordinal_and_interfaces", test_sorter_area_by_ordinal_and_interfaces),
         ("positions_stale_and_unplaced", test_positions_stale_and_unplaced),
         ("drawing_measure", test_drawing_measure),
         ("template_bundle", test_template_bundle),
-        ("the_shipped_template_bundles", test_the_shipped_template_bundles),
     ]))

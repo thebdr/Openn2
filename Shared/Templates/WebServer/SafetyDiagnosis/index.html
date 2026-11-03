@@ -2,14 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Safety diagnosis</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<header><h1 id="title">Safety diagnosis</h1><p id="plc"></p></header>
-<main id="main"><p id="status">Loading the plant model...</p></main>
-<footer>Read-only diagnostic display, not a safety function.</footer>
+<div id="app" class="app">
+  <header class="top">
+    <div class="brand"><h1 id="title">Safety diagnosis</h1><p id="plc" class="muted"></p></div>
+    <div id="conn" class="conn" role="status" aria-live="polite">Starting</div>
+  </header>
+  <nav id="nav" class="nav" aria-label="Views"></nav>
+  <div id="banners" class="banners"></div>
+  <main id="view" class="view" tabindex="-1"><p id="status" class="muted">Loading the plant model...</p></main>
+  <aside id="detail" class="detail" aria-label="Details" hidden></aside>
+  <footer class="foot">Read-only diagnostic display, not a safety function.</footer>
+</div>
+<noscript><p>This page needs JavaScript.</p></noscript>
 <script src="app.js"></script>
 </body>
 </html>

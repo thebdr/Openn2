@@ -140,7 +140,8 @@ def _scope_index(member_states: list, members_by_db: dict) -> dict:
 
 def _members_of(keys, scope: str, scope_index: dict, members_by_source: dict) -> list:
     """An entity's members: every db_members row whose source is one of `keys`, labelled by its scope's
-    member_states rows where one matches (labelled first, in rule order), the rest as details."""
+    member_states rows where one matches (labelled first, in rule order), the rest as details. A member whose
+    rule has the role `ignore` is left out - not shown, not read."""
     labelled = {}
     for key in keys:
         for m in scope_index.get(scope, {}).get(key, []):
@@ -151,8 +152,15 @@ def _members_of(keys, scope: str, scope_index: dict, members_by_source: dict) ->
             var = member_var(row)
             if var not in seen:
                 seen.add(var)
-                out.append(labelled.get(var) or _member(row))
+                member = labelled.get(var) or _member(row)
+                if member["role"] != "ignore":
+                    out.append(member)
     return sorted(out, key=lambda m: m["order"])
+
+
+def _shown(members: list) -> list:
+    """Labelled members in rule order, without those whose rule has the role `ignore`."""
+    return sorted((m for m in members if m["role"] != "ignore"), key=lambda m: m["order"])
 
 
 def _public(member: dict) -> dict:
@@ -285,7 +293,7 @@ def _diag_pairs(entries: list) -> list:
 
 
 def build_plant(database, kinds: list, member_states: list, params: dict, *, positions=(), drawing=None,
-                families=None, diag=None, tristate=None, meta=None, plc=None) -> tuple:
+                families=None, diag=None, tristate=None, meta=None, plc=None, notes=()) -> tuple:
     """The plant model (schema 1) and the findings. `database` = the SSOT tables (a Database or a {table: rows}
     mapping); `kinds` / `member_states` / `params` = the loaded webui config; `positions` = the loaded positions
     rows; `drawing` = {file, width, height, view_box} of the measured plant drawing or None; `families` = the
@@ -396,7 +404,7 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
                     if _truthy(a.get("sorter"))]
     sorters = [{"id": f"sorter-{key}", "index": key,
                 "area": sorter_areas[n] if n < len(sorter_areas) else None,
-                "members": [_public(m) for m in sorted(scope_index["sorter"][key], key=lambda m: m["order"])]}
+                "members": [_public(m) for m in _shown(scope_index["sorter"][key])]}
                for n, key in enumerate(sorter_keys)]
     if sorters and len(sorter_keys) != len(sorter_areas):
         findings.append(_f("webui_sorter_unlinked", "INFO",
@@ -409,8 +417,7 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
         areas.append({"id": name, "name": name, "number": _text(a.get("number")), "parent": _text(a.get("parent")) or None,
                       "part": _text(a.get("part")), "order": _int_or_none(a.get("order")),
                       "description": _text(a.get("description")), "sorter": sorter_of_area.get(name),
-                      "members": [_public(m) for m in sorted(scope_index.get("area", {}).get(name, []),
-                                                              key=lambda m: m["order"])]})
+                      "members": [_public(m) for m in _shown(scope_index.get("area", {}).get(name, []))]})
     elements_by_interface: dict = {}
     for el in _rows(database, "interface_elements"):
         if _text(el.get("signal_name")):
@@ -441,6 +448,10 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
     for sorter in sorters:
         for m in sorter["members"]:
             add(m["var"])
+    for node in nodes:                                 # the not-installed flags: read every refresh (the violet border)
+        for m in node["members"]:
+            if m["role"] == "not_installed":
+                add(m["var"])
 
     known = {f"{e['kind']}|{e['fld']}" for e in devices + nodes}
     placed = {}
@@ -451,6 +462,15 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
         findings.append(_f("webui_position_stale", "WARN",
                            f"{len(stale)} position(s) name no device of the plant - ignored by the page: "
                            f"{', '.join(stale[:5])}", params["layout"]["positions"]))
+    noted = {}                                         # the device notes, kind|fld -> {text, updated}
+    for row in notes:
+        noted[f"{row['kind']}|{row['fld']}"] = {"text": row["note"], "updated": row["updated"]}
+    stale_notes = sorted(k for k in noted if k not in known)
+    if stale_notes:
+        findings.append(_f("webui_note_stale", "WARN",
+                           f"{len(stale_notes)} note(s) name no device of the plant - ignored by the page: "
+                           f"{', '.join(stale_notes[:5])}", params["notes"]["file"]))
+        noted = {k: v for k, v in noted.items() if k in known}
     if drawing is not None:
         unplaced = len(known - set(placed))
         if unplaced:
@@ -459,8 +479,8 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
                                f"page lists them in its edit mode's tray", params["layout"]["positions"]))
 
     rated = [m for m in used if m["labelled"]]
-    rated += [m for name in area_names for m in scope_index.get("area", {}).get(name, [])]
-    rated += [m for key in sorter_keys for m in scope_index["sorter"][key]]
+    rated += [m for name in area_names for m in _shown(scope_index.get("area", {}).get(name, []))]
+    rated += [m for key in sorter_keys for m in _shown(scope_index["sorter"][key])]
     unrated = sum(1 for m in rated if m["healthy"] is None)
     if unrated:
         findings.append(_f("webui_polarity_unknown", "INFO",
@@ -479,17 +499,41 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
                                                            f"is one - the page shows the kind empty",
                                "webui/device_kinds.csv"))
 
+    # the overview's tabs: each tab's enabled kinds in its own order; a kind no tab names joins the last tab. A tab
+    # with nodes: wired shows only the PROFINET nodes its devices are wired to (their diagnosis entries' node
+    # bindings) - "nodes" lists them in the plant's node order; null = every node of the tab's node kinds
+    known_kinds, enabled_kinds = {k["kind"] for k in kinds}, [k["kind"] for k in enabled]
+    tabs = []
+    for tab in params["layout"]["overview_tabs"]:
+        unknown = [k for k in tab["kinds"] if k not in known_kinds]
+        if unknown:
+            findings.append(_f("webui_tab_kind_unknown", "WARN", f"overview tab {tab['label']!r} names {', '.join(unknown)}"
+                               " - no device kind of device_kinds.csv, ignored", "webui/webui_params.yaml"))
+        tabs.append({"label": tab["label"], "kinds": [k for k in tab["kinds"] if k in enabled_kinds],
+                     "nodes": tab["nodes"]})
+    named = {k for tab in tabs for k in tab["kinds"]}
+    tabs[-1]["kinds"] += [k for k in enabled_kinds if k not in named]
+    for tab in tabs:
+        if tab["nodes"] == "wired":
+            wired = {n for d in devices if d["kind"] in tab["kinds"] for n in d["nodes"]}
+            tab["nodes"] = [n["id"] for n in nodes if n["id"] in wired]
+        else:
+            tab["nodes"] = None
+
     app = params["app"]
     plant = {
         "schema": SCHEMA, "meta": dict(meta or {}), "plc": dict(plc or {}),
         "app": {"name": app["name"], "title": app["title"]},
         "polling": dict(params["polling"]), "login": {"users": list(params["login"]["users"])},
         "diag": dict(params["diag"]),
-        "kinds": [{k: kind[k] for k in ("kind", "label", "plural", "icon", "order", "state", "group_by")}
+        "kinds": [{k: kind[k] for k in ("kind", "label", "plural", "icon", "shape", "order", "state", "field",
+                                        "group_by")}
                   for kind in enabled],
         "poll": poll, "areas": areas, "sorters": sorters, "cabinets": cabinets, "nodes": nodes, "devices": devices,
         "interfaces": interfaces,
-        "layout": {"image": drawing, "positions": placed, "group_by": list(params["layout"]["group_by"])},
+        "layout": {"image": drawing, "positions": placed, "group_by": list(params["layout"]["group_by"]),
+                   "overview_tabs": tabs},
+        "notes": noted,
         "custom_data": dict(params["custom_data"]),
     }
     plant["counts"] = {"kinds": counts, "areas": len(areas), "sorters": len(sorters), "cabinets": len(cabinets),

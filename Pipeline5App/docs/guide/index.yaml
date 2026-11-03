@@ -9,3 +9,4 @@ sections:
   - {id: database-explorer, title: The Database Explorer}
   - {id: expressions, title: Expressions (the fx language)}
   - {id: treatments, title: Findings & treatments}
+  - {id: web-diagnosis, title: The web diagnosis app}
