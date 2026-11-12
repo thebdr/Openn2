@@ -19,6 +19,7 @@ from pipeline5.systems.plc_based.siemens_s7 import creation_info_csv as _creatio
 from pipeline5.systems.plc_based.siemens_s7 import fc_xml_emitter as _fc_xml
 from pipeline5.systems.plc_based.siemens_s7 import scl_emitter as _scl
 from pipeline5.systems.plc_based.siemens_s7 import template_scanner as _templates
+from pipeline5.systems.plc_based.siemens_s7 import tia_version as _tia
 from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
 from pipeline5.systems.plc_based.siemens_s7.symbols import SYMBOLS
 from pipeline5.systems.plc_based.siemens_s7.safety import main as _main
@@ -70,6 +71,7 @@ SYSTEM = System(
     reaction_legs=_main.REACTION_LEGS,
     reaction_absorbs=_main.REACTION_ABSORBS,
     template_language="scl",
+    project_options=(_tia.OPTION,),          # the TIA Portal version, asked at New project (C-049)
 )
 
 # Registration (deliberately LAST - see the module docstring): the builders decorate themselves

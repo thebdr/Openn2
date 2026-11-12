@@ -18,6 +18,7 @@ namespace Openn._00_Contract
     ///     &lt;PLC name&gt;\Program blocks\&lt;group&gt;\...   sw/code-block, sw/data-block, sw/block-gen, sw/instance-db, sw/source
     ///     &lt;PLC name&gt;\PLC data types\              sw/udt
     ///     &lt;PLC name&gt;\PLC tags\                    sw/tag-table (+ the manual PLCTags.xlsx)
+    ///     &lt;PLC name&gt;\Web applications\&lt;app&gt;\      web/app (webapp.manifest.csv + its header-free resources; not a TIA folder)
     ///
     /// The legacy BuilderData layout (HardwareConfiguration, SoftwareBlocks\CreationInfo,
     /// SoftwareBlocks\ImportReady, PlcTags, UserDataTypes, DataBlocks) is recognized only to name it:
@@ -50,8 +51,15 @@ namespace Openn._00_Contract
         public const string LegacyUserDataTypes = "UserDataTypes";
         public const string LegacyDataBlocks = "DataBlocks";
 
+        /// <summary>The CPU web applications of a PLC (web/app): one folder per app, uploaded through the Web API - not a TIA folder.</summary>
+        public const string WebApplications = "Web applications";
+
         public static bool IsVciFolder(string name) =>
             VciFolders.Any(f => f.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>A folder a PLC folder may hold: a TIA (VCI) folder or the web applications folder.</summary>
+        public static bool IsPlcFolder(string name) =>
+            IsVciFolder(name) || WebApplications.Equals(name, StringComparison.OrdinalIgnoreCase);
 
         public static bool IsLegacyRoot(string firstSegment) =>
             new[] { LegacyHardware, LegacySoftwareBlocks, LegacyPlcTags, LegacyUserDataTypes, LegacyDataBlocks }
@@ -100,7 +108,11 @@ namespace Openn._00_Contract
 
         /// <summary>True for the one status the importer accepts: a valid header, consistent placement, current run.</summary>
         public bool Importable => Status == ItemStatus.Ready
-                                  && KindInfo != null && KindInfo.Route != ImportRoute.None && KindInfo.Route != ImportRoute.Template;
+                                  && KindInfo != null && KindInfo.Route != ImportRoute.None && KindInfo.Route != ImportRoute.Template
+                                  && KindInfo.Route != ImportRoute.UploadWebApp;
+
+        /// <summary>True for a Ready web application manifest (its resources verified): uploaded to the CPU, never imported into TIA.</summary>
+        public bool Uploadable => Status == ItemStatus.Ready && KindInfo != null && KindInfo.Route == ImportRoute.UploadWebApp;
 
         /// <summary>"PLC / Category/Group" for display.</summary>
         public string Placement
@@ -173,10 +185,67 @@ namespace Openn._00_Contract
                 Classify(item, name, ext);
                 CheckConsistency(item);
                 CheckStale(catalog, item);
-                if (item.Misplaced && item.Importable) item.Status = ItemStatus.Invalid; //no usable TIA target (the Place note says why)
+                if (item.Misplaced && (item.Importable || item.Uploadable)) item.Status = ItemStatus.Invalid; //no usable TIA target (the Place note says why)
             }
+            CheckWebApps(catalog);
             return catalog;
         }
+
+        /// <summary>
+        /// A web application is its manifest plus the resources beside it: a Ready manifest whose own rows are bad, whose
+        /// folder is not "&lt;PLC&gt;\Web applications\&lt;app&gt;", or whose resources are missing / of another size / of another
+        /// SHA-256 (changed after the generation) is Invalid - the upload would not be the generation's app. Resources the
+        /// manifest does not list, and resources with no manifest at all, are noted on their own rows.
+        /// </summary>
+        private static void CheckWebApps(WorkspaceCatalog catalog)
+        {
+            var manifests = catalog.Items.Where(i => i.Kind == InputKind.WebApp).ToList();
+            var appFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (WorkspaceItem item in manifests)
+            {
+                string[] segments = item.RelativePath.Split('/');
+                bool placed = segments.Length == 4 && segments[1].Equals(WorkspaceLayout.WebApplications, StringComparison.OrdinalIgnoreCase) &&
+                              segments[3].Equals(WebAppManifest.FileName, StringComparison.OrdinalIgnoreCase);
+                if (placed) appFolders.Add(string.Join("/", segments, 0, 3));
+                if (item.Status != ItemStatus.Ready) continue;
+
+                var problems = new List<string>();
+                if (!placed)
+                    problems.Add("a web/app manifest belongs at <PLC>/" + WorkspaceLayout.WebApplications + "/<app>/" + WebAppManifest.FileName);
+                else
+                {
+                    WebAppManifest manifest = WebAppManifest.Read(item.Path);
+                    problems.AddRange(manifest.Errors);
+                    if (manifest.Errors.Count == 0) problems.AddRange(manifest.VerifyResources());
+                    if (problems.Count == 0)
+                    {
+                        item.Notes.Add("web application '" + manifest.AppName + "': " + manifest.Resources.Count + " resource(s), default page " +
+                                       manifest.DefaultPage.Name + " - uploaded to the CPU's web server, never imported into TIA");
+                        string appFolder = string.Join("/", segments, 0, 3) + "/";
+                        foreach (string unlisted in manifest.UnlistedFiles())
+                        {
+                            item.Notes.Add("'" + unlisted + "' is not in the manifest - not uploaded");
+                            WorkspaceItem row = catalog.Items.FirstOrDefault(i => i.RelativePath.Equals(appFolder + unlisted, StringComparison.OrdinalIgnoreCase));
+                            if (row != null) { row.Notes.Clear(); row.Notes.Add("not in " + WebAppManifest.FileName + " - never uploaded"); }
+                        }
+                    }
+                }
+                if (problems.Count == 0) continue;
+                item.Status = ItemStatus.Invalid;
+                foreach (string p in problems) item.Notes.Add(p);
+            }
+
+            foreach (WorkspaceItem resource in catalog.Items.Where(i => i.Status == ItemStatus.Ignored && IsWebAppResource(i.RelativePath.Split('/'))))
+            {
+                string[] segments = resource.RelativePath.Split('/');
+                if (!appFolders.Contains(string.Join("/", segments, 0, 3)))
+                    resource.Notes.Add("no " + WebAppManifest.FileName + " in '" + string.Join("/", segments, 0, 3) + "' - nothing uploads it");
+            }
+        }
+
+        private static bool IsWebAppResource(string[] segments) =>
+            segments.Length >= 4 && segments[1].Equals(WorkspaceLayout.WebApplications, StringComparison.OrdinalIgnoreCase) &&
+            !(segments.Length == 4 && segments[3].Equals(WebAppManifest.FileName, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
         /// A Ready item whose header "run" differs from the workspace config's "run" is a leftover
@@ -234,6 +303,11 @@ namespace Openn._00_Contract
                              ", stale " + group.Count(i => i.Status == ItemStatus.Stale);
             }
 
+            var webApps = Items.Where(i => i.Kind == InputKind.WebApp).ToList();
+            if (webApps.Count > 0)
+                yield return "  " + webApps.Count + " web application(s), " + webApps.Count(i => i.Uploadable) +
+                             " uploadable - uploaded to the CPU's web server through the Web API, never imported into TIA";
+
             var attention = Items.Where(i => i.Status == ItemStatus.Invalid || i.Status == ItemStatus.Unclassified || i.Status == ItemStatus.Stale).ToList();
             if (attention.Count > 0)
             {
@@ -255,6 +329,7 @@ namespace Openn._00_Contract
             if (segments[0].Equals(WorkspaceLayout.VciConfigFolder, StringComparison.OrdinalIgnoreCase)) { item.Notes.Add("TIA VCI workspace config"); return true; }
             if (ext == OpennHeader.SidecarExtension) { item.Notes.Add("header sidecar of " + name.Substring(0, name.Length - ext.Length)); return true; }
             if (name.StartsWith("~$", StringComparison.Ordinal) || TempNames.Contains(name.ToLowerInvariant())) { item.Notes.Add("temporary file"); return true; }
+            if (IsWebAppResource(segments)) { item.Plc = segments[0]; item.Category = WorkspaceLayout.WebApplications; item.GroupPath = Join(segments, 2, segments.Length - 1); item.Notes.Add("web application resource - uploaded with its " + WebAppManifest.FileName + ", never imported"); return true; }
             return false;
         }
 
@@ -299,10 +374,10 @@ namespace Openn._00_Contract
                 return;
             }
             item.Category = segments[1];
-            if (!WorkspaceLayout.IsVciFolder(item.Category))
+            if (!WorkspaceLayout.IsPlcFolder(item.Category))
             {
                 item.Misplaced = true;
-                item.Notes.Add("'" + item.Category + "' is not a TIA folder name (" + string.Join(", ", WorkspaceLayout.VciFolders) + ")");
+                item.Notes.Add("'" + item.Category + "' is not a TIA folder name (" + string.Join(", ", WorkspaceLayout.VciFolders) + ") nor '" + WorkspaceLayout.WebApplications + "'");
             }
             item.GroupPath = Join(segments, 2, segments.Length - 1);
         }
@@ -463,7 +538,7 @@ namespace Openn._00_Contract
 
             if (kind.Area == InputArea.Hardware && item.Plc != null)
                 problems.Add(kind.Id + " belongs in '" + WorkspaceLayout.HardwareFolder + "' at the workspace root, not under PLC '" + item.Plc + "'");
-            if (kind.Area == InputArea.Software && item.Plc == null && !item.LegacyPlacement)
+            if ((kind.Area == InputArea.Software || kind.Area == InputArea.Web) && item.Plc == null && !item.LegacyPlacement)
                 problems.Add(kind.Id + " belongs under a PLC folder (<PLC>/" + (kind.VciFolder ?? WorkspaceLayout.ProgramBlocks) + "/...)");
             if (!item.LegacyPlacement && kind.VciFolder != null && item.Category.Length > 0 &&
                 !item.Category.Equals(kind.VciFolder, StringComparison.OrdinalIgnoreCase))

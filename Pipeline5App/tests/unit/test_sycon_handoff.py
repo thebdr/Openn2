@@ -404,7 +404,8 @@ def test_coupler_modules_mirrored_by_connector():
 
 def test_coupler_dap_parameters_by_connector():
     """2026-10-28: the coupler's DAP record 1 reads 00 0C 00 02 .. on X2 and 00 0C 00 01 .. on X1 - the DAP Parameters
-    cell takes the `X2: ...; X1: ...` form, the head's Connector picks."""
+    cell takes the `X2: ...; X1: ...` form, the head's Connector picks; a head naming none takes the first (for_connector -
+    the WARN is the per-connector Catalog Item's, a plain one here)."""
     dtd = dict(DTD, **{"6ES7158-3AD10-0XA0": {"model_id": "6ES7158-3AD10-0XA0", "role": "slave", "catalog_item": "PN/PN Coupler X2",
                                                "modules": "default", "gsdml": "", "comment": "", "symbolic": "default",
                                                "dap_parameters": "X2: 4=0 | record:1=00 0C 00 02 00 00; X1: 4=0 | record:1=00 0C 00 01 00 00"}})
@@ -414,8 +415,9 @@ def test_coupler_dap_parameters_by_connector():
             dict(_head("n0008-c", "192.168.1.8", "6ES7158-3AD10-0XA0", "-K3", "8"), connector="")]
     _stations, modules, findings = sycon.build(rows, dtd)
     assert [(m["station_name"], m["slot"], m["subslot"], m["parameters"]) for m in modules] == [
-        ("n0006-a", "0", "1", "4=0 | record:1=00 0C 00 02 00 00"), ("n0007-b", "0", "1", "4=0 | record:1=00 0C 00 01 00 00")]
-    assert [(f.type, f.severity) for f in findings] == [("sycon_connector_unknown", "WARN")]
+        ("n0006-a", "0", "1", "4=0 | record:1=00 0C 00 02 00 00"), ("n0007-b", "0", "1", "4=0 | record:1=00 0C 00 01 00 00"),
+        ("n0008-c", "0", "1", "4=0 | record:1=00 0C 00 02 00 00")]
+    assert findings == []
 
 
 def test_unknown_modules_policy_is_refused():

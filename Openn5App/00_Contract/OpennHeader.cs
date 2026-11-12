@@ -114,6 +114,8 @@ namespace Openn._00_Contract
             }
         }
         public string Project => Get("project");
+        /// <summary>Workspace config only: the TIA Portal version the producer's SimaticML targets, e.g. "V20" (contract §3.4).</summary>
+        public string Tia => Get("tia");
         public string Plc => Get("plc");
         public string Target => Get("target");
         public string Name => Get("name");

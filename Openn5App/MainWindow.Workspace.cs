@@ -220,6 +220,8 @@ namespace Openn
         {
             if (item.KindInfo == null) return item.Status == ItemStatus.Ignored ? "-" : "not imported";
             string route = RouteLabel(item.KindInfo.Route);
+            if (item.KindInfo.Route == ImportRoute.UploadWebApp)
+                return item.Uploadable ? route : "not uploadable (" + route + ")";
             return item.Importable || item.KindInfo.Route == ImportRoute.Template || item.KindInfo.Route == ImportRoute.None
                 ? route
                 : "not imported (" + route + ")";
@@ -238,6 +240,7 @@ namespace Openn
                 case ImportRoute.CreateInstanceDbs: return "create instance DBs";
                 case ImportRoute.GenerateFromSource: return "compile source";
                 case ImportRoute.Template: return "template (never imported)";
+                case ImportRoute.UploadWebApp: return "upload to the CPU (never imported)";
                 default: return "listed only";
             }
         }
@@ -255,6 +258,7 @@ namespace Openn
                 case ImportRoute.CreateInstanceDbs: return "CreateInstanceDB per csv row (Folder column relative to the file's folder); name clashes prompt Retry/Abort/Ignore";
                 case ImportRoute.GenerateFromSource: return "ExternalSources.CreateFromFile + GenerateBlocksFromSource - blocks land in the Program blocks root";
                 case ImportRoute.Template: return "referenced by block-gen csvs through template=, never imported by itself";
+                case ImportRoute.UploadWebApp: return "a CPU web application: its manifest and resources are uploaded to the CPU's web server through the Web API (WebApp.*), never imported into TIA";
                 default: return "documentation - listed, never imported";
             }
         }
@@ -504,6 +508,18 @@ namespace Openn
                 bool ok = cfg.Status == HeaderStatus.Ok;
                 AddSummaryChip(text, tip, ok ? WorkspaceColors.Green : WorkspaceColors.Red, ok ? WorkspaceColors.GreenTint : WorkspaceColors.RedTint);
             }
+
+            //the workspace's TIA version against the Portal this Openn5 runs with (an import refuses a newer workspace)
+            TiaVersionCheck tia = TiaVersionCheck.Compare(cfg, OpennessSetup.SelectedInstallation.PortalVersion.Major);
+            string tiaText = tia.Verdict == TiaVersionVerdict.Unreadable
+                ? "TIA: unreadable"
+                : "TIA V" + tia.WorkspaceMajor + (tia.Assumed ? " (assumed)" : string.Empty) + " - Portal V" + tia.PortalMajor;
+            if (tia.Verdict == TiaVersionVerdict.Match)
+                AddSummaryChip(tiaText, tia.Message, WorkspaceColors.Green, WorkspaceColors.GreenTint);
+            else if (tia.Verdict == TiaVersionVerdict.OlderWorkspace)
+                AddSummaryChip(tiaText, tia.Message, WorkspaceColors.Amber, WorkspaceColors.AmberTint);
+            else
+                AddSummaryChip(tiaText + " - not importable", tia.Message, WorkspaceColors.Red, WorkspaceColors.RedTint, true);
 
             int disabledByUser = workspaceRows.Count(r => r.ImportDisabled);
             AddSummaryChip(Totals(catalog).Split(';')[0] + "; " + catalog.InImportOrder().Count() + " importable" + (disabledByUser > 0 ? " (" + disabledByUser + " unticked)" : string.Empty),

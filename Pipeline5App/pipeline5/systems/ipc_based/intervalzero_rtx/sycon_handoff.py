@@ -302,14 +302,45 @@ def load_dtd(path: str | None = None) -> dict:
         symbolic = row[6].lower() or "default"
         if symbolic not in SYMBOLIC_RULES:
             raise ValueError("SyconDeviceTypesDatabase: unknown symbolic-name rule %r for %r" % (row[6], row[0]))
-        fixed = fixed_modules(row[7])
+        # a `scalance-pnio` row's column 8 names its configurable ports' submodules (2026-11-02), not modules
+        fixed = fixed_modules(row[7]) if policy != "scalance-pnio" else []
         if policy == "fixed" and not fixed:
             raise ValueError("SyconDeviceTypesDatabase: policy fixed without Fixed Modules for %r" % row[0])
+        ports = row[7] if policy == "scalance-pnio" else ""
+        if ports:
+            per = by_node(ports)
+            for text in (per.values() if per is not None else [ports]):
+                if not is_module_list(text):
+                    raise ValueError("SyconDeviceTypesDatabase: the ports of %r are not N[text] items: %r" % (row[0], text))
         m = QUALIFIED_MODEL.match(row[0])
         out[dtd_key(row[0])] = {"model_id": model_id(m.group(1) if m else row[0]), "role": role, "catalog_item": row[2],
                                          "modules": policy, "gsdml": row[4], "comment": row[5],
-                                         "symbolic": symbolic, "fixed_modules": fixed, "dap_parameters": row[8]}
+                                         "symbolic": symbolic, "fixed_modules": fixed, "dap_parameters": row[8],
+                                         "ports": ports}
     return out
+
+
+NODE_KEY = re.compile(r"^\s*(n\d+|\*)\s*:\s*(.*)$", re.I)
+
+
+def by_node(cell):
+    """{key: text} when a cell names one entry per station node (`n0010: ...; *: ...` - the key the PROFINET name's
+    first part, `*` every other station); None for a plain cell. A SCALANCE row's ports take the form (user
+    2026-11-02: "192.168.1.10: all 4 ports SFP; all the others: 1st port SFP, the others RJ45" - the main cabinet's
+    switch is node 10 in both sorters, 192.168.1.10 lower and 192.168.6.10 upper)."""
+    pieces = [piece for piece in str(cell or "").split(";") if piece.strip()]
+    if pieces and all(NODE_KEY.match(piece) for piece in pieces):
+        return {NODE_KEY.match(p).group(1).lower(): NODE_KEY.match(p).group(2).strip() for p in pieces}
+    return None
+
+
+def for_node(cell, station_name):
+    """A cell's value for a station: the plain cell, or - per node - its node's entry, else the `*` entry, else ""."""
+    per = by_node(cell)
+    if per is None:
+        return str(cell or "")
+    node = str(station_name or "").split("-")[0].strip().lower()
+    return per.get(node, per.get("*", ""))
 
 
 CONNECTOR_LIST = re.compile(r"^\s*(X\d+)\s*:\s*(.*)$", re.I)
@@ -350,6 +381,17 @@ def module_items(text):
     return out
 
 
+MODULE_LIST_COLUMN = "desc_l1"         # the I/O List's Column I: under a head, a row holding only its module list
+MODULE_LIST = re.compile(r"^\s*\d+\s*\[[^\[\]]*\]\s*(\|\s*\d+\s*\[[^\[\]]*\]\s*)*$")
+
+
+def is_module_list(text):
+    """True for a station's own module list in the I/O List (2026-10-30, the LOWER SORTER R1.4's couplers: the row
+    under the head carries `2[*IN 128 Byte] | 2[*OUT 128 Byte]` in Column I): every `|` item is `N[text]` - a strict
+    form, so a signal's description is never read as one (a single module is `1[text]`)."""
+    return bool(MODULE_LIST.match(str(text or "")))
+
+
 def fixed_modules(text):
     """The Fixed Modules column: a list of module texts in slot order (`module_items`) - or, per connector
     (`by_connector`), {CONNECTOR: list}."""
@@ -357,6 +399,19 @@ def fixed_modules(text):
     if per is not None:
         return {connector: module_items(items) for connector, items in per.items()}
     return module_items(text)
+
+
+def for_connector(cell, row):
+    """A database cell's value for a head row: the plain cell, or - per connector (`X2: ...; X1: ...`) - the row's
+    Connector's entry, the first when the row names none of them (`catalog_item_for` WARNs that case). The DAP
+    Parameters take the form (2026-10-30: a PN/PN coupler's record 1 ends with its GEO ID, 1 on X1 and 2 on X2 - the
+    X1 couplers read `00 0C 00 01 00 00` where the X2 oracle wanted `... 00 02 ...`, their Diagnostics data validity 0
+    all the same)."""
+    per = by_connector(cell)
+    if per is None:
+        return cell
+    connector = str(row.get("connector") or "").strip().upper()
+    return per.get(connector, next(iter(per.values())))
 
 
 def catalog_item_for(rec, row, findings, name, where):
@@ -471,18 +526,38 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
             cur["station"]["update_time_ms"] = str(FAST_UPDATE_TIME_MS)
             cur["station"]["comment"] = (cur["station"]["comment"] + " | fast: " + ", ".join(
                 sorted({k for s in cur["signals"] for k in FAST_SIGNAL_KEYWORDS if k in signal_text(s)}))).strip(" |")
-        dap_parameters = rec.get("dap_parameters")
-        per_connector = by_connector(dap_parameters)       # `X2: ...; X1: ...` like the Catalog Item (2026-10-28: the
-        if per_connector:                                  # coupler's record 1 reads 00 0C 00 02 on X2, 00 0C 00 01 on X1)
-            connector = str(cur["row"].get("connector") or "").strip().upper()
-            dap_parameters = per_connector.get(connector, "")
-            if not dap_parameters:
-                findings.append(_f("sycon_connector_unknown", "WARN", "station %r: connector %r has no DAP parameters "
-                                   "(%s) - none set" % (cur["name"], connector, " / ".join(sorted(per_connector))), cur["where"]))
-        if dap_parameters:                                 # the device's own submodule (slot 0, subslot 1)
+        if rec.get("dap_parameters"):                      # the device's own submodule (slot 0, subslot 1)
+            rec = dict(rec, dap_parameters=for_connector(rec["dap_parameters"], cur["row"]))
             modules.append({"station_name": cur["name"], "slot": "0", "subslot": "1", "module_id": "",
-                            "module_text": "", "parameters": dap_parameters,
+                            "module_text": "", "parameters": rec["dap_parameters"],
                             "comment": "DAP parameters of %s" % rec["model_id"]})
+        listed, list_row = None, None
+        for s in cur["signals"]:                           # the station's own module list, the row under its head
+            text = str(s.get(MODULE_LIST_COLUMN) or "").strip()
+            if is_module_list(text):
+                if listed is None:
+                    listed, list_row = module_items(text), s
+                else:
+                    findings.append(_f("sycon_module_list_twice", "WARN", "station %r: a second module list %r (%s) - "
+                                       "the first, %s, taken" % (cur["name"], text, s.get("source_cell") or "",
+                                                                list_row.get("source_cell") or ""), cur["where"]))
+        if listed is not None and rec["modules"] not in ("fixed", "scalance-pnio"):
+            findings.append(_f("sycon_module_list_ignored", "WARN", "station %r: the I/O List's module list %r (%s) is "
+                               "ignored - its model's modules policy is %r, not fixed" % (
+                                   cur["name"], list_row.get(MODULE_LIST_COLUMN), list_row.get("source_cell") or "",
+                                   rec["modules"]), cur["where"]))
+        if rec["modules"] == "fixed" and listed is not None:
+            # the I/O List names this station's modules (user 2026-10-26: "added new custom modules management:
+            # 4[*OUT 128 Byte] | 4[*IN 128 Byte]"; 2026-10-30: "the couplers got a new submodule management" - a row
+            # under the coupler's head, Column I) - they replace the database's list for this station
+            findings.append(_f("sycon_modules_from_iolist", "INFO", "station %r: %d module(s) from the I/O List row %s "
+                               "(%s) instead of the database's" % (cur["name"], len(listed), list_row.get("source_cell") or "",
+                                                                   list_row.get(MODULE_LIST_COLUMN)), cur["where"]))
+            for n, text in enumerate(listed, start=1):
+                modules.append({"station_name": cur["name"], "slot": str(n), "subslot": "", "module_id": "",
+                                "module_text": text, "parameters": "",
+                                "comment": "module of %s from the I/O List row %s" % (rec["model_id"], list_row.get("source_cell") or "")})
+            return
         if rec["modules"] == "fixed":                      # the database's module texts, in slot order
             fixed = rec.get("fixed_modules") or []
             if isinstance(fixed, dict):                    # per connector: the head row's Connector column picks
@@ -501,9 +576,24 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
                             "module_text": "PN-IO", "parameters": scalance_pnio_params(rec["catalog_item"]),
                             "comment": "PN-IO: Loop Detection Interface Mode Off, Port Mirroring Mode Off"})
             port_numbers, text, sfp = SCALANCE_COMBO_PORTS.get(rec["model_id"].upper(), ((), "", ""))
-            for n in port_numbers:
-                modules.append({"station_name": cur["name"], "slot": "0", "subslot": str(0x8000 + n), "module_id": sfp,
-                                "module_text": text, "parameters": "", "comment": "port %d: SFP991-1" % n})
+            # the configurable ports' submodules: the I/O List row under the switch, else the database's (per node:
+            # `n0010: 4[SFP 991-1 A]; *: 1[SFP 991-1 A] | 3[RJ45 1 GBit]`, user 2026-11-02), else every port the SFP
+            texts, source = [text] * len(port_numbers), "SFP991-1"
+            if listed is not None:
+                texts, source = listed, "the I/O List row %s" % (list_row.get("source_cell") or "")
+            elif rec.get("ports") and port_numbers:
+                cell = for_node(rec["ports"], cur["name"])
+                if cell:
+                    texts, source = module_items(cell), "the database"
+            if port_numbers and len(texts) != len(port_numbers):
+                findings.append(_f("sycon_port_list_length", "WARN", "station %r: %d port submodule(s) from %s for its %d "
+                                   "configurable ports %s - the first %d set" % (cur["name"], len(texts), source, len(port_numbers),
+                                                                                list(port_numbers), min(len(texts), len(port_numbers))),
+                                   cur["where"]))
+            for n, port_text in zip(port_numbers, texts):
+                modules.append({"station_name": cur["name"], "slot": "0", "subslot": str(0x8000 + n),
+                                "module_id": sfp if port_text.strip().lower() == text.lower() else "",
+                                "module_text": port_text, "parameters": "", "comment": "port %d: %s (%s)" % (n, port_text, source)})
             return
         if rec["modules"] == "iolink-ports":
             misnamed = []

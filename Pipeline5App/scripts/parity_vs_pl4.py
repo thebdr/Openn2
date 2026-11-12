@@ -46,9 +46,19 @@ IF_-sheet insert, no ph200 fill) into a sandbox and compares it with the referen
         its db_blocks / db_members rows, db_members' `struct` column (every other member's empty) and its name in
         the coverage outputs dropped from the PL5 side, the reference DBs named after it numbered one up (the
         name-sorted `<Number>` placeholder; all counted)
+      * every member a block references declared (C-053, 2026-10-28, user): 07 Speed Control's encoder slot is the
+        encoder's own 04_SPEED member - the reference's `Safety Encoder Failure [ <FLD> ]` (a member no DB declared)
+        read as the reference's `Safety Encoder <n> Healthy [ <FLD> ]` of that FLD (software_block_members, the
+        CreationInfo CSV; counted); and the commissioning DBs declare the PW nodes 00_Only for Commissioning
+        bypasses (the reference: PA only) - those nodes' 00_Commissioning rows / members, 00_Commissioning in their
+        signals' `datablocks` and coverage placement dropped from the PL5 side (counted), 99_Commissioning's
+        NodesNotInstalled checked against the reference's PA and PW nodes in document order
       * the coupler transfer areas (C-031, contract §2.1): the `TransferArea-*` rows of `hardware_modules.csv`
         and `Modules.csv` are PL5-only (PL4 never emitted them) - dropped from the PL5 side only, counted in the
         verdict; a reference row of that model would still be a difference
+      * the TIA Portal version (C-049, 2026-10-27, user: "we should be able to set the tia version in PL5"): every
+        SimaticML document PL5 writes is stamped with the project's `tia_version` (the builtin V20 here), the
+        reference's with V18 - a PL5 stamp equal to the setting is read as V18, counted; any other stamp differs
 The verdict is the EXIT CODE (0 = parity): the policy lives in the command, not in log prose.
 
 Run:         <python> scripts/parity_vs_pl4.py
@@ -140,6 +150,8 @@ def run_pl5(db_dir: str, out_dir: str) -> None:
     from pipeline5.phases.coverage import signal_paths       # PL5-only (C-038): checked, never compared
     from pipeline5.systems.plc_based.siemens_s7.safety.main import _ready_block_xml
     signal_paths.project(db, ready=_ready_block_xml(db, SYSTEM))
+    from pipeline5.systems.plc_based.siemens_s7.safety import webui_project   # PL5-only (C-050): checked, never compared
+    webui_project.project(db)
 
 
 def _tree(root: str) -> dict:
@@ -189,8 +201,25 @@ _CM_TEMPLATE = ("TEMPLATE--v1.1--00_Only for Commissioning", "TEMPLATE--v1.2--00
 _RENAMED = _TEMPLATE_RENAMES + _MEMBER_RENAMES + (_PB_TEMPLATE, _CM_TEMPLATE)
 
 
+_ENGINEERING_RX = re.compile(r'<Engineering version="(V\d+)"')
+
+
+def _norm_tia(text: str) -> str:
+    """C-049: a stamp equal to PL5's configured TIA version read as the reference's V18 (counted)."""
+    from pipeline5.systems.plc_based.siemens_s7 import tia_version
+    target = tia_version.active()
+
+    def read_as_reference(m):
+        if m.group(1) == target and target != "V18":
+            SANCTIONED["tia_version"] += 1
+            return '<Engineering version="V18"'
+        return m.group(0)
+    return _ENGINEERING_RX.sub(read_as_reference, text)
+
+
 def _norm_str(text: str) -> str:
     text, _headered = _strip_header(text)
+    text = _norm_tia(text)
     for form in _repo_forms():
         text = text.replace(form, "<REPO>")
     for old, new in _RENAMED:                      # sanctioned + counted: the reference spells them the old way
@@ -228,7 +257,8 @@ _MODULE_TABLES = ("hardware_modules.csv", "Modules.csv")
 SANCTIONED = {"transfer_area_rows": 0, "tag_table_xml": 0, "interface_descriptions": 0, "region_comments": 0,
               "device_types_copy": 0, "signal_paths_page": 0, "areas_table": 0, "renamed_tags": 0, "em_state_comments": 0,
               "pb_template": 0, "pb_rows": 0, "dr_channel_params": 0, "cm_template": 0, "cm_rows": 0, "cm_db": 0, "cm_db_rows": 0,
-              "cm_db_numbers": 0, "cm_coverage": 0}
+              "cm_db_numbers": 0, "cm_coverage": 0, "tia_version": 0, "web_app_files": 0, "encoder_members": 0,
+              "pw_bypass": 0}
 _SIGNAL_PATHS = "ProjectDocumentation/Reports/io_signal_paths.html"
 _DEVICE_TYPES_COPY = _WORKSPACE + "Devices & networks/DeviceTypesDatabase.csv"
 _SHARED_DEVICE_TYPES = os.path.join(REPO, "Shared", "HardwareConfigBuilderData", "DeviceTypesDatabase.csv")
@@ -593,7 +623,8 @@ def _check_cm_template(path: str, label: str) -> list:
 
 def _check_cm_db(path: str, ref_members: str, label: str) -> list:
     """PL5's 99_Commissioning.xml (C-042) - a NEW file: headered, a standard DB (OPC UA off, web server on), its Static
-    = RESET_VIA_TIA then the Struct NodesNotInstalled holding exactly the reference's 00_Commissioning nodes."""
+    = RESET_VIA_TIA then the Struct NodesNotInstalled holding exactly the reference's PA and PW nodes, in document
+    order (C-053: its PA nodes until 2026-10-28)."""
     import csv
     import xml.etree.ElementTree as ET
     text, headered = _strip_header(open(path, "rb").read().decode("utf-8"))
@@ -611,12 +642,75 @@ def _check_cm_db(path: str, ref_members: str, label: str) -> list:
     top = [(m.get("Name"), m.get("Datatype")) for m in static if local(m) == "Member"]
     struct = next((m for m in static if local(m) == "Member" and m.get("Name") == "NodesNotInstalled"), None)
     nodes = [m.get("Name") for m in struct if local(m) == "Member"] if struct is not None else []
-    with open(ref_members, encoding="utf-8-sig", newline="") as handle:
-        want = [r["member"] for r in csv.DictReader(handle)
-                if r["db_name"] == "00_Commissioning" and r["source"] != "seed"]
+    with open(os.path.join(os.path.dirname(ref_members), "signals.csv"), encoding="utf-8-sig", newline="") as handle:
+        want = []                                      # C-053: every PA and PW node, in document order
+        for r in csv.DictReader(handle):
+            node = f"{r['profinet_name']} {r['profinet_ip']}"
+            if r["script_type"] in ("PA", "PW") and node not in want:
+                want.append(node)
     if top != [("RESET_VIA_TIA", "Bool"), ("NodesNotInstalled", "Struct")] or nodes != want:
         problems.append(f"{label}: {_CM_DB}.xml holds {top} / {nodes} - expected RESET_VIA_TIA + the nodes {want}")
     return problems
+
+
+# --- C-053: every member a block references declared ------------------------------------------------------------- #
+_ENC_OLD = re.compile(r"Safety Encoder Failure \[ ([^\]]*?) \]")      # what 07 Speed Control wrote until 2026-10-28
+_ENC_DECLARED = re.compile(r"^Safety Encoder \d+ Healthy \[ (.*) \]$")
+_BYPASS_DB, _WARNING_DB = "00_Commissioning", "PROFINET_NODES_WARNING"
+
+
+def _ref_members(db_name: str) -> list:
+    """The reference's own members of `db_name` (no seed), in its order."""
+    import csv
+    with open(os.path.join(REFERENCE, "db", "db_members.csv"), encoding="utf-8-sig", newline="") as handle:
+        return [r["member"] for r in csv.DictReader(handle) if r["db_name"] == db_name and r["source"] != "seed"]
+
+
+def _encoder_members(rel: str, data: bytes) -> bytes:
+    """The REFERENCE's 07 Speed Control encoder slot read as the member the DB declares (C-053): its `Safety Encoder
+    Failure [ <FLD> ]` as the reference's 04_SPEED `Safety Encoder <n> Healthy [ <FLD> ]` of that FLD - in
+    software_block_members (its uid hashes block + seq, unchanged) and the CreationInfo CSV; counted. An FLD without
+    such a member is left - a difference."""
+    if b"Safety Encoder Failure [ " not in data:
+        return data
+    declared = {m.group(1): member for member in _ref_members("04_SPEED") for m in [_ENC_DECLARED.match(member)] if m}
+
+    def read(match):
+        if match.group(1) not in declared:
+            return match.group(0)
+        SANCTIONED["encoder_members"] += 1
+        return declared[match.group(1)]
+    return _ENC_OLD.sub(read, data.decode("utf-8")).encode("utf-8")
+
+
+def _drop_pw_bypass(rel: str, data: bytes) -> bytes:
+    """PL5's bypass members of the PW-only nodes out of the compared files (C-053: the commissioning DBs declare every
+    node 00_Only for Commissioning bypasses, the reference's PA only): their 00_Commissioning rows of db_members, their
+    members of 00_Commissioning.xml, 00_Commissioning in their signals' `datablocks` and in their coverage placement
+    (after `_drop_cm_db`); counted. 99_Commissioning's NodesNotInstalled is checked whole (`_check_cm_db`)."""
+    name = os.path.basename(rel)
+    if name not in ("db_members.csv", _BYPASS_DB + ".xml", "signals.csv", "coverage.csv",
+                    "io_project_coverage_report.csv"):
+        return data
+    nodes = set(_ref_members(_WARNING_DB)) - set(_ref_members(_BYPASS_DB))
+    if name == "signals.csv":
+        old, new = f'"[""{_WARNING_DB}"",""{_BYPASS_DB}""]"'.encode(), f'"[""{_WARNING_DB}""]"'.encode()
+    elif name != "db_members.csv" and not name.endswith(".xml"):
+        old, new = f",{_BYPASS_DB}|{_WARNING_DB},".encode(), f",{_WARNING_DB},".encode()
+    else:
+        old = None
+    if old is not None:
+        SANCTIONED["pw_bypass"] += data.count(old)
+        return data.replace(old, new)
+    text = data.decode("utf-8")
+    for node in sorted(nodes):
+        if name == "db_members.csv":
+            text, n = re.subn(rf"^[^,\r\n]*,{re.escape(_BYPASS_DB)},{re.escape(node)},[^\r\n]*\r?\n", "", text,
+                              flags=re.MULTILINE)
+        else:
+            text, n = re.subn(rf'\s*<Member Name="{re.escape(node)}".*?</Member>', "", text, flags=re.DOTALL)
+        SANCTIONED["pw_bypass"] += n
+    return text.encode("utf-8")
 
 
 def _is_tag_table_xml(rel: str) -> bool:
@@ -710,6 +804,26 @@ def _check_areas_table(path: str, ref_signals: str, label: str) -> list:
     return problems
 
 
+def _check_web_app(app_dir: str, label: str) -> list:
+    """C-050: the web application folder is PL5-only (no PL4 counterpart): its manifest carries a valid web/app
+    header, every resource is the manifest's (size + SHA-256) and plant.json parses as schema 1."""
+    import json
+    from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+    from pipeline5.systems.plc_based.siemens_s7 import webapp_folder
+    problems = []
+    h = header.read_header(os.path.join(app_dir, header.WEBAPP_MANIFEST))
+    if h.status != "ok" or h.get("kind") != "web/app":
+        problems.append(f"{label}: web app manifest header {h.status} {h.get('kind')}: {h.problems}")
+    problems += [f"{label}: web app {os.path.basename(app_dir)}: {p}" for p in webapp_folder.verify(app_dir)]
+    try:
+        plant = json.load(open(os.path.join(app_dir, "plant.json"), encoding="utf-8"))
+        if plant.get("schema") != 1 or not plant.get("poll"):
+            problems.append(f"{label}: plant.json is no schema-1 plant with a poll set")
+    except (OSError, ValueError) as error:
+        problems.append(f"{label}: plant.json does not load: {error}")
+    return problems
+
+
 def _legacy_rel(rel: str):
     """A PL5 output path -> the frozen reference's path: the VCI-shaped workspace (contract §4) onto the
     legacy BuilderData folders (§4.1, inverted). None = a PL5-only file by design (the workspace config,
@@ -763,6 +877,11 @@ def compare(a_root: str, b_root: str, label: str) -> list:
             diffs += _check_pb_template(path, label)
             SANCTIONED["pb_template"] += 1
             continue
+        if rel.startswith(_WORKSPACE) and "/Web applications/" in rel:   # C-050: PL5-only, checked
+            if rel.endswith("/webapp.manifest.csv"):
+                diffs += _check_web_app(os.path.dirname(path), label)
+            SANCTIONED["web_app_files"] += 1
+            continue
         if rel == _SIGNAL_PATHS:                       # the signal-paths page: its data checked, never compared
             diffs += _check_signal_paths(path, os.path.join(a_root, "ProjectDocumentation", "Reports",
                                                             "io_project_coverage_report.csv"), label)
@@ -801,9 +920,9 @@ def compare(a_root: str, b_root: str, label: str) -> list:
             if not headered:
                 diffs.append(f"{label}: no #!openn header: {rel}")
         da = _norm_text(_renumber_after_cm_db(rel, _commissioning_v12(rel, _unpad_push_buttons(
-            rel, _drop_em_state_comments(rel, open(a[rel], "rb").read(), pl5=False)))))
-        db = _norm_text(_drop_cm_db(rel, _drop_em_state_comments(rel, _restamp_renamed_rows(
-            rel, _drop_interface_descriptions(rel, _strip_dr_params(rel, _drop_transfer_areas(rel, raw_b)))), pl5=True)))
+            rel, _drop_em_state_comments(rel, _encoder_members(rel, open(a[rel], "rb").read()), pl5=False)))))
+        db = _norm_text(_drop_pw_bypass(rel, _drop_cm_db(rel, _drop_em_state_comments(rel, _restamp_renamed_rows(
+            rel, _drop_interface_descriptions(rel, _strip_dr_params(rel, _drop_transfer_areas(rel, raw_b)))), pl5=True))))
         if da != db:
             diffs.append(f"{label}: bytes differ: {rel}")
     return diffs
@@ -866,7 +985,11 @@ def main() -> int:
               f"{SANCTIONED['cm_template']} v1.2 00 template checked against Shared, {SANCTIONED['cm_rows']} 00 rows "
               f"read in the v1.2 form, {SANCTIONED['cm_db']} 99_Commissioning checked against the reference's nodes, "
               f"{SANCTIONED['cm_db_rows']} of its table rows + {SANCTIONED['cm_coverage']} coverage mention(s) "
-              f"dropped, {SANCTIONED['cm_db_numbers']} DB number(s) shifted)")
+              f"dropped, {SANCTIONED['cm_db_numbers']} DB number(s) shifted; C-049: {SANCTIONED['tia_version']} "
+              f"SimaticML stamp(s) of the tia_version setting read as V18; C-050: {SANCTIONED['web_app_files']} "
+              f"web application file(s) checked against their manifest; C-053: "
+              f"{SANCTIONED['encoder_members']} encoder slot(s) read as the declared member, "
+              f"{SANCTIONED['pw_bypass']} PW-node bypass mention(s) dropped)")
         return 0
 
 

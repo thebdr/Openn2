@@ -21,10 +21,10 @@ def test_builtin_generation_params_load():
 
 
 def test_diag_params_and_instance_render():
-    p = diagnosis_scl._diag_params()
+    p = diagnosis_scl.diag_params()
     eq(p["alarm_dwords"], ["ALARM1", "ALARM2"], "loader -> typed knobs")
     eq(p["default_variant"], 1)
-    inst = diagnosis_scl._inst("001", "ALARM1", p["instance_template"])
+    inst = diagnosis_scl.cabinet_word("001", "ALARM1", p["instance_template"])
     eq(inst, "S1.CABINET001.ALARM1", "the configured template renders through core/expr")
     eq(diagnosis._binding_sentinel(), "$PLC_Binding$", "the sentinel reads from the params")
 

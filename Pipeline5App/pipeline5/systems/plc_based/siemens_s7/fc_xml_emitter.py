@@ -38,6 +38,7 @@ import os
 import re
 
 from pipeline5.systems.plc_based.siemens_s7 import openn_header as header
+from pipeline5.systems.plc_based.siemens_s7 import tia_version
 
 PHASE = 820
 _TEMPLATE_PREFIX = re.compile(r"^TEMPLATE--v([\d.]+)--")
@@ -466,7 +467,7 @@ def write_fc_xml(name, table, template_path, out_dir, kind, plc=None) -> str:
     emit = EMIT_FUNCS.get(kind)
     if emit is None or not template_path or not os.path.exists(template_path):
         return ""
-    xml = header.stamp_xml(emit(table, template_path, name),
+    xml = header.stamp_xml(tia_version.stamp(emit(table, template_path, name)),   # the project's TIA version (C-049)
                            header.fields("sw/code-block", PHASE, plc=plc, target=header.PROGRAM_BLOCKS,
                                          source=f"software_blocks (template {template_label(template_path)})"))
     os.makedirs(out_dir, exist_ok=True)

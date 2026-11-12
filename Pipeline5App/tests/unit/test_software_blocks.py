@@ -11,6 +11,7 @@ from pipeline5.systems.plc_based.siemens_s7 import creation_info_csv as creation
 from pipeline5.systems.plc_based.siemens_s7.safety.system import SYSTEM
 from pipeline5.systems.plc_based.siemens_s7 import scl_emitter as scl_emit
 from pipeline5.systems.plc_based.siemens_s7 import fc_xml_emitter as xml_emit
+from pipeline5.systems.plc_based.siemens_s7 import tia_version
 from pipeline5.phases.software_blocks.signals_view import Database
 from pipeline5.phases.software_blocks.block_table import Table
 from pipeline5.systems.plc_based.siemens_s7.safety import block_builders as builders
@@ -172,15 +173,25 @@ def test_builder_06_feedback_error_chunks_to_8():
 
 
 def test_builder_07_speed_control_pairs_encoders():
-    rows = [{"script_type": "N1/2", "index": "1", "name_in_db": "enc1", "name_in_tagtable": "ENC1_tag", "iol_FLD": "S1"},
-            {"script_type": "N2/2", "index": "1", "name_in_db": "enc2", "name_in_tagtable": "ENC2_tag"},
-            {"script_type": "N1/2", "index": "2", "name_in_db": "enc3", "name_in_tagtable": "ENC3_tag", "iol_FLD": "S2"}]
-    t = builders.build_07_speed_control(Database(rows))
+    """One SLS network per encoder index; the ENC slot is the N1/2 row's own second 04_SPEED member - the encoder's,
+    as the DB declares it ([[C-053]], user 2026-10-28: `Safety Encoder Failure [ <FLD> ]` until then, a member no DB
+    declared) - blank when the DB gave the row none."""
+    rows = [{"uid": "u1", "script_type": "N1/2", "index": "1", "name_in_db": "enc1", "name_in_tagtable": "ENC1_tag",
+             "iol_FLD": "S1"},
+            {"uid": "u2", "script_type": "N2/2", "index": "1", "name_in_db": "enc2", "name_in_tagtable": "ENC2_tag"},
+            {"uid": "u3", "script_type": "N1/2", "index": "2", "name_in_db": "enc3", "name_in_tagtable": "ENC3_tag",
+             "iol_FLD": "S2"}]
+    members = [{"db_name": "04_SPEED", "member": "enc1", "source": "u1"},
+               {"db_name": "04_SPEED", "member": "enc2", "source": "u2"},
+               {"db_name": "04_SPEED", "member": "Safety Encoder 0001 Healthy [ S1 ]", "source": "u1"},
+               {"db_name": "04_SPEED", "member": "enc3", "source": "u3"}]
+    t = builders.build_07_speed_control(Database(rows, members=members))
     eq(len(t), 2, "two N1/2 indices")
     eq(t.rows[0]["instanceOf-01_Speed_Control_SLS"], "SLS_SORTER_01", "zero-padded index")
     eq(t.rows[0]["04_SPEED.{db_element:ENC2/2}"], "enc2", "the paired N2/2")
-    eq(t.rows[0]["04_SPEED.{db_element:ENC}"], "Safety Encoder Failure [ S1 ]")
+    eq(t.rows[0]["04_SPEED.{db_element:ENC}"], "Safety Encoder 0001 Healthy [ S1 ]", "the encoder's declared member")
     eq(t.rows[1]["04_SPEED.{db_element:ENC2/2}"], "", "no N2/2 for index 2 -> blank")
+    eq(t.rows[1]["04_SPEED.{db_element:ENC}"], "", "no second 04_SPEED member for index 2 -> blank")
 
 
 # --- the complex builders (02/03/04/05/08) ----------------------------------------------------- #
@@ -441,6 +452,9 @@ def test_write_fc_xml_bom_and_path():
            "a single UTF-8 BOM, the declaration, then the contract-v1 header as the first comment")
         ok(b"#! target: Program blocks\r\n" in raw and b"#!end\r\n-->\r\n<Document>" in raw, "...closing right before the Document")
         ok(b"\r\n" in raw, "CRLF line endings")
+        version = tia_version.active().encode()
+        ok(b'<Engineering version="' + version + b'" />' in raw and b'"V18"' not in raw,
+           "the template's V18 stamp replaced by the project's TIA version (C-049)")
         eq(xml_emit.write_fc_xml("00_Only for Commissioning", t, tpl, out, "csv"), "", "a non-fc kind -> '' (no XML)")
 
 

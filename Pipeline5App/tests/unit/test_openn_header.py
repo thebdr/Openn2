@@ -186,6 +186,38 @@ def test_layout_plc_folder_and_dirs():
             p5paths._BUILTIN_OUTPUT = orig
 
 
+def test_web_app_kind_and_dirs():
+    """C-050: `web/app` is a contract kind (schema 1) whose manifest sits in `<PLC>/Web applications/<app>/`
+    - a csv header that round-trips through the parser - and the layout resolves that folder for the writers
+    (`web_apps`) and for the open button (`web_app`: the first app on disk, else the folder, else the PLC)."""
+    _pin_clock()
+    header.begin_run("20261028-120000-c050")
+    f = header.fields("web/app", 650, project="8FVT", plc="n1", target="Web applications/safety", name="safety",
+                      source="webui")
+    eq((f["kind"], f["schema"], f["producer"]), ("web/app", "1", "Pipeline5 5.0 (phase 650)"))
+    h = header.parse_directives([line for line in header.render_csv(f).split("\r\n") if line])
+    eq((h.status, h.get("target"), h.get("name")), ("ok", "Web applications/safety", "safety"),
+       "the manifest's header round-trips")
+    eq((header.WEB_APPS, header.WEBAPP_MANIFEST), ("Web applications", "webapp.manifest.csv"))
+    ok(header.WEB_APPS not in header.RESERVED_ROOT_FOLDERS, "a per-PLC folder, not a reserved root folder")
+    orig = p5paths._BUILTIN_OUTPUT
+    with tempfile.TemporaryDirectory() as d:
+        p5paths._BUILTIN_OUTPUT = d
+        try:
+            root = os.path.join(d, "TiaPortalProjectInterface", "BuilderData")
+            dirs = LAYOUT.delivery_dirs({"signals": [{"script_type": "PLC", "profinet_name": "n1"}]})
+            eq(dirs["web_apps"], os.path.join(root, "n1", "Web applications"))
+            eq(LAYOUT.web_app_dir("n1", "safety"), os.path.join(root, "n1", "Web applications", "safety"))
+            eq(LAYOUT.dirs()["web_app"], root, "nothing on disk: the workspace root")
+            os.makedirs(os.path.join(root, "n1", "Program blocks"))
+            eq(LAYOUT.dirs()["web_app"], os.path.join(root, "n1"), "a PLC folder without web apps: the PLC folder")
+            os.makedirs(os.path.join(root, "n1", "Web applications", "safety"))
+            eq(LAYOUT.dirs()["web_app"], os.path.join(root, "n1", "Web applications", "safety"), "the first app")
+            eq(LAYOUT.plc_folders_on_disk(), ["n1"], "Web applications sits inside the PLC folder")
+        finally:
+            p5paths._BUILTIN_OUTPUT = orig
+
+
 def test_begin_generation_writes_the_config_once_per_run():
     orig = p5paths._BUILTIN_OUTPUT
     db = {"signals": [{"script_type": "PLC", "profinet_name": "n1"}]}
@@ -216,5 +248,6 @@ if __name__ == "__main__":
         ("sidecar_and_read_header", test_sidecar_and_read_header),
         ("run_id_and_workspace_config", test_run_id_and_workspace_config),
         ("layout_plc_folder_and_dirs", test_layout_plc_folder_and_dirs),
+        ("web_app_kind_and_dirs", test_web_app_kind_and_dirs),
         ("begin_generation_writes_the_config_once_per_run", test_begin_generation_writes_the_config_once_per_run),
     ]))

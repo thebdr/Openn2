@@ -96,6 +96,7 @@ namespace Openn._03_ApiManager
                 h.Set("generated", Iso(GeneratedUtc));
                 h.Set("run", RunId);
                 h.Set("project", ProjectName);
+                h.Set("tia", "V" + OpennessSetup.SelectedInstallation.PortalVersion.Major);   //the exported XML is this Portal's
                 h.Set("plcs", string.Join(", ", Plcs.OrderBy(p => p, StringComparer.OrdinalIgnoreCase)));
                 string dir = Path.Combine(Root, WorkspaceLayout.ConfigFolder);
                 Directory.CreateDirectory(dir);

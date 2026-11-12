@@ -72,8 +72,10 @@ PHASES = PhaseSet(
         Phase(600, "ph_diagnosis", handler="diagnosis", requires=(300, 520), subs=(
             Sub(610, "pb_gen_diag_list"),
             Sub(620, "pb_gen_diag_swblocks"),
+            Sub(650, "pb_gen_webapp"),                                       # the CPU web diagnosis app (C-050)
             Sub(630, "pb_open_diag_data", kind="open", opens="diaglist"),
             Sub(640, "pb_open_diag_config", kind="open", opens="diag_config"),
+            Sub(660, "pb_open_webapp", kind="open", opens="web_app"),
         )),
         Phase(700, "ph_hardware", handler="hardware", requires=(300,), subs=(
             Sub(710, "pb_gen_stations"),
@@ -339,10 +341,12 @@ def _begin_generation(ctx, database) -> dict:
     run id (the host's `ctx.run` - one per button press; Run-all shares it across its phases) and
     `.openn/workspace.openn.config`, written once per run - the log says where the workspace is the first
     time. Returns the generation's delivery dirs (`delivery_dirs` - the PLC folder from the staged facts)."""
+    from pipeline5.systems.plc_based.siemens_s7 import tia_version
     from pipeline5.systems.plc_based.siemens_s7.output_layout import LAYOUT
     run, written = LAYOUT.begin_generation(database, ctx.run)
     if written:
-        ctx.emit("INFO", f"  OP5 workspace {LAYOUT.workspace_root()}  (run {run} - files of older runs are stale)")
+        ctx.emit("INFO", f"  OP5 workspace {LAYOUT.workspace_root()}  (run {run} - files of older runs are stale;"
+                         f" TIA Portal {tia_version.active()})")
     return LAYOUT.delivery_dirs(database)
 
 
@@ -506,9 +510,10 @@ def run_interfaces(ctx, only=None):
 
 
 def run_diagnosis(ctx, only=None):
-    """Phase 600: stage -> 520 build -> diagnosis.build, then project 610 DiagList_IO/Logic.csv and/or
-    620 the OPC SCL. only=610/620 projects just that surface; None does both. (Both need diagnosis.build,
-    so it always runs.)"""
+    """Phase 600: stage -> 520 build -> diagnosis.build, then project 610 DiagList_IO/Logic.csv, 620 the OPC SCL
+    and 650 the CPU web diagnosis app ([[C-050]]: the interfaces built too, then `<PLC>/Web applications/<app>/`).
+    only=610/620/650 projects just that surface; None does all three. (All need diagnosis.build, so it always
+    runs.)"""
     from pipeline5 import config
     from pipeline5.findings import gate as run
     from pipeline5.phases.staging import iolist as staging
@@ -516,8 +521,9 @@ def run_diagnosis(ctx, only=None):
     from pipeline5.phases.diagnosis import builder as diagnosis
     from pipeline5.phases.diagnosis import diaglist as diaglist_csv
     from pipeline5.systems.plc_based.siemens_s7.safety import opc_diagnosis_scl as diagnosis_scl
-    label = {610: "610 Generate Diag List", 620: "620 Generate Diag Software Blocks"}.get(
-        only, "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL)")
+    label = {610: "610 Generate Diag List", 620: "620 Generate Diag Software Blocks",
+             650: "650 Generate Web Application"}.get(
+        only, "600 Diagnosis Mapping  (610 DiagList + 620 OPC SCL + 650 Web Application)")
     ctx.emit("PHASE", label)
     ctx.status("diagnosis…")
     findings = []
@@ -530,17 +536,29 @@ def run_diagnosis(ctx, only=None):
         ctx.emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
         return
     database, diag_findings = diagnosis.build(database)
-    rendered, res, scl = list(diag_findings), None, None
+    rendered, res, scl, web = list(diag_findings), None, None, None
     if only in (None, 610):
         res = diaglist_csv.project(database); rendered += res["findings"]
     if only in (None, 620):
         _begin_generation(ctx, database)
         scl = diagnosis_scl.project(database); rendered += scl["findings"]
+    if only in (None, 650):
+        from pipeline5.phases.interfaces import builder as interfaces
+        from pipeline5.systems.plc_based.siemens_s7.safety import webui_project
+        ctx.status("web application…")
+        database, iface_findings = interfaces.build_interfaces(database)   # the page lists the machine interfaces
+        _begin_generation(ctx, database)
+        web = webui_project.project(database); rendered += iface_findings + web["findings"]
     ctx.render(rendered, label="600 diagnosis")
     if res is not None:
         ctx.emit("RSLT", f"  610 DiagList: {res['io_count']} IO + {res['logic_count']} logic rows -> {config.diaglist_dir()}")
     if scl is not None and scl["path"]:
         ctx.emit("RSLT", f"  620 OPC SCL: {scl['entries']} entries across {scl['cabinets']} cabinets -> {scl['path']}")
+    if web is not None and web["dir"]:
+        kinds = ", ".join(f"{n} {kind}" for kind, n in web["counts"]["kinds"].items())
+        ctx.emit("RSLT", f"  650 web application: {kinds}; {web['counts']['cabinets']} cabinets, "
+                         f"{web['counts']['areas']} areas, {web['counts']['poll']} variables per refresh; "
+                         f"{len(web['resources'])} resources, {web['bytes']} bytes -> {web['dir']}")
 
 
 def run_hardware(ctx, only=None):
@@ -574,14 +592,15 @@ def run_hardware(ctx, only=None):
 
 
 def run_software(ctx, only=None):
-    """Phase 800: stage -> 520 -> engine.build. only=820 projects the CreationInfo CSVs + the 03 FC
-    XML; only=830 writes InstanceDBs.csv; None does both. (engine.build always runs - both surfaces
-    project from it. 02_COM/05_EM_STATE are ordinary 520 config DBs - the 500 leg projects them.)"""
+    """Phase 800: stage -> 520 -> engine.build -> the undeclared-member check ([[C-053]]). only=820 projects the
+    CreationInfo CSVs + the 03 FC XML; only=830 writes InstanceDBs.csv; None does both. (engine.build always runs -
+    both surfaces project from it. 02_COM/05_EM_STATE are ordinary 520 config DBs - the 500 leg projects them.)"""
     from pipeline5 import config
     from pipeline5.findings import gate as run
     from pipeline5.phases.staging import iolist as staging
     from pipeline5.phases.datablocks import generator as datablocks
     from pipeline5.phases.software_blocks import build_engine as engine
+    from pipeline5.phases.coverage import member_references
     label = {820: "820 Generate Blocks", 830: "830 Generate Instances"}.get(
         only, "800 Software Generation  (820 Blocks + 830 Instances + 03 FC XML)")
     ctx.emit("PHASE", label)
@@ -596,6 +615,14 @@ def run_software(ctx, only=None):
         ctx.emit("WARN", "  520 prereq produced no tables (a blocking finding was downgraded but yielded no data) - nothing further")
         return
     database, blk_findings = engine.build(database, system=ctx.system)
+    # [[C-053]]: a block reading a member its generated DB does not declare (a project config older than a builder's
+    # rename) - TIA would only reject it at compile time
+    undeclared = member_references.check(database, ready_xml=_ready_block_xml(database, ctx.system),
+                                         ready_scl=_ready_block_scl(database, ctx.system),
+                                         find_bindings=ctx.system.symbols.find_bindings)
+    if undeclared:
+        database.save(config.database_dir())             # engine.build saved before they were recorded
+    blk_findings += undeclared
     # a builder's own blocking finding halts BEFORE any block is written ([[C-040]]: a sorter area whose TT06
     # network cannot be built - a CSV with an empty symbol slot would only fail at the block generation)
     if not ctx.gate(blk_findings, label="800 software blocks"):
@@ -684,6 +711,17 @@ def _ready_block_xml(database, system) -> dict:
         if emit is not None and ref and os.path.isfile(ref):
             out[block["name"]] = emit(tables[block["name"]], ref, block["name"])
     return out
+
+
+def _ready_block_scl(database, system) -> dict:
+    """{block name -> the SCL source PL5 renders for it} for every block that ships READY as SCL (emit scl - 03_Diagnostic
+    Nodes), without its `#!openn` header. In memory - no file written."""
+    from pipeline5.phases.software_blocks import build_engine as engine
+    from pipeline5.systems.plc_based.siemens_s7 import scl_emitter
+    tables = engine.block_tables(database)
+    return {b["name"]: scl_emitter.SCL_RENDERERS[b["name"]](tables[b["name"]], b["name"])
+            for b in (database["software_blocks"] if "software_blocks" in database else [])
+            if system.builders.emit_kind(b["name"]) == "scl" and b["name"] in scl_emitter.SCL_RENDERERS}
 
 
 # The dispatch table System.handlers carries - Phase.handler / a special Sub.opens key -> handler.

@@ -1,0 +1,26 @@
+scope,db_name,member,label,healthy,severity,role,order,comment
+area,05_EM_STATE,{area} Q,E-stop circuit,,alarm,state,10,"the area's emergency-stop state (immediate); healthy blank = polarity unknown until the M0 polarity watch (shown neutral, INFO finding)"
+area,05_EM_STATE,{area} Q_Delayed,E-stop circuit (delayed),,alarm,state,20,
+area,05_EM_STATE,{area} SAFETY AND EMERGENCY CONDITIONS OK,Safety and emergency conditions,,alarm,state,30,"the area's safety cut, extended name (the CPU's, C-052)"
+area,05_EM_STATE,{area} SAFETY CONDITIONS OK,Safety conditions,,alarm,state,31,the sorter areas' second cut (on the CPU; PL5 C-052 open)
+area,05_EM_STATE,{area} POWER ENABLED,Power enabled,,alarm,state,32,the safety cut where the area keeps the short name
+area,05_EM_STATE,{area} RESET,Reset,,info,reset,40,
+area,02_COM,{area} E-STOP_PUSHBUTTONS,E-stop push buttons,,alarm,cause,50,
+area,02_COM,{area} PB,E-stop push buttons,,alarm,cause,51,the name before C-052 - a row whose member a project lacks is skipped
+area,02_COM,{area} CONTACTOR_FEEDBACKS,Contactor feedbacks,,alarm,cause,60,
+area,02_COM,{area} FDB,Contactor feedbacks,,alarm,cause,61,the name before C-052
+area,02_COM,{area} SAFETY_BREAKERS,Safety breakers,,alarm,cause,70,
+area,02_COM,{area} DOORS,Safety doors,,alarm,cause,80,
+sorter,05_EM_STATE,SORTER_{index}_NOT_RUNNING,Sorter stopped,,info,state,10,
+node,PROFINET_NODES_ALARM,{node},Node failed,,alarm,state,10,"{node} = the station's PROFINET name and IP, as PL5 names the member"
+node,99_Commissioning,NodesNotInstalled.{node},Not installed,,info,state,20,
+device,01_Pushbutton,Emergency Push Button [ {fld} ],E-stop,,alarm,state,10,
+device,01_Pushbutton,Safety Breaker [ {fld} ],Safety breaker,,alarm,state,10,
+device,03_FDBACK,Contactor Feedback Error [ {fld} ],Feedback error,,alarm,state,10,
+device,03_FDBACK_RAW,Contactor Feedback Error [ {fld} ],Feedback error (raw),,alarm,detail,20,
+device,04_SPEED,Safety Encoder {n} Healthy [ {fld} ],Encoder healthy,,alarm,state,10,
+device,04_SPEED,Safety Encoder {n} Sensor 1 Healthy [ {fld} ],Sensor 1 healthy,,alarm,detail,20,
+device,04_SPEED,Safety Encoder {n} Sensor 2 Healthy [ {fld} ],Sensor 2 healthy,,alarm,detail,21,
+device,07_DOOR,Door Closed SAFE_STATE [ {fld} ],Door closed (safe),,alarm,state,10,
+device,07_DOOR,Door Closed DIAGNOSIS [ {fld} ],Door closed (diagnosis),,warning,detail,20,
+device,07_DOOR,Door Alarm [ {fld} ],Door alarm,,alarm,detail,30,

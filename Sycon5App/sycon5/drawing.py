@@ -58,33 +58,60 @@ def drawing_pane(main):
     return panes[0]
 
 
+LONG_VERTICAL_PX = 200          # a green column this long ...
+BUS_EDGE_PX = 20                # ... at the pane's left edge is the laid-out bus (canvas.apply_layout puts it at x 8..12);
+                                # SYCON.net's default layout stacks drop lines into long columns too, never at the edge
+
+
+def pick_green(cols, rows, count, step=2):
+    """The controller's green line from a colour scan: ('h', dy, x0, x1) or ('v', dx, y0, y1), pane-relative; None.
+    A long vertical green line wins (2026-10-30: on a project `canvas.apply_layout` laid out, the bus is vertical at x
+    8..12 and the devices hang on horizontal branches - the most common green row was a device's branch, y 670 x
+    8..548, and six drops there attached nothing; a drop on the vertical bus attached at once) - when it sits at the
+    pane's left edge, where the layout puts the bus (2026-11-02: a fresh build's 15th drop took a column of stacked
+    drop lines at x 532, in SYCON.net's default layout, for the bus - four drops, no node). Else, as before, the most
+    common horizontal row (a SYCON.net default layout: the controller's horizontal line), else a vertical one."""
+    for key, n in count.most_common(10):
+        R, G, B = key
+        if not (G > R + 40 and G > B and n > 50):
+            continue
+        rw, c = rows[key], cols[key]
+        dx, vhits = c.most_common(1)[0]
+        edge = {x: k for x, k in c.items() if x <= BUS_EDGE_PX}
+        if edge and max(edge.values()) * step >= LONG_VERTICAL_PX:
+            top = max(edge.values())
+            strong = sorted(x for x, k in edge.items() if k >= top * 0.8)
+            ys = sorted(rw)
+            return ("v", (strong[0] + strong[-1]) // 2, ys[0], ys[-1])
+        dy, hits = rw.most_common(1)[0]
+        if hits * step > 100:
+            xs = sorted(c)
+            return ("h", dy, xs[0], xs[-1])
+        if vhits * step > 100:
+            ys = sorted(rw)
+            return ("v", dx, ys[0], ys[-1])
+    return None
+
+
+def crossing_rows(rows, count, step=2, min_px=30):
+    """The pane rows a horizontal green line crosses (a device's branch on a laid-out bus) - drop points avoid them."""
+    out = set()
+    for key, n in count.most_common(10):
+        R, G, B = key
+        if G > R + 40 and G > B and n > 50:
+            out |= {y for y, k in rows[key].items() if k * step >= min_px}
+    return out
+
+
 def locate_lines(main, step=2):
-    """Returns (pane rect, grey root line dy or None, green line or None).
+    """Returns (pane rect, grey root line dy or None, green line or None, the rows branch lines cross).
     green = ('h', dy, x0, x1) for a horizontal line, ('v', dx, y0, y1) for a vertical one (pane-relative)."""
     r = drawing_pane(main).rectangle()
     cols, rows, count, grey = colour_lines(r, step)
     h = r.height()
     cand = [(hits, dy) for dy, hits in grey.items() if 10 < dy < h - 30 and hits * step > r.width() // 4]
     grey_dy = max(cand)[1] if cand else None
-    green = None
-    for key, n in count.most_common(10):
-        R, G, B = key
-        if G > R + 40 and G > B and n > 50:
-            rw, c = rows[key], cols[key]
-            dy, hits = rw.most_common(1)[0]
-            if hits * step > 100:
-                xs = sorted(c)
-                green = ("h", dy, xs[0], xs[-1])
-                break
-            dx, hits = c.most_common(1)[0]
-            if hits * step > 100:
-                ys = sorted(rw)
-                green = ("v", dx, ys[0], ys[-1])
-                break
-    return r, grey_dy, green
-
-
-BUS_MIN_PX = 300
+    return r, grey_dy, pick_green(cols, rows, count, step), crossing_rows(rows, count, step)
 
 
 def scroll_home(main):
@@ -98,36 +125,26 @@ def scroll_home(main):
     time.sleep(1.0)
 
 
-def bus_line(main, step=2):
-    """The controller's vertical bus of a laid-out project: the longest green pixel column, ('v', dx, y0, y1), or
-    None when no green column runs BUS_MIN_PX - in a full drawing the most frequent green is a device's branch
-    (y=454 of the IO0030 card 1 update: six drops on it, no node), not the bus."""
-    r = drawing_pane(main).rectangle()
-    cols, rows, count, _grey = colour_lines(r, step)
-    best = None
-    for key, n in count.most_common(10):
-        R, G, B = key
-        if not (G > R + 40 and G > B and n > 50):
-            continue
-        dx, hits = cols[key].most_common(1)[0]
-        if hits * step >= BUS_MIN_PX and (best is None or hits > best[0]):
-            ys = sorted(rows[key])
-            best = (hits, ("v", dx, ys[0], ys[-1]))
-    return best[1] if best else None
-
-
 def master_points(grey_dy):
     """Candidate drop points (pane-relative) on the root line for a Master."""
     return [(400, grey_dy), (300, grey_dy), (500, grey_dy), (400, grey_dy - 1), (400, grey_dy + 1)]
 
 
-def slave_points(green):
-    """Candidate drop points (pane-relative) on a controller's green line for a Slave, proven-first."""
+def slave_points(green, crossings=()):
+    """Candidate drop points (pane-relative) on a controller's green line for a Slave, proven-first. On a vertical line
+    each point is moved down off the rows a branch crosses (`crossings`), 4 px clear - a drop on a junction could take
+    the branch's device line."""
     if green[0] == "h":
         x0, x1, dy = green[2], green[3], green[1]
         return [(x0 + 170, dy), ((x0 + x1) // 2, dy), (x0 + 100, dy), (x1 - 120, dy), (x0 + 170, dy - 1), (x0 + 170, dy + 1)]
     dx, y0, y1 = green[1], green[2], green[3]
-    return [(dx, (y0 + y1) // 2), (dx, y0 + 150), (dx, y1 - 150)]
+    out = []
+    for y in (y0 + 128, (y0 + y1) // 2, y0 + 250, y1 - 150):
+        while any(abs(y - c) < 4 for c in crossings) and y < y1:
+            y += 1
+        if y0 < y < y1 and (dx, y) not in out:
+            out.append((dx, y))
+    return out
 
 
 def dark_profile(rect, threshold=600, x0=40, step=2):
