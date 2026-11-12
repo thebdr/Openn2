@@ -51,6 +51,15 @@ class Verification:
 same_text = Session.same_text
 
 
+def slot_is(dev, slot, text):
+    """The read-back module of `slot` is `text`: its name, or any text its module record carries (a SEW MFE saves
+    its name TextId `MM 3PD` where the combo showed `MOVIMOT 3PD` - IO0023, 2026-11-12), or a name the combo text
+    starts with (the first 12 characters: a combo item may carry an order-number suffix)."""
+    got = dev.slots.get(slot, "")
+    texts = [got] + list(getattr(dev, "slot_texts", {}).get(slot, []))
+    return bool(got) and any(same_text(t, text) for t in texts) or (bool(got) and got.startswith(text[:12]))
+
+
 def order_is_pattern(order):
     """A GSDML DAP whose OrderNumber is not a literal: a wildcard pattern (`13xx.xx7x.xxxx.x`, the LTi ServoOne
     Junior) or a placeholder token (`T_ID_DAP_DESCRIPTION`, the Anybus Communicator) - 2026-10-24, the sorter's
@@ -176,7 +185,7 @@ def verify(handoff, project, plugged, timing_set=None, skipped=None, keep_extras
                 chosen = (plugged.get(s["station_name"]) or {}).get(m["slot"], "")
                 got = d.slots.get(int(m["slot"]), "")
                 head = chosen.split("  [")[0].strip()
-                v.check(bool(got) and (not head or got == head or got.startswith(head[:12])),
+                v.check(bool(got) and (not head or slot_is(d, int(m["slot"]), head)),
                         "station %s slot %s: %r (chosen %r, table %s)" % (name, m["slot"], got, chosen, m["module_id"]))
                 for pname, pvalue in parse_parameters(m["parameters"]):
                     if pname == "potential_group":
@@ -271,8 +280,10 @@ def apply_station(d, h, station, dev, plugged, node=None):
             d.set_module_parameters(node, 0, parse_parameters(m["parameters"]), subslot=int(m["subslot"]))
             changed = True
     have = {k for k in (dev.slots if dev is not None else {}) if k != 0}
-    if rows and not all(int(m["slot"]) in have for m in rows):
-        chosen = d.plug_modules(node, [m["module_text"] or ("order:" + m["module_id"]) for m in rows])
+    if rows and not all(int(m["slot"]) in have and (not m["module_text"] or slot_is(dev, int(m["slot"]), m["module_text"]))
+                        for m in rows):
+        chosen = d.plug_modules(node, [m["module_text"] or ("order:" + m["module_id"]) for m in rows],
+                                slots=[int(m["slot"]) for m in rows])
         plugged[station] = {m["slot"]: chosen[i] for i, m in enumerate(rows)}
         changed, dev = True, None                                 # the read-back is stale from here
     for m in rows:

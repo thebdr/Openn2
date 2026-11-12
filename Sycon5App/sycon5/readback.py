@@ -36,6 +36,8 @@ class Device:
     dap: str = ""                                  # the DAP id text of slot 0 (`DAP V2.1 X2`, `DIM ST V4.2`, `DIM 1`)
     order_no: str = ""                             # the DAP's order number (`6ES7 158-3AD00-0XA0`, `AL1202`)
     slots: dict = field(default_factory=dict)      # slot -> module name
+    slot_texts: dict = field(default_factory=dict) # slot -> every text its module record carries (id, name, its
+                                                   # TextId - a SEW MFE saves `MOVIMOT 3PD`, `MM 3PD`, `MOVIMOT 3 ...`)
     submodules: dict = field(default_factory=dict) # (slot, subslot) -> submodule name (the DAP's 0x8000+ ones too)
     records: dict = field(default_factory=dict)    # (slot, subslot, index) -> bytes
     network: list = field(default_factory=list)    # controller only: [(name of station, ip)]
@@ -160,6 +162,7 @@ def _parse_blob(dev, hexdata):
                 slot = int(path.split("/")[1])
                 strs = _strings(data)
                 dev.slots[slot] = strs[1] if len(strs) > 1 else (strs[0] if strs else "")
+                dev.slot_texts[slot] = [x for x in strs if not GUID.match(x)]
                 if slot == 0 and strs:
                     dev.dap = strs[0]
                     tail = [s for s in strs[1:] if not GUID.match(s)]
