@@ -157,14 +157,24 @@ def card_is_output(rows, model) -> bool:
     return model_id(model).upper().startswith(OUTPUT_FAMILIES)
 
 
-def port_rows(signals) -> dict:
+PQI_PORT_RE = re.compile(r"\bPORT\s+X(\d{1,2})\s*\(PQI\)", re.I)
+
+
+def port_rows(signals, misnamed=None) -> dict:
     """{'X01': [rows], ...}: a row with a connector opens (or continues) its port; a row without one belongs to
-    the port opened last."""
+    the port opened last. A PQI row names its port in its description (`DIAGNOSTIC OF PORT X06 (PQI)`): that
+    port wins over a Connector cell that says otherwise (the IO0030 list files X06's PQI under X05 on every
+    AL1202 - 2026-10-27); each such row is appended to `misnamed` as (connector, port, row)."""
     ports, cur = {}, None
     for s in signals:
         m = PORT_RE.match(str(s.get("connector") or "").strip())
         if m:
             cur = "X%02d" % int(m.group(1))
+            q = PQI_PORT_RE.search(signal_text(s))
+            if q and "X%02d" % int(q.group(1)) != cur:
+                if misnamed is not None:
+                    misnamed.append((cur, "X%02d" % int(q.group(1)), s))
+                cur = "X%02d" % int(q.group(1))
             ports.setdefault(cur, [])
         if cur is not None:
             ports[cur].append(s)
@@ -226,6 +236,35 @@ def model_id(part_no) -> str:
     return str(part_no or "").replace(" ", "").strip()
 
 
+# A database Model Id may carry the head's variable description in brackets, `<model> [<description>]`: that row
+# takes the heads of the model whose Description language 1 (2nd part) reads so, the plain row the others (user
+# 2026-10-27: the TELESCOPIC - CHUTES PN/PN couplers of IO0030 take the CaljanTelescopicFVT pre-configured GSDML,
+# the list's other couplers the standard one).
+QUALIFIED_MODEL = re.compile(r"^(.*?)\s*\[(.+)\]\s*$")
+
+
+def qualifier(text) -> str:
+    return " ".join(str(text or "").split()).upper()
+
+
+def dtd_key(cell) -> str:
+    """The database key of a Model Id cell: `MODEL` or, for a qualified one, `MODEL [DESCRIPTION]` (normalized)."""
+    m = QUALIFIED_MODEL.match(str(cell or ""))
+    if m:
+        return "%s [%s]" % (model_id(m.group(1)).upper(), qualifier(m.group(2)))
+    return model_id(cell).upper()
+
+
+def dtd_record(dtd, model, row):
+    """The database row of a head: the one qualified by its variable description, else the model's own."""
+    desc = qualifier(row.get("desc_l1b"))
+    if desc:
+        rec = dtd.get("%s [%s]" % (model.upper(), desc))
+        if rec is not None:
+            return rec
+    return dtd.get(model.upper())
+
+
 FIVES_CODE = re.compile(r"^\d{2}C_\d{5}$")           # a Fives catalog code (`14C_00051`), never a model
 
 
@@ -266,7 +305,8 @@ def load_dtd(path: str | None = None) -> dict:
         fixed = fixed_modules(row[7])
         if policy == "fixed" and not fixed:
             raise ValueError("SyconDeviceTypesDatabase: policy fixed without Fixed Modules for %r" % row[0])
-        out[model_id(row[0]).upper()] = {"model_id": model_id(row[0]), "role": role, "catalog_item": row[2],
+        m = QUALIFIED_MODEL.match(row[0])
+        out[dtd_key(row[0])] = {"model_id": model_id(m.group(1) if m else row[0]), "role": role, "catalog_item": row[2],
                                          "modules": policy, "gsdml": row[4], "comment": row[5],
                                          "symbolic": symbolic, "fixed_modules": fixed, "dap_parameters": row[8]}
     return out
@@ -368,6 +408,17 @@ def cards_of(rows, dtd: dict) -> list:
     return cards
 
 
+def controller_name(name, row, earlier) -> str:
+    """The name of station of a card's controller: as written, unless an earlier card's controller has it and the
+    head's slot tag tells another card - then the name's last segment becomes the slot tag (IO0030, user
+    2026-10-27: card 2's head `n0001-tric-aec01-K22101.1`, slot tag `-K22101.2` -> `n0001-tric-aec01-K22101.2`)."""
+    tag = str(row.get("slot") or "").strip().lstrip("-")
+    stem, _sep, last = name.rpartition("-")
+    if not tag or not stem or last.lower() == tag.lower() or not any(c["name"].lower() == name.lower() for c in earlier):
+        return name
+    return "%s-%s" % (stem, tag)
+
+
 def symbolic_text(rule, row) -> str:
     """The description part of a station's netDevice label by the database's rule (user 2026-10-24, the edited
     sorter project); empty for `default`."""
@@ -420,9 +471,17 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
             cur["station"]["update_time_ms"] = str(FAST_UPDATE_TIME_MS)
             cur["station"]["comment"] = (cur["station"]["comment"] + " | fast: " + ", ".join(
                 sorted({k for s in cur["signals"] for k in FAST_SIGNAL_KEYWORDS if k in signal_text(s)}))).strip(" |")
-        if rec.get("dap_parameters"):                      # the device's own submodule (slot 0, subslot 1)
+        dap_parameters = rec.get("dap_parameters")
+        per_connector = by_connector(dap_parameters)       # `X2: ...; X1: ...` like the Catalog Item (2026-10-28: the
+        if per_connector:                                  # coupler's record 1 reads 00 0C 00 02 on X2, 00 0C 00 01 on X1)
+            connector = str(cur["row"].get("connector") or "").strip().upper()
+            dap_parameters = per_connector.get(connector, "")
+            if not dap_parameters:
+                findings.append(_f("sycon_connector_unknown", "WARN", "station %r: connector %r has no DAP parameters "
+                                   "(%s) - none set" % (cur["name"], connector, " / ".join(sorted(per_connector))), cur["where"]))
+        if dap_parameters:                                 # the device's own submodule (slot 0, subslot 1)
             modules.append({"station_name": cur["name"], "slot": "0", "subslot": "1", "module_id": "",
-                            "module_text": "", "parameters": rec["dap_parameters"],
+                            "module_text": "", "parameters": dap_parameters,
                             "comment": "DAP parameters of %s" % rec["model_id"]})
         if rec["modules"] == "fixed":                      # the database's module texts, in slot order
             fixed = rec.get("fixed_modules") or []
@@ -447,7 +506,12 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
                                 "module_text": text, "parameters": "", "comment": "port %d: SFP991-1" % n})
             return
         if rec["modules"] == "iolink-ports":
-            ports = port_rows(cur["signals"])
+            misnamed = []
+            ports = port_rows(cur["signals"], misnamed)
+            for conn, port, s in misnamed:
+                findings.append(_f("sycon_pqi_connector_mismatch", "WARN", "station %r: the PQI row %s sits under "
+                                   "connector %s - taken as port %s" % (cur["name"], str(s.get("bit") or ""), conn, port),
+                                   cur["where"]))
             for n in range(1, PORT_COUNT + 1):
                 port = "X%02d" % n
                 prow = ports.get(port, [])
@@ -505,7 +569,7 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
         if not model:
             findings.append(_f("sycon_head_without_model", "WARN", "station %r has no Part No. - skipped" % name, where))
             continue
-        rec = dtd.get(model.upper())
+        rec = dtd_record(dtd, model, row)
         if rec is None:
             findings.append(_f("sycon_model_not_in_dtd", "WARN", "station %r: model %r is not in the SYCON device-types "
                                "database - skipped" % (name, model), where))
@@ -522,7 +586,16 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
         # second repeats the first's station names - merged into one project they blocked the SYCON.net controller
         # dialog): the other cards' controllers and stations are INFO findings here, built by their own card
         if rec["role"] == "controller":
-            if chosen is not None and controller is None and name.lower() == chosen["name"].lower():
+            # the name AND the network (IO0030, 2026-10-27: card 2's head repeats card 1's name - by name alone card
+            # 2 took card 1's head, 192.168.11.1, and SYCON.net refused its 192.168.12.x stations)
+            if chosen is not None and controller is None and name.lower() == chosen["name"].lower() and net == chosen["net"]:
+                fixed = controller_name(name, row, cards[:card - 1])
+                if fixed != name:
+                    findings.append(_f("sycon_controller_name_repeated", "WARN", "card %d's controller repeats card %s's "
+                                       "name %r - named %r after its slot tag %r" % (card, ", ".join(
+                                           str(c["card"]) for c in cards[:card - 1] if c["name"].lower() == name.lower()),
+                                           name, fixed, str(row.get("slot") or "").strip()), where))
+                    name = fixed
                 controller, controller_net = name, net
             else:
                 other = next((c for c in cards if net is not None and c["net"] == net), None)

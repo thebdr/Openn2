@@ -78,7 +78,7 @@ def test_the_shipped_database_reads_as_the_user_set_it():
     for model, item in (("6GK5208-0BA00-2AC2", "SCALANCE XC208 V4.3"), ("6GK5206-2BS00-2AC2", "SCALANCE XC206-2 SFP V4.3"),
                         ("6GK5216-4BS00-2AC2", "SCALANCE XC216-4C V4.3")):
         eq(db[model]["catalog_item"], item, "the catalog's V4.3 entry (user 2026-10-26)")
-        eq(db[model]["gsdml"], "GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml")
+        eq(db[model]["gsdml"], "GSDML-V2.45-Siemens-002A-SCALANCE_XC200-20260302.xml")   # the 2021 file out of the catalog (user 2026-10-28)
     ok(not [m for m, rec in db.items() if "V4.4" in rec["catalog_item"]], "no catalog item names V4.4 any more")
 
 

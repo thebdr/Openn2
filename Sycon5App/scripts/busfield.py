@@ -1,5 +1,7 @@
 """`IODriver\\BusField.csv` of a production folder (user 2026-10-24, the FVZ reference
-`PRODUCTION\\IODriver\\BusField.csv`): one row per PROFINET node of every cifX card. Board Number = the card,
+`PRODUCTION\\IODriver\\BusField.csv`): one row per PROFINET node of every cifX card - an I/O List with several
+cards gives ONE file, the cards' rows one after the other, only the Board Number telling them apart (user
+2026-10-27: 1 for card 1, 2 for card 2 and so on; `tests/test_refute_c044.py` pins it). Board Number = the card,
 Physical Node Address = the IP's last octet, Node Type = 0x<VendorID><DeviceID> of the device's GSDML identity as
 the saved project records it (`fdt:manufacturerId` / `fdt:deviceTypeId` - the ET200SP's 42 / 787 = 0x002A0313,
 the cifX master's 286 / 515 = 0x011E0203), the description `[station] DESCRIPTION (MANUFACTURER) FLD (ip)`.

@@ -54,9 +54,36 @@ same_text = Session.same_text
 def order_is_pattern(order):
     """A GSDML DAP whose OrderNumber is not a literal: a wildcard pattern (`13xx.xx7x.xxxx.x`, the LTi ServoOne
     Junior) or a placeholder token (`T_ID_DAP_DESCRIPTION`, the Anybus Communicator) - 2026-10-24, the sorter's
-    27 false FAILs; the type and the DAP are still compared, the order number noted."""
+    27 false FAILs; `TOK_DAP_DESCRIPTION_CU4`, the NORD SK CU4-ETH - 2026-10-27); the type and the DAP are still
+    compared, the order number noted."""
     o = str(order or "").strip()
-    return o.startswith("T_ID_") or "x" in o
+    return o.startswith("T_ID_") or o.upper().startswith("TOK_") or "x" in o
+
+
+def index_ranges(values):
+    """[1, 2, 6, 7, 8] -> '1-2, 6-8'."""
+    out, run = [], []
+    for x in sorted(values):
+        if run and x == run[-1] + 1:
+            run.append(x)
+            continue
+        if run:
+            out.append("%d-%d" % (run[0], run[-1]) if len(run) > 1 else str(run[0]))
+        run = [x]
+    if run:
+        out.append("%d-%d" % (run[0], run[-1]) if len(run) > 1 else str(run[0]))
+    return ", ".join(out)
+
+
+def order_matches(order, model_id, dap=""):
+    """The DAP's order number against the I/O List's Part No.: equal once spaces are dropped, or the Part No. is the
+    order number behind a vendor prefix (Interroll's `S-1101834` for the GSDML's `1101834` - 2026-10-27), or the
+    Part No. is the DAP's own name (Balluff's `BNI PG3-508-0C5-R015`, order `BNI00K4` - IO0030, 2026-10-27)."""
+    o, m = str(order or "").replace(" ", "").upper(), str(model_id or "").replace(" ", "").upper()
+    if o == m or (m and m == str(dap or "").replace(" ", "").upper()):
+        return True
+    prefix, _sep, rest = m.partition("-")
+    return bool(o) and rest == o and prefix.isalpha()
 
 
 def verify(handoff, project, plugged, timing_set=None, skipped=None, keep_extras=False):
@@ -72,6 +99,11 @@ def verify(handoff, project, plugged, timing_set=None, skipped=None, keep_extras
     v.check(ctrl is not None, "controller present: %s" % (ctrl.device_no if ctrl else None))
     twice = sorted({d.device_no.lower() for d in project.devices if [x.device_no.lower() for x in project.devices].count(d.device_no.lower()) > 1})
     v.check(not twice, "no station name twice in the project (twice: %r)" % twice)   # C-047 refute round 1
+    if ctrl is not None and ctrl.indices:   # the Device Table's indices 1..N, no gap (user 2026-10-28)
+        got = sorted(ctrl.indices.values())
+        holes = sorted(set(range(1, len(got) + 1)) - set(got))
+        v.check(got == list(range(1, len(got) + 1)), "Device Table indices 1..%d consecutive (read %s%s)" % (
+            len(got), index_ranges(got), "; missing %s" % index_ranges(holes) if holes else ""))
     if ctrl is not None:              # the controller's own name of station and address (user 2026-10-26)
         want_name, want_ip = handoff.controller["station_name"], handoff.controller.get("ip_address", "")
         if skipped is not None and not controller_is_unnamed(ctrl.name) and ctrl.name.lower() != want_name.lower():
@@ -115,10 +147,13 @@ def verify(handoff, project, plugged, timing_set=None, skipped=None, keep_extras
         if variant:
             v.check(same_text(d.dap, variant), "station %s DAP %s (read %r)" % (name, variant, d.dap))
         if d.order_no and s.get("model_id"):          # the DAP's order number = the I/O List's Part No.
-            if order_is_pattern(d.order_no):
+            if s["model_id"].strip().upper() == str(s.get("comment") or "").strip().upper():
+                v.note("station %s is keyed by its manufacturer %s (no Part No. in the I/O List): the GSDML's order "
+                       "number %r - not compared" % (name, s["model_id"], d.order_no))
+            elif order_is_pattern(d.order_no):
                 v.note("station %s model %s: the GSDML's order number is the pattern %r - not compared" % (name, s["model_id"], d.order_no))
             else:
-                v.check(d.order_no.replace(" ", "").upper() == s["model_id"].replace(" ", "").upper(),
+                v.check(order_matches(d.order_no, s["model_id"], d.dap),
                         "station %s model %s (the saved DAP %r is order %s)" % (name, s["model_id"], d.dap, d.order_no))
         rows = handoff.plug_rows(s["station_name"])
         if rows:
@@ -427,6 +462,15 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None, update=
         station = s["station_name"]
         if apply_station(d, h, station, saved_now.get(station.lower()), plugged):
             checkpoint()
+    # the Device Table's indices 1..N with no gap (user 2026-10-28: a station deleted by hand, or an update's adds,
+    # leave holes - 1, 2, 6, 7 ...), before the addressing and the exports read them
+    # a rewritten Index resets that device's symbolic name to its catalog default (2026-10-28: 94 of card 1's
+    # `nnn_...` labels became `AL1202`, `SK_CU4-ETH` ...) - the names saved before are written back below
+    kept_symbolics = {dev.device_no: dev.symbolic for dev in read_project(xml).devices
+                      if not dev.is_controller and dev.symbolic} if os.path.exists(xml) else {}
+    renumbered = d.renumber_devices()
+    if renumbered:
+        checkpoint()
     # 4. the controller's Auto addressing and the two exports beside the project, as the user does them (recorded
     # 2026-10-24 19:11): HilscherIO.xml (the process data, the IO driver's input) in the project's folder and
     # nWid\config.nxd (the configuration database) - the production folder's layout
@@ -441,6 +485,9 @@ def build(handoff_dir, out_spj, base_project, resume=False, driver=None, update=
     time.sleep(2.0)
     # the canvas (symbolic names, positions) is written into the XML with the project CLOSED, then read back
     log("close:", d.close())
+    if renumbered and kept_symbolics:
+        n_sym, _n = canvas.apply(xml, kept_symbolics, {}, controller_rect=None)
+        log("canvas: %d symbolic names written back after the renumbering" % n_sym)
     canvas.apply_layout(xml, h, only={s["station_name"] for s in todo} if update else None)
     project = read_project(xml)
     v = verify(h, project, plugged, timing_set, skipped=done_names if update else None, keep_extras=update)

@@ -270,6 +270,25 @@ class SyconDriver:
             self.model[new] = self.model.pop(old, {"slots": {}})
         log("renamed and addressed %d stations" % len(mapping))
 
+    def renumber_devices(self):
+        """The controller's Device Table Index column made 1..N in table order (one dialog; Apply + OK when a row
+        changed). Returns [(position, old index)] of the rows rewritten."""
+        dlg = ControllerDialog(self.session, self.controller_station())
+        try:
+            changed = dlg.renumber()
+            if changed:
+                errs = dlg.apply()
+                if errs:
+                    raise SyconError("errors after Apply (device indices): %r" % errs)
+                dlg.ok()
+            else:
+                dlg.close(keep=False)
+        except SyconError:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            raise
+        return changed
+
     def set_auto_addressing(self, enabled=True):
         """The controller's Address Table: Auto addressing on (one dialog; Apply + OK when changed)."""
         dlg = ControllerDialog(self.session, self.controller_station())
@@ -415,7 +434,9 @@ class SyconDriver:
         """wanted: [(subslot, submodule text)] for the pluggable port submodules of the device itself (a SCALANCE
         XC216-4C's combo ports 32769-32772: `SFP 991-1 A` / `RJ45 1 GBit`). The DAP (row 1) expanded shows its
         submodule rows in subslot order - 1 (the device), 32768 (PN-IO), 32769.. (the ports) - so port n sits
-        on row 3 + n; each one's submodule is chosen through the in-place combo like a module's. Draft of
+        on row 3 + n; each one's submodule is chosen through the in-place combo like a module's. A port of the
+        GSDML's PhysicalSubslots (an XC206-2 SFP's 32775..32776) has no row until 'Add Submodule' on the DAP
+        appends it, in subslot order (IO0030, 2026-10-27: the grid stopped at port 6, row 9). Draft of
         2026-10-23 20:30, to be verified by scripts/probe_switch.py."""
         dlg = DeviceDialog(self.session, station)
         chosen = []
@@ -423,8 +444,15 @@ class SyconDriver:
             dlg.modules_page()
             dlg.collapse_all()
             dlg.ensure_expanded(1)
-            for subslot, text in wanted:
+            last = max(dlg.visible_rows() or [0])      # read once: an editor left open reads as one more row
+            for subslot, text in wanted:               # (IO0030 smoke: port 8 never added, port 7 chosen twice)
                 row = 3 + (subslot - 0x8000)
+                if row == last + 1:
+                    added = dlg.add_submodule(1)
+                    log("  port %d: no row - Add Submodule on the DAP -> row %d" % (subslot - 0x8000, added))
+                    if added != row:
+                        raise SyconError("port %d added on row %d, expected row %d" % (subslot - 0x8000, added, row))
+                    last = row
                 chosen.append(dlg.set_submodule(row, text))
             errs = dlg.apply()
             if errs:

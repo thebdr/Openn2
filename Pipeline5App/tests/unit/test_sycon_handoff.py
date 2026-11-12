@@ -103,6 +103,25 @@ def test_iolink_ports_from_the_connector_rows():
     assert len(warn) == 1 and "n0036-trib-sm007-K1" in warn[0].detail and "X01" in warn[0].detail
 
 
+def test_a_pqi_row_under_the_wrong_connector_goes_to_the_port_it_names():
+    """IO0030: every AL1202 files X06's PQI row under X05 - X05 read 2 in / 2 out and got no row (2026-10-27)."""
+    def pqi(conn, bit, port):
+        return dict(_port(conn, "", bit), desc_l1="DIAGNOSTIC OF PORT %s (PQI)" % port)
+    rows = [PORT_ROWS[0], _head("n0123-svr-K1", "192.168.1.123", "AL1202", "-K1", "123"),
+            _port("X05", "4", ""), _port("X05", "2", ""), pqi("X05", "I.123.6.7", "X05"),
+            _port("X06", "4", ""), pqi("X05", "I.123.7.7", "X06"),
+            _port("X05", "4", "", "-VE01"), _port("", "", "Q.123.4.0", "H1"), _port("", "", "Q.123.5.2", "P3"),
+            _port("X06", "4", "", "-VE02"), _port("", "", "Q.123.6.0", "H1"), _port("", "", "Q.123.7.2", "P3")]
+    _stations, modules, findings = sycon.build(rows, PORT_DTD)
+    got = {m["comment"].split()[0]: (m["module_text"], m["comment"]) for m in modules}
+    assert got["X05"] == ("IO-Link Out  2 Byte + PQI", "X05 [1 in, 2 out] -VE01 H1 P3")
+    assert got["X06"] == ("IO-Link Out  2 Byte + PQI", "X06 [1 in, 2 out] -VE02 H1 P3")
+    assert len(modules) == 8
+    assert not [f for f in findings if f.type == "sycon_port_footprint_unknown"]
+    warn = [f for f in findings if f.type == "sycon_pqi_connector_mismatch"]
+    assert len(warn) == 1 and "I.123.7.7" in warn[0].detail and "taken as port X06" in warn[0].detail
+
+
 def test_fast_stations_take_2_ms():
     rows = [
         _head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
@@ -152,6 +171,31 @@ def test_scalance_pnio_row():
     assert modules[0]["parameters"].startswith("2=Off | 4=Off | record:3=00 03 00 06") and "record:12312=30 1C" in modules[0]["parameters"]
     assert [(m["slot"], m["subslot"], m["module_id"], m["module_text"]) for m in modules[1:]] == [
         ("0", str(32768 + n), "6GK5991-1AD00-8GA0", "SFP 991-1 A") for n in (1, 2, 3, 4)]
+
+
+def test_a_qualified_model_row_takes_the_heads_with_its_variable_description():
+    dtd = dict(DTD)
+    dtd["6ES7158-3AD10-0XA0"] = {"model_id": "6ES7158-3AD10-0XA0", "role": "slave", "catalog_item": "PN/PN Coupler X1",
+                                 "modules": "default", "gsdml": "GSDML-STD.xml", "comment": ""}
+    dtd[sycon.dtd_key("6ES7158-3AD10-0XA0 [Telescopic -  chutes]")] = {
+        "model_id": "6ES7158-3AD10-0XA0", "role": "slave", "catalog_item": "CaljanTelescopicFVT",
+        "modules": "default", "gsdml": "GSDML-CALJAN.xml", "comment": ""}
+    rows = [_head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+            dict(_head("n0006-tric-aec01-K24501", "192.168.1.6", "6ES7158-3AD10-0XA0", "-K24501", "6"), desc_l1b="CHUTES / SORTER LOWER"),
+            dict(_head("n0078-svr143-enc01-aec1-K11", "192.168.1.78", "6ES7158-3AD10-0XA0", "-K11", "78"), desc_l1b="TELESCOPIC - CHUTES")]
+    stations, _m, _f = sycon.build(rows, dtd)
+    assert [(s["catalog_item"], s["gsdml"], s["model_id"]) for s in stations[1:]] == [
+        ("PN/PN Coupler X1", "GSDML-STD.xml", "6ES7158-3AD10-0XA0"),
+        ("CaljanTelescopicFVT", "GSDML-CALJAN.xml", "6ES7158-3AD10-0XA0")]
+
+
+def test_load_dtd_reads_a_qualified_model_id(tmp_path):
+    p = tmp_path / "db.csv"
+    p.write_text("# header\nX-1 [TELESCOPIC - CHUTES],slave,Caljan,default,G.xml,c,default,\nX-1,slave,Std,default,S.xml,c,default,\n",
+                 encoding="utf-8")
+    dtd = sycon.load_dtd(str(p))
+    assert dtd["X-1 [TELESCOPIC - CHUTES]"]["catalog_item"] == "Caljan" and dtd["X-1"]["catalog_item"] == "Std"
+    assert dtd["X-1 [TELESCOPIC - CHUTES]"]["model_id"] == "X-1"
 
 
 def test_scalance_pnio_row_v43_has_no_media_redundancy_record():
@@ -237,6 +281,22 @@ def test_two_cards_two_folders():
         assert kinds == ["sycon_other_network", "sycon_other_network", "sycon_second_controller", "sycon_second_controller"]
         one = sycon.project(rows, os.path.join(d, "ONE"), dtd, card=2)
         assert [c["card"] for c in one["cards"]] == [2] and one["controller"] == "n0001-trib-aec01-K22102.2"
+
+
+def test_a_second_card_repeating_the_first_cards_name_keeps_its_own_ip():
+    """IO0030: card 2's controller head repeats card 1's name - card 2 must still take ITS head (192.168.12.1)."""
+    rows = [_head("n0001-tric-aec01-K22101.1", "192.168.11.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+            _head("n0011-a", "192.168.11.11", "6ES7155-6AU01-0BN0", "-K1", "11"),
+            _head("n0001-tric-aec01-K22101.1", "192.168.12.1", "CIFX 80-RE/ML", "-K22101.2", "1"),
+            _head("n0012-b", "192.168.12.12", "6ES7155-6AU01-0BN0", "-K2", "12")]
+    stations, _modules, findings = sycon.build(rows, DTD, card=2)
+    # its name follows its slot tag (user 2026-10-27: n0001-tric-aec01-K22101.2)
+    assert [(s["station_name"], s["ip_address"]) for s in stations] == [
+        ("n0001-tric-aec01-K22101.2", "192.168.12.1"), ("n0012-b", "192.168.12.12")]
+    assert [f.severity for f in findings if f.type == "sycon_controller_name_repeated"] == ["WARN"]
+    first, _m, findings1 = sycon.build(rows, DTD, card=1)          # card 1 keeps its name
+    assert first[0]["station_name"] == "n0001-tric-aec01-K22101.1"
+    assert not [f for f in findings1 if f.type == "sycon_controller_name_repeated"]
 
 
 def test_fixed_modules_symbolic_rules_and_the_manufacturer_key():
@@ -340,6 +400,22 @@ def test_coupler_modules_mirrored_by_connector():
         ("n0007-trib-aec01-K24502", "1", "*IN 128 Byte"), ("n0007-trib-aec01-K24502", "2", "*OUT 128 Byte")]
     assert [(f.type, f.severity) for f in findings] == [("sycon_connector_unknown", "WARN")]
     assert "n0008-trib-aec01-K24503" in findings[0].detail and len(stations) == 4
+
+
+def test_coupler_dap_parameters_by_connector():
+    """2026-10-28: the coupler's DAP record 1 reads 00 0C 00 02 .. on X2 and 00 0C 00 01 .. on X1 - the DAP Parameters
+    cell takes the `X2: ...; X1: ...` form, the head's Connector picks."""
+    dtd = dict(DTD, **{"6ES7158-3AD10-0XA0": {"model_id": "6ES7158-3AD10-0XA0", "role": "slave", "catalog_item": "PN/PN Coupler X2",
+                                               "modules": "default", "gsdml": "", "comment": "", "symbolic": "default",
+                                               "dap_parameters": "X2: 4=0 | record:1=00 0C 00 02 00 00; X1: 4=0 | record:1=00 0C 00 01 00 00"}})
+    rows = [_head("n0001-trib-aec01-K22101.1", "192.168.1.1", "CIFX 80-RE/ML", "-K22101.1", "1"),
+            dict(_head("n0006-a", "192.168.1.6", "6ES7158-3AD10-0XA0", "-K1", "6"), connector="X2"),
+            dict(_head("n0007-b", "192.168.1.7", "6ES7158-3AD10-0XA0", "-K2", "7"), connector="X1"),
+            dict(_head("n0008-c", "192.168.1.8", "6ES7158-3AD10-0XA0", "-K3", "8"), connector="")]
+    _stations, modules, findings = sycon.build(rows, dtd)
+    assert [(m["station_name"], m["slot"], m["subslot"], m["parameters"]) for m in modules] == [
+        ("n0006-a", "0", "1", "4=0 | record:1=00 0C 00 02 00 00"), ("n0007-b", "0", "1", "4=0 | record:1=00 0C 00 01 00 00")]
+    assert [(f.type, f.severity) for f in findings] == [("sycon_connector_unknown", "WARN")]
 
 
 def test_unknown_modules_policy_is_refused():

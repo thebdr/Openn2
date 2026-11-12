@@ -7,7 +7,7 @@ import time
 
 from pywinauto import mouse
 
-from .drawing import drawing_pane, locate_lines, master_points, slave_points
+from .drawing import bus_line, drawing_pane, locate_lines, master_points, scroll_home, slave_points
 from .session import Session, SyconError, log, pid_at_point
 
 FIELDBUS = "PROFINET IO"
@@ -158,9 +158,16 @@ def add_device(session: Session, kind, item_name, gsdml=None):
             raise SyconError("the grey root line was not found in the drawing")
         points = master_points(grey_dy)
     else:
-        if green is None:
+        # a laid-out project (an update): the drawing scrolled home and its vertical bus tried first - its most
+        # frequent green is a device's branch, where a drop attaches nothing (IO0030 card 1, 2026-10-28)
+        scroll_home(session.main())
+        bus = bus_line(session.main())
+        r, grey_dy, green = locate_lines(session.main())
+        if green is None and bus is None:
             raise SyconError("no green controller line in the drawing (add the controller first)")
-        points = slave_points(green)
+        points = (slave_points(bus) if bus else []) + (slave_points(green) if green else [])
+        if bus:
+            log("bus: %r" % (bus,))
     for dx, dy in points:
         label = drop(session, item, dx, dy)
         if label:

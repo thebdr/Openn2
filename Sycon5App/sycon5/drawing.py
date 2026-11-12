@@ -84,6 +84,38 @@ def locate_lines(main, step=2):
     return r, grey_dy, green
 
 
+BUS_MIN_PX = 300
+
+
+def scroll_home(main):
+    """The drawing scrolled to its top-left corner (a saved project reopens scrolled: the IO0030 card 1 update of
+    2026-10-28 found its vertical bus off the pane's left edge)."""
+    import time
+    import win32api
+    h = drawing_pane(main).handle
+    win32api.SendMessage(h, win32con.WM_HSCROLL, win32con.SB_LEFT, 0)
+    win32api.SendMessage(h, win32con.WM_VSCROLL, win32con.SB_TOP, 0)
+    time.sleep(1.0)
+
+
+def bus_line(main, step=2):
+    """The controller's vertical bus of a laid-out project: the longest green pixel column, ('v', dx, y0, y1), or
+    None when no green column runs BUS_MIN_PX - in a full drawing the most frequent green is a device's branch
+    (y=454 of the IO0030 card 1 update: six drops on it, no node), not the bus."""
+    r = drawing_pane(main).rectangle()
+    cols, rows, count, _grey = colour_lines(r, step)
+    best = None
+    for key, n in count.most_common(10):
+        R, G, B = key
+        if not (G > R + 40 and G > B and n > 50):
+            continue
+        dx, hits = cols[key].most_common(1)[0]
+        if hits * step >= BUS_MIN_PX and (best is None or hits > best[0]):
+            ys = sorted(rows[key])
+            best = (hits, ("v", dx, ys[0], ys[-1]))
+    return best[1] if best else None
+
+
 def master_points(grey_dy):
     """Candidate drop points (pane-relative) on the root line for a Master."""
     return [(400, grey_dy), (300, grey_dy), (500, grey_dy), (400, grey_dy - 1), (400, grey_dy + 1)]

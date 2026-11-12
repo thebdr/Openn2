@@ -22,6 +22,7 @@ TIMING_NAME_COMBO_ID, TIMING_UPDATE_COMBO_ID, TIMING_WATCHDOG_EDIT_ID = 220, 223
 ROW_Y0, ROW_H = 27, 16               # the custom grids: an 18 px header, 16 px rows - row n (0-based) centre at ROW_Y0 + ROW_H * n (measured 2026-10-23)
 NAME_X, COMMIT_X, IP_X, IP_COMMIT_X = 200, 400, 260, 500
 NAME_EDIT_ID = 1902
+INDEX_X, INDEX_EDIT_ID = 91, 1901    # the Device Table's Index column (the grid's 2nd) and its in-place editor
 
 
 def _ip_key(ip):
@@ -430,6 +431,84 @@ class ControllerDialog(ConfigDialog):
                     log("  scroll resync: row %d (%s) sits %+d rows from where the measured shift put it" % (known_abs, known_value, k))
                 return scrolled - k * ROW_H
         raise SyconError("scroll lost: row %d (%s) not found within 8 rows of its place" % (known_abs, known_value))
+
+    def renumber(self):
+        """The Device Table's Index column made 1, 2, 3 ... in table order (user 2026-10-28: "the indices must be
+        consecutive and start from 1" - a station deleted by hand left 1, 2, 6, 7 ...). The table is sorted by
+        Index, so a row given its position keeps its place; a visited row's Index is its position, the key the
+        scroll is resynced on. The cell opens a plain Edit (1901) like the name cell (probe of 2026-10-28).
+        Returns [(position, old index)] of the rows rewritten."""
+        self.select_page(DEVICE_TABLE_PAGE)
+        r = self._grid(DEVICE_TABLE_ID)
+        visible = self._rows_visible(r)
+        visited, changed = set(), []
+        scrolled, px_per_notch = 0, None
+
+        def sweep(at_end):
+            first_abs = -(-scrolled // ROW_H)
+            page_rows = 0
+            for k in range(visible + 2):
+                abs_row = first_abs + k
+                y = ROW_Y0 + ROW_H * abs_row - scrolled
+                if y < ROW_Y0 - 4 or y > r.height() - (3 if at_end else 10) or abs_row in visited:
+                    continue
+                y = min(y, r.height() - 4)
+                ed = self._index_editor(r, y)
+                if ed is None:
+                    return -1                                   # below the last row: no editor
+                old, want = ed.window_text().strip(), str(abs_row + 1)
+                visited.add(abs_row)
+                page_rows += 1
+                if old != want:
+                    ed.select()
+                    time.sleep(0.2)
+                    keyboard.send_keys(want)
+                    time.sleep(0.3)
+                    mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + y))
+                    time.sleep(0.7)
+                    errs = self.session.dismiss_errors()
+                    if errs:
+                        raise SyconError("row %d: Index %s -> %s refused: %r" % (abs_row, old, want, errs))
+                    value = self._read_index_at(r, y)
+                    if value != want:
+                        raise SyconError("row %d: Index reads %r after writing %s" % (abs_row, value, want))
+                    changed.append((abs_row + 1, old))
+                    log("  row %d: Index %s -> %s" % (abs_row, old, want))
+                else:
+                    mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + y))
+                    time.sleep(0.4)
+            return page_rows
+
+        while True:
+            if sweep(False) < 0:
+                break
+            notches = 3 if px_per_notch is None else max(1, int((visible // 2) * ROW_H / px_per_notch))
+            shift = self._scroll(r, notches)
+            if shift <= 0:
+                sweep(True)
+                break
+            if px_per_notch is None:
+                px_per_notch = shift / notches
+            scrolled += shift
+            last = max(visited)
+            scrolled = self._resync(r, scrolled, last, str(last + 1), self._read_index_at)
+        mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + ROW_Y0))
+        time.sleep(0.4)
+        log("  Device Table: %d rows, %d indices rewritten" % (len(visited), len(changed)))
+        return changed
+
+    def _index_editor(self, r, y):
+        mouse.click(coords=(r.left + self.cx(INDEX_X), r.top + y))
+        time.sleep(0.7)
+        eds = self.controls(("Edit",), cid=INDEX_EDIT_ID)
+        return eds[0] if eds else None
+
+    def _read_index_at(self, r, y):
+        ed = self._index_editor(r, y)
+        value = ed.window_text().strip() if ed is not None else ""
+        mouse.click(coords=(r.left + self.cx(COMMIT_X), r.top + y))
+        time.sleep(0.4)
+        return value
 
     def _read_name_at(self, r, y):
         mouse.click(coords=(r.left + self.cx(NAME_X), r.top + y))
