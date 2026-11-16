@@ -136,6 +136,11 @@ PORT_SUBMODULES = {
     (33, 0): "IO-Link In 32 Byte + PQI",
     (33, 32): "IO-Link In/Out 32/32 Byte + PQI",
 }
+# A chute stack light (device -VE01 / -VE02) takes 8 output bytes + PQI whatever bytes its lamps' addresses span
+# (user 2026-11-16, IO0030 R0.2: "in tutte le IFM che hanno una lampada connessa con descrizione VE01 o VE02 ...
+# un modulo da 8byte output + PQI"; the list's cover: "Chute stack lights (VE01/VE02): 8 byte output + PQI")
+STACK_LIGHT_DEVICES = ("-VE01", "-VE02")
+STACK_LIGHT_SUBMODULE = "IO-Link Out  8 Byte + PQI"
 PORT_RE = re.compile(r"^X(\d{1,2})$", re.I)
 BIT_RE = re.compile(r"^([IQ])\.(\d+)\.(\d+)\.(\d+)$", re.I)
 
@@ -609,6 +614,8 @@ def build(rows, dtd: dict, update_time_ms=DEFAULT_UPDATE_TIME_MS, card: int = 1)
                 text = port_submodule(size_in, size_out, do)
                 devices = sorted({str(r.get("device") or r.get("location") or "").strip() for r in prow
                                   if str(r.get("device") or r.get("location") or "").strip()})
+                if any(d.upper() in STACK_LIGHT_DEVICES for d in devices) and size_in <= 1 and size_out and not do:
+                    text = STACK_LIGHT_SUBMODULE
                 if not text:
                     findings.append(_f("sycon_port_footprint_unknown", "WARN", "station %r port %s: %d input, %d output "
                                        "bytes%s fit no port submodule - no row" % (cur["name"], port, size_in, size_out,

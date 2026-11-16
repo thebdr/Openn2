@@ -1,0 +1,5 @@
+uid,name,number,parent,part,order,description,sorter
+57ab007329,AREA 1,1,,,1,AREA 1 (Sorter),yes
+86c3cc4daf,AREA 2,2,,,2,Area 2 (Conveyors North),
+c8978693c8,AREA 3,3,,,3,Area 3 (Conveyors East),
+868be4b323,AREA 4,4,,,4,Area 4 (Conveyors West),

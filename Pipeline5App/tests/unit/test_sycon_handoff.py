@@ -114,8 +114,8 @@ def test_a_pqi_row_under_the_wrong_connector_goes_to_the_port_it_names():
             _port("X06", "4", "", "-VE02"), _port("", "", "Q.123.6.0", "H1"), _port("", "", "Q.123.7.2", "P3")]
     _stations, modules, findings = sycon.build(rows, PORT_DTD)
     got = {m["comment"].split()[0]: (m["module_text"], m["comment"]) for m in modules}
-    assert got["X05"] == ("IO-Link Out  2 Byte + PQI", "X05 [1 in, 2 out] -VE01 H1 P3")
-    assert got["X06"] == ("IO-Link Out  2 Byte + PQI", "X06 [1 in, 2 out] -VE02 H1 P3")
+    assert got["X05"] == ("IO-Link Out  8 Byte + PQI", "X05 [1 in, 2 out] -VE01 H1 P3")
+    assert got["X06"] == ("IO-Link Out  8 Byte + PQI", "X06 [1 in, 2 out] -VE02 H1 P3")
     assert len(modules) == 8
     assert not [f for f in findings if f.type == "sycon_port_footprint_unknown"]
     warn = [f for f in findings if f.type == "sycon_pqi_connector_mismatch"]
