@@ -270,6 +270,25 @@ class SyconDriver:
             self.model[new] = self.model.pop(old, {"slots": {}})
         log("renamed and addressed %d stations" % len(mapping))
 
+    def renumber_devices(self):
+        """The controller's Device Table Index column made 1..N in table order (one dialog; Apply + OK when a row
+        changed). Returns [(position, old index)] of the rows rewritten."""
+        dlg = ControllerDialog(self.session, self.controller_station())
+        try:
+            changed = dlg.renumber()
+            if changed:
+                errs = dlg.apply()
+                if errs:
+                    raise SyconError("errors after Apply (device indices): %r" % errs)
+                dlg.ok()
+            else:
+                dlg.close(keep=False)
+        except SyconError:
+            if dlg.is_open():
+                dlg.close(keep=False)
+            raise
+        return changed
+
     def set_auto_addressing(self, enabled=True):
         """The controller's Address Table: Auto addressing on (one dialog; Apply + OK when changed)."""
         dlg = ControllerDialog(self.session, self.controller_station())
@@ -311,17 +330,40 @@ class SyconDriver:
         log("stations timing set: %r" % shown)
         return shown
 
-    def plug_modules(self, station, specs):
-        """Append modules in order in ONE dialog; a spec is a combo text or 'order:<order number>'. Returns the
-        texts chosen."""
+    def plug_modules(self, station, specs, slots=None):
+        """The modules of `slots` (default 1..n) in ONE dialog; a spec is a combo text or 'order:<order number>'. A
+        slot the device already holds - a GSDML's UsedInSlots / FixedInSlots modules a catalog drop pre-plugs (the
+        SEW MFE: `Slot not used` in 1..4 + `MOVIMOT 3PD` in 5; IO0023, 2026-11-12) - is re-typed in place through
+        its row's combo (left alone when it already shows the text); the slots after them are appended. Returns
+        the texts chosen."""
+        slots = list(slots) if slots is not None else list(range(1, len(specs) + 1))
         dlg = DeviceDialog(self.session, station)
         chosen = []
         try:
             dlg.modules_page()
-            for spec in specs:
-                row = dlg.add_module()
-                text = dlg.resolve_module(row, spec)
-                dlg.set_module(row, text)
+            present = dlg.slots_used() - 1           # the DAP counts: the modules held fill slots 1..present
+            if present > 0:
+                dlg.collapse_all()
+                log("  %s holds %d module(s) already: those slots re-typed in place" % (station, present))
+            for slot, spec in zip(slots, specs):
+                if slot <= present:
+                    row = 1 + slot
+                    dlg.collapse_all()                # a re-typed row may come expanded: slot n on row 1 + n only when none is
+                else:
+                    row = dlg.add_module()
+                    if row != 1 + slot:
+                        log("  WARN slot %d wanted, Add Module gave row %d (slots held %d)" % (slot, row, present))
+                try:
+                    text = dlg.resolve_module(row, spec)
+                    dlg.set_module(row, text)
+                except SyconError as ex:
+                    if slot > present or "no module combo" not in str(ex):
+                        raise
+                    # a module the GSDML fixes in its slot (FixedInSlots - the SEW MFE's slot 1) opens no editor:
+                    # it stays as the drop plugged it; the read-back verifies it against the table
+                    log("  slot %d: no module combo (fixed by the GSDML) - kept as plugged" % slot)
+                    dlg.select_row(row)
+                    text = spec
                 chosen.append(text)
             errs = dlg.apply()
             for _round in range(2):
@@ -346,8 +388,8 @@ class SyconDriver:
                 dlg.close(keep=False)
             raise
         used = self.model.setdefault(station, {"slots": {}})["slots"]
-        for text in chosen:
-            used[max(used) + 1 if used else 1] = text
+        for slot, text in zip(slots, chosen):
+            used[slot] = text
         log("modules plugged on %s: %r" % (station, chosen))
         return chosen
 
@@ -415,7 +457,9 @@ class SyconDriver:
         """wanted: [(subslot, submodule text)] for the pluggable port submodules of the device itself (a SCALANCE
         XC216-4C's combo ports 32769-32772: `SFP 991-1 A` / `RJ45 1 GBit`). The DAP (row 1) expanded shows its
         submodule rows in subslot order - 1 (the device), 32768 (PN-IO), 32769.. (the ports) - so port n sits
-        on row 3 + n; each one's submodule is chosen through the in-place combo like a module's. Draft of
+        on row 3 + n; each one's submodule is chosen through the in-place combo like a module's. A port of the
+        GSDML's PhysicalSubslots (an XC206-2 SFP's 32775..32776) has no row until 'Add Submodule' on the DAP
+        appends it, in subslot order (IO0030, 2026-10-27: the grid stopped at port 6, row 9). Draft of
         2026-10-23 20:30, to be verified by scripts/probe_switch.py."""
         dlg = DeviceDialog(self.session, station)
         chosen = []
@@ -423,8 +467,15 @@ class SyconDriver:
             dlg.modules_page()
             dlg.collapse_all()
             dlg.ensure_expanded(1)
-            for subslot, text in wanted:
+            last = max(dlg.visible_rows() or [0])      # read once: an editor left open reads as one more row
+            for subslot, text in wanted:               # (IO0030 smoke: port 8 never added, port 7 chosen twice)
                 row = 3 + (subslot - 0x8000)
+                if row == last + 1:
+                    added = dlg.add_submodule(1)
+                    log("  port %d: no row - Add Submodule on the DAP -> row %d" % (subslot - 0x8000, added))
+                    if added != row:
+                        raise SyconError("port %d added on row %d, expected row %d" % (subslot - 0x8000, added, row))
+                    last = row
                 chosen.append(dlg.set_submodule(row, text))
             errs = dlg.apply()
             if errs:

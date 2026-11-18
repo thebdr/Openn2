@@ -206,3 +206,27 @@ def test_more_than_eight_stations_wrap_to_the_next_row():
     assert tops[:8] == [canvas.FIRST_ROW_TOP + i * canvas.DY for i in range(8)]
     assert tops[8] == canvas.FIRST_ROW_TOP + canvas.ROW_PITCH and tops[16] == canvas.FIRST_ROW_TOP + 2 * canvas.ROW_PITCH
     assert len(rects) == 20 and len({r[1] for r in rects.values()}) == 8
+
+
+def test_order_number_placeholders_and_vendor_prefixes():
+    """2026-10-27, IO0030: the NORD SK CU4-ETH's GSDML order number is a TOK_ placeholder (noted, not compared) and
+    the I/O List writes Interroll's 1101834 as S-1101834 (a letter prefix: a match); a truncated number is not."""
+    assert consumer.order_is_pattern("TOK_DAP_DESCRIPTION_CU4") and not consumer.order_is_pattern("6ES7 158-3AD10-0XA0")
+    assert consumer.order_matches("1101834", "S-1101834")
+    assert consumer.order_matches("6ES7 158-3AD10-0XA0", "6ES7158-3AD10-0XA0")
+    assert not consumer.order_matches("158-3AD10-0XA0", "6ES7158-3AD10-0XA0")
+    assert not consumer.order_matches("1101834", "9-1101834")
+    assert consumer.order_matches("BNI00K4", "BNIPG3-508-0C5-R015", "BNI PG3-508-0C5-R015")   # Balluff: the Part No. is the DAP name
+    assert not consumer.order_matches("BNI00K4", "BNIPG3-508-0C5-R015", "BNI PG3-508-0C5-Z015")
+
+
+def test_device_table_index_read_from_a_device_list_entry():
+    """The controller's device-list entry (PNIODeviceBasic) carries the Device Table Index as tag 7, a u32 (the IO0030
+    card 1 project read 1, 2, 6, 7 ... after three couplers were deleted by hand - user 2026-10-28)."""
+    from sycon5 import readback
+    head = bytes.fromhex("15 00 01 00 00 00 01 02 00 00 00 01 03 00 00 00 20 00 04 00 00 00 08 00 05 00 00 00 03 00 "
+                         "06 00 00 00 03 00")
+    assert readback._device_index(head + bytes.fromhex("07 00 00 00 06 00 00 00 08 00 00 00 01")) == 6
+    with pytest.raises(readback.ReadbackError):
+        readback._device_index(head[:20])
+    assert consumer.index_ranges([1, 2, 6, 7, 8, 10]) == "1-2, 6-8, 10"

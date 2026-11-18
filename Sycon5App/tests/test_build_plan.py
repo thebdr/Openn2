@@ -29,7 +29,7 @@ class _Driver:
     def __init__(self):
         self.calls = []
 
-    def plug_modules(self, node, specs):
+    def plug_modules(self, node, specs, slots=None):
         self.calls.append(("plug_modules", node, tuple(specs)))
         return [sp.replace("order:", "") for sp in specs]
 
@@ -117,3 +117,20 @@ if __name__ == "__main__":
     test_differing_structures_are_not_cloned_configured()
     test_dap_rows_against_their_record_oracle()
     print("ok")
+
+
+def test_preplugged_slots_of_another_module_are_replugged():
+    """A device whose drop pre-plugs its slots (the SEW MFE: `Slot not used` in 1..4, `MOVIMOT 3PD` in 5) holds every
+    slot the table names, but not every module: the modules are set (re-typed in place by the driver), slot by slot."""
+    rows = [_row("s", n, text=t) for n, t in ((1, "Slot not used"), (2, "Slot not used"), (3, "4/6 DI"), (4, "Slot not used"),
+                                              (5, "MOVIMOT 3PD"))]
+    h = _handoff([_station("s", "MFE2A/MF221D", "MFE V1.0")], rows)
+    dev = _Dev(slots={0: "MFE V1.0", 1: "Leermodul", 2: "Leermodul", 3: "Leermodul", 4: "Leermodul", 5: "MM 3PD"})
+    dev.slot_texts = {k: ["Slot not used", "Leermodul"] for k in (1, 2, 3, 4)}
+    dev.slot_texts[5] = ["MOVIMOT 3PD", "MM 3PD"]
+    d = _Driver()
+    assert consumer.apply_station(d, h, "s", dev, {}) is True
+    assert d.calls[0][0] == "plug_modules"
+    dev.slot_texts[3] = ["4/6 DI", "4 6 DI"]
+    d = _Driver()
+    assert consumer.apply_station(d, h, "s", dev, {}) is False

@@ -7,7 +7,7 @@ import time
 
 from pywinauto import mouse
 
-from .drawing import drawing_pane, locate_lines, master_points, slave_points
+from .drawing import drawing_pane, locate_lines, master_points, scroll_home, slave_points
 from .session import Session, SyconError, log, pid_at_point
 
 FIELDBUS = "PROFINET IO"
@@ -151,6 +151,10 @@ def add_device(session: Session, kind, item_name, gsdml=None):
     session.close_menus()
     session.bring_front()
     item = catalog_item(session, kind, item_name, gsdml)
+    if kind != "master":
+        # a laid-out project (an update): the drawing scrolled home, so its vertical bus is at the pane's left edge
+        # where pick_green looks for it (IO0030 card 1, 2026-10-28: scrolled away, the drops landed on a branch)
+        scroll_home(session.main())
     r, grey_dy, green, crossings = locate_lines(session.main())
     log("lines: grey root dy=%s green=%s" % (grey_dy, green))
     if kind == "master":

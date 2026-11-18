@@ -114,6 +114,17 @@ def locate_lines(main, step=2):
     return r, grey_dy, pick_green(cols, rows, count, step), crossing_rows(rows, count, step)
 
 
+def scroll_home(main):
+    """The drawing scrolled to its top-left corner (a saved project reopens scrolled: the IO0030 card 1 update of
+    2026-10-28 found its vertical bus off the pane's left edge)."""
+    import time
+    import win32api
+    h = drawing_pane(main).handle
+    win32api.SendMessage(h, win32con.WM_HSCROLL, win32con.SB_LEFT, 0)
+    win32api.SendMessage(h, win32con.WM_VSCROLL, win32con.SB_TOP, 0)
+    time.sleep(1.0)
+
+
 def master_points(grey_dy):
     """Candidate drop points (pane-relative) on the root line for a Master."""
     return [(400, grey_dy), (300, grey_dy), (500, grey_dy), (400, grey_dy - 1), (400, grey_dy + 1)]

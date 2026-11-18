@@ -36,10 +36,14 @@ class Device:
     dap: str = ""                                  # the DAP id text of slot 0 (`DAP V2.1 X2`, `DIM ST V4.2`, `DIM 1`)
     order_no: str = ""                             # the DAP's order number (`6ES7 158-3AD00-0XA0`, `AL1202`)
     slots: dict = field(default_factory=dict)      # slot -> module name
+    slot_texts: dict = field(default_factory=dict) # slot -> every text its module record carries (id, name, its
+                                                   # TextId - a SEW MFE saves `MOVIMOT 3PD`, `MM 3PD`, `MOVIMOT 3 ...`)
     submodules: dict = field(default_factory=dict) # (slot, subslot) -> submodule name (the DAP's 0x8000+ ones too)
     records: dict = field(default_factory=dict)    # (slot, subslot, index) -> bytes
     network: list = field(default_factory=list)    # controller only: [(name of station, ip)]
     timing: dict = field(default_factory=dict)     # controller only: name of station -> (update ms, watchdog ms)
+    indices: dict = field(default_factory=dict)    # controller only: device list entry -> its Device Table Index
+    list_names: dict = field(default_factory=dict) # controller only: device list entry -> its name of station
     manufacturer_id: int = 0                       # the GSDML DeviceIdentity VendorID (fdt:manufacturerId, decimal)
     device_type_id: int = 0                        # ... and DeviceID (fdt:deviceTypeId)
     rect: tuple = ()                               # the netDevice canvas box (top, left, bottom, right)
@@ -102,6 +106,19 @@ class ReadbackError(ValueError):
     a DTM blob cut in half read as a device without modules)."""
 
 
+DEVICE_INDEX_TAG = b"\x07\x00\x00\x00"
+DEVICE_INDEX_AT = 36                               # count u16 + tags 1-2 (4+1 bytes) + tags 3-6 (4+2 bytes)
+
+
+def _device_index(data):
+    """The Device Table Index of one controller device-list entry (its PNIODeviceBasic): tag 7, a u32 - read on the
+    IO0030 card 1 project, 2026-10-28 (1, 2, 6, 7 ... after three couplers deleted by hand, as the table showed)."""
+    at = DEVICE_INDEX_AT if data[DEVICE_INDEX_AT:DEVICE_INDEX_AT + 4] == DEVICE_INDEX_TAG else data.find(DEVICE_INDEX_TAG, 2)
+    if at < 0 or len(data) < at + 8:
+        raise ReadbackError("a device-list entry without its Index tag")
+    return int.from_bytes(data[at + 4:at + 8], "little")
+
+
 def _parse_blob(dev, hexdata):
     try:
         raw = bytes.fromhex(hexdata.strip())
@@ -128,6 +145,11 @@ def _parse_blob(dev, hexdata):
                 xmls = [s for s in strs if s.lower().endswith(".xml")]
                 if xmls and not dev.gsdml:
                     dev.gsdml = xmls[0]
+            elif re.search(r"/STLDeviceList/\d+/PNIODeviceBasic$", path):
+                dev.indices[int(path.split("/")[-2])] = _device_index(data)
+            elif re.search(r"/STLDeviceList/\d+/PNIODeviceDataModelBasic$", path):
+                strs = _strings(data)
+                dev.list_names[int(path.split("/")[-2])] = strs[0] if strs else ""
             elif path.endswith("CachedController/PNIOControllerDataModelBasic"):
                 # the controller's own name of station, IP and mask (`controller` until the name is set - user
                 # 2026-10-26: the export showed `<controller>`; the Network Settings page's edit sets it)
@@ -140,6 +162,7 @@ def _parse_blob(dev, hexdata):
                 slot = int(path.split("/")[1])
                 strs = _strings(data)
                 dev.slots[slot] = strs[1] if len(strs) > 1 else (strs[0] if strs else "")
+                dev.slot_texts[slot] = [x for x in strs if not GUID.match(x)]
                 if slot == 0 and strs:
                     dev.dap = strs[0]
                     tail = [s for s in strs[1:] if not GUID.match(s)]

@@ -294,11 +294,12 @@ class DeviceDialog(ConfigDialog):
         visual row of the new submodule (the last row of the grid, scrolled into view)."""
         before = self.data_length()
         self.scroll_to_end(up=True)       # the module row at its unscrolled place
+        rows_before = len(self.visible_rows())
         self.select_row(module_row)
         for attempt in range(3):          # a first press only closes an open in-place editor
             self.press("Add Submodule", settle=1.2)
-            if self.data_length() != before:
-                break
+            if self.data_length() != before or len(self.visible_rows()) > rows_before:
+                break                     # a port submodule carries no data: the new row is its proof
             log("  Add Submodule: data length unchanged (attempt %d)" % (attempt + 1))
         else:
             raise SyconError("Add Submodule added nothing (data length %r)" % before)

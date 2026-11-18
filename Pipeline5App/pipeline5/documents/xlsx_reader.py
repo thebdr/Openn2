@@ -86,7 +86,13 @@ class SheetView:
 
     @property
     def max_col(self) -> int:
-        return self.ws.max_column
+        """The last column that holds a value: a sheet formatted out to XFD (IO0030 R0.2, 2026-10-28: A1:XFD1742)
+        reads as wide as its data - by `max_column` every row's strike check walked 16384 cells, 28 M a sheet."""
+        if getattr(self, "_max_col", None) is None:
+            cells = getattr(self.ws, "_cells", None)
+            used = [c for (_r, c), cell in cells.items() if cell.value is not None] if cells is not None else []
+            self._max_col = max(used) if used else self.ws.max_column
+        return self._max_col
 
     # --- values ---------------------------------------------------------------------------------- #
     def cell(self, row: int, column):

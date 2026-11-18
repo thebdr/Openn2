@@ -15,6 +15,7 @@ __pycache__/
 # Generated / regenerable output (not version-controlled)
 Pipeline2App/Output/
 Shared/OutputTree/
+Shared/Database/
 
 # Phase-200 fill backups (timestamped copies made beside the source I/O List)
 *.bak_*.xlsx
