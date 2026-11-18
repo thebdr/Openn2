@@ -4,9 +4,9 @@
   "use strict";
   SD.view("notes", { label: "Notes", icon: "note", order: 75, nav: true, render: function (ctx) {
     var notes = ctx.notes, model = ctx.model, node = SD.el("div"), host = SD.el("div"), count = SD.el("span", { cls: "muted" });
-    var save = SD.el("button", { cls: "btn", type: "button", text: "Download webui_notes.csv",
+    var save = SD.btn({ text: "Download webui_notes.csv",
       on: { click: function () { SD.download("webui_notes.csv", notes.csv(), "text/csv"); } } });
-    var discard = SD.el("button", { cls: "btn", type: "button", text: "Discard this browser's edits", on: { click: function () {
+    var discard = SD.btn({ text: "Discard this browser's edits", on: { click: function () {
       if (window.confirm("Discard the notes edited in this browser? The project's notes stay.")) { notes.discard(); draw(); }
     } } });
     SD.add(node, [SD.el("div", { cls: "head" }, [SD.el("h2", { text: "Notes" }), count]),

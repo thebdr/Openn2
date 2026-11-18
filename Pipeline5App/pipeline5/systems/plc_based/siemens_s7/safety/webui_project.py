@@ -7,7 +7,8 @@ project) + the project's `plant.json` (+ the plant drawing when the project has 
   file is copied as it is (`*.md` notes excepted). No build tool, no CDN: what the template holds is what the CPU
   serves.
 - **The project's data.** `plant.json` = `webui_model.build_plant` over the Database and the webui config
-  (device_kinds.csv, member_states.csv, webui_params.yaml, the positions file); the drawing (`layout.drawing`, an
+  (device_kinds.csv, member_states.csv, program_members.csv, webui_params.yaml, the positions and notes files);
+  the drawing (`layout.drawing`, an
   optional .svg / .png / .jpg in the config tiers) ships as `plant.<ext>` with its size measured here (SVG
   viewBox / width / height, the PNG IHDR, the JPEG SOF - stdlib only).
 - **The folder.** `webapp_folder.write_web_app` writes the resources byte for byte and the headered manifest; it
@@ -36,6 +37,7 @@ APP_JS, APP_CSS = "app.js", "app.css"
 _SVG_ROOT = re.compile(rb"<svg\b[^>]*>", re.S)
 _ATTR = r'\b{}\s*=\s*["\']([^"\']*)["\']'
 _CSS_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+_JS_TRAILING_COMMENT = re.compile(r"\s+// .*$")
 
 
 def _f(type: str, severity: str, detail: str, location: str = "") -> Finding:
@@ -44,10 +46,11 @@ def _f(type: str, severity: str, detail: str, location: str = "") -> Finding:
 
 # --- the fixed app ------------------------------------------------------------------------------------------ #
 def _lean_js(text: str) -> str:
-    """A js/ file as app.js carries it: every line's indentation and every blank or comment-only (`//`) line
-    dropped - the CPU serves less (the page's budget), the template stays the readable source. Safe for the
-    template's style: no template literal, no string or block comment spanning lines (the bundle test checks)."""
-    lines = (line.strip() for line in text.splitlines())
+    """A js/ file as app.js carries it: every line's indentation, every blank or comment-only (`//`) line and
+    every ` // ` comment after code dropped - the CPU serves less (the page's budget), the template stays the
+    readable source. Safe for the template's style: no template literal, no string or block comment spanning
+    lines, no ` // ` inside a string (the bundle test checks)."""
+    lines = (_JS_TRAILING_COMMENT.sub("", line.strip()) for line in text.splitlines())
     return "\n".join(line for line in lines if line and not line.startswith("//"))
 
 
@@ -165,6 +168,7 @@ def project(database, out_dir: str | None = None, template_dir: str | None = Non
         params = config.load_webui_params()
         positions = config.load_webui_positions(params["layout"]["positions"])
         notes = config.load_webui_notes(params["notes"]["file"])
+        program_members = config.load_webui_program_members()
     except (OSError, ValueError) as error:
         findings.append(_f("webui_config_invalid", "FAIL", f"the web app config does not load: {error}",
                            "webui/"))
@@ -200,7 +204,7 @@ def project(database, out_dir: str | None = None, template_dir: str | None = Non
             "generated": header.generated_now()}
     plant, model_findings = webui_model.build_plant(
         database, kinds, member_states, params, positions=positions, notes=notes, drawing=drawing, meta=meta,
-        plc={"station": plc, "ip": _plc_ip(database, plc)})
+        plc={"station": plc, "ip": _plc_ip(database, plc)}, program_members=program_members)
     findings += model_findings
     files.append((PLANT_FILE, webui_model.to_json(plant)))
     if drawing_file:

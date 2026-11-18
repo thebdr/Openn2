@@ -82,8 +82,8 @@
     function pager(key, total, size, redraw) {
       var page = pages[key] || 0, last = Math.max(0, Math.ceil(total / size) - 1);
       if (total <= size) { return null; }
-      var prev = SD.el("button", { cls: "btn", type: "button", text: "Previous", disabled: page === 0 });
-      var next = SD.el("button", { cls: "btn", type: "button", text: "Next", disabled: page >= last });
+      var prev = SD.btn({ text: "Previous", disabled: page === 0 });
+      var next = SD.btn({ text: "Next", disabled: page >= last });
       prev.addEventListener("click", function () { pages[key] = page - 1; redraw(); });
       next.addEventListener("click", function () { pages[key] = page + 1; redraw(); });
       return SD.el("div", { cls: "pager" }, [prev, SD.el("span", { text: "rows " + (page * size + 1) + "-" + Math.min(total, (page + 1) * size) + " of " + total }), next]);

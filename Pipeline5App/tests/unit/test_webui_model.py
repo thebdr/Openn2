@@ -1,8 +1,8 @@
 """The web diagnosis app's plant model (phase 650, C-050, `webui_model.build_plant`) on a small synthetic Database
 with the SHIPPED webui config: the exact quoted variable names, the poll set, the family + index grouping and the
 anchor, the node-failed resolution, a further kind enabled by config alone, the polarity INFO, the most specific
-member rule, the sorter's area by ordinal, the positions' stale WARN / unplaced INFO, the drawing measure and the
-template bundle."""
+member rule, the per-device members program_members.csv declares, the sorter's area by ordinal, the positions'
+stale WARN / unplaced INFO, the drawing measure and the template bundle."""
 import copy
 import os
 import struct
@@ -225,6 +225,52 @@ def test_device_notes():
     ok("door|=NOPE-B1" in _types(findings)["webui_note_stale"].detail, "the orphan note is warned")
 
 
+def test_program_members():
+    """[[C-050]] the per-device not-installed flags (user 2026-11-03): program_members.csv declares the members the
+    CPU's program has but PL5 does not generate (99_Commissioning.ESTOPSNotInstalled, added in TIA) - one per device
+    of the kind, {fld} = its FLD, labelled by member_states.csv like any member (role not_installed, first), read
+    every refresh after the nodes' flags; one PL5 already generates is not added twice; the loader is strict."""
+    shipped = config.load_webui_program_members()
+    eq([(r["kind"], r["db_name"], r["member"]) for r in shipped],
+       [("estop", "99_Commissioning", "ESTOPSNotInstalled.Emergency Push Button [ {fld} ]"),
+        ("breaker", "99_Commissioning", "ESTOPSNotInstalled.Safety Breaker [ {fld} ]")], "the shipped rows")
+    flag = '"99_Commissioning"."ESTOPSNotInstalled"."Emergency Push Button [ =ES-0001 ]"'
+    plant, findings = _build(program_members=shipped)
+    estop = next(d for d in plant["devices"] if d["id"] == "estop-0001")
+    eq(estop["members"][0], {"var": flag, "label": "Not installed", "healthy": False, "severity": "info",
+                             "role": "not_installed"}, "the e-stop's own flag, quoted level by level, labelled first")
+    eq(plant["poll"][-2:], ['"99_Commissioning"."NodesNotInstalled"."n0002-io 10.0.0.2"', flag],
+       "read every refresh, after the nodes' flags")
+    f = _types(findings)["webui_program_members"]
+    ok(f.severity == "INFO" and f.detail.startswith("1 member(s)") and "(estop)" in f.detail, f.detail)
+    contactor = next(d for d in plant["devices"] if d["id"] == "contactor-0044")
+    ok(all("ESTOPSNotInstalled" not in m["var"] for m in contactor["members"]), "another kind gets none")
+
+    database = _database()
+    database["db_members"].append(_mem("99_Commissioning", "Emergency Push Button [ =ES-0001 ]", "e1",
+                                       struct="ESTOPSNotInstalled"))
+    plant, findings = model.build_plant(database, config.load_webui_kinds(), config.load_webui_member_states(),
+                                        config.load_webui_params(), diag=DIAG, tristate=set(), program_members=shipped)
+    estop = next(d for d in plant["devices"] if d["id"] == "estop-0001")
+    eq([m["var"] for m in estop["members"]].count(flag), 1, "PL5 generates it: one member, not two")
+    ok("webui_program_members" not in _types(findings), "nothing added, nothing said")
+    _plant, findings = _build(program_members=shipped + [{"kind": "lamp", "db_name": "X", "member": "{fld}",
+                                                          "comment": ""}])
+    ok("lamp" in _types(findings)["webui_program_member_kind_unknown"].detail, "a kind no row of device_kinds names")
+
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "program_members.csv")
+        for body, why in (("kind,db_name,member\r\n", "no comment column"),
+                          ("kind,db_name,member,comment\r\nestop,DB,flag,\r\n", "no {fld}"),
+                          ("kind,db_name,member,comment\r\nestop,DB,{fld} {n},\r\n", "another placeholder"),
+                          ("kind,db_name,member,comment\r\nestop,DB,{fld},\r\nestop,DB,{fld},\r\n", "a row twice"),
+                          ("kind,db_name,member,comment\r\nestop,,{fld},\r\n", "no DB")):
+            open(path, "w", newline="", encoding="utf-8").write(body)
+            raises(ValueError, lambda: config.load_webui_program_members(path))
+        open(path, "w", newline="", encoding="utf-8").write("kind,db_name,member,comment\r\n")
+        eq(config.load_webui_program_members(path), [], "a header-only file declares nothing")
+
+
 def test_sorter_area_by_ordinal_and_interfaces():
     plant, _ = _build()
     eq([(s["id"], s["area"]) for s in plant["sorters"]], [("sorter-0001", "AREA 1_TRIB")])
@@ -279,8 +325,9 @@ def test_template_bundle():
         files = dict(project.bundle(d))
         eq(sorted(files), ["app.css", "app.js", "index.html"], "js/ and css/ joined, notes skipped")
         eq(files["app.js"].decode(), "// --- js/00_rpc.js ---\nvar a = 1;\n\n// --- js/10_poller.js ---\nvar b = 2;\n\n"
-                                     "// --- js/views/overview.js ---\nif (a) {\nvar c = 3;   // trailing\n}\n",
-           "in path order, each named; a js file without its indentation and its comment-only / blank lines")
+                                     "// --- js/views/overview.js ---\nif (a) {\nvar c = 3;\n}\n",
+           "in path order, each named; a js file without its indentation, its comment-only / blank lines and its "
+           "comments after code")
         open(os.path.join(d, "plant.json"), "w").write("{}")
         raises(ValueError, lambda: project.bundle(d))
 
@@ -295,6 +342,7 @@ if __name__ == "__main__":
         ("member_rules_and_polarity", test_member_rules_and_polarity),
         ("overview_tabs", test_overview_tabs),
         ("device_notes", test_device_notes),
+        ("program_members", test_program_members),
         ("sorter_area_by_ordinal_and_interfaces", test_sorter_area_by_ordinal_and_interfaces),
         ("positions_stale_and_unplaced", test_positions_stale_and_unplaced),
         ("drawing_measure", test_drawing_measure),

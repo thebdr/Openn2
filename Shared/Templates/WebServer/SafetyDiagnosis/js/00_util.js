@@ -7,6 +7,8 @@ var SD = window.SD = window.SD || {};
   var SVG = "http://www.w3.org/2000/svg";
 
   // el("tr", {cls: "click", text: "...", on: {click: f}, title: "..."}, [child nodes / strings])
+  // a plain button: class btn, type button (never a form submit)
+  SD.btn = function (props, kids) { props.cls = "btn"; props.type = "button"; return SD.el("button", props, kids); };
   SD.el = function (tag, props, kids) {
     var node = document.createElement(tag);
     if (props) {
@@ -48,6 +50,8 @@ var SD = window.SD = window.SD || {};
   SD.STATES = ["ok", "stale", "unknown", "node", "warning", "alarm"];
   SD.STATE_TEXT = { ok: "OK", warning: "Warning", alarm: "Alarm", unknown: "Unknown", node: "Unknown - node failed",
     stale: "No data", info: "Info" };
+  // why an entity is marked not installed (ev.ni): its own flag, or its node's
+  SD.NI = { own: "not installed", node: "node not installed" };
   SD.worse = function (a, b) { return SD.STATES.indexOf(b) > SD.STATES.indexOf(a) ? b : a; };
   SD.chip = function (state, text, title) {
     return SD.el("span", { cls: "chip s-" + state, text: text || SD.STATE_TEXT[state] || state, title: title });

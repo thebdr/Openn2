@@ -16,6 +16,9 @@ device kind, a DB or a member name: they all come from the config, so a new kind
   NodesNotInstalled). member_states.csv labels them: a row's pattern ({area} {index} {node} {fld} {n} =
   anything) matched against the members of its DB and scope gives label, role, severity and the `healthy`
   polarity (blank = unknown, shown neutral, one INFO); an entity's member no row matches is listed as a detail.
+  program_members.csv adds the members the CPU's program has beyond PL5's DBs (added in TIA - the per-e-stop
+  not-installed flags): one per entity of its kind, {fld} = the entity's FLD, sourced to its anchor signal, then
+  labelled the same way.
 - **Cabinets.** Every cabinet with a numeric (cabinet, bit) entry: its words (the 620 instance names =
   its DiagnosticTags members, `opc_diagnosis_scl.cabinet_word`), tristate by the 620 rule, its bits with the
   DiagList text and the device or node they belong to.
@@ -201,6 +204,15 @@ def _anchor(signals: list, anchors: list) -> dict:
     return signals[0]
 
 
+def _anchor_of(kind: dict, fam, signals: list) -> dict:
+    """An entity's anchor signal: a node's first signal; a device's by its kind's anchor types (blank = the
+    family's)."""
+    if kind["state"] == "node":
+        return signals[0]
+    anchors = kind["anchor_types"] or ([a for a in fam.anchor.split("|") if a] if fam else [])
+    return _anchor(signals, anchors)
+
+
 def _fld(signal: dict) -> str:
     return (_text(signal.get("iol_FLD")) or _text(signal.get("combined_FLD"))
             or "".join(_text(signal.get(k)) for k in ("functional_unit", "location", "device")))
@@ -236,6 +248,41 @@ def _entities(signals: list, kinds: list, families: list) -> list:
             order.append(key)
         groups[key][3].append(s)
     return [groups[k] for k in order]
+
+
+def _program_members(staged: list, program_members, kinds: list, have: set, findings: list) -> list:
+    """db_members-like rows for program_members.csv: per entity of a row's kind, the row's member with {fld} = the
+    entity's FLD (split at its first '.' into struct and member), its source the entity's anchor signal. A member
+    db_members already has is not added twice (PL5 generates it now); an entity without FLD gets none."""
+    known = {k["kind"] for k in kinds}
+    unknown = sorted({r["kind"] for r in program_members if r["kind"] not in known})
+    if unknown:
+        findings.append(_f("webui_program_member_kind_unknown", "WARN",
+                           f"webui/program_members.csv names {', '.join(unknown)} - no device kind of "
+                           f"device_kinds.csv, its rows unused", "webui/program_members.csv"))
+    out, kinds_used = [], set()
+    for kind, fam, _index, sigs in staged:
+        rows = [r for r in program_members if r["kind"] == kind["kind"]]
+        if not rows:
+            continue
+        anchor = _anchor_of(kind, fam, sigs)
+        fld = _fld(anchor)
+        if not fld:
+            continue
+        for r in rows:
+            struct, _dot, member = r["member"].partition(".") if "." in r["member"] else ("", "", r["member"])
+            row = {"db_name": r["db_name"], "struct": struct, "member": member.replace("{fld}", fld),
+                   "source": _text(anchor.get("uid"))}
+            if member_var(row) not in have:
+                have.add(member_var(row))
+                out.append(row)
+                kinds_used.add(kind["kind"])
+    if out:
+        findings.append(_f("webui_program_members", "INFO",
+                           f"{len(out)} member(s) of webui/program_members.csv added ({', '.join(sorted(kinds_used))}) - "
+                           f"PL5 does not generate them: the CPU's program must have them, else the page lists them "
+                           f"under Configuration problems", "webui/program_members.csv"))
+    return out
 
 
 def _diag_text(entry: dict) -> str:
@@ -293,10 +340,11 @@ def _diag_pairs(entries: list) -> list:
 
 
 def build_plant(database, kinds: list, member_states: list, params: dict, *, positions=(), drawing=None,
-                families=None, diag=None, tristate=None, meta=None, plc=None, notes=()) -> tuple:
+                families=None, diag=None, tristate=None, meta=None, plc=None, notes=(), program_members=()) -> tuple:
     """The plant model (schema 1) and the findings. `database` = the SSOT tables (a Database or a {table: rows}
     mapping); `kinds` / `member_states` / `params` = the loaded webui config; `positions` = the loaded positions
-    rows; `drawing` = {file, width, height, view_box} of the measured plant drawing or None; `families` = the
+    rows; `program_members` = the loaded program_members.csv rows (the members PL5 does not generate);
+    `drawing` = {file, width, height, view_box} of the measured plant drawing or None; `families` = the
     object families (default: loaded); `diag` = the 620 knobs (default: generation_params.yaml); `tristate` = the
     per-type tristate cabinets (default: the 620 rule over the signals); `meta` / `plc` = the header sections."""
     from pipeline5.systems.plc_based.siemens_s7.safety import opc_diagnosis_scl as opc
@@ -314,7 +362,9 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
 
     signals = _rows(database, "signals")
     entries = _rows(database, "diagnosis_entries")
+    staged = _entities(signals, enabled, families)
     members = [row for row in _rows(database, "db_members") if _text(row.get("source")) != SEED]
+    members += _program_members(staged, program_members, kinds, {member_var(r) for r in members}, findings)
     members_by_db, members_by_source, member_by_name = {}, {}, {}
     for row in members:
         members_by_db.setdefault(_text(row.get("db_name")), []).append(row)
@@ -329,7 +379,6 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
 
     # --- the entities ---------------------------------------------------------------------------- #
     nodes, devices, owner_of, node_by_binding, used = [], [], {}, {}, []
-    staged = _entities(signals, enabled, families)
     for kind, fam, index, sigs in staged:            # the nodes first: the devices name them
         if kind["state"] != "node":
             continue
@@ -351,8 +400,7 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
     for kind, fam, index, sigs in staged:
         if kind["state"] == "node":
             continue
-        anchors = kind["anchor_types"] or ([a for a in fam.anchor.split("|") if a] if fam else [])
-        anchor = _anchor(sigs, anchors)
+        anchor = _anchor_of(kind, fam, sigs)
         entity_id = f"{kind['kind']}-{index}"
         uids = [_text(x.get("uid")) for x in sigs]
         own_entries = [e for uid in uids for e in entries_by_signal.get(uid, [])]
@@ -448,8 +496,8 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
     for sorter in sorters:
         for m in sorter["members"]:
             add(m["var"])
-    for node in nodes:                                 # the not-installed flags: read every refresh (the violet border)
-        for m in node["members"]:
+    for entity in nodes + devices:                     # the not-installed flags: read every refresh (the violet border)
+        for m in entity["members"]:
             if m["role"] == "not_installed":
                 add(m["var"])
 

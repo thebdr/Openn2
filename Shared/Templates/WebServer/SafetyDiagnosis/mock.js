@@ -211,8 +211,9 @@
     });
     plant.devices.concat(plant.nodes).forEach(function (e) {
       (e.members || []).forEach(function (m) {
-        values[m.var] = function () {     // one node in five flagged not installed (TRUE), to show the violet border
-          return /NodesNotInstalled/.test(m.var) ? hash(m.var) % 5 === 0 : /00_Commissioning/.test(m.var) ? false : memberValue(m, on(e.id));
+        values[m.var] = function () {     // one node in five, one e-stop in nine flagged not installed (TRUE): the violet border
+          return /NotInstalled/.test(m.var) ? hash(m.var) % (/Nodes/.test(m.var) ? 5 : 9) === 0
+            : /00_Commissioning/.test(m.var) ? false : memberValue(m, on(e.id));
         };
       });
       (e.tags || []).forEach(function (t) {

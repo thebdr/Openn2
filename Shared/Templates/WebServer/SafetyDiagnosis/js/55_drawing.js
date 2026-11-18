@@ -2,11 +2,14 @@
 // (plant.layout.positions, "kind|fld" -> [x, y] in the drawing's view_box), coloured by its state. Drag to pan,
 // wheel, buttons or two fingers to zoom: the view is the SVG's viewBox, so nothing is styled inline, and the icons
 // keep their screen size. Edit mode moves icons, places the unplaced ones (pick one in the tray, then tap the
-// drawing) and downloads webui_positions.csv for the project's config - the page itself writes nothing anywhere.
+// drawing) and downloads webui_positions.csv for the project's config - the page writes nothing to the CPU. The
+// moves not downloaded yet are kept in this browser like the notes (localStorage, per project) as edits over the
+// project's positions ("kind|fld" -> [x, y], null = unplaced), so a reload or a closed browser keeps them; an edit
+// back to the project's position is no edit.
 (function (SD) {
   "use strict";
   var NS = "http://www.w3.org/2000/svg", PIN = 11, TAP = 5;   // the icons' largest radius (screen px)
-  var draft = null;                  // unsaved edits survive a change of view (not a reload)
+  var draft = null;                  // the edits, also when this browser cannot store them (across views only)
 
   function svg(tag, attrs) {
     var node = document.createElementNS(NS, tag);
@@ -28,8 +31,16 @@
   SD.drawing = function (ctx, show) {
     var model = ctx.model, image = ctx.plant.layout.image, v0 = image.view_box;
     var entities = model.entities.filter(function (e) { return !show || show(e); });
-    var saved = ctx.plant.layout.positions || {};
-    var positions = draft ? draft.positions : JSON.parse(JSON.stringify(saved));
+    var saved = ctx.plant.layout.positions || {}, positions = JSON.parse(JSON.stringify(saved)), kept = true;
+    var store = "pl5-positions-v1:" + (ctx.plant.meta.project || ctx.plant.app.name);
+    try { draft = JSON.parse(localStorage.getItem(store)) || draft; } catch (e) { kept = false; }
+    var known = {};
+    model.entities.forEach(function (e) { known[e.kind + "|" + e.fld] = 1; });
+    Object.keys(draft || {}).forEach(function (k) {   // an edit of no device of this plant, or a damaged one, is dropped
+      var p = draft[k];
+      if (!known[k]) { return; }
+      if (p === null) { delete positions[k]; } else if (p && p[0] === +p[0] && p[1] === +p[1]) { positions[k] = [p[0], p[1]]; }
+    });
     var vb = { x: v0[0], y: v0[1], w: v0[2], h: v0[3] }, fitW = v0[2], pins = {}, pointers = {}, gesture = null;
     var editing = false, armed = null, selected = null, frame = 0, lastEv = null, onlyBad = false, pass = null;
     var started = false, want = null, finding = null, findTimer = 0;
@@ -161,17 +172,17 @@
 
     // --- edit mode --------------------------------------------------------------------------------------- //
     var count = SD.el("span", { cls: "muted" });
-    var save = SD.el("button", { cls: "btn", type: "button", text: "Download webui_positions.csv" });
-    var discard = SD.el("button", { cls: "btn", type: "button", text: "Discard changes" });
-    var unplace = SD.el("button", { cls: "btn", type: "button", text: "Unplace selected", disabled: true });
+    var save = SD.btn({ text: "Download webui_positions.csv" });
+    var discard = SD.btn({ text: "Discard changes" });
+    var unplace = SD.btn({ text: "Unplace selected", disabled: true });
     var tray = SD.el("div", { cls: "tray" });
     var editBar = SD.el("div", { cls: "editbar", hidden: true }, [
       SD.el("div", { cls: "toolbar" }, [count, save, discard, unplace]),
       SD.el("p", { cls: "note", text: "Drag an icon to move it. Pick a device below, then tap the drawing to place it. "
-        + "Save the downloaded file as webui/webui_positions.csv in the project's config (config_project/systems/"
-        + "siemens_s7_safety/webui/), run 650 again and upload the application." }),
+        + "Changes stay in this browser until downloaded: save the file in the project's config_project/systems/"
+        + "siemens_s7_safety/webui/ folder, run 650 again and upload the application." }),
       SD.el("div", { cls: "section", text: "Not placed" }), tray]);
-    var editBtn = SD.el("button", { cls: "btn", type: "button", text: "Edit positions", "aria-pressed": "false" });
+    var editBtn = SD.btn({ text: "Edit positions", "aria-pressed": "false" });
     var placedText = SD.el("span", { cls: "muted", text: Object.keys(pins).length + " of " + entities.length + " placed" });
 
     function startDrag(ev, e) {
@@ -185,11 +196,20 @@
       unplace.disabled = !id;
       refresh();
     }
-    function dirty() { return SD.positionsCsv(positions) !== SD.positionsCsv(saved); }
+    function at(p) { return p ? (+p[0]).toFixed(1) + " " + (+p[1]).toFixed(1) : ""; }   // as the file writes it
     function changed() {
-      draft = dirty() ? { positions: positions } : null;
-      count.textContent = draft ? "Unsaved changes" : "No change";
-      placedText.textContent = Object.keys(pins).length + " of " + entities.length + " placed";
+      var edits = {}, n = 0;
+      Object.keys(positions).concat(Object.keys(saved)).forEach(function (k) {
+        if (!(k in edits) && at(positions[k]) !== at(saved[k])) { edits[k] = positions[k] || null; n += 1; }
+      });
+      draft = n ? edits : null;
+      try {
+        if (draft) { localStorage.setItem(store, JSON.stringify(draft)); } else { localStorage.removeItem(store); }
+        kept = true;
+      } catch (e) { kept = false; }
+      var undone = n + " change(s) not downloaded";
+      count.textContent = n ? undone + (kept ? ", kept in this browser" : "") : "No change";   // not kept: leaving asks
+      placedText.textContent = Object.keys(pins).length + " of " + entities.length + " placed" + (n ? ", " + undone : "");
       draw();
     }
     function place(e, cx, cy) {
@@ -243,7 +263,7 @@
       fillTray();
       changed();
     });
-    function guard(ev) { if (draft) { ev.preventDefault(); ev.returnValue = ""; } }
+    function guard(ev) { if (draft && !kept) { ev.preventDefault(); ev.returnValue = ""; } }   // only edits it would lose
     window.addEventListener("beforeunload", guard);
     // the box resized (a panel opened, the window turned): same centre and width, the height to the new aspect
     function resized() {
@@ -256,10 +276,11 @@
     if (watcher) { watcher.observe(box); } else { window.addEventListener("resize", resized); }
 
     var zoomBar = SD.el("div", { cls: "toolbar" }, [
-      SD.el("button", { cls: "btn", type: "button", text: "−", title: "Zoom out", "aria-label": "Zoom out", on: { click: function () { zoom(1 / 1.4); } } }),
-      SD.el("button", { cls: "btn", type: "button", text: "+", title: "Zoom in", "aria-label": "Zoom in", on: { click: function () { zoom(1.4); } } }),
-      SD.el("button", { cls: "btn", type: "button", text: "Fit", on: { click: fit } }), editBtn, placedText]);
+      SD.btn({ text: "−", title: "Zoom out", "aria-label": "Zoom out", on: { click: function () { zoom(1 / 1.4); } } }),
+      SD.btn({ text: "+", title: "Zoom in", "aria-label": "Zoom in", on: { click: function () { zoom(1.4); } } }),
+      SD.btn({ text: "Fit", on: { click: fit } }), editBtn, placedText]);
     var node = SD.el("div", { cls: "plant" }, [zoomBar, box, editBar]);
+    changed();                                         // the stored edits: counted, and dropped once the project has them
 
     function refresh() {
       var ev = lastEv;
@@ -269,7 +290,7 @@
         var ni = ev && ev.ni[id];
         pin.g.setAttribute("class", "pin s-" + state + (ni ? " ni" : "") + (sel ? " sel" : "") + (id === finding ? " find" : "")
           + (hide ? " off" : ""));
-        pin.g.setAttribute("aria-label", pin.title + ": " + SD.STATE_TEXT[state] + (ni ? ", node not installed" : ""));
+        pin.g.setAttribute("aria-label", pin.title + ": " + SD.STATE_TEXT[state] + (ni ? ", " + SD.NI[ni] : ""));
       });
     }
     // "Show on layout": centre the view on the icon, zoomed in, and make it pulse for a moment

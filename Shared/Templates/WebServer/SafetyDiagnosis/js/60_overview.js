@@ -34,7 +34,7 @@
     var tabBar = tabs.length > 1 ? SD.el("div", { cls: "tabs" }, tabs.map(function (t, i) {
       return SD.el("a", { href: SD.href("overview", String(i)), cls: i === tab ? "on" : "", text: t.label });
     })) : null;
-    var node = SD.el("div"), toggle = SD.el("button", { cls: "btn", type: "button", text: "Only not OK", "aria-pressed": "false" });
+    var node = SD.el("div"), toggle = SD.btn({ text: "Only not OK", "aria-pressed": "false" });
 
     var areaStrip = SD.el("div", { cls: "strip" });
     plant.areas.forEach(function (a) {
@@ -190,7 +190,7 @@
         tile.className = "tile s-" + state + (ev.ni[id] ? " ni" : "") + (id === selected ? " sel" : "")
           + (id === finding ? " find" : "") + (ctx.notes.get(e.kind + "|" + e.fld).text ? " noted" : "");
         tile.hidden = id !== selected && ((onlyBad && state === "ok") || !pass[id]);   // the open one stays
-        tile.setAttribute("aria-label", tile.title + ": " + SD.STATE_TEXT[state] + (ev.ni[id] ? ", node not installed" : ""));
+        tile.setAttribute("aria-label", tile.title + ": " + SD.STATE_TEXT[state] + (ev.ni[id] ? ", " + SD.NI[ev.ni[id]] : ""));
       });
       sections.forEach(function (box) {
         var rows = box.querySelectorAll(".loc"), any = false;

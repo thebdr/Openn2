@@ -18,8 +18,15 @@ and is not a safety function.
 - **660 Open Web Application Folder** opens that folder.
 - What the page shows comes from the webui config, not from code: `device_kinds.csv` (one row per kind,
   its marker shape and its field I/O rule), `member_states.csv` (labels, healthy polarity and roles),
+  `program_members.csv` (members the CPU's program has but PL5 does not generate, below),
   `webui_params.yaml` (polling, the overview's tabs, the files below) and `webui_notes.csv` (the device
   notes), in the safety system's `config_project/webui/` folder.
+- **`program_members.csv`** declares members added to the program in TIA by hand, which PL5's database
+  therefore lacks: `kind,db_name,member` gives each device of the kind the member, `{fld}` being its FLD
+  (`<struct>.<name>` for a member in a struct). `member_states.csv` then labels them like any member. The
+  shipped rows are the per-e-stop not-installed flags, `"99_Commissioning".ESTOPSNotInstalled."Emergency Push
+  Button [ <FLD> ]"`, and the two safety breakers' flags in the same struct. The CPU's program must have them,
+  or the page lists them under **Configuration problems**. Once PL5 generates such a member, remove its row.
 - OP5 uploads the folder to the CPU (Workspace tab). The upload needs no TIA download and leaves the
   F-signature untouched.
 
@@ -46,8 +53,10 @@ and is not a safety function.
   each member (`healthy` in `member_states.csv`) is config. The shipped values were confirmed live on the FVT
   1518F; a blank one shows Unknown, the raw value still shown.
 - A violet border marks a PROFINET node flagged not installed in the program (`99_Commissioning`), and every
-  device on it. The program then simulates those devices' members, so the page reads their field I/O instead
-  (the kind's `field` rule) and the detail panel labels their members "(simulated)".
+  device on it ("node not installed"). It also marks an e-stop or safety breaker flagged not installed on its own
+  (`99_Commissioning.ESTOPSNotInstalled`, "not installed"). The program then simulates those devices' members, so
+  the page reads their field I/O instead (the kind's `field` rule) and the detail panel labels their members
+  "(simulated)". The flag itself shows its real value.
 - A lost connection greys every state and retries. "No read right" means the anonymous user lacks
   **Read tags** on the CPU.
 - **Configuration problems** lists the variables of `plant.json` the CPU does not know: the CPU runs
@@ -92,6 +101,11 @@ and is not a safety function.
   selected** takes an icon off, **Discard changes** goes back. **Download webui_positions.csv** gives the file;
   save it over the project's `webui_positions.csv`, run **650** again and upload the application. The page
   itself changes nothing on the CPU.
+- Moves not downloaded yet are kept in this browser, like the notes, so a reload or a closed browser keeps them.
+  The toolbar counts them ("N change(s) not downloaded"). They are stored as edits over the project's positions,
+  so once the project's file holds the same position after 650 and the upload, the edit drops away. **Discard
+  changes** removes them. A browser that blocks storage keeps them only while the page is open, and asks before
+  leaving.
 - Phase 650 warns about a position that names no device of the plant, and notes the devices without a position
   (the edit mode lists them).
 

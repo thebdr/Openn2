@@ -8,10 +8,12 @@
 // - A cabinet's own summary is its STATE word: bit state_alarm_bit / state_warning_bit set = any alarm / warning.
 // - A device = the worst of its channels; while one of its PROFINET nodes is failed it is "node" (unknown - node
 //   failed), never OK. A member (area, sorter, device detail) compares its value with its `healthy` polarity.
-// - A node whose `not_installed` member is active is marked not installed (ev.ni), and so is every device on it.
-//   The bypass then simulates the device's DB member and channel, so such a device (its node not failed) takes its
-//   state from its field I/O instead (ev.field): its kind's `field` rule - {type, healthy} = that tag at that value,
-//   {a, b} = each a-tag differing from the b-tag of its channel (KI != KQ) - Unknown without a rule or a value.
+// - A node whose `not_installed` member is active is marked not installed (ev.ni = "own"), and so is every device
+//   on it (ev.ni = "node"); a device with its own active `not_installed` member (the per-e-stop flag) is marked
+//   alone ("own"). The bypass then simulates the device's DB member and channel, so such a device (its node not
+//   failed) takes its state from its field I/O instead (ev.field): its kind's `field` rule - {type, healthy} = that
+//   tag at that value, {a, b} = each a-tag differing from the b-tag of its channel (KI != KQ) - Unknown without a
+//   rule or a value.
 (function (SD) {
   "use strict";
 
@@ -158,15 +160,18 @@
         return ch ? ch.state : snap.fresh ? "unknown" : "stale";
       }), snap.fresh ? "unknown" : "stale");
     }
+    function flagged(e) {
+      return (e.members || []).some(function (m) {
+        return m.role === "not_installed" && ["ok", "unknown", "stale"].indexOf(self.member(snap, m).state) < 0;
+      }) && "own";
+    }
     this.plant.nodes.forEach(function (n) {
       ev.entity[n.id] = own(n);
-      ev.ni[n.id] = (n.members || []).some(function (m) {
-        return m.role === "not_installed" && ["ok", "unknown", "stale"].indexOf(self.member(snap, m).state) < 0;
-      });
+      ev.ni[n.id] = flagged(n);
     });
     this.plant.devices.forEach(function (d) {
       var failed = (d.nodes || []).some(function (n) { return ev.entity[n] === "alarm"; });
-      ev.ni[d.id] = (d.nodes || []).some(function (n) { return ev.ni[n]; });
+      ev.ni[d.id] = flagged(d) || (d.nodes || []).some(function (n) { return ev.ni[n]; }) && "node";
       ev.field[d.id] = ev.ni[d.id] && !failed;
       ev.entity[d.id] = failed && snap.fresh ? "node" : !snap.fresh ? "stale" : ev.field[d.id] ? self.fieldState(snap, d) : own(d);
     });
@@ -204,7 +209,7 @@
     this.plant.devices.forEach(function (d) {
       if (ev.field[d.id] && ev.entity[d.id] === "alarm") {
         faults.push({ severity: "alarm", group: 0, text: (self.kind[d.kind] || {}).label + " " + d.fld + ": field input",
-          where: "node not installed - read from the field I/O", owner: d.id });
+          where: SD.NI[ev.ni[d.id]] + " - read from the field I/O", owner: d.id });
       }
     });
     this.plant.areas.forEach(function (a) {

@@ -15,6 +15,8 @@ area,02_COM,{area} DOORS,Safety doors,true,alarm,cause,80,
 sorter,05_EM_STATE,SORTER_{index}_NOT_RUNNING,Sorter stopped,false,info,state,10,TRUE = the sorter is stopped (user 2026-10-29)
 node,PROFINET_NODES_ALARM,{node},Node failed,false,alarm,state,10,"{node} = the station's PROFINET name and IP, as PL5 names the member; TRUE = failed (user 2026-10-29, live: TRUE on exactly the nodes whose cabinet channel is active)"
 node,99_Commissioning,NodesNotInstalled.{node},Not installed,false,info,not_installed,20,"TRUE = flagged not installed (user 2026-10-29); read every refresh, the node and the devices on it get a violet border"
+device,99_Commissioning,ESTOPSNotInstalled.Emergency Push Button [ {fld} ],Not installed,false,info,not_installed,5,"TRUE = the e-stop flagged not installed, its own commissioning bypass (user 2026-11-03; program_members.csv declares it until PL5 generates it); read every refresh, the e-stop gets a violet border and its state from the field I/O"
+device,99_Commissioning,ESTOPSNotInstalled.Safety Breaker [ {fld} ],Not installed,false,info,not_installed,5,the safety breaker's (user 2026-11-03)
 device,01_Pushbutton,Emergency Push Button [ {fld} ],E-stop,true,alarm,state,10,"TRUE = released (user 2026-10-29, live: FALSE on the e-stop whose channel is active)"
 device,01_Pushbutton,Safety Breaker [ {fld} ],Safety breaker,true,alarm,state,10,
 device,03_FDBACK,Contactor Feedback Error [ {fld} ],Feedback error,true,alarm,state,10,"TRUE = no error, despite the name (user 2026-10-29, live: FALSE on exactly the contactors whose channel is active)"

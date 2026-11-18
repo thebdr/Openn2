@@ -457,9 +457,11 @@ def load_reaction_templates() -> dict:
 WEBUI_KINDS_REL = "webui/device_kinds.csv"
 WEBUI_MEMBER_STATES_REL = "webui/member_states.csv"
 WEBUI_PARAMS_REL = "webui/webui_params.yaml"
+WEBUI_PROGRAM_MEMBERS_REL = "webui/program_members.csv"
 WEBUI_KIND_COLUMNS = ("kind", "label", "plural", "icon", "shape", "order", "family", "types", "anchor_types", "state",
                       "field", "group_by", "enabled", "comment")
 WEBUI_MEMBER_COLUMNS = ("scope", "db_name", "member", "label", "healthy", "severity", "role", "order", "comment")
+WEBUI_PROGRAM_MEMBER_COLUMNS = ("kind", "db_name", "member", "comment")
 WEBUI_POSITION_COLUMNS = ("kind", "fld", "x", "y")
 WEBUI_NOTE_COLUMNS = ("kind", "fld", "note", "updated")
 WEBUI_STATES = ("diag", "node")                      # how a kind's state is read: its cabinet bits, its node alarm
@@ -572,9 +574,9 @@ def load_webui_member_states(path: str | None = None) -> list:
     as data: {scope, db_name, member, label, healthy, severity, role, order, comment}. `member` is a name pattern
     ({area} {index} {node} {fld} {n} placeholders, matched against the project's db_members - a row no member
     matches is simply unused); `healthy` is True / False, or None = unknown (shown neutral); role `ignore` keeps
-    the members it matches off the page (not shown, not read - a command pulse, say); role `not_installed` (a node
-    member) is read every refresh, and while it is not `healthy` the node and the devices on it are marked not
-    installed. STRICT like the kinds."""
+    the members it matches off the page (not shown, not read - a command pulse, say); role `not_installed` (a node's
+    or a device's member) is read every refresh, and while it is not `healthy` the node and the devices on it, or
+    the device alone, are marked not installed. STRICT like the kinds."""
     rel = WEBUI_MEMBER_STATES_REL
     out = []
     for number, row in enumerate(_webui_rows(rel, WEBUI_MEMBER_COLUMNS, path), 1):
@@ -592,6 +594,30 @@ def load_webui_member_states(path: str | None = None) -> list:
                     "severity": _choice(row, "severity", WEBUI_SEVERITIES, where),
                     "role": _choice(row, "role", WEBUI_ROLES, where), "order": _int_cell(row, "order", where),
                     "comment": _cell(row, "comment")})
+    return out
+
+
+def load_webui_program_members(path: str | None = None) -> list:
+    """webui/program_members.csv - members the CPU's program has but PL5 does not generate (added in TIA by
+    hand), so the Database's db_members lacks them: {kind, db_name, member, comment}. Each device or node of the
+    kind gets the member, `member` = `<struct>.<name>` or `<name>` with {fld} = its FLD (the only placeholder,
+    required - one member per entity); member_states.csv then labels it like any member. STRICT like the kinds; a
+    row twice is an error."""
+    rel = WEBUI_PROGRAM_MEMBERS_REL
+    out, seen = [], set()
+    for number, row in enumerate(_webui_rows(rel, WEBUI_PROGRAM_MEMBER_COLUMNS, path), 1):
+        where = f"{rel} row {number}"
+        for key in ("kind", "db_name", "member"):
+            if not _cell(row, key):
+                raise ValueError(f"{where}: {key} is empty")
+        member = _cell(row, "member")
+        if re.findall(r"\{[^}]*\}", member) != ["{fld}"]:
+            raise ValueError(f"{where}: member must hold {{fld}} once and no other placeholder, got {member!r}")
+        key = (_cell(row, "kind"), _cell(row, "db_name"), member)
+        if key in seen:
+            raise ValueError(f"{where}: {key[0]} {key[1]}.{member} appears twice")
+        seen.add(key)
+        out.append({"kind": key[0], "db_name": key[1], "member": member, "comment": _cell(row, "comment")})
     return out
 
 

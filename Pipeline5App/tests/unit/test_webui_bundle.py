@@ -15,7 +15,7 @@ from pipeline5.systems.plc_based.siemens_s7.safety import webui_project as proje
 import test_webui_model as fixture
 
 PAGE = ("index.html", "app.js", "app.css", "icons.svg")
-PAGE_BUDGET = 120 * 1024          # the plan's budget for what every browser loads
+PAGE_BUDGET = 500 * 1024          # what every browser loads besides the project's data (user 2026-11-06; 120 KB before)
 MOCK_BUDGET = 24 * 1024           # the dev preview's simulator, loaded only on a local host
 READ_ONLY = {"Api.Login", "Api.Logout", "Api.Browse", "PlcProgram.Read", "PlcProgram.Browse",
              # a PROFINET node's diagnostics on newer firmware (js/71_nodediag.js) - reads that need read_diagnostics
@@ -99,6 +99,31 @@ def test_app_css_is_lean():
         eq(css.count(mark), source.count(mark), f"every {mark!r} of the template is kept")
 
 
+def test_app_js_is_lean():
+    """app.js = the js/ files without indentation and comments (webui_project._lean_js): no line of it ends in a
+    ` // ` comment, a comment dropped after code was outside every string (its line's quotes balanced, none
+    escaped), no string of the template holds ` // `, and the code of every line is kept."""
+    js = _text(_files(), "app.js")
+    eq([line for line in js.splitlines() if re.search(r"\s// ", line)], [], "no comment after code is left")
+    names = sorted(n for n in os.listdir(os.path.join(config.WEBAPP_TEMPLATE_DIR, "js")) if n.endswith(".js"))
+    kept = 0
+    for name in names:
+        for number, raw in enumerate(open(os.path.join(config.WEBAPP_TEMPLATE_DIR, "js", name), encoding="utf-8"), 1):
+            line = raw.strip()
+            if not line or line.startswith("//"):
+                continue
+            ok(not re.search(r'"[^"]* // [^"]*"' + "|'[^']* // [^']*'", line), f"js/{name}:{number}: a string holds ' // '")
+            cut = re.search(r"\s+// .*$", line)
+            if cut:
+                code = line[:cut.start()]
+                ok(code.count('"') % 2 == 0 and code.count("'") % 2 == 0 and "\\" not in code.replace("\\\\", ""),
+                   f"js/{name}:{number}: the comment might sit in a string: {line[:80]}")
+                line = code
+            ok(line in js, f"js/{name}:{number}: its code is in app.js")
+            kept += 1
+    ok(kept > 1000, f"{kept} code lines checked")
+
+
 def test_the_mock_only_on_a_local_host():
     files = _files()
     js, html = _text(files, "app.js"), _text(files, "index.html")
@@ -173,6 +198,7 @@ if __name__ == "__main__":
         ("texts_are_text", test_texts_are_text),
         ("size_budget", test_size_budget),
         ("app_css_is_lean", test_app_css_is_lean),
+        ("app_js_is_lean", test_app_js_is_lean),
         ("the_mock_only_on_a_local_host", test_the_mock_only_on_a_local_host),
         ("the_plant_keys_it_reads_exist", test_the_plant_keys_it_reads_exist),
         ("the_positions_round_trip", test_the_positions_round_trip),

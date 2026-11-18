@@ -80,7 +80,7 @@
   // the detail panel's section for node `e` -> {node, leave}
   SD.nodeDiag = function (ctx, e) {
     var gone = false, body = SD.el("div");
-    var refresh = SD.el("button", { cls: "btn", type: "button", title: "Read again from the CPU" }, [SD.icon("refresh"), "Refresh"]);
+    var refresh = SD.btn({ title: "Read again from the CPU" }, [SD.icon("refresh"), "Refresh"]);
     var node = SD.el("div", null, [SD.el("div", { cls: "head sub" }, [SD.el("h3", { cls: "section", text: "CPU diagnostics" }), refresh]), body]);
     function note(text, cls) { return SD.el("p", { cls: cls || "note", text: text }); }
     function chip(s) {

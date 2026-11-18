@@ -111,8 +111,7 @@
 
     return { node: node, leave: function () { ctx.poller.unwatch("detail"); if (cpuDiag) { cpuDiag.leave(); } }, update: function (ev) {
       var s = ev.entity[e.id];
-      state.textContent = SD.STATE_TEXT[s] + (e.kind === "pn_node" ? (ev.ni[e.id] ? " - not installed" : "")
-        : ev.field[e.id] ? " - field I/O, node not installed" : ev.ni[e.id] ? " - node not installed" : "");
+      state.textContent = SD.STATE_TEXT[s] + (ev.ni[e.id] ? " - " + (ev.field[e.id] ? "field I/O, " : "") + SD.NI[ev.ni[e.id]] : "");
       SD.setState(state, s);
       state.classList.toggle("ni", !!ev.ni[e.id]);
       channels.forEach(function (c) {
@@ -128,8 +127,10 @@
         if (err) { r.td.textContent = "not readable: " + err.message; return; }
         var text = valueText(value);
         if (r.member && r.member.healthy !== null && r.member.healthy !== undefined && typeof value === "boolean") {
-          // a device on a not-installed node: the node's flag forces its DB members, so their value says nothing
-          text += simulated ? " (simulated)" : value === r.member.healthy ? " (healthy)" : " (" + r.member.severity + ")";
+          // a not-installed device: the flag (its node's or its own) forces its DB members, so their value says
+          // nothing - the flag itself stays real
+          text += simulated && r.member.role !== "not_installed" ? " (simulated)"
+            : value === r.member.healthy ? " (healthy)" : " (" + r.member.severity + ")";
         }
         r.td.textContent = text;
       });
