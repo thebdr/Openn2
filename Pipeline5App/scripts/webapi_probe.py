@@ -10,10 +10,11 @@ on the CPU itself what the documentation leaves open:
     to the device text) and of the area states while someone presses an e-stop / opens a door
   - how PlcProgram.Browse describes a free-form PL5_CustomData DB (`browse`)
   - with a deploy user: whether a throwaway web application is created, served and deleted
-    (`deploy-probe`, `delete-probe`)
+    (`deploy-probe`, `delete-probe`), and a test upload of the app folder phase 650 writes (`deploy-app`)
 Everything it learns goes into .zen/evidence/C-050.md (`--out` keeps the raw replies as JSON).
 
-It never writes a PLC value. The only write-type calls are WebApp.* on the throwaway app, and those log in
+It never writes a PLC value. The only write-type calls are WebApp.* (the throwaway app, or the app folder
+`deploy-app` is given), and those log in
 with a user whose password is asked on the terminal (getpass) - never taken from an argument, a file or the
 environment.
 
@@ -30,6 +31,7 @@ certificate, save the PEM and pass `--cafile <pem>` - verification stays on, onl
     <python> scripts/webapi_probe.py --host 192.168.20.1 --cafile cpu.pem call Api.Browse
     <python> scripts/webapi_probe.py --host 192.168.20.1 --cafile cpu.pem --user deploy deploy-probe
     <python> scripts/webapi_probe.py --host 192.168.20.1 --cafile cpu.pem --user deploy delete-probe
+    <python> scripts/webapi_probe.py --host 192.168.20.1 --cafile cpu.pem --user deploy deploy-app --dir "<PLC>/Web applications/safety"
 `--user <name>` on any command logs in first (password prompt) - `info` with and without it shows what the
 Anonymous user lacks. `--anonymous` logs in as the built-in anonymous user instead ("Everybody" before FW
 V3.1, "Anonymous" after, empty password): on FW V2.9.4 a call without any token has no rights, even when TIA
@@ -451,6 +453,111 @@ def cmd_delete_probe(api: WebApi, args, record: dict) -> None:
     record["delete_probe"] = steps
 
 
+def _app_files(app_dir: str) -> tuple:
+    """(rows, default page) of a phase-650 app folder's webapp.manifest.csv, each row with its file's bytes. Every
+    resource is checked against its size and SHA-256 first: a missing or changed file stops before anything is
+    sent (run 650 again)."""
+    path = os.path.join(app_dir, "webapp.manifest.csv")
+    if not os.path.isfile(path):
+        raise ProbeError(f"no webapp.manifest.csv in {app_dir} - the folder phase 650 writes is needed")
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        rows = list(csv.DictReader(line for line in handle.read().splitlines() if not line.startswith("#!")))
+    problems = []
+    for row in rows:
+        file = os.path.join(app_dir, *row["name"].split("/"))
+        row["data"] = open(file, "rb").read() if os.path.isfile(file) else None
+        if row["data"] is None:
+            problems.append(f"{row['name']} missing")
+        elif len(row["data"]) != int(row["size"]) or hashlib.sha256(row["data"]).hexdigest() != row["sha256"]:
+            problems.append(f"{row['name']} changed since 650 wrote the manifest")
+    defaults = [row["name"] for row in rows if row["default_page"] == "yes"]
+    if problems or len(defaults) != 1:
+        raise ProbeError(f"{app_dir} does not match its manifest ({'; '.join(problems) or 'no single default page'})"
+                         " - run 650 again")
+    return rows, defaults[0]
+
+
+def _check(label: str, error, result=True) -> None:
+    if error is not None or result is None or result is False:
+        raise ProbeError(f"{label} failed: {json.dumps(error) if error is not None else result}")
+
+
+def cmd_deploy_app(api: WebApi, args, record: dict) -> None:
+    """Upload a phase-650 app folder as a Web API web application (a test upload until OP5's deployer, C-050 M4):
+    the manifest's files checked, the app created disabled, each resource through its ticket (closed before the
+    next - the CPU holds 4), the default page set, the app enabled; then the CPU's resource list compared with the
+    manifest, every resource fetched back without a login and hashed, and (--verify) plant.json's poll set read
+    as the anonymous user, as the page does. An app of the same name is replaced only with --replace."""
+    if not api.token:
+        raise ProbeError("deploy-app needs --user <deploy user> (a user with the manage-user-pages right)")
+    rows, default = _app_files(args.dir)
+    app = args.app or os.path.basename(os.path.normpath(args.dir))
+    print(f"{args.dir}: {len(rows)} resources, {sum(len(r['data']) for r in rows)} bytes, default page {default}")
+    steps: list = []
+    perms, error = _step(api, "permissions", "Api.GetPermissions", None, steps)
+    if "manage_user_pages" not in {p.get("name") for p in perms or []}:
+        raise ProbeError(f"the user {args.user!r} lacks manage_user_pages: {perms or error}")
+    apps, error = _step(api, "apps before", "WebApp.Browse", None, steps)
+    _check("WebApp.Browse", error, apps)
+    if any(a.get("name") == app for a in apps.get("applications", [])):
+        if not args.replace:
+            raise ProbeError(f"the CPU already has a web application {app!r} - pass --replace to delete it first")
+        result, error = _step(api, "delete old", "WebApp.Delete", {"name": app}, steps)
+        _check("WebApp.Delete", error, result)
+    result, error = _step(api, "create", "WebApp.Create", {"name": app, "state": "disabled"}, steps)
+    _check("WebApp.Create", error, result)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
+    for row in rows:
+        ticket, error = _step(api, row["name"], "WebApp.CreateResource",
+                              {"app_name": app, "name": row["name"], "media_type": row["media_type"],
+                               "last_modified": stamp, "visibility": row["visibility"]}, steps)
+        _check(f"WebApp.CreateResource {row['name']}", error, ticket)
+        try:
+            status, body, seconds = api.upload(str(ticket), row["data"])
+            print(f"  upload {row['name']}: HTTP {status}, {len(row['data'])} bytes in {seconds * 1000:.0f} ms")
+            steps.append({"step": f"upload {row['name']}", "http": status, "bytes": len(row["data"])})
+            if status not in (200, 204):
+                raise ProbeError(f"upload of {row['name']}: HTTP {status} {body[:200]!r}")
+        finally:
+            _step(api, "close ticket", "Api.CloseTicket", {"id": ticket}, steps)
+    result, error = _step(api, "default page", "WebApp.SetDefaultPage", {"name": app, "resource_name": default}, steps)
+    _check("WebApp.SetDefaultPage", error, result)
+    result, error = _step(api, "enable", "WebApp.SetState", {"name": app, "state": "enabled"}, steps)
+    _check("WebApp.SetState", error, result)
+    listed, error = _step(api, "resources", "WebApp.BrowseResources", {"app_name": app}, steps)
+    sizes = {r.get("name"): r.get("size") for r in (listed or {}).get("resources", [])}
+    wrong = [r["name"] for r in rows if sizes.get(r["name"]) != len(r["data"])]
+    fetched = []
+    for row in rows:
+        status, body, seconds = api.get(f"/~{app}/{row['name']}")
+        same = status == 200 and hashlib.sha256(body).hexdigest() == row["sha256"]
+        fetched.append({"name": row["name"], "http": status, "same": same, "ms": round(seconds * 1000)})
+        if not same:
+            wrong.append(f"{row['name']} (GET HTTP {status})")
+    status, _body, _seconds = api.get(f"/~{app}/")
+    print(f"anonymous GET /~{app}/: HTTP {status}; every resource fetched back: "
+          f"{sum(f['same'] for f in fetched)} of {len(rows)} byte-identical")
+    record["deploy_app"] = {"app": app, "steps": steps, "fetched": fetched, "default_get": status, "wrong": wrong}
+    if wrong:
+        raise ProbeError(f"the CPU's copy differs from the manifest: {', '.join(wrong)}")
+    if args.verify:
+        plant = json.loads(next(r["data"] for r in rows if r["name"] == "plant.json"))
+        reader = WebApi(api.base.split("://", 1)[1], api.context, api.timeout, api.base.split("://", 1)[0])
+        try:
+            user = reader.login_anonymous()
+            results = read_many(reader, plant["poll"], args.chunk)
+        finally:
+            reader.logout()
+        bad = [(var, error) for var, _value, error in results if error]
+        print(f"verify as {user}: {len(results) - len(bad)} of {len(results)} poll variables readable")
+        for var, error in bad:
+            print(f"  NOT READABLE {var}: {error.get('message')} (code {error.get('code')})")
+        record["deploy_app"]["verify"] = {"user": user, "readable": len(results) - len(bad), "of": len(results),
+                                          "failing": [{"var": var, "error": error} for var, error in bad]}
+    print(f"open https://{api.base.split('://', 1)[1]}/~{app}/")
+
+
 def cmd_call(api: WebApi, args, record: dict) -> None:
     params = json.loads(args.params) if args.params else None
     result, error, seconds = api.call(args.method, params)
@@ -461,7 +568,7 @@ def cmd_call(api: WebApi, args, record: dict) -> None:
 
 COMMANDS = {"info": cmd_info, "read": cmd_read, "read-set": cmd_read_set, "sweep": cmd_sweep,
             "watch": cmd_watch, "browse": cmd_browse, "deploy-probe": cmd_deploy_probe,
-            "delete-probe": cmd_delete_probe, "call": cmd_call}
+            "delete-probe": cmd_delete_probe, "deploy-app": cmd_deploy_app, "call": cmd_call}
 
 
 def _context(args):
@@ -509,6 +616,12 @@ def parse_args(argv=None):
     for name in ("deploy-probe", "delete-probe"):
         p = sub.add_parser(name)
         p.add_argument("--app", default="pl5probe")
+    p = sub.add_parser("deploy-app", help="upload a phase-650 app folder (a test upload until OP5's deployer)")
+    p.add_argument("--dir", required=True, help="the <PLC>/Web applications/<app> folder phase 650 wrote")
+    p.add_argument("--app", help="the application name (default: the folder's name)")
+    p.add_argument("--replace", action="store_true", help="delete an application of that name first")
+    p.add_argument("--no-verify", dest="verify", action="store_false",
+                   help="skip reading plant.json's poll set as the anonymous user afterwards")
     p = sub.add_parser("call")
     p.add_argument("method")
     p.add_argument("params", nargs="?", help="JSON params")

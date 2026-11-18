@@ -101,9 +101,12 @@ from pipeline5.config.loaders import (  # noqa: F401
     WEBUI_KINDS_REL,
     WEBUI_MEMBER_STATES_REL,
     WEBUI_PARAMS_REL,
+    WEBUI_PROGRAM_MEMBERS_REL,
     load_webui_kinds,
     load_webui_member_states,
+    load_webui_program_members,
     load_webui_params,
     load_webui_positions,
+    load_webui_notes,
     find_webui_drawing,
 )

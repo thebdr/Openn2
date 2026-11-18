@@ -16,6 +16,9 @@ device kind, a DB or a member name: they all come from the config, so a new kind
   NodesNotInstalled). member_states.csv labels them: a row's pattern ({area} {index} {node} {fld} {n} =
   anything) matched against the members of its DB and scope gives label, role, severity and the `healthy`
   polarity (blank = unknown, shown neutral, one INFO); an entity's member no row matches is listed as a detail.
+  program_members.csv adds the members the CPU's program has beyond PL5's DBs (added in TIA - the per-e-stop
+  not-installed flags): one per entity of its kind, {fld} = the entity's FLD, sourced to its anchor signal, then
+  labelled the same way.
 - **Cabinets.** Every cabinet with a numeric (cabinet, bit) entry: its words (the 620 instance names =
   its DiagnosticTags members, `opc_diagnosis_scl.cabinet_word`), tristate by the 620 rule, its bits with the
   DiagList text and the device or node they belong to.
@@ -140,7 +143,8 @@ def _scope_index(member_states: list, members_by_db: dict) -> dict:
 
 def _members_of(keys, scope: str, scope_index: dict, members_by_source: dict) -> list:
     """An entity's members: every db_members row whose source is one of `keys`, labelled by its scope's
-    member_states rows where one matches (labelled first, in rule order), the rest as details."""
+    member_states rows where one matches (labelled first, in rule order), the rest as details. A member whose
+    rule has the role `ignore` is left out - not shown, not read."""
     labelled = {}
     for key in keys:
         for m in scope_index.get(scope, {}).get(key, []):
@@ -151,8 +155,15 @@ def _members_of(keys, scope: str, scope_index: dict, members_by_source: dict) ->
             var = member_var(row)
             if var not in seen:
                 seen.add(var)
-                out.append(labelled.get(var) or _member(row))
+                member = labelled.get(var) or _member(row)
+                if member["role"] != "ignore":
+                    out.append(member)
     return sorted(out, key=lambda m: m["order"])
+
+
+def _shown(members: list) -> list:
+    """Labelled members in rule order, without those whose rule has the role `ignore`."""
+    return sorted((m for m in members if m["role"] != "ignore"), key=lambda m: m["order"])
 
 
 def _public(member: dict) -> dict:
@@ -193,6 +204,15 @@ def _anchor(signals: list, anchors: list) -> dict:
     return signals[0]
 
 
+def _anchor_of(kind: dict, fam, signals: list) -> dict:
+    """An entity's anchor signal: a node's first signal; a device's by its kind's anchor types (blank = the
+    family's)."""
+    if kind["state"] == "node":
+        return signals[0]
+    anchors = kind["anchor_types"] or ([a for a in fam.anchor.split("|") if a] if fam else [])
+    return _anchor(signals, anchors)
+
+
 def _fld(signal: dict) -> str:
     return (_text(signal.get("iol_FLD")) or _text(signal.get("combined_FLD"))
             or "".join(_text(signal.get(k)) for k in ("functional_unit", "location", "device")))
@@ -228,6 +248,41 @@ def _entities(signals: list, kinds: list, families: list) -> list:
             order.append(key)
         groups[key][3].append(s)
     return [groups[k] for k in order]
+
+
+def _program_members(staged: list, program_members, kinds: list, have: set, findings: list) -> list:
+    """db_members-like rows for program_members.csv: per entity of a row's kind, the row's member with {fld} = the
+    entity's FLD (split at its first '.' into struct and member), its source the entity's anchor signal. A member
+    db_members already has is not added twice (PL5 generates it now); an entity without FLD gets none."""
+    known = {k["kind"] for k in kinds}
+    unknown = sorted({r["kind"] for r in program_members if r["kind"] not in known})
+    if unknown:
+        findings.append(_f("webui_program_member_kind_unknown", "WARN",
+                           f"webui/program_members.csv names {', '.join(unknown)} - no device kind of "
+                           f"device_kinds.csv, its rows unused", "webui/program_members.csv"))
+    out, kinds_used = [], set()
+    for kind, fam, _index, sigs in staged:
+        rows = [r for r in program_members if r["kind"] == kind["kind"]]
+        if not rows:
+            continue
+        anchor = _anchor_of(kind, fam, sigs)
+        fld = _fld(anchor)
+        if not fld:
+            continue
+        for r in rows:
+            struct, _dot, member = r["member"].partition(".") if "." in r["member"] else ("", "", r["member"])
+            row = {"db_name": r["db_name"], "struct": struct, "member": member.replace("{fld}", fld),
+                   "source": _text(anchor.get("uid"))}
+            if member_var(row) not in have:
+                have.add(member_var(row))
+                out.append(row)
+                kinds_used.add(kind["kind"])
+    if out:
+        findings.append(_f("webui_program_members", "INFO",
+                           f"{len(out)} member(s) of webui/program_members.csv added ({', '.join(sorted(kinds_used))}) - "
+                           f"PL5 does not generate them: the CPU's program must have them, else the page lists them "
+                           f"under Configuration problems", "webui/program_members.csv"))
+    return out
 
 
 def _diag_text(entry: dict) -> str:
@@ -285,10 +340,11 @@ def _diag_pairs(entries: list) -> list:
 
 
 def build_plant(database, kinds: list, member_states: list, params: dict, *, positions=(), drawing=None,
-                families=None, diag=None, tristate=None, meta=None, plc=None) -> tuple:
+                families=None, diag=None, tristate=None, meta=None, plc=None, notes=(), program_members=()) -> tuple:
     """The plant model (schema 1) and the findings. `database` = the SSOT tables (a Database or a {table: rows}
     mapping); `kinds` / `member_states` / `params` = the loaded webui config; `positions` = the loaded positions
-    rows; `drawing` = {file, width, height, view_box} of the measured plant drawing or None; `families` = the
+    rows; `program_members` = the loaded program_members.csv rows (the members PL5 does not generate);
+    `drawing` = {file, width, height, view_box} of the measured plant drawing or None; `families` = the
     object families (default: loaded); `diag` = the 620 knobs (default: generation_params.yaml); `tristate` = the
     per-type tristate cabinets (default: the 620 rule over the signals); `meta` / `plc` = the header sections."""
     from pipeline5.systems.plc_based.siemens_s7.safety import opc_diagnosis_scl as opc
@@ -306,7 +362,9 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
 
     signals = _rows(database, "signals")
     entries = _rows(database, "diagnosis_entries")
+    staged = _entities(signals, enabled, families)
     members = [row for row in _rows(database, "db_members") if _text(row.get("source")) != SEED]
+    members += _program_members(staged, program_members, kinds, {member_var(r) for r in members}, findings)
     members_by_db, members_by_source, member_by_name = {}, {}, {}
     for row in members:
         members_by_db.setdefault(_text(row.get("db_name")), []).append(row)
@@ -321,7 +379,6 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
 
     # --- the entities ---------------------------------------------------------------------------- #
     nodes, devices, owner_of, node_by_binding, used = [], [], {}, {}, []
-    staged = _entities(signals, enabled, families)
     for kind, fam, index, sigs in staged:            # the nodes first: the devices name them
         if kind["state"] != "node":
             continue
@@ -343,8 +400,7 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
     for kind, fam, index, sigs in staged:
         if kind["state"] == "node":
             continue
-        anchors = kind["anchor_types"] or ([a for a in fam.anchor.split("|") if a] if fam else [])
-        anchor = _anchor(sigs, anchors)
+        anchor = _anchor_of(kind, fam, sigs)
         entity_id = f"{kind['kind']}-{index}"
         uids = [_text(x.get("uid")) for x in sigs]
         own_entries = [e for uid in uids for e in entries_by_signal.get(uid, [])]
@@ -396,7 +452,7 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
                     if _truthy(a.get("sorter"))]
     sorters = [{"id": f"sorter-{key}", "index": key,
                 "area": sorter_areas[n] if n < len(sorter_areas) else None,
-                "members": [_public(m) for m in sorted(scope_index["sorter"][key], key=lambda m: m["order"])]}
+                "members": [_public(m) for m in _shown(scope_index["sorter"][key])]}
                for n, key in enumerate(sorter_keys)]
     if sorters and len(sorter_keys) != len(sorter_areas):
         findings.append(_f("webui_sorter_unlinked", "INFO",
@@ -409,8 +465,7 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
         areas.append({"id": name, "name": name, "number": _text(a.get("number")), "parent": _text(a.get("parent")) or None,
                       "part": _text(a.get("part")), "order": _int_or_none(a.get("order")),
                       "description": _text(a.get("description")), "sorter": sorter_of_area.get(name),
-                      "members": [_public(m) for m in sorted(scope_index.get("area", {}).get(name, []),
-                                                              key=lambda m: m["order"])]})
+                      "members": [_public(m) for m in _shown(scope_index.get("area", {}).get(name, []))]})
     elements_by_interface: dict = {}
     for el in _rows(database, "interface_elements"):
         if _text(el.get("signal_name")):
@@ -441,6 +496,10 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
     for sorter in sorters:
         for m in sorter["members"]:
             add(m["var"])
+    for entity in nodes + devices:                     # the not-installed flags: read every refresh (the violet border)
+        for m in entity["members"]:
+            if m["role"] == "not_installed":
+                add(m["var"])
 
     known = {f"{e['kind']}|{e['fld']}" for e in devices + nodes}
     placed = {}
@@ -451,6 +510,15 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
         findings.append(_f("webui_position_stale", "WARN",
                            f"{len(stale)} position(s) name no device of the plant - ignored by the page: "
                            f"{', '.join(stale[:5])}", params["layout"]["positions"]))
+    noted = {}                                         # the device notes, kind|fld -> {text, updated}
+    for row in notes:
+        noted[f"{row['kind']}|{row['fld']}"] = {"text": row["note"], "updated": row["updated"]}
+    stale_notes = sorted(k for k in noted if k not in known)
+    if stale_notes:
+        findings.append(_f("webui_note_stale", "WARN",
+                           f"{len(stale_notes)} note(s) name no device of the plant - ignored by the page: "
+                           f"{', '.join(stale_notes[:5])}", params["notes"]["file"]))
+        noted = {k: v for k, v in noted.items() if k in known}
     if drawing is not None:
         unplaced = len(known - set(placed))
         if unplaced:
@@ -459,8 +527,8 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
                                f"page lists them in its edit mode's tray", params["layout"]["positions"]))
 
     rated = [m for m in used if m["labelled"]]
-    rated += [m for name in area_names for m in scope_index.get("area", {}).get(name, [])]
-    rated += [m for key in sorter_keys for m in scope_index["sorter"][key]]
+    rated += [m for name in area_names for m in _shown(scope_index.get("area", {}).get(name, []))]
+    rated += [m for key in sorter_keys for m in _shown(scope_index["sorter"][key])]
     unrated = sum(1 for m in rated if m["healthy"] is None)
     if unrated:
         findings.append(_f("webui_polarity_unknown", "INFO",
@@ -479,17 +547,41 @@ def build_plant(database, kinds: list, member_states: list, params: dict, *, pos
                                                            f"is one - the page shows the kind empty",
                                "webui/device_kinds.csv"))
 
+    # the overview's tabs: each tab's enabled kinds in its own order; a kind no tab names joins the last tab. A tab
+    # with nodes: wired shows only the PROFINET nodes its devices are wired to (their diagnosis entries' node
+    # bindings) - "nodes" lists them in the plant's node order; null = every node of the tab's node kinds
+    known_kinds, enabled_kinds = {k["kind"] for k in kinds}, [k["kind"] for k in enabled]
+    tabs = []
+    for tab in params["layout"]["overview_tabs"]:
+        unknown = [k for k in tab["kinds"] if k not in known_kinds]
+        if unknown:
+            findings.append(_f("webui_tab_kind_unknown", "WARN", f"overview tab {tab['label']!r} names {', '.join(unknown)}"
+                               " - no device kind of device_kinds.csv, ignored", "webui/webui_params.yaml"))
+        tabs.append({"label": tab["label"], "kinds": [k for k in tab["kinds"] if k in enabled_kinds],
+                     "nodes": tab["nodes"]})
+    named = {k for tab in tabs for k in tab["kinds"]}
+    tabs[-1]["kinds"] += [k for k in enabled_kinds if k not in named]
+    for tab in tabs:
+        if tab["nodes"] == "wired":
+            wired = {n for d in devices if d["kind"] in tab["kinds"] for n in d["nodes"]}
+            tab["nodes"] = [n["id"] for n in nodes if n["id"] in wired]
+        else:
+            tab["nodes"] = None
+
     app = params["app"]
     plant = {
         "schema": SCHEMA, "meta": dict(meta or {}), "plc": dict(plc or {}),
         "app": {"name": app["name"], "title": app["title"]},
         "polling": dict(params["polling"]), "login": {"users": list(params["login"]["users"])},
         "diag": dict(params["diag"]),
-        "kinds": [{k: kind[k] for k in ("kind", "label", "plural", "icon", "order", "state", "group_by")}
+        "kinds": [{k: kind[k] for k in ("kind", "label", "plural", "icon", "shape", "order", "state", "field",
+                                        "group_by")}
                   for kind in enabled],
         "poll": poll, "areas": areas, "sorters": sorters, "cabinets": cabinets, "nodes": nodes, "devices": devices,
         "interfaces": interfaces,
-        "layout": {"image": drawing, "positions": placed, "group_by": list(params["layout"]["group_by"])},
+        "layout": {"image": drawing, "positions": placed, "group_by": list(params["layout"]["group_by"]),
+                   "overview_tabs": tabs},
+        "notes": noted,
         "custom_data": dict(params["custom_data"]),
     }
     plant["counts"] = {"kinds": counts, "areas": len(areas), "sorters": len(sorters), "cabinets": len(cabinets),

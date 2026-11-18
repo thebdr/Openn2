@@ -3,7 +3,8 @@
 # required (the loader names a missing one) - config is config, never an in-code default.
 
 app:
-  name: safety                 # the Web API application name: the page is served at https://<cpu>/~safety/
+  name: pl5                    # the Web API application name: the page is served at https://<cpu>/~pl5/ (the ~
+                               # is the CPU web server's fixed marker of a web application; user 2026-10-29)
   title: Safety diagnosis
   default_page: index.html
   visibility: public           # the resources' Web API visibility (public = served without a login)
@@ -11,9 +12,12 @@ app:
 polling:
   interval_ms: 1000            # one poll cycle; one request in flight at a time
   chunk: 50                    # variables per PlcProgram.Read batch (M0: 50 DB members ~30 ms on the 1518F)
-  timeout_ms: 5000
+  timeout_ms: 20000            # one request's limit; 5 s timed out often on the 1518F (user 2026-10-29)
   detail_interval_ms: 1000     # a device's own members, read only while its detail panel is open
   backoff_ms: [2000, 5000, 10000]   # after a lost connection
+  field_per_cycle: 25          # field I/O of devices on not-installed nodes read per cycle, in turn: PLC tags read
+                               # slower than DB members (1.4-2.7 s per 50 on the 1518F), so a small slice keeps the
+                               # page's refresh near 1.5-2 s while the ~230 FVT field tags come round in ~20 s
 
 login:
   # The Web API has no rights without a token on FW V2.9.4 (M0 2026-10-28): the page logs in as the CPU's
@@ -22,9 +26,11 @@ login:
 
 diag:
   # The cabinet diagnosis words' bit polarity (DiagnosticTags ALARM1/2, WARNING1/2): 1 = a set bit means
-  # active, 0 = a cleared bit means active, null = unknown until the M0 polarity watch (bits shown neutral).
-  alarm_bit: null
-  warning_bit: null
+  # active, 0 = a cleared bit means active, null = unknown (bits shown neutral). A set bit is active (user
+  # 2026-10-29; live on the 1518F: alarm bits set only where the cabinet's STATE reports an alarm, warning words
+  # non-zero only where it reports a warning).
+  alarm_bit: 1
+  warning_bit: 1
   # the cabinet's STATE word (the CabState FB of the 620 OPC SCL): the bit set while any alarm / any warning of
   # the cabinet is active
   state_alarm_bit: 12
@@ -34,6 +40,18 @@ layout:
   drawing: webui/webui_plant   # the optional plant drawing, looked up as .svg / .png / .jpg in the config tiers
   positions: webui/webui_positions.csv
   group_by: [functional_unit, location]
+  # the overview's tabs: each shows its kinds' summaries, drawing icons and schematic tiles (user 2026-10-29); a
+  # kind no tab names joins the last tab, so a new kind is never hidden. nodes: all = every PROFINET node of the
+  # tab's node kinds, wired = only the nodes the tab's devices are wired to. The first tab is kept to the causes:
+  # the E, D, N and B families and their nodes (user 2026-10-29)
+  overview_tabs:
+    - {label: Causes, kinds: [estop, door, encoder, breaker, pn_node], nodes: wired}
+    - {label: Other devices, kinds: [contactor, fire_alarm, pn_node], nodes: all}
+
+notes:
+  # the device notes (user 2026-10-29): written in the page's detail panel and kept in that browser; the page's
+  # 'Download webui_notes.csv', saved here in the project's webui config, ships them to every browser at 650
+  file: webui/webui_notes.csv
 
 custom_data:
   enabled: true
