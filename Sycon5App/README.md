@@ -770,6 +770,107 @@ matching pn name. also, no pn name was set for the controller".
   button), `tests/test_readback.py` (the controller's stream). Not done on the VM yet: a fresh build (the name
   edit filled and read back) and an update of the fast sorter project with a station added to the list.
 
+## The ServoOne's module, a station left without one, Davi1's fixes (2026-10-29/30)
+
+User: "the servo one junior were missing their module on the sorter. Davi1 should have committed the update".
+
+- **Why.** The ServoOne Junior's DAP (`DAP 2` of `GSDML-V2.3-LT-i-ServoOne-20130515.xml`) takes one module in slot 1
+  and fixes none, so a catalog drop plugs nothing; its database row said `default`, the handoff had no module rows
+  for it, and the verification - which compared only the modules the table names - had nothing to compare: the
+  sorter's 26 ServoOne verified clean with their DAP alone.
+- **Davi1's update** (f7f26fc, IO0011 LOWER GR1) sat on the branch `sycon/io0011-lower-gr1-fixes`, never merged; merged
+  2026-10-30 with: the controller's `Name of station` edit looked up as a page control (`min_id=0` - the lookup's
+  default skips ids below the in-place editors' 1900, so a fresh build on main stopped right after the controller)
+  and read back case-insensitively (SYCON.net lower-cases names); the SCALANCE V4.3 DAPs' PN-IO grid (no record 3:
+  `0=Off | 2=Off`, `scalance_pnio_params`); the KEBA D3-DU 330 row (its DAP fixes its module: `default` is right);
+  the ServoOne's module text `PPO 3, 4 bytes IO` - in the Fixed Modules column while the policy stayed `default`,
+  which never plugs it. The row's policy is `fixed` now: every ServoOne gets slot 1 `PPO 3, 4 bytes IO` (the sorter
+  list re-exported: 26 rows, the ServoOne clone-safe - the first configured, the clones inherit).
+- **The oracle.** `sycon5/gsdml.py` reads a DAP's module slots from its GSDML (SYCON.net's catalog folder
+  `C:\ProgramData\SYCONnet\PROFINET\GSDML`): `verify` checks every station the table gives no module rows - when
+  its DAP takes modules (`AllowedInSlots` / `FixedInSlots` / `UsedInSlots` >= 1) one must be plugged. A SCALANCE DAP
+  lists none (not checked), the AL1202 and the KEBA fix theirs (checked, plugged by the catalog), a GSDML or DAP not
+  found is a NOTE. On the saved fast sorter project the check fails exactly the 26 ServoOne.
+- **Resume names the controller** (`controller_action`): a saved project's unnamed controller is named by a resume
+  as by an update; a resume also writes the table's name over another one (this handoff's own build), an update
+  keeps a named controller (OP5's rule).
+- **The fast sorter project needs a resume, not an update** (an update skips existing stations whole, the ServoOne
+  included). Found 2026-10-30: its saved XML was rewritten on 2026-10-26 13:27 outside the build and holds 55 devices
+  - no PN/PN coupler, no SCALANCE switch; a resume on a re-exported handoff re-adds those eight (4 x 128-byte
+  modules a coupler side, the V4.3 switches), plugs the ServoOne modules, names the controller.
+- **A catalog drop on a laid-out project** (2026-10-30, the first resume of the repair copy): the driver found the
+  controller's green line by colour and took the most common horizontal row - on a project `canvas.apply_layout` laid
+  out that is a device's branch (y 670, x 8..548), not the bus; six coupler drops attached nothing. A probe on a
+  never-saved copy (`scripts/probe_drop_laid_out.py`) dropped on the vertical bus (x 8..12) and the node appeared at
+  once. `drawing.pick_green` prefers a green column 200 px or longer (only a laid-out bus is one; SYCON.net's default
+  layout keeps its horizontal line), `slave_points` keeps the points 4 px off the rows a branch crosses. `--update`
+  needs this too: it adds stations to a laid-out project. Tests: `tests/test_drawing_lines.py`.
+- **The sorter repaired on a copy** (`spike/scratch/PROD_Sorter_Lower_repair`, 2026-10-30 08:07-08:28, 21 min): the
+  handoff re-exported with the fixed database, then `--resume` - the controller named, the 3 couplers dropped on the
+  vertical bus with 4 x 128-byte modules a side and cloned, the 5 SCALANCE V4.3 switches added and cloned, the 26
+  ServoOne given `PPO 3, 4 bytes IO`; **910 PASS / 0 FAIL** (the controller's name and IP, the export's controller
+  name, 26 ServoOne `1 modules plugged (table 1)`, 19 GSDML module checks); BusField 63 `@` rows, the master's own
+  station `#`, no node type 0x00000000. The original `PROD_Sorter_Lower_fast` is left as it was found.
+- Tests: `tests/test_module_expectation.py`, `Pipeline5App/tests/unit/test_sycon_fixed_multiplier.py`
+  (`test_the_servoone_plugs_its_ppo3_module`), Davi1's `test_scalance_pnio_row_v43_has_no_media_redundancy_record`.
+
+## A station's module list in the I/O List (2026-10-30)
+
+User: "maybe the information got lost somewhere, but the couplers got a new submodule management" - the LOWER
+SORTER R1.4 (2026-10-26) puts a coupler's modules on the row under its head, in Column I (staged `desc_l1`), in the
+multiplier syntax of 2026-10-26: `2[*IN 128 Byte] | 2[*OUT 128 Byte]` under the X1 couplers n0006 / n0007,
+`4[*OUT 128 Byte] | 4[*IN 128 Byte]` under the X2 coupler n0008. The message of 2026-10-26 ("pnpn couplers updated:
+added missing ones, added new custom modules management") meant this list and the two couplers R1.4 added (n0004,
+n0008); it was read then as a database cell and as the coupler's X1 catalog side - the database's per-connector
+list stays as the default of a coupler without a row (n0004 X2, n0009 X1), the per-connector catalog item stays
+(an X1 row takes `PN/PN Coupler X1 [DAP X1 V4.2]` - not yet dragged on the VM).
+
+- PL5 `sycon_handoff`: `is_module_list` - every `|` item `N[text]` (strict, so a signal's description is never read
+  as one; a single module is `1[text]`); the first such row among a head's rows replaces the database's list for a
+  `fixed`-policy station (INFO `sycon_modules_from_iolist`, the module rows' comment names the I/O List cell); a
+  second list is a WARN (`sycon_module_list_twice`), a list under another policy is ignored with a WARN
+  (`sycon_module_list_ignored`). R1.4 in memory: n0006 / n0007 4 modules, n0008 8 from its row, n0004 / n0009 8
+  from the database, the 26 ServoOne `PPO 3`. Tests: `Pipeline5App/tests/unit/test_sycon_module_list_row.py`.
+- **The repair on R1.4** (2026-10-30, the user: "repair the project in ...PROD_Sorter_Lower_repair - i already deleted
+  the couplers"; backup `PROD_Sorter_Lower_repair_backup_20261030_0905`): R1.4's handoff exported into the folder, then
+  `--resume`. The two AL1202 R1.4 renamed (n0091 rc02 -> cz03, n0120 rc03 -> rc02, same IPs) paired in node order and
+  renamed; the five couplers added - the X2 ones from `PN/PN Coupler X2 [DAP X2 V4.2]` cloned configured, the X1 ones
+  from `PN/PN Coupler X1 [DAP X1 V4.2]` (the first X1 drag on the VM: the info pane cited `DAP X1 V4.2`) cloned and
+  configured one by one (4 modules from their rows, 8 from the database); n0058's port 7 re-typed to IO-Link 32/32.
+  Two fixes on the way: (1) **the IP pass's resync anchor** - the pass wrote rows 1-6 and its next targets were rows 48
+  and 61; after a half-view scroll the anchor (the last row written) was out of view: "scroll lost". The anchor is now
+  the lowest row in view, read before the scroll (`controller.bottom_row`; `tests/test_grid_anchor.py`) - a sparse
+  pass, every update's, needs it. (2) **the coupler's record oracle per side** - record 1 ends with the GEO ID, 1 on X1
+  and 2 on X2: the X1 couplers read `00 0c 00 01 00 00` (Diagnostics data validity 0 as wanted) against the X2 oracle;
+  the DAP Parameters cell takes the per-connector form (`for_connector`). Result: **939 PASS / 5 FAIL** - the 5 FAILs
+  are the switches' GSDML file: SYCON.net bound them, on the project's reload, to `GSDML-V2.4-...-SCALANCE_XC200-
+  20210310.xml` (same device identity 0x002A/0x0A0B, DAP 5C in both files; every other switch check passes) - the
+  2021 file sits beside the 2026 one in `C:\ProgramData\SYCONnet\PROFINET\GSDML`, the user's call. BusField 65 `@`,
+  the master's own station `#`.
+- The repaired copy (`PROD_Sorter_Lower_repair`) is R1.2's: R1.4 adds two couplers, moves three to their X1 side and
+  changes their modules - an update would skip those three whole; R1.4 needs a fresh build.
+
+## The upper sorter, the coupler default, the switch ports (2026-11-02)
+
+User: "time to generate the upper sorter sycon project - notice that there is a new v1.4 io list; couplers without
+explicit modules configuration in the iolist get 4*128 in+out, while the default should be 128+128; the scalance
+switches configurable ports: 192.168.1.10: all 4 ports SFP, all the others: 1st port SFP, the others RJ45".
+
+- **The coupler default** is one module each way again (`X2: *OUT 128 Byte | *IN 128 Byte; X1: *IN 128 Byte | *OUT 128
+  Byte`); a coupler with a module-list row in the I/O List keeps its row's modules.
+- **The XC216-4C's combo ports** (subslots 32769-32772; the GSDML's `RJ45 1 GBit` by default, `SFP 991-1 A` pluggable):
+  the database row's column 8 names them per node - `n0010: 4[SFP 991-1 A]; *: 1[SFP 991-1 A] | 3[RJ45 1 GBit]`
+  (`by_node` / `for_node`: the PROFINET name's first part, `*` every other). The main cabinet's switch is node 10 in
+  both sorters - 192.168.1.10 lower, 192.168.6.10 upper - so the rule is keyed on the node, not the address. An I/O
+  List module-list row under a switch overrides the database (`2[SFP 991-1 A] | 2[RJ45 1 GBit]`); a list of the
+  wrong length is a WARN (`sycon_port_list_length`); a ports cell that is not `N[text]` items is refused by the
+  loader. The driver re-types only a port that differs (a field switch: port 1). Tests:
+  `Pipeline5App/tests/unit/test_sycon_switch_ports.py`.
+- **The upper sorter** (`8FVT_IO0020 - Sorter I-O List - UPPER SORTER_R1.4.xlsx`, network 192.168.6.x): 64 stations
+  (the controller, 5 couplers - n0006 / n0007 X1 4 modules from their rows, n0008 X2 8 from its row, n0004 / n0009 X2
+  the 128 + 128 default - 5 XC216-4C, 5 ET200SP, 26 ServoOne, 19 AL1202, 3 Anybus), 253 module rows; built fresh
+  in `spike/scratch/PROD_Sorter_Upper` (9 + 51 min): **911 PASS / 5 FAIL - the five the switches' GSDML file, which SYCON.net re-binds to the 2021 XC200 file when a project is reopened (the resume after the first run's stop); the hub n0010 4 x SFP 991-1 A and the field switches SFP + 3 x RJ45 1 GBit read back, the 26 ServoOne 1 module each, the couplers 4 / 4 / 2 / 8 / 2 modules, the controller named; BusField 64 @. The fresh run stopped at its 15th drop (the first ServoOne): a column of stacked drop lines at x 532 in SYCON.net's default layout was taken for the laid-out bus - the vertical-bus preference now holds only at the pane's left edge (drawing.BUS_EDGE_PX), and the resume finished it**.
+
 ## The driver — `sycon5` (2026-10-23, round 3 verified)
 
 The proven mechanisms as a package; `SyconDriver` is the facade the skill / the PL5 consumer will call. Run

@@ -151,7 +151,7 @@ def add_device(session: Session, kind, item_name, gsdml=None):
     session.close_menus()
     session.bring_front()
     item = catalog_item(session, kind, item_name, gsdml)
-    r, grey_dy, green = locate_lines(session.main())
+    r, grey_dy, green, crossings = locate_lines(session.main())
     log("lines: grey root dy=%s green=%s" % (grey_dy, green))
     if kind == "master":
         if grey_dy is None:
@@ -160,7 +160,7 @@ def add_device(session: Session, kind, item_name, gsdml=None):
     else:
         if green is None:
             raise SyconError("no green controller line in the drawing (add the controller first)")
-        points = slave_points(green)
+        points = slave_points(green, crossings)
     for dx, dy in points:
         label = drop(session, item, dx, dy)
         if label:

@@ -69,11 +69,29 @@ def test_the_catalog_item_follows_the_connector_and_the_modules_too():
     ok(not [t for s, sub, t in by_station.get("n0008-none", []) if not sub], "no modules for a connector-less coupler")
 
 
+def test_the_servoone_plugs_its_ppo3_module():
+    """2026-10-29 (user: "the servo one junior were missing their module on the sorter"): the ServoOne Junior's DAP
+    fixes no module, so its row's policy is `fixed` with the module Davi1 named - the handoff gives every ServoOne
+    head one module row, slot 1 `PPO 3, 4 bytes IO` (the `default` policy had given none)."""
+    db = sycon.load_dtd()
+    servo = db["SO24.004.007D.0101.X"]
+    eq((servo["modules"], servo["fixed_modules"]), ("fixed", ["PPO 3, 4 bytes IO"]))
+    rows = [_head("n0001-ctrl", "192.168.1.1", "CIFX 80-RE/ML", "-K1", "1"),
+            _head("n0025-trib-du01-aec1-T57101", "192.168.1.25", "SO24.004.007D.0101.x", "-T57101", "25"),
+            _head("n0026-trib-du01-aec1-T57201", "192.168.1.26", "SO24.004.007D.0101.x", "-T57201", "26")]
+    stations, modules, findings = sycon.build(rows, db)
+    eq([(m["station_name"], m["slot"], m["subslot"], m["module_text"]) for m in modules], [
+        ("n0025-trib-du01-aec1-T57101", "1", "", "PPO 3, 4 bytes IO"), ("n0026-trib-du01-aec1-T57201", "1", "", "PPO 3, 4 bytes IO")])
+    eq([s["catalog_item"] for s in stations[1:]], ["ServoOne Junior", "ServoOne Junior"])
+
+
 def test_the_shipped_database_reads_as_the_user_set_it():
     db = sycon.load_dtd()
     coupler = db[COUPLER]
-    eq(coupler["fixed_modules"]["X2"], ["*OUT 128 Byte"] * 4 + ["*IN 128 Byte"] * 4)
-    eq(coupler["fixed_modules"]["X1"], ["*IN 128 Byte"] * 4 + ["*OUT 128 Byte"] * 4)
+    # user 2026-11-02: "couplers without explicit modules configuration in the iolist get 4*128 in+out, while the
+    # default should be 128+128" - one module each way, X1 mirrored; an I/O List row names more
+    eq(coupler["fixed_modules"]["X2"], ["*OUT 128 Byte", "*IN 128 Byte"])
+    eq(coupler["fixed_modules"]["X1"], ["*IN 128 Byte", "*OUT 128 Byte"])
     eq(sycon.by_connector(coupler["catalog_item"]), {"X2": "PN/PN Coupler X2 [DAP X2 V4.2]", "X1": "PN/PN Coupler X1 [DAP X1 V4.2]"})
     for model, item in (("6GK5208-0BA00-2AC2", "SCALANCE XC208 V4.3"), ("6GK5206-2BS00-2AC2", "SCALANCE XC206-2 SFP V4.3"),
                         ("6GK5216-4BS00-2AC2", "SCALANCE XC216-4C V4.3")):
